@@ -16,11 +16,6 @@ module testbench
       end
    endfunction
    
-   wire [0:width-1] req_rr;
-   wire [0:width-1] req_matrix;
-   wire [0:width-1] gnt_rr;
-   wire [0:width-1] gnt_matrix;
-   
    reg 		    reset;
    reg 		    clk;
    wire 	    update = 1'b1;
@@ -32,40 +27,27 @@ module testbench
       clk <= 1'b0;
       #(Tclk/2);
    end
+
+   wire [0:width*width-1] req;
+   wire [0:width*width-1] gnt;
    
-   rr_arbiter #(.width(width)) arb_rr(.clk(clk),
-				      .reset(reset),
-				      .update(update),
-				      .req(req_rr),
-				      .gnt(gnt_rr));
-   matrix_arbiter #(.width(width)) arb_matrix(.clk(clk),
-					      .reset(reset),
-					      .update(update),
-					      .req(req_matrix), 
-					      .gnt(gnt_matrix));
-   
-   wire error_rr = (pop_count(gnt_rr) > 1) || 
-        (|(req_rr)) & ~(|(req_rr & gnt_rr));
-   wire error_matrix = (pop_count(gnt_matrix) > 1) || 
-        (|(req_matrix)) & ~(|(req_matrix & gnt_matrix));
-   wire error = error_rr | error_matrix;
-   
-   wire error_q;
-   wire error_s = (error_q & ~reset) | error;
-   dff #(.width(1)) error_ff(.clk(clk), .d(error_s), .q(error_q));
+   wf_alloc #(.num_ports(4)) wfa(.clk(clk),
+				 .reset(reset),
+				 .update(update),
+				 .req(req),
+				 .gnt(gnt));
    
    genvar i;
    generate
       for(i = 0; i < width; i = i + 1)
-	begin:rr_drvs
-	   driver #(.mean_delay(mean_delay), .initial_seed(i))
-	   drv(.clk(clk), .reset(reset), .gnt(gnt_rr[i]), .req(req_rr[i]));
-	end
-      for(i = 0; i < width; i = i + 1)
-	begin:matrix_drvs
-	   driver #(.mean_delay(mean_delay), .initial_seed(i))
-	   drv(.clk(clk), .reset(reset), .gnt(gnt_matrix[i]),
-	       .req(req_matrix[i]));
+	begin:drvs
+	   wire [0:width-1] drv_req;
+	   wire [0:width-1] drv_gnt = gnt[i*width:(i+1)*width-1];
+	   
+	   driver #(.mean_delay(mean_delay), .initial_seed(i), .width(width))
+	   drv(.clk(clk), .reset(reset), .gnt(drv_gnt), .req(drv_req));
+
+	   assign req[i*width:(i+1)*width-1] = drv_req;
 	end
    endgenerate
 
