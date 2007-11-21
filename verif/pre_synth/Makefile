@@ -2,9 +2,9 @@ TOP = testbench
 
 SRCS = $(TOP).v 
 
-SRC_DIR = ../../rtl
+SRC_DIR = ../../src
 
-VCS_FLAGS = +lint +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug
+VCS_FLAGS = +lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug
 
 # DUMP_CTRL may be overidden by script calling this
 DUMP_CTRL=
