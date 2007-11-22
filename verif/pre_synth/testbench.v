@@ -34,7 +34,6 @@ module testbench
 
    wire [0:width*width-1] gnt_for_port;
    wire [0:width-1] 	  any_gnt;
-   wire [0:width-1] 	  error_no_alloc;
    wire [0:width*32-1] 	  error_count_s;
    reg [0:width*32-1] 	  error_count_q;
    
@@ -54,12 +53,16 @@ module testbench
 	begin:drvs
 	   wire [0:width-1] drv_req;
 	   wire [0:width-1] drv_gnt = gnt[i*width:(i+1)*width-1];
+	   wire [0:31] 	    drv_avg_latency;
+	   wire [0:31] 	    drv_avg_rate;
+	   wire             drv_error_no_alloc;
+	   wire [0:31] 	    drv_error_count;
 	   
 	   driver #(.mean_delay(mean_delay), .initial_seed(i), .width(width))
-	   drv(.clk(clk), .reset(reset), .req(drv_req), .gnt(drv_gnt),
-	       .avg_latency(avg_latency[i*32:(i+1)*32-1]),
-	       .avg_rate(avg_rate[i*32:(i+1)*32-1]));
+	   drv(.clk(clk), .reset(reset), .req(drv_req), .gnt(drv_gnt), .avg_latency(drv_avg_latency), .avg_rate(drv_avg_rate));
 
+	   assign 	    avg_rate[i*32:(i+1)*32-1] = drv_avg_rate;
+	   assign 	    avg_latency[i*32:(i+1)*32-1] = drv_avg_latency;
 	   assign 	    req[i*width:(i+1)*width-1] = drv_req;
 	   
 	   for(j = 0; j < width; j = j + 1)
@@ -68,10 +71,14 @@ module testbench
 	     end
 
 	   assign      any_gnt[i] = |gnt_for_port[i*width:(i+1)*width-1];
-	   assign      error_no_alloc[i] = ~|drv_gnt & |(drv_req & ~any_gnt);
+
+	   assign      drv_error_no_alloc = ~|drv_gnt & |(drv_req & ~any_gnt);
+
 	   assign      error_count_s[i*32:(i+1)*32-1] = (reset ?
 							 {width{1'b0}} :
-							 (error_count_q[i*32:(i+1)*32-1] + error_no_alloc));
+							 (error_count_q[i*32:(i+1)*32-1] + drv_error_no_alloc));
+
+	   assign      drv_error_count = error_count_s[i*32:(i+1)*32-1];
 	   
 	end
    endgenerate
