@@ -2,7 +2,8 @@ module testbench
   #(
     parameter Tclk = 6,
     parameter width = 4,
-    parameter mean_delay = 10)
+    parameter mean_delay = 2,
+    parameter runtime = 100000)
    ();
    
    function integer pop_count(input [0:width-1] x);
@@ -30,14 +31,24 @@ module testbench
 
    wire [0:width*width-1] req;
    wire [0:width*width-1] gnt;
+
+   wire [0:width*width-1] gnt_for_port;
+   wire [0:width-1] 	  any_gnt;
+   wire [0:width-1] 	  error_no_alloc;
+   wire [0:width*32-1] 	  error_count_s;
+   reg [0:width*32-1] 	  error_count_q;
+   
+   wire [0:width*32-1]	  avg_latency;
+   wire [0:width*32-1] 	  avg_rate;
    
    wf_alloc #(.num_ports(4)) wfa(.clk(clk),
 				 .reset(reset),
 				 .update(update),
 				 .req(req),
 				 .gnt(gnt));
+
+   genvar 		  i, j;
    
-   genvar i;
    generate
       for(i = 0; i < width; i = i + 1)
 	begin:drvs
@@ -45,12 +56,33 @@ module testbench
 	   wire [0:width-1] drv_gnt = gnt[i*width:(i+1)*width-1];
 	   
 	   driver #(.mean_delay(mean_delay), .initial_seed(i), .width(width))
-	   drv(.clk(clk), .reset(reset), .gnt(drv_gnt), .req(drv_req));
+	   drv(.clk(clk), .reset(reset), .req(drv_req), .gnt(drv_gnt),
+	       .avg_latency(avg_latency[i*32:(i+1)*32-1]),
+	       .avg_rate(avg_rate[i*32:(i+1)*32-1]));
 
-	   assign req[i*width:(i+1)*width-1] = drv_req;
+	   assign 	    req[i*width:(i+1)*width-1] = drv_req;
+	   
+	   for(j = 0; j < width; j = j + 1)
+	     begin:per_port
+		assign gnt_for_port[j*width+i] = drv_gnt[j];
+	     end
+
+	   assign      any_gnt[i] = |gnt_for_port[i*width:(i+1)*width-1];
+	   assign      error_no_alloc[i] = ~|drv_gnt & |(drv_req & ~any_gnt);
+	   assign      error_count_s[i*32:(i+1)*32-1] = (reset ?
+							 {width{1'b0}} :
+							 (error_count_q[i*32:(i+1)*32-1] + error_no_alloc));
+	   
 	end
    endgenerate
+   
+   always@(posedge clk)
+     begin
+	error_count_q <= error_count_s;
+     end
 
+   integer k;
+	   
    initial
    begin
       
@@ -60,7 +92,19 @@ module testbench
       
       reset = 0'b0;
       
-      #(1000000*Tclk);
+      #(runtime*Tclk);
+
+      $display(" driver |   rate   | latency  |  errors  ");
+      $display("-----------------------------------------");
+      for(k = 0; k < width; k = k + 1)
+	begin
+	   $display(" %6d | %8.3f | %8.3f | %8d ",
+		  k,
+		  avg_rate[k*32 +: 32] * 0.0001,
+		  avg_latency[k*32 +: 32] * 0.0001,
+		    error_count_q[k*32 +: 32]);
+	end
+      $display("-----------------------------------------");
       
       $finish;
       

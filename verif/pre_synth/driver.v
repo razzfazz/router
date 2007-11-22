@@ -6,8 +6,10 @@ module driver
    (
     input     clk,
     input     reset,
-    input [0:width-1] gnt,
-    output wire [0:width-1] req);
+    output wire [0:width-1] req,
+    input [0:width-1] 	    gnt,
+    output reg [0:31] 	    avg_latency,
+    output reg [0:31] 	    avg_rate);
    
    integer 		    seed = initial_seed;
    integer 		    delay;
@@ -19,8 +21,6 @@ module driver
    integer 		    requests;
    integer 		    cycles;
    integer 		    wait_cycles;
-   integer 		    avg_latency;
-   integer 		    avg_rate;
 
    wire 		    error = |(gnt & ~req_int);
    
@@ -47,13 +47,12 @@ initial
 	       @(posedge clk);
 	       cycles = cycles + !reset;
 	    end
-	  @(posedge clk);
 	  cycles = cycles + !reset;
 	  req_int = $dist_uniform(seed, 1, 2 ** width - 1);
 	  requests = requests + !reset;
 	  @(posedge clk);
 	  cycles = cycles + !reset;
-	  while(!(|(req_int & gnt)))
+	  while(~|(req_int & gnt))
 	    begin
 	       @(posedge clk);
 	       wait_cycles = wait_cycles + !reset;
