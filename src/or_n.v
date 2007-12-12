@@ -1,10 +1,10 @@
 module or_n
   #(
     parameter width = 1,
-    parameter inputs = 2
+    parameter num_ports = 2
     )
    (
-    input [0:width*inputs-1] data_in,
+    input [0:width*num_ports-1] data_in,
     output [0:width-1] data_out
     )
 
@@ -12,9 +12,9 @@ module or_n
     generate
        for(i = 0; i < width; i = i + 1)
 	 begin:bit_positions
-	    wire [0:inputs-1] data;
+	    wire [0:num_ports-1] data;
 	    genvar 	      j;
-	    for(j = 0; j < inputs; j = j + 1)
+	    for(j = 0; j < num_ports; j = j + 1)
 	      begin:input_ports
 		 data[j] = data_in[j*width+i];
 	      end
