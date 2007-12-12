@@ -1,6 +1,7 @@
 module matrix_arbiter
   #(
-    parameter width = 32
+    parameter width = 32,
+    parameter disable_clock_gating = 0
     )
    (
     input     clk,
@@ -43,12 +44,23 @@ module matrix_arbiter
    generate
       for(i = 0; i < width; i = i + 1)
 	begin:gnts
-	   assign gnt[i] = req[i] & &(prio_q[i*width:(i+1)*width-1] | ~req); 
+	   assign gnt[i] = req[i] & (&(prio_q[i*width:(i+1)*width-1] | ~req));
 	end
    endgenerate
    
-   wire 	  act = (|gnt & update) | reset;
-   
-   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
+   generate
+      if(disable_clock_gating == 0)
+	begin
+	   wire act;
+
+	   assign act = (|gnt & update) | reset;
+
+	   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
+	end
+      else
+	begin
+	   assign clk_gated = clk;
+	end
+   endgenerate
    
 endmodule

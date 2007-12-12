@@ -1,6 +1,7 @@
 module rr_arbiter
   #(
-    parameter width = 32
+    parameter width = 32,
+    parameter disable_clock_gating = 0
     )
    (
     input     clk,
@@ -37,9 +38,20 @@ module rr_arbiter
 	end
    endgenerate
 
-   wire 	  act = (|gnt_unqual & update) | reset;
+   generate
+      if(disable_clock_gating == 0)
+	begin
+	   wire act;
+
+	   assign act = (|gnt_unqual & update) | reset;
    
-   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
+	   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
+	end
+      else
+	begin
+	   assign clk_gated = clk;
+	end
+   endgenerate
    
    dff #(.width(width)) prev_ff (.clk(clk_gated), .d(prev_s), .q(prev_q));
    
