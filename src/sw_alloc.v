@@ -89,7 +89,7 @@ module sw_alloc
 	   wire [0:num_vcs-1] 		req1_ivc;
 	   
 	   // combine requests for all ports (any output port requested by VC?)
-	   or_n
+	   or_nto1
 	     #(.width(num_vcs),
 	       .num_ports(num_ports))
 	   req1_op_or
@@ -146,7 +146,7 @@ module sw_alloc
 	   
 		// create bit vector per input port representing if any of the
 		// input port's VCs requests a given output port
-		or_n
+		or_nto1
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
 		req1_ivc_or
