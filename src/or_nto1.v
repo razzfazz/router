@@ -2,7 +2,7 @@ module or_nto1
   #(parameter width = 1,
     parameter num_ports = 2)
    (input [0:width*num_ports-1] data_in,
-    output [0:width-1] data_out)
+    output [0:width-1] data_out);
 
     genvar i;
     generate
@@ -12,9 +12,9 @@ module or_nto1
 	    genvar 	      j;
 	    for(j = 0; j < num_ports; j = j + 1)
 	      begin:input_ports
-		 data[j] = data_in[j*width+i];
+		 assign data[j] = data_in[j*width+i];
 	      end
-	    data_out[i] = |data;
+	    assign data_out[i] = |data;
 	 end
     endgenerate
 
