@@ -8,7 +8,10 @@ module wf_alloc
     // clone priority flipflops to reduce delay
     // (0 = num_ports FFs for num_ports priority groups
     //  1 = num_ports^2 FFs for 3.5*num_ports*(num_ports-1) + 1 base blocks)
-    parameter clone_prio_flipflops = 0
+    parameter clone_prio_flipflops = 0,
+
+    // disable clock gating?
+    parameter disable_clock_gating = 0
 	
     )
    (
@@ -72,29 +75,44 @@ module wf_alloc
 	     end
 	end
 
-      // generate gated clocks
-      if(clone_prio_flipflops == 0)
-	begin
-	   wire act;
-	   
-	   assign act = update;
-	   
-	   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated[0]));
-	   
-	   assign clk_gated[1:num_ports-1] = {(num_ports-1){1'b0}};
-	end
-      else if(clone_prio_flipflops == 1)
-	begin
-	   for(row = 0; row < num_ports; row = row + 1)
-	     begin:clk_gate_blks
-		wire       act;
+   endgenerate
 
-		assign 	   act = (prio[(((row+num_ports-1)%num_ports)*(2*num_ports))] | prio[row*(2*num_ports)]) & update;
-	   
-		clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated[row]));
+   generate
+      
+      // generate gated clocks
+      if(disable_clock_gating == 0)
+	begin
+	   if(clone_prio_flipflops == 0)
+	     begin
+		wire act;
+		
+		assign act = update;
+		
+		clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated[0]));
+		
+		assign clk_gated[1:num_ports-1] = {(num_ports-1){clk_gated[0]}};
+	     end
+	   else if(clone_prio_flipflops == 1)
+	     begin
+		for(row = 0; row < num_ports; row = row + 1)
+		  begin:clk_gate_blks
+		     wire       act;
+		     
+		     assign 	act = (prio[(((row+num_ports-1)%num_ports)*(2*num_ports))] | prio[row*(2*num_ports)]) & update;
+		     
+		     clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated[row]));
+		  end
 	     end
 	end
+      else
+	begin
+	   assign clk_gated = {num_ports{clk}};
+	end
 
+   endgenerate
+
+   generate
+      
       // replicate basic n*n matrix 4 times to avoid combinational loops
       for(row = 0; row < 2 * num_ports; row = row + 1)
 	begin:rows
