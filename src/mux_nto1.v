@@ -1,50 +1,27 @@
-
-
+`include
+  "functions.v"
+  
 module mux_nto1
-  #(  paramter num_ports = 4,
-      parameter width = 32)
-   (   input [0:log2(num_ports)-1] select,
-       input [0:num_ports*width-1] data_in,
-       output [0:width-1] data_out);
+  #(parameter width = 32,
+    paramter num_ports = 4)
+   (input [0:clogb(num_ports)-1] select,
+    input [0:num_ports*width-1] data_in,
+    output [0:width-1] data_out);
    
-   wire [0:width*width-1] prio_s, prio_q;
-
-   wire 		  clk_gated;
-   
-   genvar row, col;
+   genvar 		      i, j;
    
    generate
-   for(row = 0; row < width; row = row + 1)
-     begin:rows
-	for(col = 0; col < width; col = col + 1)
-	  begin:cols
-	     if(row < col)
-               dff #(.width(1), .offset(col)) cell_ff
-		 (.clk(clk_gated), .d(prio_s[row * width + col]),
-		  .q(prio_q[row * width + col]));
-	     else if(row == col)
-               assign prio_q[row * width + col] = 1;
-	     else
-               assign prio_q[row * width + col] = ~prio_q[col * width + row];
-	     
-	     assign   prio_s[row * width + col] = (prio_q[row * width + col] | 
-						   gnt[col] | reset) & 
-						    ~gnt[row];
-	  end
-     end
+      for(i = 0; i < width; i = i + 1)
+	begin:width_loop
+	   wire [0:num_ports-1] port_bits;
+	   
+	   for(j = 0; j < num_ports; j = j + 1)
+	     begin:ports_loop
+		assign port_bits[j] = data[i+j*width] & (select == j);
+	     end
+
+	   assign data_out[i] = |port_bits;
+	end
    endgenerate
 
-   genvar i;
-
-   generate
-   for(i = 0; i < width; i = i + 1)
-     begin:gnts
-	assign gnt[i] = req[i] & &(prio_q[i*width:(i+1)*width-1] | ~req); 
-     end
-   endgenerate
-
-   wire        act = |gnt | reset;
-
-   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
-   
 endmodule
