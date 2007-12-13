@@ -76,4 +76,4 @@ report_cell > $rpt_dir/$top.cell
 report_design -verbose  > $rpt_dir/$top.design
 report_power -verbose -hier > $rpt_dir/$top.power
 
-exit
+#exit
