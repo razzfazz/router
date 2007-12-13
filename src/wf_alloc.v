@@ -41,9 +41,9 @@ module wf_alloc
       if(clone_prio_flipflops)
 	begin
 	   for(row = 0; row < 2 * num_ports; row = row + 1)
-	     begin:prio_rows
+	     begin:cloned_prio_rows
 		for(col = 0; col < 2 * num_ports; col = col + 1)
-		  begin:prio_cols
+		  begin:cloned_prio_cols
 
 		     // generate one num_ports^2 matrix of priority flipflops
 		     if((row < num_ports) && (col < num_ports))
@@ -51,16 +51,14 @@ module wf_alloc
 			  
 			  wire prio_s, prio_q;
 			  
-			  localparam idx = (((row+num_ports-1)%num_ports)*
-					    (2*num_ports)+((col+num_ports-1)%
-							   num_ports));
-
 			  assign prio_s = (reset ?
 					   ((((row+col)%num_ports)==0) ?
 					    1'b1 :
 					    1'b0) :
 					   update ?
-					   prio[idx] :
+					   prio[((row+num_ports-1)%num_ports)*
+						(2*num_ports)+
+						((col+num_ports-1)%num_ports)] :
 					   prio_q);
 			  
 			  dff
@@ -108,9 +106,9 @@ module wf_alloc
 
 	   // hook up priority signals
 	   for(row = 0; row < 2 * num_ports; row = row + 1)
-	     begin:prio_rows
+	     begin:uncloned_prio_rows
 		for(col = 0; col < 2 * num_ports; col = col + 1)
-		  begin:prio_cols
+		  begin:uncloned_prio_cols
 		     assign prio[row*(2*num_ports)+col]
 			      = prio_q[(row+col)%num_ports];
 		  end
@@ -123,7 +121,11 @@ module wf_alloc
    generate
       
       // generate gated clocks
-      if(disable_clock_gating == 0)
+      if(disable_clock_gating)
+	begin
+	   assign clk_gated = clk;
+	end
+      else
 	begin
 	   
 	   wire act;
@@ -135,10 +137,6 @@ module wf_alloc
 	      .act(act),
 	      .clk_gated(clk_gated));
 		
-	end
-      else
-	begin
-	   assign clk_gated = clk;
 	end
 
    endgenerate
