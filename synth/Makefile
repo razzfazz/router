@@ -31,7 +31,7 @@ all: $(proj)
 $(proj):
 	$(wrap) -module $(proj) -input $(rtl_dir)/$(proj).v\
           -output wrappers/$(proj)_syn_wrapper.v 
-	dc_shell-xg-t -f $(proj).tcl > $(rpt_dir)/$(proj).lis
+	dc_shell-xg-t -f $(proj).tcl | tee $(rpt_dir)/$(proj).lis
 	rm -f command.log *-verilog.* *.mr
 	scripts/getrep.pl $@
 	rm -rf dwsvf_*
