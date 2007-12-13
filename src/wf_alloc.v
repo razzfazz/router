@@ -23,7 +23,7 @@ module wf_alloc
 
    wire 				    clk_gated;
    
-   genvar 				    i, j, k;
+   genvar 				    prio, row, col;
    
    wire [0:num_ports-1] 		    prio_s, prio_q;
    
@@ -65,30 +65,46 @@ module wf_alloc
 
    generate
       
-      for(i = 0; i < num_ports; i = i + 1)
-	begin:blk_prios
+      for(prio = 0; prio < num_ports; prio = prio + 1)
+	begin:prios
 
 	   wire [0:num_ports*num_ports-1] req_int;
 	   wire [0:num_ports*num_ports-1] gnt_int;
+	   wire [0:num_ports*num_ports-1] y;
 
-	   wf_alloc_blk
-	     #(.num_ports(num_ports))
-	   wfa_blk
-	     (.req(req_int),
-	      .gnt(gnt_int));
+	   for(row = 0; row < num_ports; row = row + 1)
+	     begin:rows
+		
+		wire [0:num_ports-1] x_in, y_in;
+		wire [0:num_ports]   x_out, y_out;
+		wire [0:num_ports-1] req_in;
+		wire [0:num_ports-1] gnt_out;
 
-	   for(j = 0; j < num_ports; j = j + 1)
-	     begin:blk_rows
-		for(k = 0; k < num_ports; k = k + 1)
-		  begin:blk_cols
+		assign x_in = x_out[0:num_ports-1];
+		assign y_in = y[((row+num_ports)%num_ports)*num_ports:
+				((row+num_ports)%num_ports+1)*num_ports-1];
+		assign req_in = req_int[row*num_ports:(row+1)*num_ports-1];
+		
+		assign x_out = {1'b1, (~y_in | ~req_in) & x_in};
+		assign y_out = {1'b1, (~x_in | ~req_in) & y_in};
+		assign gnt_out = req_in & x_in & y_in;
+		
+		assign y[((row+num_ports+1)%num_ports)*num_ports:
+			 ((row+num_ports+1)%num_ports+1)*num_ports-1]
+			 = y_out[0:num_ports-1];
+		assign gnt_int[row*num_ports:(row+1)*num_ports-1]
+			 = gnt_out;
+		
+		for(col = 0; col < num_ports; col = col + 1)
+		  begin:cols
 		     
-		     assign req_int[j*num_ports+k] 
-			      = req[((i+j)%num_ports)*num_ports +
-				    (num_ports-j+k)%num_ports];
-		     assign gnt_by_prio[((i+j)%num_ports)*num_ports +
-				    (num_ports-j+k)%num_ports +
-					i*num_ports*num_ports]
-			      = gnt_int[j*num_ports+k];
+		     assign req_int[row*num_ports+col] 
+			      = req[((prio+row)%num_ports)*num_ports +
+				    (num_ports-row+col)%num_ports];
+		     assign gnt_by_prio[((prio+row)%num_ports)*num_ports +
+				    (num_ports-row+col)%num_ports +
+					prio*num_ports*num_ports]
+			      = gnt_int[row*num_ports+col];
 
 		  end
 	     end
