@@ -14,7 +14,7 @@ module select_1ofn
 	   
 	   for(j = 0; j < num_ports; j = j + 1)
 	     begin:ports_loop
-		assign port_bits[j] = data[i+j*width] & select[j];
+		assign port_bits[j] = data_in[i+j*width] & select[j];
 	     end
 
 	   assign data_out[i] = |port_bits;
