@@ -1,13 +1,19 @@
 module sw_alloc
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
-    parameter use_matrix_arb = 1,
+    parameter use_matrix_arb = 1
+
+    // the following option enables speculation between input and output stage
+    // currently, this just makes arbitration at both stages independent,
+    // leading to decreased matching probability
     parameter use_speculation = 0)
+   
    (input     clk,
     input     reset,
     
-    // I/O to input controller
+    // requests and grant signals to input controller
     // [sort order: input port,input VC,ouput port]
+    // [each input VC at each input port can request at most one output port]
     input [0:num_ports*num_vcs*num_ports-1] req,
     output [0:num_ports*num_vcs*num_ports-1] gnt,
     
@@ -17,15 +23,15 @@ module sw_alloc
    
    genvar i;
    
-
+   
    //---------------------------------------------------------------------------
    // global wires
    //---------------------------------------------------------------------------
-
-   wire [0:num_ports*num_ports-1] 	  gnt1_ip_op;
-   wire [0:num_ports*num_ports-1] 	  req2_ip_op;
-   wire [0:num_ports*num_ports-1] 	  gnt2_ip_op;
-
+   
+   wire [0:num_ports*num_ports-1] gnt1_ip_op;
+   wire [0:num_ports*num_ports-1] req2_ip_op;
+   wire [0:num_ports*num_ports-1] gnt2_ip_op;
+   
    
    //---------------------------------------------------------------------------
    // input stage
@@ -38,7 +44,7 @@ module sw_alloc
 	   //-------------------------------------------------------------------
 	   // connect inputs
 	   //-------------------------------------------------------------------
-
+	   
 	   wire [0:num_vcs*num_ports-1] req1_ivc_op;
 	   
 	   assign req1_ivc_op = req[i*num_vcs*num_ports:
