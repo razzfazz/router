@@ -1,13 +1,14 @@
 module testbench
   #(parameter Tclk = 6,
-    parameter num_ports = 5,
-    parameter use_clock_gating = 0,
-    parameter use_allocator_type = 1, // 0 = separable, 1 = wavefront, 2 = grant all
-    parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
-    parameter mean_delay = 1,
-    parameter fixed_delay = 1,
-    parameter hold_requests = 0,
-    parameter runtime = 100000)
+    parameter num_ports = 20,
+    parameter use_clock_gating = 1,
+    parameter use_allocator_type = 2, // 0 = separable, 1 = wavefront, 2 = grant all
+    parameter use_arbiter_type = 0, // 0 = RR, 1 = matrix
+    parameter mean_delay = 8,
+    parameter fixed_delay = 0,
+    parameter hold_requests = 1,
+    parameter runtime = 100000,
+    parameter output_as_csv = 1)
    ();
    
    function integer pop_count(input [0:num_ports-1] x);
@@ -92,129 +93,19 @@ module testbench
 	end
    endgenerate
    
+
+   allocator
+     #(.num_ports(num_ports),
+       .use_clock_gating(use_clock_gating),
+       .use_allocator_type(use_allocator_type),
+       .use_arbiter_type(use_arbiter_type))
+   alloc
+     (.CLK(clk),
+      .RST(reset),
+      .req(req_ip_op),
+      .gnt(gnt_ip_op));
+
    
-   generate
-   
-      if(use_allocator_type == 0)
-	begin
-
-	   // [sort order: input port,output port]
-	   wire [0:num_ports*num_ports-1] req1_ip_op;
-	   wire [0:num_ports*num_ports-1] gnt1_ip_op;   
-	   wire [0:num_ports*num_ports-1] gnt2_ip_op;   
-
-	   assign req1_ip_op = req_ip_op;
-
-	   // first stage arbiters
-	   for(i = 0; i < num_ports; i = i + 1)
-	     begin:input_ports
-
-		wire [0:num_ports-1] req1_op;
-		wire [0:num_ports-1] gnt1_op;
-		wire [0:num_ports-1] gnt2_op;
-
-		assign req1_op = req1_ip_op[i*num_ports:(i+1)*num_ports-1];
-		assign gnt2_op = gnt2_ip_op[i*num_ports:(i+1)*num_ports-1];
-		
-		wire 		     update;
-
-		assign update = |gnt2_op;
-	   
-		arbiter
-		  #(.num_ports(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
-		    .use_clock_gating(use_clock_gating))
-		arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update),
-		   .req(req1_op),
-		   .gnt(gnt1_op));
-
-		assign gnt1_ip_op[i*num_ports:(i+1)*num_ports-1] = gnt1_op;
-		
-	     end
-
-	   // [sort order: input port,output port]
-	   wire [0:num_ports*num_ports-1] req2_ip_op;
-
-	   assign req2_ip_op = gnt1_ip_op;
-
-	   // [sort order: output port,input port]
-	   wire [0:num_ports*num_ports-1] req2_op_ip;
-   
-	   interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   req2_intl
-	     (.data_in(req2_ip_op),
-	      .data_out(req2_op_ip));
-
-	   // [sort order: output port,input port]
-	   wire [0:num_ports*num_ports-1] gnt2_op_ip;
-
-	   // second stage arbiters
-	   for(i = 0; i < num_ports; i = i + 1)
-	     begin:output_ports
-		
-		wire [0:num_ports-1] req2_ip;
-		wire [0:num_ports-1] gnt2_ip;
-
-		assign req2_ip = req2_op_ip[i*num_ports:(i+1)*num_ports-1];
-		
-		wire 		     update;
-		
-		assign update = |req2_ip;
-	   
-		arbiter
-		  #(.num_ports(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
-		    .use_clock_gating(use_clock_gating))
-		arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update),
-		   .req(req2_ip),
-		   .gnt(gnt2_ip));
-
-		assign gnt2_op_ip[i*num_ports:(i+1)*num_ports-1] = gnt2_ip;
-		
-	     end
-	   
-	   interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   gnt2_intl
-	     (.data_in(gnt2_op_ip),
-	      .data_out(gnt2_ip_op));
-
-	   assign gnt_ip_op = gnt2_ip_op;
-	   
-	end
-      else if(use_allocator_type == 1)
-	begin
-
-	   assign update = |req_ip_op;
-	     
-	   wf_alloc
-	     #(.num_ports(num_ports),
-	       .use_clock_gating(use_clock_gating))
-	   alloc
-	     (.clk(clk),
-	      .reset(reset),
-	      .update(update),
-	      .req(req_ip_op),
-	      .gnt(gnt_ip_op));
-	   
-	end // if (use_allocator_type == 1)
-      else if(use_allocator_type == 2)
-	begin
-	   assign gnt_ip_op = req_ip_op;
-	end
-      
-   endgenerate
-
-
    always@(posedge clk)
      begin
 	error_count_q <= error_count_s;
@@ -222,6 +113,11 @@ module testbench
 
    
    integer k;
+
+   integer mean_latency = 0;
+   integer mean_rate = 0;
+   integer mean_match = 0;
+   
 	   
    initial
    begin
@@ -234,18 +130,48 @@ module testbench
       
       #(runtime*Tclk);
 
-      $display(" driver | latency  |   rate   |   match  |  errors  ");
-      $display("----------------------------------------------------");
-      for(k = 0; k < num_ports; k = k + 1)
+      if(output_as_csv)
 	begin
-	   $display(" %6d | %8.3f | %8.3f | %8.3f | %8d ",
-		    k,
-		    avg_latency[k*32 +: 32] * 0.0001,
-		    avg_rate[k*32 +: 32] * 0.0001,
-		    avg_match[k*32 +: 32] * 0.0001,
-		    error_count_q[k*32 +: 32]);
+	   $display("driver,latency,rate,match,errors");
+	   for(k = 0; k < num_ports; k = k + 1)
+	     begin
+		$display("%0d,%0f,%0f,%0f,%0d",
+			 k,
+			 avg_latency[k*32 +: 32] * 0.0001,
+			 avg_rate[k*32 +: 32] * 0.0001,
+			 avg_match[k*32 +: 32] * 0.0001,
+			 error_count_q[k*32 +: 32]);
+		mean_latency = mean_latency + avg_latency[k*32 +: 32];
+		mean_rate = mean_rate + avg_rate[k*32 +: 32];
+		mean_match = mean_match + avg_match[k*32 +: 32];
+	     end
+	   $display("mean,%0f,%0f,%0f",
+		    mean_latency * 0.0001 / num_ports,
+		    mean_rate * 0.0001 / num_ports,
+		    mean_match * 0.0001 / num_ports);
 	end
-      $display("----------------------------------------------------");
+      else
+	begin
+	   $display(" driver | latency  |   rate   |   match  |  errors  ");
+	   $display("----------------------------------------------------");
+	   for(k = 0; k < num_ports; k = k + 1)
+	     begin
+		$display(" %6d | %8.3f | %8.3f | %8.3f | %8d ",
+			 k,
+			 avg_latency[k*32 +: 32] * 0.0001,
+			 avg_rate[k*32 +: 32] * 0.0001,
+			 avg_match[k*32 +: 32] * 0.0001,
+			 error_count_q[k*32 +: 32]);
+		mean_latency = mean_latency + avg_latency[k*32 +: 32];
+		mean_rate = mean_rate + avg_rate[k*32 +: 32];
+		mean_match = mean_match + avg_match[k*32 +: 32];
+	     end
+	   $display("  mean  | %8.3f | %8.3f | %8.3f |",
+		    mean_latency * 0.0001 / num_ports,
+		    mean_rate * 0.0001 / num_ports,
+		    mean_match * 0.0001 / num_ports);
+	   $display("----------------------------------------------------");
+	end
       
       $finish;
       
