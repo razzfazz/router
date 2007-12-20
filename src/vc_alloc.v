@@ -1,48 +1,38 @@
-module matrix_arbiter
-  #(  parameter width = 32)
-   (   input clk,
-       input reset,
-       input[0:width-1] req,
-       output[0:width-1] gnt);
-   
-   wire [0:width*width-1] prio_s, prio_q;
+module vc_alloc
+  #(parameter num_ports = 8,
+    parameter num_vcs = 4,
+    parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
+    parameter use_output_first = 0,
+    parameter use_allocator_type = 0) // 0 = separable
+   (input     clk,
+    input     reset,
+    
+    // I/O to input controller
+    // [sort order: input port,input VC,ouput port]
+    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req,
+    output [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt,
 
-   wire 		  clk_gated;
-   
-   genvar row, col;
+    // bit mask representing available output VCs
+    // [sort order: output port,output VC]
+    input [0:num_ports*num_vcs-1] vc_mask);
    
    generate
-   for(row = 0; row < width; row = row + 1)
-     begin:rows
-	for(col = 0; col < width; col = col + 1)
-	  begin:cols
-	     if(row < col)
-               dff #(.width(1), .offset(col)) cell_ff
-		 (.clk(clk_gated), .d(prio_s[row * width + col]),
-		  .q(prio_q[row * width + col]));
-	     else if(row == col)
-               assign prio_q[row * width + col] = 1;
-	     else
-               assign prio_q[row * width + col] = ~prio_q[col * width + row];
-	     
-	     assign   prio_s[row * width + col] = (prio_q[row * width + col] | 
-						   gnt[col] | reset) & 
-						    ~gnt[row];
-	  end
-     end
+
+      if(use_allocator_type == 0)
+	begin
+	   vc_alloc_separable
+	     #(.num_ports(num_ports),
+	       .num_vcs(num_vcs),
+	       .use_arbiter_type(use_arbiter_type),
+	       .use_output_first(use_output_first))
+	   sep_alloc
+	     (.clk(clk),
+	      .reset(reset),
+	      .req(req),
+	      .gnt(gnt),
+	      .vc_state(vc_state));
+	end
+      
    endgenerate
-
-   genvar i;
-
-   generate
-   for(i = 0; i < width; i = i + 1)
-     begin:gnts
-	assign gnt[i] = req[i] & &(prio_q[i*width:(i+1)*width-1] | ~req); 
-     end
-   endgenerate
-
-   wire        act = |gnt | reset;
-
-   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
    
 endmodule
