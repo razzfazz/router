@@ -1,61 +1,72 @@
 module matrix_arbiter
-  #(
-    parameter width = 32,
-    parameter disable_clock_gating = 0
-    )
-   (
-    input     clk,
+  #(parameter num_ports = 32,
+    parameter use_clock_gating = 1)
+   (input     clk,
     input     reset,
     input     update,
-    input [0:width-1] req,
-    output [0:width-1] gnt
-    );
+    input [0:num_ports-1] req,
+    output wire [0:num_ports-1] gnt);
    
-   wire [0:width*width-1] prio_s, prio_q;
-
-   wire 		  clk_gated;
+   wire [0:num_ports*num_ports-1] prio_s, prio_q;
    
-   genvar 		  row, col;
+   wire 			  clk_gated;
+   
+   genvar 			  row, col;
    
    generate
-      for(row = 0; row < width; row = row + 1)
+      for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
-	   for(col = 0; col < width; col = col + 1)
+	   for(col = 0; col < num_ports; col = col + 1)
 	     begin:cols
 		if(row < col)
-		  dff #(.width(1), .offset(col)) cell_ff
-		    (.clk(clk_gated), .d(prio_s[row*width+col]),
-		     .q(prio_q[row*width+col]));
+		  begin
+		     dff
+		       #(.width(1),
+			 .offset(col))
+		     prioq
+		       (.clk(clk_gated),
+			.d(prio_s[row*num_ports+col]),
+			.q(prio_q[row*num_ports+col]));
+		  end
 		else if(row == col)
-			  assign prio_q[row*width+col] = 1;
+		  begin
+		     assign prio_q[row*num_ports+col] = 1'b1;
+		  end
 		else
-		     assign prio_q[row*width+col] = ~prio_q[col*width+row];
+		  begin
+		     assign prio_q[row*num_ports+col]
+			      = ~prio_q[col*num_ports+row];
+		  end
 		
-		assign 	    prio_s[row*width+col] = ((prio_q[row*width+col] |
-						      (gnt[col] & update)) & 
-						     (~gnt[row] | ~update)) | 
-						    reset;
+		assign prio_s[row*num_ports+col] = ((prio_q[row*num_ports+col] |
+						     (gnt[col] & update)) & 
+						    (~gnt[row] | ~update)) | 
+						   reset;
 	     end
 	end
    endgenerate
-
+   
    genvar 		    i;
-
+   
    generate
-      for(i = 0; i < width; i = i + 1)
+      for(i = 0; i < num_ports; i = i + 1)
 	begin:gnts
-	   assign gnt[i] = req[i] & (&(prio_q[i*width:(i+1)*width-1] | ~req));
+	   assign gnt[i] = req[i] & 
+			   (&(prio_q[i*num_ports:(i+1)*num_ports-1] | ~req));
 	end
    endgenerate
    
    generate
-      if(disable_clock_gating == 0)
+      if(use_clock_gating)
 	begin
 	   wire act;
-
-	   assign act = (|gnt & update) | reset;
-
-	   clkgate clk_gate_blk(.clk(clk), .act(act), .clk_gated(clk_gated));
+	   
+	   assign act = update | reset;
+	   
+	   clkgate clk_gate_blk
+	     (.clk(clk),
+	      .act(act),
+	      .clk_gated(clk_gated));
 	end
       else
 	begin
