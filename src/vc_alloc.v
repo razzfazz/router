@@ -10,12 +10,8 @@ module vc_alloc
     // I/O to input controller
     // [sort order: input port,input VC,ouput port]
     input [0:num_ports*num_vcs*num_ports*num_vcs-1] req,
-    output [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt,
+    output [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt);
 
-    // bit mask representing available output VCs
-    // [sort order: output port,output VC]
-    input [0:num_ports*num_vcs-1] vc_mask);
-   
    generate
 
       if(use_allocator_type == 0)
@@ -29,8 +25,7 @@ module vc_alloc
 	     (.clk(clk),
 	      .reset(reset),
 	      .req(req),
-	      .gnt(gnt),
-	      .vc_state(vc_state));
+	      .gnt(gnt));
 	end
       
    endgenerate
