@@ -1,24 +1,27 @@
 module wf_alloc
-  #(
-    
+  #(    
     // number of input/output ports
     // each input can bid for any combination of outputs
     parameter num_ports = 8,
 
-    // disable clock gating?
-    parameter disable_clock_gating = 0
-	
-    )
-   (
-    input     clk,
-    input     reset,
-    
-    input     update,
-    
-    input [0:num_ports*num_ports-1] req,
-    output [0:num_ports*num_ports-1] gnt
-    );
+    // enable clock gating?
+    parameter use_clock_gating = 1)
    
+   (input     clk,
+    input     reset,
+
+    // update arbitration priorities
+    input     update,
+
+    // requests
+    // [sort order: input port,output port]
+    input [0:num_ports*num_ports-1] req,
+
+    // grants
+    // [sort order: input port,output port]
+    output [0:num_ports*num_ports-1] gnt);
+
+   // [sort order: input port,output port,priority group]
    wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
 
    wire 				    clk_gated;
@@ -43,22 +46,22 @@ module wf_alloc
    generate
       
       // generate gated clocks
-      if(disable_clock_gating)
-	begin
-	   assign clk_gated = clk;
-	end
-      else
+      if(use_clock_gating)
 	begin
 	   
 	   wire act;
 		
-	   assign act = reset | update;
+	   assign act = update | reset;
 		
 	   clkgate clk_gate_blk
 	     (.clk(clk),
 	      .act(act),
 	      .clk_gated(clk_gated));
 		
+	end
+      else
+	begin
+	   assign clk_gated = clk;
 	end
 
    endgenerate
@@ -68,6 +71,7 @@ module wf_alloc
       for(prio = 0; prio < num_ports; prio = prio + 1)
 	begin:prios
 
+	   // [sort order: input port,output port]
 	   wire [0:num_ports*num_ports-1] req_int;
 	   wire [0:num_ports*num_ports-1] gnt_int;
 	   wire [0:num_ports*num_ports-1] y;
