@@ -22,7 +22,7 @@ set auto_wire_load_selection true
 
 # Clocks
 set clk_name   CLK
-set clk_period 5.5
+set clk_period 5.0
 
 set all_input_ports  [ get_ports "*" -filter {@port_direction == in} ]
 set all_output_ports [ get_ports "*" -filter {@port_direction == out} ]
@@ -76,4 +76,4 @@ report_cell > $rpt_dir/$top.cell
 report_design -verbose  > $rpt_dir/$top.design
 report_power -verbose -hier > $rpt_dir/$top.power
 
-#exit
+exit
