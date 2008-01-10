@@ -4,7 +4,7 @@
 SHELL = /bin/sh
 
 # globals
-proj := router
+proj := allocator
 
 # clear suffix rules
 .SUFFIXES: 
@@ -40,7 +40,9 @@ $(proj):
 #  Other Targets
 # --
 clean:
-	rm -f $(rpt_dir)/*
+	rm -f $(rpt_dir)/$(proj).lis
+	rm -f $(rpt_dir)/$(proj)_syn_wrapper.*
+	rm -f $wrappers/*
 	rm -f $(net_dir)/*
 	rm -f *~
 
