@@ -22,7 +22,7 @@ set auto_wire_load_selection true
 
 # Clocks
 set clk_name   CLK
-set clk_period 5.0
+set clk_period 4.0
 
 set all_input_ports  [ get_ports "*" -filter {@port_direction == in} ]
 set all_output_ports [ get_ports "*" -filter {@port_direction == out} ]
