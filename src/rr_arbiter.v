@@ -20,10 +20,9 @@ module rr_arbiter
 					   {gnt_qual, 1'b0} :
 					   gnt_unqual);
    
-   wire [0:num_ports-2] 	prev_s = ((update ?
-					   gnt_rev[1:num_ports-1] :
-					   prev_q) & 
-					  ~{num_ports{reset}});
+   wire [0:num_ports-2] 	prev_s = (update ?
+					  gnt_rev[1:num_ports-1] :
+					  prev_q);
    
    wire 			clk_gated;
    
@@ -55,7 +54,9 @@ module rr_arbiter
    endgenerate
    
    dff
-     #(.width(num_ports-1))
+     #(.width(num_ports-1),
+       .reset_type(1),
+       .reset_value({(num_ports-1){1'b1}}))
    prevq
      (.clk(clk_gated),
       .d(prev_s),
