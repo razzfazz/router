@@ -8,17 +8,21 @@ module rr_arbiter
     output wire [0:num_ports-1] gnt);
    
    wire [0:num_ports-1] 	req_rev;
-   wire [0:num_ports-1] 	prev_q;
+   wire [0:num_ports-2] 	prev_q;
    
    wire [0:num_ports-1] 	gnt_unqual = req_rev & -req_rev;
 
-   wire [0:num_ports-1] 	mask = prev_q | (prev_q - 1);
-   wire [0:num_ports-1] 	req_qual = req_rev & ~mask;
-   wire [0:num_ports-1] 	gnt_qual = req_qual & -req_qual;
+   wire [0:num_ports-2] 	mask = prev_q - 1;
+   wire [0:num_ports-2] 	req_qual = req_rev[0:num_ports-2] & ~mask;
+   wire [0:num_ports-2] 	gnt_qual = req_qual & -req_qual;
    
-   wire [0:num_ports-1] 	gnt_rev = (|req_qual) ? gnt_qual : gnt_unqual;
+   wire [0:num_ports-1] 	gnt_rev = ((|req_qual) ?
+					   {gnt_qual, 1'b0} :
+					   gnt_unqual);
    
-   wire [0:num_ports-1] 	prev_s = ((update ? gnt_rev : prev_q) & 
+   wire [0:num_ports-2] 	prev_s = ((update ?
+					   gnt_rev[1:num_ports-1] :
+					   prev_q) & 
 					  ~{num_ports{reset}});
    
    wire 			clk_gated;
@@ -51,7 +55,7 @@ module rr_arbiter
    endgenerate
    
    dff
-     #(.width(num_ports))
+     #(.width(num_ports-1))
    prevq
      (.clk(clk_gated),
       .d(prev_s),
