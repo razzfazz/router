@@ -11,12 +11,12 @@ module rr_arbiter
    wire [0:num_ports-1] 	prev_q;
    
    wire [0:num_ports-1] 	gnt_unqual = req_rev & -req_rev;
-   
+
    wire [0:num_ports-1] 	mask = prev_q | (prev_q - 1);
    wire [0:num_ports-1] 	req_qual = req_rev & ~mask;
    wire [0:num_ports-1] 	gnt_qual = req_qual & -req_qual;
    
-   wire [0:num_ports-1] 	gnt_rev = (|gnt_qual) ? gnt_qual : gnt_unqual;
+   wire [0:num_ports-1] 	gnt_rev = (|req_qual) ? gnt_qual : gnt_unqual;
    
    wire [0:num_ports-1] 	prev_s = ((update ? gnt_rev : prev_q) & 
 					  ~{num_ports{reset}});
