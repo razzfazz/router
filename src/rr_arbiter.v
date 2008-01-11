@@ -58,6 +58,7 @@ module rr_arbiter
        .reset_type(1))
    prevq
      (.clk(clk_gated),
+      .reset(reset),
       .d(prev_s),
       .q(prev_q));
    
