@@ -40,7 +40,7 @@ module rr_arbiter
 	begin
 	   wire act;
 	   
-	   assign act = update | reset;
+	   assign act = update;
 	   
 	   clkgate clk_gate_blk
 	     (.clk(clk),
