@@ -55,8 +55,7 @@ module rr_arbiter
    
    dff
      #(.width(num_ports-1),
-       .reset_type(1),
-       .reset_value({(num_ports-1){1'b1}}))
+       .reset_type(1))
    prevq
      (.clk(clk_gated),
       .d(prev_s),
