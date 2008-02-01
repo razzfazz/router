@@ -20,13 +20,34 @@ module matrix_arbiter
 	     begin:cols
 		if(row < col)
 		  begin
-		     dff
-		       #(.width(1),
-			 .offset(col))
-		     prioq
-		       (.clk(clk_gated),
-			.d(prio_s[row*num_ports+col]),
-			.q(prio_q[row*num_ports+col]));
+		     if(use_clock_gating)
+		       begin
+			  dff
+			    #(.width(1),
+			      .offset(col),
+			      .reset_type(1),
+			      .reset_value(1'b1))
+			  prioq
+			    (.clk(clk_gated),
+			     .reset(reset),
+			     .d(prio_s[row*num_ports+col]),
+			     .q(prio_q[row*num_ports+col]));
+		       end
+		     else
+		       begin
+			  dff
+			    #(.width(1),
+			      .offset(col),
+			      .reset_type(1),
+			      .reset_value(1'b1),
+			      .use_enable(1))
+			  prioq
+			    (.clk(clk_gated),
+			     .reset(reset),
+			     .enable(update),
+			     .d(prio_s[row*num_ports+col]),
+			     .q(prio_q[row*num_ports+col]));
+		       end
 		  end
 		else if(row == col)
 		  begin
@@ -38,10 +59,8 @@ module matrix_arbiter
 			      = ~prio_q[col*num_ports+row];
 		  end
 		
-		assign prio_s[row*num_ports+col] = ((prio_q[row*num_ports+col] |
-						     (gnt[col] & update)) & 
-						    (~gnt[row] | ~update)) | 
-						   reset;
+		assign prio_s[row*num_ports+col]
+			 = (prio_q[row*num_ports+col] | gnt[col]) & ~gnt[row];
 	     end
 	end
    endgenerate
@@ -61,7 +80,7 @@ module matrix_arbiter
 	begin
 	   wire act;
 	   
-	   assign act = update | reset;
+	   assign act = update;
 	   
 	   clkgate clk_gate_blk
 	     (.clk(clk),

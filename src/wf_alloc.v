@@ -30,18 +30,7 @@ module wf_alloc
    
    wire [0:num_ports-1] 		    prio_s, prio_q;
    
-   assign prio_s = (reset ? 
-		    {1'b1, {(num_ports-1){1'b0}}} :
-		    update ?
-		    {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
-		    prio_q);
-   
-   dff
-     #(.width(num_ports))
-   prioq
-     (.clk(clk_gated),
-      .d(prio_s),
-      .q(prio_q));
+   assign prio_s = {prio_q[num_ports-1], prio_q[0:num_ports-2]};
    
    generate
       
@@ -51,17 +40,38 @@ module wf_alloc
 	   
 	   wire act;
 		
-	   assign act = update | reset;
+	   assign act = update;
 		
 	   clkgate clk_gate_blk
 	     (.clk(clk),
 	      .act(act),
 	      .clk_gated(clk_gated));
 		
-	end
+	   dff
+	     #(.width(num_ports),
+	       .reset_type(1),
+	       .reset_value({1'b1, {(num_ports-1){1'b0}}}))
+	   prioq
+	     (.clk(clk_gated),
+	      .reset(reset),
+	      .d(prio_s),
+	      .q(prio_q));
+   	end
       else
 	begin
 	   assign clk_gated = clk;
+
+	   dff
+	     #(.width(num_ports),
+	       .reset_type(1),
+	       .reset_value({1'b1, {(num_ports-1){1'b0}}}),
+	       .use_enable(1))
+	   prioq
+	     (.clk(clk_gated),
+	      .reset(reset),
+	      .enable(update),
+	      .d(prio_s),
+	      .q(prio_q));
 	end
 
    endgenerate
@@ -118,7 +128,7 @@ module wf_alloc
    select_1ofn
      #(.width(num_ports*num_ports),
        .num_ports(num_ports))
-   gnt_or
+   gnt_sel
      (.select(prio_q),
       .data_in(gnt_by_prio),
       .data_out(gnt));

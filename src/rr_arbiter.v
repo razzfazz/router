@@ -20,9 +20,7 @@ module rr_arbiter
 					   {gnt_qual, 1'b0} :
 					   gnt_unqual);
    
-   wire [0:num_ports-2] 	prev_s = (update ?
-					  gnt_rev[1:num_ports-1] :
-					  prev_q);
+   wire [0:num_ports-2] 	prev_s = gnt_rev[1:num_ports-1];
    
    wire 			clk_gated;
    
@@ -46,20 +44,31 @@ module rr_arbiter
 	     (.clk(clk),
 	      .act(act),
 	      .clk_gated(clk_gated));
+
+	   dff
+	     #(.width(num_ports-1),
+	       .reset_type(1))
+	   prevq
+	     (.clk(clk_gated),
+	      .reset(reset),
+	      .d(prev_s),
+	      .q(prev_q));   
 	end
       else
 	begin
 	   assign clk_gated = clk;
+	   
+	   dff
+	     #(.width(num_ports-1),
+	       .reset_type(1),
+	       .use_enable(1))
+	   prevq
+	     (.clk(clk_gated),
+	      .reset(reset),
+	      .enable(update),
+	      .d(prev_s),
+	      .q(prev_q));
 	end
    endgenerate
-   
-   dff
-     #(.width(num_ports-1),
-       .reset_type(1))
-   prevq
-     (.clk(clk_gated),
-      .reset(reset),
-      .d(prev_s),
-      .q(prev_q));
    
 endmodule
