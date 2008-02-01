@@ -1,4 +1,4 @@
-module allocator(CLK, RST, req, gnt);
+module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 
    parameter num_ports = NUM_PORTS;
    parameter use_clock_gating = USE_CLOCK_GATING;
@@ -7,10 +7,13 @@ module allocator(CLK, RST, req, gnt);
 
    input CLK;
    input RST;
-   
+
+   // [sort order: input port]   
+   input [0:num_ports-1] req_ip;
+
    // [sort order: input port,output port]
-   input [0:num_ports*num_ports-1] req;
-   output [0:num_ports*num_ports-1] gnt;
+   input [0:num_ports*num_ports-1] req_ip_op;
+   output [0:num_ports*num_ports-1] gnt_ip_op;
    
    wire 			     clk = CLK;
    wire 			     reset;
@@ -24,13 +27,6 @@ module allocator(CLK, RST, req, gnt);
 
    genvar 			     i;
    
-   // [sort order: input port,output port]
-   wire [0:num_ports*num_ports-1] req_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
-
-   assign req_ip_op = req;
-   assign gnt = gnt_ip_op;
-
    generate
 
       if(use_allocator_type == 0)
@@ -134,7 +130,7 @@ module allocator(CLK, RST, req, gnt);
 
 	   wire update;
 	   
-	   assign update = |req_ip_op;
+	   assign update = |req_ip;
 	     
 	   wf_alloc
 	     #(.num_ports(num_ports),
@@ -146,10 +142,6 @@ module allocator(CLK, RST, req, gnt);
 	      .req(req_ip_op),
 	      .gnt(gnt_ip_op));
 	   
-	end
-      else if(use_allocator_type == 2)
-	begin
-	   assign gnt_ip_op = req_ip_op;
 	end
       
    endgenerate
