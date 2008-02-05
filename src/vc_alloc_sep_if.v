@@ -1,4 +1,4 @@
-module vc_alloc_separable
+module vc_alloc_sep_if
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
     parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
@@ -6,11 +6,9 @@ module vc_alloc_separable
    (input     clk,
     input     reset,
     
-    // requests and grant signals to input controller
-    // [sort order: input port,input VC,ouput port,output VC]
-    // [each input VC at each input port can request any output port and VC]
-    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req,
-    output wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt);
+    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc,
+
+    output wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc);
    
    genvar 						  i, j;
    
@@ -39,8 +37,9 @@ module vc_alloc_separable
 
 		wire [0:num_ports*num_vcs-1] req_op_ovc;
 
-		assign req_op_ovc = req[(i*num_vcs+v)*num_ports*num_vcs:
-					(i*num_vcs+v+1)*num_ports*num_vcs-1];
+		assign req_op_ovc
+		  = reqip_ivc_op_ovc[(i*num_vcs+v)*num_ports*num_vcs:
+				     (i*num_vcs+v+1)*num_ports*num_vcs-1];
 
 		wire [0:num_ports*num_vcs-1] gnt2_op_ovc;
 		
@@ -180,6 +179,6 @@ module vc_alloc_separable
    // assign global grant signals
    //---------------------------------------------------------------------------
 
-   assign gnt = gnt2_ip_ivc_op_ovc;
+   assign gnt_ip_ivc_op_ovc = gnt2_ip_ivc_op_ovc;
 
 endmodule

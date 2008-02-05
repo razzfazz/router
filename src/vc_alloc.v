@@ -7,25 +7,24 @@ module vc_alloc
    (input     clk,
     input     reset,
     
-    // I/O to input controller
-    // [sort order: input port,input VC,ouput port]
-    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req,
-    output [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt);
+    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc,
+    
+    output wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc);
 
    generate
 
       if(use_allocator_type == 0)
 	begin
-	   vc_alloc_separable
+	   vc_alloc_sep_if
 	     #(.num_ports(num_ports),
 	       .num_vcs(num_vcs),
 	       .use_arbiter_type(use_arbiter_type),
 	       .use_clock_gating(use_clock_gating))
-	   sep_alloc
+	   sep_if_vc_alloc
 	     (.clk(clk),
 	      .reset(reset),
-	      .req(req),
-	      .gnt(gnt));
+	      .req_ip_ivc_op_ovc(req_ip_ivc_op_ovc),
+	      .gnt_ip_ivc_op_ovc(gnt_ip_ivc_op_ovc));
 	end
       
    endgenerate
