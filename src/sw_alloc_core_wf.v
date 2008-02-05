@@ -1,7 +1,7 @@
 // switch allocator
 // (wavefront allocator for matching ports)
 
-module sw_alloc_wf
+module sw_alloc_core_wf
 
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
@@ -10,7 +10,6 @@ module sw_alloc_wf
    (input     clk,
     input     reset,
     
-    input [0:num_ports*num_vcs-1] req_ip_ivc,
     input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
     
     output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
@@ -134,7 +133,7 @@ module sw_alloc_wf
    // if there are any requests at all in a cycle, at least one of them will
    // eventually be granted, so update priorities
    wire 				update_alloc;
-   assign update_alloc = |req_ip_ivc;
+   assign update_alloc = |req_ip_ivc_op;
    
    wf_alloc
      #(.num_ports(num_ports),
