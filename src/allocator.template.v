@@ -22,6 +22,8 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
      #(.width(1))
    resetq
      (.clk(clk),
+      .reset(1'b0),
+      .enable(1'b0),
       .d(RST),
       .q(reset));
 
@@ -125,7 +127,7 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   assign gnt_ip_op = gnt2_ip_op;
 	   
 	end
-      else if(use_allocator_type == 1)
+      else if((use_allocator_type == 1) || (use_allocator_type == 2))
 	begin
 
 	   wire update;
@@ -134,7 +136,8 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	     
 	   wf_alloc
 	     #(.num_ports(num_ports),
-	       .use_clock_gating(use_clock_gating))
+	       .use_clock_gating(use_clock_gating),
+	       .use_architecture(use_allocator_type-1))
 	   alloc
 	     (.clk(clk),
 	      .reset(reset),
