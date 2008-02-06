@@ -1,7 +1,6 @@
 module testbench
   #(parameter Tclk = 6,
     parameter num_ports = NUM_PORTS,
-    parameter num_vcs = NUM_VCS,
     parameter use_clock_gating = USE_CLOCK_GATING,
     parameter use_allocator_type = USE_ALLOCATOR_TYPE, // 0 = separable, 1 = wavefront, 2 = grant all
     parameter use_arbiter_type = USE_ARBITER_TYPE, // 0 = RR, 1 = matrix
