@@ -2,13 +2,18 @@ module testbench
   #(parameter Tclk = 6,
     parameter num_ports = 4,
     parameter use_clock_gating = 1,
-    parameter use_allocator_type = 1, // 0 = separable, 1 = wavefront
-    parameter use_arbiter_type = 0, // 0 = RR, 1 = matrix
     parameter mean_delay = 8,
     parameter fixed_delay = 0,
     parameter hold_requests = 1,
     parameter runtime = 100000,
-    parameter output_as_csv = 1)
+    parameter output_as_csv = 1,
+
+    /* supported architectures:
+    0: separable, input-first, round-robin arbiters
+    1: separable, input-first, matrix arbiters
+    2: wavefront, rotate inputs for priority
+    3: wavefront, replicated logic for priority */
+    parameter use_architecture = 0)
    ();
    
    function integer pop_count(input [0:num_ports-1] x);
@@ -33,7 +38,6 @@ module testbench
       #(Tclk/2);
    end
 
-   wire [0:num_ports-1] req_ip;
    wire [0:num_ports*num_ports-1] req_ip_op;
    wire [0:num_ports*num_ports-1] gnt_ip_op;
 
@@ -81,7 +85,6 @@ module testbench
 	   assign avg_rate[i*32:(i+1)*32-1] = drv_avg_rate;
 	   assign avg_match[i*32:(i+1)*32-1] = drv_avg_match;
 	   assign req_ip_op[i*num_ports:(i+1)*num_ports-1] = req_op;
-	   assign req_ip[i] = |req_op;
 	   
 	   assign drv_error_bad_alloc = |(gnt_op & ~req_op);
 
@@ -98,12 +101,10 @@ module testbench
    simple_alloc
      #(.num_ports(num_ports),
        .use_clock_gating(use_clock_gating),
-       .use_allocator_type(use_allocator_type),
-       .use_arbiter_type(use_arbiter_type))
+       .use_architecture(use_architecture))
    alloc
      (.CLK(clk),
       .RST(reset),
-      .req_ip(req_ip),
       .req_ip_op(req_ip_op),
       .gnt_ip_op(gnt_ip_op));
 
