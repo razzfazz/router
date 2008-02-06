@@ -1,17 +1,18 @@
-module simple_alloc(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
+module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 
    parameter num_ports = 10;
    parameter use_clock_gating = 0;
-   parameter use_allocator_type = 1;
-   parameter use_arbiter_type = 0;
+
+   /* supported architectures:
+    0: separable, input-first, round-robin arbiters
+    1: separable, input-first, matrix arbiters
+    2: wavefront, rotate inputs for priority
+    3: wavefront, replicated logic for priority */
+   parameter use_architecture = 0;
 
    input CLK;
    input RST;
 
-   // [sort order: input port]   
-   input [0:num_ports-1] req_ip;
-
-   // [sort order: input port,output port]
    input [0:num_ports*num_ports-1] req_ip_op;
    output [0:num_ports*num_ports-1] gnt_ip_op;
    
@@ -19,7 +20,9 @@ module simple_alloc(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
    wire 			     reset;
    
    dff
-     #(.width(1))
+     #(.width(1),
+       .reset_type(0),
+       .use_enable(0))
    resetq
      (.clk(clk),
       .d(RST),
@@ -29,7 +32,7 @@ module simple_alloc(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
    
    generate
 
-      if(use_allocator_type == 0)
+      if((use_architecture == 0) || (use_architecture == 1))
 	begin
 
 	   // [sort order: input port,output port]
@@ -56,7 +59,7 @@ module simple_alloc(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   
 		arbiter
 		  #(.num_ports(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_architecture(use_architecture & 1),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
@@ -102,7 +105,7 @@ module simple_alloc(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   
 		arbiter
 		  #(.num_ports(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_architecture(use_architecture & 1),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
@@ -125,16 +128,17 @@ module simple_alloc(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   assign gnt_ip_op = gnt2_ip_op;
 	   
 	end
-      else if(use_allocator_type == 1)
+      else if((use_architecture == 2) || (use_architecture == 3))
 	begin
 
 	   wire update;
 	   
-	   assign update = |req_ip;
+	   assign update = |req_ip_op;
 	     
 	   wf_alloc
 	     #(.num_ports(num_ports),
-	       .use_clock_gating(use_clock_gating))
+	       .use_clock_gating(use_clock_gating),
+	       .use_architecture(use_architecture-2))
 	   alloc
 	     (.clk(clk),
 	      .reset(reset),
