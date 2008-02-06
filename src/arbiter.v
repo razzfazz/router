@@ -1,8 +1,12 @@
 module arbiter
   #(parameter num_ports = 32,
     parameter num_blocks = 1,
-    parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
-    parameter use_clock_gating = 1)
+    parameter use_clock_gating = 0,
+
+    /* supported architectures:
+     0: round-robin arbiter
+     1: matrix arbiter */
+    parameter use_architecture = 0)
    (input     clk,
     input     reset,
     input     update,
@@ -18,7 +22,7 @@ module arbiter
 
 	// if we have one big block, just do flat arbitration between all ports
 	begin
-	   if(use_arbiter_type == 0)
+	   if(use_architecture == 0)
 	     begin
 		rr_arbiter
 		  #(.num_ports(num_ports),
@@ -30,7 +34,7 @@ module arbiter
 		   .req(req),
 		   .gnt(gnt));
 	     end
-	   else if(use_arbiter_type == 1)
+	   else if(use_architecture == 1)
 	     begin
 		matrix_arbiter
 		  #(.num_ports(num_ports),
@@ -65,7 +69,7 @@ module arbiter
 		
 		assign stg2_req[i] = |stg1_req;
 
-		if(use_arbiter_type == 0)
+		if(use_architecture == 0)
 		  begin
 		     rr_arbiter
 		       #(.num_ports(num_ports),
@@ -77,7 +81,7 @@ module arbiter
 			.req(stg1_req),
 			.gnt(stg1_gnt));
 		  end
-		else if(use_arbiter_type == 1)
+		else if(use_architecture == 1)
 		  begin
 		     matrix_arbiter
 		       #(.num_ports(num_ports),
@@ -96,7 +100,7 @@ module arbiter
 	     end
 
 	   // second stage of arbitration: arbitrate between all groups
-	   if(use_arbiter_type == 0)
+	   if(use_architecture == 0)
 	     begin
 		rr_arbiter
 		  #(.num_ports(num_ports),
@@ -108,7 +112,7 @@ module arbiter
 		   .req(stg2_req),
 		   .gnt(stg2_gnt));
 	     end
-	   else if(use_arbiter_type == 1)
+	   else if(use_architecture == 1)
 	     begin
 		matrix_arbiter
 		  #(.num_ports(num_ports),
