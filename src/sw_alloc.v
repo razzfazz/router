@@ -1,10 +1,19 @@
 module sw_alloc
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
-    parameter use_allocator_type = 0, // 0 = separable, 1 = wavefront
-    parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
-    parameter use_output_first = 0,
-    parameter use_clock_gating = 1)
+    parameter use_clock_gating = 1,
+    
+    /*
+     supported architectures:
+     
+     0: separable, input-first, RR arbiters
+     1: separable, output-first, RR arbiters
+     2: separable, input-first, matrix arbiters
+     3: separable, output-first, matrix arbiters
+     4: wavefront, RR arbiters
+     5: wavefront, matrix arbiters
+      */
+    parameter use_architecture = 0)
    (input     clk,
     input     reset,
     
@@ -60,15 +69,15 @@ module sw_alloc
 
    generate
       
-      if(use_allocator_type == 0)
+      if((use_architecture >= 0) && (use_architecture <= 3))
 	begin
-	   if(use_output_first == 1)
+	   if((use_architecture >> 1) & 1)
 	     begin
 		
 		sw_alloc_core_sep_of
 		  #(.num_ports(num_ports),
 		    .num_vcs(num_vcs),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_arbiter_type(use_architecture & 1),
 		    .use_clock_gating(use_clock_gating))
 		core_sep_of
 		  (.clk(clk),
@@ -84,7 +93,7 @@ module sw_alloc
 		sw_alloc_core_sep_if
 		  #(.num_ports(num_ports),
 		    .num_vcs(num_vcs),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_arbiter_type(use_architecture & 1).
 		    .use_clock_gating(use_clock_gating))
 		core_sep_if
 		  (.clk(clk),
@@ -95,13 +104,13 @@ module sw_alloc
 
 	     end
 	end
-      else if(use_allocator_type == 1)
+      else if((use_architecture == 5) || (use_architecture == 6))
 	begin
 	   
 	   sw_alloc_core_wf
 	     #(.num_ports(num_ports),
 	       .num_vcs(num_vcs),
-	       .use_arbiter_type(use_arbiter_type),
+	       .use_arbiter_type(use_architecture & 1),
 	       .use_clock_gating(use_clock_gating))
 	   core_wf
 	     (.clk(clk),
