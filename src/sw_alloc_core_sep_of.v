@@ -84,16 +84,23 @@ module sw_alloc_core_sep_of
 	      .data_out(req1_ivc));
 	     
 	   wire [0:num_vcs-1] 		gnt1_ivc;
-	   arbiter
-	     #(.num_ports(num_vcs),
-	       .use_arbiter_type(use_architecture & 1),
-	       .use_clock_gating(use_clock_gating))
-	   arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .update(update_arb),
-	      .req(req1_ivc),
-	      .gnt(gnt1_ivc));
+	   if(num_vcs > 1)
+	     begin
+		arbiter
+		  #(.num_ports(num_vcs),
+		    .use_arbiter_type(use_architecture & 1),
+		    .use_clock_gating(use_clock_gating))
+		arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .update(update_arb),
+		   .req(req1_ivc),
+		   .gnt(gnt1_ivc));
+	     end
+	   else
+	     begin
+		assign gnt1_ivc = req1_ivc;
+	     end
 	   
 
 	   //-------------------------------------------------------------------
