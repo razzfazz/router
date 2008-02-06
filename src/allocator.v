@@ -1,9 +1,8 @@
 module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 
-   parameter num_ports = 10;
+   parameter num_ports = 14;
    parameter use_clock_gating = 0;
-   parameter use_allocator_type = 1;
-   parameter use_arbiter_type = 0;
+   parameter use_architecture = 1;
 
    input CLK;
    input RST;
@@ -31,7 +30,7 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
    
    generate
 
-      if(use_allocator_type == 0)
+      if((use_architecture == 0) || (use_architecture == 1))
 	begin
 
 	   // [sort order: input port,output port]
@@ -58,7 +57,7 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   
 		arbiter
 		  #(.num_ports(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_arbiter_type(use_architecture),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
@@ -104,7 +103,7 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   
 		arbiter
 		  #(.num_ports(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_arbiter_type(use_architecture),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
@@ -127,7 +126,7 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   assign gnt_ip_op = gnt2_ip_op;
 	   
 	end
-      else if((use_allocator_type == 1) || (use_allocator_type == 2))
+      else if((use_architecture == 2) || (use_architecture == 3))
 	begin
 
 	   wire update;
@@ -137,7 +136,7 @@ module allocator(CLK, RST, req_ip, req_ip_op, gnt_ip_op);
 	   wf_alloc
 	     #(.num_ports(num_ports),
 	       .use_clock_gating(use_clock_gating),
-	       .use_architecture(use_allocator_type-1))
+	       .use_architecture(use_architecture-2))
 	   alloc
 	     (.clk(clk),
 	      .reset(reset),
