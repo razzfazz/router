@@ -12,7 +12,7 @@ module rr_arbiter
    
    wire [0:num_ports-1] 	gnt_unqual = req_rev & -req_rev;
 
-   wire [0:num_ports-2] 	mask = prev_q - 1;
+   wire [0:num_ports-2] 	mask = prev_q - {{num_ports-2{1'b0}}, 1'b1};
    wire [0:num_ports-2] 	req_qual = req_rev[0:num_ports-2] & ~mask;
    wire [0:num_ports-2] 	gnt_qual = req_qual & -req_qual;
    
