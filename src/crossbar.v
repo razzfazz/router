@@ -18,7 +18,7 @@ module crossbar
 
    interleaver
      #(.width(num_ports),
-       .num_ports(num_ports))
+       .num_blocks(num_ports))
    ctrl_intl
      (.data_in(ctrl_in),
       .data_out(ctrl_op_ip));
