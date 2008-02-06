@@ -5,9 +5,11 @@ module wf_alloc
     
     // enable clock gating?
     parameter use_clock_gating = 1,
-    
-    parameter use_architecture = 0) // 0 = more area/speed, 1 = less area/speed
-   
+
+    /* supported architectures:
+     0: rotate inputs based on priority
+     1: replicate logic for priorities */
+    parameter use_architecture = 0)
    (input     clk,
     input     reset,
 
@@ -75,73 +77,6 @@ module wf_alloc
    generate
 
       if(use_architecture == 0)
-	begin
-
-	   // [sort order: input port,output port,priority group]
-	   wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
-
-	   genvar 				    prio;
-	   
-	   for(prio = 0; prio < num_ports; prio = prio + 1)
-	     begin:prios
-		
-		// [sort order: input port,output port]
-		wire [0:num_ports*num_ports-1] req_int;
-		wire [0:num_ports*num_ports-1] gnt_int;
-		wire [0:num_ports*num_ports-1] y;
-
-		genvar 			       row;
-		
-		for(row = 0; row < num_ports; row = row + 1)
-		  begin:rows
-		     
-		     wire [0:num_ports-1] x_in, y_in;
-		     wire [0:num_ports]   x_out, y_out;
-		     wire [0:num_ports-1] req_in;
-		     wire [0:num_ports-1] gnt_out;
-		     
-		     assign x_in = x_out[0:num_ports-1];
-		     assign y_in = y[((row+num_ports)%num_ports)*num_ports:
-				     ((row+num_ports)%num_ports+1)*num_ports-1];
-		     assign req_in = req_int[row*num_ports:(row+1)*num_ports-1];
-		     
-		     assign x_out = {1'b1, (~y_in | ~req_in) & x_in};
-		     assign y_out = {1'b1, (~x_in | ~req_in) & y_in};
-		     assign gnt_out = req_in & x_in & y_in;
-		     
-		     assign y[((row+num_ports+1)%num_ports)*num_ports:
-			      ((row+num_ports+1)%num_ports+1)*num_ports-1]
-			      = y_out[0:num_ports-1];
-		     assign gnt_int[row*num_ports:(row+1)*num_ports-1]
-			      = gnt_out;
-		
-		     genvar 		  col;
-		     
-		     for(col = 0; col < num_ports; col = col + 1)
-		       begin:cols
-			  
-			  assign req_int[row*num_ports+col] 
-				   = req[((prio+row)%num_ports)*num_ports +
-					 (num_ports-row+col)%num_ports];
-			  assign gnt_by_prio[((prio+row)%num_ports)*num_ports +
-					     (num_ports-row+col)%num_ports +
-					     prio*num_ports*num_ports]
-				   = gnt_int[row*num_ports+col];
-			  
-		       end
-		  end
-	     end
-	   
-	   select_1ofn
-	     #(.width(num_ports*num_ports),
-	       .num_ports(num_ports))
-	   gnt_sel
-	     (.select(prio_q),
-	      .data_in(gnt_by_prio),
-	      .data_out(gnt));
-	   
-	end
-      else if(use_architecture == 1)
 	begin
 
 	   // [sort order: input port,output port]
@@ -225,6 +160,73 @@ module wf_alloc
 		     
 		  end		
 	     end
+	end
+    else if(use_architecture == 1)
+	begin
+
+	   // [sort order: input port,output port,priority group]
+	   wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
+
+	   genvar 				    prio;
+	   
+	   for(prio = 0; prio < num_ports; prio = prio + 1)
+	     begin:prios
+		
+		// [sort order: input port,output port]
+		wire [0:num_ports*num_ports-1] req_int;
+		wire [0:num_ports*num_ports-1] gnt_int;
+		wire [0:num_ports*num_ports-1] y;
+
+		genvar 			       row;
+		
+		for(row = 0; row < num_ports; row = row + 1)
+		  begin:rows
+		     
+		     wire [0:num_ports-1] x_in, y_in;
+		     wire [0:num_ports]   x_out, y_out;
+		     wire [0:num_ports-1] req_in;
+		     wire [0:num_ports-1] gnt_out;
+		     
+		     assign x_in = x_out[0:num_ports-1];
+		     assign y_in = y[((row+num_ports)%num_ports)*num_ports:
+				     ((row+num_ports)%num_ports+1)*num_ports-1];
+		     assign req_in = req_int[row*num_ports:(row+1)*num_ports-1];
+		     
+		     assign x_out = {1'b1, (~y_in | ~req_in) & x_in};
+		     assign y_out = {1'b1, (~x_in | ~req_in) & y_in};
+		     assign gnt_out = req_in & x_in & y_in;
+		     
+		     assign y[((row+num_ports+1)%num_ports)*num_ports:
+			      ((row+num_ports+1)%num_ports+1)*num_ports-1]
+			      = y_out[0:num_ports-1];
+		     assign gnt_int[row*num_ports:(row+1)*num_ports-1]
+			      = gnt_out;
+		
+		     genvar 		  col;
+		     
+		     for(col = 0; col < num_ports; col = col + 1)
+		       begin:cols
+			  
+			  assign req_int[row*num_ports+col] 
+				   = req[((prio+row)%num_ports)*num_ports +
+					 (num_ports-row+col)%num_ports];
+			  assign gnt_by_prio[((prio+row)%num_ports)*num_ports +
+					     (num_ports-row+col)%num_ports +
+					     prio*num_ports*num_ports]
+				   = gnt_int[row*num_ports+col];
+			  
+		       end
+		  end
+	     end
+	   
+	   select_1ofn
+	     #(.width(num_ports*num_ports),
+	       .num_ports(num_ports))
+	   gnt_sel
+	     (.select(prio_q),
+	      .data_in(gnt_by_prio),
+	      .data_out(gnt));
+	   
 	end
       
    endgenerate

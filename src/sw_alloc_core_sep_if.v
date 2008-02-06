@@ -1,12 +1,16 @@
-// switch allocator
+// switch allocator core
 // (separable, input-first)
 
 module sw_alloc_core_sep_if
 
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
-    parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
-    parameter use_clock_gating = 1)
+    parameter use_clock_gating = 1,
+    
+    /* supported architectures:
+     0: use round-robin arbiters
+     1: use matrix arbiters */
+    parameter use_architecture = 0)
    (input     clk,
     input     reset,
     
@@ -75,7 +79,7 @@ module sw_alloc_core_sep_if
 	   wire [0:num_vcs-1] 		gnt1_ivc;
 	   arbiter
 	     #(.num_ports(num_vcs),
-	       .use_arbiter_type(use_arbiter_type),
+	       .use_arbiter_type(use_architecture & 1),
 	       .use_clock_gating(use_clock_gating))
 	   arb
 	     (.clk(clk),
@@ -105,6 +109,8 @@ module sw_alloc_core_sep_if
 	   //-------------------------------------------------------------------
 	   // generate global grants
 	   //-------------------------------------------------------------------
+
+	   wire [0:num_vcs-1] 		gnt_ivc;
 	   
 	   select_1ofn
 	     #(.width(num_vcs),
@@ -187,7 +193,7 @@ module sw_alloc_core_sep_if
 	   wire [0:num_ports-1] gnt2_ip;
 	   arbiter
 	     #(.num_ports(num_ports),
-	       .use_arbiter_type(use_arbiter_type),
+	       .use_arbiter_type(use_architecture & 1),
 	       .use_clock_gating(use_clock_gating))
 	   arb
 	     (.clk(clk),
