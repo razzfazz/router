@@ -1,7 +1,7 @@
 module testbench
   #(parameter Tclk = 6,
     parameter num_ports = NUM_PORTS,
-    parameter use_clock_gating = 1,
+    parameter use_clock_gating = 0,
     parameter use_allocator_type = USE_ALLOCATOR_TYPE, // 0 = separable, 1 = wavefront, 2 = grant all
     parameter use_arbiter_type = USE_ARBITER_TYPE, // 0 = RR, 1 = matrix
     parameter mean_delay = MEAN_DELAY,
@@ -33,7 +33,7 @@ module testbench
       #(Tclk/2);
    end
 
-   // [sort order: input port,output port]
+   wire [0:num_ports-1] req_ip;
    wire [0:num_ports*num_ports-1] req_ip_op;
    wire [0:num_ports*num_ports-1] gnt_ip_op;
 
@@ -81,6 +81,7 @@ module testbench
 	   assign avg_rate[i*32:(i+1)*32-1] = drv_avg_rate;
 	   assign avg_match[i*32:(i+1)*32-1] = drv_avg_match;
 	   assign req_ip_op[i*num_ports:(i+1)*num_ports-1] = req_op;
+	   assign req_ip[i] = |req_op;
 	   
 	   assign drv_error_bad_alloc = |(gnt_op & ~req_op);
 
@@ -102,8 +103,9 @@ module testbench
    alloc
      (.CLK(clk),
       .RST(reset),
-      .req(req_ip_op),
-      .gnt(gnt_ip_op));
+      .req_ip(req_ip),
+      .req_ip_op(req_ip_op),
+      .gnt_ip_op(gnt_ip_op));
 
    
    always@(posedge clk)
