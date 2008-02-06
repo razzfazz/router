@@ -48,7 +48,8 @@ module wf_alloc
 	   dff
 	     #(.width(num_ports),
 	       .reset_type(1),
-	       .reset_value({1'b1, {(num_ports-1){1'b0}}}))
+	       .reset_value({1'b1, {(num_ports-1){1'b0}}}),
+	       .use_enable(0))
 	   prioq
 	     (.clk(clk_gated),
 	      .reset(reset),
