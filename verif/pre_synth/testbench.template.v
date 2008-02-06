@@ -1,14 +1,15 @@
 module testbench
   #(parameter Tclk = 6,
     parameter num_ports = NUM_PORTS,
-    parameter use_clock_gating = 0,
+    parameter num_vcs = NUM_VCS,
+    parameter use_clock_gating = USE_CLOCK_GATING,
     parameter use_allocator_type = USE_ALLOCATOR_TYPE, // 0 = separable, 1 = wavefront, 2 = grant all
     parameter use_arbiter_type = USE_ARBITER_TYPE, // 0 = RR, 1 = matrix
     parameter mean_delay = MEAN_DELAY,
     parameter fixed_delay = FIXED_DELAY,
     parameter hold_requests = HOLD_REQUESTS,
-    parameter runtime = 100000,
-    parameter output_as_csv = 1)
+    parameter runtime = RUNTIME,
+    parameter output_as_csv = OUTPUT_AS_CSV)
    ();
    
    function integer pop_count(input [0:num_ports-1] x);
