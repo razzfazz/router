@@ -1,8 +1,12 @@
 module vc_alloc_sep_if
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
-    parameter use_arbiter_type = 1, // 0 = RR, 1 = matrix
-    parameter use_clock_gating = 1)
+    parameter use_clock_gating = 1,
+
+    /* supported architectures:
+     0: use round-robin arbiters
+     1: use matrix arbiters */
+    parameter use_architecture = 0)
    (input     clk,
     input     reset,
     
@@ -64,7 +68,7 @@ module vc_alloc_sep_if
 		arbiter
 		  #(.num_ports(num_ports*num_vcs),
 		    .num_blocks(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_architecture(use_architecture),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
@@ -153,7 +157,7 @@ module vc_alloc_sep_if
 		arbiter
 		  #(.num_ports(num_ports*num_vcs),
 		    .num_blocks(num_ports),
-		    .use_arbiter_type(use_arbiter_type),
+		    .use_architecture(use_architecture),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
