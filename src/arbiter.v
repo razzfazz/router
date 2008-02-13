@@ -72,9 +72,9 @@ module arbiter
 		if(use_architecture == 0)
 		  begin
 		     rr_arbiter
-		       #(.num_ports(num_ports),
+		       #(.num_ports(ports_per_block),
 			 .use_clock_gating(use_clock_gating))
-		     arb
+		     stg1_arb
 		       (.clk(clk),
 			.reset(reset),
 			.update(update),
@@ -84,9 +84,9 @@ module arbiter
 		else if(use_architecture == 1)
 		  begin
 		     matrix_arbiter
-		       #(.num_ports(num_ports),
+		       #(.num_ports(ports_per_block),
 			 .use_clock_gating(use_clock_gating))
-		     arb
+		     stg1_arb
 		       (.clk(clk),
 			.reset(reset),
 			.update(update),
@@ -103,9 +103,9 @@ module arbiter
 	   if(use_architecture == 0)
 	     begin
 		rr_arbiter
-		  #(.num_ports(num_ports),
+		  #(.num_ports(num_blocks),
 		    .use_clock_gating(use_clock_gating))
-		arb
+		stg2_arb
 		  (.clk(clk),
 		   .reset(reset),
 		   .update(update),
@@ -115,9 +115,9 @@ module arbiter
 	   else if(use_architecture == 1)
 	     begin
 		matrix_arbiter
-		  #(.num_ports(num_ports),
+		  #(.num_ports(num_blocks),
 		    .use_clock_gating(use_clock_gating))
-		arb
+		stg2_arb
 		  (.clk(clk),
 		   .reset(reset),
 		   .update(update),
