@@ -89,7 +89,7 @@ module sw_alloc_core_wf
 	     begin
 		arbiter
 		  #(.num_ports(num_vcs),
-		    .use_arbiter_type(use_architecture & 1),
+		    .use_architecture(use_architecture & 1),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),

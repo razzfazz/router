@@ -88,7 +88,7 @@ module sw_alloc_core_sep_of
 	     begin
 		arbiter
 		  #(.num_ports(num_vcs),
-		    .use_arbiter_type(use_architecture & 1),
+		    .use_architecture(use_architecture & 1),
 		    .use_clock_gating(use_clock_gating))
 		arb
 		  (.clk(clk),
@@ -216,7 +216,7 @@ module sw_alloc_core_sep_of
 	   wire [0:num_ports-1] gnt2_ip;
 	   arbiter
 	     #(.num_ports(num_ports),
-	       .use_arbiter_type(use_architecture & 1),
+	       .use_architecture(use_architecture & 1),
 	       .use_clock_gating(use_clock_gating))
 	   arb
 	     (.clk(clk),
