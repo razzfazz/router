@@ -44,5 +44,6 @@ clean:
 	rm -f $(rpt_dir)/$(proj)_syn_wrapper.*
 	rm -f $wrappers/*
 	rm -f $(net_dir)/$(proj)_syn_wrapper.*
+	rm -f *.pvl *.syn *.mr
 	rm -f *~
 
