@@ -1,4 +1,4 @@
-source $script_dir/setup_proj_paths.tcl
+source ${script_dir}/setup_proj_paths.tcl
 
 set hdlin_auto_save_templates true
 
@@ -11,6 +11,6 @@ set hdlin_auto_save_templates true
 
 set link_library "*"
 
-source $script_dir/setup_tsmc.tcl
+source ${script_dir}/setup_tsmc.tcl
 
-source $script_dir/setup_dw.tcl
+source ${script_dir}/setup_dw.tcl
