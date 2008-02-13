@@ -23,13 +23,13 @@ $dir = "rpt" unless $dir;
 print "Using module $module in dir $dir\n";
 
 #check list file for errors
-print "checking $module.lis file for errors\n";
+print "checking $module.out file for errors\n";
 
-@errors = `grep Error $dir/$module.lis`;
+@errors = `grep Error $dir/$module.out`;
 if(@errors)
 {
     if ($noninteractive){
-        print "Errors found in $module.lis, aborting\n";
+        print "Errors found in $module.out, aborting\n";
     }
     my $again = 1;
     while($again){
