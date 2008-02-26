@@ -16,14 +16,228 @@ module testbench
     parameter use_architecture = USE_ARCHITECTURE)
    ();
    
-   function integer pop_count(input [0:num_ports-1] x);
-      integer i;
+   function integer get_flow(input [0:num_ports*num_ports-1] gnt_matrix);
+      integer i, j;
       begin
-	 pop_count = 0;
+	 get_flow = 0;
 	 for(i = 0; i < num_ports; i = i + 1)
 	   begin
-              pop_count = pop_count + x[i];
+	      for(j = 0; j < num_ports; j = j + 1)
+		begin
+		   if(gnt_matrix[i*num_ports+j])
+		     get_flow = get_flow + 1;
+		end
 	   end
+      end
+   endfunction
+   
+/*   function integer max_flow(input [0:num_ports*num_ports-1] req_matrix);
+      integer i, j, k, l;
+      integer i_k, j_k, j_l;
+      integer sum;
+      begin
+	 
+	 // can have at most 1 grant per port, so we start out with that
+	 max_flow = num_ports;
+	 
+	 // traverse all possible cut sets
+	 for(i = 0; i < 2 ** num_ports; i = i + 1)
+	   begin
+	      sum = 0;
+	      for(j = 0; j < 2 ** num_ports; j = j + 1)
+		begin
+		   for(k = 0; k < num_ports; k = k + 1)
+		     begin
+			
+			i_k = (i >> k) & 1;
+			j_k = (j >> k) & 1;
+			j_l = (j >> l) & 1;
+			
+			// add 1 for each input node in right part of cut set
+			if(!i_k)
+			  sum = sum + 1;
+			
+			// add 1 for each output node in left part of cut set
+			if(j_k)
+			  sum = sum + 1;
+			
+			for(l = 0; l < num_ports; l = l + 1)
+			  begin
+			     
+			     // add 1 for each request where the input port is
+			     // in the left part of the cutset and the output
+			     // port is in its right part
+			     if(i_k && !j_l)
+			       sum = sum + req_matrix[k*num_ports+l];
+			     
+			  end
+		     end
+		   if (sum < max_flow)
+		     max_flow = sum;
+		end
+	   end
+      end
+   endfunction
+*/
+
+   function [0:num_ports*num_ports-1] augment_alloc
+     (input [0:num_ports*num_ports-1] requests,
+      input [0:num_ports*num_ports-1] grants);
+      reg [0:num_ports*num_ports-1] results;
+      integer 			    i, j;
+/*      integer 			    k;*/
+      reg 			    done;
+      reg 			    assigned;
+      begin
+/*	 $display(">>>augment_alloc");
+	 $display("Requests:");
+	 for(i = 0; i < num_ports; i = i + 1)
+	   $display("%b", requests[i*num_ports +: num_ports]);
+	 $display("Grants:");
+	 for(i = 0; i < num_ports; i = i + 1)
+	   $display("%b", grants[i*num_ports +: num_ports]);*/
+	 done = 1'b0;
+	 requests = requests & ~grants;
+	 while(!done)
+	   begin
+/*	      $display("begin while loop");*/
+	      done = 1'b1;
+	      for(i = 0; i < num_ports; i = i + 1)
+		begin
+/*		   $display("begin for loop (i=%d)", i);*/
+		   assigned = 1'b0;
+		   for(j = 0; j < num_ports; j = j + 1)
+		     begin
+			if(grants[j*num_ports+i])
+			  begin
+			     assigned = 1'b1;
+			  end
+		     end
+		   if(!assigned)
+		     begin
+/*			$display("checking port %d", i);*/
+			results = find_aug_path(i, {num_ports{1'b0}}, requests, grants);
+			if(|results)
+			  begin
+			     requests = requests ^ results;
+			     grants = grants ^ results;
+			     done = 1'b0;
+			     i = num_ports;
+/*			     $display("found path; restarting");
+			     $display("New request matrix:");
+			     for(k = 0; k < num_ports; k = k + 1)
+			       $display("%b", requests[k*num_ports +: num_ports]);
+			     $display("New grant matrix:");
+			     for(k = 0; k < num_ports; k = k + 1)
+			       $display("%b", grants[k*num_ports +: num_ports]);*/
+			  end
+		     end
+/*		   $display("end for loop");*/
+		end
+/*	      $display("end while loop");*/
+	   end
+	 augment_alloc = grants;
+/*	 $display("Augmented:");
+	 for(i = 0; i < num_ports; i = i + 1)
+	   $display("%b", augment_alloc[i*num_ports +: num_ports]);
+	 $display("<<<augment_alloc");*/
+      end
+   endfunction
+   
+   function automatic [0:num_ports*num_ports-1] find_aug_path
+     (input integer port_select,
+      input [0:num_ports-1] ports_ignore,
+      input [0:num_ports*num_ports-1] requests,
+      input [0:num_ports*num_ports-1] grants);
+      reg [0:num_ports*num_ports-1] results;
+      reg 			    done;
+      integer 			    i, j;
+      begin
+/*	 $display(">>>find_aug_path");
+	 $display("port_select=%d, ports_ignore=%b", port_select, ports_ignore);
+	 $display("Requests:");
+	 for(i = 0; i < num_ports; i = i + 1)
+	   $display("%b", requests[i*num_ports +: num_ports]);
+	 $display("Grants:");
+	 for(i = 0; i < num_ports; i = i + 1)
+	   $display("%b", grants[i*num_ports +: num_ports]);*/
+	 find_aug_path = {num_ports*num_ports{1'b0}};
+	 done = 1'b0;
+	 for(i = 0; (i < num_ports) && !done; i = i + 1)
+	   begin
+
+/*	      $display("checking input port %d", i);*/
+	      
+	      // check if there is an unsatisfied request from this input port
+	      if(requests[i*num_ports+port_select] && !ports_ignore[i])
+		begin
+
+		   find_aug_path[i*num_ports+port_select] = 1'b1;
+
+		   if(!(|grants[i*num_ports +: num_ports]))
+		     begin
+
+/*			$display("input port %d has not been granted to anybody so far; terminating", i);*/
+			
+			// if input port has not yet been granted, we have found
+			// an augmenting path, and leave the loop (we know there
+			// was a request from this input port to our initial
+			// output port, i.e., the lack of grant is not simply
+			// due to no request having been made by this input)
+			done = 1'b1;
+			     
+		     end
+			
+		   // has this input port been granted to someone else?
+		   // (can't be the current output, otherwise we wouldn't have
+		   // an unsatisfied request)
+		   for(j = 0; (j < num_ports) && !done; j = j + 1)
+		     begin
+			if(grants[i*num_ports+j])
+			  begin
+
+/*			     $display("input port %d was previously granted to output port %d; recursing", i, j);*/
+			     
+			     // try if removing that grant helps using recursion
+			     find_aug_path[i*num_ports+j] = 1'b1;
+			     results = find_aug_path(j, ports_ignore | ({1'b1, {num_ports-1{1'b0}}} >> i),
+						     requests ^ find_aug_path,
+						     grants ^ find_aug_path);
+			     if(|results)
+			       begin
+				  
+				  // we found an augmenting path, so look no
+				  // further
+				  find_aug_path
+				    = find_aug_path | results;
+				  done = 1'b1;
+				  
+			       end
+			     else
+			       begin
+
+				  // this path didn't work out, so remove from
+				  // results
+				  find_aug_path[i*num_ports+j] = 1'b0;
+			     
+			       end
+			  end
+		     end
+		   
+		   if(!done)
+		     begin
+
+			// none of the paths through this input port worked out,
+			// so remove from results
+			find_aug_path[i*num_ports+port_select] = 1'b0;
+			
+		     end
+		end
+	   end
+/*	 $display("Result:");
+	 for(i = 0; i < num_ports; i = i + 1)
+	   $display("%b", find_aug_path[i*num_ports +: num_ports]);
+	 $display("<<<find_aug_path");*/
       end
    endfunction
    
@@ -108,6 +322,7 @@ module testbench
       .req_ip_op(req_ip_op),
       .gnt_ip_op(gnt_ip_op));
 
+   reg [0:num_ports*num_ports-1] max_ip_op;
    
    always@(posedge clk)
      begin
@@ -115,12 +330,17 @@ module testbench
      end
 
    
-   integer k;
+   integer k, l, m;
 
    integer mean_latency = 0;
    integer mean_rate = 0;
    integer mean_match = 0;
-   
+
+   integer grant_actual = 0;
+   integer grant_ideal = 0;
+
+   integer flow_ideal = 0;
+   integer flow_actual = 0;
 	   
    initial
    begin
@@ -130,9 +350,35 @@ module testbench
       #(2*Tclk)
       
       reset = 0'b0;
-      
-      #(runtime*Tclk);
 
+      for(k = 0; k < runtime; k = k + 1)
+	begin
+	   #(Tclk);
+	   max_ip_op = augment_alloc(req_ip_op, gnt_ip_op);
+	   flow_ideal = get_flow(max_ip_op);
+	   flow_actual = get_flow(gnt_ip_op);
+	   grant_ideal = grant_ideal + flow_ideal;
+	   grant_actual = grant_actual + flow_actual;
+	   if(|(max_ip_op & ~req_ip_op) || (flow_actual > flow_ideal))
+	     begin
+		$display("ERROR: Assertion failed!");
+		$display("Requests:");
+		for(l = 0; l < num_ports; l = l + 1)
+		  $display("%b", req_ip_op[l*num_ports +: num_ports]);
+		$display("Grants:");
+		for(l = 0; l < num_ports; l = l + 1)
+		  $display("%b", gnt_ip_op[l*num_ports +: num_ports]);
+		$display("Augmented:");
+		for(l = 0; l < num_ports; l = l + 1)
+		  $display("%b", max_ip_op[l*num_ports +: num_ports]);
+		$display("");
+	      end
+	end
+
+      $display("flow analysis: actual=%d, ideal=%d (%d%%)",
+	       grant_actual, grant_ideal, 100 * grant_actual / grant_ideal);
+      $display("");
+      
       if(output_as_csv)
 	begin
 	   $display("driver,latency,rate,match,errors");
@@ -175,7 +421,7 @@ module testbench
 		    mean_match * 0.0001 / num_ports);
 	   $display("----------------------------------------------------");
 	end
-      
+
       $finish;
       
    end
