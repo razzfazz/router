@@ -4,18 +4,24 @@ module or_nto1
    (input [0:width*num_ports-1] data_in,
     output [0:width-1] data_out);
 
-    genvar i;
     generate
+
+       genvar i;
        for(i = 0; i < width; i = i + 1)
 	 begin:bit_positions
+	    
 	    wire [0:num_ports-1] data;
-	    genvar 	      j;
+	    
+	    genvar 		 j;
 	    for(j = 0; j < num_ports; j = j + 1)
 	      begin:input_ports
 		 assign data[j] = data_in[j*width+i];
 	      end
+	    
 	    assign data_out[i] = |data;
+	    
 	 end
+       
     endgenerate
 
 endmodule

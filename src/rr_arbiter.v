@@ -30,7 +30,6 @@ module rr_arbiter
 
    wire [0:num_ports-2] 	prev_s;
 
-   genvar 			i;
    generate   
 
       if(hold_type == 0)
@@ -38,6 +37,7 @@ module rr_arbiter
       else if((hold_type == 1) || (hold_type == 2))
 	assign prev_s = gnt_rev[1:num_ports-1];
       
+      genvar 			i;
       for(i = 0; i < num_ports; i = i + 1)
 	begin:connect
 	   assign req_rev[i] = req[(num_ports-1)-i];

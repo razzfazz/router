@@ -12,14 +12,16 @@ module matrix_arbiter
    
    wire [0:num_ports*num_ports-1] prio_s, prio_q;
    
-   genvar 			  row, col;
-   genvar 			  i;
    generate
-      
+
+      genvar 			  row;
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
+
+	   genvar col;
 	   for(col = 0; col < num_ports; col = col + 1)
 	     begin:cols
+		
 		if(row < col)
 		  begin
 		     dff
@@ -51,6 +53,7 @@ module matrix_arbiter
 	     end
 	end
 
+      genvar i;
       for(i = 0; i < num_ports; i = i + 1)
 	begin:gnts
 	   assign gnt[i] = req[i] & 
