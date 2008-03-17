@@ -1,14 +1,14 @@
 module dff
-  #(  parameter width = 32,
-      parameter offset = 0,
-      parameter reset_type = 0, // 0 = none, 1 = async, 2 = sync
-      parameter reset_value = {width{1'b0}},
-      parameter use_enable = 0)
-   (   input clk,
-       input reset,
-       input enable,
-       input [offset:offset+width-1] d,
-       output reg [offset:offset+width-1] q);
+  #(parameter width = 32,
+    parameter offset = 0,
+    parameter reset_type = 0, // 0 = none, 1 = async, 2 = sync
+    parameter reset_value = {width{1'b0}},
+    parameter hold_type = 0) // 0 = explicit, 1 = enable pin, 2 = clock gating
+   (input clk,
+    input reset,
+    input enable,
+    input [offset:offset+width-1] d,
+    output reg [offset:offset+width-1] q);
 
    generate
 
@@ -16,7 +16,7 @@ module dff
 
 	0:
 	  always @(posedge clk)
-	    if(enable || !use_enable)
+	    if((hold_type != 1) || enable)
 	      q <= d;
 	
 	1:
@@ -24,7 +24,7 @@ module dff
 	    if(reset)
 	      q <= reset_value;
 	    else
-	      if(enable || !use_enable)
+	      if((hold_type != 1) || enable)
 		q <= d;
 
 	2:
@@ -32,7 +32,7 @@ module dff
 	    if(reset)
 	      q <= reset_value;
 	    else
-	      if(enable || !use_enable)
+	      if((hold_type != 1) || enable)
 		q <= d;
 
       endcase 
