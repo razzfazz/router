@@ -1,14 +1,17 @@
 module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 
-   parameter num_ports = 10;
-   parameter use_clock_gating = 0;
+   parameter num_ports = 15;
+
+   // see dff.v for supported values
+   parameter reset_type = 1;
+   parameter hold_type = 1;
 
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
     2: wavefront, rotate inputs for priority
     3: wavefront, replicated logic for priority */
-   parameter use_architecture = 0;
+   parameter architecture = 4;
 
    input CLK;
    input RST;
@@ -16,138 +19,133 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
    input [0:num_ports*num_ports-1] req_ip_op;
    output [0:num_ports*num_ports-1] gnt_ip_op;
    
-   wire 			     clk = CLK;
-   wire 			     reset;
+   wire clk = CLK;
+   wire reset;
    
    dff
      #(.width(1),
        .reset_type(0),
-       .use_enable(0))
+       .hold_type(0))
    resetq
      (.clk(clk),
       .d(RST),
       .q(reset));
 
-   genvar 			     i;
-   
    generate
 
-      if((use_architecture == 0) || (use_architecture == 1))
-	begin
-
-	   // [sort order: input port,output port]
-	   wire [0:num_ports*num_ports-1] req1_ip_op;
-	   wire [0:num_ports*num_ports-1] gnt1_ip_op;   
-	   wire [0:num_ports*num_ports-1] gnt2_ip_op;   
-
-	   assign req1_ip_op = req_ip_op;
-
-	   // first stage arbiters
-	   for(i = 0; i < num_ports; i = i + 1)
-	     begin:input_ports
-
-		wire [0:num_ports-1] req1_op;
-		wire [0:num_ports-1] gnt1_op;
-		wire [0:num_ports-1] gnt2_op;
-
-		assign req1_op = req1_ip_op[i*num_ports:(i+1)*num_ports-1];
-		assign gnt2_op = gnt2_ip_op[i*num_ports:(i+1)*num_ports-1];
-		
-		wire 		     update;
-
-		assign update = |gnt2_op;
-	   
-		arbiter
-		  #(.num_ports(num_ports),
-		    .use_architecture(use_architecture & 1),
-		    .use_clock_gating(use_clock_gating))
-		arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update),
-		   .req(req1_op),
-		   .gnt(gnt1_op));
-
-		assign gnt1_ip_op[i*num_ports:(i+1)*num_ports-1] = gnt1_op;
-		
-	     end
-
-	   // [sort order: input port,output port]
-	   wire [0:num_ports*num_ports-1] req2_ip_op;
-
-	   assign req2_ip_op = gnt1_ip_op;
-
-	   // [sort order: output port,input port]
-	   wire [0:num_ports*num_ports-1] req2_op_ip;
-   
-	   interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   req2_intl
-	     (.data_in(req2_ip_op),
-	      .data_out(req2_op_ip));
-
-	   // [sort order: output port,input port]
-	   wire [0:num_ports*num_ports-1] gnt2_op_ip;
-
-	   // second stage arbiters
-	   for(i = 0; i < num_ports; i = i + 1)
-	     begin:output_ports
-		
-		wire [0:num_ports-1] req2_ip;
-		wire [0:num_ports-1] gnt2_ip;
-
-		assign req2_ip = req2_op_ip[i*num_ports:(i+1)*num_ports-1];
-		
-		wire 		     update;
-		
-		assign update = |req2_ip;
-	   
-		arbiter
-		  #(.num_ports(num_ports),
-		    .use_architecture(use_architecture & 1),
-		    .use_clock_gating(use_clock_gating))
-		arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update),
-		   .req(req2_ip),
-		   .gnt(gnt2_ip));
-
-		assign gnt2_op_ip[i*num_ports:(i+1)*num_ports-1] = gnt2_ip;
-		
-	     end
-	   
-	   interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   gnt2_intl
-	     (.data_in(gnt2_op_ip),
-	      .data_out(gnt2_ip_op));
-
-	   assign gnt_ip_op = gnt2_ip_op;
-	   
-	end
-      else if((use_architecture == 2) || (use_architecture == 3))
-	begin
-
-	   wire update;
-	   
-	   assign update = |req_ip_op;
+      case(architecture)
+	0, 1:
+	  begin
 	     
-	   wf_alloc
-	     #(.num_ports(num_ports),
-	       .use_clock_gating(use_clock_gating),
-	       .use_architecture(use_architecture-2))
-	   alloc
-	     (.clk(clk),
-	      .reset(reset),
-	      .update(update),
-	      .req(req_ip_op),
-	      .gnt(gnt_ip_op));
-	   
-	end
+	     wire [0:num_ports*num_ports-1] req1_ip_op;
+	     assign req1_ip_op = req_ip_op;
+	     
+	     wire [0:num_ports*num_ports-1] gnt1_ip_op;   
+	     wire [0:num_ports*num_ports-1] gnt2_ip_op;   
+	     
+	     // first stage arbiters
+	     genvar 			    i;
+	     for(i = 0; i < num_ports; i = i + 1)
+	       begin:input_ports
+		  
+		  wire [0:num_ports-1] req1_op;		  
+		  assign req1_op = req1_ip_op[i*num_ports:(i+1)*num_ports-1];
+		  
+		  wire [0:num_ports-1] gnt2_op;
+		  assign gnt2_op = gnt2_ip_op[i*num_ports:(i+1)*num_ports-1];
+		  
+		  wire 		       update;
+		  assign update = |gnt2_op;
+		  
+		  wire [0:num_ports-1] gnt1_op;
+		  arbiter
+		    #(.num_ports(num_ports),
+		      .architecture(architecture),
+		      .reset_type(reset_type),
+		      .hold_type(hold_type))
+		  arb
+		    (.clk(clk),
+		     .reset(reset),
+		     .update(update),
+		     .req(req1_op),
+		     .gnt(gnt1_op));
+		  
+		  assign gnt1_ip_op[i*num_ports:(i+1)*num_ports-1] = gnt1_op;
+		  
+	       end
+	     
+	     wire [0:num_ports*num_ports-1] req2_ip_op;
+	     assign req2_ip_op = gnt1_ip_op;
+	     
+	     wire [0:num_ports*num_ports-1] req2_op_ip;
+	     interleaver
+	       #(.width(num_ports*num_ports),
+		 .num_blocks(num_ports))
+	     req2_intl
+	       (.data_in(req2_ip_op),
+		.data_out(req2_op_ip));
+	     
+	     wire [0:num_ports*num_ports-1] gnt2_op_ip;
+	     
+	     // second stage arbiters
+	     for(i = 0; i < num_ports; i = i + 1)
+	       begin:output_ports
+		  
+		  wire [0:num_ports-1] req2_ip;
+		  assign req2_ip = req2_op_ip[i*num_ports:(i+1)*num_ports-1];
+		  
+		  wire 		       update;
+		  assign update = |req2_ip;
+		  
+		  wire [0:num_ports-1] gnt2_ip;
+		  arbiter
+		    #(.num_ports(num_ports),
+		      .architecture(architecture),
+		      .reset_type(reset_type),
+		      .hold_type(hold_type))
+		  arb
+		    (.clk(clk),
+		     .reset(reset),
+		     .update(update),
+		     .req(req2_ip),
+		     .gnt(gnt2_ip));
+		  
+		  assign gnt2_op_ip[i*num_ports:(i+1)*num_ports-1] = gnt2_ip;
+		  
+	       end
+	     
+	     interleaver
+	       #(.width(num_ports*num_ports),
+		 .num_blocks(num_ports))
+	     gnt2_intl
+	       (.data_in(gnt2_op_ip),
+		.data_out(gnt2_ip_op));
+	     
+	     assign gnt_ip_op = gnt2_ip_op;
+	     
+	  end
+	2, 3, 4:
+	  begin
+	     
+	     wire update;
+	     assign update = |req_ip_op;
+	     
+	     wf_alloc
+	       #(.num_ports(num_ports),
+		 .reset_type(reset_type),
+		 .hold_type(hold_type),
+		 .architecture(architecture-2))
+	     alloc
+	       (.clk(clk),
+		.reset(reset),
+		.update(update),
+		.req(req_ip_op),
+		.gnt(gnt_ip_op));
+	     
+	  end
+	
+      endcase
       
    endgenerate
-
+   
 endmodule
