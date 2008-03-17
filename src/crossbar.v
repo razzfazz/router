@@ -1,7 +1,11 @@
 module crossbar
   #(parameter num_ports = 5,
     parameter width = 32,
-    parameter use_muxes = 0)
+
+    /* supported architectures:
+     0: use tristate buses
+     1: use multiplexers */
+    parameter architecture = 0)
    (
     // [sort order: input port,bits]
     input [0:num_ports*width-1] data_in,
@@ -29,23 +33,7 @@ module crossbar
 	
 	   wire [0:width-1] out;
 
-	   if(use_muxes)
-	     begin
-		
-		wire [0:num_ports-1] ctrl;
-
-		assign ctrl = ctrl_op_ip[i*num_ports:(i+1)*num_ports-1];
-	   
-		select_1ofn
-		  #(.width(width),
-		    .num_ports(num_ports))
-		out_mux
-		  (.select(ctrl),
-		   .data_in(data_in),
-		   .data_out(out));
-		
-	     end
-	   else
+	   if(architecture == 0)
 	     begin
 
 		genvar j;
@@ -65,6 +53,22 @@ module crossbar
 
 		  end
 
+	     end
+	   else if(architecture == 1)
+	     begin
+		
+		wire [0:num_ports-1] ctrl;
+
+		assign ctrl = ctrl_op_ip[i*num_ports:(i+1)*num_ports-1];
+	   
+		select_1ofn
+		  #(.width(width),
+		    .num_ports(num_ports))
+		out_mux
+		  (.select(ctrl),
+		   .data_in(data_in),
+		   .data_out(out));
+		
 	     end
 
 	   assign data_out[i*width:(i+1)*width-1] = out;
