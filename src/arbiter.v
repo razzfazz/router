@@ -1,12 +1,12 @@
 module arbiter
   #(parameter num_ports = 32,
     parameter num_blocks = 1,
-    parameter use_clock_gating = 0,
+    parameter reset_type = 1,
 
     /* supported architectures:
      0: round-robin arbiter
      1: matrix arbiter */
-    parameter use_architecture = 0)
+    parameter architecture = 0)
    (input     clk,
     input     reset,
     input     update,
@@ -22,11 +22,11 @@ module arbiter
 
 	// if we have one big block, just do flat arbitration between all ports
 	begin
-	   if(use_architecture == 0)
+	   if(architecture == 0)
 	     begin
 		rr_arbiter
 		  #(.num_ports(num_ports),
-		    .use_clock_gating(use_clock_gating))
+		    .reset_type(reset_type))
 		arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -34,11 +34,11 @@ module arbiter
 		   .req(req),
 		   .gnt(gnt));
 	     end
-	   else if(use_architecture == 1)
+	   else if(architecture == 1)
 	     begin
 		matrix_arbiter
 		  #(.num_ports(num_ports),
-		    .use_clock_gating(use_clock_gating))
+		    .reset_type(reset_type))
 		arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -69,11 +69,11 @@ module arbiter
 		
 		assign stg2_req[i] = |stg1_req;
 
-		if(use_architecture == 0)
+		if(architecture == 0)
 		  begin
 		     rr_arbiter
 		       #(.num_ports(ports_per_block),
-			 .use_clock_gating(use_clock_gating))
+			 .reset_type(reset_type))
 		     stg1_arb
 		       (.clk(clk),
 			.reset(reset),
@@ -81,11 +81,11 @@ module arbiter
 			.req(stg1_req),
 			.gnt(stg1_gnt));
 		  end
-		else if(use_architecture == 1)
+		else if(architecture == 1)
 		  begin
 		     matrix_arbiter
 		       #(.num_ports(ports_per_block),
-			 .use_clock_gating(use_clock_gating))
+			 .reset_type(reset_type))
 		     stg1_arb
 		       (.clk(clk),
 			.reset(reset),
@@ -100,11 +100,11 @@ module arbiter
 	     end
 
 	   // second stage of arbitration: arbitrate between all groups
-	   if(use_architecture == 0)
+	   if(architecture == 0)
 	     begin
 		rr_arbiter
 		  #(.num_ports(num_blocks),
-		    .use_clock_gating(use_clock_gating))
+		    .reset_type(reset_type))
 		stg2_arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -112,11 +112,11 @@ module arbiter
 		   .req(stg2_req),
 		   .gnt(stg2_gnt));
 	     end
-	   else if(use_architecture == 1)
+	   else if(architecture == 1)
 	     begin
 		matrix_arbiter
 		  #(.num_ports(num_blocks),
-		    .use_clock_gating(use_clock_gating))
+		    .reset_type(reset_type))
 		stg2_arb
 		  (.clk(clk),
 		   .reset(reset),
