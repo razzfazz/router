@@ -42,11 +42,11 @@ module matrix_arbiter
 		else
 		  assign prio_q[row*num_ports+col] = ~prio_q[col*num_ports+row];
 
-		if(hold_type == 1)
+		if(hold_type == 0)
 		  assign prio_s[row*num_ports+col]
 			   = (prio_q[row*num_ports+col] | (gnt[col] & update)) &
 			     !(gnt[row] & update);
-		else if((hold_type == 0) || (hold_type == 2))
+		else if((hold_type == 1) || (hold_type == 2))
 		  assign prio_s[row*num_ports+col]
 			   = (prio_q[row*num_ports+col] | gnt[col]) & !gnt[row];
 		

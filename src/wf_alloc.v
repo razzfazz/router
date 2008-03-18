@@ -33,11 +33,11 @@ module wf_alloc
 	  begin
 	     
 	     wire [0:num_ports-1] prio_s, prio_q;
-	     if(hold_type == 1)
+	     if(hold_type == 0)
 	       assign prio_s = update ?
 			       {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
 			       prio_q;
-	     else if((hold_type == 0) | (hold_type == 2))
+	     else if((hold_type == 1) || (hold_type == 2))
 	       assign prio_s = {prio_q[num_ports-1], prio_q[0:num_ports-2]};
 	     
 	     dff
@@ -133,11 +133,11 @@ module wf_alloc
 	     
 	     wire [0:num_ports-1] 		    prio_s, prio_q;
 
-	     if(hold_type == 1)
+	     if(hold_type == 0)
 	       assign prio_s = update ?
 			       {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
 			       prio_q;
-	     else if((hold_type == 0) || (hold_type == 2))
+	     else if((hold_type == 1) || (hold_type == 2))
 	       assign prio_s = {prio_q[num_ports-1], prio_q[0:num_ports-2]};
 	     
 	     dff
@@ -224,13 +224,13 @@ module wf_alloc
 	     
 	     wire [0:2*num_ports-2] prio_s, prio_q;
 
-	     if(hold_type == 1)
+	     if(hold_type == 0)
 	       assign prio_s = update ?
 			       reset_prio ?
 			       {{num_ports{1'b1}}, {(num_ports-1){1'b0}}} :
 			       {1'b0, prio_q[0:2*num_ports-3]} :
 			       prio_q;
-	     else if((hold_type == 0) || (hold_type == 2))
+	     else if((hold_type == 1) || (hold_type == 2))
 	       assign prio_s = reset_prio ?
 			       {{num_ports{1'b1}}, {(num_ports-1){1'b0}}} :
 			       {1'b0, prio_q[0:2*num_ports-3]};
