@@ -69,9 +69,10 @@ module vc_alloc_core_sep_if
 		assign update_arb = gnt2;
 		
 		wire [0:num_ports*num_vcs-1] gnt1_op_ovc;
+
 		arbiter
 		  #(.num_ports(num_ports*num_vcs),
-		    .num_blocks(num_ports),
+		    .num_blocks((num_vcs == 1) ? 1 : num_ports),
 		    .architecture(architecture),
 		    .reset_type(reset_type))
 		arb
@@ -162,7 +163,7 @@ module vc_alloc_core_sep_if
 		wire [0:num_ports*num_vcs-1] gnt2_ip_ivc;
 		arbiter
 		  #(.num_ports(num_ports*num_vcs),
-		    .num_blocks(num_ports),
+		    .num_blocks((num_vcs == 1) ? 1 : num_ports),
 		    .reset_type(reset_type),
 		    .hold_type(hold_type),
 		    .architecture(architecture))
