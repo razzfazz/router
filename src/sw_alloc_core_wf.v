@@ -152,8 +152,8 @@ module sw_alloc_core_wf
    wf_alloc
      #(.num_ports(num_ports),
        .reset_type(reset_type),
-       .hold_type(hold_type).
-       .architecture(architecture >> 1)
+       .hold_type(hold_type),
+       .architecture(architecture >> 1))
    alloc
      (.clk(clk),
       .reset(reset),
