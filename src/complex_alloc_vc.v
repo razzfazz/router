@@ -1,9 +1,12 @@
 module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc,
 			gnt_ip_ivc_op_ovc, gnt_ip_ivc);
    
-   parameter num_ports = 8;
-   parameter num_vcs = 2;
+   parameter num_ports = 5;
+   parameter num_vcs = 1;
+
+   // see dff.v for supported values
    parameter reset_type = 1;
+   parameter hold_type = 1;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
