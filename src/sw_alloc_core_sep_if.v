@@ -1,16 +1,15 @@
-// switch allocator core
-// (separable, input-first)
-
 module sw_alloc_core_sep_if
-
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
-    parameter use_clock_gating = 1,
+    
+    // see dff.v for supported values
+    parameter reset_type = 1,
+    parameter hold_type = 1,
     
     /* supported architectures:
      0: use round-robin arbiters
      1: use matrix arbiters */
-    parameter use_architecture = 0)
+    parameter architecture = 0)
    (input     clk,
     input     reset,
     
@@ -19,15 +18,13 @@ module sw_alloc_core_sep_if
     output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
     output wire [0:num_ports*num_ports-1] gnt_ip_op);
    
-   genvar 				  i;
-   
    
    //---------------------------------------------------------------------------
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 		  req2_ip_op;
-   wire [0:num_ports*num_ports-1] 		  gnt2_ip_op;
+   wire [0:num_ports*num_ports-1] 	  req2_ip_op;
+   wire [0:num_ports*num_ports-1] 	  gnt2_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -35,19 +32,21 @@ module sw_alloc_core_sep_if
    //---------------------------------------------------------------------------
    
    generate
-      for(i = 0; i < num_ports; i = i + 1)
-	begin:input_ports
+      
+      genvar 				  ip;
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
 	   
 	   //-------------------------------------------------------------------
 	   // connect inputs
 	   //-------------------------------------------------------------------
-
+	   
 	   wire [0:num_vcs*num_ports-1] req_ivc_op;
-	   assign req_ivc_op = req_ip_ivc_op[i*num_vcs*num_ports:
-					     (i+1)*num_vcs*num_ports-1];
+	   assign req_ivc_op = req_ip_ivc_op[ip*num_vcs*num_ports:
+					     (ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_ports-1] 	gnt2_op;
-	   assign gnt2_op = gnt2_ip_op[i*num_ports:(i+1)*num_ports-1];
+	   assign gnt2_op = gnt2_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 
 
 	   //-------------------------------------------------------------------
@@ -81,8 +80,9 @@ module sw_alloc_core_sep_if
 	     begin
 		arbiter
 		  #(.num_ports(num_vcs),
-		    .use_architecture(use_architecture & 1),
-		    .use_clock_gating(use_clock_gating))
+		    .reset_type(reset_type),
+		    .hold_type(hold_type),
+		    .architecture(architecture & 1))
 		arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -91,10 +91,8 @@ module sw_alloc_core_sep_if
 		   .gnt(gnt1_ivc));
 	     end
 	   else
-	     begin
-		assign gnt1_ivc = req1_ivc;
-	     end
-
+	     assign gnt1_ivc = req1_ivc;
+	   
 
 	   //-------------------------------------------------------------------
 	   // generate requests for second stage
@@ -132,10 +130,11 @@ module sw_alloc_core_sep_if
 	   // connect outputs
 	   //-------------------------------------------------------------------
 
-	   assign req2_ip_op[i*num_ports:(i+1)*num_ports-1] = req2_op;
-	   assign gnt_ip_ivc[i*num_vcs:(i+1)*num_vcs-1] = gnt_ivc;
+	   assign req2_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req2_op;
+	   assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = gnt_ivc;
 	   
 	end
+
    endgenerate
 
    
@@ -173,15 +172,17 @@ module sw_alloc_core_sep_if
    //---------------------------------------------------------------------------
 
    generate
-      for (i = 0; i < num_ports; i = i + 1)
-	begin:output_ports
+
+      genvar 				op;
+      for (op = 0; op < num_ports; op = op + 1)
+	begin:ops
 
 	   //-------------------------------------------------------------------
 	   // connect inputs
 	   //-------------------------------------------------------------------
 
 	   wire [0:num_ports-1] req2_ip;
-	   assign req2_ip = req2_op_ip[i*num_ports:(i+1)*num_ports-1];
+	   assign req2_ip = req2_op_ip[op*num_ports:(op+1)*num_ports-1];
 
 	   
 	   //-------------------------------------------------------------------
@@ -200,8 +201,9 @@ module sw_alloc_core_sep_if
 	   wire [0:num_ports-1] gnt2_ip;
 	   arbiter
 	     #(.num_ports(num_ports),
-	       .use_architecture(use_architecture & 1),
-	       .use_clock_gating(use_clock_gating))
+	       .reset_type(reset_type),
+	       .hold_type(hold_type),
+	       .architecture(architecture & 1))
 	   arb
 	     (.clk(clk),
 	      .reset(reset),
@@ -222,10 +224,11 @@ module sw_alloc_core_sep_if
 	   // connect outputs
 	   //-------------------------------------------------------------------
 
-	   assign gnt2_op_ip[i*num_ports:(i+1)*num_ports-1] = gnt2_ip;
-	   assign gnt_op_ip[i*num_ports:(i+1)*num_ports-1] = gnt_ip;
+	   assign gnt2_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt2_ip;
+	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
 	   
 	end
+
    endgenerate
 
 endmodule

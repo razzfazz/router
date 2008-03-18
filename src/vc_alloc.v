@@ -1,12 +1,15 @@
 module vc_alloc
   #(parameter num_ports = 8,
     parameter num_vcs = 4,
-    parameter use_clock_gating = 1,
+
+    // see dff.v for supported values
+    parameter reset_type = 1,
+    parameter hold_type = 1,
 
     /* supported architectures:
      0: separable, input-first, round-robin arbiters
      1: separable, input-first, matrix arbiters */
-    parameter use_architecture = 0)
+    parameter architecture = 0)
    (input     clk,
     input     reset,
     
@@ -19,47 +22,52 @@ module vc_alloc
 
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_qual_ip_ivc_op_ovc;
    
-   genvar 				  i;
-   
    generate
-   
-      for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	begin:input_vcs
 
-	   wire [0:num_ports*num_vcs-1] req_op_ovc;
-
-	   assign req_op_ovc 
-	     = req_ip_ivc_op_ovc[i*num_ports*num_vcs:(i+1)*num_ports*num_vcs-1];
-
-	   wire [0:num_vcs*num_ports-1] req_qual_op_ovc;
-
-	   assign req_qual_op_ovc = req_op_ovc & elig_op_ovc;
+      genvar 					  ip;
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
 	   
-	   assign req_qual_ip_ivc_op_ovc[i*num_ports*num_vcs:
-					 (i+1)*num_ports*num_vcs-1]
+	   genvar ivc;
+	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	     begin:ivcs
+		
+		wire [0:num_ports*num_vcs-1] req_op_ovc;
+		assign req_op_ovc
+		  = req_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
+				      (ip*num_vcs+ivc+1)*num_ports*num_vcs-1];
+
+		wire [0:num_vcs*num_ports-1] req_qual_op_ovc;
+		assign req_qual_op_ovc = req_op_ovc & elig_op_ovc;
+	   
+		assign req_qual_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*
+					      num_vcs:
+					      (ip*num_vcs+ivc+1)*num_ports*
+					      num_vcs-1]
 		    = req_qual_op_ovc;
+
+	     end
 	   
-	end
-
-   endgenerate
-
-   generate
-
-      if((use_architecture == 0) || (use_architecture == 1))
-	begin
-	   vc_alloc_core_sep_if
-	     #(.num_ports(num_ports),
-	       .num_vcs(num_vcs),
-	       .use_clock_gating(use_clock_gating),
-	       .use_architecture(use_architecture))
-	   core_sep_if
-	     (.clk(clk),
-	      .reset(reset),
-	      .req_ip_ivc_op_ovc(req_qual_ip_ivc_op_ovc),
-	      .gnt_ip_ivc_op_ovc(gnt_ip_ivc_op_ovc),
-	      .gnt_ip_ivc(gnt_ip_ivc));
 	end
       
+      case(architecture)
+	0, 1:
+	  begin
+	     vc_alloc_core_sep_if
+	       #(.num_ports(num_ports),
+		 .num_vcs(num_vcs),
+		 .reset_type(reset_type),
+		 .hold_type(hold_type),
+		 .architecture(architecture))
+	     core_sep_if
+	       (.clk(clk),
+		.reset(reset),
+		.req_ip_ivc_op_ovc(req_qual_ip_ivc_op_ovc),
+		.gnt_ip_ivc_op_ovc(gnt_ip_ivc_op_ovc),
+		.gnt_ip_ivc(gnt_ip_ivc));
+	  end
+	endcase
+
    endgenerate
    
 endmodule

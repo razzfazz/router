@@ -1,17 +1,25 @@
-module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc, gnt_ip_op);
+module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc,
+			gnt_ip_op);
    
    parameter num_ports = NUM_PORTS;
    parameter num_vcs = NUM_VCS;
-   parameter use_clock_gating = USE_CLOCK_GATING;
+
+   // see dff.v for supported values
+   parameter reset_type = RESET_TYPE;
+   parameter hold_type = HOLD_TYPE;
    
    /* supported architectures:
     0: separable, input-first, RR arbiters
-    1: separable, output-first, RR arbiters
-    2: separable, input-first, matrix arbiters
+    1: separable, input-first, matrix arbiters
+    2: separable, output-first, RR arbiters
     3: separable, output-first, matrix arbiters
-    4: wavefront, RR arbiters
-    5: wavefront, matrix arbiters */
-   parameter use_architecture = USE_ARCHITECTURE;
+    4: rotate inputs based on prio, round-robin arbiters in final stage
+    5: rotate inputs based on prio, matrix arbiters in final stage
+    6: replicate logic for prios, round-robin arbiters in final stage
+    7: replicate logic for prios, matrix arbiters in final stage
+    8: diagonal propagation arbiter, round-robin arbiters in final stage
+    9: diagonal propagation arbiter, matrix arbiters in final stage */
+   parameter architecture = ARCHITECTURE;
    
    input CLK;
    input RST;
@@ -21,13 +29,13 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc, gn
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    output [0:num_ports*num_ports-1] gnt_ip_op;
    
-   wire 			     clk = CLK;
-   wire 			     reset;
+   wire clk = CLK;
+   wire reset;
    
    dff
      #(.width(1),
        .reset_type(0),
-       .use_enable(0))
+       .hold_type(0))
    resetq
      (.clk(clk),
       .d(RST),
@@ -36,8 +44,9 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc, gn
    sw_alloc
      #(.num_ports(num_ports),
        .num_vcs(num_vcs),
-       .use_clock_gating(use_clock_gating),
-       .use_architecture(use_architecture))
+       .reset_type(reset_type),
+       .hold_type(hold_type),
+       .architecture(architecture))
    alloc
      (.clk(clk),
       .reset(reset),

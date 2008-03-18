@@ -1,13 +1,17 @@
-module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc, gnt_ip_ivc_op_ovc, gnt_ip_ivc);
+module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc,
+			gnt_ip_ivc_op_ovc, gnt_ip_ivc);
    
    parameter num_ports = NUM_PORTS;
    parameter num_vcs = NUM_VCS;
-   parameter use_clock_gating = USE_CLOCK_GATING;
+
+   // see dff.v for supported values
+   parameter reset_type = RESET_TYPE;
+   parameter hold_type = HOLD_TYPE;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters */
-   parameter use_architecture = USE_ARCHITECTURE;
+   parameter architecture = ARCHITECTURE;
    
    input CLK;
    input RST;
@@ -17,13 +21,13 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc, gnt_ip_ivc_op_
    output [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc;
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    
-   wire 			     clk = CLK;
-   wire 			     reset;
+   wire clk = CLK;
+   wire reset;
    
    dff
      #(.width(1),
        .reset_type(0),
-       .use_enable(0))
+       .hold_type(0))
    resetq
      (.clk(clk),
       .d(RST),
@@ -32,8 +36,9 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc, gnt_ip_ivc_op_
    vc_alloc
      #(.num_ports(num_ports),
        .num_vcs(num_vcs),
-       .use_clock_gating(use_clock_gating),
-       .use_architecture(use_architecture))
+       .reset_type(reset_type),
+       .hold_type(hold_type),
+       .architecture(architecture))
    alloc
      (.clk(clk),
       .reset(reset),
