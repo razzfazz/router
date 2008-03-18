@@ -9,7 +9,6 @@ set top ${proj}_syn_wrapper
 set src_files [list \
 		   arbiter.v \
 		   clkgate.v \
-		   complex_alloc_sw.v \
 		   complex_alloc_vc.v \
 		   dff.v \
 		   interleaver.v \
@@ -17,7 +16,6 @@ set src_files [list \
 		   or_nto1.v \
 		   rr_arbiter.v \
 		   select_1ofn.v \
-		   simple_alloc.v \
 		   sw_alloc.v \
 		   sw_alloc_core_sep_if.v \
 		   sw_alloc_core_sep_of.v \

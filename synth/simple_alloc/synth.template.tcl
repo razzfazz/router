@@ -9,8 +9,6 @@ set top ${proj}_syn_wrapper
 set src_files [list \
 		   arbiter.v \
 		   clkgate.v \
-		   complex_alloc_sw.v \
-		   complex_alloc_vc.v \
 		   dff.v \
 		   interleaver.v \
 		   matrix_arbiter.v \

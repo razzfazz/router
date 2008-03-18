@@ -9,8 +9,6 @@ set top ${proj}_syn_wrapper
 set src_files [list \
 		   arbiter.v \
 		   clkgate.v \
-		   complex_alloc_sw.v \
-		   complex_alloc_vc.v \
 		   dff.v \
 		   interleaver.v \
 		   matrix_arbiter.v \
@@ -32,7 +30,7 @@ current_design    ${top}
 
 # Clocks
 set clk_name   CLK
-set clk_period 2.5
+set clk_period 3
 
 set reset_name RST
 set_ideal_network ${reset_name}
