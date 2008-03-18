@@ -1,5 +1,4 @@
 module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
-
    parameter num_ports = NUM_PORTS;
 
    // see dff.v for supported values
@@ -10,7 +9,8 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
     2: wavefront, rotate inputs for priority
-    3: wavefront, replicated logic for priority */
+    3: wavefront, replicated logic for priority
+    4: wavefront, diagonal propagation arbiter */
    parameter architecture = ARCHITECTURE;
 
    input CLK;
