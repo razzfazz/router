@@ -1,11 +1,9 @@
 function integer clogb(input integer argument);
    integer i;
    begin
-      i = argument - 1;
-      for(clogb = 0; i > 0; clogb = clogb + 1)
-	begin
-	   i = i >> 1;
-	end
+      clogb = 0;
+      for(i = argument - 1; i > 0; i = i >> 1)
+	  clogb = clogb + 1;
       /*for(i = 0; i < 32; i = i + 1)
 	if(1 << i >= argument)
 	  begin
@@ -26,9 +24,9 @@ endfunction
 function integer pop_count(input integer argument);
    integer i;
    begin
-      i = argument;
-      for(pop_count = 0; i > 0; pop_count = pop_count + i % 2)
-	i = i >> 1;
+      pop_count = 0;
+      for(i = argument; i > 0; i = i >> 1)
+	pop_count = pop_count + (i & 1);
    end
 endfunction
 	   
