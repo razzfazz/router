@@ -44,7 +44,22 @@ module testbench
       .vc_full(vc_full),
       .vc_empty(vc_empty));
 
-   packet_source
+   wire [0:num_vcs-1] 	 cred;
+   port_state
+     #(.num_vcs(num_vcs),
+       .num_buffers(num_buffers),
+       .reset_type(reset_type),
+       .hold_type(hold_type))
+   pst
+     (.clk(clk),
+      .reset(reset),
+      .push(push),
+      .push_vc(push_vc),
+      .pop(pop),
+      .pop_vc(pop_vc),
+      .cred(cred));
+   
+   flit_source
      #(.initial_seed(initial_seed),
        .flit_rate(flit_generate_rate),
        .flit_width(flit_width),
@@ -57,16 +72,14 @@ module testbench
       .vc(push_vc),
       .data(flit_data_in));
 
-   packet_sink
+   flit_sink
      #(.initial_seed(initial_seed),
        .flit_rate(flit_sink_rate),
-       .flit_width(flit_width),
        .num_vcs(num_vcs))
    sink
      (.clk(clk),
       .reset(reset),
       .valid(~vc_empty),
-      .data(flit_data_out),
       .ready(pop),
       .vc(pop_vc));
 
