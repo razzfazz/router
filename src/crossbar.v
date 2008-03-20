@@ -7,29 +7,23 @@ module crossbar
      1: use multiplexers */
     parameter architecture = 0)
    (
-    // [sort order: input port,bits]
-    input [0:num_ports*width-1] data_in,
-    
-    // [sort order: input port,output port]
-    input [0:num_ports*num_ports-1] ctrl_in,
-    
-    // [sort order: output port,bits]
-    output [0:num_ports*width-1] data_out);
+    input [0:num_ports*width-1] data_ip,
+    input [0:num_ports*num_ports-1] ctrl_ip_op,
+    output [0:num_ports*width-1] data_op);
 
    wire [0:num_ports*num_ports-1] ctrl_op_ip;
-
    interleaver
      #(.width(num_ports),
        .num_blocks(num_ports))
    ctrl_intl
-     (.data_in(ctrl_in),
+     (.data_in(ctrl_ip_op),
       .data_out(ctrl_op_ip));
 
    generate
 	   
-      genvar 			  i;
-      for(i = 0; i < num_ports; i = i + 1)
-	begin:output_ports
+      genvar 			  op;
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
 	
 	   wire [0:width-1] out;
 
@@ -37,15 +31,15 @@ module crossbar
 	     0:
 	       begin
 		  
-		  genvar j;
-		  for(j = 0; j < num_ports; j = j + 1)
-		    begin:input_ports
+		  genvar ip;
+		  for(ip = 0; ip < num_ports; ip = ip + 1)
+		    begin:ips
 		       
 		       wire [0:width-1] in;
-		       assign in = data_in[j*width:(j+1)*width-1];
+		       assign in = data_in[ip*width:(ip+1)*width-1];
 		       
 		       wire 		ctrl;
-		       assign ctrl = ctrl_op_ip[i*num_ports+j];
+		       assign ctrl = ctrl_op_ip[op*num_ports+ip];
 		       
 		       assign out = ctrl ? in : {width{1'bz}};
 		       
@@ -56,7 +50,7 @@ module crossbar
 	       begin
 		  
 		  wire [0:num_ports-1] ctrl;
-		  assign ctrl = ctrl_op_ip[i*num_ports:(i+1)*num_ports-1];
+		  assign ctrl = ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 		  select_1ofn
 		    #(.width(width),
@@ -69,7 +63,7 @@ module crossbar
 	       end
 	     endcase
 
-	   assign data_out[i*width:(i+1)*width-1] = out;
+	   assign data_op[op*width:(op+1)*width-1] = out;
 	   
 	end
       
