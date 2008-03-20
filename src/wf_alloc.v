@@ -219,11 +219,11 @@ module wf_alloc
 	2:
 	  begin
 	     
+	     wire [0:2*num_ports-2] prio_s, prio_q;
+
 	     wire reset_prio;
 	     assign reset_prio = reset || ~|prio_q[0:num_ports-2];
 	     
-	     wire [0:2*num_ports-2] prio_s, prio_q;
-
 	     if(hold_type == 0)
 	       assign prio_s = update ?
 			       reset_prio ?
