@@ -1,13 +1,13 @@
 module flit_buffer
-  #(parameter flit_width = 64,
+  #(parameter data_width = 64,
     parameter num_vcs = 4,
     parameter num_buffers = 8,
 
     // see dff.v for supported values
     parameter reset_type = 1,
     parameter hold_type = 1)
-   (clk, reset, push, push_vc, flit_data_in, pop, pop_vc, flit_data_out,
-    vc_full, vc_empty);
+   (clk, reset, push, push_vc, data_in, pop, pop_vc, data_out, vc_full,
+    vc_empty, errors);
 
 `include "functions.v"
 
@@ -18,12 +18,13 @@ module flit_buffer
    input                        reset;
    input                        push;
    input [0:vc_width-1]         push_vc;
-   input [0:flit_width-1]       flit_data_in;
+   input [0:data_width-1]       data_in;
    input                        pop;
    input [0:vc_width-1]         pop_vc;
-   output wire [0:flit_width-1] flit_data_out;
+   output wire [0:data_width-1] data_out;
    output wire [0:num_vcs-1]    vc_full;
    output wire [0:num_vcs-1]    vc_empty;
+   output wire [0:num_vcs-1] 	errors;
    
    wire [0:num_vcs*buffer_width-1] read_address_vc;
    wire [0:num_vcs*buffer_width-1] write_address_vc;
@@ -37,13 +38,14 @@ module flit_buffer
 	   wire pop_this_vc;
 	   assign pop_this_vc = pop && (pop_vc == ivc);
 
+	   wire [0:buffer_width-1] read_address_q;
 	   wire [0:buffer_width-1] read_address_next;
 	   assign read_address_next
 	     = (read_address_q == num_buffers - 1) ?
 	       {buffer_width{1'b0}} :
-	       read_address_q + {{buffer_width-1{1'b0}}, 1'b1}
+	       read_address_q + {{buffer_width-1{1'b0}}, 1'b1};
 	   
-	   wire [0:buffer_width-1] read_address_s, read_address_q;
+	   wire [0:buffer_width-1] read_address_s;
 	   
 	   if(hold_type == 0)
 	     assign read_address_s
@@ -57,13 +59,14 @@ module flit_buffer
 	   wire 		   push_this_vc;
 	   assign push_this_vc = push && (push_vc == ivc);
 	   
+	   wire [0:buffer_width-1] write_address_q;
 	   wire [0:buffer_width-1] write_address_next;
 	   assign write_address_next
 	     = (write_address_q == (num_buffers - 1)) ?
 	       {buffer_width{1'b0}} :
-	       write_address_q + {{buffer_width-1{1'b0}}, 1'b1}
+	       write_address_q + {{buffer_width-1{1'b0}}, 1'b1};
 	   
-	   wire [0:buffer_width-1] write_address_s, write_address_q;
+	   wire [0:buffer_width-1] write_address_s;
 	   
 	   if(hold_type == 0)
 	     assign write_address_s
@@ -91,6 +94,9 @@ module flit_buffer
 	     = (full_q | (almost_full & push_this_vc)) & ~pop_this_vc;
 	   
 	   assign vc_full[ivc] = full_q;
+
+	   assign errors[ivc] = (full_q && push_this_vc) ||
+				(empty_q && pop_this_vc);
 	   
 	   dff
 	     #(.width(buffer_width),
@@ -160,15 +166,15 @@ module flit_buffer
       .data_out(write_address[vc_width:vc_width+buffer_width-1]));
 
    regfile
-     #(.width(flit_width),
+     #(.width(data_width),
        .depth(num_vcs*num_buffers),
        .sync_rf_output(0))
    flit_rf
      (.clk(clk),
       .write_enable(push),
       .write_address(write_address),
-      .write_data(flit_data_in),
+      .write_data(data_in),
       .read_address(read_address),
-      .read_data(flit_data_out));
+      .read_data(data_out));
    
 endmodule
