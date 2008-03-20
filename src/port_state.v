@@ -20,7 +20,7 @@ module port_state
    output wire [0:num_vcs-1] cred;
    output wire [0:num_vcs-1] errors;
 
-   localparam addr_width = clogb(num_buffers);
+   localparam buffer_width = clogb(num_buffers);
 
    wire [0:num_vcs-1] 	     set_cred, reset_cred;
    wire [0:num_vcs-1] 	     cred_s, cred_q;
@@ -50,7 +50,7 @@ module port_state
 	   wire pop_this_vc;
 	   assign pop_this_vc = pop && (pop_vc == vc);
 	   
-	   wire [0:addr_width-1] cred_count_q;
+	   wire [0:buffer_width-1] cred_count_q;
 	   wire cred_count_zero;
 	   assign cred_count_zero = ~|cred_count_q;
 
@@ -60,7 +60,7 @@ module port_state
 	   wire decr_count;
 	   assign decr_count = push_this_vc && !pop_this_vc && !cred_count_zero;
 	   
-	   wire [0:addr_width-1] cred_count_s;
+	   wire [0:buffer_width-1] cred_count_s;
 	   if(hold_type == 0)
 	     assign cred_count_s = cred_q[vc] ?
 				   cred_count_q - decr_count + incr_count :
@@ -68,7 +68,7 @@ module port_state
 	   else
 	     assign cred_count_s = cred_count_q - decr_count + incr_count;
 	   dff
-	     #(.width(addr_width),
+	     #(.width(buffer_width),
 	       .reset_type(reset_type),
 	       .reset_value(num_buffers-1),
 	       .hold_type(hold_type))
