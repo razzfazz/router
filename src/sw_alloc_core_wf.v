@@ -60,9 +60,6 @@ module sw_alloc_core_wf
 	   wire 			gnt2;
 	   assign gnt2 = |gnt2_op;
 
-	   wire 			update_arb;
-	   assign update_arb = gnt2;
-
 	   wire [0:num_vcs*num_ports-1] mask_ivc_op;
 	   assign mask_ivc_op = {num_vcs{gnt2_op}};
 	   
@@ -85,25 +82,23 @@ module sw_alloc_core_wf
 	     (.data_in(req1_op_ivc),
 	      .data_out(req1_ivc));
 	     
-	   wire [0:num_vcs-1] 		gnt1_ivc;
-	   if(num_vcs > 1)
-	     begin
-		arbiter
-		  #(.num_ports(num_vcs),
-		    .reset_type(reset_type),
-		    .hold_type(hold_type),
-		    .architecture(architecture & 1))
-		arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update_arb),
-		   .req(req1_ivc),
-		   .gnt(gnt1_ivc));
-	     end
-	   else
-	     assign gnt1_ivc = req1_ivc;
+	   wire 			update_arb;
+	   assign update_arb = gnt2;
 	   
-
+	   wire [0:num_vcs-1] 		gnt1_ivc;
+	   arbiter
+	     #(.num_ports(num_vcs),
+	       .reset_type(reset_type),
+	       .hold_type(hold_type),
+	       .architecture(architecture & 1))
+	   arb
+	     (.clk(clk),
+	      .reset(reset),
+	      .update(update_arb),
+	      .req(req1_ivc),
+	      .gnt(gnt1_ivc));
+	   
+	   
 	   //-------------------------------------------------------------------
 	   // generate requests for second stage
 	   //-------------------------------------------------------------------
