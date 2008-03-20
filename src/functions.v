@@ -30,3 +30,17 @@ function integer pop_count(input integer argument);
    end
 endfunction
 	   
+function integer encode(input integer argument);
+   integer i;
+   integer scale;
+   begin
+      encode = 0;
+      scale = 0;
+      for(i = argument; i > 0; i = i >> 1)
+	begin
+	   if(i & 1)
+	     encode = encode + scale;
+	   scale = scale + 1;
+	end
+   end
+endfunction
