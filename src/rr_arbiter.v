@@ -2,8 +2,7 @@ module rr_arbiter
   #(parameter num_ports = 32,
 
     // see dff.v for supported values
-    parameter reset_type = 1,
-    parameter hold_type = 1)
+    parameter reset_type = 1)
    (input     clk,
     input     reset,
     input     update,
@@ -32,10 +31,7 @@ module rr_arbiter
 
    generate   
 
-      if(hold_type == 0)
-	assign prev_s = update ? gnt_rev[1:num_ports-1] : prev_q;
-      else if((hold_type == 1) || (hold_type == 2))
-	assign prev_s = gnt_rev[1:num_ports-1];
+      assign prev_s = update ? gnt_rev[1:num_ports-1] : prev_q;
       
       genvar 			i;
       for(i = 0; i < num_ports; i = i + 1)
@@ -46,12 +42,10 @@ module rr_arbiter
       
       dff
 	#(.width(num_ports-1),
-	  .reset_type(reset_type),
-	  .hold_type(hold_type))
+	  .reset_type(reset_type))
       prevq
 	(.clk(clk),
 	 .reset(reset),
-	 .enable(update),
 	 .d(prev_s),
 	 .q(prev_q));
    

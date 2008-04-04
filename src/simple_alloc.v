@@ -3,7 +3,6 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 
    // see dff.v for supported values
    parameter reset_type = 1;
-   parameter hold_type = 1;
 
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -24,8 +23,7 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
    
    dff
      #(.width(1),
-       .reset_type(0),
-       .hold_type(0))
+       .reset_type(0))
    resetq
      (.clk(clk),
       .d(RST),
@@ -60,9 +58,8 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 		  wire [0:num_ports-1] gnt1_op;
 		  arbiter
 		    #(.num_ports(num_ports),
-		      .architecture(architecture),
 		      .reset_type(reset_type),
-		      .hold_type(hold_type))
+		      .architecture(architecture))
 		  arb
 		    (.clk(clk),
 		     .reset(reset),
@@ -100,9 +97,8 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 		  wire [0:num_ports-1] gnt2_ip;
 		  arbiter
 		    #(.num_ports(num_ports),
-		      .architecture(architecture),
 		      .reset_type(reset_type),
-		      .hold_type(hold_type))
+		      .architecture(architecture))
 		  arb
 		    (.clk(clk),
 		     .reset(reset),
@@ -133,7 +129,6 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 	     wf_alloc
 	       #(.num_ports(num_ports),
 		 .reset_type(reset_type),
-		 .hold_type(hold_type),
 		 .architecture(architecture-2))
 	     alloc
 	       (.clk(clk),

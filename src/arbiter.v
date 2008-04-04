@@ -3,7 +3,6 @@ module arbiter
 
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1,
 
     /* supported architectures:
      0: round-robin arbiter
@@ -22,8 +21,7 @@ module arbiter
 	  begin
 	     rr_arbiter
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .hold_type(hold_type))
+		 .reset_type(reset_type))
 	     arb
 	       (.clk(clk),
 		.reset(reset),
@@ -35,8 +33,7 @@ module arbiter
 	  begin
 	     matrix_arbiter
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .hold_type(hold_type))
+		 .reset_type(reset_type))
 	     arb
 	       (.clk(clk),
 		.reset(reset),

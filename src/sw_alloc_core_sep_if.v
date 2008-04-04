@@ -4,7 +4,6 @@ module sw_alloc_core_sep_if
     
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1,
     
     /* supported architectures:
      0: use round-robin arbiters
@@ -126,7 +125,6 @@ module sw_alloc_core_sep_if
 	   arbiter
 	     #(.num_ports(num_vcs),
 	       .reset_type(reset_type),
-	       .hold_type(hold_type),
 	       .architecture(architecture & 1))
 	   arb
 	     (.clk(clk),
@@ -240,7 +238,6 @@ module sw_alloc_core_sep_if
 	   arbiter
 	     #(.num_ports(num_ports),
 	       .reset_type(reset_type),
-	       .hold_type(hold_type),
 	       .architecture(architecture & 1))
 	   arb
 	     (.clk(clk),

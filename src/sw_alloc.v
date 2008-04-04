@@ -4,7 +4,6 @@ module sw_alloc
 
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1,
     
     /* supported architectures:
      0: separable, input-first, round-robin arbiters
@@ -38,7 +37,6 @@ module sw_alloc
 	       #(.num_ports(num_ports),
 		 .num_vcs(num_vcs),
 		 .reset_type(reset_type),
-		 .hold_type(hold_type),
 		 .architecture(architecture))
 	     core_sep_if
 	       (.clk(clk),
@@ -55,7 +53,6 @@ module sw_alloc
 	       #(.num_ports(num_ports),
 		 .num_vcs(num_vcs),
 		 .reset_type(reset_type),
-		 .hold_type(hold_type),
 		 .architecture(architecture - 2))
 	     core_sep_of
 	       (.clk(clk),
@@ -73,7 +70,6 @@ module sw_alloc
 	       #(.num_ports(num_ports),
 		 .num_vcs(num_vcs),
 		 .reset_type(reset_type),
-		 .hold_type(hold_type),
 		 .architecture(architecture - 4))
 	     core_wf
 	       (.clk(clk),

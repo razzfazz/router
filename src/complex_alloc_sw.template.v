@@ -6,7 +6,6 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
 
    // see dff.v for supported values
    parameter reset_type = RESET_TYPE;
-   parameter hold_type = HOLD_TYPE;
    
    /* supported architectures:
     0: separable, input-first, RR arbiters
@@ -35,8 +34,7 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
    
    dff
      #(.width(1),
-       .reset_type(0),
-       .hold_type(0))
+       .reset_type(0))
    resetq
      (.clk(clk),
       .d(RST),
@@ -46,7 +44,6 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
      #(.num_ports(num_ports),
        .num_vcs(num_vcs),
        .reset_type(reset_type),
-       .hold_type(hold_type),
        .architecture(architecture))
    alloc
      (.clk(clk),

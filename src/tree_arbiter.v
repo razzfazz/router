@@ -4,7 +4,6 @@ module tree_arbiter
 
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1,
 
     /* supported architectures:
      0: round-robin arbiter
@@ -37,7 +36,6 @@ module tree_arbiter
 	   arbiter
 	     #(.num_ports(ports_per_block),
 	       .reset_type(reset_type),
-	       .hold_type(hold_type),
 	       .architecture(architecture))
 	   stg1_arb
 	     (.clk(clk),
@@ -57,7 +55,6 @@ module tree_arbiter
    arbiter
      #(.num_ports(num_blocks),
        .reset_type(reset_type),
-       .hold_type(hold_type),
        .architecture(architecture))
    stg2_arb
      (.clk(clk),

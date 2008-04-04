@@ -5,7 +5,6 @@ module wf_alloc
 
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1,
     
     /* supported architectures:
      0: rotate inputs/outputs based on priority
@@ -33,22 +32,16 @@ module wf_alloc
 	  begin
 	     
 	     wire [0:num_ports-1] prio_s, prio_q;
-	     if(hold_type == 0)
-	       assign prio_s = update ?
-			       {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
-			       prio_q;
-	     else if((hold_type == 1) || (hold_type == 2))
-	       assign prio_s = {prio_q[num_ports-1], prio_q[0:num_ports-2]};
-	     
+	     assign prio_s = update ?
+			     {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
+			     prio_q;
 	     dff
 	       #(.width(num_ports),
 		 .reset_type(reset_type),
-		 .reset_value({1'b1, {(num_ports-1){1'b0}}}),
-		 .hold_type(hold_type))
+		 .reset_value({1'b1, {(num_ports-1){1'b0}}}))
 	     prioq
 	       (.clk(clk),
 		.reset(reset),
-		.enable(update),
 		.d(prio_s),
 		.q(prio_q));
 	     
@@ -133,22 +126,16 @@ module wf_alloc
 	     
 	     wire [0:num_ports-1] 		    prio_s, prio_q;
 
-	     if(hold_type == 0)
-	       assign prio_s = update ?
-			       {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
-			       prio_q;
-	     else if((hold_type == 1) || (hold_type == 2))
-	       assign prio_s = {prio_q[num_ports-1], prio_q[0:num_ports-2]};
-	     
+	     assign prio_s = update ?
+			     {prio_q[num_ports-1], prio_q[0:num_ports-2]} :
+			     prio_q;
 	     dff
 	       #(.width(num_ports),
 		 .reset_type(reset_type),
-		 .reset_value({1'b1, {(num_ports-1){1'b0}}}),
-		 .hold_type(hold_type))
+		 .reset_value({1'b1, {(num_ports-1){1'b0}}}))
 	     prioq
 	       (.clk(clk),
 		.reset(reset),
-		.enable(update),
 		.d(prio_s),
 		.q(prio_q));
 	     
@@ -219,31 +206,23 @@ module wf_alloc
 	2:
 	  begin
 	     
-	     wire [0:2*num_ports-2] prio_s, prio_q;
+	     wire [0:(2*num_ports-1)-1] prio_s, prio_q;
 
 	     wire reset_prio;
-	     assign reset_prio = ~|prio_q[0:num_ports-2];
+	     assign reset_prio = ~|prio_q[0:(num_ports-1)-1];
 	     
-	     if(hold_type == 0)
-	       assign prio_s = update ?
-			       reset_prio ?
-			       {{num_ports{1'b1}}, {(num_ports-1){1'b0}}} :
-			       {1'b0, prio_q[0:2*num_ports-3]} :
-			       prio_q;
-	     else if((hold_type == 1) || (hold_type == 2))
-	       assign prio_s = reset_prio ?
-			       {{num_ports{1'b1}}, {(num_ports-1){1'b0}}} :
-			       {1'b0, prio_q[0:2*num_ports-3]};
-	     
+	     assign prio_s = update ?
+			     reset_prio ?
+			     {{num_ports{1'b1}}, {(num_ports-1){1'b0}}} :
+			     {1'b0, prio_q[0:(2*num_ports-2)-1]} :
+			     prio_q;
 	     dff
 	       #(.width(2*num_ports-1),
 		 .reset_type(reset_type),
-		 .reset_value({{num_ports{1'b1}}, {(num_ports-1){1'b0}}}),
-		 .hold_type(hold_type))
+		 .reset_value({{num_ports{1'b1}}, {(num_ports-1){1'b0}}}))
 	     prioq
 	       (.clk(clk),
 		.reset(reset),
-		.enable(update),
 		.d(prio_s),
 		.q(prio_q));
 	     
@@ -253,20 +232,20 @@ module wf_alloc
 	     for(col = 0; col < num_ports; col = col + 1)
 	       begin:cols
 		  
-		  wire [0:2*num_ports-2] x_in, y_in;
-		  wire [0:2*num_ports-2] x_out, y_out;
-		  wire [0:2*num_ports-2] req_in;
-		  wire [0:2*num_ports-2] gnt_out;
+		  wire [0:(2*num_ports-1)-1] x_in, y_in;
+		  wire [0:(2*num_ports-1)-1] x_out, y_out;
+		  wire [0:(2*num_ports-1)-1] req_in;
+		  wire [0:(2*num_ports-1)-1] gnt_out;
 		  
 		  assign x_in = {1'b1, x[col*(2*num_ports-2):
-					 (col+1)*(2*num_ports-2)-2]};
-		  assign y_in = {1'b1, y_out[0:2*num_ports-3]};
+					 (col+1)*(2*num_ports-2)-1]};
+		  assign y_in = {1'b1, y_out[0:(2*num_ports-2)-1]};
 		  assign x_out = (x_in & ~(y_in & req_in)) | ~prio_q;
 		  assign y_out = (y_in & ~(x_in & req_in)) | ~prio_q;
 		  assign gnt_out = req_in & x_in & y_in & prio_q;
 		  assign x[((col+1)%num_ports)*(2*num_ports-2):
-			   ((col+1+1)%num_ports)*(2*num_ports-2)-1]
-			   = x_out[0:2*num_ports-3];
+			   ((col+1)%num_ports+1)*(2*num_ports-2)-1]
+			   = x_out[0:(2*num_ports-2)-1];
 		  
 		  genvar 		 row;
 		  for(row = 0; row < num_ports-1; row = row + 1)

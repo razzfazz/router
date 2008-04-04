@@ -4,7 +4,6 @@ module comb_alloc_wf
 
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1,
     
     /* supported architectures:
      0: separable, round-robin arbiters
@@ -106,7 +105,6 @@ module comb_alloc_wf
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
-		    .hold_type(hold_type),
 		    .architecture(architecture & 1))
 		gnt_ovc_arb
 		  (.clk(clk),
@@ -166,7 +164,6 @@ module comb_alloc_wf
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
-		    .hold_type(hold_type),
 		    .architecture(architecture & 1))
 		mask_sw_arb
 		  (.clk(clk),
@@ -217,7 +214,6 @@ module comb_alloc_wf
 		  arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type),
-		      .hold_type(hold_type),
 		      .architecture(architecture & 1))
 		  arb
 		    (.clk(clk),
@@ -257,7 +253,6 @@ module comb_alloc_wf
 		  arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type),
-		      .hold_type(hold_type),
 		      .architecture(architecture & 1))
 		  arb
 		    (.clk(clk),
@@ -289,7 +284,6 @@ module comb_alloc_wf
 	     wf_alloc
 	       #(.num_ports(num_ports),
 		 .reset_type(reset_type),
-		 .hold_type(hold_type),
 		 .architecture(architecture - 2))
 	     sw_alloc
 	       (.clk(clk),

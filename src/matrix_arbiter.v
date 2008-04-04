@@ -2,8 +2,7 @@ module matrix_arbiter
   #(parameter num_ports = 32,
 
     // see dff.v for supported values
-    parameter reset_type = 1,
-    parameter hold_type = 1)
+    parameter reset_type = 1)
    (input     clk,
     input     reset,
     input     update,
@@ -28,12 +27,10 @@ module matrix_arbiter
 		       #(.width(1),
 			 .offset(col),
 			 .reset_type(reset_type),
-			 .reset_value(1'b1),
-			 .hold_type(hold_type))
+			 .reset_value(1'b1))
 		     prioq
 		       (.clk(clk),
 			.reset(reset),
-			.enable(update),
 			.d(prio_s[row*num_ports+col]),
 			.q(prio_q[row*num_ports+col]));
 		  end
@@ -42,13 +39,10 @@ module matrix_arbiter
 		else
 		  assign prio_q[row*num_ports+col] = ~prio_q[col*num_ports+row];
 
-		if(hold_type == 0)
-		  assign prio_s[row*num_ports+col]
-			   = (prio_q[row*num_ports+col] | (gnt[col] & update)) &
-			     !(gnt[row] & update);
-		else if((hold_type == 1) || (hold_type == 2))
-		  assign prio_s[row*num_ports+col]
-			   = (prio_q[row*num_ports+col] | gnt[col]) & !gnt[row];
+		assign prio_s[row*num_ports+col]
+			 = update ?
+			   (prio_q[row*num_ports+col] | gnt[col]) & !gnt[row] :
+			   prio_q;
 		
 	     end
 	end

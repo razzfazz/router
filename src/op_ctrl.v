@@ -4,8 +4,7 @@ module op_ctrl
     parameter num_ptes = 4,
 
     // see dff.v for supported values
-    parameter reset_type = 1,
-    parameter hold_type = 1)
+    parameter reset_type = 1)
    (clk, reset, debit, debit_vc, debit_type, credit, credit_vc, credit_type,
     alloc_vc, free_vc, flit_free, packet_free, errors);
 
@@ -31,12 +30,10 @@ module op_ctrl
    assign vc_busy_s = alloc_vc | (vc_busy_q & ~free_vc);
    dff
      #(.width(num_vcs),
-       .reset_type(reset_type),
-       .hold_type(hold_type))
+       .reset_type(reset_type))
    vc_busyq
      (.clk(clk),
       .reset(reset),
-      .enable(|alloc_vc || |free_vc),
       .d(vc_busy_s),
       .q(vc_busy_q));
    
@@ -62,8 +59,7 @@ module op_ctrl
 
 	   credit_tracker
 	     #(.num_credits(num_buffers),
-	       .reset_type(reset_type),
-	       .hold_type(hold_type))
+	       .reset_type(reset_type))
 	   flit_ct
 	     (.clk(clk),
 	      .reset(reset),
@@ -74,8 +70,7 @@ module op_ctrl
 
 	   credit_tracker
 	     #(.num_credits(num_ptes),
-	       .reset_type(reset_type),
-	       .hold_type(hold_type))
+	       .reset_type(reset_type))
 	   packet_ct
 	     (.clk(clk),
 	      .reset(reset),

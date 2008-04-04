@@ -6,7 +6,6 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
 
    // see dff.v for supported values
    parameter reset_type = 1;
-   parameter hold_type = 1;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -29,8 +28,7 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
    
    dff
      #(.width(1),
-       .reset_type(0),
-       .hold_type(0))
+       .reset_type(0))
    resetq
      (.clk(clk),
       .d(RST),
@@ -40,7 +38,6 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
      #(.num_ports(num_ports),
        .num_vcs(num_vcs),
        .reset_type(reset_type),
-       .hold_type(hold_type),
        .architecture(architecture))
    alloc
      (.clk(clk),

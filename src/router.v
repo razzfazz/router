@@ -74,7 +74,6 @@ module router(CLK, RST,
      #(.num_ports(num_ports),
        .num_vcs(num_vcs),
        .reset_type(reset_type),
-       .hold_type(hold_type),
        .architecture(architecture_vca))
    vca
      (.clk(clk),
@@ -89,7 +88,6 @@ module router(CLK, RST,
      #(.num_ports(num_ports),
        .num_vcs(num_vcs),
        .reset_type(reset_type),
-       .hold_type(hold_type),
        .architecture(architecture_swa))
    swa
      (.clk(clk),
