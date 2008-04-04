@@ -6,7 +6,7 @@ module testbench
     parameter mean_delay = 1,
     parameter fixed_delay = 0,
     parameter hold_requests = 0,
-    parameter runtime = 1000,
+    parameter runtime = 100000,
     parameter output_as_csv = 1,
 
     /* supported architectures:
