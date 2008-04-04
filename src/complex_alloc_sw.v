@@ -1,8 +1,8 @@
-module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc,
-			gnt_ip_op);
+module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
+			gnt_ip_ivc, gnt_ip_op);
    
    parameter num_ports = 5;
-   parameter num_vcs = 1;
+   parameter num_vcs = 2;
 
    // see dff.v for supported values
    parameter reset_type = 1;
@@ -24,7 +24,8 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc,
    input CLK;
    input RST;
    
-   input [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc;
+   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
    input [0:num_ports*num_vcs-1] cred_op_ovc;
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    output [0:num_ports*num_ports-1] gnt_ip_op;
@@ -50,7 +51,8 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op_ovc, cred_op_ovc, gnt_ip_ivc,
    alloc
      (.clk(clk),
       .reset(reset),
-      .req_ip_ivc_op_ovc(req_ip_ivc_op_ovc),
+      .req_ip_ivc_op(req_ip_ivc_op),
+      .req_ip_ivc_ovc(req_ip_ivc_ovc),
       .cred_op_ovc(cred_op_ovc),
       .gnt_ip_ivc(gnt_ip_ivc),
       .gnt_ip_op(gnt_ip_op));
