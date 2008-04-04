@@ -13,10 +13,13 @@ module vc_alloc_core_sep_if
    (input     clk,
     input     reset,
     
-    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc,
+    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
+    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
 
-    output wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc,
-    output wire [0:num_ports*num_vcs-1] 		  gnt_ip_ivc);
+    input [0:num_ports*num_vcs-1] elig_op_ovc,
+    
+    output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
+    output wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc);
    
    
    //---------------------------------------------------------------------------
@@ -45,22 +48,35 @@ module vc_alloc_core_sep_if
 		// connect inputs
 		//--------------------------------------------------------------
 
-		wire [0:num_ports*num_vcs-1] req_op_ovc;
-		assign req_op_ovc
-		  = req_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
-				      (ip*num_vcs+ivc+1)*num_ports*num_vcs-1];
+		wire [0:num_ports-1] req_op;
+		assign req_op = req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
+					      (ip*num_vcs+ivc+1)*num_ports-1];
+
+		wire [0:num_vcs-1]   req_ovc;
+		assign req_ovc = req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
+						(ip*num_vcs+ivc+1)*num_vcs-1];
 
 		wire [0:num_ports*num_vcs-1] gnt2_op_ovc;
 		assign gnt2_op_ovc
 		  = gnt2_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
 				       (ip*num_vcs+ivc+1)*num_ports*num_vcs-1];
+		
 
 		//--------------------------------------------------------------
 		// first arbitration stage (select output port and VC)
 		//--------------------------------------------------------------
 
-		wire [0:num_ports*num_vcs-1] req1_op_ovc;
-		assign req1_op_ovc = req_op_ovc;
+		wire [0:num_vcs-1] elig_ovc;
+		select_1ofn
+		  #(.width(num_vcs),
+		    .num_ports(num_ports))
+		elig_op_sel
+		  (.select(req_op),
+		   .data_in(elig_op_ovc),
+		   .data_out(elig_ovc));
+		
+		wire [0:num_vcs-1] req1_ovc;
+		assign req1_ovc = req_ovc & elig_ovc;
 
 		wire 			     gnt2;
 		assign gnt2 = |gnt2_op_ovc;
@@ -68,29 +84,39 @@ module vc_alloc_core_sep_if
 		wire 			     update_arb;
 		assign update_arb = gnt2;
 		
-		wire [0:num_ports*num_vcs-1] gnt1_op_ovc;
-
+		wire [0:num_vcs-1] gnt1_ovc;
 		arbiter
-		  #(.num_ports(num_ports*num_vcs),
-		    .num_blocks(num_ports),
-		    .architecture(architecture),
-		    .reset_type(reset_type))
+		  #(.num_ports(num_vcs),
+		    .reset_type(reset_type),
+		    .hold_type(hold_type),
+		    .architecture(architecture))
 		arb
 		  (.clk(clk),
 		   .reset(reset),
 		   .update(update_arb),
-		   .req(req1_op_ovc),
-		   .gnt(gnt1_op_ovc));
+		   .req(req1_ovc),
+		   .gnt(gnt1_ovc));
 
 		
 		//--------------------------------------------------------------
 		// generate requests for second stage
 		//--------------------------------------------------------------
 
-		wire [0:num_ports*num_vcs-1] req2_op_ovc;
-		assign req2_op_ovc = gnt1_op_ovc;
-		
+		wire [0:num_vcs*num_ports-1] mask_ovc_op;
+		assign mask_ovc_op = {num_vcs{req_op}};
 
+		wire [0:num_ports*num_vcs-1] mask_op_ovc;
+		interleaver
+		  #(.width(num_vcs*num_ports),
+		    .num_blocks(num_vcs))
+		mask_intl
+		  (.data_in(mask_ovc_op),
+		   .data_out(mask_op_ovc));
+
+		wire [0:num_ports*num_vcs-1] req2_op_ovc;
+		assign req2_op_ovc = {num_ports{gnt1_ovc}} & mask_op_ovc;
+		
+		
 		//--------------------------------------------------------------
 		// connect outputs
 		//--------------------------------------------------------------
@@ -100,6 +126,9 @@ module vc_alloc_core_sep_if
 					  -1] = req2_op_ovc;
 
 		assign gnt_ip_ivc[ip*num_vcs+ivc] = gnt2;
+		assign gnt_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
+				      (ip*num_vcs+ivc+1)*num_vcs-1]
+			 = gnt2 ? gnt1_ovc : {num_vcs{1'b0}};
 
 	     end
 	   
@@ -161,7 +190,7 @@ module vc_alloc_core_sep_if
 		assign update_arb = |req2_ip_ivc;
 		
 		wire [0:num_ports*num_vcs-1] gnt2_ip_ivc;
-		arbiter
+		tree_arbiter
 		  #(.num_ports(num_ports*num_vcs),
 		    .num_blocks(num_ports),
 		    .reset_type(reset_type),
@@ -186,11 +215,5 @@ module vc_alloc_core_sep_if
 	     end
 	end
    endgenerate
-
-   //---------------------------------------------------------------------------
-   // assign global grant signals
-   //---------------------------------------------------------------------------
-
-   assign gnt_ip_ivc_op_ovc = gnt2_ip_ivc_op_ovc;
 
 endmodule
