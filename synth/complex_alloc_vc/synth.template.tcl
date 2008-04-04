@@ -20,6 +20,7 @@ set src_files [list \
 		   sw_alloc_core_sep_if.v \
 		   sw_alloc_core_sep_of.v \
 		   sw_alloc_core_wf.v \
+		   tree_arbiter.v \
 		   vc_alloc.v \
 		   vc_alloc_core_sep_if.v \
 		   wf_alloc.v \
