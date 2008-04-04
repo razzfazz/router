@@ -5,14 +5,15 @@ module flit_buffer
 
     // see dff.v for supported values
     parameter reset_type = 1,
-    parameter hold_type = 1)
+    
+    parameter gate_clocks = 1)
    (clk, reset, push, push_vc, data_in, pop, pop_vc, data_out, vc_full,
     vc_empty, errors);
 
 `include "functions.v"
 
    localparam vc_width = clogb(num_vcs);
-   localparam buffer_width = clogb(num_buffers);
+   localparam buff_addr_width = clogb(num_buffers);
    
    input                        clk;
    input                        reset;
@@ -26,63 +27,96 @@ module flit_buffer
    output wire [0:num_vcs-1]    vc_empty;
    output wire [0:num_vcs-1] 	errors;
    
-   wire [0:num_vcs*buffer_width-1] read_address_vc;
-   wire [0:num_vcs*buffer_width-1] write_address_vc;
+   wire [0:num_vcs*buff_addr_width-1] read_address_vc;
+   wire [0:num_vcs*buff_addr_width-1] write_address_vc;
+
+   wire [0:num_vcs-1] 		      pop_vc_1hot;
+   wire [0:num_vcs-1] 		      push_vc_1hot;
    
+   wire 			      clk_addr;
+   wire 			      clk_rf;
+
    generate
+
+      if(gate_clocks == 1)
+	begin
+	   wire act;
+	   assign act = push | pop;
+	   clkgate
+	     (.clk(clk),
+	      .act(act),
+	      .clk_gated(clk_addr));
+	   assign clk_rf = clk_addr;
+	end
+      else
+	begin
+	   assign clk_addr = clk;
+	   assign clk_rf = clk;
+	end
       
       genvar 			   ivc;
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
 	   
-	   wire pop_this_vc;
-	   assign pop_this_vc = pop && (pop_vc == ivc);
+	   assign pop_vc_1hot[ivc] = pop && (pop_vc == ivc);
+	   
+	   wire [0:buff_addr_width-1] read_address_q;
+	   wire [0:buff_addr_width-1] read_address_next;
+	   if(2 ** clogb(num_buffers) == num_buffers)
+	     begin
+		// in this case, we have natural wraparound
+		assign read_address_next = read_address_q + 1'b1;
+	     end
+	   else
+	     begin
+		// here we need explicit wraparound
+		assign read_address_next
+		  = (read_address_q == num_buffers - 1) ?
+		    {buff_addr_width{1'b0}} :
+		    (read_address_q + 1'b1);
+	     end
+	   
+	   wire [0:buff_addr_width-1] read_address_s;
+	   assign read_address_s
+	     = pop_vc_1hot[ivc] ? read_address_next : read_address_q;
+	   
+	   assign read_address_vc[ivc*buff_addr_width:
+				  (ivc+1)*buff_addr_width-1]
+		    = read_address_q;
+	   
+	   assign push_vc_1hot[ivc] = push && (push_vc == ivc);
+	   
+	   wire [0:buff_addr_width-1] write_address_q;
+	   wire [0:buff_addr_width-1] write_address_next;
+	   if(2 ** clogb(num_buffers) == num_buffers)
+	     begin
+		// in this case, we have natural wraparound
+		assign write_address_next = write_address_q + 1'b1;
+	     end
+	   else
+	     begin
+		// here we need explicit wraparound
+		assign write_address_next
+		  = (write_address_q == (num_buffers - 1)) ?
+		    {buff_addr_width{1'b0}} :
+		    (write_address_q + 1'b1);
+	     end
+	   
+	   wire [0:buff_addr_width-1] write_address_s;
+	   assign write_address_s
+	     = push_vc_1hot[ivc] ? write_address_next : write_address_q;
 
-	   wire [0:buffer_width-1] read_address_q;
-	   wire [0:buffer_width-1] read_address_next;
-	   assign read_address_next
-	     = (read_address_q == num_buffers - 1) ?
-	       {buffer_width{1'b0}} :
-	       read_address_q + {{buffer_width-1{1'b0}}, 1'b1};
-	   
-	   wire [0:buffer_width-1] read_address_s;
-	   
-	   if(hold_type == 0)
-	     assign read_address_s
-	       = pop_this_vc ? read_address_next : read_address_q;
-	   else if((hold_type == 1) || (hold_type == 2))
-	     assign read_address_s = read_address_next;
-	   
-	   assign read_address_vc[ivc*buffer_width:(ivc+1)*buffer_width-1]
-		    = read_address_q & {buffer_width{pop_this_vc}};
-	   
-	   wire 		   push_this_vc;
-	   assign push_this_vc = push && (push_vc == ivc);
-	   
-	   wire [0:buffer_width-1] write_address_q;
-	   wire [0:buffer_width-1] write_address_next;
-	   assign write_address_next
-	     = (write_address_q == (num_buffers - 1)) ?
-	       {buffer_width{1'b0}} :
-	       write_address_q + {{buffer_width-1{1'b0}}, 1'b1};
-	   
-	   wire [0:buffer_width-1] write_address_s;
-	   
-	   if(hold_type == 0)
-	     assign write_address_s
-	       = push_this_vc ? write_address_next : write_address_q;
-	   else if((hold_type == 1) || (hold_type == 2))
-	     assign write_address_s = write_address_next;
-
-	   assign write_address_vc[ivc*buffer_width:(ivc+1)*buffer_width-1]
-		    = write_address_q & {buffer_width{push_this_vc}};
+	   assign write_address_vc[ivc*buff_addr_width:
+				   (ivc+1)*buff_addr_width-1]
+		    = write_address_q;
 	   
 	   wire 		   almost_empty;
 	   assign almost_empty = (read_address_next == write_address_q);
 	   
 	   wire 		   empty_s, empty_q;
 	   assign empty_s
-	     = (empty_q | (almost_empty & pop_this_vc)) & ~push_this_vc;
+	     = (empty_q | (almost_empty & pop_vc_1hot[ivc])) &
+	       ~push_vc_1hot[ivc];
 	   
 	   assign vc_empty[ivc] = empty_q;
 	   
@@ -91,55 +125,48 @@ module flit_buffer
 	   
 	   wire 		   full_s, full_q;
 	   assign full_s
-	     = (full_q | (almost_full & push_this_vc)) & ~pop_this_vc;
+	     = (full_q | (almost_full & push_vc_1hot[ivc])) &
+	       ~pop_vc_1hot[ivc];
 	   
 	   assign vc_full[ivc] = full_q;
 
-	   assign errors[ivc] = (full_q && push_this_vc) ||
-				(empty_q && pop_this_vc);
+	   assign errors[ivc] = (full_q && push_vc_1hot[ivc]) ||
+				(empty_q && pop_vc_1hot[ivc]);
 	   
 	   dff
-	     #(.width(buffer_width),
-	       .reset_type(reset_type),
-	       .hold_type(hold_type))
+	     #(.width(buff_addr_width),
+	       .reset_type(reset_type))
 	   read_addressq
-	     (.clk(clk),
+	     (.clk(clk_addr),
 	      .reset(reset),
-	      .enable(pop_this_vc),
 	      .d(read_address_s),
 	      .q(read_address_q));
 		
 	   dff
-	     #(.width(buffer_width),
-	       .reset_type(reset_type),
-	       .hold_type(hold_type))
+	     #(.width(buff_addr_width),
+	       .reset_type(reset_type))
 	   write_addressq
-	     (.clk(clk),
+	     (.clk(clk_addr),
 	      .reset(reset),
-	      .enable(push_this_vc),
 	      .d(write_address_s),
 	      .q(write_address_q));
 	   
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type),
-	       .reset_value(1'b1),
-	       .hold_type(hold_type))
+	       .reset_value(1'b1))
 	   emptyq
-	     (.clk(clk),
+	     (.clk(clk_addr),
 	      .reset(reset),
-	      .enable(pop_this_vc | push_this_vc),
 	      .d(empty_s),
 	      .q(empty_q));
 	   
 	   dff
 	     #(.width(1),
-	       .reset_type(reset_type),
-	       .hold_type(hold_type))
+	       .reset_type(reset_type))
 	   fullq
-	     (.clk(clk),
+	     (.clk(clk_addr),
 	      .reset(reset),
-	      .enable(pop_this_vc | push_this_vc),
 	      .d(full_s),
 	      .q(full_q));
 		
@@ -147,23 +174,25 @@ module flit_buffer
       
    endgenerate
 
-   wire [0:vc_width+buffer_width-1] read_address;
+   wire [0:vc_width+buff_addr_width-1] read_address;
    assign read_address[0:vc_width-1] = pop_vc;
-   or_nto1
-     #(.width(buffer_width),
+   select_1ofn
+     #(.width(buff_addr_width),
        .num_ports(num_vcs))
    read_address_vc_or
-     (.data_in(read_address_vc),
-      .data_out(read_address[vc_width:vc_width+buffer_width-1]));
+     (.select(pop_vc_1hot),
+      .data_in(read_address_vc),
+      .data_out(read_address[vc_width:vc_width+buff_addr_width-1]));
 
-   wire [0:vc_width+buffer_width-1] write_address;
+   wire [0:vc_width+buff_addr_width-1] write_address;
    assign write_address[0:vc_width-1] = push_vc;
-   or_nto1
-     #(.width(buffer_width),
+   select_1ofn
+     #(.width(buff_addr_width),
        .num_ports(num_vcs))
    write_address_vc_or
-     (.data_in(write_address_vc),
-      .data_out(write_address[vc_width:vc_width+buffer_width-1]));
+     (.select(push_vc_1hot),
+      .data_in(write_address_vc),
+      .data_out(write_address[vc_width:vc_width+buff_addr_width-1]));
 
    regfile
      #(.width(data_width),
