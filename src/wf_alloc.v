@@ -265,7 +265,7 @@ module wf_alloc
 		  assign y_out = (y_in & ~(x_in & req_in)) | ~prio_q;
 		  assign gnt_out = req_in & x_in & y_in & prio_q;
 		  assign x[((col+1)%num_ports)*(2*num_ports-2):
-			   ((col+1)%num_ports+1)*(2*num_ports-2)-1]
+			   ((col+1+1)%num_ports)*(2*num_ports-2)-1]
 			   = x_out[0:2*num_ports-3];
 		  
 		  genvar 		 row;
