@@ -4,7 +4,7 @@ module testbench
     parameter initial_seed = 0,
     parameter flit_generate_rate = 80,
     parameter flit_sink_rate = 80,
-    parameter flit_width = 64,
+    parameter data_width = 64,
     parameter num_vcs = 4,
     parameter num_buffers = 8,
     parameter reset_type = 1,
@@ -19,15 +19,15 @@ module testbench
    reg reset;
    wire push;
    wire [0:vc_width-1] push_vc;
-   wire [0:flit_width-1] flit_data_in;
+   wire [0:data_width-1] data_in;
    wire 		 pop;
    wire [0:vc_width-1] 	 pop_vc;
-   wire [0:flit_width-1] flit_data_out;
+   wire [0:data_width-1] data_out;
    wire [0:num_vcs-1] 	 vc_full;
    wire [0:num_vcs-1] 	 vc_empty;
    
    flit_buffer
-     #(.flit_width(flit_width),
+     #(.data_width(data_width),
        .num_vcs(num_vcs),
        .num_buffers(num_buffers),
        .reset_type(reset_type),
@@ -37,10 +37,10 @@ module testbench
       .reset(reset),
       .push(push),
       .push_vc(push_vc),
-      .flit_data_in(flit_data_in),
+      .data_in(data_in),
       .pop(pop),
       .pop_vc(pop_vc),
-      .flit_data_out(flit_data_out),
+      .data_out(data_out),
       .vc_full(vc_full),
       .vc_empty(vc_empty));
 
@@ -62,7 +62,7 @@ module testbench
    flit_source
      #(.initial_seed(initial_seed),
        .flit_rate(flit_generate_rate),
-       .flit_width(flit_width),
+       .data_width(data_width),
        .num_vcs(num_vcs))
    source
      (.clk(clk),
@@ -70,7 +70,7 @@ module testbench
       .ready(~vc_full),
       .valid(push),
       .vc(push_vc),
-      .data(flit_data_in));
+      .data(data_in));
 
    flit_sink
      #(.initial_seed(initial_seed),
@@ -91,10 +91,10 @@ module testbench
 	   
 	   wire capture_in;
 	   assign capture_in = push && (push_vc == vc);
-	   wire [0:flit_width-1] in_data_s, in_data_q;
-	   assign in_data_s = capture_in ? flit_data_in : in_data_q;
+	   wire [0:data_width-1] in_data_s, in_data_q;
+	   assign in_data_s = capture_in ? data_in : in_data_q;
 	   dff
-	     #(.width(flit_width),
+	     #(.width(data_width),
 	       .reset_type(1))
 	   in_dataq
 	     (.clk(clk),
@@ -104,10 +104,10 @@ module testbench
 	   
 	   wire 		 capture_out;
 	   assign capture_out = pop && (pop_vc == vc);
-	   wire [0:flit_width-1] out_data_s, out_data_q;
-	   assign out_data_s = capture_out ? flit_data_out : out_data_q;
+	   wire [0:data_width-1] out_data_s, out_data_q;
+	   assign out_data_s = capture_out ? data_out : out_data_q;
 	   dff
-	     #(.width(flit_width),
+	     #(.width(data_width),
 	       .reset_type(1))
 	   out_dataq
 	     (.clk(clk),
