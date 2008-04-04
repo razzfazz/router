@@ -1,19 +1,21 @@
 module testbench
   #(parameter Tclk = 6,
     parameter num_ports = 5,
-    parameter use_clock_gating = 1,
+    parameter hold_type = 1,
+    parameter reset_type = 1,
     parameter mean_delay = 1,
     parameter fixed_delay = 0,
-    parameter hold_requests = 1,
-    parameter runtime = 100000,
+    parameter hold_requests = 0,
+    parameter runtime = 1000,
     parameter output_as_csv = 1,
 
     /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
     2: wavefront, rotate inputs for priority
-    3: wavefront, replicated logic for priority */
-    parameter use_architecture = 0)
+    3: wavefront, replicated logic for priority
+    4: diagonal propagation arbiter (DPA) */
+    parameter architecture = 0)
    ();
    
    function integer get_flow(input [0:num_ports*num_ports-1] gnt_matrix);
@@ -28,6 +30,48 @@ module testbench
 		     get_flow = get_flow + 1;
 		end
 	   end
+      end
+   endfunction
+   
+   function integer one_hot(input [0:num_ports-1] vector);
+      integer i;
+      reg [0:num_ports-1] vec_sub1;
+      reg [0:num_ports-1] vec_rev;
+      reg [0:num_ports-1] vec_rev_sub1;
+      reg [0:num_ports-1] vec_sub1rev;
+      begin
+	 for(i = 0; i < num_ports; i = i + 1)
+	   begin
+	      vec_rev[i] = vector[num_ports - i - 1];
+	   end
+	 vec_sub1 = vector - {{num_ports-1{1'b0}}, 1'b1};
+	 vec_rev_sub1 = vec_rev - {{num_ports-1{1'b0}}, 1'b1};
+	 for(i = 0; i < num_ports; i = i + 1)
+	   begin
+	      vec_sub1rev[i] = vec_rev_sub1[num_ports - i - 1];
+	   end
+	 one_hot = &(vector ^ vec_sub1 ^ vec_sub1rev);
+      end
+   endfunction
+   
+   function integer zero_or_one_hot(input [0:num_ports-1] vector);
+      integer i;
+      reg [0:num_ports-1] vec_sub1;
+      reg [0:num_ports-1] vec_rev;
+      reg [0:num_ports-1] vec_rev_sub1;
+      reg [0:num_ports-1] vec_sub1rev;
+      begin
+	 for(i = 0; i < num_ports; i = i + 1)
+	   begin
+	      vec_rev[i] = vector[num_ports - i - 1];
+	   end
+	 vec_sub1 = vector - {{num_ports-1{1'b0}}, 1'b1};
+	 vec_rev_sub1 = vec_rev - {{num_ports-1{1'b0}}, 1'b1};
+	 for(i = 0; i < num_ports; i = i + 1)
+	   begin
+	      vec_sub1rev[i] = vec_rev_sub1[num_ports - i - 1];
+	   end
+	 zero_or_one_hot = &(vector ^ (vec_sub1 | vec_sub1rev));
       end
    endfunction
    
@@ -300,7 +344,8 @@ module testbench
 	   assign avg_match[i*32:(i+1)*32-1] = drv_avg_match;
 	   assign req_ip_op[i*num_ports:(i+1)*num_ports-1] = req_op;
 	   
-	   assign drv_error_bad_alloc = |(gnt_op & ~req_op);
+	   assign drv_error_bad_alloc = |(gnt_op & ~req_op) ||
+					!zero_or_one_hot(gnt_op);
 
 	   assign drv_error_count_q = error_count_q[i*32:(i+1)*32-1];
 	   assign drv_error_count_s = reset ?
@@ -314,8 +359,9 @@ module testbench
 
    simple_alloc
      #(.num_ports(num_ports),
-       .use_clock_gating(use_clock_gating),
-       .use_architecture(use_architecture))
+       .reset_type(reset_type),
+       .hold_type(hold_type),
+       .architecture(architecture))
    alloc
      (.CLK(clk),
       .RST(reset),
