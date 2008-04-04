@@ -21,13 +21,16 @@ module comb_alloc_wf
     
     input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
     input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
+    
     input [0:num_ports*num_vcs-1] cred_op_ovc,
     input [0:num_ports*num_vcs-1] elig_op_ovc,
+    
     input [0:num_ports*num_vcs-1] allocated_ip_ivc,
     
-    output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
-    output wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc,
-    output wire [0:num_ports*num_ports-1] 	gnt_ip_op);
+    output wire [0:num_ports*num_vcs-1] vc_gnt_ip_ivc,
+    output wire [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc,
+    output wire [0:num_ports*num_vcs-1] 	sw_gnt_ip_ivc,
+    output wire [0:num_ports*num_ports-1] 	sw_gnt_ip_op);
    
    
    //---------------------------------------------------------------------------
@@ -117,16 +120,9 @@ module comb_alloc_wf
 			 = allocated ? req_ovc : gnt_ovc;
 
 		wire 		   request_port;
+
 		assign req_sw = req_qual_elig & req_qual_cred;
-		
-		select_1ofn
-		  #(.width(num_ports),
-		    .num_ports(1))
-		req_op_sel
-		  (.select(req_sw),
-		   .data_in(req_op),
-		   .data_out(req_sw_op));
-		
+		assign req_sw_op = req_sw ? req_op : {num_ports{1'b0}};
 		assign req_sw_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 			 = req_sw_op;
 		
