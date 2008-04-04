@@ -42,7 +42,7 @@ module matrix_arbiter
 		assign prio_s[row*num_ports+col]
 			 = update ?
 			   (prio_q[row*num_ports+col] | gnt[col]) & !gnt[row] :
-			   prio_q;
+			   prio_q[row*num_ports+col];
 		
 	     end
 	end
