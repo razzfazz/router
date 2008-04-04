@@ -21,57 +21,16 @@ module sw_alloc
    (input     clk,
     input     reset,
     
-    input [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc,
+    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
+    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
 
     input [0:num_ports*num_vcs-1] cred_op_ovc,
 
     output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
     output wire [0:num_ports*num_ports-1] gnt_ip_op);
 
-   wire [0:num_ports*num_vcs*num_ports-1] req_qual_ip_ivc_op;
-   
    generate
 
-      genvar 				  ip;
-      for(ip = 0; ip < num_ports; ip = ip + 1)
-	begin:ips
-	   
-	   genvar ivc;
-	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	     begin:ivcs
-	   
-		wire [0:num_ports*num_vcs-1] req_op_ovc;
-		assign req_op_ovc
-		  = req_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
-				      (ip*num_vcs+ivc+1)*num_ports*num_vcs-1];
-	   
-		wire [0:num_vcs*num_ports-1] req_qual_op_ovc;
-		assign req_qual_op_ovc = req_op_ovc & cred_op_ovc;
-		
-		wire [0:num_vcs*num_ports-1] req_qual_ovc_op;
-		interleaver
-		  #(.width(num_ports*num_vcs),
-		    .num_blocks(num_ports))
-		intl_req_qual
-		  (.data_in(req_qual_op_ovc),
-		   .data_out(req_qual_ovc_op));
-		
-		wire [0:num_ports-1] 	     req_qual_op;
-		or_nto1
-		  #(.width(num_ports),
-		    .num_ports(num_vcs))
-		or_req_qual_ovc
-		  (.data_in(req_qual_ovc_op),
-		   .data_out(req_qual_op));
-	   
-		assign req_qual_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
-					  (ip*num_vcs+ivc+1)*num_ports-1]
-			 = req_qual_op;
-		
-	     end
-	   
-	end
-      
       case(architecture)
 	0, 1:
 	  begin
@@ -80,11 +39,13 @@ module sw_alloc
 		 .num_vcs(num_vcs),
 		 .reset_type(reset_type),
 		 .hold_type(hold_type),
-		 .architecture(architecture & 1))
+		 .architecture(architecture))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
-		.req_ip_ivc_op(req_qual_ip_ivc_op),
+		.req_ip_ivc_op(req_ip_ivc_op),
+		.req_ip_ivc_ovc(req_ip_ivc_ovc),
+		.cred_op_ovc(cred_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_op(gnt_ip_op));
 	  end
@@ -95,11 +56,13 @@ module sw_alloc
 		 .num_vcs(num_vcs),
 		 .reset_type(reset_type),
 		 .hold_type(hold_type),
-		 .architecture(architecture & 1))
+		 .architecture(architecture - 2))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
-		.req_ip_ivc_op(req_qual_ip_ivc_op),
+		.req_ip_ivc_op(req_ip_ivc_op),
+		.req_ip_ivc_ovc(req_ip_ivc_ovc),
+		.cred_op_ovc(cred_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_op(gnt_ip_op));
 	  end
@@ -115,7 +78,9 @@ module sw_alloc
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
-		.req_ip_ivc_op(req_qual_ip_ivc_op),
+		.req_ip_ivc_op(req_ip_ivc_op),
+		.req_ip_ivc_ovc(req_ip_ivc_ovc),
+		.cred_op_ovc(cred_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_op(gnt_ip_op));
 	     
