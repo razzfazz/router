@@ -1,5 +1,5 @@
-module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc,
-			gnt_ip_ivc_op_ovc, gnt_ip_ivc);
+module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
+			gnt_ip_ivc, gnt_ip_ivc_ovc);
    
    parameter num_ports = NUM_PORTS;
    parameter num_vcs = NUM_VCS;
@@ -10,16 +10,19 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc,
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
-    1: separable, input-first, matrix arbiters */
+    1: separable, input-first, matrix arbiters
+    2: separable, output-first, round-robin arbiters
+    3: separable, output-first, matrix arbiters */
    parameter architecture = ARCHITECTURE;
    
    input CLK;
    input RST;
    
-   input [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc;
+   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
    input [0:num_ports*num_vcs-1] elig_op_ovc;
-   output [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc;
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
    
    wire clk = CLK;
    wire reset;
@@ -42,9 +45,10 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op_ovc, elig_op_ovc,
    alloc
      (.clk(clk),
       .reset(reset),
-      .req_ip_ivc_op_ovc(req_ip_ivc_op_ovc),
+      .req_ip_ivc_op(req_ip_ivc_op),
+      .req_ip_ivc_ovc(req_ip_ivc_ovc),
       .elig_op_ovc(elig_op_ovc),
-      .gnt_ip_ivc_op_ovc(gnt_ip_ivc_op_ovc),
-      .gnt_ip_ivc(gnt_ip_ivc));
+      .gnt_ip_ivc(gnt_ip_ivc),
+      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc));
    
 endmodule
