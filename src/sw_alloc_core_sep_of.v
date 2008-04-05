@@ -194,8 +194,8 @@ module sw_alloc_core_sep_of
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt1_intl
-     (.data_in(gnt1_op_ip),
-      .data_out(gnt1_ip_op));
+     (.data_in(gnt1_ip_op),
+      .data_out(gnt1_op_ip));
 
    wire [0:num_ports*num_ports-1] 	req2_op_ip;
    interleaver
