@@ -1,39 +1,21 @@
 #!/bin/sh
 
-tclk=2
-sim_cycles=1000
-warmup_cycles=100
-initial_seed=0
-reset_type=1
-hold_type=1
-output_as_csv=1
-
-for buffer_occupancy in 25 50 75
+for num_ports in 5 10 15
   do
-  for num_ports in 5 10 15
+  for num_vcs in 2 4 8
     do
-    for num_vcs in 2 4 8
+    for buffer_occupancy in 25 75
       do
-      if [ ${output_as_csv} -eq 1 ]
-	  then
-	  echo "num_ports=${num_ports},num_vcs=${num_vcs},buffer_occupancy=${buffer_occupancy}"
-      else
-	  echo "SWEEP: num_ports=${num_ports},num_vcs=${num_vcs},buffer_occupancy=${buffer_occupancy}"
-      fi
-      cat testbench.template.v \
-	  | sed s/TCLK/${tclk}/ \
-	  | sed s/SIM_CYCLES/${sim_cycles}/ \
-	  | sed s/WARMUP_CYCLES/${warmup_cycles}/ \
-	  | sed s/INITIAL_SEED/${initial_seed}/ \
-	  | sed s/RESET_TYPE/${reset_type}/ \
-	  | sed s/HOLD_TYPE/${hold_type}/ \
-	  | sed s/NUM_PORTS/${num_ports}/ \
-	  | sed s/NUM_VCS/${num_vcs}/ \
-	  | sed s/BUFFER_OCCUPANCY/${buffer_occupancy}/ \
-	  | sed s/OUTPUT_AS_CSV/${output_as_csv}/ \
-	  > testbench.v
-      make clean all > /dev/null
-      ./simv
+      name=p${num_ports}_v${num_vcs}_o${buffer_occupancy}
+      basedir=`pwd`/build/${name}
+      ./clone.sh ${basedir}
+      rundir=${basedir}/verif/run
+      touch ${rundir}/config.sh
+      echo "rundir=${rundir}" > ${rundir}/config.sh
+      echo "num_ports=${num_ports}" >> ${rundir}/config.sh
+      echo "num_vcs=${num_vcs}" >> ${rundir}/config.sh
+      echo "buffer_occupancy=${buffer_occupancy}" >> ${rundir}/config.sh
+      echo ${rundir}/run.sh | qsub -N ${name} -v rundir=${rundir}
     done
   done
 done
