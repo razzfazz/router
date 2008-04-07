@@ -1,7 +1,6 @@
 module clkgate
-  #()
-   (input clk,
-    input act,
+  (input clk,
+   input act,
     output wire clk_gated);
    
    reg 		act_q;
