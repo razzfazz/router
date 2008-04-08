@@ -17,6 +17,8 @@ sed -i "s/\(parameter *architecture *=\) [0-9]*/\1 ${architecture}/" ${srcdir}/c
 for clk_period in `seq ${clk_period_max} ${clk_period_delta} ${clk_period_min}`
   do
 
+  echo "running synthesis for clock period ${clk_period}..."
+  
   sed -i "s/\(set clk_period\) .*/\1 ${clk_period}/" synth.tcl
   
   make clean > /dev/null
