@@ -28,17 +28,20 @@ print "checking $module.out file for errors\n";
 @errors = `grep Error $dir/$module.out`;
 if(@errors)
 {
-    if ($noninteractive){
-        print "Errors found in $module.out, aborting\n";
-    }
-    my $again = 1;
-    while($again){
-        print STDERR "Errors found, do you want to continue ([y]es/[n]o/[p]rint errors):";
-        $_ = <STDIN>;
-        $again = 0 if (substr($_, 0, 1) eq 'y');
-        exit if (substr($_, 0, 1) eq 'n');
-        print STDERR @errors if (substr($_, 0, 1) eq 'p');
-    }
+#    if ($noninteractive){
+#        print "Errors found in $module.out, aborting\n";
+#    }
+#    my $again = 1;
+#    while($again){
+#        print STDERR "Errors found, do you want to continue ([y]es/[n]o/[p]rint errors):";
+#        $_ = <STDIN>;
+#        $again = 0 if (substr($_, 0, 1) eq 'y');
+#        exit if (substr($_, 0, 1) eq 'n');
+#        print STDERR @errors if (substr($_, 0, 1) eq 'p');
+#    }
+     print STDERR "Errors found in $module.out, aborting.\n";
+     print STDERR @errors;
+     exit;
 }
 
 #get area
