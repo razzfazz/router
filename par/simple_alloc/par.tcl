@@ -159,3 +159,4 @@ delayCal -mergeSetupHold -sdf ${top}.sdf
 
 saveDesign "${top}.enc"
 
+summaryReport
