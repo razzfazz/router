@@ -1,0 +1,59 @@
+module matrix_arbiter
+  #(parameter num_ports = 32,
+
+    // see dff.v for supported values
+    parameter reset_type = 1)
+   (input     clk,
+    input     reset,
+    input     update,
+    input [0:num_ports-1] req,
+    output wire [0:num_ports-1] gnt);
+   
+   wire [0:num_ports*num_ports-1] prio_s, prio_q;
+   
+   generate
+
+      genvar 			  row;
+      for(row = 0; row < num_ports; row = row + 1)
+	begin:rows
+
+	   genvar col;
+	   for(col = 0; col < num_ports; col = col + 1)
+	     begin:cols
+		
+		if(row < col)
+		  begin
+		     dff
+		       #(.width(1),
+			 .offset(col),
+			 .reset_type(reset_type),
+			 .reset_value(1'b1))
+		     prioq
+		       (.clk(clk),
+			.reset(reset),
+			.d(prio_s[row*num_ports+col]),
+			.q(prio_q[row*num_ports+col]));
+		  end
+		else if(row == col)
+		  assign prio_q[row*num_ports+col] = 1'b1;
+		else
+		  assign prio_q[row*num_ports+col] = ~prio_q[col*num_ports+row];
+
+		assign prio_s[row*num_ports+col]
+			 = update ?
+			   (prio_q[row*num_ports+col] | gnt[col]) & !gnt[row] :
+			   prio_q[row*num_ports+col];
+		
+	     end
+	end
+
+      genvar i;
+      for(i = 0; i < num_ports; i = i + 1)
+	begin:gnts
+	   assign gnt[i] = req[i] & 
+			   (&(prio_q[i*num_ports:(i+1)*num_ports-1] | ~req));
+	end
+      
+   endgenerate
+   
+endmodule
