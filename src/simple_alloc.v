@@ -7,9 +7,10 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
-    2: wavefront, rotate inputs for priority
+    2: wavefront, mux inputs for priority
     3: wavefront, replicated logic for priority
-    4: wavefront, diagonal propagation arbiter */
+    4: wavefront, diagonal propagation arbiter
+    5: wavefront, rotate inputs for priority */
    parameter architecture = 0;
 
    input CLK;
@@ -120,7 +121,7 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
 	     assign gnt_ip_op = gnt2_ip_op;
 	     
 	  end
-	2, 3, 4:
+	2, 3, 4, 5:
 	  begin
 	     
 	     wire update;
