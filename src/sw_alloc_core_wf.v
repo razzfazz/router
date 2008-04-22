@@ -6,12 +6,14 @@ module sw_alloc_core_wf
     parameter reset_type = 1,
 
     /* supported architectures:
-     0: rotate inputs based on prio, round-robin arbiters in final stage
-     1: rotate inputs based on prio, matrix arbiters in final stage
+     0: mux inputs based on prio, round-robin arbiters in final stage
+     1: mux inputs based on prio, matrix arbiters in final stage
      2: replicate logic for prios, round-robin arbiters in final stage
      3: replicate logic for prios, matrix arbiters in final stage
      4: diagonal propagation arbiter, round-robin arbiters in final stage
-     5: diagonal propagation arbiter, matrix arbiters in final stage */
+     5: diagonal propagation arbiter, matrix arbiters in final stage
+     6: rotate inputs based on prio, round-robin arbiters in final stage
+     7: rotate inputs based on prio, matrix arbiters in final stage */
     parameter architecture = 0)
    (input     clk,
     input     reset,
