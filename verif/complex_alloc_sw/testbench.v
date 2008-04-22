@@ -1,12 +1,12 @@
 module testbench
   #(parameter Tclk = 2,
-    parameter sim_cycles = 1000,
+    parameter sim_cycles = 10000,
     parameter warmup_cycles = 100,
     parameter initial_seed = 0,
     parameter output_as_csv = 1,
-    parameter buffer_occupancy = 25,
-    parameter num_ports = 5,
-    parameter num_vcs = 2,
+    parameter buffer_occupancy = 75,
+    parameter num_ports = 10,
+    parameter num_vcs = 8,
     parameter reset_type = 1)
    ();
    
@@ -15,13 +15,15 @@ module testbench
      1: separable, input-first, matrix arbiters
      2: separable, output-first, round-robin arbiters
      3: separable, output-first, matrix arbiters
-     4: rotate inputs based on prio, round-robin arbiters in final stage
-     5: rotate inputs based on prio, matrix arbiters in final stage
+     4: mux inputs based on prio, round-robin arbiters in final stage
+     5: mux inputs based on prio, matrix arbiters in final stage
      6: replicate logic for prios, round-robin arbiters in final stage
      7: replicate logic for prios, matrix arbiters in final stage
      8: diagonal propagation arbiter, round-robin arbiters in final stage
-     9: diagonal propagation arbiter, matrix arbiters in final stage */
-   localparam num_archs = 10;
+     9: diagonal propagation arbiter, matrix arbiters in final stage
+     10: rotate inputs based on prio, round-robin arbiters in final stage
+     11: rotate inputs based on prio, matrix arbiters in final stage */
+   localparam num_archs = 12;
    
    function integer get_flow(input [0:num_ports*num_ports-1] gnt_matrix);
       integer i, j;
@@ -379,11 +381,15 @@ module testbench
 	   integer 			  flow_actual;
 	   integer 			  l;
 	   integer 			  bad_alloc;
+	   integer 			  grant_port[0:num_ports-1];
 	   
 	   initial
 	   begin
 
 	      grant_actual[arch] = 0;
+
+	      for(l = 0; l < num_ports; l = l + 1)
+		grant_port[l] = 0;
 	      
 	      #(2*Tclk);
 	      
@@ -398,6 +404,8 @@ module testbench
 			  bad_alloc = bad_alloc | 1;
 			if(!zero_or_one_hot(gnt_op_ip[l*num_ports+:num_ports]))
 			  bad_alloc = bad_alloc | 2;
+			if(|gnt_ip_op[l*num_ports+:num_ports])
+			  grant_port[l] = grant_port[l] + 1;
 		     end
 		   if(|(gnt_ip_op & ~req_ip_op))
 		     bad_alloc = bad_alloc | 4;
