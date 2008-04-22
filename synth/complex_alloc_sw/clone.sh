@@ -4,6 +4,8 @@ basedir=${1}
 
 files="config_base.sh Makefile run.sh synth.tcl"
 
+rm -rf ${basedir}
+
 mkdir -p ${basedir}
 cp -R ../../src ${basedir}
 mkdir -p ${basedir}/synth
