@@ -2,7 +2,7 @@
 
 basedir=${1}
 
-files="config_base.sh Makefile run.sh testbench.v"
+files="config_base.sh Makefile run.sh testbench.v functions.v"
 
 mkdir -p ${basedir}
 cp -R ../../src ${basedir}
