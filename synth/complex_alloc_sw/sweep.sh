@@ -4,10 +4,10 @@ for num_ports in 5 10 15
   do
   for num_vcs in 2 4 8
     do
-    for architecture in 0 1 2 3 4 5 6 7 8 9
+    for architecture in 0 1 2 3 4 5 6 7 8 9 10 11
       do
       name=p${num_ports}_v${num_vcs}_a${architecture}
-      clk_period_range=`cat clk_ranges.csv | grep ${name}`
+      clk_period_range=`cat clk_ranges.csv | egrep "^${name},"`
       clk_period_min=`echo ${clk_period_range} | cut -d "," -f 2`
       clk_period_max=`echo ${clk_period_range} | cut -d "," -f 3`
       basedir=`pwd`/build/${name}
