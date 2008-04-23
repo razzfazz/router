@@ -99,9 +99,6 @@ module sw_alloc_core_sep_if
 	   // first arbitration stage (select VC)
 	   //-------------------------------------------------------------------
 
-	   wire 		     gnt2;
-	   assign gnt2 = |gnt2_op;
-	   
 	   wire [0:num_ports*num_vcs-1] req1_op_ivc;
 	   interleaver
 	     #(.width(num_vcs*num_ports),
@@ -117,7 +114,10 @@ module sw_alloc_core_sep_if
 	   req_op_or
 	     (.data_in(req1_op_ivc),
 	      .data_out(req1_ivc));
-
+	   
+	   wire 			gnt2;
+	   assign gnt2 = |gnt2_op;
+	   
 	   wire 			update_arb;
 	   assign update_arb = gnt2;
 	   
