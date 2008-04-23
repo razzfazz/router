@@ -153,13 +153,7 @@ module sw_alloc_core_sep_if
 	   //-------------------------------------------------------------------
 
 	   wire [0:num_vcs-1] 		gnt_ivc;
-	   select_1ofn
-	     #(.width(num_vcs),
-	       .num_ports(1))
-	   gnt1_sel
-	     (.select(gnt2),
-	      .data_in(gnt1_ivc),
-	      .data_out(gnt_ivc));
+	   assign gnt_ivc = {num_vcs{gnt2}} & gnt1_ivc;
 
 	   
 	   //-------------------------------------------------------------------
