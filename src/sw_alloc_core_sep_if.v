@@ -61,7 +61,6 @@ module sw_alloc_core_sep_if
 	   //-------------------------------------------------------------------
 
 	   wire [0:num_vcs-1] 		req1_ivc;
-	   wire [0:num_vcs*num_ports-1] req1_ivc_op;
 	   
 	   genvar ivc;
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
@@ -72,30 +71,6 @@ module sw_alloc_core_sep_if
 
 		wire [0:num_vcs-1]   req_ovc;
 		assign req_ovc = req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
-
-		wire [0:num_ports*num_vcs-1] cred_avail_op_ovc;
-		assign cred_avail_op_ovc = {num_ports{req_ovc}} & cred_op_ovc;
-
-		wire [0:num_vcs*num_ports-1] cred_avail_ovc_op;
-		interleaver
-		  #(.width(num_ports*num_vcs),
-		    .num_blocks(num_ports))
-		cred_avail_intl
-		  (.data_in(cred_avail_op_ovc),
-		   .data_out(cred_avail_ovc_op));
-
-		wire [0:num_ports-1] 	     cred_avail_op;
-		or_nto1
-		  #(.width(num_ports),
-		    .num_ports(num_vcs))
-		cred_avail_ovc_or
-		  (.data_in(cred_avail_ovc_op),
-		   .data_out(cred_avail_op));
-
-		wire [0:num_ports-1] req1_op;
-		assign req1_op = req_op & cred_avail_op;
-		
-		assign req1_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req1_op;
 
 		wire [0:num_vcs-1]   cred_avail_ovc;
 		select_1ofn
