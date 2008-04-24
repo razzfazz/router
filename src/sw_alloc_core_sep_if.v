@@ -60,6 +60,7 @@ module sw_alloc_core_sep_if
 	   // filter out unavailable VCs
 	   //-------------------------------------------------------------------
 
+	   wire [0:num_vcs-1] 		req1_ivc;
 	   wire [0:num_vcs*num_ports-1] req1_ivc_op;
 	   
 	   genvar ivc;
@@ -90,6 +91,7 @@ module sw_alloc_core_sep_if
 		wire [0:num_ports-1] req1_op;
 		assign req1_op = {num_ports{req1}} & req_op;
 		
+		assign req1_ivc[ivc] = req1;
 		assign req1_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req1_op;
 		
 	     end
@@ -99,22 +101,6 @@ module sw_alloc_core_sep_if
 	   // first arbitration stage (select VC)
 	   //-------------------------------------------------------------------
 
-	   wire [0:num_ports*num_vcs-1] req1_op_ivc;
-	   interleaver
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   req_intl
-	     (.data_in(req1_ivc_op),
-	      .data_out(req1_op_ivc));
-	   
-	   wire [0:num_vcs-1] 		req1_ivc;
-	   or_nto1
-	     #(.width(num_vcs),
-	       .num_ports(num_ports))
-	   req_op_or
-	     (.data_in(req1_op_ivc),
-	      .data_out(req1_ivc));
-	   
 	   wire 			gnt2;
 	   assign gnt2 = |gnt2_op;
 	   
@@ -144,7 +130,7 @@ module sw_alloc_core_sep_if
 	       .num_ports(num_vcs))
 	   req1_ivc_sel
 	     (.select(gnt1_ivc),
-	      .data_in(req1_ivc_op),
+	      .data_in(req_ivc_op),
 	      .data_out(req2_op));
 
 
