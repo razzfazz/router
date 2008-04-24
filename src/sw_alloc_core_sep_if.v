@@ -82,11 +82,8 @@ module sw_alloc_core_sep_if
 		   .data_in(cred_op_ovc),
 		   .data_out(cred_ovc));
 		
-		wire [0:num_vcs-1]   req1_ovc;
-		assign req1_ovc = req_ovc & cred_ovc;
-
 		wire 		     req1;
-		assign req1 = |req1_ovc;
+		assign req1 = |(req_ovc & cred_ovc);
 		
 		wire [0:num_ports-1] req1_op;
 		assign req1_op = {num_ports{req1}} & req_op;
