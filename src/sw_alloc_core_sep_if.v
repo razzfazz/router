@@ -72,24 +72,44 @@ module sw_alloc_core_sep_if
 
 		wire [0:num_vcs-1]   req_ovc;
 		assign req_ovc = req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
-	   
-		wire [0:num_vcs-1]   cred_ovc;
+
+		wire [0:num_ports*num_vcs-1] cred_avail_op_ovc;
+		assign cred_avail_op_ovc = {num_ports{req_ovc}} & cred_op_ovc;
+
+		wire [0:num_vcs*num_ports-1] cred_avail_ovc_op;
+		interleaver
+		  #(.width(num_ports*num_vcs),
+		    .num_blocks(num_ports))
+		cred_avail_intl
+		  (.data_in(cred_avail_op_ovc),
+		   .data_out(cred_avail_ovc_op));
+
+		wire [0:num_ports-1] 	     cred_avail_op;
+		or_nto1
+		  #(.width(num_ports),
+		    .num_ports(num_vcs))
+		cred_avail_ovc_or
+		  (.data_in(cred_avail_ovc_op),
+		   .data_out(cred_avail_op));
+
+		wire [0:num_ports-1] req1_op;
+		assign req1_op = req_op & cred_avail_op;
+		
+		assign req1_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req1_op;
+
+		wire [0:num_vcs-1]   cred_avail_ovc;
 		select_1ofn
 		  #(.width(num_vcs),
 		    .num_ports(num_ports))
 		cred_op_sel
 		  (.select(req_op),
 		   .data_in(cred_op_ovc),
-		   .data_out(cred_ovc));
-		
+		   .data_out(cred_avail_ovc));
+
 		wire 		     req1;
-		assign req1 = |(req_ovc & cred_ovc);
-		
-		wire [0:num_ports-1] req1_op;
-		assign req1_op = {num_ports{req1}} & req_op;
+		assign req1 = |(req_ovc & cred_avail_ovc);
 		
 		assign req1_ivc[ivc] = req1;
-		assign req1_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req1_op;
 		
 	     end
       
@@ -98,7 +118,7 @@ module sw_alloc_core_sep_if
 	   // first arbitration stage (select VC)
 	   //-------------------------------------------------------------------
 
-	   wire 			gnt2;
+	   wire 		     gnt2;
 	   assign gnt2 = |gnt2_op;
 	   
 	   wire 			update_arb;
@@ -202,14 +222,11 @@ module sw_alloc_core_sep_if
 	   // second arbitration stage (select input port)
 	   //-------------------------------------------------------------------
 	   
-	   wire 		req2;
-	   assign req2 = |req2_ip;
-
 	   // if any VC requesting this output port was granted at any input
 	   // port in the first stage, one of these input ports will be granted
 	   // here as well, and we can thus update priorities
 	   wire 		update_arb;
-	   assign update_arb = req2;
+	   assign update_arb = |req2_ip;
 
 	   wire [0:num_ports-1] gnt2_ip;
 	   arbiter

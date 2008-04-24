@@ -66,6 +66,7 @@ module sw_alloc_core_wf
 	   //-------------------------------------------------------------------
 
 	   wire [0:num_vcs*num_ports-1] req2_ivc_op;
+	   wire [0:num_vcs-1] 		req1_ivc;
 
 	   genvar ivc;
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
@@ -76,56 +77,53 @@ module sw_alloc_core_wf
 
 		wire [0:num_vcs-1]   req_ovc;
 		assign req_ovc = req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
-	   
-		wire [0:num_vcs-1]   cred_ovc;
-		select_1ofn
-		  #(.width(num_vcs),
-		    .num_ports(num_ports))
-		cred_op_sel
-		  (.select(req_op),
-		   .data_in(cred_op_ovc),
-		   .data_out(cred_ovc));
-		
-		wire [0:num_vcs-1]   req2_ovc;
-		assign req2_ovc = req_ovc & cred_ovc;
 
-		wire 		     req2;
-		assign req2 = |req2_ovc;
-		
+		wire [0:num_ports*num_vcs-1] cred_avail_op_ovc;
+		assign cred_avail_op_ovc = {num_ports{req_ovc}} & cred_op_ovc;
+
+		wire [0:num_vcs*num_ports-1] cred_avail_ovc_op;
+		interleaver
+		  #(.width(num_ports*num_vcs),
+		    .num_blocks(num_ports))
+		cred_avail_intl
+		  (.data_in(cred_avail_op_ovc),
+		   .data_out(cred_avail_ovc_op));
+
+		wire [0:num_ports-1] 	     cred_avail_op;
+		or_nto1
+		  #(.width(num_ports),
+		    .num_ports(num_vcs))
+		cred_avail_ovc_or
+		  (.data_in(cred_avail_ovc_op),
+		   .data_out(cred_avail_op));
+
 		wire [0:num_ports-1] req2_op;
-		assign req2_op = {num_ports{req2}} & req_op;
+		assign req2_op = req_op & cred_avail_op;
 		
 		assign req2_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req2_op;
+
+		assign req1_ivc[ivc] = |(req2_op & gnt2_op);
 		
 	     end
       
 	   
 	   //-------------------------------------------------------------------
+	   // generate requests for second stage
+	   //-------------------------------------------------------------------
+
+	   wire [0:num_ports-1] 	req2_op;
+	   or_nto1
+	     #(.width(num_ports),
+	       .num_ports(num_vcs))
+	   req2_ivc_or
+	     (.data_in(req2_ivc_op),
+	      .data_out(req2_op));
+	   
+	   
+	   //-------------------------------------------------------------------
 	   // first arbitration stage (select VC)
 	   //-------------------------------------------------------------------
 
-	   wire [0:num_vcs*num_ports-1] mask_ivc_op;
-	   assign mask_ivc_op = {num_vcs{gnt2_op}};
-	   
-	   wire [0:num_vcs*num_ports-1] req1_ivc_op;
-	   assign req1_ivc_op = req2_ivc_op & mask_ivc_op;
-
-	   wire [0:num_ports*num_vcs-1] req1_op_ivc;
-	   interleaver
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   req1_intl
-	     (.data_in(req1_ivc_op),
-	      .data_out(req1_op_ivc));
-	   
-	   wire [0:num_vcs-1] 		req1_ivc;
-	   or_nto1
-	     #(.width(num_vcs),
-	       .num_ports(num_ports))
-	   req1_op_or
-	     (.data_in(req1_op_ivc),
-	      .data_out(req1_ivc));
-	     
 	   wire 			update_arb;
 	   assign update_arb = |gnt2_op;
 	   
@@ -140,19 +138,6 @@ module sw_alloc_core_wf
 	      .update(update_arb),
 	      .req(req1_ivc),
 	      .gnt(gnt1_ivc));
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // generate requests for second stage
-	   //-------------------------------------------------------------------
-
-	   wire [0:num_ports-1] 	req2_op;
-	   or_nto1
-	     #(.width(num_ports),
-	       .num_ports(num_vcs))
-	   req2_ivc_or
-	     (.data_in(req2_ivc_op),
-	      .data_out(req2_op));
 	   
 	   
 	   //-------------------------------------------------------------------
