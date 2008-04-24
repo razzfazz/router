@@ -175,14 +175,14 @@ module sw_alloc_core_sep_of
    // bit shuffling for changing sort order
    //---------------------------------------------------------------------------
 
-   wire [0:num_ports*num_ports-1] 	gnt1_op_ip;
-   interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   gnt1_intl
+   wire [0:num_ports-1] 		gnt1_op;
+   or_nto1
+     #(.width(num_ports),
+       .num_ports(num_ports))
+   gnt1_ip_or
      (.data_in(gnt1_ip_op),
-      .data_out(gnt1_op_ip));
-
+      .data_out(gnt1_op));
+   
    wire [0:num_ports*num_ports-1] 	req2_op_ip;
    interleaver
      #(.width(num_ports*num_ports),
@@ -213,24 +213,24 @@ module sw_alloc_core_sep_of
 	   //-------------------------------------------------------------------
 	   // connect inputs
 	   //-------------------------------------------------------------------
-
-	   wire [0:num_ports-1] gnt1_ip;
-	   assign gnt1_ip = gnt1_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] req2_ip;
 	   assign req2_ip = req2_op_ip[op*num_ports:(op+1)*num_ports-1];
-
+	   
+	   wire 		gnt1;
+	   assign gnt1 = gnt1_op[op];
+	   
 	   
 	   //-------------------------------------------------------------------
 	   // second arbitration stage (select input port)
 	   //-------------------------------------------------------------------
-
+	   
 	   // if any VC requesting this output port was granted at any input
 	   // port in the first stage, the corresponding second-stage grant must
 	   // have taken place before that, so we can update priorities
 	   wire 		update_arb;
-	   assign update_arb = |gnt1_ip;
-
+	   assign update_arb = gnt1;
+	   
 	   wire [0:num_ports-1] gnt2_ip;
 	   arbiter
 	     #(.num_ports(num_ports),
@@ -242,12 +242,12 @@ module sw_alloc_core_sep_of
 	      .update(update_arb),
 	      .req(req2_ip),
 	      .gnt(gnt2_ip));
-
+	   
 	   
 	   //-------------------------------------------------------------------
 	   // connect outputs
 	   //-------------------------------------------------------------------
-
+	   
 	   assign gnt2_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt2_ip;
 	   
 	end
