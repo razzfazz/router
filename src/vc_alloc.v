@@ -41,7 +41,7 @@ module vc_alloc
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc));
 	  end
-/*	2, 3:
+	2, 3:
 	  begin
 	     vc_alloc_core_sep_of
 	       #(.num_ports(num_ports),
@@ -56,7 +56,7 @@ module vc_alloc
 		.elig_op_ovc(elig_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc));
-	  end*/
+	  end
 	endcase
 
    endgenerate
