@@ -7,7 +7,7 @@ module dff
      1: asynchronous reset
      2: synchronous reset */
     parameter reset_type = 0,
-    parameter reset_value = {width{1'b0}})
+    parameter [0:width-1] reset_value = {width{1'b0}})
    (input clk,
     input reset,
     input [offset:offset+width-1] d,
