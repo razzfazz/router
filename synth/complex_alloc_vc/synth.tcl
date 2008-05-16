@@ -9,6 +9,7 @@ set top ${proj}_syn_wrapper
 set src_files [list \
 		   arbiter.v \
 		   clkgate.v \
+		   complex_alloc_sw.v \
 		   complex_alloc_vc.v \
 		   dff.v \
 		   interleaver.v \
@@ -16,14 +17,19 @@ set src_files [list \
 		   or_nto1.v \
 		   rr_arbiter.v \
 		   select_1ofn.v \
+		   rotator.v \
 		   sw_alloc.v \
 		   sw_alloc_core_sep_if.v \
 		   sw_alloc_core_sep_of.v \
 		   sw_alloc_core_wf.v \
-		   tree_arbiter.v \
 		   vc_alloc.v \
 		   vc_alloc_core_sep_if.v \
+		   vc_alloc_core_sep_of.v \
 		   wf_alloc.v \
+		   wf_alloc_core_mux.v \
+		   wf_alloc_core_rep.v \
+		   wf_alloc_core_dpa.v \
+		   wf_alloc_core_rot.v \
 		   ${proj}_syn_wrapper.v ]
 
 read_verilog -rtl ${src_files}
@@ -42,8 +48,8 @@ source ${script_dir}/setup_post.tcl
 
 # report_timing_requirements
 
-#compile_ultra -no_autoungroup
-compile_ultra
+compile_ultra -no_autoungroup
+#compile_ultra
 
 report_design
 report_resources

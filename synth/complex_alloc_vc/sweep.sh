@@ -1,38 +1,26 @@
 #!/bin/sh
 
-reset_type=1
-hold_type=1
-
-for num_ports in 5 10 15
-do
-    for num_vcs in 2 4 8
+for num_ports in 5 10 #15
+  do
+  for num_vcs in 2 4 #8
     do
-	for architecture in 0 1
-	do
-            for clk_period in `seq 5.0 -0.2 0.0`
-            do
-		echo "num_ports=${num_ports},num_vcs=${num_vcs},architecture=${architecture},reset_type=${reset_type},hold_type=${hold_type},clk_period=${clk_period}"
-		cfg=num_ports${num_ports}_num_vcs${num_vcs}_architecture${architecture}_reset_type${reset_type}_hold_type${hold_type}_clk_period${clk_period}
-		cat synth.template.tcl \
-    		    | sed s/CLK_PERIOD/${clk_period}/ \
-    		    > synth.tcl
-    		cat ../../src/complex_alloc_vc.template.v \
-    		    | sed s/NUM_PORTS/${num_ports}/ \
-    		    | sed s/NUM_VCS/${num_vcs}/ \
-    		    | sed s/RESET_TYPE/${reset_type}/ \
-    		    | sed s/HOLD_TYPE/${hold_type}/ \
-    		    | sed s/ARCHITECTURE/${architecture}/ \
-    		    > ../../src/complex_alloc_vc.v
-    		make clean > /dev/null
-    		make | tail -8 | head -7
-    		mkdir results/${cfg}
-    		cp -R build/* results/${cfg}
-		if cat build/rpt/*.timing | grep VIOLATED
-		then
-		    echo "TIMING NOT MET!"
-		    break
-		fi
-	    done
-    	done
+    for architecture in 0 1 2 3
+      do
+      name=p${num_ports}_v${num_vcs}_a${architecture}
+      clk_period_range=`cat clk_ranges.csv | egrep "^${name},"`
+      clk_period_min=`echo ${clk_period_range} | cut -d "," -f 2`
+      clk_period_max=`echo ${clk_period_range} | cut -d "," -f 3`
+      basedir=`pwd`/build/${name}
+      ./clone.sh ${basedir}
+      rundir=${basedir}/synth/run
+      touch ${rundir}/config.sh
+      echo "rundir=${rundir}" > ${rundir}/config.sh
+      echo "num_ports=${num_ports}" >> ${rundir}/config.sh
+      echo "num_vcs=${num_vcs}" >> ${rundir}/config.sh
+      echo "architecture=${architecture}" >> ${rundir}/config.sh
+      echo "clk_period_min=${clk_period_min}" >> ${rundir}/config.sh
+      echo "clk_period_max=${clk_period_max}" >> ${rundir}/config.sh
+      echo ${rundir}/run.sh | qsub -N ${name} -v rundir=${rundir}
     done
+  done
 done
