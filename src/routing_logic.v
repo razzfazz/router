@@ -1,14 +1,41 @@
 module routing_logic
-  #(parameter addr_width = 8,
-    parameter address = 0,
-    parameter use_clock_gating = 1)
-   (input clk,
-    input reset,
-    input req,
-    input [0:addr_width-1] dest,
-    output gnt,
-
-    // [sort order: output port,output VC]
-    output [0:num_ports*num_vcs-1] route_info);
-
+  (clk, reset, req, pkt_class, pkt_address, gnt, op, ovc_mask);
+   
+   parameter architecture = 0;
+   
+`include "config.v"
+   
+   parameter [0:addr_width-1] address = {addr_width{1'b0}};
+   
+   input clk;
+   input reset;
+   input req;
+   input [0:class_width-1] pkt_class;
+   input [0:addr_width-1] pkt_address;
+   output gnt;
+   output [0:num_ports-1] op;
+   output [0:num_vcs-1]   ovc_mask;
+   
+   generate
+      
+      case(architecture)
+	0:
+	  begin
+	     rl
+	       #(.address(address),
+		 .vc_masks(vc_masks))
+	     routing_logic_dim_order
+	       (.clk(clk),
+		.reset(reset),
+		.req(req),
+		.pkt_class(pkt_class),
+		.pkt_address(pkt_address),
+		.gnt(gnt),
+		.op(op),
+		.ovc_mask(ovc_mask));
+	  end
+      endcase
+      
+   endgenerate
+   
 endmodule
