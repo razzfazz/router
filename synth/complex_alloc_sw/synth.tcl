@@ -10,6 +10,7 @@ set src_files [list \
 		   arbiter.v \
 		   clkgate.v \
 		   complex_alloc_sw.v \
+		   complex_alloc_vc.v \
 		   dff.v \
 		   interleaver.v \
 		   matrix_arbiter.v \
@@ -23,6 +24,7 @@ set src_files [list \
 		   sw_alloc_core_wf.v \
 		   vc_alloc.v \
 		   vc_alloc_core_sep_if.v \
+		   vc_alloc_core_sep_of.v \
 		   wf_alloc.v \
 		   wf_alloc_core_mux.v \
 		   wf_alloc_core_rep.v \
