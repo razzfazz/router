@@ -1,4 +1,4 @@
-module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc);
+module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
    
    // see dff.v for supported values
    parameter reset_type = 1;
@@ -20,6 +20,7 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gn
    input [0:num_ports*num_vcs-1] elig_op_ovc;
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
+   output [0:num_ports*num_vcs-1] gnt_op_ovc;
    
    wire clk = CLK;
    wire reset;
@@ -42,6 +43,7 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gn
       .req_ip_ivc_ovc(req_ip_ivc_ovc),
       .elig_op_ovc(elig_op_ovc),
       .gnt_ip_ivc(gnt_ip_ivc),
-      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc));
+      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+      .gnt_op_ovc(gnt_op_ovc));
    
 endmodule
