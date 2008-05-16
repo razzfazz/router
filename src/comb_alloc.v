@@ -1,35 +1,39 @@
 module comb_alloc_wf
-  #(parameter num_ports = 8,
-    parameter num_vcs = 4,
-
-    // see dff.v for supported values
-    parameter reset_type = 1,
-    
-    /* supported architectures:
-     0: separable, round-robin arbiters
-     1: separable, matrix arbiters
-     2: wavefront, rotate inputs for priority, round-robin arbiters
-     3: wavefront, rotate inputs for priority, matrix arbiters
-     4: wavefront, replicated logic for priority, round-robin arbiters
-     5: wavefront, replicated logic for priority, matrix arbiters
-     6: wavefront, diagonal propagation arbiter, round-robin arbiters
-     7: wavefront, diagonal propagation arbiter, matrix arbiters */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-    
-    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
-    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
-    
-    input [0:num_ports*num_vcs-1] cred_op_ovc,
-    input [0:num_ports*num_vcs-1] elig_op_ovc,
-    
-    input [0:num_ports*num_vcs-1] allocated_ip_ivc,
-    
-    output wire [0:num_ports*num_vcs-1] vc_gnt_ip_ivc,
-    output wire [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc,
-    output wire [0:num_ports*num_vcs-1] 	sw_gnt_ip_ivc,
-    output wire [0:num_ports*num_ports-1] 	sw_gnt_ip_op);
+  (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, elig_op_ovc,
+   allocated_ip_ivc, vc_gnt_ip_ivc, vc_gnt_ip_ivc_ovc, sw_gnt_ip_ivc,
+   sw_gnt_ip_op);
+   
+   // see dff.v for supported values
+   parameter reset_type = 1;
+   
+   /* supported architectures:
+    0: separable, round-robin arbiters
+    1: separable, matrix arbiters
+    2: wavefront, rotate inputs for priority, round-robin arbiters
+    3: wavefront, rotate inputs for priority, matrix arbiters
+    4: wavefront, replicated logic for priority, round-robin arbiters
+    5: wavefront, replicated logic for priority, matrix arbiters
+    6: wavefront, diagonal propagation arbiter, round-robin arbiters
+    7: wavefront, diagonal propagation arbiter, matrix arbiters */
+   parameter architecture = 0;
+   
+`include "config.v"
+   
+   input clk;
+   input reset;
+   
+   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   
+   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   input [0:num_ports*num_vcs-1] elig_op_ovc;
+   
+   input [0:num_ports*num_vcs-1] allocated_ip_ivc;
+   
+   output [0:num_ports*num_vcs-1] vc_gnt_ip_ivc;
+   output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
+   output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
+   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    
    //---------------------------------------------------------------------------
