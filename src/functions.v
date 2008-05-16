@@ -1,3 +1,6 @@
+//`ifndef _FUNCTIONS_V_
+//`define _FUNCTIONS_V_
+
 function integer clogb(input integer argument);
    integer i;
    begin
@@ -44,3 +47,5 @@ function integer encode(input integer argument);
 	end
    end
 endfunction
+
+//`endif
