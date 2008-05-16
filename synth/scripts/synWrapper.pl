@@ -85,6 +85,13 @@ while ( ($line = <IN>) && ($done == 0) ) {
 
     while ( ($line = <IN>) && ($done == 0) ) {
 
+	if ( $line =~ m/`include/ ) {
+	    $line =~ m/`include\s+\"([a-z0-9-_.]*)\"/ ;
+	    push( @include_list, $1 ) ;
+	    print( OUT $line ) ;
+	    next ;
+	}
+
 	if ( $line =~ m/parameter/ ) {
 	    $line =~ m/parameter\s+(\w+)\s*=\s*([0-9]+)/ ;
 	    push( @param_list, $1 ) ;
