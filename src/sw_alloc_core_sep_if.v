@@ -1,24 +1,30 @@
 module sw_alloc_core_sep_if
-  #(parameter num_ports = 8,
-    parameter num_vcs = 4,
+  (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc,
+   gnt_ip_op);
+   
+   // see dff.v for supported values
+   parameter reset_type = 1;
     
-    // see dff.v for supported values
-    parameter reset_type = 1,
-    
-    /* supported architectures:
-     0: use round-robin arbiters
-     1: use matrix arbiters */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-    
-    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
-    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
-    
-    input [0:num_ports*num_vcs-1] cred_op_ovc,
-    
-    output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
-    output wire [0:num_ports*num_ports-1] gnt_ip_op);
+   /* supported architectures:
+    0: use round-robin arbiters
+    1: use matrix arbiters */
+   parameter architecture = 0;
+   
+`include "config.v"
+   
+   localparam architecture_arb = architecture & 1;
+   
+   
+   input clk;
+   input reset;
+   
+   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   
+   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   
+   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output [0:num_ports*num_ports-1] gnt_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -103,7 +109,7 @@ module sw_alloc_core_sep_if
 	   arbiter
 	     #(.num_ports(num_vcs),
 	       .reset_type(reset_type),
-	       .architecture(architecture & 1))
+	       .architecture(architecture_arb))
 	   arb
 	     (.clk(clk),
 	      .reset(reset),
@@ -207,7 +213,7 @@ module sw_alloc_core_sep_if
 	   arbiter
 	     #(.num_ports(num_ports),
 	       .reset_type(reset_type),
-	       .architecture(architecture & 1))
+	       .architecture(architecture_arb))
 	   arb
 	     (.clk(clk),
 	      .reset(reset),

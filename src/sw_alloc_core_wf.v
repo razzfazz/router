@@ -1,30 +1,36 @@
 module sw_alloc_core_wf
-  #(parameter num_ports = 8,
-    parameter num_vcs = 4,
+  (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc,
+   gnt_ip_op);
+   
+   // see dff.v for supported values
+   parameter reset_type = 1;
+   
+   /* supported architectures:
+    0: mux inputs based on prio, round-robin arbiters in final stage
+    1: mux inputs based on prio, matrix arbiters in final stage
+    2: replicate logic for prios, round-robin arbiters in final stage
+    3: replicate logic for prios, matrix arbiters in final stage
+    4: diagonal propagation arbiter, round-robin arbiters in final stage
+    5: diagonal propagation arbiter, matrix arbiters in final stage
+    6: rotate inputs based on prio, round-robin arbiters in final stage
+    7: rotate inputs based on prio, matrix arbiters in final stage */
+   parameter architecture = 0;
 
-    // see dff.v for supported values
-    parameter reset_type = 1,
-
-    /* supported architectures:
-     0: mux inputs based on prio, round-robin arbiters in final stage
-     1: mux inputs based on prio, matrix arbiters in final stage
-     2: replicate logic for prios, round-robin arbiters in final stage
-     3: replicate logic for prios, matrix arbiters in final stage
-     4: diagonal propagation arbiter, round-robin arbiters in final stage
-     5: diagonal propagation arbiter, matrix arbiters in final stage
-     6: rotate inputs based on prio, round-robin arbiters in final stage
-     7: rotate inputs based on prio, matrix arbiters in final stage */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-    
-    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
-    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
-    
-    input [0:num_ports*num_vcs-1] cred_op_ovc,
-    
-    output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
-    output wire [0:num_ports*num_ports-1] gnt_ip_op);
+`include "config.v"
+   
+   localparam architecture_wf = architecture >> 1;
+   localparam architecture_arb = architecture & 1;
+   
+   input clk;
+   input reset;
+   
+   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   
+   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   
+   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output [0:num_ports*num_ports-1] gnt_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -131,7 +137,7 @@ module sw_alloc_core_wf
 	   arbiter
 	     #(.num_ports(num_vcs),
 	       .reset_type(reset_type),
-	       .architecture(architecture & 1))
+	       .architecture(architecture_arb))
 	   arb
 	     (.clk(clk),
 	      .reset(reset),
@@ -172,7 +178,7 @@ module sw_alloc_core_wf
    wf_alloc
      #(.num_ports(num_ports),
        .reset_type(reset_type),
-       .architecture(architecture >> 1))
+       .architecture(architecture_wf))
    alloc
      (.clk(clk),
       .reset(reset),

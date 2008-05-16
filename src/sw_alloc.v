@@ -1,45 +1,52 @@
 module sw_alloc
-  #(parameter num_ports = 8,
-    parameter num_vcs = 4,
+  (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc,
+   gnt_ip_op);
 
-    // see dff.v for supported values
-    parameter reset_type = 1,
-    
-    /* supported architectures:
-     0: separable, input-first, round-robin arbiters
-     1: separable, input-first, matrix arbiters
-     2: separable, output-first, round-robin arbiters
-     3: separable, output-first, matrix arbiters
-     4: mux inputs based on prio, round-robin arbiters in final stage
-     5: mux inputs based on prio, matrix arbiters in final stage
-     6: replicate logic for prios, round-robin arbiters in final stage
-     7: replicate logic for prios, matrix arbiters in final stage
-     8: diagonal propagation arbiter, round-robin arbiters in final stage
-     9: diagonal propagation arbiter, matrix arbiters in final stage
-     10: rotate inputs based on prio, round-robin arbiters in final stage
-     11: rotate inputs based on prio, matrix arbiters in final stage */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-    
-    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op,
-    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc,
+   // see dff.v for supported values
+   parameter reset_type = 1;
+   
+   /* supported architectures:
+    0: separable, input-first, round-robin arbiters
+    1: separable, input-first, matrix arbiters
+    2: separable, output-first, round-robin arbiters
+    3: separable, output-first, matrix arbiters
+    4: mux inputs based on prio, round-robin arbiters in final stage
+    5: mux inputs based on prio, matrix arbiters in final stage
+    6: replicate logic for prios, round-robin arbiters in final stage
+    7: replicate logic for prios, matrix arbiters in final stage
+    8: diagonal propagation arbiter, round-robin arbiters in final stage
+    9: diagonal propagation arbiter, matrix arbiters in final stage
+    10: rotate inputs based on prio, round-robin arbiters in final stage
+    11: rotate inputs based on prio, matrix arbiters in final stage */
+   parameter architecture = 0;
 
-    input [0:num_ports*num_vcs-1] cred_op_ovc,
-
-    output wire [0:num_ports*num_vcs-1] gnt_ip_ivc,
-    output wire [0:num_ports*num_ports-1] gnt_ip_op);
-
+`include "config.v"
+   
+   localparam architecture_sep_if = architecture;
+   localparam architecture_sep_of = architecture - 2;
+   localparam architecture_wf = architecture - 4;
+   
+   
+   input clk;
+   input reset;
+   
+   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   
+   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   
+   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output [0:num_ports*num_ports-1] gnt_ip_op;
+   
+   
    generate
-
+      
       case(architecture)
 	0, 1:
 	  begin
 	     sw_alloc_core_sep_if
-	       #(.num_ports(num_ports),
-		 .num_vcs(num_vcs),
-		 .reset_type(reset_type),
-		 .architecture(architecture))
+	       #(.reset_type(reset_type),
+		 .architecture(architecture_sep_if))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
@@ -52,10 +59,8 @@ module sw_alloc
 	2, 3:
 	  begin
 	     sw_alloc_core_sep_of
-	       #(.num_ports(num_ports),
-		 .num_vcs(num_vcs),
-		 .reset_type(reset_type),
-		 .architecture(architecture - 2))
+	       #(.reset_type(reset_type),
+		 .architecture(architecture_sep_of))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
@@ -69,10 +74,8 @@ module sw_alloc
 	  begin
 	     
 	     sw_alloc_core_wf
-	       #(.num_ports(num_ports),
-		 .num_vcs(num_vcs),
-		 .reset_type(reset_type),
-		 .architecture(architecture - 4))
+	       #(.reset_type(reset_type),
+		 .architecture(architecture_wf))
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
