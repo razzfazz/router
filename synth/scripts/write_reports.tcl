@@ -1,3 +1,5 @@
+report_design
+report_resources
 report_timing -nworst 5 > ${rpt_dir}/${top}.timing
 report_area -physical  > ${rpt_dir}/${top}.area
 report_cell > ${rpt_dir}/${top}.cell
