@@ -1,4 +1,4 @@
-module vc_alloc_core_sep_if
+module vc_alloc_core_sep_of
   (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc,
    gnt_ip_ivc_ovc, gnt_op_ovc);
    
