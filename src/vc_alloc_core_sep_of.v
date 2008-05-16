@@ -34,6 +34,7 @@ module vc_alloc_core_sep_of
 
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req2_ip_ivc_op_ovc;
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt2_ip_ivc_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt1_ip_ivc_op_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -87,8 +88,7 @@ module vc_alloc_core_sep_of
 		assign vc_req_op_ovc = {num_ports{req_ovc}};
 		
 		wire [0:num_ports*num_vcs-1] req2_op_ovc;
-		assign req2_op_ovc
-		  = port_req_op_ovc & vc_req_op_ovc & cred_op_ovc;
+		assign req2_op_ovc = port_req_op_ovc & vc_req_op_ovc;
 		
 		
 		//--------------------------------------------------------------
