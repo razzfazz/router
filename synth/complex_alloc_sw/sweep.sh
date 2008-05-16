@@ -6,7 +6,7 @@ for num_ports in 5 10 #15
     do
     for architecture in 0 1 2 3 4 5 6 7 8 9 10 11
       do
-      name=p${num_ports}_v${num_vcs}_a${architecture}
+      name=sw_p${num_ports}_v${num_vcs}_a${architecture}
       clk_period_range=`cat clk_ranges.csv | egrep "^${name},"`
       clk_period_min=`echo ${clk_period_range} | cut -d "," -f 2`
       clk_period_max=`echo ${clk_period_range} | cut -d "," -f 3`
