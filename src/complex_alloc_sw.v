@@ -1,9 +1,6 @@
-module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
-			gnt_ip_ivc, gnt_ip_op);
+module complex_alloc_sw
+  (CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc, gnt_ip_op);
    
-   parameter num_ports = 5;
-   parameter num_vcs = 2;
-
    // see dff.v for supported values
    parameter reset_type = 1;
    
@@ -22,6 +19,8 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
     11: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
    
+`include "config.v"
+
    input CLK;
    input RST;
    
@@ -43,9 +42,7 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc,
       .q(reset));
    
    sw_alloc
-     #(.num_ports(num_ports),
-       .num_vcs(num_vcs),
-       .reset_type(reset_type),
+     #(.reset_type(reset_type),
        .architecture(architecture))
    alloc
      (.clk(clk),

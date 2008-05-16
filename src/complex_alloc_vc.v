@@ -1,9 +1,7 @@
-module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
-			gnt_ip_ivc, gnt_ip_ivc_ovc);
+module complex_alloc_vc
+  (CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc,
+   gnt_ip_ivc_ovc);
    
-   parameter num_ports = 5;
-   parameter num_vcs = 2;
-
    // see dff.v for supported values
    parameter reset_type = 1;
    
@@ -13,6 +11,8 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
     2: separable, output-first, round-robin arbiters
     3: separable, output-first, matrix arbiters */
    parameter architecture = 0;
+   
+`include "config.v"
    
    input CLK;
    input RST;
@@ -35,9 +35,7 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc,
       .q(reset));
    
    vc_alloc
-     #(.num_ports(num_ports),
-       .num_vcs(num_vcs),
-       .reset_type(reset_type),
+     #(.reset_type(reset_type),
        .architecture(architecture))
    alloc
      (.clk(clk),

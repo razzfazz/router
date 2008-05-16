@@ -1,6 +1,6 @@
-module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
-   parameter num_ports = 5;
-
+module simple_alloc
+   (CLK, RST, req_ip_op, gnt_ip_op);
+   
    // see dff.v for supported values
    parameter reset_type = 1;
 
@@ -12,6 +12,8 @@ module simple_alloc(CLK, RST, req_ip_op, gnt_ip_op);
     4: wavefront, diagonal propagation arbiter
     5: wavefront, rotate inputs for priority */
    parameter architecture = 0;
+
+`include "config.v"
 
    input CLK;
    input RST;
