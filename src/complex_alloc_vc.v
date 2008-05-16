@@ -1,6 +1,4 @@
-module complex_alloc_vc
-  (CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc,
-   gnt_ip_ivc_ovc);
+module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc);
    
    // see dff.v for supported values
    parameter reset_type = 1;

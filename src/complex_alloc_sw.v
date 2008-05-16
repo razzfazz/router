@@ -1,5 +1,4 @@
-module complex_alloc_sw
-  (CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc, gnt_ip_op);
+module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc, gnt_ip_op);
    
    // see dff.v for supported values
    parameter reset_type = 1;
