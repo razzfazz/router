@@ -9,7 +9,7 @@ module matrix_arbiter
     input [0:num_ports-1] req,
     output wire [0:num_ports-1] gnt);
    
-   wire [0:num_ports*num_ports-1] prio_s, prio_q;
+   wire [0:num_ports*num_ports-1] prio;
    
    generate
 
@@ -17,43 +17,45 @@ module matrix_arbiter
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
 
+	   // lower triangle has inverted values of transposed upper triangle
 	   genvar col;
-	   for(col = 0; col < num_ports; col = col + 1)
+	   for(col = 0; col < row; col = col + 1)
 	     begin:cols
-		
-		if(row < col)
-		  begin
-		     dff
-		       #(.width(1),
-			 .offset(col),
-			 .reset_type(reset_type),
-			 .reset_value(1'b1))
-		     prioq
-		       (.clk(clk),
-			.reset(reset),
-			.d(prio_s[row*num_ports+col]),
-			.q(prio_q[row*num_ports+col]));
-		  end
-		else if(row == col)
-		  assign prio_q[row*num_ports+col] = 1'b1;
-		else
-		  assign prio_q[row*num_ports+col] = ~prio_q[col*num_ports+row];
-
-		assign prio_s[row*num_ports+col]
-			 = update ?
-			   (prio_q[row*num_ports+col] | gnt[col]) & !gnt[row] :
-			   prio_q[row*num_ports+col];
-		
+		assign prio[row*num_ports+col] = ~prio[col*num_ports+row];
 	     end
+
+	   // diagonal has all ones
+	   assign prio[row*num_ports+row] = 1'b1;
+
+	   // upper triangle has actual registers
+	   if(row < num_ports-1)
+	     begin
+		wire [(row+1):num_ports-1] prio_s, prio_q;
+		assign prio_s
+		  = update ?
+		    (prio_q | gnt[(row+1):num_ports-1]) &
+		    ~{(num_ports-row-1){gnt[row]}} :
+		    prio_q;
+		dff
+		  #(.width(num_ports-row-1),
+		    .offset(row+1),
+		    .reset_type(reset_type),
+		    .reset_value({(num_ports-row-1){1'b1}}))
+		prioq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(prio_s),
+		   .q(prio_q));
+		assign prio[row*num_ports+row+1:(row+1)*num_ports-1] = prio_q;
+	     end
+
+	   // grant requests if we have priority over all other requestors
+	   assign gnt[row]
+		    = req[row] &
+		      (&(prio[row*num_ports:(row+1)*num_ports-1] | ~req));
+	   
 	end
 
-      genvar i;
-      for(i = 0; i < num_ports; i = i + 1)
-	begin:gnts
-	   assign gnt[i] = req[i] & 
-			   (&(prio_q[i*num_ports:(i+1)*num_ports-1] | ~req));
-	end
-      
    endgenerate
    
 endmodule
