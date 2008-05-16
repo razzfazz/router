@@ -1,9 +1,12 @@
 module select_1ofn
-  #(parameter width = 32,
-    parameter num_ports = 4)
-   (input [0:num_ports-1] select,
-    input [0:num_ports*width-1] data_in,
-    output [0:width-1] data_out);
+  (select, data_in, data_out);
+   
+   parameter width = 32;
+   parameter num_ports = 4;
+   
+   input [0:num_ports-1] select;
+   input [0:num_ports*width-1] data_in;
+   output [0:width-1] 	       data_out;
 
    generate
 
