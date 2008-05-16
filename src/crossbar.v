@@ -1,32 +1,34 @@
 module crossbar
-  #(parameter num_ports = 5,
-    parameter width = 32,
-
-    /* supported architectures:
-     0: use tristate buses
-     1: use multiplexers */
-    parameter architecture = 0)
-   (
-    input [0:num_ports*width-1] data_ip,
-    input [0:num_ports*num_ports-1] ctrl_ip_op,
-    output [0:num_ports*width-1] data_op);
-
-   wire [0:num_ports*num_ports-1] ctrl_op_ip;
+  (ctrl_ip_op, data_ip, data_op);
+   
+   parameter num_ports = 5;
+   parameter width = 32;
+   
+   /* supported architectures:
+    0: use tristate buses
+    1: use multiplexers */
+   parameter architecture = 0;
+   
+   input [0:num_ports*num_ports-1] ctrl_ip_op;
+   input [0:num_ports*width-1] 	   data_ip;
+   output [0:num_ports*width-1]    data_op;
+   
+   wire [0:num_ports*num_ports-1]  ctrl_op_ip;
    interleaver
      #(.width(num_ports),
        .num_blocks(num_ports))
    ctrl_intl
      (.data_in(ctrl_ip_op),
       .data_out(ctrl_op_ip));
-
+   
    generate
-	   
-      genvar 			  op;
+      
+      genvar 			   op;
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
-	
+	   
 	   wire [0:width-1] out;
-
+	   
 	   case(architecture)
 	     0:
 	       begin
@@ -44,14 +46,14 @@ module crossbar
 		       assign out = ctrl ? in : {width{1'bz}};
 		       
 		    end
-
+		  
 	       end
 	     1:
 	       begin
 		  
 		  wire [0:num_ports-1] ctrl;
 		  assign ctrl = ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
+		  
 		  select_1ofn
 		    #(.width(width),
 		      .num_ports(num_ports))
@@ -61,8 +63,8 @@ module crossbar
 		     .data_out(out));
 		  
 	       end
-	     endcase
-
+	   endcase
+	   
 	   assign data_op[op*width:(op+1)*width-1] = out;
 	   
 	end
