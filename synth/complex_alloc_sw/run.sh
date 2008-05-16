@@ -9,8 +9,8 @@ source ./config.sh
 
 srcdir=../../src
 
-sed -i "s/\(parameter *num_ports *=\) [0-9]*/\1 ${num_ports}/" ${srcdir}/complex_alloc_sw.v
-sed -i "s/\(parameter *num_vcs *=\) [0-9]*/\1 ${num_vcs}/" ${srcdir}/complex_alloc_sw.v
+sed -i "s/\(parameter *num_ports *=\) [0-9]*/\1 ${num_ports}/" ${srcdir}/config.v
+sed -i "s/\(parameter *num_vcs *=\) [0-9]*/\1 ${num_vcs}/" ${srcdir}/config.v
 sed -i "s/\(parameter *reset_type *=\) [0-9]*/\1 ${reset_type}/" ${srcdir}/complex_alloc_sw.v
 sed -i "s/\(parameter *architecture *=\) [0-9]*/\1 ${architecture}/" ${srcdir}/complex_alloc_sw.v
 
