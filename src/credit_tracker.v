@@ -1,15 +1,18 @@
 module credit_tracker
-  #(parameter num_credits = 8,
-
-    // see dff.v for supported values
-    parameter reset_type = 1)
-   (input clk,
-    input reset,
-    input debit,
-    input credit,
-    output wire free,
-    output wire errors);
-
+  (clk, reset, debit, credit, free);
+   
+   parameter num_credits = 8;
+   
+   // see dff.v for supported values
+   parameter reset_type = 1;
+   
+   input clk;
+   input reset;
+   input debit;
+   input credit;
+   output free;
+   output errors;
+   
 `include "functions.v"
 
    wire        set_cred, reset_cred;
