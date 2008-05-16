@@ -1,8 +1,8 @@
 #!/bin/sh
 
-for num_ports in 5 10 15
+for num_ports in 5 10 #15
   do
-  for num_vcs in 2 4 8
+  for num_vcs in 2 4 #8
     do
     for architecture in 0 1 2 3 4 5 6 7 8 9 10 11
       do

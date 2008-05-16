@@ -46,8 +46,8 @@ source ${script_dir}/setup_post.tcl
 
 # report_timing_requirements
 
-#compile_ultra -no_autoungroup
-compile_ultra
+compile_ultra -no_autoungroup
+#compile_ultra
 
 report_design
 report_resources
