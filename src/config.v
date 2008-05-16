@@ -8,14 +8,20 @@ parameter num_vcs = 4;
 parameter num_buffers = 8;
 
 // flit types
-// (idle, reserved, valid, tail)
+//  0: idle (no flit)
+//  1: reserved
+//  2: valid (head or body flit)
+//  3: tail flit
 parameter num_types = 4;
 
 // flit width
 parameter data_width = 64;
 
 // packet classes
-// (read request, read reply, write request, write reply)
+//  0: minimal request
+//  1: minimal reply
+//  2: adaptive request
+//  3: adaptive reply
 parameter num_classes = 4;
 
 // network dimensions
@@ -48,5 +54,10 @@ localparam [0:type_width-1] type_idle = 0;
 localparam [0:type_width-1] type_rsvd = 1;
 localparam [0:type_width-1] type_valid = 2;
 localparam [0:type_width-1] type_tail = 3;
+
+localparam [0:class_idx_width-1] class_minimal_request = 0;
+localparam [0:class_idx_width-1] class_minimal_reply = 1;
+localparam [0:class_idx_width-1] class_adaptive_request = 2;
+localparam [0:class_idx_width-1] class_adaptive_reply = 3;
 
 //`endif
