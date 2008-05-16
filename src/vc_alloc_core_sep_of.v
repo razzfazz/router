@@ -168,7 +168,7 @@ module vc_alloc_core_sep_of
    wire [0:num_ports*num_vcs-1] 	     gnt1_op_ovc;
    or_nto1
      #(.width(num_ports*num_vcs),
-       .num_blocks(num_ports*num_vcs))
+       .num_ports(num_ports*num_vcs))
    gnt1_ip_ivc_or
      (.data_in(gnt1_ip_ivc_op_ovc),
       .data_out(gnt1_op_ovc));
