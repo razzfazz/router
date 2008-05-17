@@ -2,7 +2,7 @@
 
 basedir=${1}
 
-files="config_base.sh Makefile run.sh synth.tcl"
+files="config_base.sh Makefile run.sh synth.tcl prolog.tcl"
 
 rm -rf ${basedir}
 
