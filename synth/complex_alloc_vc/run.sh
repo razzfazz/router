@@ -19,7 +19,7 @@ for clk_period in `seq ${clk_period_max} ${clk_period_delta} ${clk_period_min}`
 
   echo "running synthesis for clock period ${clk_period}..."
   
-  sed -i "s/\(set clk_period\) .*/\1 ${clk_period}/" synth.tcl
+  sed -i "s/\(set clk_period\) .*/\1 ${clk_period}/" prolog.tcl
   
   make clean > /dev/null
   make | tail -8 | head -7
