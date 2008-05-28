@@ -27,17 +27,11 @@ module testbench
    localparam num_archs = 12;
    
    function integer get_flow(input [0:num_ports*num_ports-1] gnt_matrix);
-      integer i, j;
+      integer i;
       begin
 	 get_flow = 0;
-	 for(i = 0; i < num_ports; i = i + 1)
-	   begin
-	      for(j = 0; j < num_ports; j = j + 1)
-		begin
-		   if(gnt_matrix[i*num_ports+j])
-		     get_flow = get_flow + 1;
-		end
-	   end
+	 for(i = 0; i < num_ports*num_ports; i = i + 1)
+	   get_flow = get_flow + gnt_matrix[i];
       end
    endfunction
    
