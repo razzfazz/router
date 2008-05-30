@@ -72,8 +72,10 @@ module sw_alloc_core_wf
 	   //-------------------------------------------------------------------
 
 	   wire [0:num_vcs*num_ports-1] req2_ivc_op;
-	   wire [0:num_vcs-1] 		req1_ivc;
-
+	   wire [0:num_vcs*num_ports-1] req1_ivc_op;
+	   wire [0:num_vcs*num_ports-1] gnt1_ivc_op;
+	   wire [0:num_vcs-1] 		gnt_ivc;
+	   
 	   genvar ivc;
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	     begin:ivcs
@@ -103,13 +105,29 @@ module sw_alloc_core_wf
 		  (.data_in(cred_avail_ovc_op),
 		   .data_out(cred_avail_op));
 
+		wire [0:num_ports-1] 	     req1_op;
+		assign req1_op = req_op & cred_avail_op;
+
+		assign req1_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req1_op;
+		
 		wire [0:num_ports-1] req2_op;
 		assign req2_op = req_op & cred_avail_op;
 		
 		assign req2_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = req2_op;
 
-		assign req1_ivc[ivc] = |(req2_op & gnt2_op);
+		wire [0:num_ports-1] gnt1_op;
+		assign gnt1_op = gnt1_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1];
+
+		wire 		     gnt;
+		assign gnt = |(gnt1_op & gnt2_op);
 		
+		
+		//--------------------------------------------------------------
+		// generate global grants
+		//--------------------------------------------------------------
+
+		assign gnt_ivc[ivc] = gnt;
+
 	     end
       
 	   
@@ -124,36 +142,55 @@ module sw_alloc_core_wf
 	   req2_ivc_or
 	     (.data_in(req2_ivc_op),
 	      .data_out(req2_op));
-	   
+
 	   
 	   //-------------------------------------------------------------------
-	   // first arbitration stage (select VC)
+	   // first arbitration stage (pre-select winning VC for each output)
 	   //-------------------------------------------------------------------
 
-	   wire 			update_arb;
-	   assign update_arb = |gnt2_op;
-	   
-	   wire [0:num_vcs-1] 		gnt1_ivc;
-	   arbiter
-	     #(.num_ports(num_vcs),
-	       .reset_type(reset_type),
-	       .architecture(architecture_arb))
-	   arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .update(update_arb),
-	      .req(req1_ivc),
-	      .gnt(gnt1_ivc));
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // generate global grants
-	   //-------------------------------------------------------------------
+	   wire [0:num_ports*num_vcs-1] req1_op_ivc;
+	   interleaver
+	     #(.width(num_vcs*num_ports),
+	       .num_blocks(num_vcs))
+	   req2_intl
+	     (.data_in(req1_ivc_op),
+	      .data_out(req1_op_ivc));
 
-	   wire [0:num_vcs-1] 		gnt_ivc;
-	   assign gnt_ivc = gnt1_ivc;
+	   wire [0:num_ports*num_vcs-1] gnt1_op_ivc;
+	   genvar 			op;
+	   for(op = 0; op < num_ports; op = op + 1)
+	     begin:ops
 
+		wire 			update_arb;
+		assign update_arb = gnt2_op[op];
 
+		wire [0:num_vcs-1] 	req1_ivc;
+		assign req1_ivc = req1_op_ivc[op*num_vcs:(op+1)*num_vcs-1];
+		
+		wire [0:num_vcs-1] 	gnt1_ivc;
+		arbiter
+		  #(.num_ports(num_vcs),
+		    .reset_type(reset_type),
+		    .architecture(architecture_arb))
+		arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .update(update_arb),
+		   .req(req1_ivc),
+		   .gnt(gnt1_ivc));
+
+		assign gnt1_op_ivc[op*num_vcs:(op+1)*num_vcs-1] = gnt1_ivc;
+		
+	     end
+
+	   interleaver
+	     #(.width(num_vcs*num_ports),
+	       .num_blocks(num_ports))
+	   gnt1_intl
+	     (.data_in(gnt1_op_ivc),
+	      .data_out(gnt1_ivc_op));
+	   
+	   
 	   //-------------------------------------------------------------------
 	   // connect outputs
 	   //-------------------------------------------------------------------
@@ -173,7 +210,7 @@ module sw_alloc_core_wf
    // if there are any requests at all in a cycle, at least one of them will
    // eventually be granted, so update priorities
    wire 				update_alloc;
-   assign update_alloc = |req_ip_ivc_op;
+   assign update_alloc = |req2_ip_op;
    
    wf_alloc
      #(.num_ports(num_ports),
