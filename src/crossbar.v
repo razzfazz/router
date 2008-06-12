@@ -38,7 +38,7 @@ module crossbar
 		    begin:ips
 		       
 		       wire [0:width-1] in;
-		       assign in = data_in[ip*width:(ip+1)*width-1];
+		       assign in = data_ip[ip*width:(ip+1)*width-1];
 		       
 		       wire 		ctrl;
 		       assign ctrl = ctrl_op_ip[op*num_ports+ip];
@@ -59,7 +59,7 @@ module crossbar
 		      .num_ports(num_ports))
 		  out_mux
 		    (.select(ctrl),
-		     .data_in(data_in),
+		     .data_in(data_ip),
 		     .data_out(out));
 		  
 	       end
