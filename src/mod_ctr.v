@@ -1,4 +1,4 @@
-module mod_ctr.v
+module mod_ctr
   (clk, reset, incr, value, next_value);
    
    parameter num_values = 8;
@@ -6,9 +6,9 @@ module mod_ctr.v
    // see dff.v for supported values
    parameter reset_type = 1;
    
-`include "functionos.v"
+`include "functions.v"
    
-   localparam width = clogb(num_states);
+   localparam width = clogb(num_values);
 
    input clk;
    input reset;
