@@ -21,7 +21,7 @@ module fifo_ctrl
    
    output empty;
    
-   wire [0:idx_width-1] read_ptr;
+   wire [0:idx_width-1] read_ptr, read_ptr_next;
    mod_ctr
      #(.num_values(depth),
        .reset_type(reset_type))
@@ -32,7 +32,7 @@ module fifo_ctrl
       .value(read_ptr),
       .next_value(read_ptr_next));
    
-   wire [0:idx_width-1] write_ptr;
+   wire [0:idx_width-1] write_ptr, write_ptr_next;
    mod_ctr
      #(.num_values(depth),
        .reset_type(reset_type))
