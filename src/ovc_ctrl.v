@@ -1,5 +1,5 @@
 module ovc_ctrl
-  (clk, reset, push, head, tail, pop, elig, cred, errors);
+  (clk, reset, push, pop, alloc, free, elig, cred);
    
    // see dff.v for supported values
    parameter reset_type = 1;
@@ -18,8 +18,6 @@ module ovc_ctrl
    output elig;
    output cred;
    
-   output [0:1] errors;
-   
    wire 	elig_s, elig_q;
    assign elig_s = (elig_q | free) & ~alloc;
    dff
@@ -33,21 +31,17 @@ module ovc_ctrl
 
    assign elig = elig_q;
 
-   wire 	packet_error;
-   assign packet_error = alloc & ~free & ~elig_q;
+   wire 	error;
+   assign error = alloc & ~free & ~elig_q;
 
-   wire 	flit_error;
    credit_tracker
-     #(.num_credits(num_credits),
+     #(.num_credits(num_buffers),
        .reset_type(reset_type))
    ct
      (.clk(clk),
       .reset(reset),
       .credit(pop),
       .debit(push),
-      .free(cred),
-      .errors(flit_error));
-   
-   assign errors = {flit_error, packet_error};
+      .free(cred));
    
 endmodule
