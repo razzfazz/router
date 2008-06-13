@@ -1,5 +1,5 @@
 module routing_logic
-  (clk, reset, req, pkt_class, pkt_address, gnt, op, ovc_mask);
+  (clk, reset, req, route_info_in, gnt, route_info_out, next_port);
    
    parameter architecture = 0;
    
@@ -10,28 +10,39 @@ module routing_logic
    input clk;
    input reset;
    input req;
-   input [0:class_idx_width-1] pkt_class;
-   input [0:addr_width-1] pkt_address;
+   input [0:route_info_width-1] route_info_in;
    output gnt;
-   output [0:num_ports-1] op;
-   output [0:num_vcs-1] ovc_mask;
+   output [0:route_info_width-1] route_info_out;
+   output [0:num_ports-1] next_port;
    
    generate
+      
+      wire [0:traffic_class_width-1] traffic_class;
+      wire [0:routing_class_width-1] routing_class;
+      wire [0:addr_width-1] next_address;
+      wire [0:addr_width-1] final_address;
+      route_info_decoder
+	#()
+      route_info_dec
+	(.route_info(route_info_in),
+	 .traffic_class(traffic_class),
+	 .routing_class(routing_class),
+	 .next_address(next_address),
+	 .final_address(final_address));
       
       case(architecture)
 	0:
 	  begin
-	     rl
+
+	     assign gnt = req;
+	     assign route_info_out = route_info_in;
+
+	     port_decoder_dim_order
 	       #(.address(address))
-	     routing_logic_dim_order
-	       (.clk(clk),
-		.reset(reset),
-		.req(req),
-		.pkt_class(pkt_class),
-		.pkt_address(pkt_address),
-		.gnt(gnt),
-		.op(op),
-		.ovc_mask(ovc_mask));
+	     port_dec
+	       (.next_address(next_address),
+		.next_port(next_port));
+
 	  end
       endcase
       
