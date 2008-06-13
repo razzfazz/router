@@ -1,8 +1,5 @@
 module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
-   
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
@@ -10,6 +7,7 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gn
     3: separable, output-first, matrix arbiters */
    parameter architecture = 0;
    
+`include "globals.v"
 `include "config.v"
    
    input CLK;

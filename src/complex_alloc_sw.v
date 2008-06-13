@@ -1,8 +1,5 @@
 module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc, gnt_ip_op);
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
-   
    /* supported architectures:
     0: separable, input-first, RR arbiters
     1: separable, input-first, matrix arbiters
@@ -18,6 +15,7 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gn
     11: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
    
+`include "globals.v"
 `include "config.v"
 
    input CLK;
