@@ -1,14 +1,15 @@
 module ip_ctrl
-  (clk, reset, valid_in, data_in, vc_in, head_in, tail_in, vc_req_ivc_op,
-   vc_req_ivc_ovc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_ive_op, sw_req_ivc_ovc,
-   sw_gnt_ivc, cred_out_ivc, data_out, vc_out, head_out, tail_out);
-   
-   parameter address = 0;
+  (clk, reset, data_in, vc_in, type_in, vc_req_ivc_op, vc_req_ivc_ovc,
+   vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_ivc_op, sw_req_nonspec_ivc_op,
+   sw_req_ivc_ovc, sw_gnt_ivc, data_out, vc_out, type_out, cred_valid_out,
+   cred_vc_out);
    
    // see dff.v for supported values
    parameter reset_type = 1;
    
 `include "config.v"
+
+   parameter [0:addr_width-1] address = {addr_width{1'b0}};
 
    input clk;
    input reset;
@@ -18,8 +19,8 @@ module ip_ctrl
    input [0:type_width-1] type_in;
    
    output [0:num_vcs*num_ports-1] vc_req_ivc_op;
-   output [0:num_vcs*num-vcs-1] vc_req_ivc_ovc;
-   input [0:num-vcs-1] vc_gnt_ivc;
+   output [0:num_vcs*num_vcs-1] vc_req_ivc_ovc;
+   input [0:num_vcs-1] vc_gnt_ivc;
    input [0:num_vcs*num_vcs-1] vc_gnt_ivc_ovc;
    
    output [0:num_vcs*num_ports-1] sw_req_ivc_op;
@@ -78,6 +79,7 @@ module ip_ctrl
    // --------------------------------------------------------------------------
 
    wire [0:num_vcs*data_width-1] data_s1_ivc;
+   wire [0:num_vcs*vc_idx_width-1] vc_s1_ivc;
    wire [0:num_vcs*type_width-1] type_s1_ivc;
    
    generate
@@ -90,7 +92,7 @@ module ip_ctrl
 	   assign type_munged = type_s0_q & {type_width{(vc_s0_q == ivc)}};
 
 	   ivc_ctrl
-	     #(.architecture(architecture),
+	     #(.address(address),
 	       .reset_type(reset_type))
 	   ivcc
 	     (.clk(clk),
@@ -107,6 +109,7 @@ module ip_ctrl
 	      .sw_req_ovc(sw_req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]),
 	      .sw_gnt(sw_gnt_ivc[ivc]),
 	      .data_out(data_s1_ivc[ivc*data_width:(ivc+1)*data_width-1]),
+	      .vc_out(vc_s1_ivc[ivc*vc_idx_width:(ivc+1)*vc_idx_width-1]),
 	      .type_out(type_s1_ivc[ivc*type_width:(ivc+1)*type_width-1]));
 	   
 	end
@@ -139,13 +142,15 @@ module ip_ctrl
    
    
    wire [0:vc_idx_width-1] 	 vc_s2_s, vc_s2_q;
-   encoder
-     #(.num_ports(num_vcs))
-   vc_enc
-     (.data_in(sw_gnt_ivc),
+   select_1ofn
+     #(.num_ports(num_vcs),
+       .width(vc_idx_width))
+   vc_out_sel
+     (.select(sw_gnt_ivc),
+      .data_in(vc_s1_ivc),
       .data_out(vc_s2_s));
    dff
-     #(.width(vc_idx_width)
+     #(.width(vc_idx_width),
        .reset_type(reset_type))
    vc_s2q
      (.clk(clk),
@@ -156,7 +161,7 @@ module ip_ctrl
    assign vc_out = vc_s2_q;
    
    
-   wire [0:type_wdith-1] 	 type_s2_s, type_s2_q;
+   wire [0:type_width-1] 	 type_s2_s, type_s2_q;
    // note: the following assumes that all-zeroes is the "no valid flit" type!
    select_1ofn
      #(.num_ports(num_vcs),
