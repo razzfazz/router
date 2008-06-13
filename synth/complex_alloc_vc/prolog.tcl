@@ -47,3 +47,9 @@ source ${script_dir}/setup_post.tcl
 # report_port                ${all_output_ports}
 
 # report_timing_requirements
+
+set_ungroup dff
+set_ungroup interleaver
+set_ungroup or_nto1
+set_ungroup rotator
+set_ungroup select_1ofn
