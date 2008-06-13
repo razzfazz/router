@@ -1,15 +1,15 @@
 module ivc_ctrl
   (clk, reset, data_in, type_in, vc_req_op, vc_req_ovc, vc_gnt, vc_gnt_ovc,
-   sw_req_op, sw_req_ovc, sw_gnt, data_out, type_out);
-   
-   parameter architecture = 0;
+   sw_req_op, sw_req_nonspec_op, sw_req_ovc, sw_gnt, data_out, vc_out,
+   type_out);
    
    // see dff.v for supported values
    parameter reset_type = 1;
    
 `include "config.v"
-`include "functions.v"
 
+   parameter [0:addr_width-1] address = {addr_width{1'b0}};
+   
    localparam buff_addr_width = clogb(num_buffers-1);
 
    
@@ -30,6 +30,7 @@ module ivc_ctrl
    input sw_gnt;
 
    output [0:data_width-1] data_out;
+   output [0:vc_idx_width-1] vc_out;
    output [0:type_width-1] type_out;
    
    
@@ -42,7 +43,7 @@ module ivc_ctrl
    
    wire 		      vc_alloc_hold_q;
    wire 		      vc_allocated;
-   assign vc_allocated == vc_gnt | vc_alloc_hold_q;
+   assign vc_allocated = vc_gnt | vc_alloc_hold_q;
 
    wire 		      vc_alloc_hold_s;
    assign vc_alloc_hold_s = vc_allocated && !((type_q == type_tail) && sw_gnt);
@@ -133,7 +134,7 @@ module ivc_ctrl
    wire [0:type_width-1]      next_type;
    assign next_type = empty ? type_in : buff_type;
 	   
-   wire [0:type_width-1]      type_s, type_q;
+   wire [0:type_width-1]      type_s;
    assign type_s = stall ? type_q : next_type;
    dff
      #(.width(type_width),
@@ -143,8 +144,10 @@ module ivc_ctrl
       .reset(reset),
       .d(type_s),
       .q(type_q));
-
-   assign type_out = type_q;
+   
+   // Suppress the outgoing flit if we haven't been allocated a VC yet.
+   // Note: This assumes "no flit" is encoded as all-zeros!
+   assign type_out = {type_width{vc_allocated}} & type_q;
    
    
    // --------------------------------------------------------------------------
@@ -158,10 +161,9 @@ module ivc_ctrl
    wire [0:head_data_width-1] header;
    assign header = next_data[0:head_data_width-1];
    
-   wire [0:class_width-1]     pkt_class;
+   wire [0:class_idx_width-1] pkt_class;
    wire [0:addr_width-1]      pkt_address;
    header_decoder
-     #()
    hdrd
      (.header(header),
       .pkt_class(pkt_class),
@@ -171,8 +173,7 @@ module ivc_ctrl
    wire [0:num_ports-1]       route_port;
    wire [0:num_vcs-1] 	      route_ovc_mask;
    routing_logic
-     #(.architecture(architecture),
-       .address(address))
+     #(.address(address))
    rtl
      (.clk(clk),
       .reset(reset),
@@ -230,5 +231,11 @@ module ivc_ctrl
    
    assign vc_req_ovc = vc_mask_q & ~{num_vcs{vc_alloc_hold_q}};
    assign sw_req_ovc = vc_mask_q;
+   
+   encoder
+     #(.num_ports(num_vcs))
+   vc_enc
+     (.data_in(vc_mask_q),
+      .data_out(vc_out));
    
 endmodule
