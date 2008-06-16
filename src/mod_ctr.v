@@ -22,7 +22,7 @@ module mod_ctr
    
    generate
       
-      if(2 ** clogb(num_values) == num_values)
+      if((2 ** width) == num_values)
 	// in this case, we have natural wraparound
 	assign value_next = value_q + 1'b1;
       else
