@@ -7,14 +7,6 @@
 parameter num_buffers = 8;
 localparam buff_idx_width = clogb(num_buffers);
 
-// flit types
-parameter num_flit_types = 4;
-localparam flit_type_width = clogb(num_flit_types);
-parameter [0:flit_type_width-1] flit_type_body = 0;
-parameter [0:flit_type_width-1] flit_type_tail = 1;
-parameter [0:flit_type_width-1] flit_type_head = 2;
-parameter [0:flit_type_width-1] flit_type_single = 3;
-
 // flit width
 parameter data_width = 64;
 
@@ -51,7 +43,7 @@ localparam router_addr_width = num_dimensions * dim_addr_width;
 localparam addr_width = router_addr_width + node_addr_width;
 
 // length of header data required for routing
-localparam route_info_width = addr_width + class_idx_width + addr_width;
+localparam route_info_width = 2 * addr_width;
 
 // connectivity in each dimension
 // flattened butterfly:
@@ -64,28 +56,56 @@ parameter num_neighbors = 2;
 // flattened butterfly:
 function [0:num_neighbors-1] get_neighbor
   (input [0:dim_addr_width-1] src, input [0:dim_addr_width-1] dst);
-   reg [0:num_routers_per_dim-1] temp = {num_routers_per_dim{1'b0}};
-   reg [0:num_neighbors-1] result = {num_neighbors{1'b0}};
-   integer 		   i;
-   integer 		   j = 0;
-   temp[dst] = 1'b1;
-   for(i = src + 1; i < num_neighbors; i = i + 1, j = j + 1)
-     begin
-	result[j] = temp[i];
-     end
-   for(i = 0; i < src; i = i + 1, j = j + 1)
-     begin
-	result[j] = temp[i];
-     end
-   choose_neighbor = result;
+   reg [0:num_routers_per_dim-1] temp;
+   reg [0:num_neighbors-1] 	 result;
+   integer 			 i;
+   begin
+      temp = {num_routers_per_dim{1'b0}};
+      temp[dst] = 1'b1;
+      for(i = src + 1; i < num_routers_per_dim; i = i + 1)
+	begin
+	   result[i - src - 1] = temp[i];
+	end
+      for(i = 0; i < src; i = i + 1)
+	begin
+	   result[num_routers_per_dim + i - src - 1] = temp[i];
+	end
+      get_neighbor = result;
+   end
 endfunction
 /* mesh:
 function [0:num_neighbors-1] get_neighbor
   (input [0:dim_addr_width-1] src, input [0:dim_addr_width-1] dst);
-   get_neighbor[0] = (dst < src);
-   get_neighbor[1] = (dst > src);
+   begin
+      get_neighbor[0] = (dst < src);
+      get_neighbor[1] = (dst > src);
+   end
 endfunction
 */
+
+// function to extract routing info structure from flit
+function [0:route_info_width-1] get_route_info
+  (input [0:data_width-1] data);
+   begin
+      get_route_info = data[0:route_info_width-1];
+   end
+endfunction
+
+// function to extract next hop address field from routing info structure
+function [0:addr_width-1] get_next_address
+  (input [0:route_info_width-1] data);
+   begin
+      get_next_address = data[0:addr_width-1];
+   end
+endfunction
+
+// function to extract final destination field from routing info structure
+function [0:addr_width-1] get_final_address
+  (input [0:route_info_width-1] data);
+   begin
+      get_final_address = data[addr_width:(2*addr_width)-1];
+   end
+endfunction
 
 // number of ports required on router
 localparam num_ports = num_dimensions * num_neighbors + num_nodes_per_router;
