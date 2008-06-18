@@ -1,7 +1,6 @@
 module testbench
   ();
    
-   parameter architecture = 0;
    parameter reset_type = 1;
    parameter Tclk = 2;
    
@@ -24,8 +23,7 @@ module testbench
    wire [0:num_ports-1] 	      next_port;
    
    routing_logic
-     #(.architecture(architecture),
-       .reset_type(reset_type),
+     #(.reset_type(reset_type),
        .address(address))
    rl
      (.clk(clk),
