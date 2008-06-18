@@ -38,8 +38,8 @@ module credit_tracker
       if(num_credits == 1)
 	begin
 	   
-	   assign set_cred = credit && !debit;
-	   assign reset_cred = debit && !credit;
+	   assign set_cred = credit & ~debit;
+	   assign reset_cred = debit & ~credit;
 	   
 	   assign error = cred_q ? credit : debit;
 	   
@@ -52,10 +52,10 @@ module credit_tracker
 	   assign cred_count_zero = ~|cred_count_q;
 	   
 	   wire 		       incr_count;
-	   assign incr_count = credit && !debit && cred_q;
+	   assign incr_count = credit & ~debit & cred_q;
 	   
 	   wire 		       decr_count;
-	   assign decr_count = debit && !credit && !cred_count_zero;
+	   assign decr_count = debit & ~credit & ~cred_count_zero;
 	   
 	   wire [0:credit_idx_width-1] cred_count_s;
 	   assign cred_count_s = cred_count_q - decr_count + incr_count;
@@ -69,8 +69,8 @@ module credit_tracker
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   assign set_cred = credit && !debit && !cred_q;
-	   assign reset_cred = debit && !credit && cred_count_zero;
+	   assign set_cred = credit & ~debit & ~cred_q;
+	   assign reset_cred = debit & ~credit & cred_count_zero;
 	   
 	   assign error = (!cred_q && debit) ||
 			  ((cred_count_q == num_credits-1) && credit);
