@@ -10,13 +10,19 @@ localparam buff_idx_width = clogb(num_buffers);
 // flit width
 parameter data_width = 64;
 
-// traffic classes
+// traffic classes (2+)
 parameter num_traffic_classes = 2;
 localparam traffic_class_idx_width = clogb(num_traffic_classes);
 
-// routing classes
+// routing classes (1+)
+// FIXME: Setting this to 1 is probably not handled correctly right now due to 
+// Verilog and/or the tools not liking zero-width vectors.
 parameter num_routing_classes = 2;
 localparam routing_class_idx_width = clogb(num_routing_classes);
+
+// definitions 
+parameter [0:routing_class_idx_width-1] routing_class_minimal = 0;
+parameter [0:routing_class_idx_width-1] routing_class_non_minomal = 1;
 
 // total number of classes
 localparam num_classes = num_traffic_classes * num_routing_classes;
@@ -88,6 +94,15 @@ function [0:route_info_width-1] get_route_info
   (input [0:data_width-1] data);
    begin
       get_route_info = data[0:route_info_width-1];
+   end
+endfunction
+
+// function to assemble routing info structure from components
+function [0:route_info_width-1] create_route_info
+  (input [0:addr_width-1] next_address, input [0:addr_width-1] final_address);
+   begin
+      create_route_info[0:addr_width-1] = next_address;
+      create_route_info[addr_width:(2*addr_width)-1] = final_address;
    end
 endfunction
 
