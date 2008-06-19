@@ -22,7 +22,7 @@ localparam routing_class_idx_width = clogb(num_routing_classes);
 
 // definitions 
 parameter [0:routing_class_idx_width-1] routing_class_minimal = 0;
-parameter [0:routing_class_idx_width-1] routing_class_non_minomal = 1;
+parameter [0:routing_class_idx_width-1] routing_class_non_minimal = 1;
 
 // total number of classes
 localparam num_classes = num_traffic_classes * num_routing_classes;
