@@ -1,5 +1,10 @@
 module testbench
   ();
+
+   /* supported architectures:
+    0: baseline
+    1: replicate port decoding logic */
+   parameter architecture = 0;
    
    parameter reset_type = 1;
    parameter Tclk = 2;
@@ -23,7 +28,8 @@ module testbench
    wire [0:num_ports-1] 	      next_port;
    
    routing_logic
-     #(.reset_type(reset_type),
+     #(.architecture(architecture),
+       .reset_type(reset_type),
        .address(address))
    rl
      (.clk(clk),
