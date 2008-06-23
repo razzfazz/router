@@ -2,8 +2,9 @@ module comb_alloc_wf
   (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, elig_op_ovc,
    allocated_ip_ivc, vc_gnt_ip_ivc, vc_gnt_ip_ivc_ovc, sw_gnt_ip_ivc,
    sw_gnt_ip_op);
-
    
+   
+`include "config.v"
 `include "constants.v"
    
    
@@ -26,9 +27,6 @@ module comb_alloc_wf
    parameter architecture = 0;
    
    
-`include "config.v"
-   
-   
    input clk;
    input reset;
    
@@ -41,18 +39,18 @@ module comb_alloc_wf
    input [0:num_ports*num_vcs-1] allocated_ip_ivc;
    
    // FIXME: these need to be actually connected somewhere!
-   output [0:num_ports*num_vcs-1] vc_gnt_ip_ivc;
-   output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
-   output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
-   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
+   output wire [0:num_ports*num_vcs-1] vc_gnt_ip_ivc;
+   output wire [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
+   output wire [0:num_ports*num_vcs-1] 	       sw_gnt_ip_ivc;
+   output wire [0:num_ports*num_ports-1]       sw_gnt_ip_op;
    
    
    //---------------------------------------------------------------------------
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 		req_sw_ip_op;
-   wire [0:num_ports*num_ports-1] 		gnt_sw_ip_op;
+   wire [0:num_ports*num_ports-1] 	       req_sw_ip_op;
+   wire [0:num_ports*num_ports-1] 	       gnt_sw_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -60,17 +58,17 @@ module comb_alloc_wf
    //---------------------------------------------------------------------------
    
    generate
-
-      genvar 					ip;
+      
+      genvar 				       ip;
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
-
+	   
 	   wire [0:num_vcs*num_ports-1] req_sw_ivc_op;
 	   wire [0:num_vcs*num_ports-1] mask_sw_ivc_op;
 	   
 	   wire [0:num_ports-1] 	gnt_sw_op;
 	   assign gnt_sw_op = gnt_sw_ip_op[ip*num_ports:(ip+1)*num_ports-1];
-
+	   
 	   genvar 			ivc;
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	     begin:ivcs
@@ -78,15 +76,15 @@ module comb_alloc_wf
 		wire [0:num_ports-1] req_op;
 		assign req_op = req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
 					      (ip*num_vcs+ivc+1)*num_ports-1];
-
+		
 		wire [0:num_vcs-1]   req_ovc;
 		assign req_ovc = req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
 						(ip*num_vcs+ivc+1)*num_vcs-1];
-
+		
 		wire 		     allocated;
 		assign allocated = allocated_ip_ivc[ip*num_vcs+ivc];
-
-		wire [0:num_vcs-1] elig_ovc;
+		
+		wire [0:num_vcs-1]   elig_ovc;
 		select_1ofn
 		  #(.width(num_vcs),
 		    .num_ports(num_ports))
@@ -94,14 +92,14 @@ module comb_alloc_wf
 		  (.select(req_op),
 		   .data_in(elig_op_ovc),
 		   .data_out(elig_ovc));
-
-		wire [0:num_vcs-1] req_qual_elig_ovc;
+		
+		wire [0:num_vcs-1]   req_qual_elig_ovc;
 		assign req_qual_elig_ovc = req_ovc & elig_ovc;
 		
-		wire 		   req_qual_elig;
+		wire 		     req_qual_elig;
 		assign req_qual_elig = |req_qual_elig_ovc | allocated;
 		
-		wire [0:num_vcs-1] cred_ovc;
+		wire [0:num_vcs-1]   cred_ovc;
 		select_1ofn
 		  #(.width(num_vcs),
 		    .num_ports(num_ports))
@@ -110,13 +108,13 @@ module comb_alloc_wf
 		   .data_in(cred_op_ovc),
 		   .data_out(cred_ovc));
 		
-		wire [0:num_vcs-1] req_qual_cred_ovc;
+		wire [0:num_vcs-1]   req_qual_cred_ovc;
 		assign req_qual_cred_ovc = req_ovc & cred_ovc;
-
-		wire 		   req_qual_cred;
+		
+		wire 		     req_qual_cred;
 		assign req_qual_cred = |req_qual_cred_ovc;
-
-		wire [0:num_vcs-1] gnt_ovc;
+		
+		wire [0:num_vcs-1]   gnt_ovc;
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
@@ -127,24 +125,24 @@ module comb_alloc_wf
 		   .update(update_arb),
 		   .req(req_qual_elig_ovc),
 		   .gnt(gnt_ovc));
-
+		
 		assign vc_gnt_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
 					 (ip*num_vcs+ivc+1)*num_vcs-1]
 			 = allocated ? req_ovc : gnt_ovc;
-
-		wire 		   req_sw;
+		
+		wire 		     req_sw;
 		assign req_sw = req_qual_elig & req_qual_cred;
-
+		
 		wire [0:num_ports-1] req_sw_op;
 		assign req_sw_op = req_sw ? req_op : {num_ports{1'b0}};
-
+		
 		assign req_sw_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 			 = req_sw_op;
 		
 		wire [0:num_ports-1] mask_sw_op;
 		assign mask_sw_op = mask_sw_ivc_op[ivc*num_ports:
 						   (ivc+1)*num_ports-1];
-
+		
 		wire 		     gnt;
 		assign gnt = |(gnt_sw_op & mask_sw_op);
 		
@@ -169,13 +167,13 @@ module comb_alloc_wf
 	   req_sw_intl
 	     (.data_in(req_sw_ivc_op),
 	      .data_out(req_sw_op_ivc));
-
+	   
 	   wire [0:num_ports*num_vcs-1] mask_sw_op_ivc;
 	   
 	   genvar 			op;
 	   for(op = 0; op < num_ports; op = op + 1)
 	     begin:ops
-
+		
 		wire [0:num_vcs-1] req_sw_ivc;
 		assign req_sw_ivc = req_sw_op_ivc[op*num_vcs:(op+1)*num_vcs-1];
 		
@@ -257,15 +255,15 @@ module comb_alloc_wf
 		.data_out(req2_op_ip));
 	     
 	     wire [0:num_ports*num_ports-1] gnt2_op_ip;
-
+	     
 	     // second stage arbiters
 	     genvar 			    op;
 	     for(op = 0; op < num_ports; op = op + 1)
 	       begin:ops
-		
+		  
 		  wire [0:num_ports-1] req2_ip;
 		  assign req2_ip = req2_op_ip[op*num_ports:(op+1)*num_ports-1];
-				  
+		  
 		  wire 		       update;
 		  assign update = |req2_ip;
 		  
@@ -282,9 +280,9 @@ module comb_alloc_wf
 		     .gnt(gnt2_ip));
 		  
 		  assign gnt2_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt2_ip;
-		
+		  
 	       end
-
+	     
 	     interleaver
 	       #(.width(num_ports*num_ports),
 		 .num_blocks(num_ports))
@@ -297,6 +295,7 @@ module comb_alloc_wf
 	  end
 	2, 3:
 	  begin
+	     // FIXME: insert output-first logic here!
 	  end
 	4, 5, 6, 7, 8, 9, 10, 11:
 	  begin

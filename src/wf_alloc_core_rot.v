@@ -1,34 +1,37 @@
 module wf_alloc_core_rot
-  #(// number of input/output ports
-    // each input can bid for any combination of outputs
-    parameter num_ports = 8,
-
-    // see dff.v for supported values
-    parameter reset_type = 1)
-   (input     clk,
-    input     reset,
-
-    // update arbitration priorities
-    input     update,
-
-    // requests
-    // [sort order: input port,output port]
-    input [0:num_ports*num_ports-1] req,
-
-    // grants
-    // [sort order: input port,output port]
-    output [0:num_ports*num_ports-1] gnt);
+  (clk, reset, update, req, gnt);
    
+   
+`include "constants.v"
 `include "functions.v"
-
+   
+   
+   // number of input/output ports
+   // each input can bid for any combination of outputs
+   parameter num_ports = 8;
+   
+   parameter reset_type = reset_type_async;
    localparam port_width = clogb(num_ports);
    
-   // [sort order: input port,output port]
-   wire [0:num_ports*num_ports-1] y;
-
+   
+   input clk;
+   input reset;
+   
+   // update arbitration priorities
+   input update;
+   
+   // requests
+   input [0:num_ports*num_ports-1] req;
+   
+   // grants
+   output wire [0:num_ports*num_ports-1] gnt;
+   
+   
+   wire [0:num_ports*num_ports-1] 	 y;
+   
    generate
       
-      genvar 			  row;
+      genvar 				 row;
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
 	   
@@ -102,5 +105,5 @@ module wf_alloc_core_rot
 	end
       
    endgenerate
-
+   
 endmodule

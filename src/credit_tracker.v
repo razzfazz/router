@@ -15,7 +15,7 @@ module credit_tracker
    input reset;
    input debit;
    input credit;
-   output free;
+   output wire free;
    
    
    wire        set_cred, reset_cred;

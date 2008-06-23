@@ -1,25 +1,31 @@
 module wf_alloc_core_rep
-  #(// number of input/output ports
-    // each input can bid for any combination of outputs
-    parameter num_ports = 8,
-
-    // see dff.v for supported values
-    parameter reset_type = 1)
-   (input     clk,
-    input     reset,
-
-    // update arbitration priorities
-    input     update,
-
-    // requests
-    // [sort order: input port,output port]
-    input [0:num_ports*num_ports-1] req,
-
-    // grants
-    // [sort order: input port,output port]
-    output [0:num_ports*num_ports-1] gnt);
-
-   wire [0:num_ports-1] 		    prio_s, prio_q;
+  (clk, reset, update, req, gnt);
+   
+   
+`include "constants.v"
+   
+   
+   // number of input/output ports
+   // each input can bid for any combination of outputs
+   parameter num_ports = 8;
+   
+   parameter reset_type = reset_type_async;
+   
+   
+   input clk;
+   input reset;
+   
+   // update arbitration priorities
+   input update;
+   
+   // requests
+   input [0:num_ports*num_ports-1] req;
+   
+   // grants
+   output wire [0:num_ports*num_ports-1] gnt;
+   
+   
+   wire [0:num_ports-1] 		 prio_s, prio_q;
    
    assign prio_s = update ? {prio_q[1:num_ports-1], prio_q[0]} : prio_q;
    dff
@@ -32,7 +38,6 @@ module wf_alloc_core_rep
       .d(prio_s),
       .q(prio_q));
    
-   // [sort order: input port,output port,priority group]
    wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
    
    generate
@@ -41,7 +46,6 @@ module wf_alloc_core_rep
       for(prio = 0; prio < num_ports; prio = prio + 1)
 	begin:prios
 	   
-	   // [sort order: input port,output port]
 	   wire [0:num_ports*num_ports-1] req_int;
 	   wire [0:num_ports*num_ports-1] gnt_int;
 	   wire [0:num_ports*num_ports-1] y;
@@ -90,7 +94,7 @@ module wf_alloc_core_rep
 	end
       
    endgenerate
-   	     
+   
    select_1ofn
      #(.width(num_ports*num_ports),
        .num_ports(num_ports))

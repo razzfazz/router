@@ -1,25 +1,30 @@
 module shift_register
   (clk, reset, full, data_in, push, empty, data_out, pop);
    
-   parameter depth = 4;
-   parameter width = 8;
-   parameter reset_type = 1;
    
 `include "config.v"
+`include "constants.v"
+   
+   
+   parameter depth = 4;
+   parameter width = 8;
+   parameter reset_type = reset_type_async;
+   
    
    input clk;
    input reset;
-
-   output full;
+   
+   output wire full;
    input [0:width-1] data_in;
    input push;
    
-   output empty;
-   output [0:width-1] data_out;
+   output wire empty;
+   output wire [0:width-1] data_out;
    input pop;
    
+   
    wire [0:(depth+1)*width-1] data;
-
+   
    wire [0:depth] 	      insert_ptr_q;
    wire 		      insert_ptr_bad;
    assign insert_ptr_bad = ~^insert_ptr_q;

@@ -1,1 +1,3 @@
-parameter reset_type = 1;
+`include "constants.v"
+
+parameter reset_type = reset_type_async;

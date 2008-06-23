@@ -1,27 +1,33 @@
 module wf_alloc_core_dpa
-  #(// number of input/output ports
-    // each input can bid for any combination of outputs
-    parameter num_ports = 8,
-
-    // see dff.v for supported values
-    parameter reset_type = 1)
-   (input     clk,
-    input     reset,
-
-    // update arbitration priorities
-    input     update,
-
-    // requests
-    // [sort order: input port,output port]
-    input [0:num_ports*num_ports-1] req,
-
-    // grants
-    // [sort order: input port,output port]
-    output [0:num_ports*num_ports-1] gnt);
-
-   wire [0:(2*num_ports-1)-1] prio_s, prio_q;
+  (clk, reset, update, req, gnt);
    
-   wire 		      reset_prio;
+   
+`include "constants.v"
+   
+   
+   // number of input/output ports
+   // each input can bid for any combination of outputs
+   parameter num_ports = 8;
+   
+   parameter reset_type = reset_type_async;
+   
+   
+   input clk;
+   input reset;
+   
+   // update arbitration priorities
+   input update;
+   
+   // requests
+   input [0:num_ports*num_ports-1] req;
+   
+   // grants
+   output wire [0:num_ports*num_ports-1] gnt;
+   
+   
+   wire [0:(2*num_ports-1)-1] 		 prio_s, prio_q;
+   
+   wire 				 reset_prio;
    assign reset_prio = ~|prio_q[num_ports:(2*num_ports-1)-1];
    
    assign prio_s = update ?
@@ -39,11 +45,11 @@ module wf_alloc_core_dpa
       .d(prio_s),
       .q(prio_q));
    
-   wire [0:num_ports*(2*num_ports-2)-1] x;
-
+   wire [0:num_ports*(2*num_ports-2)-1]  x;
+   
    generate
       
-      genvar 				col;
+      genvar 				 col;
       for(col = 0; col < num_ports; col = col + 1)
 	begin:cols
 	   
@@ -82,7 +88,7 @@ module wf_alloc_core_dpa
 		    = gnt_out[num_ports-1];
 	   
 	end	     
-
+      
    endgenerate
    
 endmodule

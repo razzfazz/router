@@ -20,10 +20,11 @@ module fifo_ctrl
    input push;
    input pop;
    
-   output [0:idx_width-1] write_addr;
-   output [0:idx_width-1] read_addr;
+   output wire [0:idx_width-1] write_addr;
+   output wire [0:idx_width-1] read_addr;
    
-   output empty;
+   output wire empty;
+   
    
    wire [0:idx_width-1] read_ptr, read_ptr_next;
    mod_ctr

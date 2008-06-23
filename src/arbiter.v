@@ -19,7 +19,7 @@ module arbiter
    input reset;
    input update;
    input [0:num_ports-1] req;
-   output [0:num_ports-1] gnt;
+   output wire [0:num_ports-1] gnt;
    
    
    generate

@@ -1,9 +1,13 @@
 module simple_alloc
    (CLK, RST, req_ip_op, gnt_ip_op);
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
-
+   
+`include "config.v"
+`include "constants.v"
+   
+   
+   parameter reset_type = reset_type_async;
+   
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
@@ -12,14 +16,14 @@ module simple_alloc
     4: wavefront, diagonal propagation arbiter
     5: wavefront, rotate inputs for priority */
    parameter architecture = 0;
-
-`include "config.v"
-
+   
+   
    input CLK;
    input RST;
    
    input [0:num_ports*num_ports-1] req_ip_op;
    output [0:num_ports*num_ports-1] gnt_ip_op;
+   
    
    wire clk = CLK;
    wire reset;

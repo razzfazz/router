@@ -1,20 +1,25 @@
 module rotator
-  #(parameter width = 8,
-
-    /* rotate direction:
-     0: left
-     1: right */
-    parameter direction = 0)
-   (data_in, select, data_out);
-
+  (data_in, select, data_out);
+   
+   
 `include "functions.v"
-
+   
+   
+   parameter width = 8;
+   
+   /* rotate direction:
+    0: left
+    1: right */
+   parameter direction = 0;
+   
    localparam sel_width = clogb(width);
-
+   
+   
    input [0:width-1] data_in;
    input [0:sel_width-1] select;
    output wire [0:width-1] data_out;
-
+   
+   
    wire [0:(2*width-1)-1]  data_dup;
    wire [0:(2*width-1)-1]  data_rot;
 

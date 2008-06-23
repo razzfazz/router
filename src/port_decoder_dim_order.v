@@ -1,12 +1,16 @@
 module port_decoder_dim_order
   (next_address, next_port);
    
+   
 `include "config.v"
+   
    
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    
+   
    input [0:addr_width-1] next_address;
-   output [0:num_ports-1] next_port;
+   output wire [0:num_ports-1] next_port;
+   
    
    wire [0:num_dimensions-1] dim_addr_match;
    
