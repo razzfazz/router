@@ -1,18 +1,22 @@
 module fifo_ctrl
    (clk, reset, push, pop, write_addr, read_addr, empty);
-
+   
+   
+`include "functions.v"
+`include "constants.v"
+   
+   
    parameter depth = 8;
    
    // see dff.v for supported values
-   parameter reset_type = 1;
+   parameter reset_type = reset_type_async;
    
-`include "functions.v"
-
    localparam idx_width = clogb(depth);
-
+   
+   
    input clk;
    input reset;
-
+   
    input push;
    input pop;
    
