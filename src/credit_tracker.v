@@ -1,10 +1,18 @@
 module credit_tracker
   (clk, reset, debit, credit, free);
    
+   
+`include "constants.v"
+`include "functions.v"
+   
+   
    parameter num_credits = 8;
    
    // see dff.v for supported values
-   parameter reset_type = 1;
+   parameter reset_type = reset_type_async;
+   
+   localparam credit_idx_width = clogb(num_credits);
+   
    
    input clk;
    input reset;
@@ -12,9 +20,6 @@ module credit_tracker
    input credit;
    output free;
    
-`include "functions.v"
-   
-   localparam credit_idx_width = clogb(num_credits);
    
    wire        set_cred, reset_cred;
    wire        cred_s, cred_q;
