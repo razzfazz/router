@@ -2,9 +2,13 @@ module comb_alloc_wf
   (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, elig_op_ovc,
    allocated_ip_ivc, vc_gnt_ip_ivc, vc_gnt_ip_ivc_ovc, sw_gnt_ip_ivc,
    sw_gnt_ip_op);
+
+   
+`include "constants.v"
+   
    
    // see dff.v for supported values
-   parameter reset_type = 1;
+   parameter reset_type = reset_type_async;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -21,7 +25,9 @@ module comb_alloc_wf
     11: wavefront, rotate inputs for priority, matrix arbiters */
    parameter architecture = 0;
    
+   
 `include "config.v"
+   
    
    input clk;
    input reset;
