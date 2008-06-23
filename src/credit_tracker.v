@@ -7,10 +7,7 @@ module credit_tracker
    
    
    parameter num_credits = 8;
-   
-   // see dff.v for supported values
    parameter reset_type = reset_type_async;
-   
    localparam credit_idx_width = clogb(num_credits);
    
    
