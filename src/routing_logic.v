@@ -2,7 +2,8 @@ module routing_logic
   (clk, reset, req, route_info, routing_class, gnt, next_route_info,
    next_routing_class, next_port);
    
-   
+
+`include "config.v"   
 `include "constants.v"
    
    
