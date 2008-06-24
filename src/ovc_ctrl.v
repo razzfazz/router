@@ -1,24 +1,28 @@
 module ovc_ctrl
   (clk, reset, push, pop, alloc, free, elig, cred);
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
    
 `include "config.v"
+`include "constants.v"
+   
+   
+   parameter reset_type = reset_type_async;
+   
    
    input clk;
    input reset;
    
    input push;
    input pop;
-
+   
    input alloc;
    input free;
    
-   output elig;
-   output cred;
+   output wire elig;
+   output wire cred;
+
    
-   wire 	elig_s, elig_q;
+   wire        elig_s, elig_q;
    assign elig_s = (elig_q | free) & ~alloc;
    dff
      #(.width(1),
@@ -28,12 +32,12 @@ module ovc_ctrl
       .reset(reset),
       .d(elig_s),
       .q(elig_q));
-
+   
    assign elig = elig_q;
-
-   wire 	error;
+   
+   wire        error;
    assign error = alloc & ~free & ~elig_q;
-
+   
    credit_tracker
      #(.num_credits(num_buffers),
        .reset_type(reset_type))

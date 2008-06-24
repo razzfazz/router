@@ -1,23 +1,27 @@
 module mod_ctr
   (clk, reset, incr, value, next_value);
    
+   
+`include "functions.v"
+   
+   
    parameter num_values = 8;
    
    // see dff.v for supported values
    parameter reset_type = 1;
    
-`include "functions.v"
-   
    localparam width = clogb(num_values);
-
+   
+   
    input clk;
    input reset;
-
+   
    input incr;
-
-   output [0:width-1] value;
-   output [0:width-1] next_value;
-
+   
+   output wire [0:width-1] value;
+   output wire [0:width-1] next_value;
+   
+   
    wire [0:width-1] value_s, value_q, value_next;
    
    generate

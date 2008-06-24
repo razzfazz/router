@@ -2,15 +2,17 @@ module vc_alloc_core_sep_of
   (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc,
    gnt_ip_ivc_ovc, gnt_op_ovc);
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
+   
+`include "config.v"
+`include "constants.v"
+   
+   
+   parameter reset_type = reset_type_async;
    
    /* supported architectures:
     0: use round-robin arbiters
     1: use matrix arbiters */
    parameter architecture = 0;
-   
-`include "config.v"
    
    localparam architecture_arb = architecture & 1;
    
@@ -23,15 +25,15 @@ module vc_alloc_core_sep_of
    
    input [0:num_ports*num_vcs-1] elig_op_ovc;
    
-   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
-   output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
-   output [0:num_ports*num_vcs-1] gnt_op_ovc;
+   output wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
+   output wire [0:num_ports*num_vcs-1] gnt_op_ovc;
    
    
    //---------------------------------------------------------------------------
    // global wires
    //---------------------------------------------------------------------------
-
+   
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req2_ip_ivc_op_ovc;
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt2_ip_ivc_op_ovc;
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt1_ip_ivc_op_ovc;
@@ -42,11 +44,11 @@ module vc_alloc_core_sep_of
    //---------------------------------------------------------------------------
    
    generate
-
-      genvar 						  ip;
+      
+      genvar 					  ip;
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
-
+	   
 	   genvar ivc;
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	     begin:ivcs
@@ -123,7 +125,7 @@ module vc_alloc_core_sep_of
 		   .update(update_arb),
 		   .req(req1_ovc),
 		   .gnt(gnt1_ovc));
-
+		
 		wire [0:num_ports*num_vcs-1] gnt1_op_ovc;
 		assign gnt1_op_ovc = port_req_op_ovc & {num_ports{gnt1_ovc}};
 		
@@ -159,8 +161,8 @@ module vc_alloc_core_sep_of
 	end
       
    endgenerate
-
-
+   
+   
    //---------------------------------------------------------------------------
    // bit shuffling for changing sort order
    //---------------------------------------------------------------------------
@@ -193,9 +195,9 @@ module vc_alloc_core_sep_of
    //---------------------------------------------------------------------------
    // output stage
    //---------------------------------------------------------------------------
-
+   
    generate
-
+      
       genvar 					  op;
       for (op = 0; op < num_ports; op = op + 1)
 	begin:ops
@@ -231,12 +233,12 @@ module vc_alloc_core_sep_of
 		genvar 			     ip;
 		for(ip = 0; ip < num_ports; ip = ip + 1)
 		  begin:ips
-
+		     
 		     wire [0:num_vcs-1] req2_ivc;
 		     assign req2_ivc = req2_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-
+		     
 		     assign req2_ip[ip] = |req2_ivc;
-
+		     
 		     wire [0:num_vcs-1] gnt2_ivc;
 		     arbiter
 		       #(.num_ports(num_vcs),
@@ -248,7 +250,7 @@ module vc_alloc_core_sep_of
 			.update(update_arb),
 			.req(req2_ivc),
 			.gnt(gnt2_ivc));
-
+		     
 		     assign gnt2_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 			      = gnt2_ivc & {num_vcs{gnt2_ip[ip]}};
 		     
@@ -264,12 +266,12 @@ module vc_alloc_core_sep_of
 		   .update(update_arb),
 		   .req(req2_ip),
 		   .gnt(gnt2_ip));
-
+		
 		
 		//--------------------------------------------------------------
 		// connect outputs
 		//--------------------------------------------------------------
-
+		
 		assign gnt2_op_ovc_ip_ivc[(op*num_vcs+ovc)*num_ports*num_vcs:
 					  (op*num_vcs+ovc+1)*num_ports*num_vcs
 					  -1] = gnt2_ip_ivc;
@@ -277,7 +279,7 @@ module vc_alloc_core_sep_of
 	     end
 	end
    endgenerate
-
+   
    assign gnt_op_ovc = gnt1_op_ovc;
    
 endmodule

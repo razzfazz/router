@@ -1,33 +1,40 @@
 module wf_alloc
-  #(// number of input/output ports
-    // each input can bid for any combination of outputs
-    parameter num_ports = 8,
-
-    // see dff.v for supported values
-    parameter reset_type = 1,
-    
-    /* supported architectures:
-     0: mux inputs/outputs based on priority
-     1: replicate logic per priority
-     2: diagonal propagation arbiter (DPA, see Hurt99)
-     3: rotate inputs/outputs based on priority */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-
-    // update arbitration priorities
-    input     update,
-
-    // requests
-    // [sort order: input port,output port]
-    input [0:num_ports*num_ports-1] req,
-
-    // grants
-    // [sort order: input port,output port]
-    output [0:num_ports*num_ports-1] gnt);
-
+  (clk, reset, update, req, gnt);
+   
+   
+`include "constants.v"
+   
+   
+   // number of input/output ports
+   // each input can bid for any combination of outputs
+   parameter num_ports = 8;
+   
+   parameter reset_type = reset_type_async;
+   
+   /* supported architectures:
+    0: mux inputs/outputs based on priority
+    1: replicate logic per priority
+    2: diagonal propagation arbiter (DPA, see Hurt99)
+    3: rotate inputs/outputs based on priority */
+   parameter architecture = 0;
+   
+   
+   input clk;
+   
+   input reset;
+   
+   // update arbitration priorities
+   input update;
+   
+   // requests
+   input [0:num_ports*num_ports-1] req;
+   
+   // grants
+   output wire [0:num_ports*num_ports-1] gnt;
+   
+   
    generate
-
+      
       case(architecture)
 	0:
 	  begin

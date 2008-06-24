@@ -1,6 +1,7 @@
 module crossbar
   (ctrl_ip_op, data_ip, data_op);
    
+   
    parameter num_ports = 5;
    parameter width = 32;
    
@@ -9,9 +10,11 @@ module crossbar
     1: use multiplexers */
    parameter architecture = 0;
    
+   
    input [0:num_ports*num_ports-1] ctrl_ip_op;
-   input [0:num_ports*width-1] 	   data_ip;
-   output [0:num_ports*width-1]    data_op;
+   input [0:num_ports*width-1] data_ip;
+   output wire [0:num_ports*width-1] data_op;
+   
    
    wire [0:num_ports*num_ports-1]  ctrl_op_ip;
    interleaver

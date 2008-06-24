@@ -1,29 +1,38 @@
 module tree_arbiter
-  #(parameter num_ports = 16,
-    parameter num_blocks = 4,
-
-    // see dff.v for supported values
-    parameter reset_type = 1,
-
-    /* supported architectures:
-     0: round-robin arbiter
-     1: matrix arbiter */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-    input     update,
-    input [0:num_ports-1] req,
-    output wire [0:num_ports-1] gnt);
+  (clk, reset, update, req, gnt);
+   
+   
+`include "constants.v"
+   
+   
+   parameter num_ports = 16;
+   parameter num_blocks = 4;
+   
+   // see dff.v for supported values
+   parameter reset_type = reset_type_async;
+   
+   /* supported architectures:
+    0: round-robin arbiter
+    1: matrix arbiter */
+   parameter architecture = 0;
    
    localparam ports_per_block = num_ports / num_blocks;
    
-   wire [0:num_blocks-1] 	stg2_req;   
-   wire [0:num_blocks-1] 	stg2_gnt;
+   
+   input clk;
+   input reset;
+   input update;
+   input [0:num_ports-1] req;
+   output wire [0:num_ports-1] gnt;
+   
+   
+   wire [0:num_blocks-1]       stg2_req;   
+   wire [0:num_blocks-1]       stg2_gnt;
    
    generate
       
       // first stage of arbitration: one arbiter per group
-      genvar 			i;
+      genvar 		       i;
       for(i = 0; i < num_blocks; i = i + 1)
 	begin:blocks
 	   
@@ -43,7 +52,7 @@ module tree_arbiter
 	      .update(update),
 	      .req(stg1_req),
 	      .gnt(stg1_gnt));
-
+	   
 	   assign gnt[i*ports_per_block:(i+1)*ports_per_block-1]
 		    = {ports_per_block{stg2_gnt[i]}} & stg1_gnt;
 	   

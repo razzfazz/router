@@ -1,20 +1,22 @@
 module credit_tracker
   (clk, reset, debit, credit, free);
    
-   parameter num_credits = 8;
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
+`include "constants.v"
+`include "functions.v"
+   
+   
+   parameter num_credits = 8;
+   parameter reset_type = reset_type_async;
+   localparam credit_idx_width = clogb(num_credits);
+   
    
    input clk;
    input reset;
    input debit;
    input credit;
-   output free;
+   output wire free;
    
-`include "functions.v"
-   
-   localparam credit_idx_width = clogb(num_credits);
    
    wire        set_cred, reset_cred;
    wire        cred_s, cred_q;
@@ -38,8 +40,8 @@ module credit_tracker
       if(num_credits == 1)
 	begin
 	   
-	   assign set_cred = credit && !debit;
-	   assign reset_cred = debit && !credit;
+	   assign set_cred = credit & ~debit;
+	   assign reset_cred = debit & ~credit;
 	   
 	   assign error = cred_q ? credit : debit;
 	   
@@ -52,10 +54,10 @@ module credit_tracker
 	   assign cred_count_zero = ~|cred_count_q;
 	   
 	   wire 		       incr_count;
-	   assign incr_count = credit && !debit && cred_q;
+	   assign incr_count = credit & ~debit & cred_q;
 	   
 	   wire 		       decr_count;
-	   assign decr_count = debit && !credit && !cred_count_zero;
+	   assign decr_count = debit & ~credit & ~cred_count_zero;
 	   
 	   wire [0:credit_idx_width-1] cred_count_s;
 	   assign cred_count_s = cred_count_q - decr_count + incr_count;
@@ -69,8 +71,8 @@ module credit_tracker
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   assign set_cred = credit && !debit && !cred_q;
-	   assign reset_cred = debit && !credit && cred_count_zero;
+	   assign set_cred = credit & ~debit & ~cred_q;
+	   assign reset_cred = debit & ~credit & cred_count_zero;
 	   
 	   assign error = (!cred_q && debit) ||
 			  ((cred_count_q == num_credits-1) && credit);

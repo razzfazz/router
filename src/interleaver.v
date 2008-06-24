@@ -1,17 +1,22 @@
 module interleaver
-  #(parameter width = 8,
-    parameter num_blocks = 2)
-   (input [0:width-1] data_in,
-    output [0:width-1] data_out);
+  (data_in, data_out);
    
+   
+   parameter width = 8;
+   parameter num_blocks = 2;
    localparam step = width/num_blocks;
    
+   
+   input [0:width-1] data_in;
+   output wire [0:width-1] data_out;
+   
+   
    generate
-
-      genvar i;
+      
+      genvar 		   i;
       for(i = 0; i < width / num_blocks; i = i + 1)
 	begin:blocks
-	
+	   
 	   genvar j;
 	   for(j = 0; j < num_blocks; j = j + 1)
 	     begin:bits

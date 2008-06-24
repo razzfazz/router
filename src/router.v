@@ -2,11 +2,14 @@ module router
   (CLK, RST, valid_in, vc_in, type_in, data_in, cred_valid_out, cred_vc_out,
    cred_type_out, valid_out, vc_out, type_out, data_out, cred_valid_in,
    cred_vc_in, cred_type_in);
-
-   parameter address = 0;
-
+   
+   
 `include "config.v"
-`include "functions.v"
+`include "globals.v"
+   
+   
+   parameter [0:addr_width-1] address = {addr_width{1'b0}};
+   
    
    input CLK;
    input RST;
@@ -24,7 +27,7 @@ module router
    
    input [0:num_ports-1] cred_valid_in_op;
    input [0:num_ports*vc_idx_width-1] cred_vc_in_op;
-
+   
    
    wire clk = CLK;
    wire reset = reset;
@@ -33,15 +36,15 @@ module router
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_req_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 	  vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_ip_ivc_ovc;
-
+   
    wire [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_vcs-1]   sw_req_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 	  sw_gnt_ip_ivc;
    
-   wire [0:num_ports*data_width-1] ipc_xbr_data_ip;
-   wire [0:num_ports*vc_idx_width-1] ipc_xbr_vc_ip;
-   wire [0:num_ports*type_width-1] ipc_xbr_type_ip;
+   wire [0:num_ports*data_width-1] 	  ipc_xbr_data_ip;
+   wire [0:num_ports*vc_idx_width-1] 	  ipc_xbr_vc_ip;
+   wire [0:num_ports*type_width-1] 	  ipc_xbr_type_ip;
    
    wire [0:num_ports*num_ports*num_vcs-1] vc_free_ip_op_ovc;
    

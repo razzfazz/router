@@ -1,7 +1,11 @@
 module sw_alloc
   (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc,
    gnt_ip_op);
-
+   
+   
+`include "config.v"
+   
+   
    // see dff.v for supported values
    parameter reset_type = 1;
    
@@ -19,8 +23,6 @@ module sw_alloc
     10: rotate inputs based on prio, round-robin arbiters in final stage
     11: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
-
-`include "config.v"
    
    localparam architecture_sep_if = architecture;
    localparam architecture_sep_of = architecture - 2;
@@ -35,8 +37,8 @@ module sw_alloc
    
    input [0:num_ports*num_vcs-1] cred_op_ovc;
    
-   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
-   output [0:num_ports*num_ports-1] gnt_ip_op;
+   output wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output wire [0:num_ports*num_ports-1] gnt_ip_op;
    
    
    generate
@@ -72,7 +74,6 @@ module sw_alloc
 	  end
 	4, 5, 6, 7, 8, 9, 10, 11:
 	  begin
-	     
 	     sw_alloc_core_wf
 	       #(.reset_type(reset_type),
 		 .architecture(architecture_wf))

@@ -2,8 +2,12 @@ module vc_alloc
   (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc,
    gnt_ip_ivc_ovc, gnt_op_ovc);
    
-   // see dff.v for supported values
-   parameter reset_type = 1;
+   
+`include "config.v"
+`include "constants.v"
+   
+   
+   parameter reset_type = reset_type_async;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -12,8 +16,6 @@ module vc_alloc
     3: separable, output-first, matrix arbiters */
    parameter architecture = 0;
    
-`include "config.v"
-
    localparam architecture_sep_if = architecture;
    localparam architecture_sep_of = architecture;
    
@@ -26,9 +28,9 @@ module vc_alloc
    
    input [0:num_ports*num_vcs-1] elig_op_ovc;
    
-   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
-   output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
-   output [0:num_ports*num_vcs-1] gnt_op_ovc;
+   output wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
+   output wire [0:num_ports*num_vcs-1] 	       gnt_op_ovc;
    
    
    generate
@@ -64,8 +66,8 @@ module vc_alloc
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 		.gnt_op_ovc(gnt_op_ovc));
 	  end
-	endcase
-
+      endcase
+      
    endgenerate
    
 endmodule

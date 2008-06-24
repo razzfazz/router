@@ -1,13 +1,17 @@
 module encoder
-  #(parameter num_ports = 8)
-   (data_in, data_out);
+  (data_in, data_out);
+   
    
 `include "functions.v"
    
+   
+   parameter num_ports = 8;
    localparam width = clogb(num_ports);
+   
    
    input [0:num_ports-1] data_in;
    output wire [0:width-1] data_out;
+   
    
    generate
       

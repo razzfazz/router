@@ -1,18 +1,26 @@
 module arbiter
-  #(parameter num_ports = 32,
-
-    // see dff.v for supported values
-    parameter reset_type = 1,
-
-    /* supported architectures:
-     0: round-robin arbiter
-     1: matrix arbiter */
-    parameter architecture = 0)
-   (input     clk,
-    input     reset,
-    input     update,
-    input [0:num_ports-1] req,
-    output wire [0:num_ports-1] gnt);
+  (clk, reset, update, req, gnt);
+   
+   
+`include "constants.v"
+   
+   
+   parameter num_ports = 32;
+   
+   parameter reset_type = reset_type_async;
+   
+   /* supported architectures:
+    0: round-robin arbiter
+    1: matrix arbiter */
+   parameter architecture = 0;
+   
+   
+   input clk;
+   input reset;
+   input update;
+   input [0:num_ports-1] req;
+   output wire [0:num_ports-1] gnt;
+   
    
    generate
       
@@ -42,7 +50,7 @@ module arbiter
 		.gnt(gnt));
 	  end
       endcase
-
+      
    endgenerate
    
 endmodule
