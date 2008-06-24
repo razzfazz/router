@@ -101,8 +101,7 @@ endfunction
 function [0:route_info_width-1] create_route_info
   (input [0:addr_width-1] next_address, input [0:addr_width-1] final_address);
    begin
-      create_route_info[0:addr_width-1] = next_address;
-      create_route_info[addr_width:(2*addr_width)-1] = final_address;
+      create_route_info = {next_address, final_address};
    end
 endfunction
 
