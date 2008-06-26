@@ -33,6 +33,60 @@ parameter num_vcs_per_class = 1;
 localparam num_vcs = num_classes * num_vcs_per_class;
 localparam vc_idx_width = clogb(num_vcs);
 
+// function to extract traffic class from VC index
+function [0:traffic_class_idx_width-1] get_traffic_class
+  (input [0:vc_idx_width-1] vc);
+   begin
+      get_traffic_class = vc[0:traffic_class_idx_width-1];
+   end
+endfunction
+
+// function to extract routing class from VC index
+function [0:routing_class_idx_width-1] get_routing_class
+  (input [0:vc_idx_width-1] vc);
+   begin
+      get_routing_class = vc[traffic_class_idx_width:
+			     traffic_class_idx_width+routing_class_idx_width-1];
+   end
+endfunction
+
+// function to change the traffic class in a VC index
+function [0:vc_idx_width-1] set_traffic_class
+  (input [0:vc_idx_width-1] vc,
+   input [0:traffic_class_idx_width-1] traffic_class);
+   begin
+      set_traffic_class = vc;
+      set_traffic_class[0:traffic_class_idx_width-1] = traffic_class;
+   end
+endfunction
+
+// function to change the routing class in a VC index
+function [0:vc_idx_width-1] set_routing_class
+  (input [0:vc_idx_width-1] vc,
+   input [0:routing_class_idx_width-1] routing_class);
+   begin
+      set_routing_class = vc;
+      set_routing_class[traffic_class_idx_width:
+			traffic_class_idx_width+routing_class_idx_width-1]
+	= routing_class;
+   end
+endfunction
+
+// function to create a bit-mask of allowable VCs for a given combination of
+// traffic class and routing class
+function [0:num_vcs-1] create_vc_mask
+  (input [0:traffic_class_idx_width-1] traffic_class,
+   input [0:routing_class_idx_width-1] routing_class);
+   integer vc;
+   begin
+      for(vc = 0; vc < num_vcs; vc = vc + 1)
+	begin
+	   create_vc_mask[vc] = (get_traffic_class(vc) == traffic_class) &&
+				(get_routing_class(vc) == routing_class);
+	end
+   end
+endfunction
+
 // network dimensions
 parameter num_dimensions = 2;
 
@@ -94,6 +148,15 @@ function [0:route_info_width-1] get_route_info
   (input [0:data_width-1] data);
    begin
       get_route_info = data[0:route_info_width-1];
+   end
+endfunction
+
+// function to set routing info in flit
+function [0:data_width-1] set_route_info
+  (input [0:data_width-1] data, input [0:route_info_width-1] route_info);
+   begin
+      set_route_info = data;
+      set_route_info[0:route_info_width-1] = route_info;
    end
 endfunction
 
