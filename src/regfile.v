@@ -24,8 +24,6 @@ module regfile
      if(write_enable)
        storage[write_address] <= write_data;
    
-   wire [0:width-1] 	   read_data;
-   
    assign read_data = storage[read_address];
    
 endmodule
