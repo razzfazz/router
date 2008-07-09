@@ -32,8 +32,10 @@ module credit_tracker
       .q(cred_q));
    assign free = cred_q;
    
-   
+
+   // synopsys translate_off
    wire        error;
+   // synopsys translate_on
    
    generate
       
@@ -42,8 +44,10 @@ module credit_tracker
 	   
 	   assign set_cred = credit & ~debit;
 	   assign reset_cred = debit & ~credit;
-	   
+
+	   // synopsys translate_off
 	   assign error = cred_q ? credit : debit;
+	   // synopsys translate_on
 	   
 	end
       else
@@ -73,9 +77,11 @@ module credit_tracker
 	   
 	   assign set_cred = credit & ~debit & ~cred_q;
 	   assign reset_cred = debit & ~credit & cred_count_zero;
-	   
+
+	   // synopsys translate_off
 	   assign error = (!cred_q && debit) ||
 			  ((cred_count_q == num_credits-1) && credit);
+	   // synopsys translate_on
 	   
 	end
       
