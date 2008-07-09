@@ -48,4 +48,16 @@ function integer encode(input integer argument);
    end
 endfunction
 
+function integer min(input integer a, input integer b);
+   begin
+      min = (a < b) ? a : b;
+   end
+endfunction
+
+function integer max(input integer a, input integer b);
+   begin
+      max = (a > b) ? a : b;
+   end
+endfunction
+
 //`endif
