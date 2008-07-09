@@ -134,7 +134,7 @@ module comb_alloc_wf
 		assign req_sw = req_qual_elig & req_qual_cred;
 		
 		wire [0:num_ports-1] req_sw_op;
-		assign req_sw_op = req_sw ? req_op : {num_ports{1'b0}};
+		assign req_sw_op = {num_ports{req_sw}} & req_op;
 		
 		assign req_sw_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 			 = req_sw_op;
