@@ -391,11 +391,11 @@ module testbench
    initial
    begin
       
-      reset = 0'b1;
+      reset = 1'b1;
       
       #(2*Tclk)
       
-      reset = 0'b0;
+      reset = 1'b0;
 
       for(k = 0; k < runtime; k = k + 1)
 	begin
