@@ -68,4 +68,12 @@ module fifo_ctrl
    assign write_addr = write_ptr;
    assign empty = empty_q;
 
+   // synopsys translate_off
+   wire 		full;
+   assign full = (read_ptr == write_ptr) && !empty_q;
+   
+   wire 		error;
+   assign error = full & push;
+   // synopsys translate_on
+
 endmodule
