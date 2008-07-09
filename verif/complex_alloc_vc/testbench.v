@@ -66,6 +66,8 @@ module testbench
    integer 				 seed = initial_seed;
    
    integer 				 ip, ivc;
+
+   reg [0:vc_idx_width-1] 		 vc_idx;
    
    always @(posedge clk)
      if(reset)
@@ -85,12 +87,19 @@ module testbench
 		    req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +: num_ports]
 		      = {num_ports{1'b0}};
 		    req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports+
-				  $dist_uniform(seed, 0, num_ports-1)]
+				  (ip + $dist_uniform(seed, 1, num_ports-1)) %
+				  num_ports]
 		      = req_ip_ivc[ip*num_vcs+ivc];
 		    req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs +: num_vcs]
 		      = {num_vcs{1'b0}};
-		    req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs+
-				   $dist_uniform(seed, 0, num_vcs-1)]
+		    vc_idx = {vc_idx_width{1'b0}};
+		    vc_idx = set_traffic_class(vc_idx, get_traffic_class(ivc));
+		    vc_idx = set_routing_class(vc_idx,
+					       $dist_uniform(seed,
+							     routing_class_minimal,
+							     routing_class_non_minimal));
+		    vc_idx = vc_idx + $dist_uniform(seed, 0, num_vcs_per_class-1);
+		    req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs+vc_idx]
 		      = req_ip_ivc[ip*num_vcs+ivc];
 		 end
 	    end
