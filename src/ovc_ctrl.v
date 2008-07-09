@@ -23,7 +23,7 @@ module ovc_ctrl
 
    
    wire        elig_s, elig_q;
-   assign elig_s = (elig_q & ~alloc) | free;
+   assign elig_s = (elig_q | free ) & ~alloc;
    dff
      #(.width(1),
        .reset_value(1'b1),
@@ -35,9 +35,11 @@ module ovc_ctrl
       .q(elig_q));
    
    assign elig = elig_q;
-   
+
+   // synopsys translate_off
    wire        error;
-   assign error = alloc & ~free & ~elig_q;
+   assign error = alloc & ~elig_q;
+   // synopsys translate_on
    
    credit_tracker
      #(.num_credits(num_buffers),
