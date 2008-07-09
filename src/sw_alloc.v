@@ -1,13 +1,14 @@
 module sw_alloc
-  (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, cred_op_ovc, gnt_ip_ivc,
-   gnt_ip_op);
+  (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
+   sw_gnt_ip_op);
    
    
+`include "constants.v"
 `include "config.v"
    
    
    // see dff.v for supported values
-   parameter reset_type = 1;
+   parameter reset_type = reset_type_async;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -24,21 +25,23 @@ module sw_alloc
     11: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
    
-   localparam architecture_sep_if = architecture;
-   localparam architecture_sep_of = architecture - 2;
-   localparam architecture_wf = architecture - 4;
+   // ignore requests for output port same as input port
+   parameter ignore_same_port = 1;
    
    
    input clk;
    input reset;
    
-   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
-   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   input [0:num_ports*num_vcs-1] sw_req_ip_ivc;
+   input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    
-   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
+   output [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
+   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
-   output wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
-   output wire [0:num_ports*num_ports-1] gnt_ip_op;
+   wire [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
+   wire [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
+   wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
    
    
    generate
@@ -48,44 +51,46 @@ module sw_alloc
 	  begin
 	     sw_alloc_core_sep_if
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_sep_if))
+		 .architecture(architecture),
+		 .ignore_same_port(ignore_same_port))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
-		.req_ip_ivc_op(req_ip_ivc_op),
-		.req_ip_ivc_ovc(req_ip_ivc_ovc),
-		.cred_op_ovc(cred_op_ovc),
-		.gnt_ip_ivc(gnt_ip_ivc),
-		.gnt_ip_op(gnt_ip_op));
+		.sw_req_ip_ivc(sw_req_ip_ivc),
+		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
+		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
+		.sw_gnt_ip_ivc_op(sw_gnt_ip_ivc_op),
+		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
 	2, 3:
 	  begin
 	     sw_alloc_core_sep_of
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_sep_of))
+		 .architecture(architecture - 2),
+		 .ignore_same_port(ignore_same_port))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
-		.req_ip_ivc_op(req_ip_ivc_op),
-		.req_ip_ivc_ovc(req_ip_ivc_ovc),
-		.cred_op_ovc(cred_op_ovc),
-		.gnt_ip_ivc(gnt_ip_ivc),
-		.gnt_ip_op(gnt_ip_op));
+		.sw_req_ip_ivc(sw_req_ip_ivc),
+		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
+		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
+		.sw_gnt_ip_ivc_op(sw_gnt_ip_ivc_op),
+		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
 	4, 5, 6, 7, 8, 9, 10, 11:
 	  begin
 	     sw_alloc_core_wf
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_wf))
+		 .architecture(architecture - 4),
+		 .ignore_same_port(ignore_same_port))
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
-		.req_ip_ivc_op(req_ip_ivc_op),
-		.req_ip_ivc_ovc(req_ip_ivc_ovc),
-		.cred_op_ovc(cred_op_ovc),
-		.gnt_ip_ivc(gnt_ip_ivc),
-		.gnt_ip_op(gnt_ip_op));
-	     
+		.sw_req_ip_ivc(sw_req_ip_ivc),
+		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
+		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
+		.sw_gnt_ip_ivc_op(sw_gnt_ip_ivc_op),
+		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
       endcase
       
