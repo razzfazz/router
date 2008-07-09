@@ -28,19 +28,19 @@ esac
 
 case ${num_vcs} in
     "2")
-    sed -i "s/\(parameter *num_classes *=\) [^;]*/\1 2/" \
+    sed -i "s/\(parameter *num_routing_classes *=\) [^;]*/\1 1/" \
 	${srcdir}/config.v
     sed -i "s/\(parameter *num_vcs_per_class *=\) [^;]*/\1 1/" \
 	${srcdir}/config.v
     ;;
     "4")
-    sed -i "s/\(parameter *num_classes *=\) [^;]*/\1 4/" \
+    sed -i "s/\(parameter *num_routing_classes *=\) [^;]*/\1 2/" \
 	${srcdir}/config.v
     sed -i "s/\(parameter *num_vcs_per_class *=\) [^;]*/\1 1/" \
 	${srcdir}/config.v
     ;;
     "8")
-    sed -i "s/\(parameter *num_classes *=\) [^;]*/\1 4/" \
+    sed -i "s/\(parameter *num_routing_classes *=\) [^;]*/\1 2/" \
 	${srcdir}/config.v
     sed -i "s/\(parameter *num_vcs_per_class *=\) [^;]*/\1 2/" \
 	${srcdir}/config.v
