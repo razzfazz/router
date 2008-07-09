@@ -17,7 +17,6 @@ set src_files [list \
 		   dff.v \
 		   encoder.v \
 		   fifo_ctrl.v \
-		   header_decoder.v \
 		   interleaver.v \
 		   ip_ctrl.v \
 		   ivc_ctrl.v \
@@ -26,9 +25,9 @@ set src_files [list \
 		   mux_nto1.v \
 		   or_nto1.v \
 		   ovc_ctrl.v \
+		   port_decoder_dim_order.v \
 		   regfile.v \
 		   rotator.v \
-		   routing_logic_dim_order.v \
 		   routing_logic.v \
 		   rr_arbiter.v \
 		   select_1ofn.v \
