@@ -10,36 +10,24 @@ set src_files [list \
 		   arbiter.v \
 		   clkgate.v \
 		   complex_alloc_sw.v \
-		   complex_alloc_vc.v \
-		   credit_tracker.v \
-		   crossbar.v \
 		   decoder.v \
 		   dff.v \
 		   encoder.v \
-		   fifo_ctrl.v \
+		   extractor.v \
 		   interleaver.v \
-		   ip_ctrl.v \
-		   ivc_ctrl.v \
 		   matrix_arbiter.v \
-		   mod_ctr.v \
 		   mux_nto1.v \
 		   or_nto1.v \
-		   ovc_ctrl.v \
-		   port_decoder_dim_order.v \
-		   regfile.v \
+		   replicator.v \
 		   rotator.v \
-		   routing_logic.v \
 		   rr_arbiter.v \
 		   select_1ofn.v \
-		   shift_register.v \
+		   spreader.v \
 		   sw_alloc_core_sep_if.v \
 		   sw_alloc_core_sep_of.v \
 		   sw_alloc_core_wf.v \
 		   sw_alloc.v \
 		   tree_arbiter.v \
-		   vc_alloc_core_sep_if.v \
-		   vc_alloc_core_sep_of.v \
-		   vc_alloc.v \
 		   wf_alloc_base.v \
 		   wf_alloc_core_dpa.v \
 		   wf_alloc_core_mux.v \
