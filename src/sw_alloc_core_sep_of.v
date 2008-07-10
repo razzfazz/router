@@ -174,7 +174,8 @@ module sw_alloc_core_sep_of
 		      = sw_gnt_op & port_mask(ip);
 	   else
 	     assign sw_gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1] = sw_gnt_op;
-
+	   
+	   wire [0:num_vcs*num_ports-1]      mask_ivc_op;
 	   replicator
 	     #(.width(num_vcs),
 	       .count(num_ports))
