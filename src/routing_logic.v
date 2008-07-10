@@ -36,7 +36,7 @@ module routing_logic
    assign gnt = req;
 
    wire 				 is_minimal;
-   assign is_non_minimal = (routing_class == routing_class_non_minimal);
+   assign is_minimal = (routing_class == routing_class_minimal);
 
    wire 				 is_next;
    assign is_next = (address == next_address);
@@ -46,7 +46,7 @@ module routing_logic
    
    assign next_route_info = create_route_info(new_next_address, final_address);
    
-   assign next_routing_class = (is_non_minimal & is_next) ? 
+   assign next_routing_class = (~is_minimal & is_next) ? 
 			       routing_class_minimal : 
 			       routing_class;
 
