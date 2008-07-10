@@ -78,8 +78,11 @@ module sw_alloc_core_sep_if
 	   wire [0:num_ports-1] gnt_out_op;
 	   assign gnt_out_op = gnt_out_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
+	   wire 		gnt_out;
+	   assign gnt_out = |gnt_out_op;
+	   
 	   wire 		update_arb;
-	   assign update_arb = |gnt_out_op;
+	   assign update_arb = gnt_out;
 	   
 	   wire [0:num_vcs-1] 	req_in_ivc;
 	   assign req_in_ivc = sw_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
@@ -247,29 +250,15 @@ module sw_alloc_core_sep_if
 	   
 	   assign gnt_out_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_out_ip;
 	   
-	   
-	   //-------------------------------------------------------------------
-	   // generate global outputs
-	   //-------------------------------------------------------------------
-	   
-	   assign sw_gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_out_ip;
-	   
 	end
       
    endgenerate
    
    
    //---------------------------------------------------------------------------
-   // bit shuffling for changing sort order
+   // generate global outputs
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1]    sw_gnt_op_ip;
-   interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   sw_gnt_ip_op_intl
-     (.data_in(sw_gnt_op_ip),
-      .data_out(sw_gnt_ip_op));
-   
+   assign sw_gnt_ip_op = gnt_out_ip_op;
    
 endmodule
