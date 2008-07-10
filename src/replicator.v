@@ -7,14 +7,16 @@ module replicator
    
    
    input [0:width-1] data_in;
-   output wire [0:count*width-1] data_out;
+   output [0:count*width-1] data_out;
+   
+   wire [0:count*width-1] data_out;
    
    
    generate
-      genvar   idx;
+      genvar 		  idx;
       for(idx = 0; idx < width; idx = idx + 1)
 	begin:idxs
-	   data_out[idx*count:(idx+1)*count-1] = {count{data_in[idx]}};
+	   assign data_out[idx*count:(idx+1)*count-1] = {count{data_in[idx]}};
 	end
    endgenerate
    
