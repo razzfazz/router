@@ -9,7 +9,9 @@ module testbench
    parameter reset_type = 1;
    parameter Tclk = 2;
    
+`include "functions.v"
 `include "config.v"
+`include "sim_functions.v"
    
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    
