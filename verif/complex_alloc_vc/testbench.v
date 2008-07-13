@@ -7,9 +7,13 @@ module testbench
    parameter initial_seed = 0;
    parameter output_as_csv = 1;
    parameter buffer_occupancy = 75;
-   parameter reset_type = 1;
-
+   
+`include "functions.v"
 `include "config.v"
+`include "constants.v"
+`include "sim_functions.v"
+   
+   parameter reset_type = reset_type_async;
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -107,10 +111,6 @@ module testbench
    
    integer grant_actual[0:num_archs-1];
    
-   // assume infinite buffers for now
-   wire [0:num_ports*num_vcs-1] elig_op_ovc;
-   assign elig_op_ovc = {num_ports*num_vcs{1'b1}};
-   
    generate
       
       genvar 			arch;
@@ -127,12 +127,11 @@ module testbench
 	   alloc
 	     (.clk(clk),
 	      .reset(reset),
-	      .req_ip_ivc_op(req_ip_ivc_op),
-	      .req_ip_ivc_ovc(req_ip_ivc_ovc),
-	      .elig_op_ovc(elig_op_ovc),
-	      .gnt_ip_ivc(gnt_ip_ivc),
-	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-	      .gnt_op_ovc(gnt_op_ovc));
+	      .vc_req_ip_ivc_op(req_ip_ivc_op),
+	      .vc_req_ip_ivc_ovc(req_ip_ivc_ovc),
+	      .vc_gnt_ip_ivc(gnt_ip_ivc),
+	      .vc_gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .vc_gnt_op_ovc(gnt_op_ovc));
 
 	   integer 			  l, m;
 	   integer 			  bad_alloc;
@@ -166,6 +165,8 @@ module testbench
 		   if(|(gnt_ip_ivc_ovc & ~req_ip_ivc_ovc))
 		     bad_alloc = bad_alloc | 4;
 		   grant_actual[arch] = grant_actual[arch] + get_flow(gnt_ip_ivc);
+		   if(is_x(gnt_ip_ivc) || is_x(gnt_ip_ivc_ovc) || is_x(gnt_op_ovc))
+		     bad_alloc = bad_alloc | 8;
 		   if(bad_alloc != 0)
 		     begin
 			$display("SIM: ERROR: Assertion failed for arch=%d!",
