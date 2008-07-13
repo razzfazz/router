@@ -1,8 +1,7 @@
 #!/bin/sh
 
-tclk=6
-hold_type=1
-reset_type=1
+tclk=2
+reset_type=reset_type_async
 fixed_delay=0
 runtime=100000
 output_as_csv=1
@@ -21,7 +20,6 @@ do
 		cat testbench.template.v \
 		    | sed s/TCLK/$tclk/ \
 		    | sed s/NUM_PORTS/$num_ports/ \
-		    | sed s/HOLD_TYPE/$hold_type/ \
 		    | sed s/RESET_TYPE/$reset_type/ \
 		    | sed s/ARCHITECTURE/$architecture/ \
 		    | sed s/MEAN_DELAY/$mean_delay/ \
