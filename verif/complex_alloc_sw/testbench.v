@@ -7,10 +7,14 @@ module testbench
    parameter initial_seed = 0;
    parameter output_as_csv = 1;
    parameter buffer_occupancy = 75;
-   parameter reset_type = 1;
-
-`include "config.v"
    
+`include "functions.v"
+`include "config.v"
+`include "constants.v"
+`include "sim_functions.v"
+   
+   parameter reset_type = reset_type_async;
+
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
@@ -281,7 +285,6 @@ module testbench
    reg [0:num_ports*num_ports-1] 	 max_ip_op;
    reg [0:num_ports*num_vcs-1]           req_ip_ivc;
    reg [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
-   reg [0:num_ports*num_vcs*num_vcs-1] 	 req_ip_ivc_ovc;
 
    integer 				 seed = initial_seed;
    
@@ -296,7 +299,6 @@ module testbench
 	  req_ip_op = {num_ports*num_ports{1'b0}};
 	  max_ip_op = {num_ports*num_ports{1'b0}};
 	  req_ip_ivc_op = {num_ports*num_vcs*num_ports{1'b0}};
-	  req_ip_ivc_ovc = {num_ports*num_vcs*num_vcs{1'b0}};
 	  flow_ideal = 0;
 	  grant_ideal = 0;
        end
@@ -315,16 +317,12 @@ module testbench
 		    req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +: num_ports]
 		      = {num_ports{1'b0}};
 		    req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports+
-				  $dist_uniform(seed, 0, num_ports-1)]
+				  (ip+$dist_uniform(seed, ignore_same_port,
+						    num_ports-1))%num_ports]
 		      = req_ip_ivc[ip*num_vcs+ivc];
 		    req_ip_op[ip*num_ports +: num_ports]
 		      = req_ip_op[ip*num_ports +: num_ports] |
 			req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +: num_ports];
-		    req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs +: num_vcs]
-		      = {num_vcs{1'b0}};
-		    req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs+
-				   $dist_uniform(seed, 0, num_vcs-1)]
-		      = req_ip_ivc[ip*num_vcs+ivc];
 		    
 		 end
 	       
@@ -338,32 +336,30 @@ module testbench
 
    integer grant_actual[0:num_archs-1];
    
-   // assume infinite buffers for now
-   wire [0:num_ports*num_vcs-1]      cred_op_ovc;
-   assign cred_op_ovc = {num_ports*num_vcs{1'b1}};
-   
    generate
       
-      genvar 			     arch;
+      genvar arch;
       for(arch = 0; arch < num_archs; arch = arch + 1)
 	begin:archs
 	   
-	   wire [0:num_ports*num_vcs-1]   gnt_ip_ivc;
-	   wire [0:num_ports*num_ports-1] gnt_ip_op;
+	   wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+	   wire [0:num_ports*num_vcs*num_ports-1] gnt_ip_ivc_op;
+	   wire [0:num_ports*num_ports-1] 	  gnt_ip_op;
 	   
 	   sw_alloc
 	     #(.reset_type(reset_type),
+	       .ignore_same_port(ignore_same_port),
 	       .architecture(arch))
 	   alloc
 	     (.clk(clk),
 	      .reset(reset),
-	      .req_ip_ivc_op(req_ip_ivc_op),
-	      .req_ip_ivc_ovc(req_ip_ivc_ovc),
-	      .cred_op_ovc(cred_op_ovc),
-	      .gnt_ip_ivc(gnt_ip_ivc),
-	      .gnt_ip_op(gnt_ip_op));
-
-	   wire [0:num_ports*num_ports-1] gnt_op_ip;
+	      .sw_req_ip_ivc(req_ip_ivc),
+	      .sw_req_ip_ivc_op(req_ip_ivc_op),
+	      .sw_gnt_ip_ivc(gnt_ip_ivc),
+	      .sw_gnt_ip_ivc_op(gnt_ip_ivc_op),
+	      .sw_gnt_ip_op(gnt_ip_op));
+	   
+	   wire [0:num_ports*num_ports-1] 	  gnt_op_ip;
 	   interleaver
 	     #(.width(num_ports*num_ports),
 	       .num_blocks(num_ports))
@@ -371,16 +367,16 @@ module testbench
 	     (.data_in(gnt_ip_op),
 	      .data_out(gnt_op_ip));
 	   
-	   integer 			  flow_actual;
-	   integer 			  l;
-	   integer 			  bad_alloc;
-	   integer 			  grant_port[0:num_ports-1];
+	   integer 				  flow_actual;
+	   integer 				  l;
+	   integer 				  bad_alloc;
+	   integer 				  grant_port[0:num_ports-1];
 	   
 	   initial
 	   begin
-
+	      
 	      grant_actual[arch] = 0;
-
+	      
 	      for(l = 0; l < num_ports; l = l + 1)
 		grant_port[l] = 0;
 	      
@@ -406,6 +402,8 @@ module testbench
 		   grant_actual[arch] = grant_actual[arch] + flow_actual;
 		   if(flow_actual > flow_ideal)
 		     bad_alloc = bad_alloc | 8;
+		   if(is_x(gnt_ip_op) || is_x(gnt_ip_ivc) || is_x(gnt_ip_ivc_op))
+		     bad_alloc = bad_alloc | 16;
 		   if(bad_alloc != 0)
 		     begin
 			$display("SIM: ERROR: Assertion failed for arch=%d!",
@@ -414,13 +412,16 @@ module testbench
 				 bad_alloc);
 			$display("SIM: Requests:");
 			for(l = 0; l < num_ports; l = l + 1)
-			  $display("SIM: %b", req_ip_op[l*num_ports +: num_ports]);
+			  $display("SIM: %b",
+				   req_ip_op[l*num_ports +: num_ports]);
 			$display("SIM: Grants:");
 			for(l = 0; l < num_ports; l = l + 1)
-			  $display("SIM: %b", gnt_ip_op[l*num_ports +: num_ports]);
+			  $display("SIM: %b",
+				   gnt_ip_op[l*num_ports +: num_ports]);
 			$display("SIM: Augmented:");
 			for(l = 0; l < num_ports; l = l + 1)
-			  $display("SIM: %b", max_ip_op[l*num_ports +: num_ports]);
+			  $display("SIM: %b",
+				   max_ip_op[l*num_ports +: num_ports]);
 		     end
 		   #(Tclk);
 		end
