@@ -1,22 +1,26 @@
-module testbench
-  #(parameter Tclk = 6,
-    parameter num_ports = 5,
-    parameter hold_type = 1,
-    parameter reset_type = 1,
-    parameter mean_delay = 1,
-    parameter fixed_delay = 0,
-    parameter hold_requests = 0,
-    parameter runtime = 100000,
-    parameter output_as_csv = 1,
+module testbench();
+   
+   parameter Tclk = 2;
+   parameter num_ports = 5;
+   parameter hold_type = 1;
+   parameter mean_delay = 1;
+   parameter fixed_delay = 0;
+   parameter hold_requests = 0;
+   parameter runtime = 100000;
+   parameter output_as_csv = 1;
 
-    /* supported architectures:
+`include "constants.v"
+
+   parameter reset_type = reset_type_async;
+
+   /* supported architectures:
     0: separable, input-first, round-robin arbiters
     1: separable, input-first, matrix arbiters
     2: wavefront, rotate inputs for priority
     3: wavefront, replicated logic for priority
     4: diagonal propagation arbiter (DPA) */
-    parameter architecture = 0)
-   ();
+   parameter architecture = 4;
+   
    
    function integer get_flow(input [0:num_ports*num_ports-1] gnt_matrix);
       integer i, j;
@@ -360,7 +364,6 @@ module testbench
    simple_alloc
      #(.num_ports(num_ports),
        .reset_type(reset_type),
-       .hold_type(hold_type),
        .architecture(architecture))
    alloc
      (.CLK(clk),
