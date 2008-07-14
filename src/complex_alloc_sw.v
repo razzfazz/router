@@ -15,9 +15,11 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc, req_ip_ivc_op, gnt_ip_ivc, gnt_ip_
     11: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
    
+`include "constants.v"
 `include "globals.v"
+`include "functions.v"
 `include "config.v"
-
+   
    input CLK;
    input RST;
    
