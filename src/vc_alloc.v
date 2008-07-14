@@ -2,10 +2,9 @@ module vc_alloc
   (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, vc_gnt_ip_ivc,
    vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
    
-   
+`include "functions.v"   
 `include "config.v"
 `include "constants.v"
-   
    
    parameter reset_type = reset_type_async;
    
@@ -15,12 +14,6 @@ module vc_alloc
     2: separable, output-first, round-robin arbiters
     3: separable, output-first, matrix arbiters */
    parameter architecture = 0;
-   
-   // ignore requests for output port same as input port
-   parameter ignore_same_port = 1;
-   
-   // restrict which VCs a given packet can go on
-   parameter restrict_vcs = 1;
    
    localparam architecture_sep_if = architecture;
    localparam architecture_sep_of = architecture - 2;
@@ -48,9 +41,7 @@ module vc_alloc
 	  begin
 	     vc_alloc_core_sep_if
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_sep_if),
-		 .ignore_same_port(ignore_same_port),
-		 .restrict_vcs(restrict_vcs))
+		 .architecture(architecture_sep_if))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
@@ -64,9 +55,7 @@ module vc_alloc
 	  begin
 	     vc_alloc_core_sep_of
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_sep_of),
-		 .ignore_same_port(ignore_same_port),
-		 .restrict_vcs(restrict_vcs))
+		 .architecture(architecture_sep_of))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
