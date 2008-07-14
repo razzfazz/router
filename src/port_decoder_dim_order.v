@@ -1,16 +1,16 @@
 module port_decoder_dim_order
   (next_address, next_port);
    
-   
+`include "functions.v"
 `include "config.v"
-   
    
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    
    
    input [0:addr_width-1] next_address;
-   output wire [0:num_ports-1] next_port;
+   output [0:num_ports-1] next_port;
    
+   wire [0:num_ports-1] next_port;
    
    wire [0:num_dimensions-1] dim_addr_match;
    
@@ -45,20 +45,32 @@ module port_decoder_dim_order
 		    = port_dec & {num_neighbors{route_here}};
 	   
 	end
+
+      if(num_nodes_per_router > 1)
+	begin
+
+	   wire [0:node_addr_width-1] 	     node_addr;
+	   assign node_addr
+	     = next_address[num_dimensions*dim_addr_width:addr_width-1];
+	   
+	   wire [0:num_nodes_per_router-1]   node_dec;
+	   decoder
+	     #(.num_ports(num_nodes_per_router))
+	   port_addr_dec
+	     (.data_in(node_addr),
+	      .data_out(node_dec));
+	   
+	   assign next_port[num_dimensions*num_neighbors:num_ports-1]
+		    = node_dec & {num_nodes_per_router{&dim_addr_match}};
+	   
+	end
+      else
+	begin
+
+	   assign next_port[num_ports-1] = &dim_addr_match;
+	   
+	end
       
    endgenerate
-   
-   wire [0:node_addr_width-1] 	     node_addr;
-   assign node_addr = next_address[num_dimensions*dim_addr_width:addr_width-1];
-   
-   wire [0:num_nodes_per_router-1]   node_dec;
-   decoder
-     #(.num_ports(num_nodes_per_router))
-   port_addr_dec
-     (.data_in(node_addr),
-      .data_out(node_dec));
-   
-   assign next_port[num_dimensions*num_neighbors:num_ports-1]
-	    = node_dec & {num_nodes_per_router{&dim_addr_match}};
    
 endmodule
