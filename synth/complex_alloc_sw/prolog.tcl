@@ -28,7 +28,6 @@ set src_files [list \
 		   sw_alloc_core_wf.v \
 		   sw_alloc.v \
 		   tree_arbiter.v \
-		   wf_alloc_base.v \
 		   wf_alloc_core_dpa.v \
 		   wf_alloc_core_mux.v \
 		   wf_alloc_core_rep.v \
