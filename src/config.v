@@ -1,10 +1,8 @@
 //`ifndef _CONFIG_V_
 //`define _CONFIG_V_
 
-`include "functions.v"
-
 // buffers per VC
-parameter num_buffers = 8;
+parameter num_buffers = 10;
 localparam buff_idx_width = clogb(num_buffers);
 
 // flit width
@@ -108,9 +106,8 @@ localparam route_info_width = 2 * addr_width;
 // connectivity in each dimension
 // flattened butterfly:
 parameter num_neighbors = num_routers_per_dim - 1;
-/* mesh:
-parameter num_neighbors = 2;
-*/
+// mesh:
+//parameter num_neighbors = 2;
 
 // function to determine neighbor to route to (
 // flattened butterfly:
@@ -133,15 +130,14 @@ function [0:num_neighbors-1] get_neighbor
       get_neighbor = result;
    end
 endfunction
-/* mesh:
-function [0:num_neighbors-1] get_neighbor
+// mesh:
+/*function [0:num_neighbors-1] get_neighbor
   (input [0:dim_addr_width-1] src, input [0:dim_addr_width-1] dst);
    begin
       get_neighbor[0] = (dst < src);
       get_neighbor[1] = (dst > src);
    end
-endfunction
-*/
+endfunction*/
 
 // function to extract routing info structure from flit
 function [0:route_info_width-1] get_route_info
@@ -187,5 +183,79 @@ endfunction
 // number of ports required on router
 localparam num_ports = num_dimensions * num_neighbors + num_nodes_per_router;
 localparam port_idx_width = clogb(num_ports);
+
+// prevent packets from exiting through same port they came in on
+parameter ignore_same_port = 1;
+
+// only allow legal ivc->ovc requestst
+parameter restrict_vcs = 1;
+
+function [0:num_ports*num_ports-1] create_mask_ip_op(input ignore_same_port);
+   integer i;
+   reg [0:port_idx_width-1] ip, op;
+   begin
+      for(i = 0; i < num_ports*num_ports; i = i + 1)
+	begin
+	   ip = i / num_ports;
+	   op = i % num_ports;
+	   create_mask_ip_op[i] = (ip != op) || !ignore_same_port;
+	end
+   end
+endfunction
+
+function [0:num_ports*num_ports-1] create_mask_op_ip(input ignore_same_port);
+   integer i;
+   reg [0:port_idx_width-1] op, ip;
+   begin
+      for(i = 0; i < num_ports*num_ports; i = i + 1)
+	begin
+	   op = i / num_ports;
+	   ip = i % num_ports;
+	   create_mask_op_ip[i] = (ip != op) || !ignore_same_port;
+	end
+   end
+endfunction
+
+function [0:num_vcs*num_vcs-1] create_mask_ivc_ovc(input restrict_vcs);
+   integer i;
+   reg [0:vc_idx_width-1] ivc, ovc;
+   reg [0:traffic_class_idx_width-1] ivctc, ovctc;
+   begin
+      for(i = 0; i < num_vcs*num_vcs; i = i + 1)
+	begin
+	   ivc = i / num_vcs;
+	   ovc = i % num_vcs;
+	   ivctc = ivc / (num_routing_classes * num_vcs_per_class);
+	   ovctc = ovc / (num_routing_classes * num_vcs_per_class);
+	   create_mask_ivc_ovc[i]
+	     = (ivctc == ovctc) ||
+	     /*= ((get_traffic_class(ivc) == get_traffic_class(ovc)) &&
+		((get_routing_class(ivc) != routing_class_minimal) ||
+		 (get_routing_class(ovc) == routing_class_minimal))) ||*/
+	       !restrict_vcs;
+	end
+   end
+endfunction
+
+function [0:num_vcs*num_vcs-1] create_mask_ovc_ivc(input restrict_vcs);
+   integer i;
+   reg [0:vc_idx_width-1] ovc, ivc;
+   reg [0:traffic_class_idx_width-1] ovctc, ivctc;
+   begin
+      for(i = 0; i < num_vcs*num_vcs; i = i + 1)
+	begin
+	   ovc = i % num_vcs;
+	   ivc = i / num_vcs;
+	   ovctc = ivc / (num_routing_classes * num_vcs_per_class);
+	   ivctc = ovc / (num_routing_classes * num_vcs_per_class);
+	   create_mask_ovc_ivc[i]
+	     = (ivctc == ovctc) ||
+	     /*= ((get_traffic_class(ivc) == get_traffic_class(ovc)) &&
+		((get_routing_class(ivc) != routing_class_minimal) ||
+		 (get_routing_class(ovc) == routing_class_minimal))) ||*/
+	       !restrict_vcs;
+	end
+   end
+endfunction
 
 //`endif
