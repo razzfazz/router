@@ -1,9 +1,7 @@
 module rotator
   (data_in, select, data_out);
    
-   
 `include "functions.v"
-   
    
    parameter width = 8;
    
@@ -17,14 +15,15 @@ module rotator
    
    input [0:width-1] data_in;
    input [0:sel_width-1] select;
-   output wire [0:width-1] data_out;
+   output [0:width-1] data_out;
    
+   wire [0:width-1] data_out;
    
-   wire [0:(2*width-1)-1]  data_dup;
-   wire [0:(2*width-1)-1]  data_rot;
-
+   wire [0:(2*width-1)-1] data_dup;
+   wire [0:(2*width-1)-1] data_rot;
+   
    generate
-
+      
       case (direction)
 	0:
 	  begin
@@ -41,5 +40,5 @@ module rotator
       endcase
       
    endgenerate
-
+   
 endmodule

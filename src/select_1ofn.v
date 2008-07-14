@@ -8,8 +8,9 @@ module select_1ofn
    
    input [0:num_ports-1] select;
    input [0:num_ports*width-1] data_in;
-   output wire [0:width-1] data_out;
+   output [0:width-1] data_out;
    
+   wire [0:width-1] data_out;
    
    generate
       

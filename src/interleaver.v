@@ -8,8 +8,9 @@ module interleaver
    
    
    input [0:width-1] data_in;
-   output wire [0:width-1] data_out;
+   output [0:width-1] data_out;
    
+   wire [0:width-1] data_out;
    
    generate
       

@@ -1,17 +1,16 @@
 module decoder
   (data_in, data_out);
    
-   
 `include "functions.v"
-   
    
    parameter num_ports = 8;
    localparam width = clogb(num_ports);
    
    
    input [0:width-1] data_in;
-   output wire [0:num_ports-1] data_out;
+   output [0:num_ports-1] data_out;
    
+   wire [0:num_ports-1] data_out;
    
    generate
       

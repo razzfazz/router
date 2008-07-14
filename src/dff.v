@@ -1,9 +1,7 @@
 module dff
   (clk, reset, d, q);
-
    
 `include "constants.v"
-
    
    parameter width = 32;
    parameter offset = 0;
@@ -12,7 +10,7 @@ module dff
     0: no reset
     1: asynchronous reset
     2: synchronous reset */
-   parameter reset_type = 0;
+   parameter reset_type = reset_type_async;
    
    parameter [offset:(offset+width)-1] reset_value = {width{1'b0}};
    
@@ -20,8 +18,9 @@ module dff
    input clk;
    input reset;
    input [offset:(offset+width)-1] d;
-   output reg [offset:(offset+width)-1] q;
+   output [offset:(offset+width)-1] q;
    
+   reg [offset:(offset+width)-1] q;
    
    generate
       

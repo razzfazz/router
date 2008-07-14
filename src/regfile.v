@@ -1,9 +1,7 @@
 module regfile
    (clk, write_enable, write_address, write_data, read_address, read_data);
    
-   
 `include "functions.v"
-   
    
    parameter width = 64;
    parameter depth = 8;
@@ -15,10 +13,11 @@ module regfile
    input [0:addr_width-1] write_address;
    input [0:width-1] write_data;
    input [0:addr_width-1] read_address;
-   output wire [0:width-1] read_data;
+   output [0:width-1] read_data;
    
+   wire [0:width-1] read_data;
    
-   reg [0:width-1] 	   storage [0:depth-1];
+   reg [0:width-1]  storage [0:depth-1];
    
    always @(posedge clk)
      if(write_enable)

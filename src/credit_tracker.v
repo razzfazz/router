@@ -1,10 +1,8 @@
 module credit_tracker
   (clk, reset, debit, credit, free);
    
-   
 `include "constants.v"
 `include "functions.v"
-   
    
    parameter num_credits = 8;
    parameter reset_type = reset_type_async;
@@ -15,11 +13,12 @@ module credit_tracker
    input reset;
    input debit;
    input credit;
-   output wire free;
+   output free;
    
+   wire free;
    
-   wire        set_cred, reset_cred;
-   wire        cred_s, cred_q;
+   wire set_cred, reset_cred;
+   wire cred_s, cred_q;
    assign cred_s = set_cred | (cred_q & ~reset_cred);
    dff
      #(.width(1),
@@ -32,9 +31,8 @@ module credit_tracker
       .q(cred_q));
    assign free = cred_q;
    
-
    // synopsys translate_off
-   wire        error;
+   wire error;
    // synopsys translate_on
    
    generate
@@ -44,7 +42,7 @@ module credit_tracker
 	   
 	   assign set_cred = credit & ~debit;
 	   assign reset_cred = debit & ~credit;
-
+	   
 	   // synopsys translate_off
 	   assign error = cred_q ? credit : debit;
 	   // synopsys translate_on
@@ -77,10 +75,10 @@ module credit_tracker
 	   
 	   assign set_cred = credit & ~debit & ~cred_q;
 	   assign reset_cred = debit & ~credit & cred_count_zero;
-
+	   
 	   // synopsys translate_off
-	   assign error = (!cred_q && debit) ||
-			  ((cred_count_q == num_credits-1) && credit);
+	   assign error = ((!cred_q && debit) ||
+			   ((cred_count_q == num_credits-1) && credit));
 	   // synopsys translate_on
 	   
 	end
