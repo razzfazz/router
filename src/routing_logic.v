@@ -2,17 +2,17 @@ module routing_logic
   (clk, reset, req, route_info, routing_class, gnt, next_route_info,
    next_routing_class, next_port);
    
-
+`include "functions.v"
 `include "config.v"   
 `include "constants.v"
-   
    
    /* supported architectures:
     0: baseline
     1: replicate port decoding logic */
    parameter architecture = 0;
    
-   parameter reset_type = 0;
+   parameter reset_type = reset_type_async;
+   
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    
    
@@ -21,27 +21,31 @@ module routing_logic
    input req;
    input [0:route_info_width-1] route_info;
    input [0:routing_class_idx_width-1] routing_class;
-   output wire gnt;
-   output wire [0:route_info_width-1] next_route_info;
-   output wire [0:routing_class_idx_width-1] next_routing_class;
-   output wire [0:num_ports-1] next_port;
+   output gnt;
+   output [0:route_info_width-1] next_route_info;
+   output [0:routing_class_idx_width-1] next_routing_class;
+   output [0:num_ports-1] next_port;
    
+   wire gnt;
+   wire [0:route_info_width-1] next_route_info;
+   wire [0:routing_class_idx_width-1] next_routing_class;
+   wire [0:num_ports-1] 	      next_port;
    
-   wire [0:addr_width-1] 		 next_address;
+   wire [0:addr_width-1] 	      next_address;
    assign next_address = get_next_address(route_info);
    
-   wire [0:addr_width-1] 		 final_address;
+   wire [0:addr_width-1] 	      final_address;
    assign final_address = get_final_address(route_info);
    
    assign gnt = req;
-
-   wire 				 is_minimal;
+   
+   wire 			      is_minimal;
    assign is_minimal = (routing_class == routing_class_minimal);
-
-   wire 				 is_next;
+   
+   wire 			      is_next;
    assign is_next = (address == next_address);
    
-   wire [0:addr_width-1] 		 new_next_address;
+   wire [0:addr_width-1] 	      new_next_address;
    assign new_next_address = is_next ? final_address : next_address;
    
    assign next_route_info = create_route_info(new_next_address, final_address);
@@ -49,9 +53,9 @@ module routing_logic
    assign next_routing_class = (~is_minimal & is_next) ? 
 			       routing_class_minimal : 
 			       routing_class;
-
-   generate
    
+   generate
+      
       case(architecture)
 	0:
 	  begin
