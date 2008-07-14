@@ -9,6 +9,8 @@ module wf_alloc_core_rep
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
+   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
+   
    parameter reset_type = reset_type_async;
    
    
@@ -22,10 +24,11 @@ module wf_alloc_core_rep
    input [0:num_ports*num_ports-1] req;
    
    // grants
-   output wire [0:num_ports*num_ports-1] gnt;
+   output [0:num_ports*num_ports-1] gnt;
    
+   wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:num_ports-1] 		 prio_s, prio_q;
+   wire [0:num_ports-1] 	  prio_s, prio_q;
    
    assign prio_s = update ? {prio_q[1:num_ports-1], prio_q[0]} : prio_q;
    dff
@@ -39,12 +42,17 @@ module wf_alloc_core_rep
       .q(prio_q));
    
    wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
+   wire [0:num_ports*num_ports-1] 	    req_msk;
    
    generate
       
       genvar 				    prio;
       for(prio = 0; prio < num_ports; prio = prio + 1)
 	begin:prios
+	   
+	   assign req_msk[prio*num_ports:(prio+1)*num_ports-1]
+		    = req[prio*num_ports:(prio+1)*num_ports-1] &
+		      mask[prio*num_ports:(prio+1)*num_ports-1];
 	   
 	   wire [0:num_ports*num_ports-1] req_int;
 	   wire [0:num_ports*num_ports-1] gnt_int;
@@ -81,8 +89,8 @@ module wf_alloc_core_rep
 		  begin:cols
 		     
 		     assign req_int[row*num_ports+col] 
-			      = req[((prio+row)%num_ports)*num_ports +
-				    (num_ports-row+col)%num_ports];
+			      = req_msk[((prio+row)%num_ports)*num_ports +
+					(num_ports-row+col)%num_ports];
 		     assign gnt_by_prio[((prio+row)%num_ports)*
 					num_ports +
 					(num_ports-row+col)%num_ports +

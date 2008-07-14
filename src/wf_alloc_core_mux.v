@@ -9,6 +9,8 @@ module wf_alloc_core_mux
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
+   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
+   
    parameter reset_type = reset_type_async;
    
    
@@ -22,10 +24,11 @@ module wf_alloc_core_mux
    input [0:num_ports*num_ports-1] req;
    
    // grants
-   output wire [0:num_ports*num_ports-1] gnt;
+   output [0:num_ports*num_ports-1] gnt;
    
+   wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:num_ports-1] 		 prio_s, prio_q;
+   wire [0:num_ports-1] 	  prio_s, prio_q;
    assign prio_s = update ? {prio_q[1:num_ports-1], prio_q[0]} : prio_q;
    dff
      #(.width(num_ports),
@@ -37,13 +40,18 @@ module wf_alloc_core_mux
       .d(prio_s),
       .q(prio_q));
    
-   wire [0:num_ports*num_ports-1] 	 y;
+   wire [0:num_ports*num_ports-1] y;
+   wire [0:num_ports*num_ports-1] req_msk;
    
    generate
       
-      genvar 				 row;
+      genvar 			  row;
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
+	   
+	   assign req_msk[row*num_ports:(row+1)*num_ports-1]
+		    = req[row*num_ports:(row+1)*num_ports-1] &
+		      mask[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] x_in, y_in;
 	   wire [0:num_ports] 	x_out, y_out;
@@ -69,7 +77,7 @@ module wf_alloc_core_mux
 	   assign gnt[row*num_ports:(row+1)*num_ports-1] = gnt_row;
 	   
 	   wire [0:num_ports-1] req_row;
-	   assign req_row = req[row*num_ports:(row+1)*num_ports-1];
+	   assign req_row = req_msk[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:2*num_ports-1] req_dup;
 	   assign req_dup = {2{req_row}};

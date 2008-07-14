@@ -10,6 +10,8 @@ module wf_alloc_core_rot
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
+   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
+   
    parameter reset_type = reset_type_async;
    localparam port_width = clogb(num_ports);
    
@@ -24,16 +26,22 @@ module wf_alloc_core_rot
    input [0:num_ports*num_ports-1] req;
    
    // grants
-   output wire [0:num_ports*num_ports-1] gnt;
+   output [0:num_ports*num_ports-1] gnt;
    
+   wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:num_ports*num_ports-1] 	 y;
+   wire [0:num_ports*num_ports-1] y;
+   wire [0:num_ports*num_ports-1] req_msk;
    
    generate
       
-      genvar 				 row;
+      genvar 			  row;
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
+	   
+	   assign req_msk[row*num_ports:(row+1)*num_ports-1]
+		    = req[row*num_ports:(row+1)*num_ports-1] &
+		      mask[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:port_width-1] prio_s, prio_q;
 	   if(2 ** port_width == num_ports)
@@ -61,7 +69,7 @@ module wf_alloc_core_rot
 	      .q(prio_q));
 	   
 	   wire [0:num_ports-1] 	req_row;
-	   assign req_row = req[row*num_ports:(row+1)*num_ports-1];
+	   assign req_row = req_msk[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] 	req_in;
 	   
