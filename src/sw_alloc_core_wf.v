@@ -2,10 +2,9 @@ module sw_alloc_core_wf
   (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
    sw_gnt_ip_op);
    
-   
+`include "functions.v"
 `include "constants.v"
 `include "config.v"
-   
    
    parameter reset_type = reset_type_async;
    
@@ -20,11 +19,11 @@ module sw_alloc_core_wf
     7: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
    
-   // ignore requests for output port same as input port
-   parameter ignore_same_port = 1;
-   
    localparam architecture_wf = architecture >> 1;
    localparam architecture_arb = architecture & 1;
+   
+   localparam [0:num_ports*num_ports-1] mask_ip_op
+     = create_mask_ip_op(ignore_same_port);
    
    
    input clk;
@@ -40,18 +39,6 @@ module sw_alloc_core_wf
    wire [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
    wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
-   
-   
-   //---------------------------------------------------------------------------
-   // utility functions
-   //---------------------------------------------------------------------------
-   
-   function [0:num_ports-1] port_mask(input integer port);
-      begin
-	 port_mask = {num_ports{1'b1}};
-	 port_mask[port] = 1'b0;
-      end
-   endfunction
    
    
    //---------------------------------------------------------------------------
@@ -77,15 +64,10 @@ module sw_alloc_core_wf
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_vcs*num_ports-1] sw_req_ivc_op;
-	   if(ignore_same_port)
-	     assign sw_req_ivc_op
-	       = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1] &
-		 port_mask(ip);
-	   else
-	     assign sw_req_ivc_op
-	       = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1];
+	   assign sw_req_ivc_op
+	     = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
+				(ip+1)*num_vcs*num_ports-1] &
+	       {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
 	   
 	   wire [0:num_vcs*num_ports-1] req_in_ivc_op;
 	   assign req_in_ivc_op = sw_req_ivc_op;
@@ -98,11 +80,7 @@ module sw_alloc_core_wf
 	     (.data_in(sw_req_ivc_op),
 	      .data_out(req_out_op));
 	   
-	   if(ignore_same_port)
-	     assign req_out_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		      = req_out_op & port_mask(ip);
-	   else
-	     assign req_out_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req_out_op;
+	   assign req_out_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req_out_op;
 	   
 	   wire [0:num_ports*num_vcs-1] req_in_op_ivc;
 	   interleaver
@@ -113,12 +91,7 @@ module sw_alloc_core_wf
 	      .data_out(req_in_op_ivc));
 	   
 	   wire [0:num_ports-1] 	gnt_out_op;
-	   if(ignore_same_port)
-	     assign gnt_out_op = gnt_out_ip_op[ip*num_ports:
-					       (ip+1)*num_ports-1] &
-				 port_mask(ip);
-	   else
-	     assign gnt_out_op = gnt_out_ip_op[ip*num_ports:(ip+1)*num_ports-1];
+	   assign gnt_out_op = gnt_out_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
 	   wire [0:num_ports*num_vcs-1] gnt_in_op_ivc;
 	   genvar 			op;
@@ -202,7 +175,8 @@ module sw_alloc_core_wf
    wf_alloc
      #(.num_ports(num_ports),
        .reset_type(reset_type),
-       .architecture(architecture_wf))
+       .architecture(architecture_wf),
+       .mask(mask_ip_op))
    gnt_out_ip_op_alloc
      (.clk(clk),
       .reset(reset),

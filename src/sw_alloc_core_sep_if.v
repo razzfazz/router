@@ -2,10 +2,9 @@ module sw_alloc_core_sep_if
   (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
    sw_gnt_ip_op);
    
-   
+`include "functions.v"
 `include "constants.v"
 `include "config.v"
-   
    
    parameter reset_type = reset_type_async;
    
@@ -14,10 +13,13 @@ module sw_alloc_core_sep_if
     1: use matrix arbiters */
    parameter architecture = 0;
    
-   // ignore requests for output port same as input port
-   parameter ignore_same_port = 1;
-   
    localparam architecture_arb = architecture & 1;
+   
+   localparam [0:num_ports*num_ports-1] mask_ip_op
+     = create_mask_ip_op(ignore_same_port);
+   
+   localparam [0:num_ports*num_ports-1] mask_op_ip
+     = create_mask_op_ip(ignore_same_port);
    
    
    input clk;
@@ -33,24 +35,6 @@ module sw_alloc_core_sep_if
    wire [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
    wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
-   
-   
-   //---------------------------------------------------------------------------
-   // utility functions
-   //---------------------------------------------------------------------------
-   
-   function [0:num_ports-1] port_mask(input integer port);
-      begin
-	 port_mask = {num_ports{1'b1}};
-	 port_mask[port] = 1'b0;
-      end
-   endfunction
-   
-   function integer port_count(input integer port);
-      begin
-	 port_count = num_ports - 1;
-      end
-   endfunction
    
    
    //---------------------------------------------------------------------------
@@ -105,15 +89,10 @@ module sw_alloc_core_sep_if
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_vcs*num_ports-1] sw_req_ivc_op;
-	   if(ignore_same_port)
-	     assign sw_req_ivc_op
-	       = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1] &
-		 {num_vcs{port_mask(ip)}};
-	   else
-	     assign sw_req_ivc_op
-	       = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1];
+	   assign sw_req_ivc_op
+	     = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
+				(ip+1)*num_vcs*num_ports-1] &
+	       {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
 	   
 	   wire [0:num_ports-1] 	req_out_op;
 	   select_1ofn
@@ -131,17 +110,17 @@ module sw_alloc_core_sep_if
 	   // generate global grants
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs*num_ports-1] mask_ivc_op;
+	   wire [0:num_vcs*num_ports-1] gnt_in_ivc_op;
 	   replicator
 	     #(.width(num_vcs),
 	       .count(num_ports))
-	   mask_ivc_op_repl
+	   gnt_in_ivc_op_repl
 	     (.data_in(gnt_in_ivc),
-	      .data_out(mask_ivc_op));
+	      .data_out(gnt_in_ivc_op));
 	   
 	   assign sw_gnt_ip_ivc_op[ip*num_vcs*num_ports:
 				   (ip+1)*num_vcs*num_ports-1]
-		    = {num_vcs{gnt_out_op}} & mask_ivc_op;
+		    = {num_vcs{gnt_out_op}} & gnt_in_ivc_op;
 	   
 	   assign sw_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = {num_vcs{gnt_out}} & gnt_in_ivc;
@@ -187,11 +166,7 @@ module sw_alloc_core_sep_if
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] req_out_ip;
-	   if(ignore_same_port)
-	     assign req_out_ip
-	       = req_out_op_ip[op*num_ports:(op+1)*num_ports-1] & port_mask(op);
-	   else
-	     assign req_out_ip = req_out_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   assign req_out_ip = req_out_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   // if any VC requesting this output port was granted at any input
 	   // port in the first stage, one of these input ports will be granted
@@ -200,48 +175,17 @@ module sw_alloc_core_sep_if
 	   assign update_arb = |req_out_ip;
 
 	   wire [0:num_ports-1] gnt_out_ip;
-	   if(ignore_same_port)
-	     begin
-		wire [0:port_count(op)-1] req_out_ip_trunc;
-		extractor
-		  #(.width(num_ports),
-		    .mask(port_mask(op)))
-		req_out_ip_trunc_extr
-		  (.data_in(req_out_ip),
-		   .data_out(req_out_ip_trunc));
-
-		wire [0:port_count(op)-1] gnt_out_ip_trunc;
-		arbiter
-		  #(.num_ports(port_count(op)),
-		    .reset_type(reset_type),
-		    .architecture(architecture_arb))
-		gnt_out_ip_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update_arb),
-		   .req(req_out_ip_trunc),
-		   .gnt(gnt_out_ip_trunc));
-
-		spreader
-		  #(.width(num_ports),
-		    .mask(port_mask(op)))
-		gnt_out_ip_sprd
-		  (.data_in(gnt_out_ip_trunc),
-		   .data_out(gnt_out_ip));
-	     end
-	   else
-	     begin
-		arbiter
-		  #(.num_ports(num_ports),
-		    .reset_type(reset_type),
-		    .architecture(architecture_arb))
-		gnt_out_ip_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update_arb),
-		   .req(req_out_ip),
-		   .gnt(gnt_out_ip));
-	     end
+	   arbiter
+	     #(.num_ports(num_ports),
+	       .reset_type(reset_type),
+	       .architecture(architecture_arb),
+	       .mask(mask_op_ip[op*num_ports:(op+1)*num_ports-1]))
+	   gnt_out_ip_arb
+	     (.clk(clk),
+	      .reset(reset),
+	      .update(update_arb),
+	      .req(req_out_ip),
+	      .gnt(gnt_out_ip));
 	   
 	   
 	   //-------------------------------------------------------------------
