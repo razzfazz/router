@@ -1,14 +1,13 @@
 module mod_ctr
   (clk, reset, incr, value, next_value);
    
-   
 `include "functions.v"
-   
+`include "constants.v"
    
    parameter num_values = 8;
    
    // see dff.v for supported values
-   parameter reset_type = 1;
+   parameter reset_type = reset_type_async;
    
    localparam width = clogb(num_values);
    
@@ -18,8 +17,11 @@ module mod_ctr
    
    input incr;
    
-   output wire [0:width-1] value;
-   output wire [0:width-1] next_value;
+   output [0:width-1] value;
+   output [0:width-1] next_value;
+   
+   wire [0:width-1] value;
+   wire [0:width-1] next_value;
    
    
    wire [0:width-1] value_s, value_q, value_next;
@@ -34,11 +36,11 @@ module mod_ctr
 	assign value_next = (value_q == num_values - 1) ?
 			    {width{1'b0}} :
 			    (value_q + 1'b1);
-
+      
    endgenerate
-
+   
    assign value_s = incr ? value_next : value_q;
-
+   
    dff
      #(.width(width),
        .reset_type(reset_type))
@@ -47,7 +49,7 @@ module mod_ctr
       .reset(reset),
       .d(value_s),
       .q(value_q));
-
+   
    assign value = value_q;
    assign next_value = value_next;
    

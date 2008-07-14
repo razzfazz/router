@@ -1,10 +1,9 @@
 module shift_register
   (clk, reset, full, data_in, push, empty, data_out, pop);
    
-   
+`include "functions.v"
 `include "config.v"
 `include "constants.v"
-   
    
    parameter depth = 4;
    parameter width = 8;
@@ -14,14 +13,17 @@ module shift_register
    input clk;
    input reset;
    
-   output wire full;
+   output full;
    input [0:width-1] data_in;
    input push;
    
-   output wire empty;
-   output wire [0:width-1] data_out;
+   output empty;
+   output [0:width-1] data_out;
    input pop;
    
+   wire full;
+   wire empty;
+   wire [0:width-1] data_out;
    
    wire [0:(depth+1)*width-1] data;
    
@@ -51,7 +53,7 @@ module shift_register
       genvar 		      level;
       for(level = 0; level < depth; level = level + 1)
 	begin:levels
-
+	   
 	   wire capture;
 	   assign capture
 	     = push & (pop ? insert_ptr_q[level] : insert_ptr_q[level+1]);
