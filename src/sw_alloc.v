@@ -2,10 +2,9 @@ module sw_alloc
   (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
    sw_gnt_ip_op);
    
-   
+`include "functions.v"   
 `include "constants.v"
 `include "config.v"
-   
    
    // see dff.v for supported values
    parameter reset_type = reset_type_async;
@@ -24,9 +23,6 @@ module sw_alloc
     10: rotate inputs based on prio, round-robin arbiters in final stage
     11: rotate inputs based on prio, matrix arbiters in final stage */
    parameter architecture = 0;
-   
-   // ignore requests for output port same as input port
-   parameter ignore_same_port = 1;
    
    
    input clk;
@@ -51,8 +47,7 @@ module sw_alloc
 	  begin
 	     sw_alloc_core_sep_if
 	       #(.reset_type(reset_type),
-		 .architecture(architecture),
-		 .ignore_same_port(ignore_same_port))
+		 .architecture(architecture))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
@@ -66,8 +61,7 @@ module sw_alloc
 	  begin
 	     sw_alloc_core_sep_of
 	       #(.reset_type(reset_type),
-		 .architecture(architecture - 2),
-		 .ignore_same_port(ignore_same_port))
+		 .architecture(architecture - 2))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
@@ -81,8 +75,7 @@ module sw_alloc
 	  begin
 	     sw_alloc_core_wf
 	       #(.reset_type(reset_type),
-		 .architecture(architecture - 4),
-		 .ignore_same_port(ignore_same_port))
+		 .architecture(architecture - 4))
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
