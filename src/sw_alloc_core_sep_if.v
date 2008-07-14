@@ -5,6 +5,7 @@ module sw_alloc_core_sep_if
 `include "functions.v"
 `include "constants.v"
 `include "config.v"
+`include "config_utils.v"
    
    parameter reset_type = reset_type_async;
    

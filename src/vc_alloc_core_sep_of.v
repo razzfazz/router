@@ -5,6 +5,7 @@ module vc_alloc_core_sep_of
 `include "functions.v"   
 `include "config.v"
 `include "constants.v"
+`include "config_utils.v"
    
    parameter reset_type = reset_type_async;
    
