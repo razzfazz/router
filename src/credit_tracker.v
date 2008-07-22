@@ -1,5 +1,5 @@
 module credit_tracker
-  (clk, reset, debit, credit, free);
+  (clk, reset, debit, credit, clear, free, free_early);
    
 `include "constants.v"
 `include "functions.v"
@@ -13,13 +13,16 @@ module credit_tracker
    input reset;
    input debit;
    input credit;
+   input clear;
    output free;
+   output free_early;
    
    wire free;
+   wire free_early;
    
    wire set_cred, reset_cred;
    wire cred_s, cred_q;
-   assign cred_s = set_cred | (cred_q & ~reset_cred);
+   assign cred_s = set_cred | (cred_q & ~reset_cred & ~clear);
    dff
      #(.width(1),
        .reset_type(reset_type),
@@ -30,6 +33,7 @@ module credit_tracker
       .d(cred_s),
       .q(cred_q));
    assign free = cred_q;
+   assign free_early = cred_s;
    
    // synopsys translate_off
    wire error;
@@ -62,7 +66,9 @@ module credit_tracker
 	   assign decr_count = debit & ~credit & ~cred_count_zero;
 	   
 	   wire [0:credit_idx_width-1] cred_count_s;
-	   assign cred_count_s = cred_count_q - decr_count + incr_count;
+	   assign cred_count_s
+	     = ((cred_count_q - decr_count) & ~{credit_idx_width{clear}}) +
+	       incr_count;
 	   dff
 	     #(.width(credit_idx_width),
 	       .reset_type(reset_type),
