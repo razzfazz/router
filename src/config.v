@@ -4,9 +4,12 @@
 `define USE_FBFLY
 //`define USE_MESH
 
-// buffers per VC
-parameter num_buffers = 10;
-localparam buff_idx_width = clogb(num_buffers);
+// flit buffers per VC
+parameter num_buffers = 8;
+localparam buffer_idx_width = clogb(num_buffers);
+
+// header buffers per VC
+parameter num_headers = 4;
 
 // flit width
 parameter data_width = 64;
