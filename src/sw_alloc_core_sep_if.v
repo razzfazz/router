@@ -1,6 +1,5 @@
 module sw_alloc_core_sep_if
-  (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
-   sw_gnt_ip_op);
+  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op, sw_gnt_ip_op);
    
 `include "functions.v"
 `include "constants.v"
@@ -26,7 +25,6 @@ module sw_alloc_core_sep_if
    input clk;
    input reset;
    
-   input [0:num_ports*num_vcs-1] sw_req_ip_ivc;
    input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    
    output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
@@ -69,8 +67,19 @@ module sw_alloc_core_sep_if
 	   wire 		update_arb;
 	   assign update_arb = gnt_out;
 	   
-	   wire [0:num_vcs-1] 	req_in_ivc;
-	   assign req_in_ivc = sw_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   wire [0:num_vcs*num_ports-1] sw_req_ivc_op;
+	   assign sw_req_ivc_op
+	     = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
+				(ip+1)*num_vcs*num_ports-1] &
+	       {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
+	   
+	   wire [0:num_vcs-1] 		req_in_ivc;
+	   genvar 			ivc;
+	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	     begin:ivcs
+		assign req_in_ivc[ivc]
+		  = |sw_req_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1];
+	     end
 	   
 	   wire [0:num_vcs-1] 	gnt_in_ivc;
 	   arbiter
@@ -88,12 +97,6 @@ module sw_alloc_core_sep_if
 	   //-------------------------------------------------------------------
 	   // generate requests for output stage
 	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_vcs*num_ports-1] sw_req_ivc_op;
-	   assign sw_req_ivc_op
-	     = sw_req_ip_ivc_op[ip*num_vcs*num_ports:
-				(ip+1)*num_vcs*num_ports-1] &
-	       {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
 	   
 	   wire [0:num_ports-1] 	req_out_op;
 	   select_1ofn

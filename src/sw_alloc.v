@@ -1,6 +1,5 @@
 module sw_alloc
-  (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
-   sw_gnt_ip_op);
+  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op, sw_gnt_ip_op);
    
 `include "functions.v"   
 `include "constants.v"
@@ -28,7 +27,6 @@ module sw_alloc
    input clk;
    input reset;
    
-   input [0:num_ports*num_vcs-1] sw_req_ip_ivc;
    input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    
    output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
@@ -51,7 +49,6 @@ module sw_alloc
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
-		.sw_req_ip_ivc(sw_req_ip_ivc),
 		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_ivc_op(sw_gnt_ip_ivc_op),
@@ -65,7 +62,6 @@ module sw_alloc
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
-		.sw_req_ip_ivc(sw_req_ip_ivc),
 		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_ivc_op(sw_gnt_ip_ivc_op),
@@ -79,7 +75,6 @@ module sw_alloc
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
-		.sw_req_ip_ivc(sw_req_ip_ivc),
 		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_ivc_op(sw_gnt_ip_ivc_op),
