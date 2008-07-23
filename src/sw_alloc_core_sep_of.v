@@ -1,6 +1,5 @@
 module sw_alloc_core_sep_of
-  (clk, reset, sw_req_ip_ivc, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op,
-   sw_gnt_ip_op);
+  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op, sw_gnt_ip_op);
    
 `include "functions.v"
 `include "constants.v"
@@ -26,7 +25,6 @@ module sw_alloc_core_sep_of
    input clk;
    input reset;
    
-   input [0:num_ports*num_vcs-1] sw_req_ip_ivc;
    input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    
    output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
