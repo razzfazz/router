@@ -1,5 +1,5 @@
 module regfile
-   (clk, write_enable, write_address, write_data, read_address, read_data);
+  (clk, write_enable, write_address, write_data, read_address, read_data);
    
 `include "functions.v"
    
@@ -15,14 +15,14 @@ module regfile
    input [0:addr_width-1] read_address;
    output [0:width-1] read_data;
    
-   wire [0:width-1] read_data;
-   
-   reg [0:width-1]  storage [0:depth-1];
+   reg [0:width-1] read_data;
+   reg [0:width-1] storage [0:depth-1];
    
    always @(posedge clk)
-     if(write_enable)
-       storage[write_address] <= write_data;
-   
-   assign read_data = storage[read_address];
+     begin
+	if(write_enable)
+	  storage[write_address] <= write_data;
+	read_data <= storage[read_address];
+     end
    
 endmodule
