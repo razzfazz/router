@@ -3,18 +3,38 @@ module credit_tracker
    
 `include "constants.v"
 `include "functions.v"
-   
+
+   // total number of credits
    parameter num_credits = 8;
+
+   // minimum number of credits to assert "free"
+   // NOTE: must be greater than zero and smaller than or equal to num_credits!
+   parameter min_credits = 1;
+   
    parameter reset_type = reset_type_async;
+   
    localparam credit_idx_width = clogb(num_credits);
+   
+   // synopsys translate_off
+   // width for full range of credit count ([0:num_credits])
+   localparam true_idx_width = clogb(num_credits+1);
+   // synopsys translate_on
    
    
    input clk;
    input reset;
+
+   // inputs for subtracting and adding credits
    input debit;
    input credit;
+
+   // clear all credits
    input clear;
+
+   // credit available?
    output free;
+
+   // credit available? (1 cycle early version of "free")
    output free_early;
    
    wire free;
@@ -34,36 +54,48 @@ module credit_tracker
       .q(cred_q));
    assign free = cred_q;
    assign free_early = cred_s;
+
+   wire incr;
+   assign incr = credit & ~debit;
+
+   wire decr;
+   assign decr = debit & ~credit;
    
    // synopsys translate_off
    wire error;
+   wire [0:true_idx_width-1] true_count;
    // synopsys translate_on
    
    generate
-      
+
+      // if we only have a single credit, we don't need explicit credit counter
+      // NOTE: if num_credits == 1, we must have min_credits == 1!
       if(num_credits == 1)
 	begin
 	   
-	   assign set_cred = credit & ~debit;
-	   assign reset_cred = debit & ~credit;
+	   assign set_cred = incr;
+	   assign reset_cred = decr;
 	   
 	   // synopsys translate_off
 	   assign error = cred_q ? credit : debit;
+	   assign true_count = cred_q;
 	   // synopsys translate_on
 	   
 	end
+
+      // if we have more than one credit, we need an extra counter to keep track
       else
 	begin
 	   
 	   wire [0:credit_idx_width-1] cred_count_q;
-	   wire 		       cred_count_zero;
-	   assign cred_count_zero = ~|cred_count_q;
+	   wire 		       cred_count_low;
+	   assign cred_count_min = (cred_count_q == (min_credits-1));
 	   
 	   wire 		       incr_count;
-	   assign incr_count = credit & ~debit & cred_q;
+	   assign incr_count = incr & ~(~cred_q & cred_count_min);
 	   
 	   wire 		       decr_count;
-	   assign decr_count = debit & ~credit & ~cred_count_zero;
+	   assign decr_count = decr & ~(cred_q & cred_count_min);
 	   
 	   wire [0:credit_idx_width-1] cred_count_s;
 	   assign cred_count_s
@@ -79,12 +111,14 @@ module credit_tracker
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   assign set_cred = credit & ~debit & ~cred_q;
-	   assign reset_cred = debit & ~credit & cred_count_zero;
+	   assign set_cred = incr & ~cred_q & cred_count_min;
+	   assign reset_cred = decr & cred_q & cred_count_min;
 	   
 	   // synopsys translate_off
-	   assign error = ((!cred_q && debit) ||
-			   ((cred_count_q == num_credits-1) && credit));
+	   assign error = (cred_q ?
+			   ((cred_count_q == num_credits-1) && credit) :
+			   (~|cred_count_q & debit));
+	   assign true_count = cred_count_q + cred_q;
 	   // synopsys translate_on
 	   
 	end
