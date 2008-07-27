@@ -1,5 +1,6 @@
 module testbench
   #(parameter num_credits = 8,
+    parameter min_credits = 2,
     parameter reset_type = 1,
     parameter Tclk = 2,
     parameter runtime = 1000,
@@ -15,17 +16,24 @@ module testbench
    
    wire debit;
    wire credit;
+   wire clear;
    wire free;
+   wire free_early;
+   
+   assign clear = 1'b0;
    
    credit_tracker
      #(.num_credits(num_credits),
+       .min_credits(min_credits),
        .reset_type(reset_type))
    dut
      (.clk(clk),
       .reset(reset),
       .debit(debit),
       .credit(credit),
-      .free(free));
+      .clear(clear),
+      .free(free),
+      .free_early(free_early));
    
    always
    begin
