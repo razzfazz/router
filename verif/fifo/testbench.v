@@ -8,9 +8,10 @@ module testbench
     parameter rate_out = 50, 
     parameter initial_seed = 0)
    ();
-
+   
 `include "functions.v"
-
+`include "sim_functions.v"
+   
    localparam addr_width = clogb(num_buffers);
    
    reg clk;
@@ -35,6 +36,7 @@ module testbench
       .empty(empty));
    
    wire free;
+   wire free_early;
    
    credit_tracker
      #(.num_credits(num_buffers),
@@ -44,7 +46,9 @@ module testbench
       .reset(reset),
       .debit(push),
       .credit(pop),
-      .free(free));
+      .clear(1'b0),
+      .free(free),
+      .free_early(free_early));
 
    reg [0:data_width-1] write_data;
    wire [0:data_width-1] read_data;
@@ -77,7 +81,27 @@ module testbench
 
    assign push = ~reset & flag_in & free;
    assign pop = ~reset & flag_out & ~empty;
-   
+
+   wire pop_q;
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   popq
+     (.clk(clk),
+      .reset(reset),
+      .d(pop),
+      .q(pop_q));
+
+   wire [0:addr_width-1] read_addr_q;
+   dff
+     #(.width(addr_width),
+       .reset_type(reset_type))
+   read_addrq
+     (.clk(clk),
+      .reset(reset),
+      .d(read_addr),
+      .q(read_addr_q));
+
    integer seed = initial_seed;
 
    always @(posedge clk)
@@ -91,8 +115,10 @@ module testbench
      begin
 	if(push)
 	  $display($time, " WRITE: %x=%x.", write_addr, write_data);
-	if(pop)
-	  $display($time, " READ:  %x=%x.", read_addr, read_data);
+	if(pop_q)
+	  $display($time, " READ:  %x=%x.", read_addr_q, read_data);
+	if(pop_q & is_x(read_data))
+	  $display($time, " ERROR: read X value");
      end
    
    initial
