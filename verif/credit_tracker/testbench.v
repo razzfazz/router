@@ -16,11 +16,9 @@ module testbench
    
    wire debit;
    wire credit;
-   wire clear;
    wire free;
    wire free_early;
-   
-   assign clear = 1'b0;
+   wire free_plus1;
    
    credit_tracker
      #(.num_credits(num_credits),
@@ -31,9 +29,9 @@ module testbench
       .reset(reset),
       .debit(debit),
       .credit(credit),
-      .clear(clear),
       .free(free),
-      .free_early(free_early));
+      .free_early(free_early),
+      .free_plus1(free_plus1));
    
    always
    begin
