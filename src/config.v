@@ -4,7 +4,7 @@
 `define USE_FBFLY
 //`define USE_MESH
 
-// flit buffers per VC
+// flit buffers per VC (must be greater than 1)
 parameter num_buffers = 8;
 localparam buffer_idx_width = clogb(num_buffers);
 
