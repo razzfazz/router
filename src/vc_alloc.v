@@ -8,15 +8,17 @@ module vc_alloc
    
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
-    0: separable, input-first, round-robin arbiters
-    1: separable, input-first, matrix arbiters
-    2: separable, output-first, round-robin arbiters
-    3: separable, output-first, matrix arbiters */
-   parameter architecture = 0;
+   /*
+    0: separable, input-first
+    1: separable, output-first
+    */
+   parameter allocator_type = 0;
    
-   localparam architecture_sep_if = architecture;
-   localparam architecture_sep_of = architecture - 2;
+   /*
+    0: round-robin arbiters
+    1: matrix arbiters
+    */
+   parameter arbiter_type = 0;
    
    
    input clk;
@@ -36,12 +38,12 @@ module vc_alloc
    
    generate
       
-      case(architecture)
-	0, 1:
+      case(allocator_type)
+	0:
 	  begin
 	     vc_alloc_core_sep_if
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_sep_if))
+		 .arbiter_type(arbiter_type))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
@@ -51,11 +53,11 @@ module vc_alloc
 		.vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
 		.vc_gnt_op_ovc(vc_gnt_op_ovc));
 	  end
-	2, 3:
+	1:
 	  begin
 	     vc_alloc_core_sep_of
 	       #(.reset_type(reset_type),
-		 .architecture(architecture_sep_of))
+		 .arbiter_type(arbiter_type))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),

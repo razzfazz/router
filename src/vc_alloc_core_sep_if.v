@@ -9,12 +9,11 @@ module vc_alloc_core_sep_if
    
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
+   /*
     0: use round-robin arbiters
-    1: use matrix arbiters */
-   parameter architecture = 0;
-   
-   localparam architecture_arb = architecture & 1;
+    1: use matrix arbiters
+    */
+   parameter arbiter_type = 0;
    
    localparam [0:num_ports*num_ports-1] mask_ip_op
      = create_mask_ip_op(ignore_same_port);
@@ -92,7 +91,7 @@ module vc_alloc_core_sep_if
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
-		    .architecture(architecture_arb),
+		    .arbiter_type(arbiter_type),
 		    .mask(mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]))
 		gnt_in_ovc_arb
 		  (.clk(clk),
@@ -232,7 +231,7 @@ module vc_alloc_core_sep_if
 		     arbiter
 		       #(.num_ports(num_vcs),
 			 .reset_type(reset_type),
-			 .architecture(architecture_arb),
+			 .arbiter_type(arbiter_type),
 			 .mask(mask_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1]))
 		     gnt_out_ivc_arb
 		       (.clk(clk),
@@ -254,7 +253,7 @@ module vc_alloc_core_sep_if
 		arbiter
 		  #(.num_ports(num_ports),
 		    .reset_type(reset_type),
-		    .architecture(architecture_arb),
+		    .arbiter_type(arbiter_type),
 		    .mask(mask_op_ip[op*num_ports:(op+1)*num_ports-1]))
 		gnt_out_ip_arb
 		  (.clk(clk),
