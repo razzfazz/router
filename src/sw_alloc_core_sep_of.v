@@ -1,5 +1,5 @@
 module sw_alloc_core_sep_of
-  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op, sw_gnt_ip_op);
+  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_op);
    
 `include "functions.v"
 `include "constants.v"
@@ -8,12 +8,11 @@ module sw_alloc_core_sep_of
    
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
-    0: use round-robin arbiters
-    1: use matrix arbiters */
-   parameter architecture = 0;
-   
-   localparam architecture_arb = architecture & 1;
+   /*
+    0: round-robin arbiters
+    1: matrix arbiters
+    */
+   parameter arbiter_type = 0;
    
    localparam [0:num_ports*num_ports-1] mask_ip_op
      = create_mask_ip_op(ignore_same_port);
@@ -28,21 +27,19 @@ module sw_alloc_core_sep_of
    input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    
    output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
-   output [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
    output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    wire [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
-   wire [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
-   wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    
    //---------------------------------------------------------------------------
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  gnt_in_ip_op;
-   wire [0:num_ports*num_ports-1] 	  req_out_ip_op;
-   wire [0:num_ports*num_ports-1] 	  gnt_out_ip_op;
+   wire [0:num_ports*num_ports-1] gnt_in_ip_op;
+   wire [0:num_ports*num_ports-1] req_out_ip_op;
+   wire [0:num_ports*num_ports-1] gnt_out_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -51,7 +48,7 @@ module sw_alloc_core_sep_of
    
    generate
       
-      genvar 				  ip;
+      genvar 			  ip;
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
@@ -117,7 +114,7 @@ module sw_alloc_core_sep_of
 	   arbiter
 	     #(.num_ports(num_vcs),
 	       .reset_type(reset_type),
-	       .architecture(architecture_arb))
+	       .arbiter_type(arbiter_type))
 	   gnt_in_ivc_arb
 	     (.clk(clk),
 	      .reset(reset),
@@ -144,18 +141,6 @@ module sw_alloc_core_sep_of
 	      .data_out(sw_gnt_op));
 	   
 	   assign sw_gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1] = sw_gnt_op;
-	   
-	   wire [0:num_vcs*num_ports-1]      gnt_in_ivc_op;
-	   replicator
-	     #(.width(num_vcs),
-	       .count(num_ports))
-	   gnt_in_ivc_op_repl
-	     (.data_in(gnt_in_ivc),
-	      .data_out(gnt_in_ivc_op));
-	   
-	   assign sw_gnt_ip_ivc_op[ip*num_vcs*num_ports:
-				   (ip+1)*num_vcs*num_ports-1]
-		    = sw_req_ivc_op & gnt_in_ivc_op;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -228,7 +213,7 @@ module sw_alloc_core_sep_of
 	   arbiter
 	     #(.num_ports(num_ports),
 	       .reset_type(reset_type),
-	       .architecture(architecture_arb),
+	       .arbiter_type(arbiter_type),
 	       .mask(mask_op_ip[op*num_ports:(op+1)*num_ports-1]))
 	   gnt_out_ip_arb
 	     (.clk(clk),

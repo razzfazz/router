@@ -1,5 +1,5 @@
 module sw_alloc_core_wf
-  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_ivc_op, sw_gnt_ip_op);
+  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_op);
    
 `include "functions.v"
 `include "constants.v"
@@ -8,19 +8,19 @@ module sw_alloc_core_wf
    
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
-    0: mux inputs based on prio, round-robin arbiters in final stage
-    1: mux inputs based on prio, matrix arbiters in final stage
-    2: replicate logic for prios, round-robin arbiters in final stage
-    3: replicate logic for prios, matrix arbiters in final stage
-    4: diagonal propagation arbiter, round-robin arbiters in final stage
-    5: diagonal propagation arbiter, matrix arbiters in final stage
-    6: rotate inputs based on prio, round-robin arbiters in final stage
-    7: rotate inputs based on prio, matrix arbiters in final stage */
-   parameter architecture = 0;
+   /*
+    0: wavefront, mux inputs for priority
+    1: wavefront, replicate logic for priorities
+    2: wavefront, diagonal propagation allocator
+    3: wavefront, rotate inputs for priority
+    */
+   parameter allocator_type = 0;
    
-   localparam architecture_wf = architecture >> 1;
-   localparam architecture_arb = architecture & 1;
+   /*
+    0: round-robin arbiters
+    1: matrix arbiters
+    */
+   parameter arbiter_type = 0;
    
    localparam [0:num_ports*num_ports-1] mask_ip_op
      = create_mask_ip_op(ignore_same_port);
@@ -32,20 +32,18 @@ module sw_alloc_core_wf
    input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
    
    output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
-   output [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
    output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    wire [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
-   wire [0:num_ports*num_vcs*num_ports-1] sw_gnt_ip_ivc_op;
-   wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    
    //---------------------------------------------------------------------------
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  req_out_ip_op;
-   wire [0:num_ports*num_ports-1] 	  gnt_out_ip_op;
+   wire [0:num_ports*num_ports-1] req_out_ip_op;
+   wire [0:num_ports*num_ports-1] gnt_out_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -54,7 +52,7 @@ module sw_alloc_core_wf
    
    generate
       
-      genvar 				  ip;
+      genvar 			  ip;
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
@@ -107,7 +105,7 @@ module sw_alloc_core_wf
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
-		    .architecture(architecture_arb))
+		    .arbiter_type(arbiter_type))
 		gnt_in_ivc_arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -134,10 +132,6 @@ module sw_alloc_core_wf
 	   
 	   wire [0:num_vcs*num_ports-1] req_masked_ivc_op;
 	   assign req_masked_ivc_op = {num_vcs{gnt_out_op}} & gnt_in_ivc_op;
-	   
-	   assign sw_gnt_ip_ivc_op[ip*num_vcs*num_ports:
-				   (ip+1)*num_vcs*num_ports-1]
-		    = req_masked_ivc_op;
 	   
 	   wire [0:num_ports*num_vcs-1] req_masked_op_ivc;
 	   interleaver
@@ -174,7 +168,7 @@ module sw_alloc_core_wf
    wf_alloc
      #(.num_ports(num_ports),
        .reset_type(reset_type),
-       .architecture(architecture_wf),
+       .allocator_type(allocator_type),
        .mask(mask_ip_op))
    gnt_out_ip_op_alloc
      (.clk(clk),
