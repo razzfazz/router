@@ -66,7 +66,7 @@ module simple_alloc
 		  arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type),
-		      .architecture(architecture))
+		      .arbiter_type(architecture))
 		  arb
 		    (.clk(clk),
 		     .reset(reset),
@@ -105,7 +105,7 @@ module simple_alloc
 		  arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type),
-		      .architecture(architecture))
+		      .arbiter_type(architecture))
 		  arb
 		    (.clk(clk),
 		     .reset(reset),
@@ -136,7 +136,7 @@ module simple_alloc
 	     wf_alloc
 	       #(.num_ports(num_ports),
 		 .reset_type(reset_type),
-		 .architecture(architecture-2))
+		 .allocator_type(architecture-2))
 	     alloc
 	       (.clk(clk),
 		.reset(reset),
