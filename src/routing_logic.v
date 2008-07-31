@@ -7,10 +7,8 @@ module routing_logic
 `include "constants.v"
 `include "config_utils.v"
    
-   /* supported architectures:
-    0: baseline
-    1: replicate port decoding logic */
-   parameter architecture = 0;
+   // replicate port decoding logic
+   parameter replicate_port_decoder = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -49,9 +47,8 @@ module routing_logic
    
    assign next_route_info = create_route_info(new_next_address, final_address);
    
-   
    generate
-
+      
       genvar 		       nvc;
       for(nvc = 0; nvc < num_vcs; nvc = nvc + 1)
 	begin:nvcs
@@ -64,32 +61,30 @@ module routing_logic
 	       !restrict_vcs;
 	end
       
-      case(architecture)
-	0:
-	  begin
-	     port_decoder_dim_order
-	       #(.address(address))
-	     port_dec
-	       (.next_address(new_next_address),
-		.next_port(next_port_int));
-	  end
-	1:
-	  begin
-	     wire [0:num_ports-1] next_port_a;
-	     port_decoder_dim_order
-	       #(.address(address))
-	     port_dec_a
-	       (.next_address(next_address),
-		.next_port(next_port_a));
-	     wire [0:num_ports-1] next_port_b;
-	     port_decoder_dim_order
-	       #(.address(address))
-	     port_dec_b
-	       (.next_address(final_address),
-		.next_port(next_port_b));
-	     assign next_port_int = is_next ? next_port_b : next_port_a;
-	  end
-      endcase
+      if(replicate_port_decoder)
+	begin
+	   wire [0:num_ports-1] next_port_a;
+	   port_decoder_dim_order
+	     #(.address(address))
+	   port_dec_a
+	     (.next_address(next_address),
+	      .next_port(next_port_a));
+	   wire [0:num_ports-1] next_port_b;
+	   port_decoder_dim_order
+	     #(.address(address))
+	   port_dec_b
+	     (.next_address(final_address),
+	      .next_port(next_port_b));
+	   assign next_port_int = is_next ? next_port_b : next_port_a;
+	end
+      else
+	begin
+	   port_decoder_dim_order
+	     #(.address(address))
+	   port_dec
+	     (.next_address(new_next_address),
+	      .next_port(next_port_int));
+	end
       
       genvar 			  nport;
       for(nport = 0; nport < num_ports; nport = nport + 1)
