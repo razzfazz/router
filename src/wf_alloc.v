@@ -7,12 +7,13 @@ module wf_alloc
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   /* supported architectures:
+   /*
     0: mux inputs/outputs based on priority
     1: replicate logic per priority
     2: diagonal propagation arbiter (DPA, see Hurt99)
-    3: rotate inputs/outputs based on priority */
-   parameter architecture = 0;
+    3: rotate inputs/outputs based on priority
+    */
+   parameter allocator_type = 0;
    
    parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
    
@@ -36,7 +37,7 @@ module wf_alloc
    
    generate
       
-      case(architecture)
+      case(allocator_type)
 	0:
 	  begin
 	     wf_alloc_core_mux
