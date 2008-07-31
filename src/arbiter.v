@@ -7,10 +7,11 @@ module arbiter
    
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
+   /*
     0: round-robin arbiter
-    1: matrix arbiter */
-   parameter architecture = 0;
+    1: matrix arbiter
+    */
+   parameter arbiter_type = 0;
    
    parameter [0:num_ports-1] mask = {num_ports{1'b1}};
    
@@ -57,7 +58,7 @@ module arbiter
 	   
 	   wire [0:width-1] 	gnt_int;
 	   
-	   case(architecture)
+	   case(arbiter_type)
 	     0:
 	       begin
 		  rr_arbiter
