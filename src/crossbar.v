@@ -5,10 +5,11 @@ module crossbar
    parameter num_ports = 5;
    parameter width = 32;
    
-   /* supported architectures:
+   /*
     0: use tristate buses
-    1: use multiplexers */
-   parameter architecture = 0;
+    1: use multiplexers
+    */
+   parameter crossbar_type = 0;
    
    
    input [0:num_ports*num_ports-1] ctrl_ip_op;
@@ -32,7 +33,7 @@ module crossbar
 	   
 	   wire [0:width-1] out;
 	   
-	   case(architecture)
+	   case(crossbar_type)
 	     0:
 	       begin
 		  
