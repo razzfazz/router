@@ -11,16 +11,13 @@ module testbench
 `include "functions.v"
 `include "config.v"
 `include "constants.v"
+`include "config_utils.v"
 `include "sim_functions.v"
    
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
-    0: separable, input-first, round-robin arbiters
-    1: separable, input-first, matrix arbiters
-    2: separable, output-first, round-robin arbiters
-    3: separable, output-first, matrix arbiters */
-   localparam num_archs = 4;
+   localparam num_allocator_types = 2;
+   localparam num_arbiter_types = 2;
    
    function integer get_flow(input [0:num_ports*num_vcs-1] gnt_matrix);
       integer i;
@@ -98,10 +95,7 @@ module testbench
 		      = {num_vcs{1'b0}};
 		    vc_idx = {vc_idx_width{1'b0}};
 		    vc_idx = set_traffic_class(vc_idx, get_traffic_class(ivc));
-		    vc_idx = set_routing_class(vc_idx,
-					       $dist_uniform(seed,
-							     routing_class_minimal,
-							     routing_class_non_minimal));
+		    vc_idx = set_routing_class(vc_idx, $dist_uniform(seed, 0, num_routing_classes-1));
 		    vc_idx = vc_idx + $dist_uniform(seed, 0, num_vcs_per_class-1);
 		    req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs+vc_idx]
 		      = req_ip_ivc[ip*num_vcs+ivc];
@@ -109,86 +103,95 @@ module testbench
 	    end
        end
    
-   integer grant_actual[0:num_archs-1];
+   integer grant_actual[0:num_allocator_types*num_arbiter_types-1];
    
    generate
       
-      genvar 			arch;
-      for(arch = 0; arch < num_archs; arch = arch + 1)
-	begin:archs
+      genvar 			allocator_type;
+      for(allocator_type = 0;
+	  allocator_type < num_allocator_types;
+	  allocator_type = allocator_type + 1)
+	begin:allocator_types
+	   genvar arbiter_type;
+	   for(arbiter_type = 0;
+	       arbiter_type < num_arbiter_types;
+	       arbiter_type = arbiter_type + 1)
+	     begin:arbiter_types
 	   
-	   wire [0:num_ports*num_vcs-1]   gnt_ip_ivc;
-	   wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
-	   wire [0:num_ports*num_vcs-1] 	gnt_op_ovc;
-	   
-	   vc_alloc
-	     #(.reset_type(reset_type),
-	       .architecture(arch))
-	   alloc
-	     (.clk(clk),
-	      .reset(reset),
-	      .vc_req_ip_ivc_op(req_ip_ivc_op),
-	      .vc_req_ip_ivc_ovc(req_ip_ivc_ovc),
-	      .vc_gnt_ip_ivc(gnt_ip_ivc),
-	      .vc_gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-	      .vc_gnt_op_ovc(gnt_op_ovc));
-
-	   integer 			  l, m;
-	   integer 			  bad_alloc;
-	   integer 			  grant_port[0:num_ports*num_vcs-1];
-	   
-	   initial
-	   begin
-	      
-	      grant_actual[arch] = 0;
-
-	      for(l = 0; l < num_ports*num_vcs; l = l + 1)
-		grant_port[l] = 0;
-	      
-	      #(2*Tclk);
-	      
-	      #(warmup_cycles*Tclk);
-	      
-	      forever
+		wire [0:num_ports*num_vcs-1]   gnt_ip_ivc;
+		wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
+		wire [0:num_ports*num_vcs-1] 	     gnt_op_ovc;
+		
+		vc_alloc
+		  #(.reset_type(reset_type),
+		    .allocator_type(allocator_type),
+		    .arbiter_type(arbiter_type))
+		alloc
+		  (.clk(clk),
+		   .reset(reset),
+		   .vc_req_ip_ivc_op(req_ip_ivc_op),
+		   .vc_req_ip_ivc_ovc(req_ip_ivc_ovc),
+		   .vc_gnt_ip_ivc(gnt_ip_ivc),
+		   .vc_gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+		   .vc_gnt_op_ovc(gnt_op_ovc));
+		
+		integer 			     l, m;
+		integer 			     bad_alloc;
+		integer 			     grant_port[0:num_ports*num_vcs-1];
+		
+		initial
 		begin
-		   for(l = 0; l < num_ports; l = l + 1)
+		   
+		   grant_actual[allocator_type*num_arbiter_types+arbiter_type] = 0;
+		   
+		   for(l = 0; l < num_ports*num_vcs; l = l + 1)
+		     grant_port[l] = 0;
+		   
+		   #(2*Tclk);
+		   
+		   #(warmup_cycles*Tclk);
+		   
+		   forever
 		     begin
-			bad_alloc = 0;
-			for(m = 0; m < num_vcs; m = m + 1)
+			for(l = 0; l < num_ports; l = l + 1)
 			  begin
-			     if(!zero_or_one_hot(gnt_ip_ivc_ovc[(l*num_vcs+m)*num_vcs +: num_vcs]))
-			       bad_alloc = bad_alloc | 1;
-			     if(|gnt_ip_ivc[l*num_ports+m +: num_ports])
-			       grant_port[l*num_ports+m] = grant_port[l*num_ports+m] + 1;
+			     bad_alloc = 0;
+			     for(m = 0; m < num_vcs; m = m + 1)
+			       begin
+				  if(!zero_or_one_hot(gnt_ip_ivc_ovc[(l*num_vcs+m)*num_vcs +: num_vcs]))
+				    bad_alloc = bad_alloc | 1;
+				  if(|gnt_ip_ivc[l*num_ports+m +: num_ports])
+				    grant_port[l*num_ports+m] = grant_port[l*num_ports+m] + 1;
+			       end
 			  end
+			if(|(gnt_ip_ivc_ovc & ~req_ip_ivc_ovc))
+			  bad_alloc = bad_alloc | 4;
+			grant_actual[allocator_type*num_arbiter_types+arbiter_type] = grant_actual[allocator_type*num_arbiter_types+arbiter_type] + get_flow(gnt_ip_ivc);
+			if(is_x(gnt_ip_ivc) || is_x(gnt_ip_ivc_ovc) || is_x(gnt_op_ovc))
+			  bad_alloc = bad_alloc | 8;
+			if(bad_alloc != 0)
+			  begin
+			     $display("SIM: ERROR: Assertion failed for allocator_type=%d, arbiter_type=%d!",
+				      allocator_type, arbiter_type);
+			     $display("SIM: Allocation error code %d > 0",
+				      bad_alloc);
+			     $display("SIM: Requests:");
+			     for(l = 0; l < num_ports*num_vcs; l = l + 1)
+			       $display("SIM: %b", req_ip_ivc_ovc[l*num_vcs +: num_vcs]);
+			     $display("SIM: Grants:");
+			     for(l = 0; l < num_ports*num_vcs; l = l + 1)
+			       $display("SIM: %b", gnt_ip_ivc_ovc[l*num_vcs +: num_vcs]);
+			  end
+			#(Tclk);
 		     end
-		   if(|(gnt_ip_ivc_ovc & ~req_ip_ivc_ovc))
-		     bad_alloc = bad_alloc | 4;
-		   grant_actual[arch] = grant_actual[arch] + get_flow(gnt_ip_ivc);
-		   if(is_x(gnt_ip_ivc) || is_x(gnt_ip_ivc_ovc) || is_x(gnt_op_ovc))
-		     bad_alloc = bad_alloc | 8;
-		   if(bad_alloc != 0)
-		     begin
-			$display("SIM: ERROR: Assertion failed for arch=%d!",
-				 arch);
-			$display("SIM: Allocation error code %d > 0",
-				 bad_alloc);
-			$display("SIM: Requests:");
-			for(l = 0; l < num_ports*num_vcs; l = l + 1)
-			  $display("SIM: %b", req_ip_ivc_ovc[l*num_vcs +: num_vcs]);
-			$display("SIM: Grants:");
-			for(l = 0; l < num_ports*num_vcs; l = l + 1)
-			  $display("SIM: %b", gnt_ip_ivc_ovc[l*num_vcs +: num_vcs]);
-		     end
-		   #(Tclk);
 		end
-	   end
-	   
+	     end
 	end
       
    endgenerate
    
    integer 			 k;
+   integer 			 l;
    
    initial
    begin
@@ -219,18 +222,20 @@ module testbench
       
       if(output_as_csv)
 	begin
-	   $display("SIM: num_ports,num_vcs,occupancy,architecture,flow");
-	   for(k = 0; k < num_archs; k = k + 1)
-	     $display("SIM: %0d,%0d,%0d,%0d,%0d",
-		      num_ports, num_vcs, buffer_occupancy, k, grant_actual[k]);
+	   $display("SIM: num_ports,num_vcs,occupancy,allocator,arbiter,flow");
+	   for(k = 0; k < num_allocator_types; k = k + 1)
+	     for(l = 0; l < num_arbiter_types; l = l + 1)
+	       $display("SIM: %0d,%0d,%0d,%0d,%0d,%0d",
+			num_ports, num_vcs, buffer_occupancy, k, l, grant_actual[k*num_arbiter_types+l]);
 	end
       else
 	begin
 	   $display("SIM: simulation completed");
 	   
 	   $display("SIM: flow analysis:");
-	   for(k = 0; k < num_archs; k = k + 1)
-	     $display("SIM: arch=%d, flow=%d", k, grant_actual[k]);
+	   for(k = 0; k < num_allocator_types; k = k + 1)
+	     for(l = 0; l < num_arbiter_types; l = l + 1)
+	       $display("SIM: allocator=%0d, arbiter=%0d, flow=%0d", k, l, grant_actual[k*num_arbiter_types+l]);
 	end
       
       $finish;
