@@ -41,7 +41,8 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, gnt_ip_ivc, gnt_ip_ivc_op, gnt_
    
    sw_alloc
      #(.reset_type(reset_type),
-       .architecture(architecture))
+       .allocator_type(architecture >> 1),
+       .arbiter_type(architecture & 1))
    alloc
      (.clk(clk),
       .reset(reset),
