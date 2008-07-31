@@ -9,10 +9,11 @@ module tree_arbiter
    // see dff.v for supported values
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
+   /*
     0: round-robin arbiter
-    1: matrix arbiter */
-   parameter architecture = 0;
+    1: matrix arbiter
+    */
+   parameter arbiter_type = 0;
    
    parameter [0:num_ports-1] mask = {num_ports{1'b1}};
    
@@ -56,7 +57,7 @@ module tree_arbiter
 	   arbiter
 	     #(.num_ports(ports_per_block),
 	       .reset_type(reset_type),
-	       .architecture(architecture),
+	       .arbiter_type(arbiter_type),
 	       .mask(mask[i*ports_per_block:(i+1)*ports_per_block-1]))
 	   stg1_arb
 	     (.clk(clk),
@@ -76,7 +77,7 @@ module tree_arbiter
    arbiter
      #(.num_ports(num_blocks),
        .reset_type(reset_type),
-       .architecture(architecture),
+       .arbiter_type(arbiter_type),
        .mask(stg2_mask))
    stg2_arb
      (.clk(clk),
