@@ -1,6 +1,6 @@
 module vc_alloc_core_sep_if
-  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, vc_gnt_ip_ivc,
-   vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
+  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, vc_gnt_ip_ivc_ovc,
+   vc_gnt_op_ovc);
    
 `include "functions.v"   
 `include "config.v"
@@ -34,11 +34,9 @@ module vc_alloc_core_sep_if
    input [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    input [0:num_ports*num_vcs*num_vcs-1] vc_req_ip_ivc_ovc;
    
-   output [0:num_ports*num_vcs-1] vc_gnt_ip_ivc;
    output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
    output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
    
-   wire [0:num_ports*num_vcs-1] vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 	vc_gnt_op_ovc;
    
@@ -131,8 +129,6 @@ module vc_alloc_core_sep_if
 		//--------------------------------------------------------------
 		// generate global grants
 		//--------------------------------------------------------------
-		
-		assign vc_gnt_ip_ivc[ip*num_vcs+ivc] = gnt_out;
 		
 		wire [0:num_vcs-1] 	     gnt_out_ovc;
 		or_nto1
