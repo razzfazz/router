@@ -1,4 +1,4 @@
-module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
+module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, gnt_ip_ivc_ovc, gnt_op_ovc);
    
    /* supported architectures:
     0: separable, input-first, round-robin arbiters
@@ -12,12 +12,14 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, gnt_ip_ivc, gnt
 `include "functions.v"
 `include "config.v"
    
+   parameter reset_type = reset_type_async;
+   
+   
    input CLK;
    input RST;
    
    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
-   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
    output [0:num_ports*num_vcs-1] gnt_op_ovc;
    
@@ -41,7 +43,6 @@ module complex_alloc_vc(CLK, RST, req_ip_ivc_op, req_ip_ivc_ovc, gnt_ip_ivc, gnt
       .reset(reset),
       .vc_req_ip_ivc_op(req_ip_ivc_op),
       .vc_req_ip_ivc_ovc(req_ip_ivc_ovc),
-      .vc_gnt_ip_ivc(gnt_ip_ivc),
       .vc_gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
       .vc_gnt_op_ovc(gnt_op_ovc));
    

@@ -1,4 +1,4 @@
-module complex_alloc_sw(CLK, RST, req_ip_ivc_op, gnt_ip_ivc, gnt_ip_ivc_op, gnt_ip_op);
+module complex_alloc_sw(CLK, RST, req_ip_ivc_op, gnt_ip_ivc, gnt_ip_op);
    
    /* supported architectures:
     0: separable, input-first, RR arbiters
@@ -19,13 +19,15 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, gnt_ip_ivc, gnt_ip_ivc_op, gnt_
 `include "globals.v"
 `include "functions.v"
 `include "config.v"
+    
+   parameter reset_type = reset_type_async;
+   
    
    input CLK;
    input RST;
    
    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
-   output [0:num_ports*num_vcs*num_ports-1] gnt_ip_ivc_op;
    output [0:num_ports*num_ports-1] gnt_ip_op;
    
    wire clk = CLK;
@@ -48,7 +50,6 @@ module complex_alloc_sw(CLK, RST, req_ip_ivc_op, gnt_ip_ivc, gnt_ip_ivc_op, gnt_
       .reset(reset),
       .sw_req_ip_ivc_op(req_ip_ivc_op),
       .sw_gnt_ip_ivc(gnt_ip_ivc),
-      .sw_gnt_ip_ivc_op(gnt_ip_ivc_op),
       .sw_gnt_ip_op(gnt_ip_op));
    
 endmodule
