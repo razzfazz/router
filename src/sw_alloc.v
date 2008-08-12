@@ -5,7 +5,6 @@ module sw_alloc
 `include "constants.v"
 `include "config.v"
    
-   // see dff.v for supported values
    parameter reset_type = reset_type_async;
    
    /*
