@@ -1,206 +1,415 @@
 module router
-  (CLK, RST, valid_in, vc_in, type_in, data_in, cred_valid_out, cred_vc_out,
-   cred_type_out, valid_out, vc_out, type_out, data_out, cred_valid_in,
-   cred_vc_in, cred_type_in);
-
-   parameter address = 0;
-
-`include "config.v"
+  (clk, reset, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
+   flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
+   flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
+   flit_data_out_op, cred_valid_in_op, cred_vc_in_op);
+   
 `include "functions.v"
+`include "config.v"
+`include "constants.v"
    
-   input CLK;
-   input RST;
+   parameter reset_type = reset_type_async;
    
-   input [0:num_ports*type_width-1] type_in_ip;
-   input [0:num_ports*vc_idx_width-1] vc_in_ip;
-   input [0:num_ports*data_width-1] data_in_ip;
+   // current router's address
+   parameter [0:addr_width-1] address = {addr_width{1'b0}};
+   
+   // enable speculative (i.e., while VC is being allocated as well) switch
+   // allocation
+   parameter enable_spec_sw_alloc = 1;
+   
+   // replicate port decoding logic in routing logic
+   parameter replicate_port_decoder = 1;
+   
+   /*
+    0: separable, input-first
+    1: separable, output-first
+    */
+   parameter vc_allocator_type = 0;
+   
+   /*
+    0: round-robin arbiters
+    1: matrix arbiters
+    */
+   parameter vc_arbiter_type = 1;
+   
+   /*
+    0: separable, input-first
+    1: separable, output-first
+    2: wavefront, mux inputs for priority
+    3: wavefront, replicate logic for priorities
+    4: wavefront, diagonal propagation allocator
+    5: wavefront, rotate inputs for priority
+    */
+   parameter sw_allocator_type = 0;
+   
+   /*
+    0: round-robin arbiters
+    1: matrix arbiters
+    */
+   parameter sw_arbiter_type = 1;
+   
+   /*
+    0: use tristate buses
+    1: use multiplexers
+    */
+   parameter crossbar_type = 1;
+   
+   localparam crossbar_width = 1 + vc_idx_width + 2 + data_width;
+   
+   // use dedicated registers to store port credit summary bits per input VC
+   parameter dedicated_free_ivc_regs = 1;
+   
+   // minimum number of available buffers required to consider VC free
+   // NOTE: This must be greater than or equal to 2 for the current 
+   // implementation to work correctly!
+   parameter buffer_free_threshold = 2;
+   
+   
+   input clk;
+   input reset;
+   
+   input [0:num_ports-1] flit_valid_in_ip;
+   input [0:num_ports*vc_idx_width-1] flit_vc_in_ip;
+   input [0:num_ports-1] flit_head_in_ip;
+   input [0:num_ports-1] flit_tail_in_ip;
+   input [0:num_ports*data_width-1] flit_data_in_ip;
    
    output [0:num_ports-1] cred_valid_out_ip;
    output [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
    
-   output [0:num_ports*type_width-1] type_out_op;
-   output [0:num_ports*vc_idx_width-1] vc_out_op;
-   output [0:num_ports*data_width-1] data_out_op;
+   output [0:num_ports-1] flit_valid_out_op;
+   output [0:num_ports*vc_idx_width-1] flit_vc_out_op;
+   output [0:num_ports-1] flit_head_out_op;
+   output [0:num_ports-1] flit_tail_out_op;
+   output [0:num_ports*data_width-1] flit_data_out_op;
    
    input [0:num_ports-1] cred_valid_in_op;
    input [0:num_ports*vc_idx_width-1] cred_vc_in_op;
-
    
-   wire clk = CLK;
-   wire reset = reset;
+   wire [0:num_ports-1] cred_valid_out_ip;
+   wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
+   
+   wire [0:num_ports-1] 	     flit_valid_out_op;
+   wire [0:num_ports*vc_idx_width-1] flit_vc_out_op;
+   wire [0:num_ports-1] 	     flit_head_out_op;
+   wire [0:num_ports-1] 	     flit_tail_out_op;
+   wire [0:num_ports*data_width-1]   flit_data_out_op;
+   
+   
+   //---------------------------------------------------------------------------
+   // input ports
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_vcs-1] 	  elig_op_ovc;
+   wire [0:num_vcs*num_ports-1] 	  free_ivc_op;
+   wire [0:num_ports*num_vcs-1] 	  free_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	  free_plus1_op_ovc;
    
    wire [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_req_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs-1] 	  vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_ip_ivc_ovc;
-
-   wire [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 	  vc_gnt_op_ovc;
+   
    wire [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
-   wire [0:num_ports*num_vcs*num_vcs-1]   sw_req_ip_ivc_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 	  sw_gnt_ip_ivc;
+   wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
    
-   wire [0:num_ports*data_width-1] ipc_xbr_data_ip;
-   wire [0:num_ports*vc_idx_width-1] ipc_xbr_vc_ip;
-   wire [0:num_ports*type_width-1] ipc_xbr_type_ip;
-   
-   wire [0:num_ports*num_ports*num_vcs-1] vc_free_ip_op_ovc;
-   
-   
-   // --------------------------------------------------------------------------
-   // -- input ports
-   // --------------------------------------------------------------------------
+   wire [0:num_ports*crossbar_width-1] 	  xbr_data_in_ip;
    
    generate
       
       genvar 			   ip;
-      for (ip = 0; i < num_ports; ip = ip + 1)
+      for (ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
-
 	   
-	   // ------------------------------------------------------------------
-	   // -- input controller
-	   // ------------------------------------------------------------------
 	   
+	   //-------------------------------------------------------------------
+	   // input controller
+	   //-------------------------------------------------------------------
+	   
+	   wire flit_valid_in;
+	   assign flit_valid_in = flit_valid_in_ip[ip];
+	   
+	   wire [0:vc_idx_width-1] flit_vc_in;
+	   assign flit_vc_in = flit_vc_in_ip[ip*vc_idx_width:
+					     (ip+1)*vc_idx_width-1];
+	   
+	   wire 		   flit_head_in;
+	   assign flit_head_in = flit_head_in_ip[ip];
+	   
+	   wire 		   flit_tail_in;
+	   assign flit_tail_in = flit_tail_in_ip[ip];
+	   
+	   wire [0:data_width-1]   flit_data_in;
+	   assign flit_data_in = flit_data_in_ip[ip*data_width:
+						 (ip+1)*data_width-1];
+	   
+	   wire [0:num_vcs*num_vcs-1] vc_gnt_ivc_ovc;
+	   assign vc_gnt_ivc_ovc = vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
+						     (ip+1)*num_vcs*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 	      sw_gnt_ivc;
+	   assign sw_gnt_ivc = sw_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
+	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
+	   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
+	   wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
+	   wire 			flit_valid_out;
+	   wire [0:vc_idx_width-1] 	flit_vc_out;
+	   wire 			flit_head_out;
+	   wire 			flit_tail_out;
+	   wire [0:data_width-1] 	flit_data_out;
+	   wire 			cred_valid_out;
+	   wire [0:vc_idx_width-1] 	cred_vc_out;
 	   ip_ctrl
-	     #(.address(address),
+	     #(.enable_spec_sw_alloc(enable_spec_sw_alloc),
+	       .replicate_port_decoder(replicate_port_decoder),
+	       .address(address),
+	       .port_id(ip),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),
 	      .reset(reset),
-	      .data_in(data_in_ip[ip*data_width:(ip+1)*data_width-1]),
-	      .vc_in(vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]),
-	      .type_in(type_in_ip[ip*type_width:(ip+1)*type_width-1]),
-	      .vc_req_ivc_op(vc_req_ip_ivc_op[ip*num_vcs*num_ports:
-					      (ip+1)*num_vcs*num_ports-1]),
-	      .vc_req_ivc_ovc(vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
-						(ip+1)*num_vcs*num_vcs]),
-	      .vc_gnt_ivc(vc_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]),
-	      .vc_gnt_ivc_ovc(vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
-						(ip+1)*num_vcs*num_vcs-1]),
-	      .sw_req_ivc_op(sw_req_ip_ivc_op[ip*num_vcs*num_ports:
-					      (ip+1)*num_vcs*num_ports-1]),
-	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ip_ivc_op[ip*num_vcs*
-							      num_ports:
-							      (ip+1)*num_vcs*
-							      num_ports-1]),
-	      .sw_req_ivc_ovc(sw_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
-						(ip+1)*num_vcs*num_vcs-1]),
-	      .sw_gnt_ivc(sw_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]),
-	      .data_out(ipc_xbr_data_ip[ip*data_width:(ip+1)*data_width-1]),
-	      .vc_out(ipc_xbr_vc_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]),
-	      .type_out(ipc_xbr_type_ip[ip*type_width:(ip+1)*type_wdith-1]),
-	      .cred_valid_out(cred_valid_out_ip[ip]),
-	      .cred_vc_out(cred_vc_out_ip[ip*vc_idx_width:
-					  (ip+1)*vc_idx_width-1]));
-
-	   assign 
+	      .flit_valid_in(flit_valid_in),
+	      .flit_vc_in(flit_vc_in),
+	      .flit_head_in(flit_head_in),
+	      .flit_tail_in(flit_tail_in),
+	      .flit_data_in(flit_data_in),
+	      .free_ivc_op(free_ivc_op),
+	      .free_op_ovc(free_op_ovc),
+	      .free_plus1_op_ovc(free_plus1_op_ovc),
+	      .elig_op_ovc(elig_op_ovc),
+	      .vc_req_ivc_op(vc_req_ivc_op),
+	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
+	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
+	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ivc_op),
+	      .sw_req_spec_ivc_op(sw_req_spec_ivc_op),
+	      .sw_gnt_ivc(sw_gnt_ivc),
+	      .flit_valid_out(flit_valid_out),
+	      .flit_vc_out(flit_vc_out),
+	      .flit_head_out(flit_head_out),
+	      .flit_tail_out(flit_tail_out),
+	      .flit_data_out(flit_data_out),
+	      .cred_valid_out(cred_valid_out),
+	      .cred_vc_out(cred_vc_out));
+	   
+	   assign vc_req_ip_ivc_op[ip*num_vcs*num_ports:
+				   (ip+1)*num_vcs*num_ports-1] = vc_req_ivc_op;
+	   assign vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
+				    (ip+1)*num_vcs*num_vcs-1] = vc_req_ivc_ovc;
+	   assign sw_req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
+					   (ip+1)*num_vcs*num_ports-1]
+		    = sw_req_nonspec_ivc_op;
+	   assign sw_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
+					(ip+1)*num_vcs*num_ports-1]
+		    = sw_req_spec_ivc_op;
+	   assign xbr_data_in_ip[ip*crossbar_width:(ip+1)*crossbar_width-1]
+		    = {flit_valid_out, flit_vc_out, flit_head_out,
+		       flit_tail_out, flit_data_out};
+	   assign cred_valid_out_ip[ip] = cred_valid_out;
+	   assign cred_vc_out_ip[ip*vc_idx_width:
+				 (ip+1)*vc_idx_width-1] = cred_vc_out;
 	   
 	end
       
    endgenerate
-
    
-   // --------------------------------------------------------------------------
-   // -- virtual channel allocator
-   // --------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] elig_op_ovc;
-   wire [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
+   //---------------------------------------------------------------------------
+   // virtual channel allocator
+   //---------------------------------------------------------------------------
+   
    vc_alloc
      #(.reset_type(reset_type),
-       .architecture(architecture_vca))
+       .allocator_type(vc_allocator_type),
+       .arbiter_type(vc_arbiter_type))
    vca
      (.clk(clk),
       .reset(reset),
-      .req_ip_ivc_op(vc_req_ip_ivc_op),
-      .req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
-      .elig_op_ovc(elig_op_ovc),
-      .gnt_ip_ivc(vc_gnt_ip_ivc),
-      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
-      .gnt_op_ovc(vc_gnt_op_ovc));
+      .vc_req_ip_ivc_op(vc_req_ip_ivc_op),
+      .vc_req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+      .vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
+      .vc_gnt_op_ovc(vc_gnt_op_ovc));
    
-
-   // --------------------------------------------------------------------------
-   // -- switch allocator
-   // --------------------------------------------------------------------------
-
-   wire [0:num_ports*num_vcs-1] cred_op_ovc;
+   
+   //---------------------------------------------------------------------------
+   // switch allocator
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_vcs-1] 	sw_gnt_nonspec_ip_ivc;
+   wire [0:num_ports*num_ports-1] 	sw_gnt_nonspec_ip_op;
    sw_alloc
      #(.reset_type(reset_type),
-       .architecture(architecture_swa))
-   swa
+       .allocator_type(sw_allocator_type),
+       .arbiter_type(sw_arbiter_type))
+   swa_nonspec
      (.clk(clk),
       .reset(reset),
-      .req_ip_ivc_op(sw_req_ip_ivc_op),
-      .req_ip_ivc_ovc(sw_req_ip_ivc_ovc),
-      .cred_op_ovc(cred_op_ovc),
-      .gnt_ip_ivc(sw_gnt_ip_ivc),
-      .gnt_ip_op(sw_gnt_ip_op));
+      .sw_req_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+      .sw_gnt_ip_ivc(sw_gnt_nonspec_ip_ivc),
+      .sw_gnt_ip_op(sw_gnt_nonspec_ip_op));
+   
+   generate
+      
+      if(enable_spec_sw_alloc)
+	begin
+	   
+	   wire [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
+	   wire [0:num_ports*num_ports-1] sw_gnt_spec_ip_op;
+	   sw_alloc
+	     #(.reset_type(reset_type),
+	       .allocator_type(sw_allocator_type),
+	       .arbiter_type(sw_arbiter_type))
+	   swa_spec
+	     (.clk(clk),
+	      .reset(reset),
+	      .sw_req_ip_ivc_op(sw_req_spec_ip_ivc_op),
+	      .sw_gnt_ip_ivc(sw_gnt_spec_ip_ivc),
+	      .sw_gnt_ip_op(sw_gnt_spec_ip_op));
+	   
+	   wire 			  any_nonspec;
+	   assign any_nonspec = |sw_req_nonspec_ip_ivc_op;
+	   
+	   assign sw_gnt_ip_ivc
+	     = any_nonspec ? sw_gnt_nonspec_ip_ivc : sw_gnt_spec_ip_ivc;
+	   
+	   assign sw_gnt_ip_op
+	     = any_nonspec ? sw_gnt_nonspec_ip_op : sw_gnt_spec_ip_op;
+	   
+	end
+      else
+	begin
+	   
+	   assign sw_gnt_ip_ivc = sw_gnt_nonspec_ip_ivc;
+	   assign sw_gnt_ip_op = sw_gnt_nonspec_ip_op;
+	   
+	end
+      
+   endgenerate
    
    
-   // --------------------------------------------------------------------------
-   // -- crossbar
-   // --------------------------------------------------------------------------
+   //---------------------------------------------------------------------------
+   // crossbar
+   //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_ports-1] 	xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
+   assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
+   dff
+     #(.width(num_ports*num_ports),
+       .reset_type(reset_type))
+   xbr_ctrl_ip_opq
+     (.clk(clk),
+      .reset(reset),
+      .d(xbr_ctrl_ip_op_s),
+      .q(xbr_ctrl_ip_op_q));
+   
+   wire [0:num_ports*crossbar_width-1] 	xbr_data_out_op;
    crossbar
      #(.num_ports(num_ports),
-       .width(data_width),
-       .architecture(architecture_xbr))
+       .width(crossbar_width),
+       .crossbar_type(crossbar_type))
    xbr_data
-     (.ctrl_in(sw_gnt_ip_op_q),
-      .data_ip(ipc_xbr_data_ip),
-      .data_op(data_out_op));
+     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
+      .data_ip(xbr_data_in_ip),
+      .data_op(xbr_data_out_op));
    
-   crossbar
-     #(.num_ports(num_ports),
-       .width(vc_idx_width),
-       .architecture(architecture_xbr))
-   xbr_vc
-     (.ctrl_in(sw_gnt_ip_op_q),
-      .data_ip(ipc_xbr_vc_ip),
-      .data_op(vc_out_op));
    
-   crossbar
-     #(.num_ports(num_ports),
-       .width(type_width),
-       .architecture(architecture_xbr))
-   xbr_type
-     (.ctrl_in(sw_gnt_ip_op_q),
-      .data_ip(ipc_xbr_type_ip),
-      .data_op(type_out_op));
+   //---------------------------------------------------------------------------
+   // output ports
+   //---------------------------------------------------------------------------
    
-
-   // --------------------------------------------------------------------------
-   // -- output ports
-   // --------------------------------------------------------------------------
+   wire [0:num_ports*num_vcs-1] 	free_op_ivc;
    
    generate
       
       genvar 			  op;
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
-
-	   genvar ovc;
-	   for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	     begin:ovcs
-		
-		ovc_ctrl
-		  #(.reset_type(reset_type))
-		ovcc
-		  (.clk(clk),
-		   .reset(reset),
-		   .push(),
-		   .pop(),
-		   .alloc(vc_gnt_op_ovc[op*num_vcs+ovc]),
-		   .free(),
-		   .elig(elig_op_ovc[op*num_vcs+ovc]),
-		   .cred(cred_op_ovc[op*num_vcs+ovc]),
-		   .errors());
-		
-	     end
+	   
+	   wire [0:crossbar_width-1] xbr_data_out;
+	   assign xbr_data_out = xbr_data_out_op[op*crossbar_width:
+						 (op+1)*crossbar_width-1];
+	   
+	   wire 		     flit_valid;
+	   assign flit_valid = xbr_data_out[0];
+	   
+	   wire [0:vc_idx_width-1]   flit_vc;
+	   assign flit_vc = xbr_data_out[1:vc_idx_width];
+	   
+	   wire 		     flit_head;
+	   assign flit_head = xbr_data_out[vc_idx_width+1];
+	   
+	   wire 		     flit_tail;
+	   assign flit_tail = xbr_data_out[vc_idx_width+2];
+	   
+	   wire [0:data_width-1]     flit_data;
+	   assign flit_data = xbr_data_out[(vc_idx_width+3):
+					   (vc_idx_width+3+data_width)-1];
+	   
+	   wire 		     cred_valid_in;
+	   assign cred_valid_in = cred_valid_in_op[op];
+	   
+	   wire [0:vc_idx_width-1]   cred_vc_in;
+	   assign cred_vc_in = cred_vc_in_op[op*vc_idx_width:
+					     (op+1)*vc_idx_width-1];
+	   
+	   wire [0:num_vcs-1] 	     vc_gnt_ovc;
+	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 	     elig_ovc;
+	   wire [0:num_vcs-1] 	     free_ovc;
+	   wire [0:num_vcs-1] 	     free_plus1_ovc;
+	   wire [0:num_vcs-1] 	     free_ivc;
+	   op_ctrl
+	     #(.dedicated_free_ivc_regs(dedicated_free_ivc_regs),
+	       .buffer_free_threshold(buffer_free_threshold),
+	       .reset_type(reset_type))
+	   opc
+	     (.clk(clk),
+	      .reset(reset),
+	      .cred_valid_in(cred_valid_in),
+	      .cred_vc_in(cred_vc_in),
+	      .vc_gnt_ovc(vc_gnt_ovc),
+	      .flit_valid_in(flit_valid),
+	      .flit_vc_in(flit_vc),
+	      .flit_tail_in(flit_tail),
+	      .elig_ovc(elig_ovc),
+	      .free_ovc(free_ovc),
+	      .free_plus1_ovc(free_plus1_ovc),
+	      .free_ivc(free_ivc));
+	   
+	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
+	   assign free_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = free_ovc;
+	   assign free_plus1_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
+		    = free_plus1_ovc;
+	   assign free_op_ivc[op*num_vcs:(op+1)*num_vcs-1] = free_ivc;
+	   
+	   assign flit_valid_out_op[op] 
+		    = flit_valid;
+	   assign flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1]
+		    = flit_vc;
+	   assign flit_head_out_op[op]
+		    = flit_head;
+	   assign flit_tail_out_op[op]
+		    = flit_tail;
+	   assign flit_data_out_op[op*data_width:(op+1)*data_width-1]
+		    = flit_data;
 	   
 	end
-
+      
    endgenerate
-
+   
+   //---------------------------------------------------------------------------
+   // bit shuffling to change sort order
+   //---------------------------------------------------------------------------
+   
+   interleaver
+     #(.width(num_ports*num_vcs),
+       .num_blocks(num_ports))
+   free_ivc_op_intl
+     (.data_in(free_op_ivc),
+      .data_out(free_ivc_op));
+   
 endmodule
