@@ -19,7 +19,7 @@ module crossbar
    
    wire [0:num_ports*num_ports-1]  ctrl_op_ip;
    interleaver
-     #(.width(num_ports),
+     #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    ctrl_intl
      (.data_in(ctrl_ip_op),
