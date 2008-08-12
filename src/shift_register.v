@@ -27,18 +27,14 @@ module shift_register
    
    wire [0:(depth+1)*width-1] data;
    
-   wire [0:depth] 	      insert_ptr_q;
-   wire 		      insert_ptr_bad;
-   assign insert_ptr_bad = ~^insert_ptr_q;
-   
-   wire [0:depth] 	      insert_ptr_s;
-   assign insert_ptr_s = insert_ptr_bad ? {{depth-1{1'b0}}, 1'b1} :
-			 (push & ~pop) ? {insert_ptr_q[1:depth], 1'b0} :
+   wire [0:depth] 	      insert_ptr_s, insert_ptr_q;
+   assign insert_ptr_s = (push & ~pop) ? {insert_ptr_q[1:depth], 1'b0} :
 			 (pop & ~push) ? {1'b0, insert_ptr_q[0:depth-1]} :
 			 insert_ptr_q;
    dff
      #(.width(depth+1),
-       .reset_type(reset_type))
+       .reset_type(reset_type),
+       .reset_value({{depth{1'b0}}, 1'b1}))
    insert_ptrq
      (.clk(clk),
       .reset(reset),
@@ -82,5 +78,11 @@ module shift_register
    endgenerate
    
    assign data_out = data[depth*width:(depth+1)*width-1];
+
+   // synopsys translate_off
+   wire 		    error;
+   assign error = ((empty & pop) | (full & push) |
+		   (pop_count(insert_ptr_q) != 1));
+   // synopsys translate_on
    
 endmodule
