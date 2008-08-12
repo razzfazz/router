@@ -1,33 +1,27 @@
 module routing_logic
-  (clk, reset, req, route_info, vc_id, gnt, next_route_info, next_port,
-   next_vcs);
+  (clk, reset, route_info, port_id, vc_id, next_port, next_vcs);
    
 `include "functions.v"
 `include "config.v"   
 `include "constants.v"
 `include "config_utils.v"
    
+   parameter reset_type = reset_type_async;
+   
    // replicate port decoding logic
    parameter replicate_port_decoder = 0;
-   
-   parameter reset_type = reset_type_async;
    
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    
    
    input clk;
    input reset;
-   input req;
    input [0:route_info_width-1] route_info;
    input [0:port_idx_width-1] port_id;
    input [0:vc_idx_width-1] vc_id;
-   output gnt;
-   output [0:route_info_width-1] next_route_info;
    output [0:num_ports-1] next_port;
    output [0:num_vcs-1] next_vcs;
    
-   wire gnt;
-   wire [0:route_info_width-1] next_route_info;
    wire [0:num_ports-1]        next_port;
    wire [0:num_vcs-1] 	       next_vcs;
    
@@ -37,24 +31,22 @@ module routing_logic
    wire [0:addr_width-1]       final_address;
    assign final_address = get_final_address(route_info);
    
-   assign gnt = req;
-   
    wire 		       is_next;
    assign is_next = (address == next_address);
    
    wire [0:addr_width-1]       new_next_address;
    assign new_next_address = is_next ? final_address : next_address;
    
-   assign next_route_info = create_route_info(new_next_address, final_address);
+   wire [0:num_ports-1]        next_port_int;
    
    generate
       
-      genvar 		       nvc;
-      for(nvc = 0; nvc < num_vcs; nvc = nvc + 1)
-	begin:nvcs
-	   assign next_vcs[nvc]
-	     = ((get_traffic_class(nvc) == get_traffic_class(vc_id)) &&
-		(get_routing_class(nvc) == 
+      genvar 		       ovc;
+      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+	begin:ovcs
+	   assign next_vcs[ovc]
+	     = ((get_traffic_class(ovc) == get_traffic_class(vc_id)) &&
+		(get_routing_class(ovc) == 
 		 ((is_next && (get_routing_class(vc_id) != 0)) ?
 		  0 :
 		  get_routing_class(vc_id)))) ||
@@ -86,11 +78,11 @@ module routing_logic
 	      .next_port(next_port_int));
 	end
       
-      genvar 			  nport;
-      for(nport = 0; nport < num_ports; nport = nport + 1)
-	begin:nports
-	   assign next_port[nport] = next_port_int &&
-				     ((nport != port_id) || !ignore_same_port);
+      genvar 			  op;
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
+	   assign next_port[op] = next_port_int[op] &&
+				  ((op != port_id) || !ignore_same_port);
 	end
       
    endgenerate
