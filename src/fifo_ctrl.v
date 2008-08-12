@@ -76,7 +76,7 @@ module fifo_ctrl
    assign full = (read_ptr == write_ptr) && !empty_q;
    
    wire 		error;
-   assign error = full & push;
+   assign error = (empty & pop) | (full & push);
    // synopsys translate_on
    
 endmodule
