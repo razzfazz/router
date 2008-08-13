@@ -45,7 +45,7 @@ if(@errors)
 }
 
 #get area
-$areafile = $module."_syn_wrapper.area";
+$areafile = $module.".area";
 open (INP, "<$dir/$areafile") or die "can't open $areafile for reading\n";
 
 $done=0;
@@ -63,7 +63,7 @@ AREA
 ;
 close (INP);
 
-$powerfile = $module."_syn_wrapper.power";
+$powerfile = $module.".power";
 open (INP, "<$dir/$powerfile") or die "can't open $powerfile for reading\n";
 
 while (<INP>){
@@ -82,7 +82,7 @@ while (<INP>){
 print "    Total Power($mname): $tot_pow\n";
 close (INP);
 
-$timingfile = $module."_syn_wrapper.timing";
+$timingfile = $module.".timing";
 open (INP, "<$dir/$timingfile") or die "can't open $timingfile for reading\n";
 
 while (<INP>){
