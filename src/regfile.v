@@ -15,14 +15,18 @@ module regfile
    input [0:addr_width-1] read_address;
    output [0:width-1] read_data;
    
-   reg [0:width-1] read_data;
-   reg [0:width-1] storage [0:depth-1];
+   wire [0:width-1] read_data;
+   
+   reg [0:addr_width-1] read_address_q;
+   reg [0:width-1] 	storage [0:depth-1];
    
    always @(posedge clk)
      begin
 	if(write_enable)
 	  storage[write_address] <= write_data;
-	read_data <= storage[read_address];
+	read_address_q <= read_address;
      end
+   
+   assign read_data = storage[read_address_q];
    
 endmodule
