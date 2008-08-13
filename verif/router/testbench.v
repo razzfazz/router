@@ -4,6 +4,7 @@ module testbench
    parameter Tclk = 2;
    parameter sim_cycles = 1000;
    parameter initial_seed = 0;
+   parameter walk_addresses = 0;
    
 `include "functions.v"
 `include "config.v"
@@ -223,7 +224,8 @@ module testbench
 			 .reset_type(reset_type),
 			 .adaptive_rate(adaptive_rate),
 			 .packet_count_width(packet_count_width),
-			 .address(address+ip-(num_ports-num_nodes_per_router)))
+			 .address(address+ip-(num_ports-num_nodes_per_router)),
+			 .walk_addresses(walk_addresses))
 		     ps
 		       (.clk(clk),
 			.reset(reset),
