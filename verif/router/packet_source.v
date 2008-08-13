@@ -13,6 +13,8 @@ module packet_source
    parameter initial_seed = 0;
    parameter adaptive_rate = 0;
    parameter packet_count_width = 32;
+   parameter [0:addr_width-1] address = {addr_width{1'b0}};
+   parameter walk_addresses = 0;
    localparam flit_count_width = clogb(packet_length);
    
    input clk;
@@ -117,14 +119,22 @@ module packet_source
 	is_reply = $dist_uniform(seed, 0, 1);
 	for(i = 0; i < data_width; i = i + 1)
 	  random_data[i] = $dist_uniform(seed, 0, 1);
-	for(i = 0; i < addr_width; i = i + 1)
-	  random_next_addr[i] = $dist_uniform(seed, 0, 1);
-	for(i = 0; i < addr_width; i = i + 1)
-	  random_final_addr[i] = is_adaptive ?
-				 $dist_uniform(seed, 0, 1) :
-				 random_next_addr[i];
+	if(walk_addresses)
+	  random_next_addr
+	    = reset ?
+	      0 :
+	      (random_next_addr + 1 + (random_next_addr + 1 == address));
+	else
+	  random_next_addr
+	    = (address + $dist_uniform(seed, 1, 1<<addr_width-1)) %
+	      (1<<addr_width);
+	random_final_addr
+	  = is_adaptive ?
+	    (address + $dist_uniform(seed, 1, 1<<addr_width-1)) %
+	    (1<<addr_width) :
+	    random_next_addr;
      end
-
+   
    reg vc_allocated_s;
    wire vc_allocated_q;
    dff
