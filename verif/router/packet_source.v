@@ -126,12 +126,10 @@ module packet_source
 	      (random_next_addr + 1 + (random_next_addr + 1 == address));
 	else
 	  random_next_addr
-	    = (address + $dist_uniform(seed, 1, 1<<addr_width-1)) %
-	      (1<<addr_width);
+	    = address + $dist_uniform(seed, 1, 2**addr_width-1);
 	random_final_addr
 	  = is_adaptive ?
-	    (address + $dist_uniform(seed, 1, 1<<addr_width-1)) %
-	    (1<<addr_width) :
+	    address + $dist_uniform(seed, 1, 2**addr_width-1) :
 	    random_next_addr;
      end
    
