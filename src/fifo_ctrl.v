@@ -1,5 +1,5 @@
 module fifo_ctrl
-   (clk, reset, push, pop, write_addr, read_addr, empty);
+   (clk, reset, push, pop, write_addr, read_addr, empty, empty_early);
    
 `include "functions.v"
 `include "constants.v"
@@ -22,11 +22,13 @@ module fifo_ctrl
    output [0:idx_width-1] read_addr;
    
    output empty;
+   output empty_early;
    
    wire [0:idx_width-1] write_addr;
    wire [0:idx_width-1] read_addr;
    
    wire 		empty;
+   wire 		empty_early;
    
    
    wire [0:idx_width-1] read_ptr, read_ptr_next;
@@ -70,6 +72,7 @@ module fifo_ctrl
    assign read_addr = read_ptr;
    assign write_addr = write_ptr;
    assign empty = empty_q;
+   assign empty_early = empty_s;
    
    // synopsys translate_off
    wire 		full;

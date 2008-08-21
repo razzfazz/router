@@ -306,9 +306,6 @@ module ivc_ctrl
       .data_in(free_op_ovc),
       .data_out(free_ovc));
    
-   wire 		       free_allocated;
-   assign free_allocated = |(free_ovc & vcs_s & mask_ovc);
-   
    wire [0:num_vcs-1] 	       free_plus1_ovc;
    select_1ofn
      #(.num_ports(num_ports),
@@ -318,22 +315,9 @@ module ivc_ctrl
       .data_in(free_plus1_op_ovc),
       .data_out(free_plus1_ovc));
    
-   wire 		       free_plus1_allocated;
-   assign free_plus1_allocated = |(free_plus1_ovc & vcs_s & mask_ovc);
-   
-   wire 		       free_allocated_s, free_allocated_q;
-   assign free_allocated_s = flit_sent ? free_plus1_allocated : free_allocated;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   free_allocatedq
-     (.clk(clk),
-      .reset(reset),
-      .d(free_allocated_s),
-      .q(free_allocated_q));
-   
-   wire 		       free;
-   assign free = allocated_q ? free_allocated_q : free_unallocated;
+   wire 		       free_allocated;
+   assign free_allocated
+     = |((flit_sent ? free_plus1_ovc : free_ovc) & vcs_s & mask_ovc);
    
    
    //---------------------------------------------------------------------------
@@ -341,24 +325,70 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 		       fbc_empty;
+   wire 		       fbc_empty_early;
    
-   assign sw_req_nonspec_op
-     = port_q & {num_ports{~fbc_empty & free & allocated_q}};
+   wire [0:num_ports-1]        sw_req_nonspec_op_s, sw_req_nonspec_op_q;
+   assign sw_req_nonspec_op_s
+     = port_s & {num_ports{~fbc_empty_early & allocated_s & free_allocated}};
+   dff
+     #(.width(num_ports),
+       .reset_type(reset_type))
+   sw_req_nonspec_opq
+     (.clk(clk),
+      .reset(reset),
+      .d(sw_req_nonspec_op_s),
+      .q(sw_req_nonspec_op_q));
+   
+   assign sw_req_nonspec_op = sw_req_nonspec_op_q;
    
    generate
       
       if(enable_spec_sw_alloc)
-	assign sw_req_spec_op
-	  = port_q &
-	    {num_ports{~fbc_empty & free & ~allocated_q}};
+	begin
+	   wire [0:num_ports-1] sw_req_spec_op_s, sw_req_spec_op_q;
+	   assign sw_req_spec_op_s
+	     = port_s & {num_ports{~fbc_empty_early & ~allocated_s}};
+	   dff
+	     #(.width(num_ports),
+	       .reset_type(reset_type))
+	   sw_req_spec_opq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(sw_req_spec_op_s),
+	      .q(sw_req_spec_op_q));
+	   
+	   assign sw_req_spec_op = sw_req_spec_op_q & free_unallocated;
+	end
       else
 	assign sw_req_spec_op = {num_ports{1'b0}};
       
    endgenerate
    
-   assign vc_req_op = port_q & {num_ports{valid_q & ~allocated_q}};
+   wire [0:num_ports-1]        vc_req_op_s, vc_req_op_q;
+   assign vc_req_op_s = port_s & {num_ports{valid_s & ~allocated_s}};
+   dff
+     #(.width(num_ports),
+       .reset_type(reset_type))
+   vc_req_opq
+     (.clk(clk),
+      .reset(reset),
+      .d(vc_req_op_s),
+      .q(vc_req_op_q));
    
-   assign vc_req_ovc = vcs_q & {num_vcs{valid_q & ~allocated_q}};
+   assign vc_req_op = vc_req_op_q;
+   
+   wire [0:num_vcs-1] 	       vc_req_ovc_s, vc_req_ovc_q;
+   assign vc_req_ovc_s = vcs_s & {num_vcs{valid_s & ~allocated_s}};
+   dff
+     #(.width(num_vcs),
+       .reset_type(reset_type))
+   vc_req_ovcq
+     (.clk(clk),
+      .reset(reset),
+      .d(vc_req_ovc_s),
+      .q(vc_req_ovc_q));
+   
+   assign vc_req_ovc = vc_req_ovc_q;
    
    
    //---------------------------------------------------------------------------
@@ -398,7 +428,8 @@ module ivc_ctrl
       .pop(fbc_pop),
       .write_addr(buff_write_addr),
       .read_addr(buff_read_addr),
-      .empty(fbc_empty));
+      .empty(fbc_empty),
+      .empty_early(fbc_empty_early));
    
    // synopsys translate_off
    wire 		       error_fbc;
