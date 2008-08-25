@@ -4,7 +4,6 @@ module testbench
    parameter Tclk = 2;
    parameter sim_cycles = 1000;
    parameter initial_seed = 0;
-   parameter walk_addresses = 0;
    
 `include "functions.v"
 `include "config.v"
@@ -15,10 +14,6 @@ module testbench
    
    // current router's address
    parameter [0:addr_width-1] address = 40;
-   
-   // enable speculative (i.e., while VC is being allocated as well) switch
-   // allocation
-   parameter enable_spec_sw_alloc = 1;
    
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 1;
@@ -43,13 +38,20 @@ module testbench
     4: wavefront, diagonal propagation allocator
     5: wavefront, rotate inputs for priority
     */
-   parameter sw_allocator_type = 0;
+   parameter sw_allocator_type = 1;
    
    /*
     0: round-robin arbiters
     1: matrix arbiters
     */
    parameter sw_arbiter_type = 1;
+   
+   /*
+    0: disable speculative switch allocation
+    1: only use speculative grants if no non-speculative requests were issued
+    2: use speculative grants when not conflicting with non-spec requests
+    */
+   parameter sw_spec_level = 2;
    
    /*
     0: use tristate buses
@@ -65,9 +67,10 @@ module testbench
    // implementation to work correctly!
    parameter buffer_free_threshold = 2;
    
-   parameter packet_length = 1;
+   parameter walk_addresses = 0;
+   parameter packet_length = 4;
    parameter packet_rate = 50;
-   parameter adaptive_rate = 0;
+   parameter adaptive_rate = 1;
    parameter packet_count_width = 32;
    parameter credit_latency = 4;
    
@@ -327,7 +330,7 @@ module testbench
    router
      #(.reset_type(reset_type),
        .address(address),
-       .enable_spec_sw_alloc(enable_spec_sw_alloc),
+       .sw_spec_level(sw_spec_level),
        .replicate_port_decoder(replicate_port_decoder),
        .vc_allocator_type(vc_allocator_type),
        .vc_arbiter_type(vc_arbiter_type),
