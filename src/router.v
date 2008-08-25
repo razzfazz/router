@@ -13,10 +13,6 @@ module router
    // current router's address
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    
-   // enable speculative (i.e., while VC is being allocated as well) switch
-   // allocation
-   parameter enable_spec_sw_alloc = 1;
-   
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 1;
    
@@ -47,6 +43,13 @@ module router
     1: matrix arbiters
     */
    parameter sw_arbiter_type = 1;
+   
+   /*
+    0: disable speculative switch allocation
+    1: only use speculative grants if no non-speculative requests were issued
+    2: use speculative grants when not conflicting with non-spec requests
+    */
+   parameter sw_spec_level = 0;
    
    /*
     0: use tristate buses
@@ -164,7 +167,7 @@ module router
 	   wire 			cred_valid_out;
 	   wire [0:vc_idx_width-1] 	cred_vc_out;
 	   ip_ctrl
-	     #(.enable_spec_sw_alloc(enable_spec_sw_alloc),
+	     #(.enable_spec_sw_alloc(sw_spec_level > 0),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
 	       .port_id(ip),
@@ -238,56 +241,18 @@ module router
    // switch allocator
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 	sw_gnt_nonspec_ip_ivc;
-   wire [0:num_ports*num_ports-1] 	sw_gnt_nonspec_ip_op;
    sw_alloc
      #(.reset_type(reset_type),
        .allocator_type(sw_allocator_type),
-       .arbiter_type(sw_arbiter_type))
-   swa_nonspec
+       .arbiter_type(sw_arbiter_type),
+       .spec_level(sw_spec_level))
+   swa
      (.clk(clk),
       .reset(reset),
-      .sw_req_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
-      .sw_gnt_ip_ivc(sw_gnt_nonspec_ip_ivc),
-      .sw_gnt_ip_op(sw_gnt_nonspec_ip_op));
-   
-   generate
-      
-      if(enable_spec_sw_alloc)
-	begin
-	   
-	   wire [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
-	   wire [0:num_ports*num_ports-1] sw_gnt_spec_ip_op;
-	   sw_alloc
-	     #(.reset_type(reset_type),
-	       .allocator_type(sw_allocator_type),
-	       .arbiter_type(sw_arbiter_type))
-	   swa_spec
-	     (.clk(clk),
-	      .reset(reset),
-	      .sw_req_ip_ivc_op(sw_req_spec_ip_ivc_op),
-	      .sw_gnt_ip_ivc(sw_gnt_spec_ip_ivc),
-	      .sw_gnt_ip_op(sw_gnt_spec_ip_op));
-	   
-	   wire 			  any_nonspec;
-	   assign any_nonspec = |sw_req_nonspec_ip_ivc_op;
-	   
-	   assign sw_gnt_ip_ivc
-	     = any_nonspec ? sw_gnt_nonspec_ip_ivc : sw_gnt_spec_ip_ivc;
-	   
-	   assign sw_gnt_ip_op
-	     = any_nonspec ? sw_gnt_nonspec_ip_op : sw_gnt_spec_ip_op;
-	   
-	end
-      else
-	begin
-	   
-	   assign sw_gnt_ip_ivc = sw_gnt_nonspec_ip_ivc;
-	   assign sw_gnt_ip_op = sw_gnt_nonspec_ip_op;
-	   
-	end
-      
-   endgenerate
+      .sw_req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+      .sw_req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
+      .sw_gnt_ip_ivc(sw_gnt_ip_ivc),
+      .sw_gnt_ip_op(sw_gnt_ip_op));
    
    
    //---------------------------------------------------------------------------

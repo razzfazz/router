@@ -1,5 +1,6 @@
 module sw_alloc
-  (clk, reset, sw_req_ip_ivc_op, sw_gnt_ip_ivc, sw_gnt_ip_op);
+  (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op, sw_gnt_ip_ivc,
+   sw_gnt_ip_op);
    
 `include "functions.v"   
 `include "constants.v"
@@ -23,11 +24,19 @@ module sw_alloc
     */
    parameter arbiter_type = 0;
    
+   /*
+    0: disable speculative switch allocation
+    1: only use speculative grants if no non-speculative requests were issued
+    2: use speculative grants when not conflicting with non-spec requests
+    */
+   parameter spec_level = 0;
+   
    
    input clk;
    input reset;
    
-   input [0:num_ports*num_vcs*num_ports-1] sw_req_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
+   input [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
    
    output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
    output [0:num_ports*num_ports-1] sw_gnt_ip_op;
@@ -43,11 +52,13 @@ module sw_alloc
 	  begin
 	     sw_alloc_core_sep_if
 	       #(.reset_type(reset_type),
-		 .arbiter_type(arbiter_type))
+		 .arbiter_type(arbiter_type),
+		 .spec_level(spec_level))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
-		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
+		.sw_req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+		.sw_req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
@@ -55,11 +66,13 @@ module sw_alloc
 	  begin
 	     sw_alloc_core_sep_of
 	       #(.reset_type(reset_type),
-		 .arbiter_type(arbiter_type))
+		 .arbiter_type(arbiter_type),
+		 .spec_level(spec_level))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
-		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
+		.sw_req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+		.sw_req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
@@ -68,11 +81,13 @@ module sw_alloc
 	     sw_alloc_core_wf
 	       #(.reset_type(reset_type),
 		 .allocator_type(allocator_type-2),
-		 .arbiter_type(arbiter_type))
+		 .arbiter_type(arbiter_type),
+		 .spec_level(spec_level))
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
-		.sw_req_ip_ivc_op(sw_req_ip_ivc_op),
+		.sw_req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+		.sw_req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
