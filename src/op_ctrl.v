@@ -18,6 +18,11 @@ module op_ctrl
    localparam [0:num_vcs*num_vcs-1] mask_ivc_ovc
      = create_mask_ivc_ovc(restrict_vcs);
    
+   // synopsys translate_off
+   // width for full range of credit count ([0:num_credits])
+   localparam cred_count_width = clogb(num_buffers+1);
+   // synopsys translate_on
+   
    
    input clk;
    input reset;
@@ -222,6 +227,24 @@ module op_ctrl
 		    = |(pop_mask & set_plus1_mask) & incr;
 	   assign reset_cred_plus1_ovc[ovc]
 		    = |(push_mask & reset_plus1_mask) & decr;
+	   
+	   // synopsys translate_off
+	   wire [0:cred_count_width-1]   cred_count_s, cred_count_q;
+	   assign cred_count_s = cred_count_q + credit - debit;
+	   dff
+	     #(.width(cred_count_width),
+	       .reset_type(reset_type),
+	       .reset_value(num_buffers))
+	   cred_countq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(cred_count_s),
+	      .q(cred_count_q));
+	   
+	   wire 		       error;
+	   assign error = (((cred_count_q == num_buffers) && credit) ||
+			   ((cred_count_q == 0) && debit));
+	   // synopsys translate_on
 	   
 	end
       
