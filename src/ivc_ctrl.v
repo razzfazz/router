@@ -13,6 +13,9 @@ module ivc_ctrl
    // allocation
    parameter enable_spec_sw_alloc = 1;
    
+   // check for credit before issuing speculative switch allocation requests
+   parameter spec_sw_alloc_checks_cred = 0;
+   
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
    
@@ -98,13 +101,26 @@ module ivc_ctrl
       .q(allocated_q));
    
    wire 		       vc_allocated;
+   wire 		       free_unallocated;
    
    generate
       
       if(enable_spec_sw_alloc)
-	assign vc_allocated = vc_gnt_masked | allocated_q;
+	begin
+	   if(spec_sw_alloc_checks_cred)
+	     begin
+		assign vc_allocated = vc_gnt_masked | allocated_q;
+	     end
+	   else
+	     begin
+		assign vc_allocated
+		  = (vc_gnt_masked & free_unallocated) | allocated_q;
+	     end
+	end
       else
-	assign vc_allocated = allocated_q;
+	begin
+	   assign vc_allocated = allocated_q;
+	end
       
    endgenerate
    
@@ -288,7 +304,6 @@ module ivc_ctrl
       .data_in(elig_op_ovc),
       .data_out(elig_ovc));
    
-   wire 		       free_unallocated;
    select_1ofn
      #(.num_ports(num_ports),
        .width(1))
@@ -357,7 +372,14 @@ module ivc_ctrl
 	      .d(sw_req_spec_op_s),
 	      .q(sw_req_spec_op_q));
 	   
-	   assign sw_req_spec_op = sw_req_spec_op_q & free_unallocated;
+	   if(spec_sw_alloc_checks_cred)
+	     begin
+		assign sw_req_spec_op = sw_req_spec_op_q & free_unallocated;
+	     end
+	   else
+	     begin
+		assign sw_req_spec_op = sw_req_spec_op_q;
+	     end
 	end
       else
 	assign sw_req_spec_op = {num_ports{1'b0}};
