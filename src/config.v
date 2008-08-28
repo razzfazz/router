@@ -52,7 +52,7 @@ localparam route_info_width = 2 * addr_width;
 `ifdef USE_FBFLY
 
 // connectivity in each dimension
-parameter num_neighbors = num_routers_per_dim - 1;
+localparam num_neighbors = num_routers_per_dim - 1;
 
 // function to determine neighbor to route to
 function [0:num_neighbors-1] get_neighbor
@@ -81,7 +81,7 @@ endfunction
 `ifdef USE_MESH
 
 // connectivity in each dimension
-parameter num_neighbors = 2;
+localparam num_neighbors = 2;
 
 // function to determine neighbor to route to
 function [0:num_neighbors-1] get_neighbor
