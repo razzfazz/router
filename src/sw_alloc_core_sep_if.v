@@ -203,7 +203,6 @@ module sw_alloc_core_sep_if
 		// generate global grants
 		//--------------------------------------------------------------
 		
-		wire [0:num_vcs-1] 	sw_gnt_spec_ivc;
 		assign sw_gnt_spec_ivc
 		  = {num_vcs{gnt_out_spec}} & gnt_in_spec_ivc;
 		
