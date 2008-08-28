@@ -14,6 +14,9 @@ module ip_ctrl
    // allocation
    parameter enable_spec_sw_alloc = 1;
    
+   // check for credit before issuing speculative switch allocation requests
+   parameter spec_sw_alloc_checks_cred = 0;
+   
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
    
@@ -117,6 +120,7 @@ module ip_ctrl
 	   wire [0:buffer_idx_width-1] buff_read_addr;
 	   ivc_ctrl
 	     #(.enable_spec_sw_alloc(enable_spec_sw_alloc),
+	       .spec_sw_alloc_checks_cred(spec_sw_alloc_checks_cred),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .reset_type(reset_type),
 	       .address(address),
