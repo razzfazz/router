@@ -436,7 +436,7 @@ module sw_alloc_core_sep_of
 	   // if any VC requesting this output port was granted at any input
 	   // port in the first stage, the corresponding second-stage grant must
 	   // have taken place before that, so we can update priorities
-	   wire 		update_arbg_nonspec;
+	   wire 		update_arb_nonspec;
 	   assign update_arb_nonspec = |gnt_in_nonspec_ip;
 	   
 	   wire [0:num_ports-1] gnt_out_nonspec_ip;
@@ -479,7 +479,7 @@ module sw_alloc_core_sep_of
 		// input port in the first stage, the corresponding second-stage
 		// grant must have taken place before that, so we can update
 		// priorities
-		wire 		     update_arbg_spec;
+		wire 		     update_arb_spec;
 		assign update_arb_spec = |gnt_in_spec_ip;
 		
 		wire [0:num_ports-1] gnt_out_unmasked_spec_ip;
