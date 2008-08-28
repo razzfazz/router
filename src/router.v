@@ -51,6 +51,9 @@ module router
     */
    parameter sw_spec_level = 0;
    
+   // check for credit before issuing speculative switch allocation requests
+   parameter sw_spec_alloc_checks_cred = 0;
+   
    /*
     0: use tristate buses
     1: use multiplexers
@@ -168,6 +171,7 @@ module router
 	   wire [0:vc_idx_width-1] 	cred_vc_out;
 	   ip_ctrl
 	     #(.enable_spec_sw_alloc(sw_spec_level > 0),
+	       .spec_sw_alloc_checks_cred(sw_spec_alloc_checks_cred),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
 	       .port_id(ip),
