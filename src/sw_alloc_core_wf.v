@@ -111,8 +111,10 @@ module sw_alloc_core_wf
 	   
 	   wire [0:num_ports*num_vcs-1] gnt_in_nonspec_op_ivc;
 	   genvar 			op;
-	   for(op = 0; op < num_ports; op = op + 1)
-	     begin:ops
+	   for(op = 0;
+	       op < num_ports;
+	       op = op + 1)
+	     begin:nonspec_ops
 		
 		wire 			update_arb_nonspec;
 		assign update_arb_nonspec = gnt_out_nonspec_op[op];
@@ -223,9 +225,8 @@ module sw_alloc_core_wf
 		  = gnt_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 		
 		wire [0:num_ports*num_vcs-1] gnt_in_spec_op_ivc;
-		genvar 			     op;
 		for(op = 0; op < num_ports; op = op + 1)
-		  begin:ops
+		  begin:spec_ops
 		     
 		     wire 			update_arb_spec;
 		     assign update_arb_spec = gnt_out_spec_op[op];

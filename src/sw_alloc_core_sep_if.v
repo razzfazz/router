@@ -161,7 +161,6 @@ module sw_alloc_core_sep_if
 		    {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
 		
 		wire [0:num_vcs-1] 	     req_in_spec_ivc;
-		genvar 			     ivc;
 		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 		  begin:spec_ivcs
 		     assign req_in_spec_ivc[ivc]
