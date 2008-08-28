@@ -155,7 +155,7 @@ module credit_tracker
 	   // synopsys translate_off
 	   assign error = (cred_q ?
 			   ((cred_count_q == num_credits-1) && credit) :
-			   (~|cred_count_q & debit));
+			   ((cred_count_q == 0) && debit));
 	   assign true_count = cred_count_q + cred_q;
 	   // synopsys translate_on
 	   
