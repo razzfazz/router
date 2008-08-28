@@ -21,17 +21,24 @@ module extractor
    
    reg [0:new_width-1] data_out;
    
-   integer idx1, idx2;
+   reg 		       unused;
+   
+   integer 	       idx1, idx2;
 
    always @(data_in)
      begin
+	unused = 1'b0;
 	idx2 = 0;
 	for(idx1 = 0; idx1 < width; idx1 = idx1 + 1)
 	  if(mask[idx1] == 1'b1)
 	    begin
 	       data_out[idx2] = data_in[idx1];
 	       idx2 = idx2 + 1;
-	    end 
+	    end
+	  else
+	    begin
+	       unused = unused | data_in[idx1];
+	    end
      end
 
 endmodule
