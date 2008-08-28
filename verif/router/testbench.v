@@ -38,7 +38,7 @@ module testbench
     4: wavefront, diagonal propagation allocator
     5: wavefront, rotate inputs for priority
     */
-   parameter sw_allocator_type = 1;
+   parameter sw_allocator_type = 0;
    
    /*
     0: round-robin arbiters
