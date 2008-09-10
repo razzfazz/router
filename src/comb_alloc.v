@@ -3,28 +3,28 @@ module comb_alloc_wf
    allocated_ip_ivc, vc_gnt_ip_ivc, vc_gnt_ip_ivc_ovc, sw_gnt_ip_ivc,
    sw_gnt_ip_op);
    
-   
+`include "functions.v"
 `include "config.v"
 `include "constants.v"
-   
    
    // see dff.v for supported values
    parameter reset_type = reset_type_async;
    
-   /* supported architectures:
-    0: separable, input-first, round-robin arbiters
-    1: separable, input-first, matrix arbiters
-    2: separable, output-first, round-robin arbiters
-    3: separable, output-first, matrix arbiters
-    4: wavefront, mux inputs for priority, round-robin arbiters
-    5: wavefront, mux inputs for priority, matrix arbiters
-    6: wavefront, replicated logic for priority, round-robin arbiters
-    7: wavefront, replicated logic for priority, matrix arbiters
-    8: wavefront, diagonal propagation arbiter, round-robin arbiters
-    9: wavefront, diagonal propagation arbiter, matrix arbiters
-    10: wavefront, rotate inputs for priority, round-robin arbiters
-    11: wavefront, rotate inputs for priority, matrix arbiters */
-   parameter architecture = 0;
+   /*
+    0: round-robin arbiters
+    1: matrix arbiters
+    */
+   parameter arbiter_type = 0;
+   
+   /*
+    0: separable, input-first
+    1: separable, output-first
+    2: wavefront, mux inputs for priority
+    3: wavefront, repolicated logic for priorities
+    4: wavefront, diagonal propagation allocator
+    5: wavefront, rotate inputs for priority
+    */
+   parameter allocator_type = 0;
    
    
    input clk;
@@ -118,7 +118,7 @@ module comb_alloc_wf
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
-		    .architecture(architecture & 1))
+		    .arbiter_type(arbiter_type))
 		gnt_ovc_arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -181,7 +181,7 @@ module comb_alloc_wf
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
-		    .architecture(architecture & 1))
+		    .arbiter_type(arbiter_type))
 		mask_sw_arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -203,8 +203,8 @@ module comb_alloc_wf
 	   
 	end
       
-      case(architecture)
-	0, 1:
+      case(allocator_type)
+	0:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req1_ip_op;
@@ -231,7 +231,7 @@ module comb_alloc_wf
 		  arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type),
-		      .architecture(architecture & 1))
+		      .arbiter_type(arbiter_type))
 		  arb
 		    (.clk(clk),
 		     .reset(reset),
@@ -271,7 +271,7 @@ module comb_alloc_wf
 		  arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type),
-		      .architecture(architecture & 1))
+		      .arbiter_type(arbiter_type))
 		  arb
 		    (.clk(clk),
 		     .reset(reset),
@@ -293,11 +293,11 @@ module comb_alloc_wf
 	     assign gnt_sw_ip_op = gnt2_ip_op;
 	     
 	  end
-	2, 3:
+	1:
 	  begin
 	     // FIXME: insert output-first logic here!
 	  end
-	4, 5, 6, 7, 8, 9, 10, 11:
+	2, 3, 4, 5:
 	  begin
 	     
 	     wire update;
@@ -306,7 +306,7 @@ module comb_alloc_wf
 	     wf_alloc
 	       #(.num_ports(num_ports),
 		 .reset_type(reset_type),
-		 .architecture(architecture - 2))
+		 .allocator_type(allocator_type-2))
 	     sw_alloc
 	       (.clk(clk),
 		.reset(reset),
