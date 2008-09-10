@@ -49,10 +49,17 @@ module router
     1: only use speculative grants if no non-speculative requests were issued
     2: use speculative grants when not conflicting with non-spec requests
     */
-   parameter sw_spec_level = 0;
+   parameter sw_spec_level = 2;
    
-   // check for credit before issuing speculative switch allocation requests
-   parameter sw_spec_alloc_checks_cred = 0;
+   /*
+    0: check that credit is available at all potential output VCs before issuing
+       request
+    1: check that credit is available at all potential output VCs in parallel
+       with allocation, then mask grants
+    2: check that credit is available at slected output VC while doing
+       allocation, then mask grants
+    */
+   parameter sw_spec_cred_check = 2;
    
    /*
     0: use tristate buses
@@ -67,7 +74,10 @@ module router
    
    // minimum number of available buffers required to consider VC free
    // NOTE: This must be greater than or equal to 2 for the current 
-   // implementation to work correctly!
+   // implementation to work correctly because of the fact that the output state
+   // is updated based on flits arriving at the crossbar output, and thus with
+   // one cycle delay. The raised threshold ensures that we can handle the case
+   // where a flit was sent in that cycle.
    parameter buffer_free_threshold = 2;
    
    
@@ -170,8 +180,8 @@ module router
 	   wire 			cred_valid_out;
 	   wire [0:vc_idx_width-1] 	cred_vc_out;
 	   ip_ctrl
-	     #(.enable_spec_sw_alloc(sw_spec_level > 0),
-	       .spec_sw_alloc_checks_cred(sw_spec_alloc_checks_cred),
+	     #(.sw_spec_enable(sw_spec_level > 0),
+	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
 	       .port_id(ip),
@@ -187,7 +197,6 @@ module router
 	      .free_ivc_op(free_ivc_op),
 	      .free_op_ovc(free_op_ovc),
 	      .free_plus1_op_ovc(free_plus1_op_ovc),
-	      .elig_op_ovc(elig_op_ovc),
 	      .vc_req_ivc_op(vc_req_ivc_op),
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
@@ -237,6 +246,7 @@ module router
       .reset(reset),
       .vc_req_ip_ivc_op(vc_req_ip_ivc_op),
       .vc_req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+      .elig_op_ovc(elig_op_ovc),
       .vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
       .vc_gnt_op_ovc(vc_gnt_op_ovc));
    

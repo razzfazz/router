@@ -1,6 +1,6 @@
 module vc_alloc_core_sep_of
-  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, vc_gnt_ip_ivc_ovc,
-   vc_gnt_op_ovc);
+  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
+   vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
    
 `include "functions.v"   
 `include "config.v"
@@ -33,6 +33,8 @@ module vc_alloc_core_sep_of
    
    input [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    input [0:num_ports*num_vcs*num_vcs-1] vc_req_ip_ivc_ovc;
+   
+   input [0:num_ports*num_vcs-1] elig_op_ovc;
    
    output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
    output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
@@ -89,8 +91,7 @@ module vc_alloc_core_sep_of
 		   .data_out(vc_req_op_ovc));
 		
 		wire [0:num_ports*num_vcs-1] req_out_op_ovc;
-		assign req_out_op_ovc
-		  = vc_req_op_ovc & {num_ports{vc_req_ovc}};
+		assign req_out_op_ovc = vc_req_op_ovc & {num_ports{vc_req_ovc}};
 		
 		assign req_out_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
 					     (ip*num_vcs+ivc+1)*num_ports*
@@ -99,7 +100,7 @@ module vc_alloc_core_sep_of
 		
 		
 		//--------------------------------------------------------------
-		// first arbitration stage (select output VC)
+		// input arbitration stage (select output VC)
 		//--------------------------------------------------------------
 		
 		wire [0:num_ports*num_vcs-1] gnt_out_op_ovc;
@@ -116,11 +117,8 @@ module vc_alloc_core_sep_of
 		  (.data_in(gnt_out_op_ovc),
 		   .data_out(gnt_out_ovc));
 		
-		wire 			     gnt_out;
-		assign gnt_out = |gnt_out_ovc;
-		
 		wire 			     update_arb;
-		assign update_arb = gnt_out;
+		assign update_arb = |gnt_out_ovc;
 		
 		wire [0:num_vcs-1] 	     req_in_ovc;
 		assign req_in_ovc = gnt_out_ovc;
@@ -139,8 +137,7 @@ module vc_alloc_core_sep_of
 		   .gnt(gnt_in_ovc));
 		
 		wire [0:num_ports*num_vcs-1] gnt_in_op_ovc;
-		assign gnt_in_op_ovc
-		  = vc_req_op_ovc & {num_ports{gnt_in_ovc}};
+		assign gnt_in_op_ovc = vc_req_op_ovc & {num_ports{gnt_in_ovc}};
 		
 		assign gnt_in_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
 					    (ip*num_vcs+ivc+1)*num_ports*num_vcs
@@ -225,6 +222,9 @@ module vc_alloc_core_sep_of
 		wire [0:num_ports-1] 	     update_arb_ip;
 		assign update_arb_ip = {num_ports{gnt_in}} & gnt_out_ip;
 		
+		wire 			     elig;
+		assign elig = elig_op_ovc[op*num_vcs+ovc];
+		
 		wire [0:num_ports*num_vcs-1] gnt_out_ip_ivc;
 		
 		genvar 			     ip;
@@ -251,7 +251,8 @@ module vc_alloc_core_sep_of
 			.gnt(gnt_out_ivc));
 		     
 		     assign gnt_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			      = gnt_out_ivc & {num_vcs{gnt_out_ip[ip]}};
+			      = gnt_out_ivc & {num_vcs{gnt_out_ip[ip] & elig}};
+		     
 		  end
 		
 		wire 			update_arb;

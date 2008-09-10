@@ -1,6 +1,6 @@
 module vc_alloc
-  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, vc_gnt_ip_ivc_ovc,
-   vc_gnt_op_ovc);
+  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
+   vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
    
 `include "functions.v"   
 `include "config.v"
@@ -27,6 +27,8 @@ module vc_alloc
    input [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    input [0:num_ports*num_vcs*num_vcs-1] vc_req_ip_ivc_ovc;
    
+   input [0:num_ports*num_vcs-1] elig_op_ovc;
+   
    output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
    output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
    
@@ -47,6 +49,7 @@ module vc_alloc
 		.reset(reset),
 		.vc_req_ip_ivc_op(vc_req_ip_ivc_op),
 		.vc_req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+		.elig_op_ovc(elig_op_ovc),
 		.vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
 		.vc_gnt_op_ovc(vc_gnt_op_ovc));
 	  end
@@ -60,6 +63,7 @@ module vc_alloc
 		.reset(reset),
 		.vc_req_ip_ivc_op(vc_req_ip_ivc_op),
 		.vc_req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+		.elig_op_ovc(elig_op_ovc),
 		.vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
 		.vc_gnt_op_ovc(vc_gnt_op_ovc));
 	  end

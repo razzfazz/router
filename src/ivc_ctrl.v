@@ -1,8 +1,8 @@
 module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
-   free_op, free_op_ovc, free_plus1_op_ovc, elig_op_ovc, vc_req_op, vc_req_ovc,
-   vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt, flit_sent,
-   flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr);
+   free_op, free_op_ovc, free_plus1_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
+   sw_req_nonspec_op, sw_req_spec_op, sw_gnt, flit_sent, flit_vc_out,
+   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr);
    
 `include "functions.v"
 `include "config.v"
@@ -11,10 +11,17 @@ module ivc_ctrl
    
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
-   parameter enable_spec_sw_alloc = 1;
-   
-   // check for credit before issuing speculative switch allocation requests
-   parameter spec_sw_alloc_checks_cred = 0;
+   parameter sw_spec_enable = 1;
+
+   /*
+    0: check that credit is available at all potential output VCs before issuing
+       request
+    1: check that credit is available at all potential output VCs in parallel
+       with allocation, then mask grants
+    2: check that credit is available at slected output VC while doing
+       allocation, then mask grants
+    */
+   parameter sw_spec_cred_check = 0;
    
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
@@ -43,7 +50,6 @@ module ivc_ctrl
    input [0:num_ports-1] free_op;
    input [0:num_ports*num_vcs-1] free_op_ovc;
    input [0:num_ports*num_vcs-1] free_plus1_op_ovc;
-   input [0:num_ports*num_vcs-1] elig_op_ovc;
    
    output [0:num_ports-1] vc_req_op;
    output [0:num_vcs-1] vc_req_ovc;
@@ -80,10 +86,8 @@ module ivc_ctrl
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       elig_ovc;
-   
    wire [0:num_vcs-1] 	       vc_gnt_masked_ovc;
-   assign vc_gnt_masked_ovc = vc_gnt_ovc & elig_ovc & mask_ovc;
+   assign vc_gnt_masked_ovc = vc_gnt_ovc & mask_ovc;
    
    wire 		       vc_gnt_masked;
    assign vc_gnt_masked = |vc_gnt_masked_ovc;
@@ -102,20 +106,28 @@ module ivc_ctrl
    
    wire 		       vc_allocated;
    wire 		       free_unallocated;
+   wire 		       free_late;
    
    generate
       
-      if(enable_spec_sw_alloc)
+      if(sw_spec_enable)
 	begin
-	   if(spec_sw_alloc_checks_cred)
-	     begin
-		assign vc_allocated = vc_gnt_masked | allocated_q;
-	     end
-	   else
-	     begin
-		assign vc_allocated
-		  = (vc_gnt_masked & free_unallocated) | allocated_q;
-	     end
+	   case(sw_spec_cred_check)
+	     0:
+	       begin
+		  assign vc_allocated = vc_gnt_masked | allocated_q;
+	       end
+	     1:
+	       begin
+		  assign vc_allocated
+		    = (vc_gnt_masked & free_unallocated) | allocated_q;
+	       end
+	     2:
+	       begin
+		  assign vc_allocated
+		    = (vc_gnt_masked & free_late) | allocated_q;
+	       end
+	   endcase
 	end
       else
 	begin
@@ -293,16 +305,8 @@ module ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // VC eligibility and credit tracking
+   // credit tracking
    //---------------------------------------------------------------------------
-   
-   select_1ofn
-     #(.num_ports(num_ports),
-       .width(num_vcs))       
-   elig_ovc_sel
-     (.select(port_q),
-      .data_in(elig_op_ovc),
-      .data_out(elig_ovc));
    
    select_1ofn
      #(.num_ports(num_ports),
@@ -334,6 +338,12 @@ module ivc_ctrl
    assign free_allocated
      = |((flit_sent ? free_plus1_ovc : free_ovc) & vcs_s & mask_ovc);
    
+   // FIXME:
+   // Is it safe to use free_ovc here (rather than free_plus1_ovc)? It seems
+   // that, since reallocation can only occur after a tail flit has passed the
+   // output, there should always be one dead cycle, so free_ovc should be ok.
+   assign free_late = |(free_ovc & vcs_s & mask_ovc);
+   
    
    //---------------------------------------------------------------------------
    // generate allocator control signals
@@ -358,7 +368,7 @@ module ivc_ctrl
    
    generate
       
-      if(enable_spec_sw_alloc)
+      if(sw_spec_enable)
 	begin
 	   wire [0:num_ports-1] sw_req_spec_op_s, sw_req_spec_op_q;
 	   assign sw_req_spec_op_s
@@ -372,32 +382,23 @@ module ivc_ctrl
 	      .d(sw_req_spec_op_s),
 	      .q(sw_req_spec_op_q));
 	   
-	   if(spec_sw_alloc_checks_cred)
-	     begin
-		assign sw_req_spec_op = sw_req_spec_op_q & free_unallocated;
-	     end
-	   else
-	     begin
-		assign sw_req_spec_op = sw_req_spec_op_q;
-	     end
+	   case(sw_spec_cred_check)
+	     0:
+	       begin
+		  assign sw_req_spec_op = sw_req_spec_op_q & free_unallocated;
+	       end
+	     1, 2:
+	       begin
+		  assign sw_req_spec_op = sw_req_spec_op_q;
+	       end
+	   endcase
 	end
       else
 	assign sw_req_spec_op = {num_ports{1'b0}};
       
    endgenerate
    
-   wire [0:num_ports-1]        vc_req_op_s, vc_req_op_q;
-   assign vc_req_op_s = port_s & {num_ports{valid_s & ~allocated_s}};
-   dff
-     #(.width(num_ports),
-       .reset_type(reset_type))
-   vc_req_opq
-     (.clk(clk),
-      .reset(reset),
-      .d(vc_req_op_s),
-      .q(vc_req_op_q));
-   
-   assign vc_req_op = vc_req_op_q;
+   assign vc_req_op = port_q;
    
    wire [0:num_vcs-1] 	       vc_req_ovc_s, vc_req_ovc_q;
    assign vc_req_ovc_s = vcs_s & {num_vcs{valid_s & ~allocated_s}};

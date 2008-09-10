@@ -1,9 +1,9 @@
 module ip_ctrl
   (clk, reset, flit_valid_in, flit_vc_in, flit_head_in, flit_tail_in,
-   flit_data_in, free_ivc_op, free_op_ovc, free_plus1_op_ovc, elig_op_ovc,
-   vc_req_ivc_op, vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op,
-   sw_req_spec_ivc_op, sw_gnt_ivc, flit_valid_out, flit_vc_out, flit_head_out,
-   flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out);
+   flit_data_in, free_ivc_op, free_op_ovc, free_plus1_op_ovc, vc_req_ivc_op,
+   vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, sw_req_spec_ivc_op,
+   sw_gnt_ivc, flit_valid_out, flit_vc_out, flit_head_out, flit_tail_out,
+   flit_data_out, cred_valid_out, cred_vc_out);
    
 `include "functions.v"
 `include "config.v"
@@ -12,10 +12,17 @@ module ip_ctrl
    
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
-   parameter enable_spec_sw_alloc = 1;
+   parameter sw_spec_enable = 1;
    
-   // check for credit before issuing speculative switch allocation requests
-   parameter spec_sw_alloc_checks_cred = 0;
+   /*
+    0: check that credit is available at all potential output VCs before issuing
+       request
+    1: check that credit is available at all potential output VCs in parallel
+       with allocation, then mask grants
+    2: check that credit is available at slected output VC while doing
+       allocation, then mask grants
+    */
+   parameter sw_spec_cred_check = 0;
    
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
@@ -41,7 +48,6 @@ module ip_ctrl
    input [0:num_vcs*num_ports-1] free_ivc_op;
    input [0:num_ports*num_vcs-1] free_op_ovc;
    input [0:num_ports*num_vcs-1] free_plus1_op_ovc;
-   input [0:num_ports*num_vcs-1] elig_op_ovc;
    
    output [0:num_vcs*num_ports-1] vc_req_ivc_op;
    output [0:num_vcs*num_vcs-1] vc_req_ivc_ovc;
@@ -119,8 +125,8 @@ module ip_ctrl
 	   wire [0:buffer_idx_width-1] buff_write_addr;
 	   wire [0:buffer_idx_width-1] buff_read_addr;
 	   ivc_ctrl
-	     #(.enable_spec_sw_alloc(enable_spec_sw_alloc),
-	       .spec_sw_alloc_checks_cred(spec_sw_alloc_checks_cred),
+	     #(.sw_spec_enable(sw_spec_enable),
+	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .reset_type(reset_type),
 	       .address(address),
@@ -136,7 +142,6 @@ module ip_ctrl
 	      .free_op(free_op),
 	      .free_op_ovc(free_op_ovc),
 	      .free_plus1_op_ovc(free_plus1_op_ovc),
-	      .elig_op_ovc(elig_op_ovc),
 	      .vc_req_op(vc_req_op),
 	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt_ovc(vc_gnt_ovc),

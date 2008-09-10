@@ -1,6 +1,6 @@
 module vc_alloc_core_sep_if
-  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, vc_gnt_ip_ivc_ovc,
-   vc_gnt_op_ovc);
+  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
+   vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
    
 `include "functions.v"   
 `include "config.v"
@@ -33,6 +33,8 @@ module vc_alloc_core_sep_if
    
    input [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    input [0:num_ports*num_vcs*num_vcs-1] vc_req_ip_ivc_ovc;
+   
+   input [0:num_ports*num_vcs-1] elig_op_ovc;
    
    output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
    output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
@@ -67,11 +69,23 @@ module vc_alloc_core_sep_if
 		// input-side arbitration stage (select output VC)
 		//--------------------------------------------------------------
 		
+		wire [0:num_ports-1] 	     vc_req_op;
+		
+		wire [0:num_vcs-1] 	     elig_ovc;
+		select_1ofn
+		  #(.num_ports(num_ports),
+		    .width(num_vcs))
+		elig_ovc_sel
+		  (.select(vc_req_op),
+		   .data_in(elig_op_ovc),
+		   .data_out(elig_ovc));
+		
 		wire [0:num_vcs-1] 	     req_in_ovc;
 		assign req_in_ovc
 		  = vc_req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
 				      (ip*num_vcs+ivc+1)*num_vcs-1] &
-		    mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
+		    mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1] &
+		    elig_ovc;
 		
 		wire [0:num_ports*num_vcs-1] gnt_out_op_ovc;
 		assign gnt_out_op_ovc
@@ -102,7 +116,6 @@ module vc_alloc_core_sep_if
 		// generate requests for output stage
 		//--------------------------------------------------------------
 		
-		wire [0:num_ports-1] 	     vc_req_op;
 		assign vc_req_op
 		  = vc_req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
 				     (ip*num_vcs+ivc+1)*num_ports-1] &
@@ -213,6 +226,9 @@ module vc_alloc_core_sep_if
 		wire [0:num_ports-1] 	     gnt_out_ip;
 		wire [0:num_ports*num_vcs-1] gnt_out_ip_ivc;
 		
+		wire 			     elig;
+		assign elig = elig_op_ovc[op*num_vcs+ovc];
+		
 		wire [0:num_ports-1] 	     update_arb_ip;
 		assign update_arb_ip = gnt_out_ip;
 		
@@ -238,6 +254,7 @@ module vc_alloc_core_sep_if
 		     
 		     assign gnt_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 			      = gnt_out_ivc & {num_vcs{gnt_out_ip[ip]}};
+		     
 		  end
 		
 		wire 			req_out;
