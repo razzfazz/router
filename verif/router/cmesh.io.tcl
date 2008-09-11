@@ -1,7 +1,7 @@
 # Begin_DVE_Session_Save_Info
 # DVE wave signals session
-# Saved on Wed Aug 13 11:21:00 2008
-# 29 signals
+# Saved on Wed Sep 10 17:37:19 2008
+# 28 signals
 # End_DVE_Session_Save_Info
 
 # DVE version: Y-2006.06-SP1_Full64
@@ -19,7 +19,7 @@ if {[gui_sg_is_group -name {Group2}]} {
     set {Group2} [gui_sg_generate_new_name]
 }
 
-gui_sg_addsignal -group "${Group2}" { {testbench.flit_valid_out_op[0:7]} {testbench.flit_vc_out_op[0:15]} {testbench.flit_head_out_op[0:7]} {testbench.flit_tail_out_op[0:7]} {testbench.flit_data_out_op[0:63]} {testbench.flit_data_out_op[64:127]} {testbench.flit_data_out_op[128:191]} {testbench.flit_data_out_op[192:255]} {testbench.flit_data_out_op[256:319]} {testbench.flit_data_out_op[320:383]} {testbench.flit_data_out_op[384:447]} {testbench.flit_data_out_op[448:511]} {testbench.cred_valid_in_op[0:7]} {testbench.flit_data_out_op[448:453]} {testbench.cred_vc_in_op[0:15]} }
+gui_sg_addsignal -group "${Group2}" { {testbench.flit_valid_out_op[0:7]} {testbench.flit_vc_out_op[0:15]} {testbench.flit_head_out_op[0:7]} {testbench.flit_tail_out_op[0:7]} {testbench.flit_data_out_op[0:63]} {testbench.flit_data_out_op[64:127]} {testbench.flit_data_out_op[128:191]} {testbench.flit_data_out_op[192:255]} {testbench.flit_data_out_op[256:319]} {testbench.flit_data_out_op[320:383]} {testbench.flit_data_out_op[384:447]} {testbench.flit_data_out_op[448:511]} {testbench.cred_valid_in_op[0:7]} {testbench.cred_vc_in_op[0:15]} }
 gui_set_time_units 1ns
 if {[string first "Wave" [gui_get_current_window -view]]==0} { 
 set Wave.1 [gui_get_current_window -view] 
@@ -33,6 +33,7 @@ gui_marker_set_ref -id ${Wave.1}  C1
 gui_wv_zoom_timerange -id ${Wave.1} 0 140
 gui_list_add_group -id ${Wave.1} -after {New Group} "{${Group1}}"
 gui_list_add_group -id ${Wave.1} -after {New Group} "{${Group2}}"
+gui_list_select -id ${Wave.1} {{testbench.cred_vc_in_op[0:15]} }
 gui_seek_criteria -id ${Wave.1} {Any Edge}
 
 
@@ -90,9 +91,7 @@ gui_set_display_scheme -id ${Wave.1} -scheme preference -signal {{testbench.flit
 gui_list_set_height -id ${Wave.1} -height 25  -name {testbench.flit_data_out_op[448:511]} -index 27 
 gui_set_display_scheme -id ${Wave.1} -scheme preference -signal {{testbench.cred_valid_in_op[0:7]}}
 gui_list_set_height -id ${Wave.1} -height 25  -name {testbench.cred_valid_in_op[0:7]} -index 28 
-gui_set_display_scheme -id ${Wave.1} -scheme preference -signal {{testbench.flit_data_out_op[448:453]}}
-gui_list_set_height -id ${Wave.1} -height 25  -name {testbench.flit_data_out_op[448:453]} -index 29 
 gui_set_display_scheme -id ${Wave.1} -scheme preference -signal {{testbench.cred_vc_in_op[0:15]}}
-gui_list_set_height -id ${Wave.1} -height 25  -name {testbench.cred_vc_in_op[0:15]} -index 30 
+gui_list_set_height -id ${Wave.1} -height 25  -name {testbench.cred_vc_in_op[0:15]} -index 29 
 
 gui_marker_move -id ${Wave.1} {C1} 2004
