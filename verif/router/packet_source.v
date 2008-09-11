@@ -1,6 +1,6 @@
 module packet_source
-  (clk, reset, flit_valid, flit_head, flit_tail, flit_data, vc_req, vc_gnt,
-   sw_req, sw_gnt);
+  (clk, reset, active, empty, flit_valid, flit_head, flit_tail, flit_data,
+   vc_req, vc_gnt, sw_req, sw_gnt);
    
 `include "functions.v"
 `include "config.v"
@@ -20,6 +20,9 @@ module packet_source
    input clk;
    input reset;
    
+   input active;
+   output empty;
+   
    output flit_valid;
    output flit_head;
    output flit_tail;
@@ -30,6 +33,8 @@ module packet_source
 
    output sw_req;
    input sw_gnt;
+   
+   wire empty;
    
    reg flit_valid;
    reg flit_head;
@@ -60,6 +65,8 @@ module packet_source
    wire 			 packet_count_zero;
    assign packet_count_zero = ~|packet_count_q;
    
+   assign empty = packet_count_zero;
+   
    reg 				 active_s;
    wire 			 active_q;
    dff
@@ -82,7 +89,7 @@ module packet_source
 	begin
 	   wire [0:flit_count_width-1] flit_count_s, flit_count_q;
 	   assign flit_count_s = load_flit_count ?
-				 (packet_length - 1) :
+				 (packet_length - 1'b1) :
 				 (flit_count_q - decr_flit_count);
 	   dff
 	     #(.width(flit_count_width),
@@ -93,7 +100,7 @@ module packet_source
 	      .d(flit_count_s),
 	      .q(flit_count_q));
 
-	   assign flit_count_max = (flit_count_q == packet_length - 1);
+	   assign flit_count_max = (flit_count_q == (packet_length - 1'b1));
 	   assign flit_count_zero = ~|flit_count_q;
 	end
       else
@@ -114,7 +121,7 @@ module packet_source
    always @(posedge clk)
      begin
 	incr_packet_count
-	  = $dist_uniform(seed, 0, 99) < (packet_rate / packet_length);
+	  = active & $dist_uniform(seed, 0, 99) < (packet_rate / packet_length);
 	is_adaptive = $dist_uniform(seed, 0, 99) < adaptive_rate;
 	is_reply = $dist_uniform(seed, 0, 1);
 	for(i = 0; i < data_width; i = i + 1)

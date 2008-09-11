@@ -54,6 +54,16 @@ module testbench
    parameter sw_spec_level = 2;
    
    /*
+    0: check that credit is available at all potential output VCs before issuing
+       request
+    1: check that credit is available at all potential output VCs in parallel
+       with allocation, then mask grants
+    2: check that credit is available at slected output VC while doing
+       allocation, then mask grants
+    */
+   parameter sw_spec_cred_check = 2;
+   
+   /*
     0: use tristate buses
     1: use multiplexers
     */
@@ -93,6 +103,9 @@ module testbench
    wire [0:num_ports*data_width-1]   flit_data_out_op;
    wire [0:num_ports-1] 	     cred_valid_in_op;
    wire [0:num_ports*vc_idx_width-1] cred_vc_in_op;
+
+   reg 				     active;
+   wire [0:num_ports*num_vcs-1]      empty_ip_ivc;
    
    generate
       
@@ -103,6 +116,8 @@ module testbench
 	   if(ip < num_ports - num_nodes_per_router)
 	     begin
 		
+		assign empty_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+			 = {num_vcs{1'b1}};
 		assign flit_valid_in_ip[ip] = 1'b0;
 		assign flit_vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]
 			 = {vc_idx_width{1'b0}};
@@ -213,13 +228,13 @@ module testbench
 		     wire sw_gnt;
 		     assign sw_gnt = sw_gnt_ivc[ivc];
 		     
+		     wire 		   empty;
 		     wire flit_valid;
 		     wire flit_head;
 		     wire flit_tail;
 		     wire [0:data_width-1] flit_data;
 		     wire 		   vc_req;
 		     wire 		   sw_req;
-		     
 		     packet_source
 		       #(.packet_length(packet_length),
 			 .packet_rate(packet_rate),
@@ -232,6 +247,8 @@ module testbench
 		     ps
 		       (.clk(clk),
 			.reset(reset),
+			.active(active),
+			.empty(empty),
 			.flit_valid(flit_valid),
 			.flit_head(flit_head),
 			.flit_tail(flit_tail),
@@ -241,6 +258,7 @@ module testbench
 			.sw_req(sw_req),
 			.sw_gnt(sw_gnt));
 		     
+		     assign empty_ip_ivc[ip*num_vcs+ivc] = empty;
 		     assign flit_valid_ivc[ivc] = flit_valid;
 		     assign flit_head_ivc[ivc] = flit_head;
 		     assign flit_tail_ivc[ivc] = flit_tail;
@@ -330,12 +348,13 @@ module testbench
    router
      #(.reset_type(reset_type),
        .address(address),
-       .sw_spec_level(sw_spec_level),
        .replicate_port_decoder(replicate_port_decoder),
        .vc_allocator_type(vc_allocator_type),
        .vc_arbiter_type(vc_arbiter_type),
        .sw_allocator_type(sw_allocator_type),
        .sw_arbiter_type(sw_arbiter_type),
+       .sw_spec_level(sw_spec_level),
+       .sw_spec_cred_check(sw_spec_cred_check),
        .crossbar_type(crossbar_type),
        .dedicated_free_ivc_regs(dedicated_free_ivc_regs),
        .buffer_free_threshold(buffer_free_threshold))
@@ -419,12 +438,19 @@ module testbench
    begin
       
       reset = 1'b1;
+      active = 1'b0;
       
       #(2*Tclk);
       
       reset = 1'b0;
+      active = 1'b1;
       
       #(sim_cycles*Tclk);
+      
+      active = 1'b0;
+      
+      while(~&empty_ip_ivc)
+	#(Tclk);
       
       $finish;
       
