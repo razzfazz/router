@@ -105,7 +105,6 @@ module testbench
    wire [0:num_ports*vc_idx_width-1] cred_vc_in_op;
 
    reg 				     active;
-   wire [0:num_ports*num_vcs-1]      empty_ip_ivc;
    
    generate
       
@@ -116,8 +115,6 @@ module testbench
 	   if(ip < num_ports - num_nodes_per_router)
 	     begin
 		
-		assign empty_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			 = {num_vcs{1'b1}};
 		assign flit_valid_in_ip[ip] = 1'b0;
 		assign flit_vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]
 			 = {vc_idx_width{1'b0}};
@@ -228,7 +225,6 @@ module testbench
 		     wire sw_gnt;
 		     assign sw_gnt = sw_gnt_ivc[ivc];
 		     
-		     wire 		   empty;
 		     wire flit_valid;
 		     wire flit_head;
 		     wire flit_tail;
@@ -248,7 +244,6 @@ module testbench
 		       (.clk(clk),
 			.reset(reset),
 			.active(active),
-			.empty(empty),
 			.flit_valid(flit_valid),
 			.flit_head(flit_head),
 			.flit_tail(flit_tail),
@@ -258,7 +253,6 @@ module testbench
 			.sw_req(sw_req),
 			.sw_gnt(sw_gnt));
 		     
-		     assign empty_ip_ivc[ip*num_vcs+ivc] = empty;
 		     assign flit_valid_ivc[ivc] = flit_valid;
 		     assign flit_head_ivc[ivc] = flit_head;
 		     assign flit_tail_ivc[ivc] = flit_tail;
@@ -426,6 +420,34 @@ module testbench
       .d(cred_vc_dly_op_s),
       .q(cred_vc_dly_op_q));
    
+   wire [0:31] in_flits_s, in_flits_q;
+   assign in_flits_s = in_flits_q + pop_count(flit_valid_in_ip);
+   dff
+     #(.width(32),
+       .reset_type(reset_type))
+   in_flitsq
+     (.clk(clk),
+      .reset(reset),
+      .d(in_flits_s),
+      .q(in_flits_q));
+   
+   wire [0:31] in_flits;
+   assign in_flits = in_flits_s;
+   
+   wire [0:31] out_flits_s, out_flits_q;
+   assign out_flits_s = out_flits_q + pop_count(flit_valid_out_op);
+   dff
+     #(.width(32),
+       .reset_type(reset_type))
+   out_flitsq
+     (.clk(clk),
+      .reset(reset),
+      .d(out_flits_s),
+      .q(out_flits_q));
+   
+   wire [0:31] out_flits;
+   assign out_flits = out_flits_s;
+   
    always
    begin
       clk <= 1'b1;
@@ -440,17 +462,22 @@ module testbench
       reset = 1'b1;
       active = 1'b0;
       
-      #(2*Tclk);
+      #(Tclk);
       
       reset = 1'b0;
+
+      #(Tclk);
+      
       active = 1'b1;
       
       #(sim_cycles*Tclk);
       
       active = 1'b0;
       
-      while(~&empty_ip_ivc)
+      while(in_flits > out_flits)
 	#(Tclk);
+      
+      $display($time, "%d packets", out_flits);
       
       $finish;
       
