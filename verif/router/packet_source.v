@@ -1,6 +1,6 @@
 module packet_source
-  (clk, reset, active, empty, flit_valid, flit_head, flit_tail, flit_data,
-   vc_req, vc_gnt, sw_req, sw_gnt);
+  (clk, reset, active, flit_valid, flit_head, flit_tail, flit_data, vc_req,
+   vc_gnt, sw_req, sw_gnt);
    
 `include "functions.v"
 `include "config.v"
@@ -21,7 +21,6 @@ module packet_source
    input reset;
    
    input active;
-   output empty;
    
    output flit_valid;
    output flit_head;
@@ -33,8 +32,6 @@ module packet_source
 
    output sw_req;
    input sw_gnt;
-   
-   wire empty;
    
    reg flit_valid;
    reg flit_head;
@@ -64,8 +61,6 @@ module packet_source
    
    wire 			 packet_count_zero;
    assign packet_count_zero = ~|packet_count_q;
-   
-   assign empty = packet_count_zero;
    
    reg 				 active_s;
    wire 			 active_q;
@@ -121,8 +116,9 @@ module packet_source
    always @(posedge clk)
      begin
 	incr_packet_count
-	  = active & $dist_uniform(seed, 0, 99) < (packet_rate / packet_length);
-	is_adaptive = $dist_uniform(seed, 0, 99) < adaptive_rate;
+	  = ($dist_uniform(seed, 0, 99) < (packet_rate / packet_length)) &&
+	    active;
+	is_adaptive = ($dist_uniform(seed, 0, 99) < adaptive_rate);
 	is_reply = $dist_uniform(seed, 0, 1);
 	for(i = 0; i < data_width; i = i + 1)
 	  random_data[i] = $dist_uniform(seed, 0, 1);
