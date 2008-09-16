@@ -33,11 +33,21 @@ module rr_arbiter
    wire [0:num_ports-1] gnt_rev;
    assign gnt_rev = |req_qual ? {gnt_qual, 1'b0} : gnt_unqual;
    
+   // The worst-case effect of bit errors in prev_q is screwing up priorities 
+   // until the next update; this only affects performance, not functionality,
+   // so no need to add protection here.
    wire [0:num_ports-2] prev_s;
+   assign prev_s = update ? gnt_rev[1:num_ports-1] : prev_q;
+   dff
+     #(.width(num_ports-1),
+       .reset_type(reset_type))
+   prevq
+     (.clk(clk),
+      .reset(reset),
+      .d(prev_s),
+      .q(prev_q));
    
    generate   
-      
-      assign prev_s = update ? gnt_rev[1:num_ports-1] : prev_q;
       
       genvar 		i;
       for(i = 0; i < num_ports; i = i + 1)
@@ -45,15 +55,6 @@ module rr_arbiter
 	   assign req_rev[i] = req[(num_ports-1)-i];
 	   assign gnt[i] = gnt_rev[(num_ports-1)-i];
 	end
-      
-      dff
-	#(.width(num_ports-1),
-	  .reset_type(reset_type))
-      prevq
-	(.clk(clk),
-	 .reset(reset),
-	 .d(prev_s),
-	 .q(prev_q));
       
    endgenerate
    
