@@ -15,6 +15,7 @@ module sw_alloc
     3: wavefront, replicate logic for priorities
     4: wavefront, diagonal propagation allocator
     5: wavefront, rotate inputs for priority
+    6: wavefront, false combinational loop
     */
    parameter allocator_type = 0;
    
@@ -76,7 +77,7 @@ module sw_alloc
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
-	2, 3, 4, 5:
+	2, 3, 4, 5, 6:
 	  begin
 	     sw_alloc_core_wf
 	       #(.reset_type(reset_type),
