@@ -15,7 +15,7 @@ module testbench
    
    parameter reset_type = reset_type_async;
    
-   localparam num_allocator_types = 6;
+   localparam num_allocator_types = 7;
    localparam num_arbiter_types = 2;
    
    function integer get_flow(input [0:num_ports*num_ports-1] gnt_matrix);
@@ -346,13 +346,13 @@ module testbench
 		
 		sw_alloc
 		  #(.reset_type(reset_type),
-		    .ignore_same_port(ignore_same_port),
 		    .allocator_type(allocator_type),
 		    .arbiter_type(arbiter_type))
 		alloc
 		  (.clk(clk),
 		   .reset(reset),
-		   .sw_req_ip_ivc_op(req_ip_ivc_op),
+		   .sw_req_nonspec_ip_ivc_op(req_ip_ivc_op),
+		   .sw_req_spec_ip_ivc_op({num_ports*num_vcs*num_ports{1'b0}}),
 		   .sw_gnt_ip_ivc(gnt_ip_ivc),
 		   .sw_gnt_ip_op(gnt_ip_op));
 		
