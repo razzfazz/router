@@ -2,11 +2,31 @@ module router
   (clk, reset, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
    flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
    flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
-   flit_data_out_op, cred_valid_in_op, cred_vc_in_op);
+   flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
    
 `include "functions.v"
 `include "config.v"
 `include "constants.v"
+   
+   // enable performance counters
+   parameter perf_ctrs = 0;
+   
+   /*
+    0: disable checker
+    1: enable checker in simulation only
+    2: enable checker in simulation and synthesis
+    */
+   parameter error_checker_mode = 1;
+   
+   /*
+    0: do not capture (hold) errors
+    1: capture (hold) first error only
+    2: capture (hold) all errors
+    */
+   parameter error_capture_mode = 0;
+   
+   // enable error recovery
+   parameter error_recovery = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -35,6 +55,7 @@ module router
     3: wavefront, replicate logic for priorities
     4: wavefront, diagonal propagation allocator
     5: wavefront, rotate inputs for priority
+    6: wavefront, false combinational loop
     */
    parameter sw_allocator_type = 0;
    
@@ -102,6 +123,8 @@ module router
    input [0:num_ports-1] cred_valid_in_op;
    input [0:num_ports*vc_idx_width-1] cred_vc_in_op;
    
+   output error;
+   
    wire [0:num_ports-1] cred_valid_out_ip;
    wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
    
@@ -110,6 +133,8 @@ module router
    wire [0:num_ports-1] 	     flit_head_out_op;
    wire [0:num_ports-1] 	     flit_tail_out_op;
    wire [0:num_ports*data_width-1]   flit_data_out_op;
+   
+   wire 			     error;
    
    
    //---------------------------------------------------------------------------
@@ -132,6 +157,8 @@ module router
    wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
    
    wire [0:num_ports*crossbar_width-1] 	  xbr_data_in_ip;
+   
+   wire [0:num_ports-1] 		  ipc_error_ip;
    
    generate
       
@@ -179,12 +206,17 @@ module router
 	   wire [0:data_width-1] 	flit_data_out;
 	   wire 			cred_valid_out;
 	   wire [0:vc_idx_width-1] 	cred_vc_out;
+	   wire 			ipc_error;
 	   ip_ctrl
 	     #(.sw_spec_enable(sw_spec_level > 0),
 	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
 	       .port_id(ip),
+	       .perf_ctrs(perf_ctrs),
+	       .error_checker_mode(error_checker_mode),
+	       .error_capture_mode(error_capture_mode),
+	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),
@@ -209,7 +241,8 @@ module router
 	      .flit_tail_out(flit_tail_out),
 	      .flit_data_out(flit_data_out),
 	      .cred_valid_out(cred_valid_out),
-	      .cred_vc_out(cred_vc_out));
+	      .cred_vc_out(cred_vc_out),
+	      .error(ipc_error));
 	   
 	   assign vc_req_ip_ivc_op[ip*num_vcs*num_ports:
 				   (ip+1)*num_vcs*num_ports-1] = vc_req_ivc_op;
@@ -227,6 +260,7 @@ module router
 	   assign cred_valid_out_ip[ip] = cred_valid_out;
 	   assign cred_vc_out_ip[ip*vc_idx_width:
 				 (ip+1)*vc_idx_width-1] = cred_vc_out;
+	   assign ipc_error_ip[ip] = ipc_error;
 	   
 	end
       
@@ -300,6 +334,8 @@ module router
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs-1] 	free_op_ivc;
+
+   wire [0:num_ports-1] 		opc_error_op;
    
    generate
       
@@ -341,9 +377,12 @@ module router
 	   wire [0:num_vcs-1] 	     free_ovc;
 	   wire [0:num_vcs-1] 	     free_plus1_ovc;
 	   wire [0:num_vcs-1] 	     free_ivc;
+	   wire 		     opc_error;
 	   op_ctrl
 	     #(.dedicated_free_ivc_regs(dedicated_free_ivc_regs),
 	       .buffer_free_threshold(buffer_free_threshold),
+	       .error_checker_mode(error_checker_mode),
+	       .error_capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   opc
 	     (.clk(clk),
@@ -357,7 +396,8 @@ module router
 	      .elig_ovc(elig_ovc),
 	      .free_ovc(free_ovc),
 	      .free_plus1_ovc(free_plus1_ovc),
-	      .free_ivc(free_ivc));
+	      .free_ivc(free_ivc),
+	      .error(opc_error));
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
 	   assign free_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = free_ovc;
@@ -375,6 +415,7 @@ module router
 		    = flit_tail;
 	   assign flit_data_out_op[op*data_width:(op+1)*data_width-1]
 		    = flit_data;
+	   assign opc_error_op[op] = opc_error;
 	   
 	end
       
@@ -390,5 +431,27 @@ module router
    free_ivc_op_intl
      (.data_in(free_op_ivc),
       .data_out(free_ivc_op));
+   
+   
+   //---------------------------------------------------------------------------
+   // error reporting
+   //---------------------------------------------------------------------------
+   
+   wire [0:2*num_ports-1] 	     errors_in;
+   assign errors_in = {ipc_error_ip, opc_error_op};
+   
+   wire [0:2*num_ports-1] 	     errors_out;
+   checker
+     #(.num_errors(2*num_ports),
+       .checker_mode(error_checker_mode),
+       .capture_mode(error_capture_mode),
+       .reset_type(reset_type))
+   chk
+     (.clk(clk),
+      .reset(reset),
+      .errors_in(errors_in),
+      .errors_out(errors_out));
+   
+   assign error = |errors_out;
    
 endmodule
