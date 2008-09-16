@@ -7,6 +7,8 @@ module sw_alloc_core_sep_of
 `include "config.v"
 `include "config_utils.v"
    
+   parameter error_recovery = 0;
+   
    parameter reset_type = reset_type_async;
    
    /*

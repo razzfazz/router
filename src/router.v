@@ -272,9 +272,9 @@ module router
    //---------------------------------------------------------------------------
    
    vc_alloc
-     #(.reset_type(reset_type),
-       .allocator_type(vc_allocator_type),
-       .arbiter_type(vc_arbiter_type))
+     #(.allocator_type(vc_allocator_type),
+       .arbiter_type(vc_arbiter_type),
+       .reset_type(reset_type))
    vca
      (.clk(clk),
       .reset(reset),
@@ -290,10 +290,11 @@ module router
    //---------------------------------------------------------------------------
    
    sw_alloc
-     #(.reset_type(reset_type),
-       .allocator_type(sw_allocator_type),
+     #(.allocator_type(sw_allocator_type),
        .arbiter_type(sw_arbiter_type),
-       .spec_level(sw_spec_level))
+       .spec_level(sw_spec_level),
+       .error_recovery(error_recovery),
+       .reset_type(reset_type))
    swa
      (.clk(clk),
       .reset(reset),

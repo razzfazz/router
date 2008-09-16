@@ -6,6 +6,8 @@ module sw_alloc
 `include "constants.v"
 `include "config.v"
    
+   parameter error_recovery = 0;
+   
    parameter reset_type = reset_type_async;
    
    /*
@@ -54,7 +56,8 @@ module sw_alloc
 	     sw_alloc_core_sep_if
 	       #(.reset_type(reset_type),
 		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level))
+		 .spec_level(spec_level),
+		 .error_recovery(error_recovery))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
@@ -68,7 +71,8 @@ module sw_alloc
 	     sw_alloc_core_sep_of
 	       #(.reset_type(reset_type),
 		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level))
+		 .spec_level(spec_level),
+		 .error_recovery(error_recovery))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
@@ -83,7 +87,8 @@ module sw_alloc
 	       #(.reset_type(reset_type),
 		 .allocator_type(allocator_type-2),
 		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level))
+		 .spec_level(spec_level),
+		 .error_recovery(error_recovery))
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),

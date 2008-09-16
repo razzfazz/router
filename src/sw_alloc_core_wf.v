@@ -7,6 +7,8 @@ module sw_alloc_core_wf
 `include "config.v"
 `include "config_utils.v"
    
+   parameter error_recovery = 0;
+   
    parameter reset_type = reset_type_async;
    
    /*
@@ -387,9 +389,10 @@ module sw_alloc_core_wf
    
    wf_alloc
      #(.num_ports(num_ports),
-       .reset_type(reset_type),
        .allocator_type(allocator_type),
-       .mask(mask_ip_op))
+       .mask(mask_ip_op),
+       .error_recovery(error_recovery),
+       .reset_type(reset_type))
    gnt_out_nonspec_ip_op_alloc
      (.clk(clk),
       .reset(reset),
@@ -410,9 +413,10 @@ module sw_alloc_core_wf
 	   wire [0:num_ports*num_ports-1] 	gnt_out_unmasked_spec_ip_op;
 	   wf_alloc
 	     #(.num_ports(num_ports),
-	       .reset_type(reset_type),
 	       .allocator_type(allocator_type),
-	       .mask(mask_ip_op))
+	       .mask(mask_ip_op),
+	       .error_recovery(error_recovery),
+	       .reset_type(reset_type))
 	   gnt_out_unmasked_spec_ip_op_alloc
 	     (.clk(clk),
 	      .reset(reset),
