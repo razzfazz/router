@@ -13,6 +13,10 @@ module wf_alloc_core_mux
    
    parameter reset_type = reset_type_async;
    
+   parameter error_recovery = 0;
+   
+   localparam [0:num_ports-1] prio_init = {1'b1, {(num_ports-1){1'b0}}};
+   
    
    input clk;
    input reset;
@@ -27,31 +31,37 @@ module wf_alloc_core_mux
    output [0:num_ports*num_ports-1] gnt;
    
    wire [0:num_ports*num_ports-1] gnt;
-   
+
+   // Need to make sure this stays one-hot, as bit errors can lead to
+   // conflicting grants being generated!
    wire [0:num_ports-1] 	  prio_s, prio_q;
-   assign prio_s = update ? {prio_q[1:num_ports-1], prio_q[0]} : prio_q;
+   wire 			  prio_bad;
+   assign prio_bad = ~^prio_q;
+   wire [0:num_ports-1] 	  prio_fixed;
+   assign prio_fixed = (error_recovery && prio_bad) ? prio_init : prio_q;
+   assign prio_s = update ?
+		   {prio_fixed[num_ports-1], prio_fixed[0:num_ports-2]} :
+		   prio_fixed;
    dff
      #(.width(num_ports),
        .reset_type(reset_type),
-       .reset_value({{(num_ports-1){1'b0}}, 1'b1}))
+       .reset_value(prio_init))
    prioq
      (.clk(clk),
       .reset(reset),
       .d(prio_s),
       .q(prio_q));
    
-   wire [0:num_ports*num_ports-1] y;
    wire [0:num_ports*num_ports-1] req_msk;
+   assign req_msk = req & mask;
+   
+   wire [0:num_ports*num_ports-1] y;
    
    generate
       
       genvar 			  row;
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
-	   
-	   assign req_msk[row*num_ports:(row+1)*num_ports-1]
-		    = req[row*num_ports:(row+1)*num_ports-1] &
-		      mask[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] x_in, y_in;
 	   wire [0:num_ports] 	x_out, y_out;

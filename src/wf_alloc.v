@@ -12,12 +12,15 @@ module wf_alloc
     1: replicate logic per priority
     2: diagonal propagation arbiter (DPA, see Hurt99)
     3: rotate inputs/outputs based on priority
+    4: false combinational loop
     */
    parameter allocator_type = 0;
    
    parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
    
    parameter reset_type = reset_type_async;
+   
+   parameter error_recovery = 0;
    
    
    input clk;
@@ -43,7 +46,8 @@ module wf_alloc
 	     wf_alloc_core_mux
 	       #(.num_ports(num_ports),
 		 .mask(mask),
-		 .reset_type(reset_type))
+		 .reset_type(reset_type),
+		 .error_recovery(error_recovery))
 	     core_mux
 	       (.clk(clk),
 		.reset(reset),
@@ -56,7 +60,8 @@ module wf_alloc
 	     wf_alloc_core_rep
 	       #(.num_ports(num_ports),
 		 .mask(mask),
-		 .reset_type(reset_type))
+		 .reset_type(reset_type),
+		 .error_recovery(error_recovery))
 	     core_rep
 	       (.clk(clk),
 		.reset(reset),
@@ -69,7 +74,8 @@ module wf_alloc
 	     wf_alloc_core_dpa
 	       #(.num_ports(num_ports),
 		 .mask(mask),
-		 .reset_type(reset_type))
+		 .reset_type(reset_type),
+		 .error_recovery(error_recovery))
 	     core_dpa
 	       (.clk(clk),
 		.reset(reset),
@@ -82,7 +88,22 @@ module wf_alloc
 	     wf_alloc_core_rot
 	       #(.num_ports(num_ports),
 		 .mask(mask),
-		 .reset_type(reset_type))
+		 .reset_type(reset_type),
+		 .error_recovery(error_recovery))
+	     core_rot
+	       (.clk(clk),
+		.reset(reset),
+		.update(update),
+		.req(req),
+		.gnt(gnt));
+	  end
+	4:
+	  begin
+	     wf_alloc_core_loop
+	       #(.num_ports(num_ports),
+		 .mask(mask),
+		 .reset_type(reset_type),
+		 .error_recovery(error_recovery))
 	     core_rot
 	       (.clk(clk),
 		.reset(reset),

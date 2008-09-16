@@ -3,6 +3,7 @@ module wf_alloc_core_rep
    
    
 `include "constants.v"
+`include "functions.v"
    
    
    // number of input/output ports
@@ -12,6 +13,10 @@ module wf_alloc_core_rep
    parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
    
    parameter reset_type = reset_type_async;
+   
+   parameter error_recovery = 0;
+   
+   localparam prio_width = clogb(num_ports);
    
    
    input clk;
@@ -28,31 +33,28 @@ module wf_alloc_core_rep
    
    wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:num_ports-1] 	  prio_s, prio_q;
-   
-   assign prio_s = update ? {prio_q[1:num_ports-1], prio_q[0]} : prio_q;
-   dff
-     #(.width(num_ports),
-       .reset_type(reset_type),
-       .reset_value({{(num_ports-1){1'b0}}, 1'b1}))
-   prioq
+   wire [0:prio_width-1] 	  current_prio;
+   wire [0:prio_width-1] 	  next_prio;
+   mod_ctr
+     #(.num_values(num_ports),
+       .reset_type(reset_type))
+   prio_ctr
      (.clk(clk),
       .reset(reset),
-      .d(prio_s),
-      .q(prio_q));
+      .incr(update),
+      .value(current_prio),
+      .next_value(next_prio));
+   
+   wire [0:num_ports*num_ports-1] 	    req_msk;
+   assign req_msk = req & mask;
    
    wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
-   wire [0:num_ports*num_ports-1] 	    req_msk;
    
    generate
       
       genvar 				    prio;
       for(prio = 0; prio < num_ports; prio = prio + 1)
 	begin:prios
-	   
-	   assign req_msk[prio*num_ports:(prio+1)*num_ports-1]
-		    = req[prio*num_ports:(prio+1)*num_ports-1] &
-		      mask[prio*num_ports:(prio+1)*num_ports-1];
 	   
 	   wire [0:num_ports*num_ports-1] req_int;
 	   wire [0:num_ports*num_ports-1] gnt_int;
@@ -103,11 +105,11 @@ module wf_alloc_core_rep
       
    endgenerate
    
-   select_1ofn
+   mux_nto1
      #(.width(num_ports*num_ports),
        .num_ports(num_ports))
-   gnt_sel
-     (.select(prio_q),
+   gnt_mux
+     (.select(current_prio),
       .data_in(gnt_by_prio),
       .data_out(gnt));
    

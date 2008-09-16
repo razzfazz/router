@@ -11,6 +11,11 @@ module wf_alloc_core_dpa
    
    parameter reset_type = reset_type_async;
    
+   parameter error_recovery = 0;
+   
+   localparam [0:(2*num_ports-1)-1] prio_init
+     = {{num_ports{1'b1}}, {(num_ports-1){1'b0}}};
+   
    
    input clk;
    input reset;
@@ -26,38 +31,41 @@ module wf_alloc_core_dpa
    
    wire [0:num_ports*num_ports-1] gnt;
    
+   // Need to make sure priority is one-hot, otherwise conflicting grants can be
+   // generated!
    wire [0:(2*num_ports-1)-1] 	  prio_s, prio_q;
+   wire 			  prio_bad;
+   assign prio_bad = ^prio_q ^ ^prio_init;
    
    wire 			  reset_prio;
-   assign reset_prio = ~|prio_q[num_ports:(2*num_ports-1)-1];
+   assign reset_prio = ~|prio_q[0:(num_ports-1)-1] ||
+		       (error_recovery && prio_bad);
    
    assign prio_s = update ?
-		   reset_prio ?
-		   {{(num_ports-1){1'b0}}, {num_ports{1'b1}}} :
-		   {prio_q[1:(2*num_ports-1)-1], 1'b0} :
+		   (reset_prio ?
+		    prio_init :
+		    {1'b0, prio_q[0:(2*num_ports-1)-2]}) :
 		   prio_q;
    dff
      #(.width(2*num_ports-1),
        .reset_type(reset_type),
-       .reset_value({{(num_ports-1){1'b0}}, {num_ports{1'b1}}}))
+       .reset_value(prio_init))
    prioq
      (.clk(clk),
       .reset(reset),
       .d(prio_s),
       .q(prio_q));
    
-   wire [0:num_ports*(2*num_ports-2)-1] x;
    wire [0:num_ports*num_ports-1] 	req_msk;
+   assign req_msk = req & mask;
+   
+   wire [0:num_ports*(2*num_ports-2)-1] x;
    
    generate
       
       genvar 				col;
       for(col = 0; col < num_ports; col = col + 1)
 	begin:cols
-	   
-	   assign req_msk[col*num_ports:(col+1)*num_ports-1]
-		    = req[col*num_ports:(col+1)*num_ports-1] &
-		      mask[col*num_ports:(col+1)*num_ports-1];
 	   
 	   wire [0:(2*num_ports-1)-1] x_in, y_in;
 	   wire [0:(2*num_ports-1)-1] x_out, y_out;

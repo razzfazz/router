@@ -13,7 +13,10 @@ module wf_alloc_core_rot
    parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
    
    parameter reset_type = reset_type_async;
-   localparam port_width = clogb(num_ports);
+   
+   parameter error_recovery = 0;
+   
+   localparam prio_width = clogb(num_ports);
    
    
    input clk;
@@ -31,7 +34,21 @@ module wf_alloc_core_rot
    wire [0:num_ports*num_ports-1] gnt;
    
    wire [0:num_ports*num_ports-1] y;
+   
    wire [0:num_ports*num_ports-1] req_msk;
+   assign req_msk = req & mask;
+   
+   wire [0:prio_width-1] 	  current_prio;
+   wire [0:prio_width-1] 	  next_prio;
+   mod_ctr
+     #(.num_values(num_ports),
+       .reset_type(reset_type))
+   prio_ctr
+     (.clk(clk),
+      .reset(reset),
+      .incr(update),
+      .value(current_prio),
+      .next_value(next_prio));
    
    generate
       
@@ -39,46 +56,28 @@ module wf_alloc_core_rot
       for(row = 0; row < num_ports; row = row + 1)
 	begin:rows
 	   
-	   assign req_msk[row*num_ports:(row+1)*num_ports-1]
-		    = req[row*num_ports:(row+1)*num_ports-1] &
-		      mask[row*num_ports:(row+1)*num_ports-1];
-	   
-	   wire [0:port_width-1] prio_s, prio_q;
-	   if(2 ** port_width == num_ports)
-	     begin
-		// in this case, we have natural wraparound
-		assign prio_s = update ? (prio_q - 1'b1) : prio_q;
-	     end
-	   else
-	     begin
-		// here we need explicit wraparound
-		assign prio_s = update ?
-				(~|prio_q ?
-				 (num_ports - 1'b1) :
-				 (prio_q - 1'b1)) :
-				prio_q;
-	     end
-	   dff
-	     #(.width(port_width),
-	       .reset_type(reset_type),
-	       .reset_value(num_ports-row-1))
-	   prioq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(prio_s),
-	      .q(prio_q));
-	   
 	   wire [0:num_ports-1] 	req_row;
 	   assign req_row = req_msk[row*num_ports:(row+1)*num_ports-1];
 	   
-	   wire [0:num_ports-1] 	req_in;
+	   wire [0:prio_width-1] 	current_row;
+	   assign current_row = row;
 	   
+	   wire [0:num_ports-1] 	req_tmp;
+	   rotator
+	     #(.width(num_ports),
+	       .direction(1))
+	   req_tmp_rot
+	     (.amount(current_row),
+	      .data_in(req_row),
+	      .data_out(req_tmp));
+	   
+	   wire [0:num_ports-1] 	req_in;
 	   rotator
 	     #(.width(num_ports),
 	       .direction(0))
-	   req_rot
-	     (.data_in(req_row),
-	      .select(prio_q),
+	   req_in_rot
+	     (.amount(current_prio),
+	      .data_in(req_tmp),
 	      .data_out(req_in));
 	   
 	   wire [0:num_ports-1] 	x_in, y_in;
@@ -98,14 +97,22 @@ module wf_alloc_core_rot
 		    ((row+num_ports+1)%num_ports+1)*num_ports-1]
 		    = y_out[0:num_ports-1];
 	   
-	   wire [0:num_ports-1] 	gnt_row;
-	   
+	   wire [0:num_ports-1] 	gnt_tmp;
 	   rotator
 	     #(.width(num_ports),
 	       .direction(1))
-	   gnt_rot
-	     (.data_in(gnt_out),
-	      .select(prio_q),
+	   gnt_tmp_rot
+	     (.amount(current_prio),
+	      .data_in(gnt_out),
+	      .data_out(gnt_tmp));
+	   
+	   wire [0:num_ports-1] 	gnt_row;
+	   rotator
+	     #(.width(num_ports),
+	       .direction(0))
+	   gnt_row_rot
+	     (.amount(current_row),
+	      .data_in(gnt_tmp),
 	      .data_out(gnt_row));
 	   
 	   assign gnt[row*num_ports:(row+1)*num_ports-1] = gnt_row;
