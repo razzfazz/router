@@ -1,11 +1,14 @@
 module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
-   flit_tail_in, elig_ovc, free_ovc, free_plus1_ovc, free_ivc);
+   flit_tail_in, elig_ovc, free_ovc, free_plus1_ovc, free_ivc, error);
 
 `include "functions.v"
 `include "config.v"
 `include "constants.v"
 `include "config_utils.v"
+   
+   parameter error_checker_mode = 1;
+   parameter error_capture_mode = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -18,10 +21,8 @@ module op_ctrl
    localparam [0:num_vcs*num_vcs-1] mask_ivc_ovc
      = create_mask_ivc_ovc(restrict_vcs);
    
-   // synopsys translate_off
    // width for full range of credit count ([0:num_credits])
    localparam cred_count_width = clogb(num_buffers+1);
-   // synopsys translate_on
    
    
    input clk;
@@ -41,10 +42,14 @@ module op_ctrl
    output [0:num_vcs-1] free_plus1_ovc;
    output [0:num_vcs-1] free_ivc;
    
+   output error;
+   
    wire [0:num_vcs-1] elig_ovc;
    wire [0:num_vcs-1] free_ovc;
    wire [0:num_vcs-1] free_plus1_ovc;
    wire [0:num_vcs-1] free_ivc;
+   
+   wire 	      error;
    
    
    wire [0:num_vcs-1] set_elig_ovc;
@@ -101,6 +106,9 @@ module op_ctrl
       .q(cred_plus1_ovc_q));
    
    assign free_plus1_ovc = cred_plus1_ovc_q;
+   
+   wire [0:num_vcs-1] error_hct_ovc;
+   wire [0:num_vcs*2-1] error_cred_ovc;
    
    generate
       
@@ -174,9 +182,12 @@ module op_ctrl
 	   wire 		       head_free;
 	   wire 		       head_free_early;
 	   wire 		       head_free_plus1;
+	   wire 		       error_hct;
 	   credit_tracker
 	     #(.num_credits(num_headers),
 	       .min_credits(1),
+	       .error_checker_mode(error_checker_mode),
+	       .error_capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   hct
 	     (.clk(clk),
@@ -185,12 +196,15 @@ module op_ctrl
 	      .debit(head_debit),
 	      .free(head_free),
 	      .free_early(head_free_early),
-	      .free_plus1(head_free_plus1));
+	      .free_plus1(head_free_plus1),
+	      .error(error_hct));
 	   
 	   assign set_elig_ovc[ovc] = debit & flit_tail_in;
 	   assign reset_elig_ovc[ovc] = head_debit;
 	   
 	   assign elig_ovc[ovc] = elig_ovc_q[ovc] & head_free;
+	   
+	   assign error_hct_ovc[ovc] = error_hct;
 	   
 	   // for overall credits, we can reuse part of the logic that keeps
 	   // track of tails
@@ -228,7 +242,6 @@ module op_ctrl
 	   assign reset_cred_plus1_ovc[ovc]
 		    = |(push_mask & reset_plus1_mask) & decr;
 	   
-	   // synopsys translate_off
 	   wire [0:cred_count_width-1]   cred_count_s, cred_count_q;
 	   assign cred_count_s = cred_count_q + credit - debit;
 	   dff
@@ -241,14 +254,29 @@ module op_ctrl
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   wire 		       error;
-	   assign error = (((cred_count_q == num_buffers) && credit) ||
-			   ((cred_count_q == 0) && debit));
-	   // synopsys translate_on
+	   wire [0:1] 			 error_cred;
+	   assign error_cred = {(cred_count_q == num_buffers) && credit,
+				(cred_count_q == 0) && debit};
+	   
+	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
 	   
 	end
       
-      genvar ivc;
+      wire [0:num_vcs*2-1] 		 errors_out_ovc;
+      checker
+	#(.num_errors(num_vcs*2),
+	  .checker_mode(error_checker_mode),
+	  .capture_mode(error_capture_mode),
+	  .reset_type(reset_type))
+      chk
+	(.clk(clk),
+	 .reset(reset),
+	 .errors_in(error_cred_ovc),
+	 .errors_out(errors_out_ovc));
+      
+      assign error = |error_hct_ovc | |errors_out_ovc;
+      
+      genvar 				 ivc;
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
 	   

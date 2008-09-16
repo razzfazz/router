@@ -1,5 +1,5 @@
 module credit_tracker
-  (clk, reset, debit, credit, free, free_early, free_plus1);
+  (clk, reset, debit, credit, free, free_early, free_plus1, error);
    
 `include "constants.v"
 `include "functions.v"
@@ -11,14 +11,15 @@ module credit_tracker
    // NOTE: must be greater than zero and smaller than or equal to num_credits!
    parameter min_credits = 1;
    
+   parameter error_checker_mode = 1;
+   parameter error_capture_mode = 0;
+   
    parameter reset_type = reset_type_async;
    
    localparam credit_idx_width = clogb(num_credits);
    
-   // synopsys translate_off
    // width for full range of credit count ([0:num_credits])
    localparam true_idx_width = clogb(num_credits+1);
-   // synopsys translate_on
    
    
    input clk;
@@ -37,9 +38,14 @@ module credit_tracker
    // at least min_credits+1 credits available?
    output free_plus1;
    
+   output error;
+   
    wire free;
    wire free_early;
    wire free_plus1;
+   
+   wire error;
+   
    
    wire set_cred, reset_cred;
    wire cred_s, cred_q;
@@ -62,11 +68,9 @@ module credit_tracker
 
    wire decr;
    assign decr = debit & ~credit;
-   
-   // synopsys translate_off
-   wire error;
+
+   wire [0:1] errors;
    wire [0:true_idx_width-1] true_count;
-   // synopsys translate_on
    
    generate
 
@@ -80,10 +84,9 @@ module credit_tracker
 	   
 	   assign free_plus1 = 1'b0;
 	   
-	   // synopsys translate_off
-	   assign error = cred_q ? credit : debit;
+	   assign errors = {cred_q & credit,
+			    ~cred_q & debit};
 	   assign true_count = cred_q;
-	   // synopsys translate_on
 	   
 	end
 
@@ -152,15 +155,26 @@ module credit_tracker
 		
 	     end
 	   
-	   // synopsys translate_off
-	   assign error = (cred_q ?
-			   ((cred_count_q == num_credits-1) && credit) :
-			   ((cred_count_q == 0) && debit));
+	   assign errors = {cred_q && (cred_count_q == num_credits-1) && credit,
+			    !cred_q && (cred_count_q == 0) && debit};
 	   assign true_count = cred_count_q + cred_q;
-	   // synopsys translate_on
 	   
 	end
       
    endgenerate
+   
+   wire [0:1] errors_out;
+   checker
+     #(.num_errors(2),
+       .checker_mode(error_checker_mode),
+       .capture_mode(error_capture_mode),
+       .reset_type(reset_type))
+   chk
+     (.clk(clk),
+      .reset(reset),
+      .errors_in(errors),
+      .errors_out(errors_out));
+   
+   assign error = |errors_out;
    
 endmodule

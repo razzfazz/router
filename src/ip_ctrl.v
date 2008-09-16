@@ -3,7 +3,7 @@ module ip_ctrl
    flit_data_in, free_ivc_op, free_op_ovc, free_plus1_op_ovc, vc_req_ivc_op,
    vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, sw_req_spec_ivc_op,
    sw_gnt_ivc, flit_valid_out, flit_vc_out, flit_head_out, flit_tail_out,
-   flit_data_out, cred_valid_out, cred_vc_out);
+   flit_data_out, cred_valid_out, cred_vc_out, error);
    
 `include "functions.v"
 `include "config.v"
@@ -26,6 +26,12 @@ module ip_ctrl
    
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
+   
+   parameter perf_ctrs = 0;
+   
+   parameter error_checker_mode = 1;
+   parameter error_capture_mode = 0;
+   parameter error_recovery = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -66,6 +72,8 @@ module ip_ctrl
    output cred_valid_out;
    output [0:vc_idx_width-1] cred_vc_out;
    
+   output error;
+   
    wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
    wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
    
@@ -80,6 +88,8 @@ module ip_ctrl
    
    wire 			cred_valid_out;
    wire [0:vc_idx_width-1] 	cred_vc_out;
+   
+   wire 			error;
    
    
    //---------------------------------------------------------------------------
@@ -96,6 +106,7 @@ module ip_ctrl
    wire [0:num_vcs-1] 		   flit_tail_ivc;
    wire [0:num_vcs*buffer_idx_width-1] buff_write_addr_ivc;
    wire [0:num_vcs*buffer_idx_width-1] buff_read_addr_ivc;
+   wire [0:num_vcs-1] 		       ivcc_error_ivc;
    generate
       
       genvar 			ivc;
@@ -124,10 +135,15 @@ module ip_ctrl
 	   wire 		   flit_tail;
 	   wire [0:buffer_idx_width-1] buff_write_addr;
 	   wire [0:buffer_idx_width-1] buff_read_addr;
+	   wire 		       ivcc_error;
 	   ivc_ctrl
 	     #(.sw_spec_enable(sw_spec_enable),
 	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
+	       .perf_ctrs(perf_ctrs),
+	       .error_checker_mode(error_checker_mode),
+	       .error_capture_mode(error_capture_mode),
+	       .error_recovery(error_recovery),
 	       .reset_type(reset_type),
 	       .address(address),
 	       .port_id(port_id),
@@ -153,7 +169,8 @@ module ip_ctrl
 	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
 	      .buff_write_addr(buff_write_addr),
-	      .buff_read_addr(buff_read_addr));
+	      .buff_read_addr(buff_read_addr),
+	      .error(ivcc_error));
 	   
 	   assign vc_req_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = vc_req_op;
 	   assign vc_req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1] = vc_req_ovc;
@@ -172,10 +189,13 @@ module ip_ctrl
 	   assign buff_read_addr_ivc[ivc*buffer_idx_width:
 				     (ivc+1)*buffer_idx_width-1]
 		    = buff_read_addr;
+	   assign ivcc_error_ivc[ivc] = ivcc_error;
 	   
 	end
       
    endgenerate
+   
+   assign error = |ivcc_error_ivc;
    
    
    //---------------------------------------------------------------------------

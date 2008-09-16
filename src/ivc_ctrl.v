@@ -2,7 +2,7 @@ module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
    free_op, free_op_ovc, free_plus1_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
    sw_req_nonspec_op, sw_req_spec_op, sw_gnt, flit_sent, flit_vc_out,
-   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr);
+   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr, error);
    
 `include "functions.v"
 `include "config.v"
@@ -25,6 +25,13 @@ module ivc_ctrl
    
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
+   
+   // enable performance counters 
+   parameter perf_ctrs = 0;
+   
+   parameter error_checker_mode = 1;
+   parameter error_capture_mode = 0;
+   parameter error_recovery = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -67,6 +74,8 @@ module ivc_ctrl
    output [0:buffer_idx_width-1] buff_write_addr;
    output [0:buffer_idx_width-1] buff_read_addr;
    
+   output error;
+   
    wire [0:num_ports-1] vc_req_op;
    wire [0:num_vcs-1] 	vc_req_ovc;
    
@@ -80,6 +89,8 @@ module ivc_ctrl
    
    wire [0:buffer_idx_width-1] buff_write_addr;
    wire [0:buffer_idx_width-1] buff_read_addr;
+   
+   wire 		       error;
    
    
    //---------------------------------------------------------------------------
@@ -161,9 +172,13 @@ module ivc_ctrl
    
    wire 		       hvsr_full;
    wire [0:1] 		       hvsr_data_out;
+   wire 		       hvsr_error;
    shift_register
      #(.width(2),
        .depth(num_buffers),
+       .error_checker_mode(error_checker_mode),
+       .error_capture_mode(error_capture_mode),
+       .error_recovery(error_recovery),
        .reset_type(reset_type))
    hvsr
      (.clk(clk),
@@ -173,12 +188,8 @@ module ivc_ctrl
       .push(hvsr_push),
       .empty(hvsr_empty),
       .data_out(hvsr_data_out),
-      .pop(hvsr_pop));
-   
-   // synopsys translate_off
-   wire 		       error_hvsr;
-   assign error_hvsr = ~hvsr_empty & ~valid_q;
-   // synopsys translate_on
+      .pop(hvsr_pop),
+      .error(hvsr_error));
    
    assign flit_head_out = hvsr_data_out[0];
    assign flit_tail_out = hvsr_data_out[1];
@@ -200,6 +211,7 @@ module ivc_ctrl
    assign hdsr_pop = get_next_header & ~hdsr_empty;
    
    wire [0:route_info_width-1] hdsr_data;
+   wire 		       hdsr_error;
    
    generate
       
@@ -210,6 +222,9 @@ module ivc_ctrl
 	   shift_register
 	     #(.width(route_info_width),
 	       .depth(num_headers-1),
+	       .error_checker_mode(error_checker_mode),
+	       .error_capture_mode(error_capture_mode),
+	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   hdsr
 	     (.clk(clk),
@@ -219,7 +234,8 @@ module ivc_ctrl
 	      .push(hdsr_push),
 	      .empty(hdsr_empty),
 	      .data_out(hdsr_data),
-	      .pop(hdsr_pop));
+	      .pop(hdsr_pop),
+	      .error(hdsr_error));
 	   
 	end
       else
@@ -227,15 +243,11 @@ module ivc_ctrl
 	   
 	   assign hdsr_empty = 1'b1;
 	   assign hdsr_data = {data_width{1'b0}};
+	   assign hdsr_error = 1'b0;
 	   
 	end
       
    endgenerate
-   
-   // synopsys translate_off
-   wire 		       error_hdsr;
-   assign error_hdsr = ~hdsr_empty & ~valid_q;
-   // synopsys translate_on
    
    wire 		       next_valid;
    assign next_valid = (flit_valid_in & flit_head_in) | ~hdsr_empty;
@@ -441,8 +453,11 @@ module ivc_ctrl
    wire 		       fbc_pop;
    assign fbc_pop = flit_sent & ~fbc_empty;
    
+   wire 		       fbc_error;
    fifo_ctrl
      #(.depth(num_buffers),
+       .error_checker_mode(error_checker_mode),
+       .error_capture_mode(error_capture_mode),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
@@ -452,11 +467,30 @@ module ivc_ctrl
       .write_addr(buff_write_addr),
       .read_addr(buff_read_addr),
       .empty(fbc_empty),
-      .empty_early(fbc_empty_early));
+      .empty_early(fbc_empty_early),
+      .error(fbc_error));
    
-   // synopsys translate_off
-   wire 		       error_fbc;
-   assign error_fbc = ~fbc_empty & ~valid_q;
-   // synopsys translate_on   
+   //---------------------------------------------------------------------------
+   // error checking
+   //---------------------------------------------------------------------------
+   
+   wire [0:2] 		       errors_in;
+   assign errors_in = {~hvsr_empty & ~valid_q,
+                       ~hdsr_empty & ~valid_q,
+                       ~fbc_empty & ~valid_q};
+   
+   wire [0:2] 		       errors_out;
+   checker
+     #(.num_errors(3),
+       .checker_mode(error_checker_mode),
+       .capture_mode(error_capture_mode),
+       .reset_type(reset_type))
+   chk
+     (.clk(clk),
+      .reset(reset),
+      .errors_in(errors_in),
+      .errors_out(errors_out));
+   
+   assign error = |errors_out | hvsr_error | hdsr_error | fbc_error;
    
 endmodule
