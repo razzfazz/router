@@ -19,6 +19,8 @@ module testbench();
     2: wavefront, rotate inputs for priority
     3: wavefront, replicated logic for priority
     4: diagonal propagation arbiter (DPA) */
+    5: wavefront, rotate inputs for priority
+    6: wavefront, false combinational loop
    parameter architecture = 4;
    
    
@@ -362,8 +364,7 @@ module testbench();
    
 
    simple_alloc
-     #(.num_ports(num_ports),
-       .reset_type(reset_type),
+     #(.reset_type(reset_type),
        .architecture(architecture))
    alloc
      (.CLK(clk),
