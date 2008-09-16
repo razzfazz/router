@@ -1,10 +1,11 @@
 module simple_alloc
-   (CLK, RST, req_ip_op, gnt_ip_op);
+  (CLK, RST, req_ip_op, gnt_ip_op);
    
    
-`include "config.v"
 `include "constants.v"
    
+   
+   parameter num_ports = 5;
    
    parameter reset_type = reset_type_async;
    
@@ -14,7 +15,9 @@ module simple_alloc
     2: wavefront, mux inputs for priority
     3: wavefront, replicated logic for priority
     4: wavefront, diagonal propagation arbiter
-    5: wavefront, rotate inputs for priority */
+    5: wavefront, rotate inputs for priority
+    6: wavefront, false combinational loop
+    */
    parameter architecture = 0;
    
    
@@ -127,7 +130,7 @@ module simple_alloc
 	     assign gnt_ip_op = gnt2_ip_op;
 	     
 	  end
-	2, 3, 4, 5:
+	2, 3, 4, 5, 6:
 	  begin
 	     
 	     wire update;
