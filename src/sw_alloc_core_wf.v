@@ -14,6 +14,7 @@ module sw_alloc_core_wf
     1: wavefront, replicate logic for priorities
     2: wavefront, diagonal propagation allocator
     3: wavefront, rotate inputs for priority
+    4: wavefront, false combinational loop
     */
    parameter allocator_type = 0;
    
