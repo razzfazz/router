@@ -27,10 +27,11 @@ module ip_ctrl
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
    
-   parameter perf_ctrs = 0;
+   parameter perf_ctr_enable = 1;
+   parameter perf_ctr_width = 32;
    
-   parameter error_checker_mode = 1;
-   parameter error_capture_mode = 0;
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = 0;
    parameter error_recovery = 0;
    
    parameter reset_type = reset_type_async;
@@ -40,6 +41,8 @@ module ip_ctrl
    
    localparam fbf_depth = num_vcs*num_buffers;
    localparam fbf_addr_width = clogb(fbf_depth);
+   
+   localparam event_width = clogb(num_vcs) + 1;
    
    
    input clk;
@@ -107,6 +110,7 @@ module ip_ctrl
    wire [0:num_vcs*buffer_idx_width-1] buff_write_addr_ivc;
    wire [0:num_vcs*buffer_idx_width-1] buff_read_addr_ivc;
    wire [0:num_vcs-1] 		       ivcc_error_ivc;
+   wire [0:num_vcs*5-1] 	       events_ivc;
    generate
       
       genvar 			ivc;
@@ -136,13 +140,14 @@ module ip_ctrl
 	   wire [0:buffer_idx_width-1] buff_write_addr;
 	   wire [0:buffer_idx_width-1] buff_read_addr;
 	   wire 		       ivcc_error;
+	   wire [0:4] 		       events;
 	   ivc_ctrl
 	     #(.sw_spec_enable(sw_spec_enable),
 	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
-	       .perf_ctrs(perf_ctrs),
-	       .error_checker_mode(error_checker_mode),
-	       .error_capture_mode(error_capture_mode),
+	       .perf_ctr_enable(perf_ctr_enable),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
 	       .error_recovery(error_recovery),
 	       .reset_type(reset_type),
 	       .address(address),
@@ -170,7 +175,8 @@ module ip_ctrl
 	      .flit_tail_out(flit_tail),
 	      .buff_write_addr(buff_write_addr),
 	      .buff_read_addr(buff_read_addr),
-	      .error(ivcc_error));
+	      .error(ivcc_error),
+	      .events(events));
 	   
 	   assign vc_req_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = vc_req_op;
 	   assign vc_req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1] = vc_req_ovc;
@@ -190,6 +196,7 @@ module ip_ctrl
 				     (ivc+1)*buffer_idx_width-1]
 		    = buff_read_addr;
 	   assign ivcc_error_ivc[ivc] = ivcc_error;
+	   assign events_ivc[ivc*5:(ivc+1)*5-1] = events;
 	   
 	end
       
@@ -398,5 +405,46 @@ module ip_ctrl
       .q(cred_vc_q));
    
    assign cred_vc_out = cred_vc_q;
+   
+   
+   //---------------------------------------------------------------------------
+   // performance counters
+   //---------------------------------------------------------------------------
+   
+   wire [0:5*num_vcs-1]        events;
+   interleaver
+     #(.width(num_vcs*5),
+       .num_blocks(num_vcs))
+   events_intl
+     (.data_in(events_ivc),
+      .data_out(events));
+   
+   genvar 		       ctr;
+   generate
+      if(perf_ctr_enable > 0)
+	begin
+	   for(ctr = 0; ctr < 5; ctr = ctr + 1)
+	     begin:ctrs
+		wire [0:event_width-1] event_sum;
+		add_nto1
+		  #(.num_ports(num_vcs),
+		    .width(1))
+		event_sum_add
+		  (.data_in(events[ctr*num_vcs:(ctr+1)*num_vcs-1]),
+		   .data_out(event_sum));
+		
+		wire [0:perf_ctr_width-1] ctr_s, ctr_q;
+		assign ctr_s = ctr_q + event_sum;
+		dff
+		  #(.width(perf_ctr_width),
+		    .reset_type(reset_type))
+		ctrq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(ctr_s),
+		   .q(ctr_q));
+	     end
+	end
+   endgenerate
    
 endmodule

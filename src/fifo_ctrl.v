@@ -6,8 +6,8 @@ module fifo_ctrl
    
    parameter depth = 8;
    
-   parameter error_checker_mode = 1;
-   parameter error_capture_mode = 0;
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = 0;
    
    // see dff.v for supported values
    parameter reset_type = reset_type_async;
@@ -115,8 +115,8 @@ module fifo_ctrl
    wire [0:3] 		errors_out;
    checker
      #(.num_errors(4),
-       .checker_mode(error_checker_mode),
-       .capture_mode(error_capture_mode),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    chk
      (.clk(clk),

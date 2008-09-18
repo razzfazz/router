@@ -8,8 +8,8 @@ module shift_register
    parameter depth = 4;
    parameter width = 8;
    
-   parameter error_checker_mode = 1;
-   parameter error_capture_mode = 0;
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = 0;
    parameter error_recovery = 0;
    
    parameter reset_type = reset_type_async;
@@ -123,8 +123,8 @@ module shift_register
 		       error_bad_ptr};
    checker
      #(.num_errors(3),
-       .checker_mode(error_checker_mode),
-       .capture_mode(error_capture_mode),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    chk
      (.clk(clk),

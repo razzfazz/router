@@ -7,8 +7,8 @@ module op_ctrl
 `include "constants.v"
 `include "config_utils.v"
    
-   parameter error_checker_mode = 1;
-   parameter error_capture_mode = 0;
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -186,8 +186,8 @@ module op_ctrl
 	   credit_tracker
 	     #(.num_credits(num_headers),
 	       .min_credits(1),
-	       .error_checker_mode(error_checker_mode),
-	       .error_capture_mode(error_capture_mode),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
 	   hct
 	     (.clk(clk),
@@ -265,8 +265,8 @@ module op_ctrl
       wire [0:num_vcs*2-1] 		 errors_out_ovc;
       checker
 	#(.num_errors(num_vcs*2),
-	  .checker_mode(error_checker_mode),
-	  .capture_mode(error_capture_mode),
+	  .enable(checker_enable),
+	  .capture_mode(checker_capture_mode),
 	  .reset_type(reset_type))
       chk
 	(.clk(clk),

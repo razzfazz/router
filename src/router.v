@@ -9,21 +9,20 @@ module router
 `include "constants.v"
    
    // enable performance counters
-   parameter perf_ctrs = 0;
+   parameter perf_ctr_enable = 1;
    
-   /*
-    0: disable checker
-    1: enable checker in simulation only
-    2: enable checker in simulation and synthesis
-    */
-   parameter error_checker_mode = 1;
+   // width of performance counters
+   parameter perf_ctr_width = 32;
+   
+   // enable error checkers
+   parameter checker_enable = 1;
    
    /*
     0: do not capture (hold) errors
     1: capture (hold) first error only
     2: capture (hold) all errors
     */
-   parameter error_capture_mode = 0;
+   parameter checker_capture_mode = 0;
    
    // enable error recovery
    parameter error_recovery = 0;
@@ -213,9 +212,10 @@ module router
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
 	       .port_id(ip),
-	       .perf_ctrs(perf_ctrs),
-	       .error_checker_mode(error_checker_mode),
-	       .error_capture_mode(error_capture_mode),
+	       .perf_ctr_enable(perf_ctr_enable),
+	       .perf_ctr_width(perf_ctr_width),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
 	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   ipc
@@ -382,8 +382,8 @@ module router
 	   op_ctrl
 	     #(.dedicated_free_ivc_regs(dedicated_free_ivc_regs),
 	       .buffer_free_threshold(buffer_free_threshold),
-	       .error_checker_mode(error_checker_mode),
-	       .error_capture_mode(error_capture_mode),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
 	   opc
 	     (.clk(clk),
@@ -444,8 +444,8 @@ module router
    wire [0:2*num_ports-1] 	     errors_out;
    checker
      #(.num_errors(2*num_ports),
-       .checker_mode(error_checker_mode),
-       .capture_mode(error_capture_mode),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    chk
      (.clk(clk),

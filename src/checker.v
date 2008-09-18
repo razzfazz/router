@@ -4,12 +4,8 @@ module checker
    // number of error inputs
    parameter num_errors = 1;
    
-   /*
-    0: disable checker
-    1: enable checker in simulation only
-    2: enable checker in simulation and synthesis
-    */
-   parameter checker_mode = 1;
+   // enable error checking
+   parameter enable = 1;
    
    /*
     0: do not capture (hold) errors
@@ -33,66 +29,40 @@ module checker
    
    generate
       
-      case(checker_mode)
-	1:
-	  begin
-	     // synopsys translate_off
-	     wire [0:num_errors-1] errors_s, errors_q;
-	     case(capture_mode)
-	       0:
+      if(enable > 0)
+	begin
+	   wire [0:num_errors-1] errors_s, errors_q;
+	   case(capture_mode)
+	     0:
 	       begin
 		  assign errors_s = errors_in;
 	       end
-	       1:
-		 begin
-		    wire [0:num_errors-1] mask;
-		    assign mask = ~{num_errors{|errors_q}};
-		    assign errors_s = errors_q | (mask & errors_in);
-		 end
-	       2:
-		 begin
-		    assign errors_s = errors_q | errors_in;
-		 end
-	     endcase
-	     dff
-	       #(.width(num_errors),
-		 .reset_type(reset_type))
-	     errorsq
-	       (.clk(clk),
-	        .reset(reset),
-	        .d(errors_s),
-	        .q(errors_q));
-	     // synopsys translate_on
-	  end
-	2:
-	  begin
-	     wire [0:num_errors-1] errors_s, errors_q;
-	     case(capture_mode)
-	       0:
+	     1:
 	       begin
-		  assign errors_s = errors_in;
+		  wire [0:num_errors-1] mask;
+		  assign mask = ~{num_errors{|errors_q}};
+		  assign errors_s = errors_q | (mask & errors_in);
 	       end
-	       1:
-		 begin
-		    wire [0:num_errors-1] mask;
-		    assign mask = ~{num_errors{|errors_q}};
-		    assign errors_s = errors_q | (mask & errors_in);
-		 end
-	       2:
-		 begin
-		    assign errors_s = errors_q | errors_in;
-		 end
-	     endcase
-	     dff
-	       #(.width(num_errors),
-		 .reset_type(reset_type))
-	     errorsq
-	       (.clk(clk),
-	        .reset(reset),
-	        .d(errors_s),
-	        .q(errors_q));
-	  end
-	endcase
+	     2:
+	       begin
+		  assign errors_s = errors_q | errors_in;
+	       end
+	   endcase
+	   dff
+	     #(.width(num_errors),
+	       .reset_type(reset_type))
+	   errorsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(errors_s),
+	      .q(errors_q));
+	   
+	   assign errors_out = errors_q;
+	end
+      else
+	begin
+	   assign errors_out = {num_errors{1'b0}};
+	end
       
    endgenerate
    

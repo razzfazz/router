@@ -2,7 +2,8 @@ module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
    free_op, free_op_ovc, free_plus1_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
    sw_req_nonspec_op, sw_req_spec_op, sw_gnt, flit_sent, flit_vc_out,
-   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr, error);
+   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr, error,
+   events);
    
 `include "functions.v"
 `include "config.v"
@@ -26,11 +27,10 @@ module ivc_ctrl
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
    
-   // enable performance counters 
-   parameter perf_ctrs = 0;
+   parameter perf_ctr_enable = 1;
    
-   parameter error_checker_mode = 1;
-   parameter error_capture_mode = 0;
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = 0;
    parameter error_recovery = 0;
    
    parameter reset_type = reset_type_async;
@@ -76,6 +76,9 @@ module ivc_ctrl
    
    output error;
    
+   output [0:4] events;
+   
+   
    wire [0:num_ports-1] vc_req_op;
    wire [0:num_vcs-1] 	vc_req_ovc;
    
@@ -91,6 +94,8 @@ module ivc_ctrl
    wire [0:buffer_idx_width-1] buff_read_addr;
    
    wire 		       error;
+   
+   wire [0:4] 		       events;
    
    
    //---------------------------------------------------------------------------
@@ -176,8 +181,8 @@ module ivc_ctrl
    shift_register
      #(.width(2),
        .depth(num_buffers),
-       .error_checker_mode(error_checker_mode),
-       .error_capture_mode(error_capture_mode),
+       .checker_enable(checker_enable),
+       .checker_capture_mode(checker_capture_mode),
        .error_recovery(error_recovery),
        .reset_type(reset_type))
    hvsr
@@ -222,8 +227,8 @@ module ivc_ctrl
 	   shift_register
 	     #(.width(route_info_width),
 	       .depth(num_headers-1),
-	       .error_checker_mode(error_checker_mode),
-	       .error_capture_mode(error_capture_mode),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
 	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   hdsr
@@ -456,8 +461,8 @@ module ivc_ctrl
    wire 		       fbc_error;
    fifo_ctrl
      #(.depth(num_buffers),
-       .error_checker_mode(error_checker_mode),
-       .error_capture_mode(error_capture_mode),
+       .checker_enable(checker_enable),
+       .checker_capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
@@ -482,8 +487,8 @@ module ivc_ctrl
    wire [0:2] 		       errors_out;
    checker
      #(.num_errors(3),
-       .checker_mode(error_checker_mode),
-       .capture_mode(error_capture_mode),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    chk
      (.clk(clk),
@@ -492,5 +497,53 @@ module ivc_ctrl
       .errors_out(errors_out));
    
    assign error = |errors_out | hvsr_error | hdsr_error | fbc_error;
+   
+   
+   //---------------------------------------------------------------------------
+   // instrumentation
+   //---------------------------------------------------------------------------
+   
+   wire 		       ev_no_flit;
+   assign ev_no_flit = valid_q & fbc_empty;
+   
+   wire 		       ev_flit_stalled_vc;
+   assign ev_flit_stalled_vc = valid_q & ~fbc_empty & ~vc_allocated;
+   
+   wire 		       ev_flit_stalled_sw;
+   assign ev_flit_stalled_sw = valid_q & ~fbc_empty & vc_allocated & ~sw_gnt;
+   
+   wire 		       ev_flit_sent;
+   assign ev_flit_sent = valid_q & ~fbc_empty & all_allocated;
+   
+   wire 		       ev_flit_sent_spec;
+   assign ev_flit_sent_spec = valid_q & ~fbc_empty & ~allocated_q &
+			      vc_gnt_masked & sw_gnt;
+   
+   generate
+
+      if(perf_ctr_enable > 0)
+	begin
+	   wire [0:4] 	       events_s, events_q;
+	   assign events_s = {ev_no_flit,
+			      ev_flit_stalled_vc,
+			      ev_flit_stalled_sw,
+			      ev_flit_sent,
+			      ev_flit_sent_spec};
+	   dff
+	     #(.width(5),
+	       .reset_type(reset_type))
+	   eventsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(events_s),
+	      .q(events_q));
+	   assign events = events_q;
+	end
+      else
+	begin
+	   assign events = 5'b0;
+	end
+      
+   endgenerate
    
 endmodule

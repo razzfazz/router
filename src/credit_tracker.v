@@ -11,8 +11,8 @@ module credit_tracker
    // NOTE: must be greater than zero and smaller than or equal to num_credits!
    parameter min_credits = 1;
    
-   parameter error_checker_mode = 1;
-   parameter error_capture_mode = 0;
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = 0;
    
    parameter reset_type = reset_type_async;
    
@@ -166,8 +166,8 @@ module credit_tracker
    wire [0:1] errors_out;
    checker
      #(.num_errors(2),
-       .checker_mode(error_checker_mode),
-       .capture_mode(error_capture_mode),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    chk
      (.clk(clk),
