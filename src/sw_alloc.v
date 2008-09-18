@@ -29,8 +29,9 @@ module sw_alloc
    
    /*
     0: disable speculative switch allocation
-    1: only use speculative grants if no non-speculative requests were issued
+    1: only use speculative grants if no non-speculative requests/grants present
     2: use speculative grants when not conflicting with non-spec requests
+    3: use speculative grants when not conflicting with non-spec grants
     */
    parameter spec_level = 0;
    

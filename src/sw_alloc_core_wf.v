@@ -28,8 +28,9 @@ module sw_alloc_core_wf
    
    /*
     0: disable speculative switch allocation
-    1: only use speculative grants if no non-speculative requests were issued
+    1: only use speculative grants if no non-speculative requests/grants present
     2: use speculative grants when not conflicting with non-spec requests
+    3: use speculative grants when not conflicting with non-spec grants
     */
    parameter spec_level = 0;
    
@@ -371,6 +372,47 @@ module sw_alloc_core_wf
 	     assign any_req_out_ip_op = {num_ports{any_req_op}};
 	     
 	     assign spec_mask_ip_op = ~(any_req_in_ip_op | any_req_out_ip_op);
+	     
+	  end
+	3:
+	  begin
+	     
+	     wire [0:num_ports*num_ports-1] gnt_out_nonspec_op_ip;
+	     interleaver
+	       #(.width(num_ports*num_ports),
+		 .num_blocks(num_ports))
+	     gnt_out_nonspec_op_ip_intl
+	       (.data_in(gnt_out_nonspec_ip_op),
+		.data_out(gnt_out_nonspec_op_ip));
+	     
+	     wire [0:num_ports-1] 	    any_gnt_ip;
+	     or_nto1
+	       #(.width(num_ports),
+		 .num_ports(num_ports))
+	     any_gnt_ip_or
+	       (.data_in(gnt_out_nonspec_op_ip),
+		.data_out(any_gnt_ip));
+	     
+	     wire [0:num_ports*num_ports-1] any_gnt_in_ip_op;
+	     replicator
+	       #(.width(num_ports),
+		 .count(num_ports))
+	     any_gnt_in_ip_op_repl
+	       (.data_in(any_gnt_ip),
+		.data_out(any_gnt_in_ip_op));
+	     
+	     wire [0:num_ports-1] any_gnt_op;
+	     or_nto1
+	       #(.width(num_ports),
+		 .num_ports(num_ports))
+	     any_gnt_op_or
+	       (.data_in(gnt_out_nonspec_ip_op),
+		.data_out(any_gnt_op));
+	     
+	     wire [0:num_ports*num_ports-1] any_gnt_out_ip_op;
+	     assign any_gnt_out_ip_op = {num_ports{any_gnt_op}};
+	     
+	     assign spec_mask_ip_op = ~(any_gnt_in_ip_op | any_gnt_out_ip_op);
 	     
 	  end
       endcase
