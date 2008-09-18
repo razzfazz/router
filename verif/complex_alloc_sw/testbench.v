@@ -7,6 +7,8 @@ module testbench
    parameter initial_seed = 0;
    parameter output_as_csv = 1;
    parameter buffer_occupancy = 75;
+   parameter spec_rate = 25;
+   parameter spec_level = 3;
    
 `include "functions.v"
 `include "config.v"
@@ -275,7 +277,8 @@ module testbench
    reg [0:num_ports*num_ports-1]         req_ip_op;
    reg [0:num_ports*num_ports-1] 	 max_ip_op;
    reg [0:num_ports*num_vcs-1]           req_ip_ivc;
-   reg [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
+   reg [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
+   reg [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
 
    integer 				 seed = initial_seed;
    
@@ -289,7 +292,8 @@ module testbench
        begin
 	  req_ip_op = {num_ports*num_ports{1'b0}};
 	  max_ip_op = {num_ports*num_ports{1'b0}};
-	  req_ip_ivc_op = {num_ports*num_vcs*num_ports{1'b0}};
+	  req_nonspec_ip_ivc_op = {num_ports*num_vcs*num_ports{1'b0}};
+	  req_spec_ip_ivc_op = {num_ports*num_vcs*num_ports{1'b0}};
 	  flow_ideal = 0;
 	  grant_ideal = 0;
        end
@@ -305,15 +309,40 @@ module testbench
 		    
 		    req_ip_ivc[ip*num_vcs+ivc]
 		      = ($dist_uniform(seed, 0, 99) < buffer_occupancy);
-		    req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +: num_ports]
-		      = {num_ports{1'b0}};
-		    req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports+
-				  (ip+$dist_uniform(seed, ignore_same_port,
-						    num_ports-1))%num_ports]
-		      = req_ip_ivc[ip*num_vcs+ivc];
+		    
+		    if($dist_uniform(seed, 0, 99) < spec_rate)
+		      begin
+			 req_spec_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +:
+					    num_ports]
+			   = {num_ports{1'b0}};
+			 req_spec_ip_ivc_op[(ip*num_vcs+ivc)*num_ports+
+					    (ip+
+					     $dist_uniform(seed,
+							   ignore_same_port,
+							   num_ports-1)) % 
+					    num_ports]
+			   = req_ip_ivc[ip*num_vcs+ivc];
+		      end
+		    else
+		      begin
+			 req_nonspec_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +:
+					       num_ports]
+			   = {num_ports{1'b0}};
+			 req_nonspec_ip_ivc_op[(ip*num_vcs+ivc)*num_ports+
+					       (ip+
+						$dist_uniform(seed,
+							      ignore_same_port,
+							      num_ports-1)) % 
+					       num_ports]
+			   = req_ip_ivc[ip*num_vcs+ivc];
+		      end
+		    
 		    req_ip_op[ip*num_ports +: num_ports]
 		      = req_ip_op[ip*num_ports +: num_ports] |
-			req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +: num_ports];
+			req_nonspec_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +:
+					      num_ports] |
+			req_spec_ip_ivc_op[(ip*num_vcs+ivc)*num_ports +:
+					      num_ports];
 		    
 		 end
 	       
@@ -347,12 +376,13 @@ module testbench
 		sw_alloc
 		  #(.reset_type(reset_type),
 		    .allocator_type(allocator_type),
-		    .arbiter_type(arbiter_type))
+		    .arbiter_type(arbiter_type),
+		    .spec_level(spec_level))
 		alloc
 		  (.clk(clk),
 		   .reset(reset),
-		   .sw_req_nonspec_ip_ivc_op(req_ip_ivc_op),
-		   .sw_req_spec_ip_ivc_op({num_ports*num_vcs*num_ports{1'b0}}),
+		   .sw_req_nonspec_ip_ivc_op(req_nonspec_ip_ivc_op),
+		   .sw_req_spec_ip_ivc_op(req_spec_ip_ivc_op),
 		   .sw_gnt_ip_ivc(gnt_ip_ivc),
 		   .sw_gnt_ip_op(gnt_ip_op));
 		
