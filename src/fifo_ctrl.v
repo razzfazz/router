@@ -72,7 +72,7 @@ module fifo_ctrl
       .next_value(write_ptr_next));
    
    wire 		write_ptr_p_s, write_ptr_p_q;
-   assign write_ptr_p_s = pop ? ^read_ptr_next : write_ptr_p_q;
+   assign write_ptr_p_s = push ? ^write_ptr_next : write_ptr_p_q;
    dff
      #(.width(1),
        .reset_type(reset_type))
