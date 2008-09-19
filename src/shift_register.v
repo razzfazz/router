@@ -1,8 +1,6 @@
 module shift_register
   (clk, reset, full, data_in, push, empty, data_out, pop, error);
    
-`include "functions.v"
-`include "config.v"
 `include "constants.v"
    
    parameter depth = 4;
