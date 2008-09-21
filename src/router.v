@@ -70,7 +70,7 @@ module router
     2: use speculative grants when not conflicting with non-spec requests
     3: use speculative grants when not conflicting with non-spec grants
     */
-   parameter sw_spec_level = 3;
+   parameter sw_spec_level = 2;
    
    /*
     0: check that credit is available at all potential output VCs before issuing
@@ -80,7 +80,7 @@ module router
     2: check that credit is available at slected output VC while doing
        allocation, then mask grants
     */
-   parameter sw_spec_cred_check = 2;
+   parameter sw_spec_cred_check = 3;
    
    /*
     0: use tristate buses
@@ -153,7 +153,8 @@ module router
    
    wire [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
-   wire [0:num_ports*num_vcs-1] 	  sw_gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  sw_gnt_nonspec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
    
    wire [0:num_ports*crossbar_width-1] 	  xbr_data_in_ip;
@@ -192,8 +193,13 @@ module router
 	   assign vc_gnt_ivc_ovc = vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
 						     (ip+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_vcs-1] 	      sw_gnt_ivc;
-	   assign sw_gnt_ivc = sw_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   wire [0:num_vcs-1] 	      sw_gnt_nonspec_ivc;
+	   assign sw_gnt_nonspec_ivc
+	     = sw_gnt_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 	      sw_gnt_spec_ivc;
+	   assign sw_gnt_spec_ivc
+	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
 	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
@@ -235,7 +241,8 @@ module router
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
 	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ivc_op),
 	      .sw_req_spec_ivc_op(sw_req_spec_ivc_op),
-	      .sw_gnt_ivc(sw_gnt_ivc),
+	      .sw_gnt_nonspec_ivc(sw_gnt_nonspec_ivc),
+	      .sw_gnt_spec_ivc(sw_gnt_spec_ivc),
 	      .flit_valid_out(flit_valid_out),
 	      .flit_vc_out(flit_vc_out),
 	      .flit_head_out(flit_head_out),
@@ -301,7 +308,8 @@ module router
       .reset(reset),
       .sw_req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
       .sw_req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
-      .sw_gnt_ip_ivc(sw_gnt_ip_ivc),
+      .sw_gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
+      .sw_gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
       .sw_gnt_ip_op(sw_gnt_ip_op));
    
    

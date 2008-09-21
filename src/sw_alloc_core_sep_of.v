@@ -1,6 +1,6 @@
 module sw_alloc_core_sep_of
-  (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op, sw_gnt_ip_ivc,
-   sw_gnt_ip_op);
+  (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op,
+   sw_gnt_nonspec_ip_ivc, sw_gnt_spec_ip_ivc, sw_gnt_ip_op);
    
 `include "functions.v"
 `include "constants.v"
@@ -38,10 +38,12 @@ module sw_alloc_core_sep_of
    input [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
    input [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
    
-   output [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
+   output [0:num_ports*num_vcs-1] sw_gnt_nonspec_ip_ivc;
+   output [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
    output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
-   wire [0:num_ports*num_vcs-1] sw_gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] sw_gnt_nonspec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    
@@ -291,8 +293,10 @@ module sw_alloc_core_sep_of
 	   // combine global grants
 	   //-------------------------------------------------------------------
 	   
-	   assign sw_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-		    = sw_gnt_nonspec_ivc | sw_gnt_spec_ivc;
+	   assign sw_gnt_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+		    = sw_gnt_nonspec_ivc;
+	   assign sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+		    = sw_gnt_spec_ivc;
 	   assign sw_gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1]
 		    = sw_gnt_nonspec_op | sw_gnt_spec_op;
 	   

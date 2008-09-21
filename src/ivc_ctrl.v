@@ -1,9 +1,9 @@
 module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
    free_op, free_op_ovc, free_plus1_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
-   sw_req_nonspec_op, sw_req_spec_op, sw_gnt, flit_sent, flit_vc_out,
-   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr, error,
-   events);
+   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent,
+   flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr,
+   error, events);
    
 `include "functions.v"
 `include "config.v"
@@ -64,7 +64,8 @@ module ivc_ctrl
    
    output [0:num_ports-1] sw_req_nonspec_op;
    output [0:num_ports-1] sw_req_spec_op;
-   input sw_gnt;
+   input sw_gnt_nonspec;
+   input sw_gnt_spec;
    
    output flit_sent;
    output [0:vc_idx_width-1] flit_vc_out;
@@ -121,6 +122,7 @@ module ivc_ctrl
       .q(allocated_q));
    
    wire 		       vc_allocated;
+   wire 		       sw_allocated;
    wire 		       free_unallocated;
    wire 		       free_late;
    
@@ -128,32 +130,35 @@ module ivc_ctrl
       
       if(sw_spec_enable)
 	begin
+	   assign vc_allocated = vc_gnt_masked | allocated_q;
 	   case(sw_spec_cred_check)
 	     0:
 	       begin
-		  assign vc_allocated = vc_gnt_masked | allocated_q;
+		  assign sw_allocated
+		    = sw_gnt_nonspec | sw_gnt_spec;
 	       end
 	     1:
 	       begin
-		  assign vc_allocated
-		    = (vc_gnt_masked & free_unallocated) | allocated_q;
+		  assign sw_allocated
+		    = sw_gnt_nonspec | (sw_gnt_spec & free_unallocated);
 	       end
 	     2:
 	       begin
-		  assign vc_allocated
-		    = (vc_gnt_masked & free_late) | allocated_q;
+		  assign sw_allocated
+		    = sw_gnt_nonspec | (sw_gnt_spec & free_late);
 	       end
 	   endcase
 	end
       else
 	begin
 	   assign vc_allocated = allocated_q;
+	   assign sw_allocated = sw_gnt_nonspec;
 	end
       
    endgenerate
    
    wire 		       all_allocated;
-   assign all_allocated = sw_gnt & vc_allocated;
+   assign all_allocated = sw_allocated & vc_allocated;
    
    wire 		       valid_q;
    
@@ -280,6 +285,9 @@ module ivc_ctrl
       .next_port(rtl_next_port),
       .next_vcs(rtl_next_vcs));
    
+   wire [0:num_vcs-1] 	       rtl_next_vcs_masked;
+   assign rtl_next_vcs_masked = rtl_next_vcs & mask_ovc;
+   
    
    //---------------------------------------------------------------------------
    // currently active header
@@ -307,10 +315,13 @@ module ivc_ctrl
       .d(port_s),
       .q(port_q));
    
-   wire [0:num_vcs-1] 	       vcs_s, vcs_q;
-   assign vcs_s = get_next_header ? 
-		  (rtl_next_vcs & mask_ovc) :
-		  (vc_gnt_masked ? vc_gnt_masked_ovc : vcs_q);
+   wire [0:num_vcs-1] 	       vcs_q;
+   
+   wire [0:num_vcs-1] 	       vcs_updated;
+   assign vcs_updated = vc_gnt_masked ? vc_gnt_masked_ovc : vcs_q;
+   
+   wire [0:num_vcs-1] 	       vcs_s;
+   assign vcs_s = get_next_header ? rtl_next_vcs_masked : vcs_updated;
    dff
      #(.width(num_vcs),
        .reset_type(reset_type))
@@ -353,13 +364,13 @@ module ivc_ctrl
    
    wire 		       free_allocated;
    assign free_allocated
-     = |((flit_sent ? free_plus1_ovc : free_ovc) & vcs_s & mask_ovc);
+     = |((flit_sent ? free_plus1_ovc : free_ovc) & vcs_updated & mask_ovc);
    
    // FIXME:
    // Is it safe to use free_ovc here (rather than free_plus1_ovc)? It seems
    // that, since reallocation can only occur after a tail flit has passed the
    // output, there should always be one dead cycle, so free_ovc should be ok.
-   assign free_late = |(free_ovc & vcs_s & mask_ovc);
+   assign free_late = |(free_ovc & vcs_updated & mask_ovc);
    
    
    //---------------------------------------------------------------------------
@@ -435,7 +446,7 @@ module ivc_ctrl
    // generate target output VC to send along with flit data
    // (valid when flit_sent=1)
    //---------------------------------------------------------------------------
-
+   
    // NOTE: don't need to use vc_gnt_masked_ovc here, as flit_valid would not be
    // generated in the first place if grant was masked, so we don't care about
    // flit_vc_dec in this case!
@@ -510,14 +521,15 @@ module ivc_ctrl
    assign ev_flit_stalled_vc = valid_q & ~fbc_empty & ~vc_allocated;
    
    wire 		       ev_flit_stalled_sw;
-   assign ev_flit_stalled_sw = valid_q & ~fbc_empty & vc_allocated & ~sw_gnt;
+   assign ev_flit_stalled_sw = valid_q & ~fbc_empty & vc_allocated &
+			       ~sw_allocated;
    
    wire 		       ev_flit_sent;
    assign ev_flit_sent = valid_q & ~fbc_empty & all_allocated;
    
    wire 		       ev_flit_sent_spec;
-   assign ev_flit_sent_spec = valid_q & ~fbc_empty & ~allocated_q &
-			      vc_gnt_masked & sw_gnt;
+   assign ev_flit_sent_spec = valid_q & ~fbc_empty & vc_gnt_masked &
+			      ~allocated_q & sw_allocated;
    
    generate
 
