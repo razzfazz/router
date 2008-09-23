@@ -181,7 +181,6 @@ module op_ctrl
 	   // track header credits using stock credit tracker module
 	   wire 		       head_free;
 	   wire 		       head_free_early;
-	   wire 		       head_free_plus1;
 	   wire 		       error_hct;
 	   credit_tracker
 	     #(.num_credits(num_headers),
@@ -196,7 +195,6 @@ module op_ctrl
 	      .debit(head_debit),
 	      .free(head_free),
 	      .free_early(head_free_early),
-	      .free_plus1(head_free_plus1),
 	      .error(error_hct));
 	   
 	   assign set_elig_ovc[ovc] = debit & flit_tail_in;

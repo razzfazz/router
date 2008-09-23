@@ -1,5 +1,5 @@
 module credit_tracker
-  (clk, reset, debit, credit, free, free_early, free_plus1, error);
+  (clk, reset, debit, credit, free, free_early, error);
    
 `include "constants.v"
 `include "functions.v"
@@ -35,14 +35,10 @@ module credit_tracker
    // 1 cycle early version of "free"
    output free_early;
    
-   // at least min_credits+1 credits available?
-   output free_plus1;
-   
    output error;
    
    wire free;
    wire free_early;
-   wire free_plus1;
    
    wire error;
    
@@ -82,8 +78,6 @@ module credit_tracker
 	   assign set_cred = incr;
 	   assign reset_cred = decr;
 	   
-	   assign free_plus1 = 1'b0;
-	   
 	   assign errors = {cred_q & credit,
 			    ~cred_q & debit};
 	   assign true_count = cred_q;
@@ -119,41 +113,6 @@ module credit_tracker
 	   
 	   assign set_cred = incr & ~cred_q & cred_count_min;
 	   assign reset_cred = decr & cred_q & cred_count_min;
-
-	   if(min_credits < num_credits)
-	     begin
-		
-		wire cred_count_min_plus1;
-		assign cred_count_min_plus1 = (cred_count_q == min_credits);
-		
-		wire set_cred_plus1;
-		assign set_cred_plus1 = incr & cred_q & cred_count_min;
-		
-		wire reset_cred_plus1;
-		assign reset_cred_plus1 = decr & cred_q & cred_count_min_plus1;
-		
-		wire 		       cred_plus1_s, cred_plus1_q;
-		assign cred_plus1_s
-		  = set_cred_plus1 | (cred_plus1_q & ~reset_cred_plus1);
-		dff
-		  #(.width(1),
-		    .reset_type(reset_type),
-		    .reset_value(1'b1))
-		cred_plus1q
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(cred_plus1_s),
-		   .q(cred_plus1_q));
-		
-		assign free_plus1 = cred_plus1_q;
-		
-	     end
-	   else
-	     begin
-		
-		assign free_plus1 = 1'b0;
-		
-	     end
 	   
 	   assign errors = {cred_q && (cred_count_q == num_credits-1) && credit,
 			    !cred_q && (cred_count_q == 0) && debit};
