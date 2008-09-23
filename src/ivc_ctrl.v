@@ -313,6 +313,7 @@ module ivc_ctrl
    
    wire [0:num_ports-1]        rtl_next_port;
    wire [0:num_vcs-1] 	       rtl_next_vcs;
+   wire 		       rtl_error_unmasked;
    routing_logic
      #(.replicate_port_decoder(replicate_port_decoder),
        .address(address),
@@ -324,10 +325,8 @@ module ivc_ctrl
       .port_id(port_id),
       .vc_id(vc_id),
       .next_port(rtl_next_port),
-      .next_vcs(rtl_next_vcs));
-   
-   wire [0:num_vcs-1] 	       rtl_next_vcs_masked;
-   assign rtl_next_vcs_masked = rtl_next_vcs & mask_ovc;
+      .next_vcs(rtl_next_vcs),
+      .error(rtl_error));
    
    
    //---------------------------------------------------------------------------
@@ -362,7 +361,7 @@ module ivc_ctrl
    assign vcs_updated = vc_gnt_masked ? vc_gnt_masked_ovc : vcs_q;
    
    wire [0:num_vcs-1] 	       vcs_s;
-   assign vcs_s = get_next_header ? rtl_next_vcs_masked : vcs_updated;
+   assign vcs_s = get_next_header ? rtl_next_vcs : vcs_updated;
    dff
      #(.width(num_vcs),
        .reset_type(reset_type))
@@ -531,14 +530,15 @@ module ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:2] 		       errors_in;
+   wire [0:3] 		       errors_in;
    assign errors_in = {~hvsr_empty & ~valid_q,
                        ~hdsr_empty & ~valid_q,
-                       ~fbc_empty & ~valid_q};
+                       ~fbc_empty & ~valid_q,
+		       rtl_error};
    
-   wire [0:2] 		       errors_out;
+   wire [0:3] 		       errors_out;
    checker
-     #(.num_errors(3),
+     #(.num_errors(4),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),
        .reset_type(reset_type))

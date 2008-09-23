@@ -1,5 +1,5 @@
 module routing_logic
-  (clk, reset, route_info, port_id, vc_id, next_port, next_vcs);
+  (clk, reset, route_info, port_id, vc_id, next_port, next_vcs, error);
    
 `include "functions.v"
 `include "config.v"   
@@ -21,36 +21,40 @@ module routing_logic
    input [0:vc_idx_width-1] vc_id;
    output [0:num_ports-1] next_port;
    output [0:num_vcs-1] next_vcs;
+   output error;
    
-   wire [0:num_ports-1]        next_port;
-   wire [0:num_vcs-1] 	       next_vcs;
+   wire [0:num_ports-1] next_port;
+   wire [0:num_vcs-1] 	next_vcs;
+   wire 		error;
    
-   wire [0:addr_width-1]       next_address;
+   wire [0:addr_width-1] next_address;
    assign next_address = get_next_address(route_info);
    
-   wire [0:addr_width-1]       final_address;
+   wire [0:addr_width-1] final_address;
    assign final_address = get_final_address(route_info);
    
-   wire 		       is_next;
+   wire 		 is_next;
    assign is_next = (address == next_address);
    
-   wire [0:addr_width-1]       new_next_address;
+   wire [0:addr_width-1] new_next_address;
    assign new_next_address = is_next ? final_address : next_address;
    
-   wire [0:num_ports-1]        next_port_int;
+   wire [0:num_ports-1]  next_port_int;
+   
+   wire [0:num_ports-1]  error_op;
    
    generate
       
-      genvar 		       ovc;
+      genvar 		 ovc;
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   assign next_vcs[ovc]
-	     = ((get_traffic_class(ovc) == get_traffic_class(vc_id)) &&
-		(get_routing_class(ovc) == 
-		 ((is_next && (get_routing_class(vc_id) != 0)) ?
-		  0 :
-		  get_routing_class(vc_id)))) ||
-	       !restrict_vcs;
+		    = ((get_traffic_class(ovc) == get_traffic_class(vc_id)) &&
+		       (get_routing_class(ovc) == 
+			((is_next && (get_routing_class(vc_id) != 0)) ?
+			 0 :
+			 get_routing_class(vc_id)))) ||
+		      !restrict_vcs;
 	end
       
       if(replicate_port_decoder)
@@ -78,13 +82,19 @@ module routing_logic
 	      .next_port(next_port_int));
 	end
       
-      genvar 			  op;
+      genvar 		   op;
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
+	   
 	   assign next_port[op] = next_port_int[op] &&
 				  ((op != port_id) || !ignore_same_port);
+	   assign error_op[op] = next_port_int[op] &&
+				 (op == port_id) && ignore_same_port;
+	   
 	end
       
    endgenerate
+   
+   assign error = |error_op;
    
 endmodule
