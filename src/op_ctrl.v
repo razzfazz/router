@@ -204,43 +204,7 @@ module op_ctrl
 	   
 	   assign error_hct_ovc[ovc] = error_hct;
 	   
-	   // for overall credits, we can reuse part of the logic that keeps
-	   // track of tails
-	   wire [0:num_buffers-1]      set_mask;
-	   assign set_mask
-	     = (push_mask >> (buffer_free_threshold - 1)) |
-	       (push_mask << (num_buffers - (buffer_free_threshold - 1)));
-	
-	   wire 		       incr;
-	   assign incr = credit & ~debit;
-
-	   wire 		       decr;
-	   assign decr = debit & ~credit;
-	   
-	   wire [0:num_buffers-1]      reset_mask;
-	   assign reset_mask
-	     = (pop_mask << buffer_free_threshold) |
-	       (pop_mask >> (num_buffers - buffer_free_threshold));
-	   
-	   assign set_cred_ovc[ovc] = |(pop_mask & set_mask) & incr;
-	   assign reset_cred_ovc[ovc] = |(push_mask & reset_mask) & decr;
-	   
-	   wire [0:num_buffers-1]      set_plus1_mask;
-	   assign set_plus1_mask
-	     = (push_mask >> buffer_free_threshold) |
-	       (push_mask << (num_buffers - buffer_free_threshold));
-	   
-	   wire [0:num_buffers-1]      reset_plus1_mask;
-	   assign reset_plus1_mask
-	     = (pop_mask << (buffer_free_threshold + 1)) |
-	       (pop_mask >> (num_buffers - (buffer_free_threshold + 1)));
-	   
-	   assign set_cred_plus1_ovc[ovc]
-		    = |(pop_mask & set_plus1_mask) & incr;
-	   assign reset_cred_plus1_ovc[ovc]
-		    = |(push_mask & reset_plus1_mask) & decr;
-	   
-	   wire [0:cred_count_width-1]   cred_count_s, cred_count_q;
+	   wire [0:cred_count_width-1] cred_count_s, cred_count_q;
 	   assign cred_count_s = cred_count_q + credit - debit;
 	   dff
 	     #(.width(cred_count_width),
@@ -251,6 +215,24 @@ module op_ctrl
 	      .reset(reset),
 	      .d(cred_count_s),
 	      .q(cred_count_q));
+	   
+	   wire 		       incr;
+	   assign incr = credit & ~debit;
+	   
+	   wire 		       decr;
+	   assign decr = debit & ~credit;
+	   
+	   assign set_cred_ovc[ovc]
+		    = (cred_count_q == (buffer_free_threshold-1)) && incr;
+	   
+	   assign reset_cred_ovc[ovc]
+		    = (cred_count_q == buffer_free_threshold) && decr;
+	   
+	   assign set_cred_plus1_ovc[ovc]
+		    = (cred_count_q == buffer_free_threshold) && incr;
+	   
+	   assign reset_cred_plus1_ovc[ovc]
+		    = (cred_count_q == (buffer_free_threshold+1)) && decr;
 	   
 	   wire [0:1] 			 error_cred;
 	   assign error_cred = {(cred_count_q == num_buffers) && credit,
