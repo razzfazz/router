@@ -169,42 +169,83 @@ module ivc_ctrl
    // keep track of when to get next header
    //---------------------------------------------------------------------------
    
+   wire 		       fbc_empty;
+   
    wire 		       hvsr_empty;
-   
-   wire 		       hvsr_push;
-   assign hvsr_push = flit_valid_in;
-   
-   wire 		       hvsr_pop;
-   assign hvsr_pop = all_allocated & ~hvsr_empty;
-   
-   wire [0:1] 		       hvsr_data_in;
-   assign hvsr_data_in = {flit_head_in, flit_tail_in};
-   
-   wire 		       hvsr_full;
-   wire [0:1] 		       hvsr_data_out;
    wire 		       hvsr_error;
-   shift_register
-     #(.width(2),
-       .depth(num_buffers),
-       .checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
-       .error_recovery(error_recovery),
-       .reset_type(reset_type))
-   hvsr
-     (.clk(clk),
-      .reset(reset),
-      .full(hvsr_full),
-      .data_in(hvsr_data_in),
-      .push(hvsr_push),
-      .empty(hvsr_empty),
-      .data_out(hvsr_data_out),
-      .pop(hvsr_pop),
-      .error(hvsr_error));
    
-   assign flit_head_out = hvsr_data_out[0];
-   assign flit_tail_out = hvsr_data_out[1];
-   
-   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
+   generate
+      
+      if(num_headers > 1)
+	begin
+	   
+	   wire 		       hvsr_push;
+	   assign hvsr_push = flit_valid_in;
+	   
+	   wire 		       hvsr_pop;
+	   assign hvsr_pop = all_allocated & ~hvsr_empty;
+	   
+	   wire [0:1] 		       hvsr_data_in;
+	   assign hvsr_data_in = {flit_head_in, flit_tail_in};
+	   
+	   wire 		       hvsr_full;
+	   wire [0:1] 		       hvsr_data_out;
+	   shift_register
+	     #(.width(2),
+	       .depth(num_buffers),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
+	       .error_recovery(error_recovery),
+	       .reset_type(reset_type))
+	   hvsr
+	     (.clk(clk),
+	      .reset(reset),
+	      .full(hvsr_full),
+	      .data_in(hvsr_data_in),
+	      .push(hvsr_push),
+	      .empty(hvsr_empty),
+	      .data_out(hvsr_data_out),
+	      .pop(hvsr_pop),
+	      .error(hvsr_error));
+	   
+	   assign flit_head_out = hvsr_data_out[0];
+	   assign flit_tail_out = hvsr_data_out[1];
+	   
+	   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
+	   
+	end
+      else
+	begin
+	   
+	   wire wait_tail_s, wait_tail_q;
+	   // Technically, fbc_empty is a cycle late here; however, due to the
+	   // time it takes the tail credit to reach the upstream router, this
+	   // shouldn't matter, and it makes timing easier.
+	   assign wait_tail_s = (wait_tail_q | (flit_valid_in & flit_tail_in)) &
+				~fbc_empty;
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   wait_tailq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(wait_tail_s),
+	      .q(wait_tail_q));
+	   
+	   assign hvsr_error = wait_tail_q & flit_valid_in;
+	   
+	   assign hvsr_empty = 1'b1;
+	   assign flit_head_out = 1'b0;
+	   assign flit_tail_out = 1'b0;
+	   
+	   // Technically, fbc_empty is a cycle late here; however, due to the
+	   // time it takes the tail credit to reach the upstream router, this
+	   // shouldn't matter, and it makes timing easier.
+	   assign get_next_header = ~valid_q | (wait_tail_q & fbc_empty);
+	   
+	end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -252,7 +293,7 @@ module ivc_ctrl
 	begin
 	   
 	   assign hdsr_empty = 1'b1;
-	   assign hdsr_data = {data_width{1'b0}};
+	   assign hdsr_data = {route_info_width{1'b0}};
 	   assign hdsr_error = 1'b0;
 	   
 	end
@@ -364,7 +405,7 @@ module ivc_ctrl
    
    wire 		       free_allocated;
    assign free_allocated
-     = |((flit_sent ? free_plus1_ovc : free_ovc) & vcs_updated & mask_ovc);
+     = |((all_allocated ? free_plus1_ovc : free_ovc) & vcs_updated & mask_ovc);
    
    // FIXME:
    // Is it safe to use free_ovc here (rather than free_plus1_ovc)? It seems
@@ -377,12 +418,12 @@ module ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   wire 		       fbc_empty;
    wire 		       fbc_empty_early;
    
    wire [0:num_ports-1]        sw_req_nonspec_op_s, sw_req_nonspec_op_q;
    assign sw_req_nonspec_op_s
-     = port_s & {num_ports{~fbc_empty_early & allocated_s & free_allocated}};
+     = port_s &
+       {num_ports{valid_s & ~fbc_empty_early & allocated_s & free_allocated}};
    dff
      #(.width(num_ports),
        .reset_type(reset_type))
@@ -400,7 +441,7 @@ module ivc_ctrl
 	begin
 	   wire [0:num_ports-1] sw_req_spec_op_s, sw_req_spec_op_q;
 	   assign sw_req_spec_op_s
-	     = port_s & {num_ports{~fbc_empty_early & ~allocated_s}};
+	     = port_s & {num_ports{valid_s & ~fbc_empty_early & ~allocated_s}};
 	   dff
 	     #(.width(num_ports),
 	       .reset_type(reset_type))
@@ -467,7 +508,7 @@ module ivc_ctrl
    assign fbc_push = flit_valid_in;
    
    wire 		       fbc_pop;
-   assign fbc_pop = flit_sent & ~fbc_empty;
+   assign fbc_pop = all_allocated & ~fbc_empty;
    
    wire 		       fbc_error;
    fifo_ctrl
@@ -553,7 +594,7 @@ module ivc_ctrl
 	end
       else
 	begin
-	   assign events = 5'b0;
+	   assign events = 5'd0;
 	end
       
    endgenerate

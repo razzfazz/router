@@ -282,21 +282,56 @@ module ip_ctrl
    
    wire 			       fbf_write_enable;
    assign fbf_write_enable = flit_valid_in;
-
-   wire [0:data_width-1] 	       fbf_write_data;
-   assign fbf_write_data = flit_data_muxed;
-
-   wire [0:data_width-1] 	       fbf_read_data;
-   regfile
-     #(.width(data_width),
-       .depth(fbf_depth))
-   fbf
-     (.clk(clk),
-      .write_enable(fbf_write_enable),
-      .write_address(fbf_write_addr),
-      .write_data(fbf_write_data),
-      .read_address(fbf_read_addr),
-      .read_data(fbf_read_data));
+   
+   generate
+      
+      if(num_headers > 1)
+	begin
+	   
+	   wire [0:data_width-1] 	       fbf_write_data;
+	   assign fbf_write_data = flit_data_muxed;
+	   
+	   wire [0:data_width-1] 	       fbf_read_data;
+	   regfile
+	     #(.width(data_width),
+	       .depth(fbf_depth))
+	   fbf
+	     (.clk(clk),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbf_write_addr),
+	      .write_data(fbf_write_data),
+	      .read_address(fbf_read_addr),
+	      .read_data(fbf_read_data));
+	   
+	   assign flit_data_out = fbf_read_data[0:data_width-1];
+	   
+	end
+      else
+	begin
+	   
+	   wire [0:(data_width+2)-1] 	       fbf_write_data;
+	   assign fbf_write_data
+	     = {flit_data_muxed, flit_head_in, flit_tail_in};
+	   
+	   wire [0:(data_width+2)-1] 	       fbf_read_data;
+	   regfile
+	     #(.width(data_width+2),
+	       .depth(fbf_depth))
+	   fbf
+	     (.clk(clk),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbf_write_addr),
+	      .write_data(fbf_write_data),
+	      .read_address(fbf_read_addr),
+	      .read_data(fbf_read_data));
+	   
+	   assign flit_data_out = fbf_read_data[0:data_width-1];
+	   assign flit_head_out = fbf_read_data[data_width];
+	   assign flit_tail_out = fbf_read_data[data_width+1];
+	   
+	end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -316,48 +351,57 @@ module ip_ctrl
    
    assign flit_valid_out = flit_valid_q;
    
-   assign flit_data_out = fbf_read_data;
+   generate
+
+      if(num_headers > 1)
+	begin
+	   
+	   // in this case, head and tail bits are tracked in input VC
+	   // controller anyway, so we can just reuse that information here
+	   wire flit_head_s, flit_head_q;
+	   select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_head_s_sel
+	     (.select(flit_sent_ivc),
+	      .data_in(flit_head_ivc),
+	      .data_out(flit_head_s));
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_headq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_head_s),
+	      .q(flit_head_q));
+	   
+	   assign flit_head_out = flit_head_q;
+
+	   wire flit_tail_s, flit_tail_q;
+	   select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_tail_s_sel
+	     (.select(flit_sent_ivc),
+	      .data_in(flit_tail_ivc),
+	      .data_out(flit_tail_s));
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_tailq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_tail_s),
+	      .q(flit_tail_q));
+	   
+	   assign flit_tail_out = flit_tail_q;
+
+	end
+
+   endgenerate
    
-   // head and tail bits are tracked in input VC controllers, so reuse those
-   wire 			       flit_head_s, flit_head_q;
-   select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   head_s_sel
-     (.select(flit_sent_ivc),
-      .data_in(flit_head_ivc),
-      .data_out(flit_head_s));
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_headq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_head_s),
-      .q(flit_head_q));
-   
-   assign flit_head_out = flit_head_q;
-   
-   wire 			       flit_tail_s, flit_tail_q;
-   select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   tail_s_sel
-     (.select(flit_sent_ivc),
-      .data_in(flit_tail_ivc),
-      .data_out(flit_tail_s));
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_tailq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_tail_s),
-      .q(flit_tail_q));
-   
-   assign flit_tail_out = flit_tail_q;
-   
-   // output VCs are tracket in input VC controllers, so reuse these
+   // output VCs are tracket in input VC controllers, so we can just reuse that 
+   // information here
    wire [0:vc_idx_width-1] 	       flit_vc_s, flit_vc_q;
    select_1ofn
      #(.num_ports(num_vcs),
@@ -381,7 +425,7 @@ module ip_ctrl
    //---------------------------------------------------------------------------
    // generate outgoing credits
    //---------------------------------------------------------------------------
-
+   
    wire 		       cred_valid_s, cred_valid_q;
    assign cred_valid_s = |flit_sent_ivc;
    dff
