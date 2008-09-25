@@ -1,9 +1,9 @@
 module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
-   free_op, free_op_ovc, free_plus1_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
-   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent,
-   flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr,
-   error, events);
+   free_op, free_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op,
+   sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent, flit_vc_out,
+   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr, error,
+   events);
    
 `include "functions.v"
 `include "config.v"
@@ -55,8 +55,7 @@ module ivc_ctrl
    input [0:route_info_width-1] route_info_in;
    
    input [0:num_ports-1] free_op;
-   input [0:num_ports*num_vcs-1] free_op_ovc;
-   input [0:num_ports*num_vcs-1] free_plus1_op_ovc;
+   input [0:num_ports*num_vcs*2-1] free_op_ovc;
    
    output [0:num_ports-1] vc_req_op;
    output [0:num_vcs-1] vc_req_ovc;
@@ -124,7 +123,7 @@ module ivc_ctrl
    wire 		       vc_allocated;
    wire 		       sw_allocated;
    wire 		       free_unallocated;
-   wire 		       free_late;
+   wire 		       free_allocated;
    
    generate
       
@@ -145,7 +144,7 @@ module ivc_ctrl
 	     2:
 	       begin
 		  assign sw_allocated
-		    = sw_gnt_nonspec | (sw_gnt_spec & free_late);
+		    = sw_gnt_nonspec | (sw_gnt_spec & free_allocated);
 	       end
 	   endcase
 	end
@@ -326,7 +325,10 @@ module ivc_ctrl
       .vc_id(vc_id),
       .next_port(rtl_next_port),
       .next_vcs(rtl_next_vcs),
-      .error(rtl_error));
+      .error(rtl_error_unmasked));
+   
+   wire 		       rtl_error;
+   assign rtl_error = rtl_error_unmasked & get_next_header & next_valid;
    
    
    //---------------------------------------------------------------------------
@@ -384,33 +386,61 @@ module ivc_ctrl
       .data_in(free_op),
       .data_out(free_unallocated));
    
-   wire [0:num_vcs-1] 	       free_ovc;
+   wire [0:num_vcs*2-1]        free_ovc;
    select_1ofn
      #(.num_ports(num_ports),
-       .width(num_vcs))
+       .width(num_vcs*2))
    free_ovc_sel
      (.select(port_q),
       .data_in(free_op_ovc),
       .data_out(free_ovc));
    
-   wire [0:num_vcs-1] 	       free_plus1_ovc;
-   select_1ofn
-     #(.num_ports(num_ports),
-       .width(num_vcs))
-   free_plus1_ovc_sel
-     (.select(port_q),
-      .data_in(free_plus1_op_ovc),
-      .data_out(free_plus1_ovc));
+   wire 		       flit_sent_prev_s, flit_sent_prev_q;
+   assign flit_sent_prev_s = flit_sent;
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_sent_prevq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_sent_prev_s),
+      .q(flit_sent_prev_q));
    
-   wire 		       free_allocated;
-   assign free_allocated
-     = |((all_allocated ? free_plus1_ovc : free_ovc) & vcs_updated & mask_ovc);
+   wire [0:2]                  flit_sent_count;
+   assign flit_sent_count = {flit_sent_prev_q & flit_sent,
+			     flit_sent_prev_q ^ flit_sent,
+			     ~(flit_sent_prev_q | flit_sent)};
    
-   // FIXME:
-   // Is it safe to use free_ovc here (rather than free_plus1_ovc)? It seems
-   // that, since reallocation can only occur after a tail flit has passed the
-   // output, there should always be one dead cycle, so free_ovc should be ok.
-   assign free_late = |(free_ovc & vcs_updated & mask_ovc);
+   wire [0:num_vcs-1] 	       next_free_ovc;
+   
+   generate
+      
+      genvar 		       ovc;
+      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+	begin:ovcs
+	   
+	   wire [0:1] free;
+	   assign free = free_ovc[ovc*2:(ovc+1)*2-1];
+	   
+	   wire [0:2] free_by_count;
+	   assign free_by_count = {|free, free[0], &free};
+	   
+	   wire       next_free;
+	   select_1ofn
+	     #(.num_ports(3),
+	       .width(1))
+	   next_free_sel
+	     (.select(flit_sent_count),
+	      .data_in(free_by_count),
+	      .data_out(next_free));
+	   
+	   assign next_free_ovc[ovc] = next_free;
+	   
+	end
+      
+   endgenerate
+   
+   assign free_allocated = |(next_free_ovc & vcs_updated & mask_ovc);
    
    
    //---------------------------------------------------------------------------

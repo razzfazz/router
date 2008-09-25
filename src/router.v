@@ -90,17 +90,6 @@ module router
    
    localparam crossbar_width = 1 + vc_idx_width + 2 + data_width;
    
-   // use dedicated registers to store port credit summary bits per input VC
-   parameter dedicated_free_ivc_regs = 1;
-   
-   // minimum number of available buffers required to consider VC free
-   // NOTE: This must be greater than or equal to 2 for the current 
-   // implementation to work correctly because of the fact that the output state
-   // is updated based on flits arriving at the crossbar output, and thus with
-   // one cycle delay. The raised threshold ensures that we can handle the case
-   // where a flit was sent in that cycle.
-   parameter buffer_free_threshold = 2;
-   
    
    input clk;
    input reset;
@@ -143,8 +132,7 @@ module router
    
    wire [0:num_ports*num_vcs-1] 	  elig_op_ovc;
    wire [0:num_vcs*num_ports-1] 	  free_ivc_op;
-   wire [0:num_ports*num_vcs-1] 	  free_op_ovc;
-   wire [0:num_ports*num_vcs-1] 	  free_plus1_op_ovc;
+   wire [0:num_ports*num_vcs*2-1] 	  free_op_ovc;
    
    wire [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_req_ip_ivc_ovc;
@@ -235,7 +223,6 @@ module router
 	      .flit_data_in(flit_data_in),
 	      .free_ivc_op(free_ivc_op),
 	      .free_op_ovc(free_op_ovc),
-	      .free_plus1_op_ovc(free_plus1_op_ovc),
 	      .vc_req_ivc_op(vc_req_ivc_op),
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
@@ -384,16 +371,14 @@ module router
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs-1] 	     elig_ovc;
-	   wire [0:num_vcs-1] 	     free_ovc;
-	   wire [0:num_vcs-1] 	     free_plus1_ovc;
+	   wire [0:num_vcs*2-1]      free_ovc;
 	   wire [0:num_vcs-1] 	     free_ivc;
 	   wire 		     opc_error;
 	   op_ctrl
-	     #(.dedicated_free_ivc_regs(dedicated_free_ivc_regs),
-	       .buffer_free_threshold(buffer_free_threshold),
-	       .checker_enable(checker_enable),
+	     #(.checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .reset_type(reset_type))
+	       .reset_type(reset_type),
+	       .cred_level_width(2))
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
@@ -405,14 +390,11 @@ module router
 	      .flit_tail_in(flit_tail),
 	      .elig_ovc(elig_ovc),
 	      .free_ovc(free_ovc),
-	      .free_plus1_ovc(free_plus1_ovc),
 	      .free_ivc(free_ivc),
 	      .error(opc_error));
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
-	   assign free_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = free_ovc;
-	   assign free_plus1_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
-		    = free_plus1_ovc;
+	   assign free_op_ovc[op*num_vcs*2:(op+1)*num_vcs*2-1] = free_ovc;
 	   assign free_op_ivc[op*num_vcs:(op+1)*num_vcs-1] = free_ivc;
 	   
 	   assign flit_valid_out_op[op] 

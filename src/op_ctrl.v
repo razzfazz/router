@@ -1,7 +1,7 @@
 module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
-   flit_tail_in, elig_ovc, free_ovc, free_plus1_ovc, free_ivc, error);
-
+   flit_tail_in, elig_ovc, free_ovc, free_ivc, error);
+   
 `include "functions.v"
 `include "config.v"
 `include "constants.v"
@@ -12,11 +12,17 @@ module op_ctrl
    
    parameter reset_type = reset_type_async;
    
-   // use dedicated registers to store port credit summary bits per input VC
-   parameter dedicated_free_ivc_regs = 0;
+   // number of bits to be used for credit level reporting
+   // (must be less than or equal to cred_count_width)
+   parameter cred_level_width = 2;
    
-   // minimum number of available buffers required to consider VC free
-   parameter buffer_free_threshold = 2;
+   localparam [0:cred_level_width-1] max_cred_level
+     = (1 << cred_level_width) - 1;
+   
+   localparam [0:cred_level_width-1] free_ovc_reset_value
+     = (clogb(num_buffers+1) > cred_level_width) ?
+       {cred_level_width{1'b1}} :
+       num_buffers;
    
    localparam [0:num_vcs*num_vcs-1] mask_ivc_ovc
      = create_mask_ivc_ovc(restrict_vcs);
@@ -38,25 +44,23 @@ module op_ctrl
    input flit_tail_in;
    
    output [0:num_vcs-1] elig_ovc;
-   output [0:num_vcs-1] free_ovc;
-   output [0:num_vcs-1] free_plus1_ovc;
+   output [0:num_vcs*cred_level_width-1] free_ovc;
    output [0:num_vcs-1] free_ivc;
    
    output error;
    
    wire [0:num_vcs-1] elig_ovc;
-   wire [0:num_vcs-1] free_ovc;
-   wire [0:num_vcs-1] free_plus1_ovc;
-   wire [0:num_vcs-1] free_ivc;
+   wire [0:num_vcs*cred_level_width-1] free_ovc;
+   wire [0:num_vcs-1] 		       free_ivc;
    
-   wire 	      error;
+   wire 			       error;
    
    
-   wire [0:num_vcs-1] set_elig_ovc;
-   wire [0:num_vcs-1] reset_elig_ovc;
+   wire [0:num_vcs-1] 		       set_elig_ovc;
+   wire [0:num_vcs-1] 		       reset_elig_ovc;
    
    // per-output-VC bit indicating whether it is available for assignment
-   wire [0:num_vcs-1] elig_ovc_s, elig_ovc_q;
+   wire [0:num_vcs-1] 		       elig_ovc_s, elig_ovc_q;
    assign elig_ovc_s = set_elig_ovc | (elig_ovc_q & ~reset_elig_ovc);
    dff
      #(.width(num_vcs),
@@ -68,51 +72,29 @@ module op_ctrl
       .d(elig_ovc_s),
       .q(elig_ovc_q));
    
-   wire [0:num_vcs-1] set_cred_ovc;
-   wire [0:num_vcs-1] reset_cred_ovc;
+   wire [0:num_vcs*cred_level_width-1] next_free_ovc;
    
-   // per-out-ut-VC bit indicating whether there is sufficient credit available
-   // to accept a new packet
-   wire [0:num_vcs-1] cred_ovc_s, cred_ovc_q;
-   assign cred_ovc_s = set_cred_ovc | (cred_ovc_q & ~reset_cred_ovc);
+   wire [0:num_vcs*cred_level_width-1] free_ovc_s, free_ovc_q;
+   assign free_ovc_s = next_free_ovc;
    dff
-     #(.width(num_vcs),
+     #(.width(num_vcs*cred_level_width),
        .reset_type(reset_type),
-       .reset_value({num_vcs{1'b1}}))
-   cred_ovcq
+       .reset_value({num_vcs{free_ovc_reset_value}}))
+   free_ovcq
      (.clk(clk),
       .reset(reset),
-      .d(cred_ovc_s),
-      .q(cred_ovc_q));
+      .d(free_ovc_s),
+      .q(free_ovc_q));
    
-   assign free_ovc = cred_ovc_q;
+   assign free_ovc = free_ovc_q;
    
-   wire [0:num_vcs-1] set_cred_plus1_ovc;
-   wire [0:num_vcs-1] reset_cred_plus1_ovc;
-
-   // per-out-ut-VC bit indicating whether there is sufficient credit available
-   // to accept two packets (to be used when one is already in flight)
-   wire [0:num_vcs-1] cred_plus1_ovc_s, cred_plus1_ovc_q;
-   assign cred_plus1_ovc_s
-     = set_cred_plus1_ovc | (cred_plus1_ovc_q & ~reset_cred_plus1_ovc);
-   dff
-     #(.width(num_vcs),
-       .reset_type(reset_type),
-       .reset_value({num_vcs{1'b1}}))
-   cred_plus1_ovcq
-     (.clk(clk),
-      .reset(reset),
-      .d(cred_plus1_ovc_s),
-      .q(cred_plus1_ovc_q));
-   
-   assign free_plus1_ovc = cred_plus1_ovc_q;
-   
-   wire [0:num_vcs-1] error_hct_ovc;
-   wire [0:num_vcs*2-1] error_cred_ovc;
+   wire [0:num_vcs-1] 		       next_cred_ovc;
+   wire [0:num_vcs-1] 		       error_hct_ovc;
+   wire [0:num_vcs*2-1] 	       error_cred_ovc;
    
    generate
       
-      genvar 	      ovc;
+      genvar 			       ovc;
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
@@ -184,7 +166,6 @@ module op_ctrl
 	   wire 		       error_hct;
 	   credit_tracker
 	     #(.num_credits(num_headers),
-	       .min_credits(1),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
@@ -216,25 +197,18 @@ module op_ctrl
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   wire 		       incr;
-	   assign incr = credit & ~debit;
+	   wire [0:cred_level_width-1] next_free;
+	   assign next_free = (cred_count_s > max_cred_level) ?
+			      max_cred_level :
+			      cred_count_s[cred_count_width-cred_level_width:
+					   cred_count_width-1];
 	   
-	   wire 		       decr;
-	   assign decr = debit & ~credit;
+	   assign next_free_ovc[ovc*cred_level_width:
+				(ovc+1)*cred_level_width-1] = next_free;
 	   
-	   assign set_cred_ovc[ovc]
-		    = (cred_count_q == (buffer_free_threshold-1)) && incr;
+	   assign next_cred_ovc[ovc] = |cred_count_s;
 	   
-	   assign reset_cred_ovc[ovc]
-		    = (cred_count_q == buffer_free_threshold) && decr;
-	   
-	   assign set_cred_plus1_ovc[ovc]
-		    = (cred_count_q == buffer_free_threshold) && incr;
-	   
-	   assign reset_cred_plus1_ovc[ovc]
-		    = (cred_count_q == (buffer_free_threshold+1)) && decr;
-	   
-	   wire [0:1] 			 error_cred;
+	   wire [0:1] 		       error_cred;
 	   assign error_cred = {(cred_count_q == num_buffers) && credit,
 				(cred_count_q == 0) && debit};
 	   
@@ -242,7 +216,7 @@ module op_ctrl
 	   
 	end
       
-      wire [0:num_vcs*2-1] 		 errors_out_ovc;
+      wire [0:num_vcs*2-1] 	       errors_out_ovc;
       checker
 	#(.num_errors(num_vcs*2),
 	  .enable(checker_enable),
@@ -256,37 +230,23 @@ module op_ctrl
       
       assign error = |error_hct_ovc | |errors_out_ovc;
       
-      genvar 				 ivc;
+      genvar 			       ivc;
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
 	   
-	   if(dedicated_free_ivc_regs)
-	     begin
-		
-		wire port_cred_s, port_cred_q;
-		assign port_cred_s
-		  = &(cred_ovc_s |
-		      ~mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]);
-		dff
-		  #(.width(1),
-		    .reset_type(reset_type))
-		port_credq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(port_cred_s),
-		   .q(port_cred_q));
-		
-		assign free_ivc[ivc] = port_cred_q;
-		
-	     end
-	   else
-	     begin
-		
-		assign free_ivc[ivc]
-			 = &(cred_ovc_q |
-			     ~mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]);
-		
-	     end
+	   wire port_cred_s, port_cred_q;
+	   assign port_cred_s
+	     = &(next_cred_ovc | ~mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]);
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   port_credq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(port_cred_s),
+	      .q(port_cred_q));
+	   
+	   assign free_ivc[ivc] = port_cred_q;
 	   
 	end
       
