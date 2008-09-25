@@ -168,7 +168,7 @@ module ivc_ctrl
    // keep track of when to get next header
    //---------------------------------------------------------------------------
    
-   wire 		       fbc_empty;
+   wire 		       fbc_empty_early;
    
    wire 		       hvsr_empty;
    wire 		       hvsr_error;
@@ -217,11 +217,8 @@ module ivc_ctrl
 	begin
 	   
 	   wire wait_tail_s, wait_tail_q;
-	   // Technically, fbc_empty is a cycle late here; however, due to the
-	   // time it takes the tail credit to reach the upstream router, this
-	   // shouldn't matter, and it makes timing easier.
 	   assign wait_tail_s = (wait_tail_q | (flit_valid_in & flit_tail_in)) &
-				~fbc_empty;
+				~fbc_empty_early;
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -237,10 +234,7 @@ module ivc_ctrl
 	   assign flit_head_out = 1'b0;
 	   assign flit_tail_out = 1'b0;
 	   
-	   // Technically, fbc_empty is a cycle late here; however, due to the
-	   // time it takes the tail credit to reach the upstream router, this
-	   // shouldn't matter, and it makes timing easier.
-	   assign get_next_header = ~valid_q | (wait_tail_q & fbc_empty);
+	   assign get_next_header = ~valid_q | (wait_tail_q & fbc_empty_early);
 	   
 	end
       
@@ -447,7 +441,7 @@ module ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   wire 		       fbc_empty_early;
+   wire 		       fbc_empty;
    
    wire [0:num_ports-1]        sw_req_nonspec_op_s, sw_req_nonspec_op_q;
    assign sw_req_nonspec_op_s
