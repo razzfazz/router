@@ -19,7 +19,7 @@ module op_ctrl
    localparam [0:cred_level_width-1] max_cred_level
      = (1 << cred_level_width) - 1;
    
-   localparam [0:cred_level_width-1] free_ovc_reset_value
+   localparam [0:cred_level_width-1] free_reset_value
      = (clogb(num_buffers+1) > cred_level_width) ?
        {cred_level_width{1'b1}} :
        num_buffers;
@@ -55,38 +55,6 @@ module op_ctrl
    
    wire 			       error;
    
-   
-   wire [0:num_vcs-1] 		       set_elig_ovc;
-   wire [0:num_vcs-1] 		       reset_elig_ovc;
-   
-   // per-output-VC bit indicating whether it is available for assignment
-   wire [0:num_vcs-1] 		       elig_ovc_s, elig_ovc_q;
-   assign elig_ovc_s = set_elig_ovc | (elig_ovc_q & ~reset_elig_ovc);
-   dff
-     #(.width(num_vcs),
-       .reset_type(reset_type),
-       .reset_value({num_vcs{1'b1}}))
-   elig_ovcq
-     (.clk(clk),
-      .reset(reset),
-      .d(elig_ovc_s),
-      .q(elig_ovc_q));
-   
-   wire [0:num_vcs*cred_level_width-1] next_free_ovc;
-   
-   wire [0:num_vcs*cred_level_width-1] free_ovc_s, free_ovc_q;
-   assign free_ovc_s = next_free_ovc;
-   dff
-     #(.width(num_vcs*cred_level_width),
-       .reset_type(reset_type),
-       .reset_value({num_vcs{free_ovc_reset_value}}))
-   free_ovcq
-     (.clk(clk),
-      .reset(reset),
-      .d(free_ovc_s),
-      .q(free_ovc_q));
-   
-   assign free_ovc = free_ovc_q;
    
    wire [0:num_vcs-1] 		       next_cred_ovc;
    wire [0:num_vcs-1] 		       error_hct_ovc;
@@ -178,11 +146,6 @@ module op_ctrl
 	      .free_early(head_free_early),
 	      .error(error_hct));
 	   
-	   assign set_elig_ovc[ovc] = debit & flit_tail_in;
-	   assign reset_elig_ovc[ovc] = head_debit;
-	   
-	   assign elig_ovc[ovc] = elig_ovc_q[ovc] & head_free;
-	   
 	   assign error_hct_ovc[ovc] = error_hct;
 	   
 	   wire [0:cred_count_width-1] cred_count_s, cred_count_q;
@@ -197,14 +160,23 @@ module op_ctrl
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   wire [0:cred_level_width-1] next_free;
-	   assign next_free = (cred_count_s > max_cred_level) ?
-			      max_cred_level :
-			      cred_count_s[cred_count_width-cred_level_width:
-					   cred_count_width-1];
+	   wire [0:cred_level_width-1] free_s, free_q;
+	   assign free_s = (cred_count_s > max_cred_level) ?
+			   max_cred_level :
+			   cred_count_s[cred_count_width-cred_level_width:
+					cred_count_width-1];
+	   dff
+	     #(.width(cred_level_width),
+	       .reset_type(reset_type),
+	       .reset_value(free_reset_value))
+	   freeq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(free_s),
+	      .q(free_q));
 	   
-	   assign next_free_ovc[ovc*cred_level_width:
-				(ovc+1)*cred_level_width-1] = next_free;
+	   assign free_ovc[ovc*cred_level_width:(ovc+1)*cred_level_width-1]
+		    = free_q;
 	   
 	   assign next_cred_ovc[ovc] = |cred_count_s;
 	   
@@ -213,6 +185,28 @@ module op_ctrl
 				(cred_count_q == 0) && debit};
 	   
 	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
+	   
+	   wire 		       set_allocated;
+	   assign set_allocated = head_debit;
+	   
+	   wire 		       reset_allocated;   
+	   assign reset_allocated = debit & flit_tail_in;
+	   
+	   // per-output-VC bit indicating whether it is available for
+	   // assignment
+	   wire 		       allocated_s, allocated_q;
+	   assign allocated_s
+	     = set_allocated | (allocated_q & ~reset_allocated);
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   allocatedq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(allocated_s),
+	      .q(allocated_q));
+	   
+	   assign elig_ovc[ovc] = ~allocated_q & head_free;
 	   
 	end
       
