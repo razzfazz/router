@@ -15,11 +15,13 @@ module ivc_ctrl
    parameter sw_spec_enable = 1;
 
    /*
-    0: check that credit is available at all potential output VCs before issuing
+    0: do not check credit for speculative switch allocation (e.g. if implicit
+       credit check is performed during VC allocation)
+    1: check that credit is available at all potential output VCs before issuing
        request
-    1: check that credit is available at all potential output VCs in parallel
+    2: check that credit is available at all potential output VCs in parallel
        with allocation, then mask grants
-    2: check that credit is available at slected output VC while doing
+    3: check that credit is available at slected output VC while doing
        allocation, then mask grants
     */
    parameter sw_spec_cred_check = 0;
@@ -131,17 +133,17 @@ module ivc_ctrl
 	begin
 	   assign vc_allocated = vc_gnt_masked | allocated_q;
 	   case(sw_spec_cred_check)
-	     0:
+	     0, 1:
 	       begin
 		  assign sw_allocated
 		    = sw_gnt_nonspec | sw_gnt_spec;
 	       end
-	     1:
+	     2:
 	       begin
 		  assign sw_allocated
 		    = sw_gnt_nonspec | (sw_gnt_spec & free_unallocated);
 	       end
-	     2:
+	     3:
 	       begin
 		  assign sw_allocated
 		    = sw_gnt_nonspec | (sw_gnt_spec & free_allocated);
@@ -475,11 +477,11 @@ module ivc_ctrl
 	      .q(sw_req_spec_op_q));
 	   
 	   case(sw_spec_cred_check)
-	     0:
+	     1:
 	       begin
 		  assign sw_req_spec_op = sw_req_spec_op_q & free_unallocated;
 	       end
-	     1, 2:
+	     0, 2, 3:
 	       begin
 		  assign sw_req_spec_op = sw_req_spec_op_q;
 	       end

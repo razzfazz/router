@@ -70,17 +70,22 @@ module router
     2: use speculative grants when not conflicting with non-spec requests
     3: use speculative grants when not conflicting with non-spec grants
     */
-   parameter sw_spec_level = 2;
+   parameter sw_spec_level = 3;
    
    /*
-    0: check that credit is available at all potential output VCs before issuing
+    0: do not check credit for speculative switch allocation (e.g. if implicit
+       credit check is performed during VC allocation)
+    1: check that credit is available at all potential output VCs before issuing
        request
-    1: check that credit is available at all potential output VCs in parallel
+    2: check that credit is available at all potential output VCs in parallel
        with allocation, then mask grants
-    2: check that credit is available at slected output VC while doing
+    3: check that credit is available at slected output VC while doing
        allocation, then mask grants
     */
-   parameter sw_spec_cred_check = 3;
+   parameter sw_spec_cred_check = 2;
+   
+   // do not grant VC unless at least one credit is available
+   parameter vc_gnt_requires_credit = (sw_spec_cred_check == 0);
    
    /*
     0: use tristate buses
@@ -378,7 +383,8 @@ module router
 	     #(.checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type),
-	       .cred_level_width(2))
+	       .cred_level_width(2),
+	       .vc_gnt_requires_credit(vc_gnt_requires_credit))
 	   opc
 	     (.clk(clk),
 	      .reset(reset),

@@ -16,6 +16,9 @@ module op_ctrl
    // (must be less than or equal to cred_count_width)
    parameter cred_level_width = 2;
    
+   // do not grant VC unless at least one credit is available
+   parameter vc_gnt_requires_credit = 0;
+   
    localparam [0:cred_level_width-1] max_cred_level
      = (1 << cred_level_width) - 1;
    
@@ -125,8 +128,11 @@ module op_ctrl
 	   wire 		       head_credit;
 	   assign head_credit = |(tail_queue_q & pop_mask) & credit;
 	   
+	   wire 		       vc_gnt;
+	   assign vc_gnt = vc_gnt_ovc[ovc] & elig_ovc[ovc];
+	   
 	   wire 		       head_debit;
-	   assign head_debit = vc_gnt_ovc[ovc] & elig_ovc[ovc];
+	   assign head_debit = vc_gnt;
 	   
 	   // track header credits using stock credit tracker module
 	   wire 		       head_free;
@@ -160,6 +166,14 @@ module op_ctrl
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
+	   assign next_cred_ovc[ovc] = |cred_count_s;
+	   
+	   wire [0:1] 		       error_cred;
+	   assign error_cred = {(cred_count_q == num_buffers) && credit,
+				(cred_count_q == 0) && debit};
+	   
+	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
+	   
 	   wire [0:cred_level_width-1] free_s, free_q;
 	   assign free_s = (cred_count_s > max_cred_level) ?
 			   max_cred_level :
@@ -175,19 +189,12 @@ module op_ctrl
 	      .d(free_s),
 	      .q(free_q));
 	   
+	   
 	   assign free_ovc[ovc*cred_level_width:(ovc+1)*cred_level_width-1]
 		    = free_q;
 	   
-	   assign next_cred_ovc[ovc] = |cred_count_s;
-	   
-	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_buffers) && credit,
-				(cred_count_q == 0) && debit};
-	   
-	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
-	   
 	   wire 		       set_allocated;
-	   assign set_allocated = head_debit;
+	   assign set_allocated = vc_gnt;
 	   
 	   wire 		       reset_allocated;   
 	   assign reset_allocated = debit & flit_tail_in;
@@ -206,7 +213,14 @@ module op_ctrl
 	      .d(allocated_s),
 	      .q(allocated_q));
 	   
-	   assign elig_ovc[ovc] = ~allocated_q & head_free;
+	   if(vc_gnt_requires_credit > 0)
+	     begin
+		assign elig_ovc[ovc] = ~allocated_q & head_free & |cred_count_q;
+	     end
+	   else
+	     begin
+		assign elig_ovc[ovc] = ~allocated_q & head_free;
+	     end
 	   
 	end
       
