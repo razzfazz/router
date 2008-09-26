@@ -390,7 +390,7 @@ module ivc_ctrl
       .data_out(free_ovc));
    
    wire 		       flit_sent_prev_s, flit_sent_prev_q;
-   assign flit_sent_prev_s = flit_sent;
+   assign flit_sent_prev_s = flit_sent & ~get_next_header;
    dff
      #(.width(1),
        .reset_type(reset_type))
