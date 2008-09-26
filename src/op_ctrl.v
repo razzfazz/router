@@ -215,7 +215,7 @@ module op_ctrl
 	   
 	   if(vc_gnt_requires_credit > 0)
 	     begin
-		assign elig_ovc[ovc] = ~allocated_q & head_free & |cred_count_q;
+		assign elig_ovc[ovc] = ~allocated_q & head_free & |free_q;
 	     end
 	   else
 	     begin
