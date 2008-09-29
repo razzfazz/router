@@ -263,7 +263,9 @@ module ip_ctrl
    assign final_address = get_final_address(route_info);
    
    wire 			       update_addr;
-   assign update_addr = flit_head_in && (address == next_address);
+   assign update_addr = flit_head_in &&
+			(address[0:router_addr_width-1] ==
+			 next_address[0:router_addr_width-1]);
    
    wire [0:route_info_width-1] 	       next_route_info;
    assign next_route_info

@@ -34,7 +34,8 @@ module routing_logic
    assign final_address = get_final_address(route_info);
    
    wire 		 is_next;
-   assign is_next = (address == next_address);
+   assign is_next = (address[0:router_addr_width-1] ==
+		     next_address[0:router_addr_width-1]);
    
    wire [0:addr_width-1] new_next_address;
    assign new_next_address = is_next ? final_address : next_address;
