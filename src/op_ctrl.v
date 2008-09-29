@@ -75,69 +75,84 @@ module op_ctrl
 	   wire debit;
 	   assign debit = flit_valid_in && (flit_vc_in == ovc);
 	   
-	   wire [0:num_buffers-1] push_mask;
-	   wire [0:num_buffers-1] pop_mask;
+	   wire head_credit;
+	   wire [0:cred_count_width-1] cred_count_s;
 	   
-	   wire [0:num_buffers-1] tail_queue_s, tail_queue_q;
-	   assign tail_queue_s
-	     = (tail_queue_q & ~({num_buffers{credit}} & pop_mask)) |
-	       ({num_buffers{debit & flit_tail_in}} & push_mask);
-	   dff
-	     #(.width(num_buffers),
-	       .reset_type(reset_type))
-	   tail_queueq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(tail_queue_s),
-	      .q(tail_queue_q));
+	   if(num_headers > 1)
+	     begin
+		
+		wire [0:num_buffers-1] push_mask;
+		wire [0:num_buffers-1] pop_mask;
+		
+		wire [0:num_buffers-1] tail_queue_s, tail_queue_q;
+		assign tail_queue_s
+		  = (tail_queue_q & ~({num_buffers{credit}} & pop_mask)) |
+		    ({num_buffers{debit & flit_tail_in}} & push_mask);
+		dff
+		  #(.width(num_buffers),
+		    .reset_type(reset_type))
+		tail_queueq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(tail_queue_s),
+		   .q(tail_queue_q));
+		
+		wire [0:buffer_idx_width-1] push_ptr, push_ptr_next;
+		mod_ctr
+		  #(.num_values(num_buffers),
+		    .reset_type(reset_type))
+		push_ptr_ctr
+		  (.clk(clk),
+		   .reset(reset),
+		   .incr(debit),
+		   .value(push_ptr),
+		   .next_value(push_ptr_next));
+		
+		decoder
+		  #(.num_ports(num_buffers))
+		push_mask_dec
+		  (.data_in(push_ptr),
+		   .data_out(push_mask));
+		
+		wire [0:buffer_idx_width-1] pop_ptr, pop_ptr_next;
+		mod_ctr
+		  #(.num_values(num_buffers),
+		    .reset_type(reset_type))
+		pop_ptr_ctr
+		  (.clk(clk),
+		   .reset(reset),
+		   .incr(credit),
+		   .value(pop_ptr),
+		   .next_value(pop_ptr_next));
+		
+		decoder
+		  #(.num_ports(num_buffers))
+		pop_mask_dec
+		  (.data_in(pop_ptr),
+		   .data_out(pop_mask));
+		
+		assign head_credit = |(tail_queue_q & pop_mask) & credit;
+		
+	     end
+	   else
+	     begin
+		
+		// if we can only have one packet per buffer, we can accept the
+		// next one once the buffer has been emptied
+		assign head_credit = credit && (cred_count_s == num_buffers);
+		
+	     end
 	   
-	   wire [0:buffer_idx_width-1] push_ptr, push_ptr_next;
-	   mod_ctr
-	     #(.num_values(num_buffers),
-	       .reset_type(reset_type))
-	   push_ptr_ctr
-	     (.clk(clk),
-	      .reset(reset),
-	      .incr(debit),
-	      .value(push_ptr),
-	      .next_value(push_ptr_next));
-	   
-	   decoder
-	     #(.num_ports(num_buffers))
-	   push_mask_dec
-	     (.data_in(push_ptr),
-	      .data_out(push_mask));
-	   
-	   wire [0:buffer_idx_width-1] pop_ptr, pop_ptr_next;
-	   mod_ctr
-	     #(.num_values(num_buffers),
-	       .reset_type(reset_type))
-	   pop_ptr_ctr
-	     (.clk(clk),
-	      .reset(reset),
-	      .incr(credit),
-	      .value(pop_ptr),
-	      .next_value(pop_ptr_next));
-	   
-	   decoder
-	     #(.num_ports(num_buffers))
-	   pop_mask_dec
-	     (.data_in(pop_ptr),
-	      .data_out(pop_mask));
-	   
-	   wire 		       head_credit;
-	   assign head_credit = |(tail_queue_q & pop_mask) & credit;
-	   
-	   wire 		       vc_gnt;
+	   wire 			    vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc] & elig_ovc[ovc];
 	   
-	   wire 		       head_debit;
+	   wire 			    head_debit;
 	   assign head_debit = vc_gnt;
 	   
 	   // track header credits using stock credit tracker module
-	   wire 		       head_free;
-	   wire 		       head_free_early;
-	   wire 		       error_hct;
+	   wire 			    head_free;
+	   wire 			    head_free_early;
+	   wire 			    error_hct;
 	   credit_tracker
 	     #(.num_credits(num_headers),
 	       .checker_enable(checker_enable),
@@ -154,7 +169,7 @@ module op_ctrl
 	   
 	   assign error_hct_ovc[ovc] = error_hct;
 	   
-	   wire [0:cred_count_width-1] cred_count_s, cred_count_q;
+	   wire [0:cred_count_width-1] cred_count_q;
 	   assign cred_count_s = cred_count_q + credit - debit;
 	   dff
 	     #(.width(cred_count_width),
@@ -188,7 +203,6 @@ module op_ctrl
 	      .reset(reset),
 	      .d(free_s),
 	      .q(free_q));
-	   
 	   
 	   assign free_ovc[ovc*cred_level_width:(ovc+1)*cred_level_width-1]
 		    = free_q;
