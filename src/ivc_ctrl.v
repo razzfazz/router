@@ -78,7 +78,7 @@ module ivc_ctrl
    
    output error;
    
-   output [0:4] events;
+   output [0:5] events;
    
    
    wire [0:num_ports-1] vc_req_op;
@@ -97,7 +97,7 @@ module ivc_ctrl
    
    wire 		       error;
    
-   wire [0:4] 		       events;
+   wire [0:5] 		       events;
    
    
    //---------------------------------------------------------------------------
@@ -591,6 +591,9 @@ module ivc_ctrl
    assign ev_flit_stalled_sw = valid_q & ~fbc_empty & vc_allocated &
 			       ~sw_allocated;
    
+   wire 		       ev_spec_failed;
+   assign ev_spec_failed = valid_q & ~fbc_empty & ~vc_allocated & sw_allocated;
+   
    wire 		       ev_flit_sent;
    assign ev_flit_sent = valid_q & ~fbc_empty & all_allocated;
    
@@ -602,14 +605,15 @@ module ivc_ctrl
 
       if(perf_ctr_enable > 0)
 	begin
-	   wire [0:4] 	       events_s, events_q;
+	   wire [0:5] 	       events_s, events_q;
 	   assign events_s = {ev_no_flit,
 			      ev_flit_stalled_vc,
 			      ev_flit_stalled_sw,
+			      ev_spec_failed,
 			      ev_flit_sent,
 			      ev_flit_sent_spec};
 	   dff
-	     #(.width(5),
+	     #(.width(6),
 	       .reset_type(reset_type))
 	   eventsq
 	     (.clk(clk),
@@ -620,7 +624,7 @@ module ivc_ctrl
 	end
       else
 	begin
-	   assign events = 5'd0;
+	   assign events = 6'd0;
 	end
       
    endgenerate

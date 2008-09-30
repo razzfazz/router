@@ -111,7 +111,7 @@ module ip_ctrl
    wire [0:num_vcs*buffer_idx_width-1] buff_write_addr_ivc;
    wire [0:num_vcs*buffer_idx_width-1] buff_read_addr_ivc;
    wire [0:num_vcs-1] 		       ivcc_error_ivc;
-   wire [0:num_vcs*5-1] 	       events_ivc;
+   wire [0:num_vcs*6-1] 	       events_ivc;
    generate
       
       genvar 			ivc;
@@ -144,7 +144,7 @@ module ip_ctrl
 	   wire [0:buffer_idx_width-1] buff_write_addr;
 	   wire [0:buffer_idx_width-1] buff_read_addr;
 	   wire 		       ivcc_error;
-	   wire [0:4] 		       events;
+	   wire [0:5] 		       events;
 	   ivc_ctrl
 	     #(.sw_spec_enable(sw_spec_enable),
 	       .sw_spec_cred_check(sw_spec_cred_check),
@@ -200,7 +200,7 @@ module ip_ctrl
 				     (ivc+1)*buffer_idx_width-1]
 		    = buff_read_addr;
 	   assign ivcc_error_ivc[ivc] = ivcc_error;
-	   assign events_ivc[ivc*5:(ivc+1)*5-1] = events;
+	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
 	   
 	end
       
@@ -461,9 +461,9 @@ module ip_ctrl
    // performance counters
    //---------------------------------------------------------------------------
    
-   wire [0:5*num_vcs-1]        events;
+   wire [0:6*num_vcs-1]        events;
    interleaver
-     #(.width(num_vcs*5),
+     #(.width(num_vcs*6),
        .num_blocks(num_vcs))
    events_intl
      (.data_in(events_ivc),
@@ -473,7 +473,7 @@ module ip_ctrl
    generate
       if(perf_ctr_enable > 0)
 	begin
-	   for(ctr = 0; ctr < 5; ctr = ctr + 1)
+	   for(ctr = 0; ctr < 6; ctr = ctr + 1)
 	     begin:ctrs
 		wire [0:event_width-1] event_sum;
 		add_nto1
