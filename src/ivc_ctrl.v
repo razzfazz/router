@@ -1,19 +1,34 @@
 module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
-   cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op,
-   sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent, flit_vc_out,
-   flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr, error,
-   events);
+   free_op, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
+   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent,
+   flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr,
+   error, events);
    
 `include "functions.v"
 `include "config.v"
 `include "constants.v"
 `include "config_utils.v"
    
+   // select method for credit signaling from output to input controller
+   //  0: indicate credit level to input side
+   //  1: push credits to input side one by one
+   parameter credit_handling_type = 1;
+   
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
-
+   
+   // select method for credit checking
+   // (note: this parameter is only used if credit_handling_type=0)
+   //  0: check that credit is available at all potential output VCs before
+   //     issuing request
+   //  1: check that credit is available at all potential output VCs in parallel
+   //     with allocation, then mask grants
+   //  2: check that credit is available at slected output VC while doing
+   //     allocation, then mask grants
+   parameter sw_spec_cred_check = 0;
+   
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
    
@@ -45,6 +60,9 @@ module ivc_ctrl
    input flit_tail_in;
    
    input [0:route_info_width-1] route_info_in;
+   
+   input [0:num_ports-1] free_op;
+   input [0:num_ports*num_vcs*2-1] free_op_ovc;
    
    input [0:num_ports*num_vcs-1] cred_op_ovc;
    
@@ -113,13 +131,40 @@ module ivc_ctrl
    
    wire 		       vc_allocated;
    wire 		       sw_allocated;
+   wire 		       free_unallocated;
+   wire 		       free_allocated;
    
    generate
       
       if(sw_spec_enable)
 	begin
 	   assign vc_allocated = vc_gnt_masked | allocated_q;
-	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
+	   case(credit_handling_type)
+	     0:
+	       begin
+		  case(sw_spec_cred_check)
+		    0:
+		      begin
+			 assign sw_allocated
+			   = sw_gnt_nonspec | sw_gnt_spec;
+		      end
+		    1:
+		      begin
+			 assign sw_allocated
+			   = sw_gnt_nonspec | (sw_gnt_spec & free_unallocated);
+		      end
+		    2:
+		      begin
+			 assign sw_allocated
+			   = sw_gnt_nonspec | (sw_gnt_spec & free_allocated);
+		      end
+		  endcase
+	       end
+	     1:
+	       begin
+		  assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
+	       end
+	   endcase
 	end
       else
 	begin
@@ -345,58 +390,142 @@ module ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       cred_ovc;
-   select_1ofn
-     #(.num_ports(num_ports),
-       .width(num_vcs))
-   cred_ovc_sel
-     (.select(port_q),
-      .data_in(cred_op_ovc),
-      .data_out(cred_ovc));
+   wire 		       cred_error;
    
-   wire 		       cred;
-   assign cred = |(cred_ovc & vcs_updated & mask_ovc);
-   
-   wire [0:cred_hold_width-1]  cred_hold_q;
-   
-   wire 		       has_cred_s, has_cred_q;
-   assign has_cred_s = (vc_gnt_masked ?
-			~sw_gnt_spec :
-			((has_cred_q & ~sw_gnt_nonspec) | |cred_hold_q)) |
-		       cred;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   has_credq
-     (.clk(clk),
-      .reset(reset),
-      .d(has_cred_s),
-      .q(has_cred_q));
-   
-   wire 		       incr_cred_hold;
-   assign incr_cred_hold = cred & ~sw_gnt_nonspec;
-   
-   wire 		       decr_cred_hold;
-   assign decr_cred_hold = ~cred & sw_gnt_nonspec & |cred_hold_q;
-   
-   wire [0:cred_hold_width-1]  cred_hold_s;
-   assign cred_hold_s = vc_gnt_masked ?
-			({cred_hold_width{1'b0}} + (cred & ~sw_gnt_spec)) :
-			allocated_q ?
-			(cred_hold_q + incr_cred_hold - decr_cred_hold) :
-			cred_hold_q;
-   dff
-     #(.width(cred_hold_width),
-       .reset_type(reset_type))
-   cred_holdq
-     (.clk(clk),
-      .reset(reset),
-      .d(cred_hold_s),
-      .q(cred_hold_q));
-   
-   wire 		       cred_hold_error;
-   assign cred_hold_error
-     = allocated_q && (cred_hold_q == num_buffers-1) && incr_cred_hold;
+   generate
+      
+      case(credit_handling_type)
+	0:
+	  begin
+	     
+	     select_1ofn
+	       #(.num_ports(num_ports),
+		 .width(1))
+	     free_sel
+	       (.select(port_q),
+		.data_in(free_op),
+		.data_out(free_unallocated));
+	     
+	     wire [0:num_vcs*2-1]        free_ovc;
+	     select_1ofn
+	       #(.num_ports(num_ports),
+		 .width(num_vcs*2))
+	     free_ovc_sel
+	       (.select(port_q),
+		.data_in(free_op_ovc),
+		.data_out(free_ovc));
+	     
+	     wire 			 flit_sent_prev_s, flit_sent_prev_q;
+	     assign flit_sent_prev_s = flit_sent & ~get_next_header;
+	     dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     flit_sent_prevq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_sent_prev_s),
+		.q(flit_sent_prev_q));
+	     
+	     wire [0:2] 		 flit_sent_count;
+	     assign flit_sent_count = {flit_sent_prev_q & flit_sent,
+				       flit_sent_prev_q ^ flit_sent,
+				       ~(flit_sent_prev_q | flit_sent)};
+	     
+	     wire [0:num_vcs-1] 	 next_free_ovc;
+	     
+	     genvar 			 ovc;
+	     for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+	       begin:ovcs
+		  
+		  wire [0:1] free;
+		  assign free = free_ovc[ovc*2:(ovc+1)*2-1];
+		  
+		  wire [0:2] free_by_count;
+		  assign free_by_count = {|free, free[0], &free};
+		  
+		  wire       next_free;
+		  select_1ofn
+		    #(.num_ports(3),
+		      .width(1))
+		  next_free_sel
+		    (.select(flit_sent_count),
+		     .data_in(free_by_count),
+		     .data_out(next_free));
+		  
+		  assign next_free_ovc[ovc] = next_free;
+		  
+	       end
+	     
+	     assign free_allocated = |(next_free_ovc & vcs_updated & mask_ovc);
+	     
+	     assign cred_error = 1'b0;
+	     
+	  end
+	1:
+	  begin
+	     
+	     assign free_unallocated = 1'b0;
+	     
+	     wire [0:num_vcs-1] 	       cred_ovc;
+	     select_1ofn
+	       #(.num_ports(num_ports),
+		 .width(num_vcs))
+	     cred_ovc_sel
+	       (.select(port_q),
+		.data_in(cred_op_ovc),
+		.data_out(cred_ovc));
+	     
+	     wire 			       cred;
+	     assign cred = |(cred_ovc & vcs_updated & mask_ovc);
+	     
+	     wire [0:cred_hold_width-1]        cred_hold_q;
+	     
+	     wire 			       has_cred_s, has_cred_q;
+	     assign has_cred_s
+	       = (vc_gnt_masked ?
+		  ~sw_gnt_spec :
+		  ((has_cred_q & ~sw_gnt_nonspec) | |cred_hold_q)) | cred;
+	     dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     has_credq
+	       (.clk(clk),
+		.reset(reset),
+		.d(has_cred_s),
+		.q(has_cred_q));
+	     
+	     assign free_allocated = has_cred_s;
+	     
+	     wire 			       incr_cred_hold;
+	     assign incr_cred_hold = cred & ~sw_gnt_nonspec;
+	     
+	     wire 			       decr_cred_hold;
+	     assign decr_cred_hold = ~cred & sw_gnt_nonspec & |cred_hold_q;
+	     
+	     wire [0:cred_hold_width-1]        cred_hold_s;
+	     assign cred_hold_s
+	       = vc_gnt_masked ?
+		 ({cred_hold_width{1'b0}} + (cred & ~sw_gnt_spec)) :
+		 allocated_q ?
+		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
+		 cred_hold_q;
+	     dff
+	       #(.width(cred_hold_width),
+		 .reset_type(reset_type))
+	     cred_holdq
+	       (.clk(clk),
+		.reset(reset),
+		.d(cred_hold_s),
+		.q(cred_hold_q));
+	     
+	     assign cred_error
+	       = allocated_q && (cred_hold_q == num_buffers-1) &&
+		 incr_cred_hold;
+	     
+	  end
+      endcase
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -408,7 +537,7 @@ module ivc_ctrl
    wire [0:num_ports-1]        sw_req_nonspec_op_s, sw_req_nonspec_op_q;
    assign sw_req_nonspec_op_s
      = port_s &
-       {num_ports{valid_s & ~fbc_empty_early & allocated_s & has_cred_s}};
+       {num_ports{valid_s & ~fbc_empty_early & allocated_s & free_allocated}};
    dff
      #(.width(num_ports),
        .reset_type(reset_type))
@@ -437,7 +566,26 @@ module ivc_ctrl
 	      .d(sw_req_spec_op_s),
 	      .q(sw_req_spec_op_q));
 	   
-	   assign sw_req_spec_op = sw_req_spec_op_q;
+	   case(credit_handling_type)
+	     0:
+	       begin
+		  case(sw_spec_cred_check)
+		    0:
+		      begin
+			 assign sw_req_spec_op
+			   = sw_req_spec_op_q & free_unallocated;
+		      end
+		    1, 2:
+		      begin
+			 assign sw_req_spec_op = sw_req_spec_op_q;
+		      end
+		  endcase
+	       end
+	     1:
+	       begin
+		  assign sw_req_spec_op = sw_req_spec_op_q;
+	       end
+	   endcase
 	   
 	end
       else
@@ -516,7 +664,7 @@ module ivc_ctrl
                        ~hdsr_empty & ~valid_q,
                        ~fbc_empty & ~valid_q,
 		       rtl_error,
-		       cred_hold_error};
+		       cred_error};
    
    wire [0:4] 		       errors_out;
    checker
