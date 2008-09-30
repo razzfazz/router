@@ -1,10 +1,9 @@
 module ip_ctrl
   (clk, reset, flit_valid_in, flit_vc_in, flit_head_in, flit_tail_in,
-   flit_data_in, free_ivc_op, free_op_ovc, vc_req_ivc_op, vc_req_ivc_ovc,
-   vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, sw_req_spec_ivc_op,
-   sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, flit_vc_out,
-   flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out,
-   error);
+   flit_data_in, cred_op_ovc, vc_req_ivc_op, vc_req_ivc_ovc, vc_gnt_ivc_ovc,
+   sw_req_nonspec_ivc_op, sw_req_spec_ivc_op, sw_gnt_nonspec_ivc,
+   sw_gnt_spec_ivc, flit_valid_out, flit_vc_out, flit_head_out, flit_tail_out,
+   flit_data_out, cred_valid_out, cred_vc_out, error);
    
 `include "functions.v"
 `include "config.v"
@@ -14,16 +13,6 @@ module ip_ctrl
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
-   
-   /*
-    0: check that credit is available at all potential output VCs before issuing
-       request
-    1: check that credit is available at all potential output VCs in parallel
-       with allocation, then mask grants
-    2: check that credit is available at slected output VC while doing
-       allocation, then mask grants
-    */
-   parameter sw_spec_cred_check = 0;
    
    // replicate port decoding logic in routing logic
    parameter replicate_port_decoder = 0;
@@ -55,8 +44,7 @@ module ip_ctrl
    input flit_tail_in;
    input [0:data_width-1] flit_data_in;
    
-   input [0:num_vcs*num_ports-1] free_ivc_op;
-   input [0:num_ports*num_vcs*2-1] free_op_ovc;
+   input [0:num_ports*num_vcs-1] cred_op_ovc;
    
    output [0:num_vcs*num_ports-1] vc_req_ivc_op;
    output [0:num_vcs*num_vcs-1] vc_req_ivc_ovc;
@@ -121,9 +109,6 @@ module ip_ctrl
 	   wire flit_valid;
 	   assign flit_valid = flit_valid_in && (flit_vc_in == ivc);
 	   
-	   wire [0:num_ports-1] free_op;
-	   assign free_op = free_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1];
-	   
 	   wire [0:num_vcs-1] 	vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
 	   
@@ -147,7 +132,6 @@ module ip_ctrl
 	   wire [0:5] 		       events;
 	   ivc_ctrl
 	     #(.sw_spec_enable(sw_spec_enable),
-	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .checker_enable(checker_enable),
@@ -164,8 +148,7 @@ module ip_ctrl
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
 	      .route_info_in(route_info_in),
-	      .free_op(free_op),
-	      .free_op_ovc(free_op_ovc),
+	      .cred_op_ovc(cred_op_ovc),
 	      .vc_req_op(vc_req_op),
 	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt_ovc(vc_gnt_ovc),

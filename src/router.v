@@ -73,21 +73,6 @@ module router
    parameter sw_spec_level = 3;
    
    /*
-    0: do not check credit for speculative switch allocation (e.g. if implicit
-       credit check is performed during VC allocation)
-    1: check that credit is available at all potential output VCs before issuing
-       request
-    2: check that credit is available at all potential output VCs in parallel
-       with allocation, then mask grants
-    3: check that credit is available at slected output VC while doing
-       allocation, then mask grants
-    */
-   parameter sw_spec_cred_check = 2;
-   
-   // do not grant VC unless at least one credit is available
-   parameter vc_gnt_requires_credit = (sw_spec_cred_check == 0);
-   
-   /*
     0: use tristate buses
     1: use multiplexers
     */
@@ -136,8 +121,7 @@ module router
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs-1] 	  elig_op_ovc;
-   wire [0:num_vcs*num_ports-1] 	  free_ivc_op;
-   wire [0:num_ports*num_vcs*2-1] 	  free_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	  cred_op_ovc;
    
    wire [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_req_ip_ivc_ovc;
@@ -208,7 +192,6 @@ module router
 	   wire 			ipc_error;
 	   ip_ctrl
 	     #(.sw_spec_enable(sw_spec_level > 0),
-	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
 	       .port_id(ip),
@@ -226,8 +209,7 @@ module router
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
-	      .free_ivc_op(free_ivc_op),
-	      .free_op_ovc(free_op_ovc),
+	      .cred_op_ovc(cred_op_ovc),
 	      .vc_req_ivc_op(vc_req_ivc_op),
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
@@ -335,8 +317,6 @@ module router
    // output ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 	free_op_ivc;
-
    wire [0:num_ports-1] 		opc_error_op;
    
    generate
@@ -376,15 +356,12 @@ module router
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs-1] 	     elig_ovc;
-	   wire [0:num_vcs*2-1]      free_ovc;
-	   wire [0:num_vcs-1] 	     free_ivc;
+	   wire [0:num_vcs-1] 	     cred_ovc;
 	   wire 		     opc_error;
 	   op_ctrl
 	     #(.checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .reset_type(reset_type),
-	       .cred_level_width(2),
-	       .vc_gnt_requires_credit(vc_gnt_requires_credit))
+	       .reset_type(reset_type))
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
@@ -395,13 +372,11 @@ module router
 	      .flit_vc_in(flit_vc),
 	      .flit_tail_in(flit_tail),
 	      .elig_ovc(elig_ovc),
-	      .free_ovc(free_ovc),
-	      .free_ivc(free_ivc),
+	      .cred_ovc(cred_ovc),
 	      .error(opc_error));
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
-	   assign free_op_ovc[op*num_vcs*2:(op+1)*num_vcs*2-1] = free_ovc;
-	   assign free_op_ivc[op*num_vcs:(op+1)*num_vcs-1] = free_ivc;
+	   assign cred_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = cred_ovc;
 	   
 	   assign flit_valid_out_op[op] 
 		    = flit_valid;
@@ -418,17 +393,6 @@ module router
 	end
       
    endgenerate
-   
-   //---------------------------------------------------------------------------
-   // bit shuffling to change sort order
-   //---------------------------------------------------------------------------
-   
-   interleaver
-     #(.width(num_ports*num_vcs),
-       .num_blocks(num_ports))
-   free_ivc_op_intl
-     (.data_in(free_op_ivc),
-      .data_out(free_ivc_op));
    
    
    //---------------------------------------------------------------------------
