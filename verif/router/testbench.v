@@ -403,6 +403,20 @@ module testbench
    wire [0:31] in_flits;
    assign in_flits = in_flits_s;
    
+   wire [0:31] in_creds_s, in_creds_q;
+   assign in_creds_s = in_creds_q + pop_count(cred_valid_out_ip);
+   dff
+     #(.width(32),
+       .reset_type(reset_type))
+   in_credsq
+     (.clk(clk),
+      .reset(reset),
+      .d(in_creds_s),
+      .q(in_creds_q));
+   
+   wire [0:31] in_creds;
+   assign in_creds = in_creds_q;
+   
    wire [0:31] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + pop_count(flit_valid_out_op);
    dff
@@ -416,6 +430,20 @@ module testbench
    
    wire [0:31] out_flits;
    assign out_flits = out_flits_s;
+   
+   wire [0:31] out_creds_s, out_creds_q;
+   assign out_creds_s = out_creds_q + pop_count(cred_valid_in_op);
+   dff
+     #(.width(32),
+       .reset_type(reset_type))
+   out_credsq
+     (.clk(clk),
+      .reset(reset),
+      .d(out_creds_s),
+      .q(out_creds_q));
+   
+   wire [0:31] out_creds;
+   assign out_creds = out_creds_q;
    
    reg 	       clk_en;
    
@@ -451,7 +479,7 @@ module testbench
       
       cycles = 0;
       
-      while(!(&done_ip) || (in_flits > out_flits))
+      while(!(&done_ip) || (in_flits > out_flits) || (in_flits > in_creds))
 	begin
 	   cycles = cycles + 1;
 	   #(Tclk);
