@@ -73,19 +73,19 @@ module router
    parameter sw_spec_level = 3;
    
    /*
-    0: do not check credit for speculative switch allocation (e.g. if implicit
-       credit check is performed during VC allocation)
-    1: check that credit is available at all potential output VCs before issuing
+    0: check that credit is available at all potential output VCs before issuing
        request
-    2: check that credit is available at all potential output VCs in parallel
+    1: check that credit is available at all potential output VCs in parallel
        with allocation, then mask grants
-    3: check that credit is available at slected output VC while doing
+    2: check that credit is available at slected output VC while doing
        allocation, then mask grants
     */
    parameter sw_spec_cred_check = 2;
    
-   // do not grant VC unless at least one credit is available
-   parameter vc_gnt_requires_credit = (sw_spec_cred_check == 0);
+   // select method for credit signaling from output to input controller
+   //  0: indicate credit level to input side
+   //  1: push credits to input side one by one
+   parameter credit_handling_type = 1;
    
    /*
     0: use tristate buses
@@ -207,7 +207,8 @@ module router
 	   wire [0:vc_idx_width-1] 	cred_vc_out;
 	   wire 			ipc_error;
 	   ip_ctrl
-	     #(.sw_spec_enable(sw_spec_level > 0),
+	     #(.credit_handling_type(credit_handling_type),
+	       .sw_spec_enable(sw_spec_level > 0),
 	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .replicate_port_decoder(replicate_port_decoder),
 	       .address(address),
@@ -383,8 +384,8 @@ module router
 	     #(.checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type),
-	       .cred_level_width(2),
-	       .vc_gnt_requires_credit(vc_gnt_requires_credit))
+	       .credit_handling_type(credit_handling_type),
+	       .cred_level_width(2))
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
