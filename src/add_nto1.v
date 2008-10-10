@@ -1,18 +1,32 @@
+// multi-operand adder
 module add_nto1
   (data_in, data_out);
    
-`include "functions.v"
+   function integer clogb(input integer argument);
+      integer i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
+   // width of each input
    parameter width = 1;
+   
+   // number of inputs
    parameter num_ports = 2;
    
+   // result width
    localparam out_width = clogb(num_ports) + width;
    
+   // vector of inputs
    input [0:width*num_ports-1] data_in;
-   output [0:out_width-1] data_out;
    
+   // output data
+   output [0:out_width-1] data_out;
    reg [0:out_width-1] data_out;
-
+   
    integer 	       i;
    
    always @(data_in)

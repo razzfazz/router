@@ -1,23 +1,30 @@
+// wavefront allocator variant which replicates the entire allocation logic for
+// the different priorities and selects the result from the appropriate one
 module wf_alloc_core_rep
   (clk, reset, update, req, gnt);
    
-   
 `include "constants.v"
-`include "functions.v"
    
+   function integer clogb(input integer argument);
+      integer i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
-   
-   parameter reset_type = reset_type_async;
-   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   localparam prio_width = clogb(num_ports);
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // width of priority selector
+   localparam prio_width = clogb(num_ports);
    
    input clk;
    input reset;
@@ -25,12 +32,11 @@ module wf_alloc_core_rep
    // update arbitration priorities
    input update;
    
-   // requests
+   // request matrix
    input [0:num_ports*num_ports-1] req;
    
-   // grants
+   // grant matrix
    output [0:num_ports*num_ports-1] gnt;
-   
    wire [0:num_ports*num_ports-1] gnt;
    
    wire [0:prio_width-1] 	  current_prio;
@@ -44,9 +50,6 @@ module wf_alloc_core_rep
       .incr(update),
       .value(current_prio),
       .next_value(next_prio));
-   
-   wire [0:num_ports*num_ports-1] 	    req_msk;
-   assign req_msk = req & mask;
    
    wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;
    
@@ -91,8 +94,8 @@ module wf_alloc_core_rep
 		  begin:cols
 		     
 		     assign req_int[row*num_ports+col] 
-			      = req_msk[((prio+row)%num_ports)*num_ports +
-					(num_ports-row+col)%num_ports];
+			      = req[((prio+row)%num_ports)*num_ports +
+				    (num_ports-row+col)%num_ports];
 		     assign gnt_by_prio[((prio+row)%num_ports)*
 					num_ports +
 					(num_ports-row+col)%num_ports +

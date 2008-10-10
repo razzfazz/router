@@ -1,43 +1,45 @@
+// configurable register
 module dff
   (clk, reset, d, q);
    
 `include "constants.v"
    
+   // width of register
    parameter width = 32;
+   
+   // offset (left index) of register
    parameter offset = 0;
    
-   /* supported reset types:
-    0: no reset
-    1: asynchronous reset
-    2: synchronous reset */
-   parameter reset_type = reset_type_async;
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    parameter [offset:(offset+width)-1] reset_value = {width{1'b0}};
    
-   
    input clk;
    input reset;
-   input [offset:(offset+width)-1] d;
-   output [offset:(offset+width)-1] q;
    
+   // data input
+   input [offset:(offset+width)-1] d;
+   
+   // data output
+   output [offset:(offset+width)-1] q;
    reg [offset:(offset+width)-1] q;
    
    generate
       
       case(reset_type)
 	
-	0:
+	`RESET_TYPE_NONE:
 	  always @(posedge clk)
 	    q <= d;
 	
-	1:
+	`RESET_TYPE_ASYNC:
 	  always @(posedge clk, posedge reset)
 	    if(reset)
 	      q <= reset_value;
 	    else
 	      q <= d;
 	
-	2:
+	`RESET_TYPE_SYNC:
 	  always @(posedge clk)
 	    if(reset)
 	      q <= reset_value;

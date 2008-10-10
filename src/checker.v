@@ -1,5 +1,8 @@
+// error checker module
 module checker
   (clk, reset, errors_in, errors_out);
+   
+`include "constants.v"
    
    // number of error inputs
    parameter num_errors = 1;
@@ -7,24 +10,20 @@ module checker
    // enable error checking
    parameter enable = 1;
    
-   /*
-    0: do not capture (hold) errors
-    1: capture (hold) first error only
-    2: capture (hold) all errors
-    */
-   parameter capture_mode = 0;
+   // select mode of operation
+   parameter capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
 
-`include "constants.v"
-   
-   parameter reset_type = reset_type_async;
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    
    input clk;
    input reset;
-   
+
+   // raw error inputs
    input [0:num_errors-1] errors_in;
-   output [0:num_errors-1] errors_out;
    
+   // registered and potentially held error outputs
+   output [0:num_errors-1] errors_out;
    wire [0:num_errors-1] errors_out;
    
    generate
@@ -33,17 +32,17 @@ module checker
 	begin
 	   wire [0:num_errors-1] errors_s, errors_q;
 	   case(capture_mode)
-	     0:
+	     `CHECKER_CAPTURE_MODE_NO_HOLD:
 	       begin
 		  assign errors_s = errors_in;
 	       end
-	     1:
+	     `CHECKER_CAPTURE_MODE_HOLD_FIRST:
 	       begin
 		  wire [0:num_errors-1] mask;
 		  assign mask = ~{num_errors{|errors_q}};
 		  assign errors_s = errors_q | (mask & errors_in);
 	       end
-	     2:
+	     `CHECKER_CAPTURE_MODE_HOLD_ALL:
 	       begin
 		  assign errors_s = errors_q | errors_in;
 	       end

@@ -2,70 +2,108 @@ module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
    flit_tail_in, elig_ovc, free_ovc, free_ivc, cred_ovc, error);
    
-`include "functions.v"
-`include "config.v"
 `include "constants.v"
-`include "config_utils.v"
    
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // flit buffer entries per VC
+   parameter num_flit_buffers = 8;
+   
+   // width required to select a buffer
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
+   // width for full range of credit count ([0:num_credits])
+   localparam cred_count_width = clogb(num_flit_buffers+1);
+   
+   // width of counter for credits waiting to be sent to input controller
+   localparam cred_hold_width = clogb(num_flit_buffers);
+   
+   // maximum number of packets that can be in a given VC buffer simultaneously
+   parameter num_header_buffers = 4;
+   
+   // number of VCs
+   parameter num_vcs = 4;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // include error checking logic
    parameter checker_enable = 1;
-   parameter checker_capture_mode = 0;
-   
-   parameter reset_type = reset_type_async;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    // select method for credit signaling from output to input controller
-   //  0: indicate credit level to input side
-   //  1: push credits to input side one by one
-   parameter credit_handling_type = 1;
+   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
    // number of bits to be used for credit level reporting
    // (note: must be less than or equal to cred_count_width as given below)
-   // (note: this parameter is only used if credit_handling_type=0)
+   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
    parameter cred_level_width = 2;
    
-   localparam [0:cred_level_width-1] max_cred_level
-     = (1 << cred_level_width) - 1;
+   // maximum value for credit level
+   localparam [0:cred_level_width-1] max_cred_level = {cred_level_width{1'b1}};
    
+   // capped reset value for credit level
    localparam [0:cred_level_width-1] free_reset_value
-     = (clogb(num_buffers+1) > cred_level_width) ?
-       {cred_level_width{1'b1}} :
-       num_buffers;
+     = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
    
-   localparam [0:num_vcs*num_vcs-1] mask_ivc_ovc
-     = create_mask_ivc_ovc(restrict_vcs);
-   
-   // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_buffers+1);
-   
-   // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width = clogb(num_buffers);
-   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
+   // valid credit data available
    input cred_valid_in;
+   
+   // which VC does credit pertain to
+   // (note: only valid if cred_valid_in=1)
    input [0:vc_idx_width-1] cred_vc_in;
    
+   // output VC was granted to an input VC
    input [0:num_vcs-1] vc_gnt_ovc;
    
+   // valid flit data available
    input flit_valid_in;
+   
+   // which VC is flit travelling on
+   // (note: only valid if flit_valid_in=1)
    input [0:vc_idx_width-1] flit_vc_in;
+   
+   // flit is tail
+   // (note: only valid if flit_valid_in=1)
    input flit_tail_in;
    
+   // output VC is eligible for allocation (i.e., not currently allocated)
    output [0:num_vcs-1] elig_ovc;
-   output [0:num_vcs*cred_level_width-1] free_ovc;
-   output [0:num_vcs-1] free_ivc;
-   output [0:num_vcs-1] cred_ovc;
-   
-   output error;
-   
    wire [0:num_vcs-1] elig_ovc;
+   
+   // output VC has given number of credits available (capped at maximum 
+   // value that can be represented with cred_level_width bits)
+   // (note: this is only used for CREDIT_HANDLING_TYPE_LEVEL)
+   output [0:num_vcs*cred_level_width-1] free_ovc;
    wire [0:num_vcs*cred_level_width-1] free_ovc;
+   
+   // all candidate output VCs for a given input VC have at least one credit
+   // available
+   // (note: this is only used for CREDIT_HANDLING_TYPE_LEVEL)
+   output [0:num_vcs-1] free_ivc;
    wire [0:num_vcs-1] 		       free_ivc;
+   
+   // credits to be sent to input controllers
+   // (note: this is only used for CREDIT_HANDLING_TYPE_PUSH)
+   output [0:num_vcs-1] cred_ovc;
    wire [0:num_vcs-1] 		       cred_ovc;
    
+   // internal error condition detected
+   output error;
    wire 			       error;
-   
    
    wire [0:num_vcs-1] 		       next_cred_ovc;
    wire [0:num_vcs-1] 		       error_hct_ovc;
@@ -86,18 +124,18 @@ module op_ctrl
 	   wire head_credit;
 	   wire [0:cred_count_width-1] cred_count_s;
 	   
-	   if(num_headers > 1)
+	   if(num_header_buffers > 1)
 	     begin
 		
-		wire [0:num_buffers-1] push_mask;
-		wire [0:num_buffers-1] pop_mask;
+		wire [0:num_flit_buffers-1] push_mask;
+		wire [0:num_flit_buffers-1] pop_mask;
 		
-		wire [0:num_buffers-1] tail_queue_s, tail_queue_q;
+		wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
 		assign tail_queue_s
-		  = (tail_queue_q & ~({num_buffers{credit}} & pop_mask)) |
-		    ({num_buffers{debit & flit_tail_in}} & push_mask);
+		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
+		    ({num_flit_buffers{debit & flit_tail_in}} & push_mask);
 		dff
-		  #(.width(num_buffers),
+		  #(.width(num_flit_buffers),
 		    .reset_type(reset_type))
 		tail_queueq
 		  (.clk(clk),
@@ -105,9 +143,9 @@ module op_ctrl
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
-		wire [0:buffer_idx_width-1] push_ptr, push_ptr_next;
+		wire [0:flit_buffer_idx_width-1] push_ptr, push_ptr_next;
 		mod_ctr
-		  #(.num_values(num_buffers),
+		  #(.num_values(num_flit_buffers),
 		    .reset_type(reset_type))
 		push_ptr_ctr
 		  (.clk(clk),
@@ -117,14 +155,14 @@ module op_ctrl
 		   .next_value(push_ptr_next));
 		
 		decoder
-		  #(.num_ports(num_buffers))
+		  #(.num_ports(num_flit_buffers))
 		push_mask_dec
 		  (.data_in(push_ptr),
 		   .data_out(push_mask));
 		
-		wire [0:buffer_idx_width-1] pop_ptr, pop_ptr_next;
+		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_next;
 		mod_ctr
-		  #(.num_values(num_buffers),
+		  #(.num_values(num_flit_buffers),
 		    .reset_type(reset_type))
 		pop_ptr_ctr
 		  (.clk(clk),
@@ -134,7 +172,7 @@ module op_ctrl
 		   .next_value(pop_ptr_next));
 		
 		decoder
-		  #(.num_ports(num_buffers))
+		  #(.num_ports(num_flit_buffers))
 		pop_mask_dec
 		  (.data_in(pop_ptr),
 		   .data_out(pop_mask));
@@ -147,7 +185,7 @@ module op_ctrl
 		
 		// if we can only have one packet per buffer, we can accept the
 		// next one once the buffer has been emptied
-		assign head_credit = credit && (cred_count_s == num_buffers);
+		assign head_credit = credit && (cred_count_s == num_flit_buffers);
 		
 	     end
 	   
@@ -162,7 +200,7 @@ module op_ctrl
 	   wire 			    head_free_early;
 	   wire 			    error_hct;
 	   credit_tracker
-	     #(.num_credits(num_headers),
+	     #(.num_credits(num_header_buffers),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
@@ -182,7 +220,7 @@ module op_ctrl
 	   dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
-	       .reset_value(num_buffers))
+	       .reset_value(num_flit_buffers))
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
@@ -192,13 +230,13 @@ module op_ctrl
 	   assign next_cred_ovc[ovc] = |cred_count_s;
 	   
 	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_buffers) && credit,
+	   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
 				(cred_count_q == 0) && debit};
 	   
 	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
 	   
 	   case(credit_handling_type)
-	     0:
+	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  wire [0:cred_level_width-1] free_s, free_q;
 		  assign free_s = (cred_count_s > max_cred_level) ?
@@ -220,7 +258,7 @@ module op_ctrl
 				  (ovc+1)*cred_level_width-1]
 			   = free_q;
 	       end
-	     1:
+	     `CREDIT_HANDLING_TYPE_PUSH:
 	       begin
 		  assign free_ovc[ovc*cred_level_width:
 				  (ovc+1)*cred_level_width-1]
@@ -251,12 +289,12 @@ module op_ctrl
 	   wire 		       elig_s;
 	   
 	   case(credit_handling_type)
-	     0:
+	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  assign cred_ovc[ovc] = 1'b0;
 		  assign elig_s = ~allocated_s & head_free_early;
 	       end
-	     1:
+	     `CREDIT_HANDLING_TYPE_PUSH:
 	       begin
 		  
 		  wire [0:cred_hold_width-1]  cred_hold_copy;
@@ -274,7 +312,7 @@ module op_ctrl
 		  dff
 		    #(.width(cred_hold_width),
 		      .reset_type(reset_type),
-		      .reset_value(num_buffers-1))
+		      .reset_value(num_flit_buffers-1))
 		  cred_holdq
 		    (.clk(clk),
 		     .reset(reset),
@@ -331,16 +369,14 @@ module op_ctrl
       assign error = |error_hct_ovc | |errors_out_ovc;
       
       case(credit_handling_type)
-	0:
+	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     genvar 			       ivc;
 	     for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	       begin:ivcs
 		  
 		  wire port_cred_s, port_cred_q;
-		  assign port_cred_s
-		    = &(next_cred_ovc | ~mask_ivc_ovc[ivc*num_vcs:
-						      (ivc+1)*num_vcs-1]);
+		  assign port_cred_s = &next_cred_ovc;
 		  dff
 		    #(.width(1),
 		      .reset_type(reset_type))
@@ -354,7 +390,7 @@ module op_ctrl
 		  
 	       end
 	  end
-	1:
+	`CREDIT_HANDLING_TYPE_PUSH:
 	  begin
 	     assign free_ivc = {num_vcs{1'b0}};
 	  end  

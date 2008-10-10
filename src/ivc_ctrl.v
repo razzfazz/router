@@ -5,121 +5,215 @@ module ivc_ctrl
    flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr,
    error, events);
    
-`include "functions.v"
-`include "config.v"
 `include "constants.v"
-`include "config_utils.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // flit buffer entries per VC
+   parameter num_flit_buffers = 8;
+   
+   // width of credit hold register
+   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_PUSH)
+   localparam cred_hold_width = clogb(num_flit_buffers);
+   
+   // width required to select a buffer
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
+   // maximum number of packets that can be in a given VC buffer simultaneously
+   parameter num_header_buffers = 4;
+   
+   // number of VCs
+   parameter num_vcs = 4;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // ID of current input VC
+   parameter [0:vc_idx_width-1] vc_id = {vc_idx_width{1'b0}};
+   
+   // number of traffic classes (e.g. read, write)
+   parameter num_traffic_classes = 2;
+   
+   // number of routing classes (e.g. minimal, adaptive)
+   parameter num_routing_classes = 2;
+   
+   // number of input and output ports on router
+   parameter num_ports = 5;
+   
+   // width required to select individual port
+   localparam port_idx_width = clogb(num_ports);
+   
+   // ID of current input port
+   parameter [0:port_idx_width-1] port_id = {port_idx_width{1'b0}};
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // current router's address
+   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
+   
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
+   // number of nodes per router (a.k.a. consentration factor)
+   localparam num_nodes_per_router
+     = num_ports - num_dimensions * num_neighbors_per_dim;
+   
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // width of global addresses
+   localparam addr_width = router_addr_width + node_addr_width;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width = 2 * addr_width;
+   
+   // select routing function type
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
    
    // select method for credit signaling from output to input controller
-   //  0: indicate credit level to input side
-   //  1: push credits to input side one by one
-   parameter credit_handling_type = 1;
+   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
    
    // select method for credit checking
-   // (note: this parameter is only used if credit_handling_type=0)
-   //  0: check that credit is available at all potential output VCs before
-   //     issuing request
-   //  1: check that credit is available at all potential output VCs in parallel
-   //     with allocation, then mask grants
-   //  2: check that credit is available at slected output VC while doing
-   //     allocation, then mask grants
-   parameter sw_spec_cred_check = 0;
+   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
+   parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
    
-   // replicate port decoding logic in routing logic
-   parameter replicate_port_decoder = 0;
-   
+   // enable performance counter
    parameter perf_ctr_enable = 1;
    
+   // include error checking logic
    parameter checker_enable = 1;
-   parameter checker_capture_mode = 0;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   parameter reset_type = reset_type_async;
-   
-   parameter [0:addr_width-1] address = {addr_width{1'b0}};
-   parameter [0:port_idx_width-1] port_id = {port_idx_width{1'b0}};
-   parameter [0:vc_idx_width-1] vc_id = {vc_idx_width{1'b0}};
-   
-   localparam [0:num_vcs*num_vcs-1] mask_ivc_ovc
-     = create_mask_ivc_ovc(restrict_vcs);
-   localparam [0:num_vcs-1] mask_ovc
-     = mask_ivc_ovc[vc_id*num_vcs:(vc_id+1)*num_vcs-1];
-   
-   localparam cred_hold_width = clogb(num_buffers);
-   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
+   // valid flit data available
    input flit_valid_in;
+   
+   // flit is head
+   // (note: valid only when flit_valid_in=1)
    input flit_head_in;
+   
+   // flit is tail
+   // (note: valid only when flit_valid_in=1)
    input flit_tail_in;
    
+   // routing information associated with current flit
+   // (note: valid only when flit_valid_in=1 and flit_head_in=1)
    input [0:route_info_width-1] route_info_in;
    
+   // summary signal indicating all output VCs at given output port have at 
+   // least one credit available
+   // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
    input [0:num_ports-1] free_op;
+   
+   // at least one credit available for given output VC at given output port
+   // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
    input [0:num_ports*num_vcs*2-1] free_op_ovc;
    
+   // credits from output controller
+   // (note: only used for CREDIT_HANDLING_TYPE_PUSH)
    input [0:num_ports*num_vcs-1] cred_op_ovc;
    
+   // requests VC allocation for given port
    output [0:num_ports-1] vc_req_op;
-   output [0:num_vcs-1] vc_req_ovc;
-   input [0:num_vcs-1] vc_gnt_ovc;
-   
-   output [0:num_ports-1] sw_req_nonspec_op;
-   output [0:num_ports-1] sw_req_spec_op;
-   input sw_gnt_nonspec;
-   input sw_gnt_spec;
-   
-   output flit_sent;
-   output [0:vc_idx_width-1] flit_vc_out;
-   output flit_head_out;
-   output flit_tail_out;
-   
-   output [0:buffer_idx_width-1] buff_write_addr;
-   output [0:buffer_idx_width-1] buff_read_addr;
-   
-   output error;
-   
-   output [0:5] events;
-   
-   
    wire [0:num_ports-1] vc_req_op;
+   
+   // allowable VCs for VC allocation
+   output [0:num_vcs-1] vc_req_ovc;
    wire [0:num_vcs-1] 	vc_req_ovc;
    
+   // granted output VC
+   input [0:num_vcs-1] vc_gnt_ovc;
+   
+   // non-speculative switch allocator requests
+   output [0:num_ports-1] sw_req_nonspec_op;
    wire [0:num_ports-1] sw_req_nonspec_op;
+   
+   // speculative switch allocator requests
+   output [0:num_ports-1] sw_req_spec_op;
    wire [0:num_ports-1] sw_req_spec_op;
    
+   // non-speculative switch allocator grants
+   input sw_gnt_nonspec;
+   
+   // speculative switch allocator grants
+   input sw_gnt_spec;
+   
+   // outgoing flit indicator
+   output flit_sent;
    wire 		flit_sent;
+   
+   // destination VC for outgoing flit
+   // (note: only valid if flit_sent=1)
+   output [0:vc_idx_width-1] flit_vc_out;
    wire [0:vc_idx_width-1] flit_vc_out;
+   
+   // outgoing flit is head
+   // (note: only valid if flit_sent=1 and num_header_buffers>1)
+   output flit_head_out;
    wire 		   flit_head_out;
+   
+   // outgoing flit is tail
+   // (note: only valid if flit_sent=1 and num_header_buffers>1)
+   output flit_tail_out;
    wire 		   flit_tail_out;
    
-   wire [0:buffer_idx_width-1] buff_write_addr;
-   wire [0:buffer_idx_width-1] buff_read_addr;
+   // write pointer for shared flit buffer
+   output [0:flit_buffer_idx_width-1] buff_write_addr;
+   wire [0:flit_buffer_idx_width-1] buff_write_addr;
    
-   wire 		       error;
+   // read pointer for shared flit buffer
+   output [0:flit_buffer_idx_width-1] buff_read_addr;
+   wire [0:flit_buffer_idx_width-1] buff_read_addr;
    
-   wire [0:5] 		       events;
+   // internal error condition detected
+   output error;
+   wire 			    error;
+   
+   // performance counter events
+   // (note: only valid if perf_ctr_enable=1)
+   output [0:5] events;
+   wire [0:5] 			    events;
    
    
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       vc_gnt_masked_ovc;
-   assign vc_gnt_masked_ovc = vc_gnt_ovc & mask_ovc;
+   wire 			    vc_gnt;
+   assign vc_gnt = |vc_gnt_ovc;
    
-   wire 		       vc_gnt_masked;
-   assign vc_gnt_masked = |vc_gnt_masked_ovc;
-   
-   wire 		       get_next_header;
-   wire 		       allocated_s, allocated_q;
-   assign allocated_s = (allocated_q | vc_gnt_masked) & ~get_next_header;
+   wire 			    get_next_header;
+   wire 			    allocated_s, allocated_q;
+   assign allocated_s = (allocated_q | vc_gnt) & ~get_next_header;
    dff
      #(.width(1),
        .reset_type(reset_type))
@@ -129,38 +223,38 @@ module ivc_ctrl
       .d(allocated_s),
       .q(allocated_q));
    
-   wire 		       vc_allocated;
-   wire 		       sw_allocated;
-   wire 		       free_unallocated;
-   wire 		       free_allocated;
+   wire 			    vc_allocated;
+   wire 			    sw_allocated;
+   wire 			    free_unallocated;
+   wire 			    free_allocated;
    
    generate
       
       if(sw_spec_enable)
 	begin
-	   assign vc_allocated = vc_gnt_masked | allocated_q;
+	   assign vc_allocated = vc_gnt | allocated_q;
 	   case(credit_handling_type)
-	     0:
+	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  case(sw_spec_cred_check)
-		    0:
+		    `SW_SPEC_CRED_CHECK_ALL_PRE:
 		      begin
 			 assign sw_allocated
 			   = sw_gnt_nonspec | sw_gnt_spec;
 		      end
-		    1:
+		    `SW_SPEC_CRED_CHECK_ALL_POST:
 		      begin
 			 assign sw_allocated
 			   = sw_gnt_nonspec | (sw_gnt_spec & free_unallocated);
 		      end
-		    2:
+		    `SW_SPEC_CRED_CHECK_SEL_POST:
 		      begin
 			 assign sw_allocated
 			   = sw_gnt_nonspec | (sw_gnt_spec & free_allocated);
 		      end
 		  endcase
 	       end
-	     1:
+	     `CREDIT_HANDLING_TYPE_PUSH:
 	       begin
 		  assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
 	       end
@@ -193,7 +287,7 @@ module ivc_ctrl
    
    generate
       
-      if(num_headers > 1)
+      if(num_header_buffers > 1)
 	begin
 	   
 	   wire 		       hvsr_push;
@@ -209,7 +303,7 @@ module ivc_ctrl
 	   wire [0:1] 		       hvsr_data_out;
 	   shift_register
 	     #(.width(2),
-	       .depth(num_buffers),
+	       .depth(num_flit_buffers),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .error_recovery(error_recovery),
@@ -263,13 +357,13 @@ module ivc_ctrl
    // header buffer
    //---------------------------------------------------------------------------
    
-   wire 		       hdsr_empty;
+   wire 	hdsr_empty;
    
-   wire 		       hdsr_push;
+   wire 	hdsr_push;
    assign hdsr_push
      = flit_valid_in & flit_head_in & (~hdsr_empty | ~get_next_header);
    
-   wire 		       hdsr_pop;
+   wire 	hdsr_pop;
    assign hdsr_pop = get_next_header & ~hdsr_empty;
    
    wire [0:route_info_width-1] hdsr_data;
@@ -277,13 +371,13 @@ module ivc_ctrl
    
    generate
       
-      if(num_headers > 1)
+      if(num_header_buffers > 1)
 	begin
 	   
 	   wire 		       hdsr_full;
 	   shift_register
 	     #(.width(route_info_width),
-	       .depth(num_headers-1),
+	       .depth(num_header_buffers-1),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .error_recovery(error_recovery),
@@ -326,8 +420,15 @@ module ivc_ctrl
    wire [0:num_vcs-1] 	       rtl_next_vcs;
    wire 		       rtl_error_unmasked;
    routing_logic
-     #(.replicate_port_decoder(replicate_port_decoder),
-       .address(address),
+     #(.num_vcs(num_vcs),
+       .num_traffic_classes(num_traffic_classes),
+       .num_routing_classes(num_routing_classes),
+       .num_ports(num_ports),
+       .num_dimensions(num_dimensions),
+       .num_routers_per_dim(num_routers_per_dim),
+       .router_address(router_address),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .routing_function_type(routing_function_type),
        .reset_type(reset_type))
    rtl
      (.clk(clk),
@@ -372,7 +473,7 @@ module ivc_ctrl
    wire [0:num_vcs-1] 	       vcs_q;
    
    wire [0:num_vcs-1] 	       vcs_updated;
-   assign vcs_updated = vc_gnt_masked ? vc_gnt_masked_ovc : vcs_q;
+   assign vcs_updated = vc_gnt ? vc_gnt_ovc : vcs_q;
    
    wire [0:num_vcs-1] 	       vcs_s;
    assign vcs_s = get_next_header ? rtl_next_vcs : vcs_updated;
@@ -395,7 +496,7 @@ module ivc_ctrl
    generate
       
       case(credit_handling_type)
-	0:
+	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
 	     select_1ofn
@@ -456,12 +557,12 @@ module ivc_ctrl
 		  
 	       end
 	     
-	     assign free_allocated = |(next_free_ovc & vcs_updated & mask_ovc);
+	     assign free_allocated = |(next_free_ovc & vcs_updated);
 	     
 	     assign cred_error = 1'b0;
 	     
 	  end
-	1:
+	`CREDIT_HANDLING_TYPE_PUSH:
 	  begin
 	     
 	     assign free_unallocated = 1'b0;
@@ -476,13 +577,13 @@ module ivc_ctrl
 		.data_out(cred_ovc));
 	     
 	     wire 			       cred;
-	     assign cred = |(cred_ovc & vcs_updated & mask_ovc);
+	     assign cred = |(cred_ovc & vcs_updated);
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_q;
 	     
 	     wire 			       has_cred_s, has_cred_q;
 	     assign has_cred_s
-	       = (vc_gnt_masked ?
+	       = (vc_gnt ?
 		  ~sw_gnt_spec :
 		  ((has_cred_q & ~sw_gnt_nonspec) | |cred_hold_q)) | cred;
 	     dff
@@ -504,7 +605,7 @@ module ivc_ctrl
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_s;
 	     assign cred_hold_s
-	       = vc_gnt_masked ?
+	       = vc_gnt ?
 		 ({cred_hold_width{1'b0}} + (cred & ~sw_gnt_spec)) :
 		 allocated_q ?
 		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
@@ -519,7 +620,7 @@ module ivc_ctrl
 		.q(cred_hold_q));
 	     
 	     assign cred_error
-	       = allocated_q && (cred_hold_q == num_buffers-1) &&
+	       = allocated_q && (cred_hold_q == num_flit_buffers-1) &&
 		 incr_cred_hold;
 	     
 	  end
@@ -532,9 +633,10 @@ module ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   wire 		       fbc_empty;
+   wire 				       fbc_empty;
    
-   wire [0:num_ports-1]        sw_req_nonspec_op_s, sw_req_nonspec_op_q;
+   wire [0:num_ports-1] 		       sw_req_nonspec_op_s,
+					       sw_req_nonspec_op_q;
    assign sw_req_nonspec_op_s
      = port_s &
        {num_ports{valid_s & ~fbc_empty_early & allocated_s & free_allocated}};
@@ -567,21 +669,21 @@ module ivc_ctrl
 	      .q(sw_req_spec_op_q));
 	   
 	   case(credit_handling_type)
-	     0:
+	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  case(sw_spec_cred_check)
-		    0:
+		    `SW_SPEC_CRED_CHECK_ALL_PRE:
 		      begin
 			 assign sw_req_spec_op
 			   = sw_req_spec_op_q & free_unallocated;
 		      end
-		    1, 2:
+		    `SW_SPEC_CRED_CHECK_ALL_POST, `SW_SPEC_CRED_CHECK_SEL_POST:
 		      begin
 			 assign sw_req_spec_op = sw_req_spec_op_q;
 		      end
 		  endcase
 	       end
-	     1:
+	     `CREDIT_HANDLING_TYPE_PUSH:
 	       begin
 		  assign sw_req_spec_op = sw_req_spec_op_q;
 	       end
@@ -589,9 +691,7 @@ module ivc_ctrl
 	   
 	end
       else
-	begin
-	   assign sw_req_spec_op = {num_ports{1'b0}};
-	end
+	assign sw_req_spec_op = {num_ports{1'b0}};
       
    endgenerate
    
@@ -616,7 +716,7 @@ module ivc_ctrl
    // (valid when flit_sent=1)
    //---------------------------------------------------------------------------
    
-   // NOTE: don't need to use vc_gnt_masked_ovc here, as flit_valid would not be
+   // NOTE: don't need to use vc_gnt_ovc here, as flit_valid would not be
    // generated in the first place if grant was masked, so we don't care about
    // flit_vc_dec in this case!
    wire [0:num_vcs-1] 	       flit_vc_dec;
@@ -640,7 +740,7 @@ module ivc_ctrl
    
    wire 		       fbc_error;
    fifo_ctrl
-     #(.depth(num_buffers),
+     #(.depth(num_flit_buffers),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
        .reset_type(reset_type))
@@ -702,11 +802,11 @@ module ivc_ctrl
    assign ev_flit_sent = valid_q & ~fbc_empty & all_allocated;
    
    wire 		       ev_flit_sent_spec;
-   assign ev_flit_sent_spec = valid_q & ~fbc_empty & vc_gnt_masked &
+   assign ev_flit_sent_spec = valid_q & ~fbc_empty & vc_gnt &
 			      ~allocated_q & sw_allocated;
    
    generate
-
+      
       if(perf_ctr_enable > 0)
 	begin
 	   wire [0:5] 	       events_s, events_q;
@@ -727,9 +827,7 @@ module ivc_ctrl
 	   assign events = events_q;
 	end
       else
-	begin
-	   assign events = 6'd0;
-	end
+	assign events = 6'd0;
       
    endgenerate
    

@@ -1,42 +1,58 @@
+// simple FIFO controller
 module fifo_ctrl
    (clk, reset, push, pop, write_addr, read_addr, empty, empty_early, error);
    
-`include "functions.v"
 `include "constants.v"
    
+   function integer clogb(input integer argument);
+      integer i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // number of entries in FIFO
    parameter depth = 8;
    
+   // include error checker
    parameter checker_enable = 1;
-   parameter checker_capture_mode = 0;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   // see dff.v for supported values
-   parameter reset_type = reset_type_async;
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // width required to select an individual buffer entry
    localparam idx_width = clogb(depth);
-   
    
    input clk;
    input reset;
    
+   // write (add) an element
    input push;
+   
+   // read (remove) an element
    input pop;
    
+   // address to write current input element to
    output [0:idx_width-1] write_addr;
-   output [0:idx_width-1] read_addr;
-   
-   output empty;
-   output empty_early;
-   
-   output error;
-   
    wire [0:idx_width-1] write_addr;
+   
+   // address to read next output element from
+   output [0:idx_width-1] read_addr;
    wire [0:idx_width-1] read_addr;
    
+   // buffer empty indication
+   output empty;
    wire 		empty;
+   
+   // buffer empty indication (one cycle early)
+   output empty_early;
    wire 		empty_early;
    
+   // internal error condition detected
+   output error;
    wire 		error;
-   
    
    wire [0:idx_width-1] read_ptr, read_ptr_next;
    mod_ctr
@@ -48,7 +64,7 @@ module fifo_ctrl
       .incr(pop),
       .value(read_ptr),
       .next_value(read_ptr_next));
-
+   
    wire 		read_ptr_p_s, read_ptr_p_q;
    assign read_ptr_p_s = pop ? ^read_ptr_next : read_ptr_p_q;
    dff

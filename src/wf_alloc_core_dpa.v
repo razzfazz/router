@@ -1,3 +1,6 @@
+// wavefron allocator variant implementing a Diagonal Propagation Arbiter as
+// described in Hurt et al, "Design and Implementation of High-Speed Symmetric 
+// Crossbar Schedulers"
 module wf_alloc_core_dpa
   (clk, reset, update, req, gnt);
    
@@ -7,15 +10,14 @@ module wf_alloc_core_dpa
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
-   
-   parameter reset_type = reset_type_async;
-   
+   // try to recover from errors
    parameter error_recovery = 0;
    
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   // reset value for priority pointer
    localparam [0:(2*num_ports-1)-1] prio_init
      = {{num_ports{1'b1}}, {(num_ports-1){1'b0}}};
-   
    
    input clk;
    input reset;
@@ -23,12 +25,11 @@ module wf_alloc_core_dpa
    // update arbitration priorities
    input update;
    
-   // requests
+   // request matrix
    input [0:num_ports*num_ports-1] req;
    
-   // grants
+   // grant matrix
    output [0:num_ports*num_ports-1] gnt;
-   
    wire [0:num_ports*num_ports-1] gnt;
    
    // Need to make sure priority is one-hot, otherwise conflicting grants can be
@@ -55,9 +56,6 @@ module wf_alloc_core_dpa
       .reset(reset),
       .d(prio_s),
       .q(prio_q));
-   
-   wire [0:num_ports*num_ports-1] 	req_msk;
-   assign req_msk = req & mask;
    
    wire [0:num_ports*(2*num_ports-2)-1] x;
    
@@ -87,17 +85,15 @@ module wf_alloc_core_dpa
 	     begin:rows
 		
 		assign req_in[row]
-			 = req_msk[((num_ports-col+row)%num_ports)*
-				   num_ports + col];
+			 = req[((num_ports-col+row)%num_ports)*num_ports + col];
 		assign req_in[row+num_ports]
-			 = req_msk[((num_ports-col+row)%num_ports)*
-				   num_ports + col];
+			 = req[((num_ports-col+row)%num_ports)*num_ports + col];
 		assign gnt[((num_ports-col+row)%num_ports)*num_ports+col]
 			 = gnt_out[row] | gnt_out[row+num_ports];
 	     end
 	   
 	   assign req_in[num_ports-1]
-		    = req_msk[((2*num_ports-1-col)%num_ports)*num_ports+col];
+		    = req[((2*num_ports-1-col)%num_ports)*num_ports+col];
 	   assign gnt[((2*num_ports-1-col)%num_ports)*num_ports+col]
 		    = gnt_out[num_ports-1];
 	   

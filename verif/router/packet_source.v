@@ -2,22 +2,36 @@ module packet_source
   (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
    cred_vc, done, error);
    
-`include "functions.v"
-`include "config.v"
-`include "config_utils.v"
 `include "constants.v"
    
-   parameter reset_type = reset_type_async;
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
    parameter packet_count = 1000;
    parameter packet_length = 1;
    parameter packet_rate = 0;
    parameter initial_seed = 0;
    parameter adaptive_rate = 0;
    parameter packet_count_width = 32;
+   parameter num_flit_buffers = 8;
+   parameter num_header_buffers = 8;
+   parameter num_vcs = 4;
+   parameter data_width = 64;
+   parameter addr_width = 6;
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    parameter walk_addresses = 0;
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   localparam vc_idx_width = clogb(num_vcs);
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam flit_count_width = clogb(packet_length);
-   localparam cred_count_width = clogb(num_buffers+1);
+   localparam cred_count_width = clogb(num_flit_buffers+1);
    
    
    input clk;
@@ -52,8 +66,6 @@ module packet_source
    integer 		   i;
    
    reg 			   new_packet;   
-   reg 			   is_adaptive;
-   reg 			   is_reply;
    reg [0:data_width-1]    random_data;
    reg [0:vc_idx_width-1]  random_vc;
    reg [0:addr_width-1]    random_next_addr;
@@ -63,8 +75,6 @@ module packet_source
 	new_packet
 	  = ($dist_uniform(seed, 0, 99) < (packet_rate / packet_length)) &&
 	    !reset;
-	is_adaptive = ($dist_uniform(seed, 0, 99) < adaptive_rate);
-	is_reply = $dist_uniform(seed, 0, 1);
 	for(i = 0; i < data_width; i = i + 1)
 	  random_data[i] = $dist_uniform(seed, 0, 1);
 	random_vc = $dist_uniform(seed, 0, num_vcs-1);
@@ -76,14 +86,11 @@ module packet_source
 	else
 	  begin
 	     random_next_addr = {addr_width{1'b0}};
-	     random_next_addr[0:router_addr_width-1]
-	       = address[0:router_addr_width-1] +
-		 $dist_uniform(seed, 1, 2**router_addr_width-1);
+	     random_next_addr[0:addr_width-1]
+	       = address[0:addr_width-1] +
+		 $dist_uniform(seed, 1, 2**addr_width-1);
 	  end
-	random_final_addr
-	  = is_adaptive ?
-	    address + $dist_uniform(seed, 1, 2**addr_width-1) :
-	    random_next_addr;
+	random_final_addr = address + $dist_uniform(seed, 1, 2**addr_width-1);
      end
    
    wire waiting_packet_count_zero;
@@ -165,18 +172,18 @@ module packet_source
 	   wire head_credit;
 	   wire [0:cred_count_width-1] cred_count_s;
 	   
-	   if(num_headers > 1)
+	   if(num_header_buffers > 1)
 	     begin
 		
-		wire [0:num_buffers-1] push_mask;
-		wire [0:num_buffers-1] pop_mask;
+		wire [0:num_flit_buffers-1] push_mask;
+		wire [0:num_flit_buffers-1] pop_mask;
 		
-		wire [0:num_buffers-1] tail_queue_s, tail_queue_q;
+		wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
 		assign tail_queue_s
-		  = (tail_queue_q & ~({num_buffers{credit}} & pop_mask)) |
-		    ({num_buffers{debit & flit_tail}} & push_mask);
+		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
+		    ({num_flit_buffers{debit & flit_tail}} & push_mask);
 		dff
-		  #(.width(num_buffers),
+		  #(.width(num_flit_buffers),
 		    .reset_type(reset_type))
 		tail_queueq
 		  (.clk(clk),
@@ -184,9 +191,9 @@ module packet_source
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
-		wire [0:buffer_idx_width-1] push_ptr, push_ptr_next;
+		wire [0:flit_buffer_idx_width-1] push_ptr, push_ptr_next;
 		mod_ctr
-		  #(.num_values(num_buffers),
+		  #(.num_values(num_flit_buffers),
 		    .reset_type(reset_type))
 		push_ptr_ctr
 		  (.clk(clk),
@@ -196,14 +203,14 @@ module packet_source
 		   .next_value(push_ptr_next));
 		
 		decoder
-		  #(.num_ports(num_buffers))
+		  #(.num_ports(num_flit_buffers))
 		push_mask_dec
 		  (.data_in(push_ptr),
 		   .data_out(push_mask));
 		
-		wire [0:buffer_idx_width-1] pop_ptr, pop_ptr_next;
+		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_next;
 		mod_ctr
-		  #(.num_values(num_buffers),
+		  #(.num_values(num_flit_buffers),
 		    .reset_type(reset_type))
 		pop_ptr_ctr
 		  (.clk(clk),
@@ -213,7 +220,7 @@ module packet_source
 		   .next_value(pop_ptr_next));
 		
 		decoder
-		  #(.num_ports(num_buffers))
+		  #(.num_ports(num_flit_buffers))
 		pop_mask_dec
 		  (.data_in(pop_ptr),
 		   .data_out(pop_mask));
@@ -226,7 +233,8 @@ module packet_source
 
 		// if we can only have one packet per buffer, we can accept the
 		// next one once the buffer has been emptied
-		assign head_credit = credit && (cred_count_s == num_buffers);
+		assign head_credit = credit &&
+				     (cred_count_s == num_flit_buffers);
 		
 	     end
 	   
@@ -238,7 +246,7 @@ module packet_source
 	   wire 			    head_free_early;
 	   wire 			    error_hct;
 	   credit_tracker
-	     #(.num_credits(num_headers),
+	     #(.num_credits(num_header_buffers),
 	       .checker_enable(1),
 	       .checker_capture_mode(0),
 	       .reset_type(reset_type))
@@ -259,7 +267,7 @@ module packet_source
 	   dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
-	       .reset_value(num_buffers))
+	       .reset_value(num_flit_buffers))
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
@@ -269,7 +277,7 @@ module packet_source
 	   assign free_ovc[ovc] = |cred_count_q;
 	   
 	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_buffers) && credit,
+	   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
 				(cred_count_q == 0) && debit};
 	   
 	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
@@ -342,13 +350,22 @@ module packet_source
       .q(vc_q));
    
    wire [0:data_width-1] 	  data_s, data_q;
-   assign data_s = flit_sent ?
-		   (packet_sent ?
-		    set_route_info(random_data, 
-				   create_route_info(random_next_addr,
-						     random_final_addr)) :
-		    random_data) :
-		   data_q;
+   assign data_s[0:addr_width-1]
+	    = flit_sent ?
+	      (packet_sent ?
+	       random_next_addr :
+	       random_data[0:addr_width-1]) :
+	      data_q[0:addr_width-1];
+   assign data_s[addr_width:2*addr_width-1]
+	    = flit_sent ?
+	      (packet_sent ?
+	       random_final_addr :
+	       random_data[addr_width:2*addr_width-1]) :
+	      data_q[addr_width:2*addr_width-1];
+   assign data_s[2*addr_width:data_width-1]
+	    = flit_sent ?
+	      random_data[2*addr_width:data_width-1] :
+	      data_q[2*addr_width:data_width-1];
    dff
      #(.width(data_width),
        .reset_type(reset_type))

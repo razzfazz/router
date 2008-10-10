@@ -1,11 +1,20 @@
+// clock gating module (supresses clock pulses)
 module clkgate
-  (input clk,
-   input act,
-    output wire clk_gated);
+  (clk, act, clk_gated);
    
-   reg 		act_q;
+   // free-running clock
+   input clk;
    
-   assign    clk_gated = clk & act_q;
+   // clock enable
+   input act;
+   
+   // gated clock
+   output clk_gated;
+   wire clk_gated;
+   
+   reg 	act_q;
+   
+   assign clk_gated = clk & act_q;
    
    always @(clk, act)
      begin

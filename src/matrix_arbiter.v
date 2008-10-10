@@ -1,20 +1,28 @@
+// generic matrix arbiter
 module matrix_arbiter
   (clk, reset, update, req, gnt);
    
 `include "constants.v"
    
+   // number of inputs ports
    parameter num_ports = 32;
-   parameter reset_type = reset_type_async;
    
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
-   input update;
-   input [0:num_ports-1] req;
-   output [0:num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
+   // request vector
+   input [0:num_ports-1] req;
+   
+   // grant vector
+   output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
    
+   // port priority matrix
    wire [0:num_ports*num_ports-1] prio;
    
    generate

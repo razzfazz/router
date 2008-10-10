@@ -1,20 +1,31 @@
+// module for tracking available credit in a buffer
 module credit_tracker
   (clk, reset, debit, credit, free, free_early, error);
    
 `include "constants.v"
-`include "functions.v"
    
-   // total number of credits
+   function integer clogb(input integer argument);
+      integer i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // total number of credits available
    parameter num_credits = 8;
    
+   // include error checker
    parameter checker_enable = 1;
-   parameter checker_capture_mode = 0;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   parameter reset_type = reset_type_async;
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // width required to select an individual credit
    localparam credit_idx_width = clogb(num_credits);
    
-   // width for full range of credit count ([0:num_credits])
+   // width required to represent full range of credit count (0..num_credits)
    localparam true_idx_width = clogb(num_credits+1);
    
    
@@ -27,17 +38,15 @@ module credit_tracker
    
    // at least one credit available?
    output free;
+   wire free;
    
    // 1 cycle early version of "free"
    output free_early;
-   
-   output error;
-   
-   wire free;
    wire free_early;
    
+   // internal error condition encountered
+   output error;
    wire error;
-   
    
    wire set_cred, reset_cred;
    wire cred_s, cred_q;

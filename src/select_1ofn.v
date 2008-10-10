@@ -1,20 +1,26 @@
+// generic select mux (i.e., mux with one-hot control signal)
 module select_1ofn
   (select, data_in, data_out);
    
-   
-   parameter width = 32;
+   // number of input ports
    parameter num_ports = 4;
    
+   // width of each port
+   parameter width = 32;
    
+   // control signal to select active port
    input [0:num_ports-1] select;
-   input [0:num_ports*width-1] data_in;
-   output [0:width-1] data_out;
    
+   // vector of inputs
+   input [0:num_ports*width-1] data_in;
+   
+   // result
+   output [0:width-1] data_out;
    wire [0:width-1] data_out;
    
    generate
       
-      genvar 		   i;
+      genvar 	    i;
       for(i = 0; i < width; i = i + 1)
 	begin:width_loop
 	   

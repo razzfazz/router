@@ -1,28 +1,39 @@
+// modulo counter (i.e., counter with wraparound)
 module mod_ctr
   (clk, reset, incr, value, next_value);
-   
-`include "functions.v"
+
 `include "constants.v"
    
+   function integer clogb(input integer argument);
+      integer i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // number of counter values (0..num_values-1)
    parameter num_values = 8;
    
-   // see dff.v for supported values
-   parameter reset_type = reset_type_async;
-   
+   // width of counter state
    localparam width = clogb(num_values);
    
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
+   // increment the counter value
    input incr;
-   
+
+   // current counter value
    output [0:width-1] value;
-   output [0:width-1] next_value;
-   
    wire [0:width-1] value;
-   wire [0:width-1] next_value;
    
+   // next counter value (i.e., (value+1) mod num_values)
+   output [0:width-1] next_value;
+   wire [0:width-1] next_value;
    
    wire [0:width-1] value_s, value_q, value_next;
    

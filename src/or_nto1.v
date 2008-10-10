@@ -1,19 +1,23 @@
+// n-input bitwise OR
 module or_nto1
   (data_in, data_out);
    
-   
-   parameter width = 1;
+   // number of inputs
    parameter num_ports = 2;
    
+   // width of each input
+   parameter width = 1;
    
+   // vector of inputs
    input [0:width*num_ports-1] data_in;
-   output [0:width-1] data_out;
    
+   // result
+   output [0:width-1] data_out;
    wire [0:width-1] data_out;
    
    generate
       
-      genvar 		   i;
+      genvar 	    i;
       for(i = 0; i < width; i = i + 1)
 	begin:bit_positions
 	   

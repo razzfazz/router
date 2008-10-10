@@ -1,23 +1,29 @@
+// confiurable crossbar module
 module crossbar
   (ctrl_ip_op, data_ip, data_op);
    
+`include "constants.v"
    
+   // number of input/output ports
    parameter num_ports = 5;
+   
+   // width per port
    parameter width = 32;
    
-   /*
-    0: use tristate buses
-    1: use multiplexers
-    */
-   parameter crossbar_type = 0;
+   // select implementation variant
+   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
-   
+   // control signals (request matrix)
    input [0:num_ports*num_ports-1] ctrl_ip_op;
+   
+   // vector of input data
    input [0:num_ports*width-1] data_ip;
-   output wire [0:num_ports*width-1] data_op;
    
+   // vector of output data
+   output [0:num_ports*width-1] data_op;
+   wire [0:num_ports*width-1] data_op;
    
-   wire [0:num_ports*num_ports-1]  ctrl_op_ip;
+   wire [0:num_ports*num_ports-1] ctrl_op_ip;
    interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
@@ -27,14 +33,14 @@ module crossbar
    
    generate
       
-      genvar 			   op;
+      genvar 			  op;
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
 	   wire [0:width-1] out;
 	   
 	   case(crossbar_type)
-	     0:
+	     `CROSSBAR_TYPE_TRISTATE:
 	       begin
 		  
 		  genvar ip;
@@ -52,7 +58,7 @@ module crossbar
 		    end
 		  
 	       end
-	     1:
+	     `CROSSBAR_TYPE_MUX:
 	       begin
 		  
 		  wire [0:num_ports-1] ctrl;

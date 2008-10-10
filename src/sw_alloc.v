@@ -2,65 +2,66 @@ module sw_alloc
   (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op,
    sw_gnt_nonspec_ip_ivc, sw_gnt_spec_ip_ivc, sw_gnt_ip_op);
    
-`include "functions.v"   
 `include "constants.v"
-`include "config.v"
    
+   // number of VCs
+   parameter num_vcs = 4;
+   
+   // number of input and output ports on router
+   parameter num_ports = 5;
+   
+   // select implementation variant for switch allocator
+   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   
+   // select implementation variant for wavefront allocator
+   // (note: only valid for SW_ALLOCATOR_TYPE_WF_BASE+x
+   localparam wf_allocator_type = sw_allocator_type-`SW_ALLOCATOR_TYPE_WF_BASE;
+   
+   // select which arbiter type to use in allocator
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select speculation level
+   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   parameter reset_type = reset_type_async;
-   
-   /*
-    0: separable, input-first
-    1: separable, output-first
-    2: wavefront, mux inputs for priority
-    3: wavefront, replicate logic for priorities
-    4: wavefront, diagonal propagation allocator
-    5: wavefront, rotate inputs for priority
-    6: wavefront, false combinational loop
-    */
-   parameter allocator_type = 0;
-   
-   /*
-    0: round-robin arbiters
-    1: matrix arbiters
-    */
-   parameter arbiter_type = 0;
-   
-   /*
-    0: disable speculative switch allocation
-    1: only use speculative grants if no non-speculative requests/grants present
-    2: use speculative grants when not conflicting with non-spec requests
-    3: use speculative grants when not conflicting with non-spec grants
-    */
-   parameter spec_level = 0;
-   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
+   // non-speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
+   
+   // speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
    
+   // grants corresponding to non-speculative requests (to input controller)
    output [0:num_ports*num_vcs-1] sw_gnt_nonspec_ip_ivc;
-   output [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
-   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
-   
    wire [0:num_ports*num_vcs-1] sw_gnt_nonspec_ip_ivc;
+   
+   // grants corresponding to speculative requests (to input controller)
+   output [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
+   
+   // crossbar control signals
+   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    wire [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    
    generate
       
-      case(allocator_type)
-	0:
+      case(sw_allocator_type)
+	`SW_ALLOCATOR_TYPE_SEP_IF:
 	  begin
 	     sw_alloc_core_sep_if
-	       #(.reset_type(reset_type),
+	       #(.num_vcs(num_vcs),
+		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level),
-		 .error_recovery(error_recovery))
+		 .sw_spec_level(sw_spec_level),
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
@@ -70,13 +71,15 @@ module sw_alloc
 		.sw_gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
-	1:
+	`SW_ALLOCATOR_TYPE_SEP_OF:
 	  begin
 	     sw_alloc_core_sep_of
-	       #(.reset_type(reset_type),
+	       #(.num_vcs(num_vcs),
+		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level),
-		 .error_recovery(error_recovery))
+		 .sw_spec_level(sw_spec_level),
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
@@ -86,14 +89,18 @@ module sw_alloc
 		.sw_gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
-	2, 3, 4, 5, 6:
+      endcase
+      
+	if(sw_allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE)
 	  begin
 	     sw_alloc_core_wf
-	       #(.reset_type(reset_type),
-		 .allocator_type(allocator_type-2),
+	       #(.num_vcs(num_vcs),
+		 .num_ports(num_ports),
+		 .wf_allocator_type(wf_allocator_type),
 		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level),
-		 .error_recovery(error_recovery))
+		 .sw_spec_level(sw_spec_level),
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
@@ -103,7 +110,6 @@ module sw_alloc
 		.sw_gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
 		.sw_gnt_ip_op(sw_gnt_ip_op));
 	  end
-      endcase
       
    endgenerate
    

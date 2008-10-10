@@ -2,54 +2,47 @@ module sw_alloc_core_wf
   (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op,
    sw_gnt_nonspec_ip_ivc, sw_gnt_spec_ip_ivc, sw_gnt_ip_op);
    
-`include "functions.v"
 `include "constants.v"
-`include "config.v"
-`include "config_utils.v"
    
+   // number of VCs
+   parameter num_vcs = 4;
+   
+   // number of input and output ports on switch
+   parameter num_ports = 5;
+   
+   // select which wavefront allocator variant to use
+   parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
+   
+   // select which arbiter type to use in allocator
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select speculation level
+   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   parameter reset_type = reset_type_async;
-   
-   /*
-    0: wavefront, mux inputs for priority
-    1: wavefront, replicate logic for priorities
-    2: wavefront, diagonal propagation allocator
-    3: wavefront, rotate inputs for priority
-    4: wavefront, false combinational loop
-    */
-   parameter allocator_type = 0;
-   
-   /*
-    0: round-robin arbiters
-    1: matrix arbiters
-    */
-   parameter arbiter_type = 0;
-   
-   /*
-    0: disable speculative switch allocation
-    1: only use speculative grants if no non-speculative requests/grants present
-    2: use speculative grants when not conflicting with non-spec requests
-    3: use speculative grants when not conflicting with non-spec grants
-    */
-   parameter spec_level = 0;
-   
-   localparam [0:num_ports*num_ports-1] mask_ip_op
-     = create_mask_ip_op(ignore_same_port);
-   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
+   // non-speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
+   
+   // speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
    
+   // grants corresponding to non-speculative requests (to input controller)
    output [0:num_ports*num_vcs-1] sw_gnt_nonspec_ip_ivc;
-   output [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
-   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
-   
    wire [0:num_ports*num_vcs-1] sw_gnt_nonspec_ip_ivc;
+   
+   // grants corresponding to speculative requests (to input controller)
+   output [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_vcs-1] sw_gnt_spec_ip_ivc;
+   
+   // crossbar control signals
+   output [0:num_ports*num_ports-1] sw_gnt_ip_op;
    wire [0:num_ports*num_ports-1] sw_gnt_ip_op;
    
    
@@ -81,8 +74,7 @@ module sw_alloc_core_wf
 	   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
 	   assign sw_req_nonspec_ivc_op
 	     = sw_req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
-					(ip+1)*num_vcs*num_ports-1] &
-	       {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
+					(ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_vcs*num_ports-1] req_in_nonspec_ivc_op;
 	   assign req_in_nonspec_ivc_op = sw_req_nonspec_ivc_op;
@@ -186,7 +178,7 @@ module sw_alloc_core_wf
 	   
 	   wire [0:num_vcs-1] 		sw_gnt_spec_ivc;
 	   
-	   if(spec_level > 0)
+	   if(sw_spec_level != `SW_SPEC_LEVEL_NONE)
 	     begin
 		
 		//--------------------------------------------------------------
@@ -196,8 +188,7 @@ module sw_alloc_core_wf
 		wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
 		assign sw_req_spec_ivc_op
 		  = sw_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
-					     (ip+1)*num_vcs*num_ports-1] &
-		    {num_vcs{mask_ip_op[ip*num_ports:(ip+1)*num_ports-1]}};
+					     (ip+1)*num_vcs*num_ports-1];
 		
 		wire [0:num_vcs*num_ports-1] req_in_spec_ivc_op;
 		assign req_in_spec_ivc_op = sw_req_spec_ivc_op;
@@ -322,22 +313,21 @@ module sw_alloc_core_wf
    wire [0:num_ports*num_ports-1] 		spec_mask_ip_op;
    generate
       
-      case(spec_level)
-	0:
+      case(sw_spec_level)
+	`SW_SPEC_LEVEL_NONE:
 	  begin
 	     
-	     assign spec_mask_ip_op
-	       = {num_ports*num_ports{1'b0}};
+	     assign spec_mask_ip_op = {num_ports*num_ports{1'b0}};
 	     
 	  end
-	1:
+	`SW_SPEC_LEVEL_ANY_NONSPEC_MASKS:
 	  begin
 	     
 	     assign spec_mask_ip_op
 	       = {num_ports*num_ports{~|req_out_nonspec_ip_op}};
 	     
 	  end
-	2:
+	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req_out_nonspec_op_ip;
@@ -378,7 +368,7 @@ module sw_alloc_core_wf
 	     assign spec_mask_ip_op = ~(any_req_in_ip_op | any_req_out_ip_op);
 	     
 	  end
-	3:
+	`SW_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] gnt_out_nonspec_op_ip;
@@ -435,8 +425,7 @@ module sw_alloc_core_wf
    
    wf_alloc
      #(.num_ports(num_ports),
-       .allocator_type(allocator_type),
-       .mask(mask_ip_op),
+       .wf_allocator_type(wf_allocator_type),
        .error_recovery(error_recovery),
        .reset_type(reset_type))
    gnt_out_nonspec_ip_op_alloc
@@ -448,7 +437,7 @@ module sw_alloc_core_wf
    
    generate
       
-      if(spec_level > 0)
+      if(sw_spec_level != `SW_SPEC_LEVEL_NONE)
 	begin
 	   
 	   // only update priorities if there is no conflicting non-
@@ -459,8 +448,7 @@ module sw_alloc_core_wf
 	   wire [0:num_ports*num_ports-1] 	gnt_out_unmasked_spec_ip_op;
 	   wf_alloc
 	     #(.num_ports(num_ports),
-	       .allocator_type(allocator_type),
-	       .mask(mask_ip_op),
+	       .wf_allocator_type(wf_allocator_type),
 	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   gnt_out_unmasked_spec_ip_op_alloc

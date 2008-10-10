@@ -1,9 +1,11 @@
+// module for extracting a set of bits from an input word (result is 
+// concatenation of these bits)
 module extractor
   (data_in, data_out);
-   
-   parameter width = 32;
-   parameter [0:width-1] mask = {width{1'b1}};
 
+   // width of input word
+   parameter width = 32;
+   
    function integer pop_count(input [0:width-1] argument);
       integer i;
       begin
@@ -13,18 +15,23 @@ module extractor
       end
    endfunction
    
+   // mask specifying which bits to extract
+   parameter [0:width-1] mask = {width{1'b1}};
+   
+   // width of result
    localparam new_width = pop_count(mask);
    
+   // input word
    input [0:width-1] data_in;
    
+   // result
    output [0:new_width-1] data_out;
-   
    reg [0:new_width-1] data_out;
    
    reg 		       unused;
    
    integer 	       idx1, idx2;
-
+   
    always @(data_in)
      begin
 	unused = 1'b0;
@@ -42,5 +49,3 @@ module extractor
      end
 
 endmodule
-
-	   

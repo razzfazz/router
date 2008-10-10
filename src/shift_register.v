@@ -1,39 +1,54 @@
+// generic shift register
 module shift_register
   (clk, reset, full, data_in, push, empty, data_out, pop, error);
    
 `include "constants.v"
    
+   // number of entries
    parameter depth = 4;
+   
+   // width of each entry
    parameter width = 8;
    
+   // include checker logic
    parameter checker_enable = 1;
-   parameter checker_capture_mode = 0;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   parameter reset_type = reset_type_async;
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // reset value for insertion pointer
    localparam [0:depth] insert_ptr_init = {{depth{1'b0}}, 1'b1};
-   
    
    input clk;
    input reset;
    
+   // all entries occupied
    output full;
+   wire full;
+   
+   // input data
    input [0:width-1] data_in;
+   
+   // write data from data_in into shift register
    input push;
    
+   // no entries occupied
    output empty;
-   output [0:width-1] data_out;
-   input pop;
-   
-   output error;
-   
-   wire full;
    wire empty;
+   
+   // output data (head element)
+   output [0:width-1] data_out;
    wire [0:width-1] data_out;
    
-   wire 	    error;
+   // remove head element from shift register
+   input pop;
    
+   // internal error condition detected
+   output error;
+   wire 	    error;
    
    wire [0:(depth+1)*width-1] data;
    
@@ -108,10 +123,10 @@ module shift_register
    
    wire 		    error_underflow;
    assign error_underflow = empty & pop;
-
+   
    wire 		    error_overflow;
    assign error_overflow = full & push;
-
+   
    wire 		    error_bad_ptr;
    assign error_bad_ptr = insert_ptr_bad;
    

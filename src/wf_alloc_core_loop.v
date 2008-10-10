@@ -1,22 +1,22 @@
+// wavefron allocator variant which uses wraparound (forming a false 
+// combinational loop) as described in Dally et al, "Principles and Practices of
+// Interconnection Networks"
 module wf_alloc_core_loop
   (clk, reset, update, req, gnt);
    
-   
 `include "constants.v"
-   
    
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
-   
-   parameter reset_type = reset_type_async;
-   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   localparam [0:num_ports-1] prio_init = {1'b1, {(num_ports-1){1'b0}}};
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // reset value for priority pointer
+   localparam [0:num_ports-1] prio_init = {1'b1, {(num_ports-1){1'b0}}};
    
    input clk;
    input reset;
@@ -24,12 +24,11 @@ module wf_alloc_core_loop
    // update arbitration priorities
    input update;
    
-   // requests
+   // request matrix
    input [0:num_ports*num_ports-1] req;
    
-   // grants
+   // grant matrix
    output [0:num_ports*num_ports-1] gnt;
-   
    wire [0:num_ports*num_ports-1] gnt;
    
    // Need to make sure priority is one-hot, otherwise conflicting grants can be
@@ -52,9 +51,6 @@ module wf_alloc_core_loop
       .d(prio_s),
       .q(prio_q));
    
-   wire [0:num_ports*num_ports-1] req_msk;
-   assign req_msk = req & mask;
-   
    wire [0:num_ports*num_ports-1] x_pri;
    wire [0:num_ports*num_ports-1] y_pri;
    
@@ -68,7 +64,7 @@ module wf_alloc_core_loop
 	     begin:cols
 		
 		wire req_in;
-		assign req_in = req_msk[row*num_ports+col];
+		assign req_in = req[row*num_ports+col];
 		
 		wire x_pri_in;
 		assign x_pri_in

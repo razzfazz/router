@@ -1,3 +1,4 @@
+// generic wavefront allocator
 module wf_alloc
   (clk, reset, update, req, gnt);
    
@@ -7,45 +8,34 @@ module wf_alloc
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   /*
-    0: mux inputs/outputs based on priority
-    1: replicate logic per priority
-    2: diagonal propagation arbiter (DPA, see Hurt99)
-    3: rotate inputs/outputs based on priority
-    4: false combinational loop
-    */
-   parameter allocator_type = 0;
+   // select implementation variant
+   parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
    
-   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
-   
-   parameter reset_type = reset_type_async;
-   
+   // try to recover from errors
    parameter error_recovery = 0;
    
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
-   
    input reset;
    
    // update arbitration priorities
    input update;
    
-   // requests
+   // request matrix
    input [0:num_ports*num_ports-1] req;
    
-   // grants
+   // grant matrix
    output [0:num_ports*num_ports-1] gnt;
-   
    wire [0:num_ports*num_ports-1] gnt;
    
    generate
       
-      case(allocator_type)
-	0:
+      case(wf_allocator_type)
+	`WF_ALLOCATOR_TYPE_MUX:
 	  begin
 	     wf_alloc_core_mux
 	       #(.num_ports(num_ports),
-		 .mask(mask),
 		 .reset_type(reset_type),
 		 .error_recovery(error_recovery))
 	     core_mux
@@ -55,11 +45,10 @@ module wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end
-	1:
+	`WF_ALLOCATOR_TYPE_REP:
 	  begin
 	     wf_alloc_core_rep
 	       #(.num_ports(num_ports),
-		 .mask(mask),
 		 .reset_type(reset_type),
 		 .error_recovery(error_recovery))
 	     core_rep
@@ -69,11 +58,10 @@ module wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end
-	2:
+	`WF_ALLOCATOR_TYPE_DPA:
 	  begin
 	     wf_alloc_core_dpa
 	       #(.num_ports(num_ports),
-		 .mask(mask),
 		 .reset_type(reset_type),
 		 .error_recovery(error_recovery))
 	     core_dpa
@@ -83,11 +71,10 @@ module wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end      
-	3:
+	`WF_ALLOCATOR_TYPE_ROT:
 	  begin
 	     wf_alloc_core_rot
 	       #(.num_ports(num_ports),
-		 .mask(mask),
 		 .reset_type(reset_type),
 		 .error_recovery(error_recovery))
 	     core_rot
@@ -97,11 +84,10 @@ module wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end
-	4:
+	`WF_ALLOCATOR_TYPE_LOOP:
 	  begin
 	     wf_alloc_core_loop
 	       #(.num_ports(num_ports),
-		 .mask(mask),
 		 .reset_type(reset_type),
 		 .error_recovery(error_recovery))
 	     core_rot

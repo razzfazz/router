@@ -1,22 +1,21 @@
+// wavefront allocator variant which uses multiplexers to permute inputs and
+// outputs based on priority
 module wf_alloc_core_mux
   (clk, reset, update, req, gnt);
    
-   
 `include "constants.v"
-   
    
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
-   
-   parameter reset_type = reset_type_async;
-   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   localparam [0:num_ports-1] prio_init = {1'b1, {(num_ports-1){1'b0}}};
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // reset value for priority pointer
+   localparam [0:num_ports-1] prio_init = {1'b1, {(num_ports-1){1'b0}}};
    
    input clk;
    input reset;
@@ -24,14 +23,13 @@ module wf_alloc_core_mux
    // update arbitration priorities
    input update;
    
-   // requests
+   // request matrix
    input [0:num_ports*num_ports-1] req;
    
-   // grants
+   // grant matrix
    output [0:num_ports*num_ports-1] gnt;
-   
    wire [0:num_ports*num_ports-1] gnt;
-
+   
    // Need to make sure this stays one-hot, as bit errors can lead to
    // conflicting grants being generated!
    wire [0:num_ports-1] 	  prio_s, prio_q;
@@ -51,9 +49,6 @@ module wf_alloc_core_mux
       .reset(reset),
       .d(prio_s),
       .q(prio_q));
-   
-   wire [0:num_ports*num_ports-1] req_msk;
-   assign req_msk = req & mask;
    
    wire [0:num_ports*num_ports-1] y;
    
@@ -87,7 +82,7 @@ module wf_alloc_core_mux
 	   assign gnt[row*num_ports:(row+1)*num_ports-1] = gnt_row;
 	   
 	   wire [0:num_ports-1] req_row;
-	   assign req_row = req_msk[row*num_ports:(row+1)*num_ports-1];
+	   assign req_row = req[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:2*num_ports-1] req_dup;
 	   assign req_dup = {2{req_row}};

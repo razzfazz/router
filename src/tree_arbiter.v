@@ -1,44 +1,40 @@
+// generic tree arbiter
 module tree_arbiter
   (clk, reset, update, req, gnt);
    
 `include "constants.v"
    
+   // number of input ports
    parameter num_ports = 16;
+   
+   // number of blocks in first stage of arbitration
    parameter num_blocks = 4;
    
-   // see dff.v for supported values
-   parameter reset_type = reset_type_async;
-   
-   /*
-    0: round-robin arbiter
-    1: matrix arbiter
-    */
-   parameter arbiter_type = 0;
-   
-   parameter [0:num_ports-1] mask = {num_ports{1'b1}};
-   
+   // number of inputs to each first-stage arbiter
    localparam ports_per_block = num_ports / num_blocks;
-
-   function [0:num_blocks-1] reduce(input [0:num_ports-1] arg);
-      integer i;
-      begin
-	 for(i = 0; i < num_blocks; i = i + 1)
-	   reduce[i] = |arg[i*ports_per_block +: ports_per_block];
-      end
-   endfunction
    
-   localparam [0:num_blocks-1] stg2_mask = reduce(mask);
+   // select arbiter variant to use
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
-   input update;
-   input [0:num_ports-1] req;
-   output [0:num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
+   // request vector
+   input [0:num_ports-1] req;
+   
+   // grant vector
+   output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
    
-   wire [0:num_blocks-1] stg2_req;   
+   // effective second-stage request vector
+   wire [0:num_blocks-1] stg2_req;
+   
+   // second-stage grant vector
    wire [0:num_blocks-1] stg2_gnt;
    
    generate
@@ -57,8 +53,7 @@ module tree_arbiter
 	   arbiter
 	     #(.num_ports(ports_per_block),
 	       .reset_type(reset_type),
-	       .arbiter_type(arbiter_type),
-	       .mask(mask[i*ports_per_block:(i+1)*ports_per_block-1]))
+	       .arbiter_type(arbiter_type))
 	   stg1_arb
 	     (.clk(clk),
 	      .reset(reset),
@@ -77,8 +72,7 @@ module tree_arbiter
    arbiter
      #(.num_ports(num_blocks),
        .reset_type(reset_type),
-       .arbiter_type(arbiter_type),
-       .mask(stg2_mask))
+       .arbiter_type(arbiter_type))
    stg2_arb
      (.clk(clk),
       .reset(reset),

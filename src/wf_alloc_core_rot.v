@@ -1,23 +1,29 @@
+// wavefront allocator variant which rotates inputs and outputs based on 
+// priority
 module wf_alloc_core_rot
   (clk, reset, update, req, gnt);
    
-   
 `include "constants.v"
-`include "functions.v"
    
+   function integer clogb(input integer argument);
+      integer i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
-   parameter [0:num_ports*num_ports-1] mask = {num_ports*num_ports{1'b1}};
-   
-   parameter reset_type = reset_type_async;
-   
+   // try to recover from errors
    parameter error_recovery = 0;
    
-   localparam prio_width = clogb(num_ports);
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
+   localparam prio_width = clogb(num_ports);
    
    input clk;
    input reset;
@@ -25,18 +31,14 @@ module wf_alloc_core_rot
    // update arbitration priorities
    input update;
    
-   // requests
+   // request matrix
    input [0:num_ports*num_ports-1] req;
    
-   // grants
+   // grant matrix
    output [0:num_ports*num_ports-1] gnt;
-   
    wire [0:num_ports*num_ports-1] gnt;
    
    wire [0:num_ports*num_ports-1] y;
-   
-   wire [0:num_ports*num_ports-1] req_msk;
-   assign req_msk = req & mask;
    
    wire [0:prio_width-1] 	  current_prio;
    wire [0:prio_width-1] 	  next_prio;
@@ -57,7 +59,7 @@ module wf_alloc_core_rot
 	begin:rows
 	   
 	   wire [0:num_ports-1] 	req_row;
-	   assign req_row = req_msk[row*num_ports:(row+1)*num_ports-1];
+	   assign req_row = req[row*num_ports:(row+1)*num_ports-1];
 	   
 	   wire [0:prio_width-1] 	current_row;
 	   assign current_row = row;
@@ -65,7 +67,7 @@ module wf_alloc_core_rot
 	   wire [0:num_ports-1] 	req_tmp;
 	   rotator
 	     #(.width(num_ports),
-	       .direction(1))
+	       .rotate_dir(`ROTATE_DIR_RIGHT))
 	   req_tmp_rot
 	     (.amount(current_row),
 	      .data_in(req_row),
@@ -74,7 +76,7 @@ module wf_alloc_core_rot
 	   wire [0:num_ports-1] 	req_in;
 	   rotator
 	     #(.width(num_ports),
-	       .direction(0))
+	       .rotate_dir(`ROTATE_DIR_LEFT))
 	   req_in_rot
 	     (.amount(current_prio),
 	      .data_in(req_tmp),
@@ -100,7 +102,7 @@ module wf_alloc_core_rot
 	   wire [0:num_ports-1] 	gnt_tmp;
 	   rotator
 	     #(.width(num_ports),
-	       .direction(1))
+	       .rotate_dir(`ROTATE_DIR_RIGHT))
 	   gnt_tmp_rot
 	     (.amount(current_prio),
 	      .data_in(gnt_out),
@@ -109,7 +111,7 @@ module wf_alloc_core_rot
 	   wire [0:num_ports-1] 	gnt_row;
 	   rotator
 	     #(.width(num_ports),
-	       .direction(0))
+	       .rotate_dir(`ROTATE_DIR_LEFT))
 	   gnt_row_rot
 	     (.amount(current_row),
 	      .data_in(gnt_tmp),

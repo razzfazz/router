@@ -2,44 +2,37 @@ module vc_alloc_core_sep_of
   (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
    vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
    
-`include "functions.v"   
-`include "config.v"
 `include "constants.v"
-`include "config_utils.v"
    
-   parameter reset_type = reset_type_async;
+   // number of VCs
+   parameter num_vcs = 4;
    
-   /*
-    0: use round-robin arbiters
-    1: use matrix arbiters
-    */
-   parameter arbiter_type = 0;
+   // number of input and output ports on switch
+   parameter num_ports = 5;
    
-   localparam [0:num_ports*num_ports-1] mask_ip_op
-     = create_mask_ip_op(ignore_same_port);
+   // select which arbiter type to use in allocator
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   localparam [0:num_ports*num_ports-1] mask_op_ip
-     = create_mask_op_ip(ignore_same_port);
-   
-   localparam [0:num_vcs*num_vcs-1] mask_ivc_ovc
-     = create_mask_ivc_ovc(restrict_vcs);
-   
-   localparam [0:num_vcs*num_vcs-1] mask_ovc_ivc
-     = create_mask_ovc_ivc(restrict_vcs);
-   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
+   // request VC allocation for given port (for each input VC)
    input [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
+   
+   // allowable VCs for VC allocation (for each input VC)
    input [0:num_ports*num_vcs*num_vcs-1] vc_req_ip_ivc_ovc;
    
+   // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] elig_op_ovc;
    
+   // granted output VC (to inpt controller)
    output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
-   output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
-   
    wire [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
+   
+   // output VC was granted (to output controller)
+   output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 	vc_gnt_op_ovc;
    
    
@@ -73,14 +66,12 @@ module vc_alloc_core_sep_of
 		wire [0:num_ports-1] 	     vc_req_op;
 		assign vc_req_op
 		  = vc_req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
-				     (ip*num_vcs+ivc+1)*num_ports-1] &
-		    mask_ip_op[ip*num_ports:(ip+1)*num_ports-1];
+				     (ip*num_vcs+ivc+1)*num_ports-1];
 		
 		wire [0:num_vcs-1] 	     vc_req_ovc;
 		assign vc_req_ovc
 		  = vc_req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
-				      (ip*num_vcs+ivc+1)*num_vcs-1] &
-		    mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
+				      (ip*num_vcs+ivc+1)*num_vcs-1];
 		
 		wire [0:num_ports*num_vcs-1] vc_req_op_ovc;
 		replicator
@@ -126,9 +117,8 @@ module vc_alloc_core_sep_of
 		wire [0:num_vcs-1] 	     gnt_in_ovc;
 		arbiter
 		  #(.num_ports(num_vcs),
-		    .reset_type(reset_type),
 		    .arbiter_type(arbiter_type),
-		    .mask(mask_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]))
+		    .reset_type(reset_type))
 		gnt_in_ovc_arb
 		  (.clk(clk),
 		   .reset(reset),
@@ -240,9 +230,8 @@ module vc_alloc_core_sep_of
 		     wire [0:num_vcs-1] gnt_out_ivc;
 		     arbiter
 		       #(.num_ports(num_vcs),
-			 .reset_type(reset_type),
 			 .arbiter_type(arbiter_type),
-			 .mask(mask_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1]))
+			 .reset_type(reset_type))
 		     gnt_out_ivc_arb
 		       (.clk(clk),
 			.reset(reset),
@@ -260,9 +249,8 @@ module vc_alloc_core_sep_of
 		
 		arbiter
 		  #(.num_ports(num_ports),
-		    .reset_type(reset_type),
 		    .arbiter_type(arbiter_type),
-		    .mask(mask_op_ip[op*num_ports:(op+1)*num_ports-1]))
+		    .reset_type(reset_type))
 		gnt_out_ip_arb
 		  (.clk(clk),
 		   .reset(reset),

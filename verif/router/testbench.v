@@ -1,76 +1,37 @@
 module testbench
   ();
    
+`include "constants.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // test for undefined bits
+   function is_x(input integer net);
+      begin
+	 is_x = (^net === 1'bx);
+      end
+   endfunction
+   
+   // population count (count ones)
+   function integer pop_count(input integer argument);
+      integer i;
+      begin
+	 pop_count = 0;
+	 for(i = argument; i > 0; i = i >> 1)
+	   pop_count = pop_count + (i & 1);
+      end
+   endfunction
+   
    parameter Tclk = 2;
    parameter initial_seed = 0;
-   
-`include "functions.v"
-`include "config.v"
-`include "constants.v"
-`include "sim_functions.v"
-   
-   parameter reset_type = reset_type_async;
-   
-   // current router's address
-   parameter [0:addr_width-1] address = 40;
-   
-   // replicate port decoding logic in routing logic
-   parameter replicate_port_decoder = 1;
-   
-   /*
-    0: separable, input-first
-    1: separable, output-first
-    */
-   parameter vc_allocator_type = 0;
-   
-   /*
-    0: round-robin arbiters
-    1: matrix arbiters
-    */
-   parameter vc_arbiter_type = 1;
-   
-   /*
-    0: separable, input-first
-    1: separable, output-first
-    2: wavefront, mux inputs for priority
-    3: wavefront, replicate logic for priorities
-    4: wavefront, diagonal propagation allocator
-    5: wavefront, rotate inputs for priority
-    */
-   parameter sw_allocator_type = 0;
-   
-   /*
-    0: round-robin arbiters
-    1: matrix arbiters
-    */
-   parameter sw_arbiter_type = 1;
-   
-   /*
-    0: disable speculative switch allocation
-    1: only use speculative grants if no non-speculative requests were issued
-    2: use speculative grants when not conflicting with non-spec requests
-    3: use speculative grants when not conflicting with non-spec grants
-    */
-   parameter sw_spec_level = 3;
-   
-   /*
-    0: do not check credit for speculative switch allocation (e.g. if implicit
-       credit check is performed during VC allocation)
-    1: check that credit is available at all potential output VCs before issuing
-       request
-    2: check that credit is available at all potential output VCs in parallel
-       with allocation, then mask grants
-    3: check that credit is available at slected output VC while doing
-       allocation, then mask grants
-    */
-   parameter sw_spec_cred_check = 0;
-   
-   /*
-    0: use tristate buses
-    1: use multiplexers
-    */
-   parameter crossbar_type = 1;
-   
    parameter walk_addresses = 0;
    parameter packet_count = 1000;
    parameter packet_length = 4;
@@ -80,6 +41,122 @@ module testbench
    parameter credit_latency = 8;
    localparam flit_idx_width = clogb(packet_length);
    
+   // select network topology
+   parameter network_topology = `NETWORK_TOPOLOGY_MESH;
+   
+   // flit buffer entries per VC
+   parameter num_flit_buffers = 8;
+   
+   // maximum number of packets that can be in a given VC buffer simultaneously
+   parameter num_header_buffers = 4;
+   
+   // number of traffic classes (e.g. read, write)
+   parameter num_traffic_classes = 2;
+   
+   // number of routing classes (e.g. minimal, adaptive)
+   parameter num_routing_classes = 2;
+   
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
+   
+   // number of VCs
+   localparam num_vcs = num_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in entire network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // current router's address
+   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
+   
+   // number of adjacent routers in each dimension
+   localparam num_neighbors_per_dim
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       2 :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (num_routers_per_dim - 1) :
+       -1;
+   
+   // number of nodes per router (a.k.a. concentration factor)
+   parameter num_nodes_per_router = 1;
+   
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // width of global addresses
+   localparam addr_width = router_addr_width + node_addr_width;
+   
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+
+   // flit width
+   parameter data_width = 64;
+   
+   // enable performance counter
+   parameter perf_ctr_enable = 1;
+   
+   // width of each counter
+   parameter perf_ctr_width = 32;
+   
+   // include error checking logic
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // try to recover from errors
+   parameter error_recovery = 0;
+   
+   // select routing function type
+   localparam routing_function_type
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       `ROUTING_FUNCTION_TYPE_BY_RELATION :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       `ROUTING_FUNCTION_TYPE_BY_DIFFERENCE :
+       -1;
+   
+   // select method for credit signaling from output to input controller
+   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   
+   // select method for credit checking
+   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
+   parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
+   
+   // select implementation variant for VC allocator
+   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   
+   // select which arbiter type to use for VC allocator
+   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select implementation variant for switch allocator
+   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   
+   // select which arbiter type to use for switch allocator
+   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select speculation level for switch allocator
+   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   
+   // enable speculative switch allocation
+   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   
+   // select crossbar implementation variant
+   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    reg 		    reset;
    reg 		    clk;
@@ -188,11 +265,17 @@ module testbench
 		    .packet_length(packet_length),
 		    .packet_rate(packet_rate),
 		    .initial_seed(initial_seed+ip),
-		    .reset_type(reset_type),
 		    .adaptive_rate(adaptive_rate),
 		    .packet_count_width(packet_count_width),
-		    .address(address+ip-(num_ports-num_nodes_per_router)),
-		    .walk_addresses(walk_addresses))
+		    .num_flit_buffers(num_flit_buffers),
+		    .num_header_buffers(num_header_buffers),
+		    .num_vcs(num_vcs),
+		    .data_width(data_width),
+		    .addr_width(addr_width),
+		    .address(router_address+
+			     ip-(num_ports-num_nodes_per_router)),
+		    .walk_addresses(walk_addresses),
+		    .reset_type(reset_type))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
@@ -225,15 +308,32 @@ module testbench
    wire 				rtr_error;
    
    router
-     #(.reset_type(reset_type),
-       .address(address),
-       .replicate_port_decoder(replicate_port_decoder),
+     #(.num_flit_buffers(num_flit_buffers),
+       .num_header_buffers(num_header_buffers),
+       .num_vcs(num_vcs),
+       .num_traffic_classes(num_traffic_classes),
+       .num_routing_classes(num_routing_classes),
+       .num_ports(num_ports),
+       .num_dimensions(num_dimensions),
+       .num_routers_per_dim(num_routers_per_dim),
+       .router_address(router_address),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .data_width(data_width),
+       .perf_ctr_enable(perf_ctr_enable),
+       .perf_ctr_width(perf_ctr_width),
+       .checker_enable(checker_enable),
+       .checker_capture_mode(checker_capture_mode),
+       .error_recovery(error_recovery),
+       .routing_function_type(routing_function_type),
+       .credit_handling_type(credit_handling_type),
+       .sw_spec_cred_check(sw_spec_cred_check),
        .vc_allocator_type(vc_allocator_type),
        .vc_arbiter_type(vc_arbiter_type),
        .sw_allocator_type(sw_allocator_type),
        .sw_arbiter_type(sw_arbiter_type),
        .sw_spec_level(sw_spec_level),
-       .crossbar_type(crossbar_type))
+       .crossbar_type(crossbar_type),
+       .reset_type(reset_type))
    rtr
      (.clk(clk),
       .reset(reset),

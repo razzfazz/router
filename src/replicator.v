@@ -1,16 +1,20 @@
+// replicate each bit in a vector a number of times
+// (abc) --> (aaabbbccc)
 module replicator
   (data_in, data_out);
    
-   
+   // width of input vector
    parameter width = 32;
+   
+   // how many times to replicate each bit
    parameter count = 2;
    
-   
+   // input data
    input [0:width-1] data_in;
+   
+   // result
    output [0:count*width-1] data_out;
-   
    wire [0:count*width-1] data_out;
-   
    
    generate
       genvar 		  idx;
