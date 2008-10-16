@@ -190,17 +190,17 @@ module ip_ctrl
    wire [0:vc_idx_width-1] 	flit_vc_out;
    
    // outgoing flit is head
-   // (note: only valid if flit_valid_out=1 and num_header_buffers>1)
+   // (note: only valid if flit_valid_out=1)
    output flit_head_out;
    wire 			flit_head_out;
    
    // outgoing flit is tail
-   // (note: only valid if flit_valid_out=1 and num_header_buffers>1)
+   // (note: only valid if flit_valid_out=1)
    output flit_tail_out;
    wire 			flit_tail_out;
    
    // flit data for outgoing flit
-   // (note: only valid if flit_valid_out=1 and num_header_buffers>1)
+   // (note: only valid if flit_valid_out=1)
    output [0:data_width-1] flit_data_out;
    wire [0:data_width-1] 	flit_data_out;
    
