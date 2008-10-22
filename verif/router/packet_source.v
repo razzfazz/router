@@ -15,7 +15,6 @@ module packet_source
    endfunction
    
    parameter packet_count = 1000;
-   parameter packet_length = 1;
    parameter packet_rate = 0;
    parameter initial_seed = 0;
    parameter adaptive_rate = 0;
@@ -23,41 +22,44 @@ module packet_source
    parameter num_flit_buffers = 8;
    parameter num_header_buffers = 8;
    parameter num_vcs = 4;
+   parameter max_packet_length = 4;
    parameter data_width = 64;
    parameter addr_width = 6;
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
    parameter walk_addresses = 0;
-   parameter reset_type = `RESET_TYPE_ASYNC;
    localparam vc_idx_width = clogb(num_vcs);
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   localparam flit_count_width = clogb(packet_length);
+   localparam packet_length_width = clogb(max_packet_length);
    localparam cred_count_width = clogb(num_flit_buffers+1);
-   
+   localparam route_info_width = 2 * addr_width;
+   localparam head_info_width = route_info_width + packet_length_width;
    
    input clk;
    input reset;
    
    output flit_valid;
+   wire flit_valid;
+   
    output flit_head;
+   wire flit_head;
+   
    output flit_tail;
+   wire flit_tail;
+   
    output [0:vc_idx_width-1] flit_vc;
+   wire [0:vc_idx_width-1] flit_vc;
+   
    output [0:data_width-1] flit_data;
+   wire [0:data_width-1]   flit_data;
    
    input cred_valid;
+   
    input [0:vc_idx_width-1] cred_vc;
    
    output done;
-   
-   output error;
-   
-   wire flit_valid;
-   wire flit_head;
-   wire flit_tail;
-   wire [0:vc_idx_width-1] flit_vc;
-   wire [0:data_width-1]   flit_data;
-   
    wire 		   done;
    
+   output error;
    wire 		   error;
    
    
@@ -70,10 +72,12 @@ module packet_source
    reg [0:vc_idx_width-1]  random_vc;
    reg [0:addr_width-1]    random_next_addr;
    reg [0:addr_width-1]    random_final_addr;
+   reg [0:head_info_width-1] random_head_info;
+   
    always @(posedge clk, posedge reset)
      begin
 	new_packet
-	  = ($dist_uniform(seed, 0, 99) < (packet_rate / packet_length)) &&
+	  = ($dist_uniform(seed, 0, 99) < packet_rate) &&
 	    !reset;
 	for(i = 0; i < data_width; i = i + 1)
 	  random_data[i] = $dist_uniform(seed, 0, 1);
@@ -85,12 +89,16 @@ module packet_source
 	      (random_next_addr + 1 + (random_next_addr + 1 == address));
 	else
 	  begin
-	     random_next_addr = {addr_width{1'b0}};
 	     random_next_addr[0:addr_width-1]
-	       = address[0:addr_width-1] +
-		 $dist_uniform(seed, 1, 2**addr_width-1);
+	       = address + $dist_uniform(seed, 1, 2**addr_width-1);
 	  end
 	random_final_addr = address + $dist_uniform(seed, 1, 2**addr_width-1);
+	random_head_info[0:addr_width-1] = random_next_addr;
+	random_head_info[addr_width:2*addr_width-1] = random_final_addr;
+	if(max_packet_length > 1)
+	  random_head_info[route_info_width:
+			   route_info_width+packet_length_width-1]
+	    = $dist_uniform(seed, 0, max_packet_length-1);
      end
    
    wire waiting_packet_count_zero;
@@ -108,7 +116,6 @@ module packet_source
 	     = waiting_packet_count_q - packet_ready;
 	   dff
 	     #(.width(packet_count_width),
-	       .reset_type(reset_type),
 	       .reset_value(packet_count))
 	   waiting_packet_countq
 	     (.clk(clk),
@@ -131,8 +138,7 @@ module packet_source
    assign ready_packet_count_s
      = ready_packet_count_q - packet_sent + packet_ready;
    dff
-     #(.width(packet_count_width),
-       .reset_type(reset_type))
+     #(.width(packet_count_width))
    ready_packet_countq
      (.clk(clk),
       .reset(reset),
@@ -148,7 +154,7 @@ module packet_source
    wire 			  flit_count_zero;
    wire 			  flit_sent;
    
-   wire [0:vc_idx_width-1] 	  vc_q;
+   reg [0:vc_idx_width-1] 	  vc_q;
    
    wire [0:num_vcs-1] 		  free_ovc;
    wire [0:num_vcs-1] 		  head_free_ovc;
@@ -183,8 +189,7 @@ module packet_source
 		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
 		    ({num_flit_buffers{debit & flit_tail}} & push_mask);
 		dff
-		  #(.width(num_flit_buffers),
-		    .reset_type(reset_type))
+		  #(.width(num_flit_buffers))
 		tail_queueq
 		  (.clk(clk),
 		   .reset(reset),
@@ -193,8 +198,7 @@ module packet_source
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr, push_ptr_next;
 		mod_ctr
-		  #(.num_values(num_flit_buffers),
-		    .reset_type(reset_type))
+		  #(.num_values(num_flit_buffers))
 		push_ptr_ctr
 		  (.clk(clk),
 		   .reset(reset),
@@ -210,8 +214,7 @@ module packet_source
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_next;
 		mod_ctr
-		  #(.num_values(num_flit_buffers),
-		    .reset_type(reset_type))
+		  #(.num_values(num_flit_buffers))
 		pop_ptr_ctr
 		  (.clk(clk),
 		   .reset(reset),
@@ -248,8 +251,7 @@ module packet_source
 	   credit_tracker
 	     #(.num_credits(num_header_buffers),
 	       .checker_enable(1),
-	       .checker_capture_mode(0),
-	       .reset_type(reset_type))
+	       .checker_capture_mode(0))
 	   hct
 	     (.clk(clk),
 	      .reset(reset),
@@ -266,7 +268,6 @@ module packet_source
 	   assign cred_count_s = cred_count_q + credit - debit;
 	   dff
 	     #(.width(cred_count_width),
-	       .reset_type(reset_type),
 	       .reset_value(num_flit_buffers))
 	   cred_countq
 	     (.clk(clk),
@@ -311,24 +312,39 @@ module packet_source
    
    generate
       
-      if(packet_length > 1)
+      if(max_packet_length > 1)
 	begin
-	   wire [0:flit_count_width-1] flit_count_s, flit_count_q;
+
+	   wire [0:packet_length_width-1] packet_length;
+	   assign packet_length
+	     = random_head_info[route_info_width:
+				route_info_width+packet_length_width-1];
+	   
+	   wire [0:packet_length_width-1] flit_count_s;
+	   reg [0:packet_length_width-1]  flit_count_q;
 	   assign flit_count_s = packet_sent ?
-				 (packet_length - 1'b1) :
+				 packet_length :
 				 (flit_count_q - flit_sent);
+	   always @(posedge clk, posedge reset)
+	     if(reset)
+	       flit_count_q <= packet_length;
+	     else
+	       flit_count_q <= flit_count_s;
+
+	   wire 			  head_s, head_q;
+	   assign head_s = (head_q & ~flit_sent) | packet_sent;
 	   dff
-	     #(.width(flit_count_width),
-	       .reset_type(reset_type),
-	       .reset_value(packet_length - 1'b1))
-	   flit_countq
+	     #(.width(1),
+	       .reset_value(1'b1))
+	   headq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(flit_count_s),
-	      .q(flit_count_q));
+	      .d(head_s),
+	      .q(head_q));
 	   
-	   assign flit_count_max = (flit_count_q == (packet_length - 1'b1));
+	   assign flit_count_max = head_q;
 	   assign flit_count_zero = ~|flit_count_q;
+
 	end
       else
 	begin
@@ -340,40 +356,33 @@ module packet_source
    
    wire [0:vc_idx_width-1] 	  vc_s;
    assign vc_s = packet_sent ? random_vc : vc_q;
-   dff
-     #(.width(vc_idx_width),
-       .reset_type(reset_type))
-   vcq
-     (.clk(clk),
-      .reset(reset),
-      .d(vc_s),
-      .q(vc_q));
-   
-   wire [0:data_width-1] 	  data_s, data_q;
-   assign data_s[0:addr_width-1]
+
+   wire [0:data_width-1] 	  data_s;
+   reg [0:data_width-1] 	  data_q;
+   assign data_s[0:head_info_width-1]
 	    = flit_sent ?
 	      (packet_sent ?
-	       random_next_addr :
-	       random_data[0:addr_width-1]) :
-	      data_q[0:addr_width-1];
-   assign data_s[addr_width:2*addr_width-1]
+	       random_head_info :
+	       random_data[0:head_info_width-1]) :
+	      data_q[0:head_info_width-1];
+   assign data_s[head_info_width:data_width-1]
 	    = flit_sent ?
-	      (packet_sent ?
-	       random_final_addr :
-	       random_data[addr_width:2*addr_width-1]) :
-	      data_q[addr_width:2*addr_width-1];
-   assign data_s[2*addr_width:data_width-1]
-	    = flit_sent ?
-	      random_data[2*addr_width:data_width-1] :
-	      data_q[2*addr_width:data_width-1];
-   dff
-     #(.width(data_width),
-       .reset_type(reset_type))
-   dataq
-     (.clk(clk),
-      .reset(reset),
-      .d(data_s),
-      .q(data_q));
+	      random_data[head_info_width:data_width-1] :
+	      data_q[head_info_width:data_width-1];
+
+   always @(posedge clk, posedge reset)
+     if(reset)
+       begin
+	  data_q[0:head_info_width-1] <= random_head_info;
+	  data_q[head_info_width:data_width-1]
+	    <= random_data[head_info_width:data_width-1];
+	  vc_q <= random_vc;
+       end
+     else
+       begin
+	  data_q <= data_s;
+	  vc_q <= vc_s;
+       end
    
    assign flit_valid = flit_sent;
    assign flit_head = flit_count_max;
