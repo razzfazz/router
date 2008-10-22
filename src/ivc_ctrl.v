@@ -2,8 +2,7 @@ module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
    free_op, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
    sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent,
-   flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr,
-   error, events);
+   flit_vc_out, flit_tail_out, buff_write_addr, buff_read_addr, error, events);
    
 `include "constants.v"
    
@@ -176,11 +175,6 @@ module ivc_ctrl
    output [0:vc_idx_width-1] flit_vc_out;
    wire [0:vc_idx_width-1] flit_vc_out;
    
-   // outgoing flit is head
-   // (note: only valid if flit_sent=1 and num_header_buffers>1)
-   output flit_head_out;
-   wire 		   flit_head_out;
-   
    // outgoing flit is tail
    // (note: only valid if flit_sent=1 and num_header_buffers>1)
    output flit_tail_out;
@@ -296,13 +290,13 @@ module ivc_ctrl
 	   wire 		       hvsr_pop;
 	   assign hvsr_pop = all_allocated & ~hvsr_empty;
 	   
-	   wire [0:1] 		       hvsr_data_in;
-	   assign hvsr_data_in = {flit_head_in, flit_tail_in};
+	   wire  		       hvsr_data_in;
+	   assign hvsr_data_in = flit_tail_in;
 	   
 	   wire 		       hvsr_full;
-	   wire [0:1] 		       hvsr_data_out;
+	   wire  		       hvsr_data_out;
 	   shift_register
-	     #(.width(2),
+	     #(.width(1),
 	       .depth(num_flit_buffers),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
@@ -319,8 +313,7 @@ module ivc_ctrl
 	      .pop(hvsr_pop),
 	      .error(hvsr_error));
 	   
-	   assign flit_head_out = hvsr_data_out[0];
-	   assign flit_tail_out = hvsr_data_out[1];
+	   assign flit_tail_out = hvsr_data_out;
 	   
 	   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
 	   
@@ -343,7 +336,6 @@ module ivc_ctrl
 	   assign hvsr_error = wait_tail_q & flit_valid_in;
 	   
 	   assign hvsr_empty = 1'b1;
-	   assign flit_head_out = 1'b0;
 	   assign flit_tail_out = 1'b0;
 	   
 	   assign get_next_header = ~valid_q | (wait_tail_q & fbc_empty_early);

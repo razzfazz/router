@@ -33,12 +33,6 @@ module ip_ctrl
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
-   // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flit_buffers;
-   
-   // required address size for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
-   
    // width of sum of event signals from all VCs
    localparam event_width = clogb(num_vcs) + 1;
    
@@ -120,6 +114,17 @@ module ip_ctrl
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
+   // number of entries in flit buffer
+   localparam fbf_depth = num_vcs*num_flit_buffers;
+   
+   // required address size for flit buffer
+   localparam fbf_addr_width = clogb(fbf_depth);
+   
+   // wdith of the flit buffer register file
+   localparam fbf_data_width = (num_header_buffers > 1) ?
+			       (data_width+1) :
+			       (data_width+2);
+   
    input clk;
    input reset;
    
@@ -228,7 +233,6 @@ module ip_ctrl
    
    wire [0:num_vcs-1] 		flit_sent_ivc;
    wire [0:num_vcs*vc_idx_width-1] flit_vc_ivc;
-   wire [0:num_vcs-1] 		   flit_head_ivc;
    wire [0:num_vcs-1] 		   flit_tail_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] buff_write_addr_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] buff_read_addr_ivc;
@@ -261,7 +265,6 @@ module ip_ctrl
 	   wire [0:num_ports-1] sw_req_spec_op;
 	   wire 		flit_sent;
 	   wire [0:vc_idx_width-1] flit_vc;
-	   wire 		   flit_head;
 	   wire 		   flit_tail;
 	   wire [0:flit_buffer_idx_width-1] buff_write_addr;
 	   wire [0:flit_buffer_idx_width-1] buff_read_addr;
@@ -308,7 +311,6 @@ module ip_ctrl
 	      .sw_gnt_spec(sw_gnt_spec),
 	      .flit_sent(flit_sent),
 	      .flit_vc_out(flit_vc),
-	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
 	      .buff_write_addr(buff_write_addr),
 	      .buff_read_addr(buff_read_addr),
@@ -324,7 +326,6 @@ module ip_ctrl
 	   assign flit_sent_ivc[ivc] = flit_sent;
 	   assign flit_vc_ivc[ivc*vc_idx_width:(ivc+1)*vc_idx_width-1]
 		    = flit_vc;
-	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
 	   assign buff_write_addr_ivc[ivc*flit_buffer_idx_width:
 				      (ivc+1)*flit_buffer_idx_width-1]
@@ -415,51 +416,31 @@ module ip_ctrl
    
    wire 				    fbf_write_enable;
    assign fbf_write_enable = flit_valid_in;
+
+   wire [0:fbf_data_width-1] 		    fbf_write_data, fbf_read_data;
+   regfile
+     #(.width(fbf_data_width),
+       .depth(fbf_depth))
+   fbf
+     (.clk(clk),
+      .write_enable(fbf_write_enable),
+      .write_address(fbf_write_addr),
+      .write_data(fbf_write_data),
+      .read_address(fbf_read_addr),
+      .read_data(fbf_read_data));
+
+   assign fbf_write_data[0:data_width-1] = flit_data_muxed;
+   assign fbf_write_data[data_width] = flit_head_in;
+   
+   assign flit_data_out = fbf_read_data[0:data_width-1];
+   assign flit_head_out = fbf_read_data[data_width];
    
    generate
       
-      if(num_header_buffers > 1)
+      if(num_header_buffers == 1)
 	begin
 	   
-	   wire [0:data_width-1] 	       fbf_write_data;
-	   assign fbf_write_data = flit_data_muxed;
-	   
-	   wire [0:data_width-1] 	       fbf_read_data;
-	   regfile
-	     #(.width(data_width),
-	       .depth(fbf_depth))
-	   fbf
-	     (.clk(clk),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
-	   
-	   assign flit_data_out = fbf_read_data[0:data_width-1];
-	   
-	end
-      else
-	begin
-	   
-	   wire [0:(data_width+2)-1] 	       fbf_write_data;
-	   assign fbf_write_data
-	     = {flit_data_muxed, flit_head_in, flit_tail_in};
-	   
-	   wire [0:(data_width+2)-1] 	       fbf_read_data;
-	   regfile
-	     #(.width(data_width+2),
-	       .depth(fbf_depth))
-	   fbf
-	     (.clk(clk),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
-	   
-	   assign flit_data_out = fbf_read_data[0:data_width-1];
-	   assign flit_head_out = fbf_read_data[data_width];
+	   assign fbf_write_data[data_width+1] = flit_tail_in;
 	   assign flit_tail_out = fbf_read_data[data_width+1];
 	   
 	end
@@ -488,27 +469,6 @@ module ip_ctrl
       
       if(num_header_buffers > 1)
 	begin
-	   
-	   // in this case, head and tail bits are tracked in input VC
-	   // controller anyway, so we can just reuse that information here
-	   wire flit_head_s, flit_head_q;
-	   select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_head_s_sel
-	     (.select(flit_sent_ivc),
-	      .data_in(flit_head_ivc),
-	      .data_out(flit_head_s));
-	   dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_headq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flit_head_s),
-	      .q(flit_head_q));
-	   
-	   assign flit_head_out = flit_head_q;
 	   
 	   wire flit_tail_s, flit_tail_q;
 	   select_1ofn
