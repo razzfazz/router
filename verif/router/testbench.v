@@ -262,7 +262,6 @@ module testbench
 		wire 			ps_error;
 		packet_source
 		  #(.packet_count(packet_count),
-		    .packet_length(packet_length),
 		    .packet_rate(packet_rate),
 		    .initial_seed(initial_seed+ip),
 		    .adaptive_rate(adaptive_rate),
@@ -270,6 +269,7 @@ module testbench
 		    .num_flit_buffers(num_flit_buffers),
 		    .num_header_buffers(num_header_buffers),
 		    .num_vcs(num_vcs),
+		    .max_packet_length(packet_length),
 		    .data_width(data_width),
 		    .addr_width(addr_width),
 		    .address(router_address+
@@ -280,9 +280,9 @@ module testbench
 		  (.clk(clk),
 		   .reset(reset),
 		   .flit_valid(flit_valid),
-		   .flit_vc(flit_vc),
 		   .flit_head(flit_head),
 		   .flit_tail(flit_tail),
+		   .flit_vc(flit_vc),
 		   .flit_data(flit_data),
 		   .cred_valid(cred_valid),
 		   .cred_vc(cred_vc),
