@@ -1,6 +1,6 @@
 module packet_source
   (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
-   cred_vc, done, error);
+   cred_vc, run, error);
    
 `include "constants.v"
    
@@ -14,8 +14,8 @@ module packet_source
       end
    endfunction
    
-   parameter packet_count = 1000;
-   parameter packet_rate = 0;
+   parameter max_packet_count = 1000;
+   parameter packet_rate = 25;
    parameter initial_seed = 0;
    parameter adaptive_rate = 0;
    parameter packet_count_width = 32;
@@ -23,6 +23,8 @@ module packet_source
    parameter num_header_buffers = 8;
    parameter num_vcs = 4;
    parameter max_packet_length = 4;
+   parameter min_packet_length = 1;
+   parameter random_packet_length = 0;
    parameter data_width = 64;
    parameter addr_width = 6;
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
@@ -56,8 +58,7 @@ module packet_source
    
    input [0:vc_idx_width-1] cred_vc;
    
-   output done;
-   wire 		   done;
+   input run;
    
    output error;
    wire 		   error;
@@ -78,7 +79,7 @@ module packet_source
      begin
 	new_packet
 	  = ($dist_uniform(seed, 0, 99) < packet_rate) &&
-	    !reset;
+	    run && !reset;
 	for(i = 0; i < data_width; i = i + 1)
 	  random_data[i] = $dist_uniform(seed, 0, 1);
 	random_vc = $dist_uniform(seed, 0, num_vcs-1);
@@ -98,7 +99,7 @@ module packet_source
 	if(max_packet_length > 1)
 	  random_head_info[route_info_width:
 			   route_info_width+packet_length_width-1]
-	    = $dist_uniform(seed, 0, max_packet_length-1);
+	    = $dist_uniform(seed, min_packet_length-1, max_packet_length-1);
      end
    
    wire waiting_packet_count_zero;
@@ -107,7 +108,7 @@ module packet_source
    assign packet_ready = new_packet & ~waiting_packet_count_zero;
    
    generate
-      if(packet_count >= 0)
+      if(max_packet_count >= 0)
 	begin
 	   
 	   wire [0:packet_count_width-1] waiting_packet_count_s,
@@ -116,7 +117,7 @@ module packet_source
 	     = waiting_packet_count_q - packet_ready;
 	   dff
 	     #(.width(packet_count_width),
-	       .reset_value(packet_count))
+	       .reset_value(max_packet_count))
 	   waiting_packet_countq
 	     (.clk(clk),
 	      .reset(reset),
@@ -136,7 +137,9 @@ module packet_source
    
    wire [0:packet_count_width-1]  ready_packet_count_s, ready_packet_count_q;
    assign ready_packet_count_s
-     = ready_packet_count_q - packet_sent + packet_ready;
+     = run ?
+       ready_packet_count_q - packet_sent + packet_ready :
+       {packet_count_width{1'b0}};
    dff
      #(.width(packet_count_width))
    ready_packet_countq
@@ -147,8 +150,6 @@ module packet_source
    
    wire 			  ready_packet_count_zero;
    assign ready_packet_count_zero = ~|ready_packet_count_q;
-   
-   assign done = waiting_packet_count_zero & ready_packet_count_zero;
    
    wire 			  flit_count_max;
    wire 			  flit_count_zero;
@@ -196,14 +197,20 @@ module packet_source
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr, push_ptr_next;
+		wire [0:flit_buffer_idx_width-1] push_ptr, push_ptr_early,
+						 push_ptr_next, push_ptr_prev;
 		mod_ctr
 		  #(.num_values(num_flit_buffers))
 		push_ptr_ctr
 		  (.clk(clk),
 		   .reset(reset),
 		   .incr(debit),
+		   .decr(1'b0),
+		   .load(1'b0),
+		   .load_value({flit_buffer_idx_width{1'b0}}),
 		   .value(push_ptr),
+		   .early_value(push_ptr_early),
+		   .prev_value(push_ptr_prev),
 		   .next_value(push_ptr_next));
 		
 		decoder
@@ -212,14 +219,20 @@ module packet_source
 		  (.data_in(push_ptr),
 		   .data_out(push_mask));
 		
-		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_next;
+		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_early,
+						 pop_ptr_next, pop_ptr_prev;
 		mod_ctr
 		  #(.num_values(num_flit_buffers))
 		pop_ptr_ctr
 		  (.clk(clk),
 		   .reset(reset),
 		   .incr(credit),
+		   .decr(1'b0),
+		   .load(1'b0),
+		   .load_value({flit_buffer_idx_width{1'b0}}),
 		   .value(pop_ptr),
+		   .early_value(pop_ptr_early),
+		   .prev_value(pop_ptr_prev),
 		   .next_value(pop_ptr_next));
 		
 		decoder

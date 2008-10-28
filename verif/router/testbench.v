@@ -33,13 +33,13 @@ module testbench
    parameter Tclk = 2;
    parameter initial_seed = 0;
    parameter walk_addresses = 0;
-   parameter packet_count = 1000;
-   parameter packet_length = 4;
-   parameter packet_rate = 50;
+   parameter max_packet_count = -1;
+   parameter packet_rate = 25;
    parameter adaptive_rate = 1;
    parameter packet_count_width = 32;
-   parameter credit_latency = 8;
-   localparam flit_idx_width = clogb(packet_length);
+   parameter credit_latency = 6;
+   parameter warmup_time = 1000;
+   parameter measure_time = 100000;
    
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_MESH;
@@ -94,16 +94,34 @@ module testbench
    // number of nodes per router (a.k.a. concentration factor)
    parameter num_nodes_per_router = 1;
    
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   
+   // width required to select individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // number of input and output ports on router
-   localparam num_ports
-     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
-
+   // total number of bits required for storing routing information
+   localparam route_info_width = 2 * addr_width;
+   
+   // maximum packet length (in flits)
+   parameter max_packet_length = 8;
+   
+   // minimum packet length (in flits)
+   parameter min_packet_length = 8;
+   
+   // total number of bits required to represent maximum packet length
+   localparam packet_length_width = clogb(max_packet_length);
+   
+   // total number of bits required for storing header information
+   localparam head_info_width = route_info_width + packet_length_width;
+   
    // flit width
    parameter data_width = 64;
    
@@ -151,7 +169,9 @@ module testbench
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
    // enable speculative switch allocation
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   localparam sw_spec_enable = (sw_spec_level == `SW_SPEC_LEVEL_NONE) ?
+			       0 :
+			       1;
    
    // select crossbar implementation variant
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -177,8 +197,9 @@ module testbench
    wire [0:num_ports-1] 	     cred_valid_in_op;
    wire [0:num_ports*vc_idx_width-1] cred_vc_in_op;
    
-   wire [0:num_ports-1] 	     done_ip;
    wire [0:num_ports-1] 	     ps_error_ip;
+   
+   reg 				     run;
    
    generate
       
@@ -196,7 +217,6 @@ module testbench
 		assign flit_tail_in_ip[ip] = 1'b0;
 		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
 			 = {data_width{1'b0}};
-		assign done_ip[ip] = 1'b1;
 		assign ps_error_ip[ip] = 1'b0;
 		
 	     end
@@ -258,10 +278,9 @@ module testbench
 		wire 			flit_tail;
 		wire [0:data_width-1] 	flit_data;
 		
-		wire 			done;
 		wire 			ps_error;
 		packet_source
-		  #(.packet_count(packet_count),
+		  #(.max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
 		    .initial_seed(initial_seed+ip),
 		    .adaptive_rate(adaptive_rate),
@@ -269,13 +288,13 @@ module testbench
 		    .num_flit_buffers(num_flit_buffers),
 		    .num_header_buffers(num_header_buffers),
 		    .num_vcs(num_vcs),
-		    .max_packet_length(packet_length),
+		    .max_packet_length(max_packet_length),
+		    .min_packet_length(min_packet_length),
 		    .data_width(data_width),
 		    .addr_width(addr_width),
 		    .address(router_address+
 			     ip-(num_ports-num_nodes_per_router)),
-		    .walk_addresses(walk_addresses),
-		    .reset_type(reset_type))
+		    .walk_addresses(walk_addresses))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
@@ -286,7 +305,7 @@ module testbench
 		   .flit_data(flit_data),
 		   .cred_valid(cred_valid),
 		   .cred_vc(cred_vc),
-		   .done(done),
+		   .run(run),
 		   .error(ps_error));
 		
 		assign flit_valid_in_ip[ip] = flit_valid;
@@ -296,9 +315,66 @@ module testbench
 		assign flit_tail_in_ip[ip] = flit_tail;
 		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
 			 = flit_data;
-		assign done_ip[ip] = done;
 		assign ps_error_ip[ip] = ps_error;
 		
+		wire [0:head_info_width-1] head_info;
+		assign head_info = flit_data[0:head_info_width-1];
+		
+		wire [0:route_info_width-1] route_info;
+		assign route_info = head_info[0:route_info_width-1];
+		
+		wire [0:num_ports-1] 	next_port;
+		wire [0:num_vcs-1] 	next_vcs;
+		wire 			error;
+		routing_logic
+		  #(.num_vcs(num_vcs),
+		    .num_traffic_classes(num_traffic_classes),
+		    .num_routing_classes(num_routing_classes),
+		    .num_ports(num_ports),
+		    .num_dimensions(num_dimensions),
+		    .num_routers_per_dim(num_routers_per_dim),
+		    .router_address(router_address),
+		    .num_neighbors_per_dim(num_neighbors_per_dim),
+		    .routing_function_type(routing_function_type),
+		    .reset_type(reset_type))
+		rtl
+		  (.clk(clk),
+		   .reset(reset),
+		   .route_info(route_info),
+		   .port_id(ip),
+		   .vc_id(flit_vc),
+		   .next_port(next_port),
+		   .next_vcs(next_vcs),
+		   .error(error));
+		
+		wire [0:port_idx_width-1] next_port_enc;
+		encoder
+		  #(.num_ports(num_ports))
+		next_port_enc_enc
+		  (.data_in(next_port),
+		   .data_out(next_port_enc));
+		
+		wire [0:port_idx_width-1] dest_port_s, dest_port_q;
+		assign dest_port_s = flit_valid ?
+				     ((flit_head ?
+				      next_port_enc :
+				      dest_port_q) &
+				      {port_idx_width{~flit_tail}}) :
+				     dest_port_q;
+		dff
+		  #(.width(port_idx_width),
+		    .reset_type(reset_type))
+		dest_portq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(dest_port_s),
+		   .q(dest_port_q));
+
+		wire [0:port_idx_width-1] dest_port;
+		assign dest_port = (flit_valid & flit_head) ?
+				   next_port_enc :
+				   dest_port_q;
+
 	     end
 	   
 	end
@@ -318,12 +394,12 @@ module testbench
        .num_routers_per_dim(num_routers_per_dim),
        .router_address(router_address),
        .num_neighbors_per_dim(num_neighbors_per_dim),
+       /*.max_packet_length(max_packet_length),*/
        .data_width(data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
-       .error_recovery(error_recovery),
        .routing_function_type(routing_function_type),
        .credit_handling_type(credit_handling_type),
        .sw_spec_cred_check(sw_spec_cred_check),
@@ -416,15 +492,16 @@ module testbench
 		    (flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1] ==
 		     ovc);
 		
-		if(packet_length > 1)
+		if(max_packet_length > 1)
 		  begin
 
+		     wire flit_count_zero;
+		     
 		     wire wait_head_s, wait_head_q;
 		     assign wait_head_s = (wait_head_q &
 					   ~(flit_valid &
 					     flit_head_out_op[op])) |
-					  (flit_valid &
-					   flit_tail_out_op[op]);
+					  (flit_valid & flit_count_zero);
 		     dff
 		       #(.width(1),
 			 .reset_type(reset_type),
@@ -434,51 +511,40 @@ module testbench
 			.reset(reset),
 			.d(wait_head_s),
 			.q(wait_head_q));
+
+		     wire [0:head_info_width-1] head_info;
+		     assign head_info
+		       = flit_data_out_op[op*data_width:
+					  op*data_width+head_info_width-1];
 		     
-		     wire wait_tail_s, wait_tail_q;
-		     assign wait_tail_s = (wait_tail_q &
-					   ~(flit_valid &
-					     flit_tail_out_op[op])) |
-					  (flit_valid &
-					   flit_head_out_op[op]);
+		     wire [0:packet_length_width-1] packet_length;
+		     assign packet_length
+		       = head_info[route_info_width:
+				   route_info_width+packet_length_width-1];
+		     
+		     wire [0:packet_length_width-1] flit_count_s, flit_count_q;
+		     assign flit_count_s
+		       = (flit_valid & flit_head_out_op[op]) ?
+			 packet_length :
+			 (flit_count_q - flit_valid);
 		     dff
-		       #(.width(1),
+		       #(.width(packet_length_width),
 			 .reset_type(reset_type))
-		     wait_tailq
+		     flit_countq
 		       (.clk(clk),
 			.reset(reset),
-			.d(wait_tail_s),
-			.q(wait_tail_q));
+			.d(flit_count_s),
+			.q(flit_count_q));
 		     
-		     wire [0:flit_idx_width-1] flit_ctr_s, flit_ctr_q;
-		     assign flit_ctr_s = (wait_head_q ?
-					  (packet_length - 1'b1) :
-					  flit_ctr_q) - flit_valid;
-		     dff
-		       #(.width(flit_idx_width),
-			 .reset_type(reset_type),
-			 .reset_value(packet_length-1))
-		     flit_ctrq
-		       (.clk(clk),
-			.reset(reset),
-			.d(flit_ctr_s),
-			.q(flit_ctr_q));
+		     assign flit_count_zero = ~|flit_count_s;
 		     
 		     assign error_op_ovc[op*num_vcs+ovc]
 			      = flit_valid &
-				((flit_head_out_op[op] & ~wait_head_q) |
-				 (flit_tail_out_op[op] & ~wait_tail_q) |
-				 (flit_tail_out_op[op] ^ ~|flit_ctr_q));
+				(flit_head_out_op[op] ^ wait_head_q);
 		     
 		  end
 		else
-		  begin
-		     
-		     assign error_op_ovc[op*num_vcs+ovc]
-			      = flit_valid &
-				~(flit_head_out_op[op] & flit_tail_out_op[op]);
-		     
-		  end
+		  assign error_op_ovc[op*num_vcs+ovc] = 1'b0;
 		
 	     end
 	   
@@ -545,6 +611,42 @@ module testbench
    wire [0:31] out_creds;
    assign out_creds = out_creds_q;
    
+   reg 	       count_en;
+   
+   wire [0:31] count_in_flits_s, count_in_flits_q;
+   assign count_in_flits_s
+     = count_en ?
+       count_in_flits_q + pop_count(flit_valid_in_ip) :
+       count_in_flits_q;
+   dff
+     #(.width(32),
+       .reset_type(reset_type))
+   count_in_flitsq
+     (.clk(clk),
+      .reset(reset),
+      .d(count_in_flits_s),
+      .q(count_in_flits_q));
+   
+   wire [0:31] count_in_flits;
+   assign count_in_flits = count_in_flits_s;
+   
+   wire [0:31] count_out_flits_s, count_out_flits_q;
+   assign count_out_flits_s
+     = count_en ?
+       count_out_flits_q + pop_count(flit_valid_out_op) :
+       count_out_flits_q;
+   dff
+     #(.width(32),
+       .reset_type(reset_type))
+   count_out_flitsq
+     (.clk(clk),
+      .reset(reset),
+      .d(count_out_flits_s),
+      .q(count_out_flits_q));
+   
+   wire [0:31] count_out_flits;
+   assign count_out_flits = count_out_flits_s;
+   
    reg 	       clk_en;
    
    always
@@ -562,6 +664,9 @@ module testbench
 
       reset = 1'b0;
       clk_en = 1'b0;
+      run = 1'b0;
+      count_en = 1'b0;
+      cycles = 0;
       
       #(Tclk/2);
       
@@ -572,22 +677,52 @@ module testbench
       reset = 1'b0;
       
       #(Tclk);
-
+      
       clk_en = 1'b1;
       
       #(Tclk/2);
       
-      cycles = 0;
+      $display("warming up...");
       
-      while(!(&done_ip) || (in_flits > out_flits) || (in_flits > in_creds))
+      run = 1'b1;
+
+      while(cycles < warmup_time)
 	begin
 	   cycles = cycles + 1;
 	   #(Tclk);
 	end
-
+      
+      $display("measuring...");
+      
+      count_en = 1'b1;
+      
+      while(cycles < warmup_time + measure_time)
+	begin
+	   cycles = cycles + 1;
+	   #(Tclk);
+	end
+      
+      count_en = 1'b0;
+      
+      $display("measured %d cycles", measure_time);
+      
+      $display("%d flits in, %d flits out", count_in_flits, count_out_flits);
+      
+      $display("cooling down...");
+      
+      run = 1'b0;
+      
+      while((in_flits > out_flits) || (in_flits > in_creds))
+	begin
+	   cycles = cycles + 1;
+	   #(Tclk);
+	end
+      
       #(Tclk*10);
       
-      $display("%d flits sent in %d cycles", out_flits, cycles);
+      $display("simulation ended after %d cycles", cycles);
+      
+      $display("%d flits received, %d flits sent", in_flits, out_flits);
       
       $finish;
       
