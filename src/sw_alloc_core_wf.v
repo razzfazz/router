@@ -19,9 +19,6 @@ module sw_alloc_core_wf
    // select speculation level
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -426,7 +423,6 @@ module sw_alloc_core_wf
    wf_alloc
      #(.num_ports(num_ports),
        .wf_allocator_type(wf_allocator_type),
-       .error_recovery(error_recovery),
        .reset_type(reset_type))
    gnt_out_nonspec_ip_op_alloc
      (.clk(clk),
@@ -449,7 +445,6 @@ module sw_alloc_core_wf
 	   wf_alloc
 	     #(.num_ports(num_ports),
 	       .wf_allocator_type(wf_allocator_type),
-	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   gnt_out_unmasked_spec_ip_op_alloc
 	     (.clk(clk),

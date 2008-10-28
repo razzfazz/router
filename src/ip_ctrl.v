@@ -91,6 +91,9 @@ module ip_ctrl
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // select implementation variant for header FIFO
+   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
@@ -108,9 +111,6 @@ module ip_ctrl
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
-   // try to recover from errors
-   parameter error_recovery = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
@@ -285,12 +285,12 @@ module ip_ctrl
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .routing_function_type(routing_function_type),
 	       .credit_handling_type(credit_handling_type),
+	       .header_fifo_type(header_fifo_type),
 	       .sw_spec_enable(sw_spec_enable),
 	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   ivcc
 	     (.clk(clk),

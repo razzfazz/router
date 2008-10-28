@@ -19,7 +19,7 @@ module wf_alloc_core_rep
    parameter num_ports = 8;
    
    // try to recover from errors
-   parameter error_recovery = 0;
+   parameter error_recovery = 0; // FIXME: actually implement this
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -39,8 +39,7 @@ module wf_alloc_core_rep
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:prio_width-1] 	  current_prio;
-   wire [0:prio_width-1] 	  next_prio;
+   wire [0:prio_width-1] 	  current_prio, early_prio, next_prio;
    mod_ctr
      #(.num_values(num_ports),
        .reset_type(reset_type))
@@ -49,6 +48,7 @@ module wf_alloc_core_rep
       .reset(reset),
       .incr(update),
       .value(current_prio),
+      .early_value(early_prio),
       .next_value(next_prio));
    
    wire [0:num_ports*num_ports*num_ports-1] gnt_by_prio;

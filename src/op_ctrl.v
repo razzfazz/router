@@ -127,13 +127,24 @@ module op_ctrl
 	   if(num_header_buffers > 1)
 	     begin
 		
-		wire [0:num_flit_buffers-1] push_mask;
-		wire [0:num_flit_buffers-1] pop_mask;
-		
 		wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
-		assign tail_queue_s
-		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
-		    ({num_flit_buffers{debit & flit_tail_in}} & push_mask);
+		
+		genvar 			    idx;
+		
+		wire [0:flit_buffer_idx_width-1] push_ptr;
+		
+		for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
+		  begin:idxs
+		     
+		     wire capture;
+		     assign capture = debit && (push_ptr == idx);
+		     
+		     assign tail_queue_s[idx] = capture ?
+						flit_tail_in :
+						tail_queue_q[idx];
+		     
+		  end
+		
 		dff
 		  #(.width(num_flit_buffers),
 		    .reset_type(reset_type))
@@ -143,7 +154,8 @@ module op_ctrl
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr, push_ptr_next;
+		wire [0:flit_buffer_idx_width-1] push_ptr_early, push_ptr_next,
+						 push_ptr_prev;
 		mod_ctr
 		  #(.num_values(num_flit_buffers),
 		    .reset_type(reset_type))
@@ -151,16 +163,16 @@ module op_ctrl
 		  (.clk(clk),
 		   .reset(reset),
 		   .incr(debit),
+		   .decr(1'b0),
+		   .load(1'b0),
+		   .load_value({flit_buffer_idx_width{1'b0}}),
 		   .value(push_ptr),
-		   .next_value(push_ptr_next));
+		   .early_value(push_ptr_early),
+		   .next_value(push_ptr_next),
+		   .prev_value(push_ptr_prev));
 		
-		decoder
-		  #(.num_ports(num_flit_buffers))
-		push_mask_dec
-		  (.data_in(push_ptr),
-		   .data_out(push_mask));
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_next;
+		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_early,
+						 pop_ptr_next, pop_ptr_prev;
 		mod_ctr
 		  #(.num_values(num_flit_buffers),
 		    .reset_type(reset_type))
@@ -168,16 +180,24 @@ module op_ctrl
 		  (.clk(clk),
 		   .reset(reset),
 		   .incr(credit),
+		   .decr(1'b0),
+		   .load(1'b0),
+		   .load_value({flit_buffer_idx_width{1'b0}}),
 		   .value(pop_ptr),
-		   .next_value(pop_ptr_next));
+		   .early_value(pop_ptr_early),
+		   .next_value(pop_ptr_next),
+		   .prev_value(pop_ptr_prev));
 		
-		decoder
-		  #(.num_ports(num_flit_buffers))
-		pop_mask_dec
-		  (.data_in(pop_ptr),
-		   .data_out(pop_mask));
+		wire 				 tail;
+		mux_nto1
+		  #(.num_ports(num_flit_buffers),
+		    .width(1))
+		tail_mux
+		  (.select(pop_ptr),
+		   .data_in(tail_queue_q),
+		   .data_out(tail));
 		
-		assign head_credit = |(tail_queue_q & pop_mask) & credit;
+		assign head_credit = tail & credit;
 		
 	     end
 	   else
@@ -185,7 +205,8 @@ module op_ctrl
 		
 		// if we can only have one packet per buffer, we can accept the
 		// next one once the buffer has been emptied
-		assign head_credit = credit && (cred_count_s == num_flit_buffers);
+		assign head_credit = credit &&
+				     (cred_count_s == num_flit_buffers);
 		
 	     end
 	   
@@ -354,7 +375,7 @@ module op_ctrl
 	   
 	end
       
-      wire [0:num_vcs*2-1] 	       errors_out_ovc;
+      wire [0:num_vcs*2-1] 	      errors_out_ovc;
       checker
 	#(.num_errors(num_vcs*2),
 	  .enable(checker_enable),

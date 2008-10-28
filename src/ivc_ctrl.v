@@ -90,6 +90,9 @@ module ivc_ctrl
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // select implementation variant for header FIFO
+   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
@@ -104,9 +107,6 @@ module ivc_ctrl
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
-   // try to recover from errors
-   parameter error_recovery = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -275,45 +275,50 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 		       fbc_empty_early;
-   
-   wire 		       hvsr_empty;
-   wire 		       hvsr_error;
+   wire 		       tail_tracker_error;
    
    generate
       
       if(num_header_buffers > 1)
 	begin
 	   
-	   wire 		       hvsr_push;
-	   assign hvsr_push = flit_valid_in;
+	   // keep track of location(s) of all tail flits in flit buffer so we
+	   // know when to get the next header data from header FIFO
+	   wire [0:num_flit_buffers-1] tail_queue;
 	   
-	   wire 		       hvsr_pop;
-	   assign hvsr_pop = all_allocated & ~hvsr_empty;
+	   genvar 		       idx;
 	   
-	   wire  		       hvsr_data_in;
-	   assign hvsr_data_in = flit_tail_in;
+	   for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
+	     begin:idxs
+		
+		wire capture;
+		assign capture = flit_valid_in && (idx == buff_write_addr);
+		
+		wire tail_s, tail_q;
+		assign tail_s = capture ? flit_tail_in : tail_q;
+		dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		tailq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(tail_s),
+		   .q(tail_q));
+		
+		assign tail_queue[idx] = tail_q;
+		
+	     end
 	   
-	   wire 		       hvsr_full;
-	   wire  		       hvsr_data_out;
-	   shift_register
-	     #(.width(1),
-	       .depth(num_flit_buffers),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
-	       .error_recovery(error_recovery),
-	       .reset_type(reset_type))
-	   hvsr
-	     (.clk(clk),
-	      .reset(reset),
-	      .full(hvsr_full),
-	      .data_in(hvsr_data_in),
-	      .push(hvsr_push),
-	      .empty(hvsr_empty),
-	      .data_out(hvsr_data_out),
-	      .pop(hvsr_pop),
-	      .error(hvsr_error));
+	   // overflow and underflow are already handled in fifo_ctrl
+	   assign tail_tracker_error = 1'b0;
 	   
-	   assign flit_tail_out = hvsr_data_out;
+	   mux_nto1
+	     #(.num_ports(num_flit_buffers),
+	       .width(1))
+	   flit_tail_out_mux
+	     (.select(buff_read_addr),
+	      .data_in(tail_queue),
+	      .data_out(flit_tail_out));
 	   
 	   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
 	   
@@ -321,24 +326,31 @@ module ivc_ctrl
       else
 	begin
 	   
-	   wire wait_tail_s, wait_tail_q;
-	   assign wait_tail_s = (wait_tail_q | (flit_valid_in & flit_tail_in)) &
-				~fbc_empty_early;
+	   // after we've seen a tail flit coming in, we need to wait for the
+	   // whole flit buffer to drain before we accept the next heeader
+	   wire wait_vc_empty_s, wait_vc_empty_q;
+	   assign wait_vc_empty_s
+	     = (wait_vc_empty_q | (flit_valid_in & flit_tail_in)) &
+	       ~fbc_empty_early;
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
-	   wait_tailq
+	   wait_vc_emptyq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(wait_tail_s),
-	      .q(wait_tail_q));
+	      .d(wait_vc_empty_s),
+	      .q(wait_vc_empty_q));
 	   
-	   assign hvsr_error = wait_tail_q & flit_valid_in;
+	   // we should not see new flits come in until the VC has been fully
+	   // drained after the last packet
+	   assign tail_tracker_error = wait_vc_empty_q & flit_valid_in;
 	   
-	   assign hvsr_empty = 1'b1;
 	   assign flit_tail_out = 1'b0;
 	   
-	   assign get_next_header = ~valid_q | (wait_tail_q & fbc_empty_early);
+	   // start accepting new packets once VC buffer is fully drained after
+	   // last one
+	   assign get_next_header
+	     = ~valid_q | (wait_vc_empty_q & fbc_empty_early);
 	   
 	end
       
@@ -349,59 +361,59 @@ module ivc_ctrl
    // header buffer
    //---------------------------------------------------------------------------
    
-   wire 	hdsr_empty;
+   wire 	hdff_empty;
    
-   wire 	hdsr_push;
-   assign hdsr_push
-     = flit_valid_in & flit_head_in & (~hdsr_empty | ~get_next_header);
+   wire 	hdff_push;
+   assign hdff_push
+     = flit_valid_in & flit_head_in & (~hdff_empty | ~get_next_header);
    
-   wire 	hdsr_pop;
-   assign hdsr_pop = get_next_header & ~hdsr_empty;
+   wire 	hdff_pop;
+   assign hdff_pop = get_next_header & ~hdff_empty;
    
-   wire [0:route_info_width-1] hdsr_data;
-   wire 		       hdsr_error;
+   wire [0:route_info_width-1] hdff_data;
+   wire 		       hdff_error;
    
    generate
       
       if(num_header_buffers > 1)
 	begin
 	   
-	   wire 		       hdsr_full;
-	   shift_register
-	     #(.width(route_info_width),
-	       .depth(num_header_buffers-1),
+	   wire 		       hdff_full;
+	   fifo
+	     #(.depth(num_header_buffers-1),
+	       .width(route_info_width),
+	       .fifo_type(header_fifo_type),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
-	   hdsr
+	   hdff
 	     (.clk(clk),
 	      .reset(reset),
-	      .full(hdsr_full),
+	      .full(hdff_full),
 	      .data_in(route_info_in),
-	      .push(hdsr_push),
-	      .empty(hdsr_empty),
-	      .data_out(hdsr_data),
-	      .pop(hdsr_pop),
-	      .error(hdsr_error));
+	      .push(hdff_push),
+	      .empty(hdff_empty),
+	      .data_out(hdff_data),
+	      .pop(hdff_pop),
+	      .error(hdff_error));
 	   
 	end
       else
 	begin
 	   
-	   assign hdsr_empty = 1'b1;
-	   assign hdsr_data = {route_info_width{1'b0}};
-	   assign hdsr_error = 1'b0;
+	   assign hdff_empty = 1'b1;
+	   assign hdff_data = {route_info_width{1'b0}};
+	   assign hdff_error = 1'b0;
 	   
 	end
       
    endgenerate
    
    wire 		       next_valid;
-   assign next_valid = (flit_valid_in & flit_head_in) | ~hdsr_empty;
+   assign next_valid = (flit_valid_in & flit_head_in) | ~hdff_empty;
    
    wire [0:route_info_width-1] next_route_info;
-   assign next_route_info = hdsr_empty ? route_info_in : hdsr_data;
+   assign next_route_info = hdff_empty ? route_info_in : hdff_data;
    
    
    //---------------------------------------------------------------------------
@@ -483,7 +495,7 @@ module ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire 		       cred_error;
+   wire 		       cred_tracker_error;
    
    generate
       
@@ -551,7 +563,7 @@ module ivc_ctrl
 	     
 	     assign free_allocated = |(next_free_ovc & vcs_updated);
 	     
-	     assign cred_error = 1'b0;
+	     assign cred_tracker_error = 1'b0;
 	     
 	  end
 	`CREDIT_HANDLING_TYPE_PUSH:
@@ -611,7 +623,7 @@ module ivc_ctrl
 		.d(cred_hold_s),
 		.q(cred_hold_q));
 	     
-	     assign cred_error
+	     assign cred_tracker_error
 	       = allocated_q && (cred_hold_q == num_flit_buffers-1) &&
 		 incr_cred_hold;
 	     
@@ -731,6 +743,8 @@ module ivc_ctrl
    assign fbc_pop = all_allocated & ~fbc_empty;
    
    wire 		       fbc_error;
+   wire 		       fbc_full;
+   wire 		       fbc_full_early;
    fifo_ctrl
      #(.depth(num_flit_buffers),
        .checker_enable(checker_enable),
@@ -745,6 +759,8 @@ module ivc_ctrl
       .read_addr(buff_read_addr),
       .empty(fbc_empty),
       .empty_early(fbc_empty_early),
+      .full(fbc_full),
+      .full_early(fbc_full_early),
       .error(fbc_error));
    
    //---------------------------------------------------------------------------
@@ -752,11 +768,11 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:4] 		       errors_in;
-   assign errors_in = {~hvsr_empty & ~valid_q,
-                       ~hdsr_empty & ~valid_q,
+   assign errors_in = {~hdff_empty & ~valid_q,
                        ~fbc_empty & ~valid_q,
-		       rtl_error,
-		       cred_error};
+		       tail_tracker_error,
+		       cred_tracker_error,
+		       rtl_error};
    
    wire [0:4] 		       errors_out;
    checker
@@ -770,7 +786,7 @@ module ivc_ctrl
       .errors_in(errors_in),
       .errors_out(errors_out));
    
-   assign error = |errors_out | hvsr_error | hdsr_error | fbc_error;
+   assign error = |errors_out | hdff_error | fbc_error;
    
    
    //---------------------------------------------------------------------------

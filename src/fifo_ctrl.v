@@ -1,6 +1,7 @@
 // simple FIFO controller
 module fifo_ctrl
-   (clk, reset, push, pop, write_addr, read_addr, empty, empty_early, error);
+   (clk, reset, push, pop, write_addr, read_addr, empty, empty_early, full,
+    full_early, error);
    
 `include "constants.v"
    
@@ -50,11 +51,20 @@ module fifo_ctrl
    output empty_early;
    wire 		empty_early;
    
+   // buffer full indication
+   output full;
+   wire 		full;
+   
+   // buffer full indication (one cycle early)
+   output full_early;
+   wire 		full_early;
+   
    // internal error condition detected
    output error;
    wire 		error;
    
-   wire [0:idx_width-1] read_ptr, read_ptr_next;
+   wire [0:idx_width-1] read_ptr, read_ptr_early, read_ptr_next,
+			read_ptr_prev;
    mod_ctr
      #(.num_values(depth),
        .reset_type(reset_type))
@@ -62,21 +72,16 @@ module fifo_ctrl
      (.clk(clk),
       .reset(reset),
       .incr(pop),
+      .decr(1'b0),
+      .load(1'b0),
+      .load_value({idx_width{1'b0}}),
       .value(read_ptr),
-      .next_value(read_ptr_next));
+      .early_value(read_ptr_early),
+      .next_value(read_ptr_next),
+      .prev_value(read_ptr_prev));
    
-   wire 		read_ptr_p_s, read_ptr_p_q;
-   assign read_ptr_p_s = pop ? ^read_ptr_next : read_ptr_p_q;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   read_ptr_pq
-     (.clk(clk),
-      .reset(reset),
-      .d(read_ptr_p_s),
-      .q(read_ptr_p_q));
-   
-   wire [0:idx_width-1] write_ptr, write_ptr_next;
+   wire [0:idx_width-1] write_ptr, write_ptr_early, write_ptr_next,
+			write_ptr_prev;
    mod_ctr
      #(.num_values(depth),
        .reset_type(reset_type))
@@ -84,19 +89,13 @@ module fifo_ctrl
      (.clk(clk),
       .reset(reset),
       .incr(push),
+      .decr(1'b0),
+      .load(1'b0),
+      .load_value({idx_width{1'b0}}),
       .value(write_ptr),
-      .next_value(write_ptr_next));
-   
-   wire 		write_ptr_p_s, write_ptr_p_q;
-   assign write_ptr_p_s = push ? ^write_ptr_next : write_ptr_p_q;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   write_ptr_pq
-     (.clk(clk),
-      .reset(reset),
-      .d(write_ptr_p_s),
-      .q(write_ptr_p_q));
+      .early_value(write_ptr_early),
+      .next_value(write_ptr_next),
+      .prev_value(write_ptr_prev));
    
    wire 		almost_empty;
    assign almost_empty = (read_ptr_next == write_ptr);
@@ -118,19 +117,22 @@ module fifo_ctrl
    assign write_addr = write_ptr;
    assign empty = empty_q;
    assign empty_early = empty_s;
-   
-   wire 		full;
    assign full = (read_ptr == write_ptr) && !empty_q;
+   assign full_early = (read_ptr_early == write_ptr_early) && !empty_s;
    
-   wire [0:3] 		errors_in;
-   assign errors_in = {empty & pop,
-		       full & push,
-		       ^read_ptr ^ read_ptr_p_q,
-		       ^write_ptr ^ write_ptr_p_q};
+   wire 		error_underflow;
+   assign error_underflow = empty & pop;
    
-   wire [0:3] 		errors_out;
+   wire 		error_overflow;
+   assign error_overflow = full & push;
+   
+   wire [0:1] 		errors_in;
+   assign errors_in = {error_underflow,
+		       error_overflow};
+   
+   wire [0:1] 		errors_out;
    checker
-     #(.num_errors(4),
+     #(.num_errors(2),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),
        .reset_type(reset_type))

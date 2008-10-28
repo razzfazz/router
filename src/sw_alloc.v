@@ -23,9 +23,6 @@ module sw_alloc
    // select speculation level
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -60,7 +57,6 @@ module sw_alloc
 		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
 		 .sw_spec_level(sw_spec_level),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_sep_if
 	       (.clk(clk),
@@ -78,7 +74,6 @@ module sw_alloc
 		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
 		 .sw_spec_level(sw_spec_level),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_sep_of
 	       (.clk(clk),
@@ -99,7 +94,6 @@ module sw_alloc
 		 .wf_allocator_type(wf_allocator_type),
 		 .arbiter_type(arbiter_type),
 		 .sw_spec_level(sw_spec_level),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_wf
 	       (.clk(clk),

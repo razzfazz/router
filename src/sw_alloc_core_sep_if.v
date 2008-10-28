@@ -16,9 +16,6 @@ module sw_alloc_core_sep_if
    // select speculation level
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;

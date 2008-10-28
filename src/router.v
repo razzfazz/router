@@ -68,14 +68,14 @@ module router
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   
+   // select implementation variant for header FIFO
+   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
    // select method for credit checking
    // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
@@ -264,13 +264,13 @@ module router
 	       .data_width(data_width),
 	       .routing_function_type(routing_function_type),
 	       .credit_handling_type(credit_handling_type),
+	       .header_fifo_type(header_fifo_type),
 	       .sw_spec_enable(sw_spec_enable),
 	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .error_recovery(error_recovery),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),
@@ -350,7 +350,6 @@ module router
        .sw_allocator_type(sw_allocator_type),
        .arbiter_type(sw_arbiter_type),
        .sw_spec_level(sw_spec_level),
-       .error_recovery(error_recovery),
        .reset_type(reset_type))
    swa
      (.clk(clk),

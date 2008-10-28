@@ -76,6 +76,17 @@
 
 
 //------------------------------------------------------------------------------
+// FIFO implementation variants
+//------------------------------------------------------------------------------
+
+// shift register with moving write pointer, fixed read pointer
+`define FIFO_TYPE_SHIFTING 0
+
+// set of registers with moving read and write pointer
+`define FIFO_TYPE_INDEXED  1
+
+
+//------------------------------------------------------------------------------
 // directions of rotation
 //------------------------------------------------------------------------------
 `define ROTATE_DIR_LEFT  0

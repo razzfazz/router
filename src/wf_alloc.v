@@ -36,8 +36,8 @@ module wf_alloc
 	  begin
 	     wf_alloc_core_mux
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .error_recovery(error_recovery))
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_mux
 	       (.clk(clk),
 		.reset(reset),
@@ -49,8 +49,8 @@ module wf_alloc
 	  begin
 	     wf_alloc_core_rep
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .error_recovery(error_recovery))
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_rep
 	       (.clk(clk),
 		.reset(reset),
@@ -62,8 +62,8 @@ module wf_alloc
 	  begin
 	     wf_alloc_core_dpa
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .error_recovery(error_recovery))
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_dpa
 	       (.clk(clk),
 		.reset(reset),
@@ -75,8 +75,8 @@ module wf_alloc
 	  begin
 	     wf_alloc_core_rot
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .error_recovery(error_recovery))
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_rot
 	       (.clk(clk),
 		.reset(reset),
@@ -88,8 +88,8 @@ module wf_alloc
 	  begin
 	     wf_alloc_core_loop
 	       #(.num_ports(num_ports),
-		 .reset_type(reset_type),
-		 .error_recovery(error_recovery))
+		 .error_recovery(error_recovery),
+		 .reset_type(reset_type))
 	     core_rot
 	       (.clk(clk),
 		.reset(reset),
