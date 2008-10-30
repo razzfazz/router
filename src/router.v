@@ -327,8 +327,10 @@ module router
    //---------------------------------------------------------------------------
    
    vc_alloc
-     #(.vc_allocator_type(vc_allocator_type),
+     #(.num_vcs(num_vcs),
+       .num_ports(num_ports),
        .arbiter_type(vc_arbiter_type),
+       .vc_allocator_type(vc_allocator_type),
        .reset_type(reset_type))
    vca
      (.clk(clk),
