@@ -97,7 +97,7 @@ module fifo
 	     wire [0:(depth+1)*width-1] data;
 	     
 	     for(level = 0; level < depth; level = level + 1)
-	       begin:levels
+	       begin:shifting_levels
 		  
 		  wire capture;
 		  assign capture = push && (level + 1 == insert_ptr + pop);
@@ -175,7 +175,7 @@ module fifo
 	     wire [0:depth*width-1]  data;
 	     
 	     for(level = 0; level < depth; level = level + 1)
-	       begin:levels
+	       begin:indexed_levels
 		  
 		  wire capture;
 		  assign capture = push && (level == write_ptr);
