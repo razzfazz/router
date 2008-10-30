@@ -17,7 +17,7 @@ module router_wrapper
    endfunction
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_MESH;
+   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
@@ -67,7 +67,7 @@ module router_wrapper
        -1;
    
    // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 1;
+   parameter num_nodes_per_router = 4;
    
    // number of input and output ports on router
    localparam num_ports
@@ -212,7 +212,6 @@ module router_wrapper
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
-       .error_recovery(error_recovery),
        .routing_function_type(routing_function_type),
        .credit_handling_type(credit_handling_type),
        .header_fifo_type(header_fifo_type),
