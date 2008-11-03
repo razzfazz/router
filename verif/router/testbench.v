@@ -116,6 +116,9 @@ module testbench
    // minimum packet length (in flits)
    parameter min_packet_length = 8;
    
+   // select packet length mode (0: uniform random, 1: bimodal)
+   parameter packet_length_mode = 0;
+   
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
@@ -134,9 +137,6 @@ module testbench
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
-   // try to recover from errors
-   parameter error_recovery = 0;
    
    // select routing function type
    localparam routing_function_type
@@ -198,12 +198,16 @@ module testbench
    wire [0:num_ports*vc_idx_width-1] cred_vc_in_op;
    
    wire [0:num_ports-1] 	     ps_error_ip;
+   wire [0:num_ports-1] 	     rtl_error_ip;
+   wire [0:num_ports-1] 	     vc_error_ip;
+   wire [0:num_ports*num_ports*num_vcs-1] check_error_ip_op_ovc;
+   wire [0:num_ports*num_ports*num_vcs-1] fifo_error_ip_op_ovc;
    
-   reg 				     run;
+   reg 					  run;
    
    generate
       
-      genvar 			     ip;
+      genvar 				  ip;
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
@@ -218,6 +222,14 @@ module testbench
 		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
 			 = {data_width{1'b0}};
 		assign ps_error_ip[ip] = 1'b0;
+		assign rtl_error_ip[ip] = 1'b0;
+		assign vc_error_ip[ip] = 1'b0;
+		assign check_error_ip_op_ovc[ip*num_ports*num_vcs:
+					     (ip+1)*num_ports*num_vcs-1]
+			 = {num_ports*num_vcs{1'b0}};
+		assign fifo_error_ip_op_ovc[ip*num_ports*num_vcs:
+					    (ip+1)*num_ports*num_vcs-1]
+			 = {num_ports*num_vcs{1'b0}};
 		
 	     end
 	   else
@@ -255,8 +267,7 @@ module testbench
 		  end
 		
 		dff
-		  #(.width(credit_latency),
-		    .reset_type(reset_type))
+		  #(.width(credit_latency))
 		cred_valid_dlyq
 		  (.clk(clk),
 		   .reset(reset),
@@ -264,8 +275,7 @@ module testbench
 		   .q(cred_valid_dly_q));
 		
 		dff
-		  #(.width(vc_idx_width*credit_latency),
-		    .reset_type(reset_type))
+		  #(.width(vc_idx_width*credit_latency))
 		cred_vc_dlyq
 		  (.clk(clk),
 		   .reset(reset),
@@ -290,6 +300,7 @@ module testbench
 		    .num_vcs(num_vcs),
 		    .max_packet_length(max_packet_length),
 		    .min_packet_length(min_packet_length),
+		    .packet_length_mode(packet_length_mode),
 		    .data_width(data_width),
 		    .addr_width(addr_width),
 		    .address(router_address+
@@ -307,6 +318,9 @@ module testbench
 		   .cred_vc(cred_vc),
 		   .run(run),
 		   .error(ps_error));
+
+		wire [0:port_idx_width-1] port_id;
+		assign port_id = ip;
 		
 		assign flit_valid_in_ip[ip] = flit_valid;
 		assign flit_vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]
@@ -314,7 +328,7 @@ module testbench
 		assign flit_head_in_ip[ip] = flit_head;
 		assign flit_tail_in_ip[ip] = flit_tail;
 		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
-			 = flit_data;
+			 = {flit_data[0:data_width-port_idx_width-1], port_id};
 		assign ps_error_ip[ip] = ps_error;
 		
 		wire [0:head_info_width-1] head_info;
@@ -325,7 +339,7 @@ module testbench
 		
 		wire [0:num_ports-1] 	next_port;
 		wire [0:num_vcs-1] 	next_vcs;
-		wire 			error;
+		wire 			rtl_error_unmasked;
 		routing_logic
 		  #(.num_vcs(num_vcs),
 		    .num_traffic_classes(num_traffic_classes),
@@ -333,19 +347,18 @@ module testbench
 		    .num_ports(num_ports),
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
-		    .router_address(router_address),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
-		    .routing_function_type(routing_function_type),
-		    .reset_type(reset_type))
+		    .routing_function_type(routing_function_type))
 		rtl
 		  (.clk(clk),
 		   .reset(reset),
-		   .route_info(route_info),
-		   .port_id(ip),
+		   .router_address(router_address),
+		   .port_id(port_id),
 		   .vc_id(flit_vc),
+		   .route_info(route_info),
 		   .next_port(next_port),
 		   .next_vcs(next_vcs),
-		   .error(error));
+		   .error(rtl_error_unmasked));
 		
 		wire [0:port_idx_width-1] next_port_enc;
 		encoder
@@ -353,6 +366,11 @@ module testbench
 		next_port_enc_enc
 		  (.data_in(next_port),
 		   .data_out(next_port_enc));
+		
+		wire 			  rtl_error;
+		assign rtl_error = rtl_error_unmasked & flit_valid &  flit_head;
+		
+		assign rtl_error_ip[ip] = rtl_error;
 		
 		wire [0:port_idx_width-1] dest_port_s, dest_port_q;
 		assign dest_port_s = flit_valid ?
@@ -362,19 +380,157 @@ module testbench
 				      {port_idx_width{~flit_tail}}) :
 				     dest_port_q;
 		dff
-		  #(.width(port_idx_width),
-		    .reset_type(reset_type))
+		  #(.width(port_idx_width))
 		dest_portq
 		  (.clk(clk),
 		   .reset(reset),
 		   .d(dest_port_s),
 		   .q(dest_port_q));
-
+		
 		wire [0:port_idx_width-1] dest_port;
 		assign dest_port = (flit_valid & flit_head) ?
 				   next_port_enc :
 				   dest_port_q;
-
+		
+		// we don't handle the case where more than one candidate VC is
+		// returned correctly, so at least flag an error in this case
+		wire 			  vc_error;
+		assign vc_error = (pop_count(next_vcs) > 1);
+		
+		assign vc_error_ip[ip] = vc_error;
+		
+		wire [0:vc_idx_width-1]   next_vc_enc;
+		encoder
+		  #(.num_ports(num_vcs))
+		next_vc_enc_enc
+		  (.data_in(next_vcs),
+		   .data_out(next_vc_enc));
+		
+		wire [0:vc_idx_width-1]   dest_vc_s, dest_vc_q;
+		assign dest_vc_s = flit_valid ?
+				   ((flit_head ?
+				     next_vc_enc :
+				     dest_vc_q) &
+				    {vc_idx_width{~flit_tail}}) :
+				   dest_vc_q;
+		dff
+		  #(.width(vc_idx_width))
+		dest_vcq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(dest_vc_s),
+		   .q(dest_vc_q));
+		
+		wire [0:vc_idx_width-1]   dest_vc;
+		assign dest_vc = (flit_valid & flit_head) ?
+				 next_vc_enc :
+				 dest_vc_q;
+		
+		wire [0:(2+data_width)-1] data_in;
+		assign data_in[0] = flit_head;
+		assign data_in[1] = flit_tail;
+		assign data_in[2:2+data_width-port_idx_width-1]
+			 = flit_data[0:data_width-port_idx_width-1];
+		assign data_in[2+data_width-port_idx_width:
+			       2+data_width-1] = port_id;
+		
+		genvar 			  op;
+		for(op = 0; op < num_ports; op = op + 1)
+		  begin:ops
+		     
+		     wire 				    check_head;
+		     assign check_head = flit_head_out_op[op];
+		     
+		     wire 				    check_tail;
+		     assign check_tail = flit_tail_out_op[op];
+		     
+		     wire [0:data_width-1] 		    check_data;
+		     assign check_data = flit_data_out_op[op*data_width:
+							  (op+1)*data_width-1];
+		     
+		     wire [0:port_idx_width-1] 		    flit_ip;
+		     assign flit_ip
+		       = check_data[data_width-port_idx_width:data_width-1];
+		     
+		     wire [0:vc_idx_width-1] 		    flit_ovc;
+		     assign flit_ovc = flit_vc_out_op[op*vc_idx_width:
+						      (op+1)*vc_idx_width-1];
+		     
+		     genvar 				    ovc;
+		     for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+		       begin:ovcs
+			  
+			  wire [0:2+data_width-1] data_out;
+			  
+			  wire 			  ref_head;
+			  assign ref_head = data_out[0];
+			  
+			  wire 			  ref_tail;
+			  assign ref_tail = data_out[1];
+			  
+			  wire [0:data_width-1]   ref_data;
+			  assign ref_data = data_out[2:2+data_width-1];
+			  
+			  wire 			  full, empty;
+			  
+			  wire 			  push, pop;
+			  assign push = flit_valid &&
+					(dest_port == op) &&
+					(dest_vc == ovc);
+			  assign pop = flit_valid_out_op[op] &&
+				       (flit_ip == ip) &&
+				       (flit_ovc == ovc);
+			  
+			  wire 			  fifo_error;
+			  
+			  fifo
+			    #(.depth(num_flit_buffers),
+			      .width(2+data_width))
+			  ref_fifo
+			    (.clk(clk),
+			     .reset(reset),
+			     .full(full),
+			     .data_in(data_in),
+			     .push(push),
+			     .empty(empty),
+			     .data_out(data_out),
+			     .pop(pop),
+			     .error(fifo_error));
+			  
+			  assign fifo_error_ip_op_ovc[(ip*num_ports+op)*num_vcs+
+						      ovc]
+				   = fifo_error;
+			  
+			  wire [0:2] 			    check_error;
+			  assign check_error
+			    = {3{pop}} &
+			      {(check_head != ref_head),
+			       (check_tail != ref_tail),
+			       (check_data != ref_data)};
+			  
+			  assign check_error_ip_op_ovc[(ip*num_ports+op)*
+						       num_vcs+ovc]
+				   = |check_error;
+			  
+			  always @(negedge clk)
+			    begin
+			       if(|check_error)
+				 begin
+				    $display("checker error at cycle %d!",
+					     $time);
+				    $display("ip=%d, op=%d, ovc=%d", ip, op,
+					     ovc);
+				    $display("head: %d vs %d", ref_head,
+					     check_head);
+				    $display("tail: %d vs %d", ref_tail,
+					     check_tail);
+				    $display("data: %x vs %x", ref_data,
+					     check_data);
+				 end
+			    end
+		       end
+		  end
+		
 	     end
 	   
 	end
@@ -386,13 +542,12 @@ module testbench
    router
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
-       .num_vcs(num_vcs),
        .num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
+       .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
-       .router_address(router_address),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        /*.max_packet_length(max_packet_length),*/
        .data_width(data_width),
@@ -413,6 +568,7 @@ module testbench
    rtr
      (.clk(clk),
       .reset(reset),
+      .router_address(router_address),
       .flit_valid_in_ip(flit_valid_in_ip),
       .flit_vc_in_ip(flit_vc_in_ip),
       .flit_head_in_ip(flit_head_in_ip),
@@ -429,7 +585,7 @@ module testbench
       .cred_vc_in_op(cred_vc_in_op),
       .error(rtr_error));
    
-   wire [0:num_ports*num_vcs-1] 	error_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	pkt_error_op_ovc;
    
    generate
       
@@ -538,13 +694,13 @@ module testbench
 		     
 		     assign flit_count_zero = ~|flit_count_s;
 		     
-		     assign error_op_ovc[op*num_vcs+ovc]
+		     assign pkt_error_op_ovc[op*num_vcs+ovc]
 			      = flit_valid &
 				(flit_head_out_op[op] ^ wait_head_q);
 		     
 		  end
 		else
-		  assign error_op_ovc[op*num_vcs+ovc] = 1'b0;
+		  assign pkt_error_op_ovc[op*num_vcs+ovc] = 1'b0;
 		
 	     end
 	   
@@ -552,8 +708,17 @@ module testbench
       
    endgenerate
    
-   wire error;
-   assign error = |ps_error_ip | rtr_error | |error_op_ovc;
+   wire [0:6] errors;
+   assign errors = {|ps_error_ip,
+		    |rtl_error_ip,
+		    |vc_error_ip,
+		    |check_error_ip_op_ovc,
+		    |fifo_error_ip_op_ovc,
+		    rtr_error,
+		    |pkt_error_op_ovc};
+   
+   wire       error;
+   assign error = |errors;
    
    wire [0:31] in_flits_s, in_flits_q;
    assign in_flits_s = in_flits_q + pop_count(flit_valid_in_ip);
