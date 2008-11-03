@@ -24,7 +24,7 @@ module packet_source
    parameter num_vcs = 4;
    parameter max_packet_length = 4;
    parameter min_packet_length = 1;
-   parameter random_packet_length = 0;
+   parameter packet_length_mode = 0;
    parameter data_width = 64;
    parameter addr_width = 6;
    parameter [0:addr_width-1] address = {addr_width{1'b0}};
@@ -97,9 +97,18 @@ module packet_source
 	random_head_info[0:addr_width-1] = random_next_addr;
 	random_head_info[addr_width:2*addr_width-1] = random_final_addr;
 	if(max_packet_length > 1)
-	  random_head_info[route_info_width:
-			   route_info_width+packet_length_width-1]
-	    = $dist_uniform(seed, min_packet_length-1, max_packet_length-1);
+	  case(packet_length_mode)
+	    0:
+	      random_head_info[route_info_width:
+			       route_info_width+packet_length_width-1]
+	      = $dist_uniform(seed, min_packet_length-1, max_packet_length-1);
+	    1:
+	      random_head_info[route_info_width:
+			       route_info_width+packet_length_width-1]
+	      = ($dist_uniform(seed, 0, 1) < 1) ?
+		min_packet_length :
+		max_packet_length;
+	  endcase
      end
    
    wire waiting_packet_count_zero;
