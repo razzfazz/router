@@ -199,9 +199,9 @@ module router_wrapper
    router
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
-       .num_vcs(num_vcs),
        .num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
+       .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),

@@ -4,8 +4,20 @@ module vc_alloc_core_sep_if
    
 `include "constants.v"
    
+   // number of traffic classes (e.g. read, write)
+   parameter num_traffic_classes = 2;
+   
+   // number of routing classes (e.g. minimal, adaptive)
+   parameter num_routing_classes = 2;
+   
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
+   
    // number of VCs
-   parameter num_vcs = 4;
+   localparam num_vcs = num_classes * num_vcs_per_class;
    
    // number of input and output ports on switch
    parameter num_ports = 5;
@@ -92,16 +104,22 @@ module vc_alloc_core_sep_if
 		assign update_arb = gnt_out;
 		
 		wire [0:num_vcs-1] 	     gnt_in_ovc;
-		arbiter
-		  #(.num_ports(num_vcs),
-		    .arbiter_type(arbiter_type),
-		    .reset_type(reset_type))
-		gnt_in_ovc_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update_arb),
-		   .req(req_in_ovc),
-		   .gnt(gnt_in_ovc));
+		if(num_vcs_per_class > 1)
+		  begin
+		     arbiter
+		       #(.num_ports(num_vcs),
+			 .arbiter_type(arbiter_type),
+			 .reset_type(reset_type))
+		     gnt_in_ovc_arb
+		       (.clk(clk),
+			.reset(reset),
+			.update(update_arb),
+			.req(req_in_ovc),
+			.gnt(gnt_in_ovc));
+		  end
+		else
+		  assign gnt_in_ovc = req_in_ovc;
+		
 		
 		//--------------------------------------------------------------
 		// generate requests for output stage
