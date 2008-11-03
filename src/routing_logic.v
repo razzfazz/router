@@ -206,7 +206,7 @@ module routing_logic
 		    = {dim_addr_dec, dim_addr_dec[0:(num_routers_per_dim-1)-1]};
 		  
 		  assign port_dec
-		    = dim_addr_dec_repl[local_dim_addr +:
+		    = dim_addr_dec_repl[(local_dim_addr+1) +:
 					num_neighbors_per_dim];
 		  
 	       end
