@@ -199,9 +199,8 @@ module testbench
    
    wire [0:num_ports-1] 	     ps_error_ip;
    wire [0:num_ports-1] 	     rtl_error_ip;
-   wire [0:num_ports-1] 	     vc_error_ip;
-   wire [0:num_ports*num_ports*num_vcs-1] check_error_ip_op_ovc;
-   wire [0:num_ports*num_ports*num_vcs-1] fifo_error_ip_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 	  fifo_error_ip_ivc;
    
    reg 					  run;
    
@@ -223,13 +222,11 @@ module testbench
 			 = {data_width{1'b0}};
 		assign ps_error_ip[ip] = 1'b0;
 		assign rtl_error_ip[ip] = 1'b0;
-		assign vc_error_ip[ip] = 1'b0;
-		assign check_error_ip_op_ovc[ip*num_ports*num_vcs:
-					     (ip+1)*num_ports*num_vcs-1]
-			 = {num_ports*num_vcs{1'b0}};
-		assign fifo_error_ip_op_ovc[ip*num_ports*num_vcs:
-					    (ip+1)*num_ports*num_vcs-1]
-			 = {num_ports*num_vcs{1'b0}};
+		assign match_ip_ivc_op[ip*num_vcs*num_ports:
+				       (ip+1)*num_vcs*num_ports-1]
+			 = {num_vcs*num_ports{1'b0}};
+		assign fifo_error_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+			 = {num_vcs{1'b0}};
 		
 	     end
 	   else
@@ -328,7 +325,7 @@ module testbench
 		assign flit_head_in_ip[ip] = flit_head;
 		assign flit_tail_in_ip[ip] = flit_tail;
 		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
-			 = {flit_data[0:data_width-port_idx_width-1], port_id};
+			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
 		
 		wire [0:head_info_width-1] head_info;
@@ -392,147 +389,154 @@ module testbench
 				   next_port_enc :
 				   dest_port_q;
 		
-		// we don't handle the case where more than one candidate VC is
-		// returned correctly, so at least flag an error in this case
-		wire 			  vc_error;
-		assign vc_error = (pop_count(next_vcs) > 1);
-		
-		assign vc_error_ip[ip] = vc_error;
-		
-		wire [0:vc_idx_width-1]   next_vc_enc;
-		encoder
-		  #(.num_ports(num_vcs))
-		next_vc_enc_enc
-		  (.data_in(next_vcs),
-		   .data_out(next_vc_enc));
-		
-		wire [0:vc_idx_width-1]   dest_vc_s, dest_vc_q;
-		assign dest_vc_s = flit_valid ?
-				   ((flit_head ?
-				     next_vc_enc :
-				     dest_vc_q) &
-				    {vc_idx_width{~flit_tail}}) :
-				   dest_vc_q;
+		wire [0:num_vcs-1]   dest_vcs_s, dest_vcs_q;
+		assign dest_vcs_s = flit_valid ?
+				    ((flit_head ?
+				      next_vcs :
+				      dest_vcs_q) &
+				     {num_vcs{~flit_tail}}) :
+				    dest_vcs_q;
 		dff
-		  #(.width(vc_idx_width))
-		dest_vcq
+		  #(.width(num_vcs))
+		dest_vcsq
 		  (.clk(clk),
 		   .reset(reset),
-		   .d(dest_vc_s),
-		   .q(dest_vc_q));
+		   .d(dest_vcs_s),
+		   .q(dest_vcs_q));
 		
-		wire [0:vc_idx_width-1]   dest_vc;
-		assign dest_vc = (flit_valid & flit_head) ?
-				 next_vc_enc :
-				 dest_vc_q;
+		wire [0:num_vcs-1]   dest_vcs;
+		assign dest_vcs = (flit_valid & flit_head) ?
+				  next_vcs :
+				  dest_vcs_q;
 		
-		wire [0:(2+data_width)-1] data_in;
+		wire [0:addr_width-1] 	    next_address;
+		assign next_address = route_info[0:addr_width-1];
+		
+		wire [0:addr_width-1] 	    final_address;
+		assign final_address = route_info[addr_width:2*addr_width-1];
+		
+		wire 			    update_addr;
+		assign update_addr
+		  = flit_head &&
+		    (router_address == next_address[0:router_addr_width-1]);
+		
+		wire [0:route_info_width-1] next_route_info;
+		assign next_route_info
+		  = {update_addr ? final_address : next_address, final_address};
+		
+		wire [0:data_width-1] 	    flit_data_muxed;
+		assign flit_data_muxed[0:route_info_width-1] = next_route_info;
+		assign flit_data_muxed[route_info_width:data_width-1]
+			 = flit_data[route_info_width:data_width-1];
+		
+		wire [0:(2+data_width+port_idx_width+num_vcs)-1] data_in;
 		assign data_in[0] = flit_head;
 		assign data_in[1] = flit_tail;
-		assign data_in[2:2+data_width-port_idx_width-1]
-			 = flit_data[0:data_width-port_idx_width-1];
-		assign data_in[2+data_width-port_idx_width:
-			       2+data_width-1] = port_id;
+		assign data_in[2:2+data_width-1]
+			 = flit_data_muxed[0:data_width-1];
+		assign data_in[2+data_width:2+data_width+port_idx_width-1]
+			 = dest_port;
+		assign data_in[2+data_width+port_idx_width:
+			       2+data_width+port_idx_width+num_vcs-1]
+			 = dest_vcs;
 		
-		genvar 			  op;
-		for(op = 0; op < num_ports; op = op + 1)
-		  begin:ops
+		genvar 						 ivc;
+		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+		  begin:ivcs
 		     
-		     wire 				    check_head;
-		     assign check_head = flit_head_out_op[op];
+		     wire [0:2+data_width+port_idx_width+num_vcs-1] data_out;
 		     
-		     wire 				    check_tail;
-		     assign check_tail = flit_tail_out_op[op];
+		     wire 					    ref_head;
+		     assign ref_head = data_out[0];
 		     
-		     wire [0:data_width-1] 		    check_data;
-		     assign check_data = flit_data_out_op[op*data_width:
-							  (op+1)*data_width-1];
+		     wire 					    ref_tail;
+		     assign ref_tail = data_out[1];
 		     
-		     wire [0:port_idx_width-1] 		    flit_ip;
-		     assign flit_ip
-		       = check_data[data_width-port_idx_width:data_width-1];
+		     wire [0:data_width-1] 			    ref_data;
+		     assign ref_data = data_out[2:2+data_width-1];
 		     
-		     wire [0:vc_idx_width-1] 		    flit_ovc;
-		     assign flit_ovc = flit_vc_out_op[op*vc_idx_width:
-						      (op+1)*vc_idx_width-1];
+		     wire [0:port_idx_width-1] 			    ref_port;
+		     assign ref_port
+		       = data_out[2+data_width:
+				  2+data_width+port_idx_width-1];
 		     
-		     genvar 				    ovc;
-		     for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-		       begin:ovcs
-			  
-			  wire [0:2+data_width-1] data_out;
-			  
-			  wire 			  ref_head;
-			  assign ref_head = data_out[0];
-			  
-			  wire 			  ref_tail;
-			  assign ref_tail = data_out[1];
-			  
-			  wire [0:data_width-1]   ref_data;
-			  assign ref_data = data_out[2:2+data_width-1];
-			  
-			  wire 			  full, empty;
-			  
-			  wire 			  push, pop;
-			  assign push = flit_valid &&
-					(dest_port == op) &&
-					(dest_vc == ovc);
-			  assign pop = flit_valid_out_op[op] &&
-				       (flit_ip == ip) &&
-				       (flit_ovc == ovc);
-			  
-			  wire 			  fifo_error;
-			  
-			  fifo
-			    #(.depth(num_flit_buffers),
-			      .width(2+data_width))
-			  ref_fifo
-			    (.clk(clk),
-			     .reset(reset),
-			     .full(full),
-			     .data_in(data_in),
-			     .push(push),
-			     .empty(empty),
-			     .data_out(data_out),
-			     .pop(pop),
-			     .error(fifo_error));
-			  
-			  assign fifo_error_ip_op_ovc[(ip*num_ports+op)*num_vcs+
-						      ovc]
-				   = fifo_error;
-			  
-			  wire [0:2] 			    check_error;
-			  assign check_error
-			    = {3{pop}} &
-			      {(check_head != ref_head),
-			       (check_tail != ref_tail),
-			       (check_data != ref_data)};
-			  
-			  assign check_error_ip_op_ovc[(ip*num_ports+op)*
-						       num_vcs+ovc]
-				   = |check_error;
-			  
-			  always @(negedge clk)
-			    begin
-			       if(|check_error)
-				 begin
-				    $display("checker error at cycle %d!",
-					     $time);
-				    $display("ip=%d, op=%d, ovc=%d", ip, op,
-					     ovc);
-				    $display("head: %d vs %d", ref_head,
-					     check_head);
-				    $display("tail: %d vs %d", ref_tail,
-					     check_tail);
-				    $display("data: %x vs %x", ref_data,
-					     check_data);
-				 end
-			    end
-		       end
+		     wire [0:num_vcs-1] 			    ref_vcs;
+		     assign ref_vcs
+		       = data_out[2+data_width+port_idx_width:
+				  2+data_width+port_idx_width+num_vcs-1];
+		     
+		     wire 					    check_head;
+		     assign check_head = flit_head_out_op[ref_port];
+		     
+		     wire 					    check_tail;
+		     assign check_tail = flit_tail_out_op[ref_port];
+		     
+		     wire [0:data_width-1] 			    check_data;
+		     assign check_data
+		       = flit_data_out_op[ref_port*data_width +: data_width];
+		     
+		     wire [0:vc_idx_width-1] 			    check_vc;
+		     assign check_vc
+		       = flit_vc_out_op[ref_port*vc_idx_width +: vc_idx_width];
+		     
+		     wire 					    push;
+		     assign push = flit_valid && (flit_vc == ivc);
+		     
+		     wire 					    match_head;
+		     assign match_head = ref_head == check_head;
+		     
+		     wire 					    match_tail;
+		     assign match_tail = ref_tail == check_tail;
+		     
+		     wire 					    match_data;
+		     assign match_data = ref_data == check_data;
+		     
+		     wire 					    match_vcs;
+		     assign match_vcs = ref_vcs[check_vc];
+		     
+		     wire 					    match;
+		     assign match
+		       = flit_valid_out_op[ref_port] &
+			 match_head & match_tail & match_data & match_vcs;
+		     
+		     wire 					    pop;
+		     assign pop = match;
+		     
+		     wire 					    full, empty;
+		     wire 					    fifo_error;
+		     
+		     fifo
+		       #(.depth(num_flit_buffers),
+			 .width(2+data_width+port_idx_width+num_vcs))
+		     ref_fifo
+		       (.clk(clk),
+			.reset(reset),
+			.full(full),
+			.data_in(data_in),
+			.push(push),
+			.empty(empty),
+			.data_out(data_out),
+			.pop(pop),
+			.error(fifo_error));
+		     
+		     assign fifo_error_ip_ivc[ip*num_vcs+ivc] = fifo_error;
+		     
+		     wire [0:num_ports-1] 			    port_mask;
+		     decoder
+		       #(.num_ports(num_ports))
+		     port_mask_dec
+		       (.data_in(ref_port),
+			.data_out(port_mask));
+		     
+		     wire [0:num_ports-1] 			    match_op;
+		     assign match_op = {num_ports{match}} & port_mask;
+		     
+		     assign match_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
+					    (ip*num_vcs+ivc+1)*num_ports-1]
+			      = match_op;
+		     
 		  end
-		
 	     end
-	   
 	end
       
    endgenerate
@@ -708,12 +712,39 @@ module testbench
       
    endgenerate
    
-   wire [0:6] errors;
+   wire [0:num_ports-1] 			    match_op;
+   or_nto1
+     #(.num_ports(num_ports*num_vcs),
+       .width(num_ports))
+   match_op_or
+     (.data_in(match_ip_ivc_op),
+      .data_out(match_op));
+   
+   wire [0:num_ports-1] 			    check_error_op;
+   assign check_error_op = flit_valid_out_op & ~match_op;
+
+   integer 					    port;
+   always @(negedge clk)
+     begin
+	for(port = 0; port < num_ports; port = port + 1)
+	  begin
+	     if(check_error_op[port])
+	       begin
+		  $display("check error: op=%d, cyc=%d", port, $time);
+		  $display("head=%d, tail=%d, vc=%d, data=%x",
+			   flit_head_out_op[port],
+			   flit_tail_out_op[port],
+			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
+			   flit_data_out_op[port*data_width +: data_width]);
+	       end
+	  end
+     end
+   
+   wire [0:5] errors;
    assign errors = {|ps_error_ip,
 		    |rtl_error_ip,
-		    |vc_error_ip,
-		    |check_error_ip_op_ovc,
-		    |fifo_error_ip_op_ovc,
+		    |check_error_op,
+		    |fifo_error_ip_ivc,
 		    rtr_error,
 		    |pkt_error_op_ovc};
    
