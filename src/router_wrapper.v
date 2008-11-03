@@ -1,5 +1,5 @@
 module router_wrapper
-  (clk, reset, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
+  (clk, reset, router_address, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
    flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
    flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
    flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
@@ -55,9 +55,6 @@ module router_wrapper
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
-   // current router's address
-   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
-   
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
      = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
@@ -77,13 +74,13 @@ module router_wrapper
    parameter data_width = 64;
    
    // enable performance counter
-   parameter perf_ctr_enable = 1;
+   parameter perf_ctr_enable = 0;
    
    // width of each counter
    parameter perf_ctr_width = 32;
    
    // include error checking logic
-   parameter checker_enable = 1;
+   parameter checker_enable = 0;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    // try to recover from errors
@@ -132,6 +129,9 @@ module router_wrapper
    
    input clk;
    input reset;
+   
+   // current router's address
+   input [0:router_addr_width-1] router_address;
    
    // valid flit data available at input port(s)
    input [0:num_ports-1] flit_valid_in_ip;
@@ -205,7 +205,6 @@ module router_wrapper
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
-       .router_address(router_address),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .data_width(data_width),
        .perf_ctr_enable(perf_ctr_enable),
@@ -226,6 +225,7 @@ module router_wrapper
    rtr
      (.clk(clk),
       .reset(reset),
+      .router_address(router_address),
       .flit_valid_in_ip(flit_valid_in_ip),
       .flit_vc_in_ip(flit_vc_in_ip),
       .flit_head_in_ip(flit_head_in_ip),

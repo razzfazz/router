@@ -1,8 +1,9 @@
 module ivc_ctrl
-  (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
-   free_op, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
-   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent,
-   flit_vc_out, flit_tail_out, buff_write_addr, buff_read_addr, error, events);
+  (clk, reset, router_address, port_id, flit_valid_in, flit_head_in,
+   flit_tail_in, route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op,
+   vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec,
+   sw_gnt_spec, flit_sent, flit_vc_out, flit_tail_out, buff_write_addr,
+   buff_read_addr, error, events);
    
 `include "constants.v"
    
@@ -50,9 +51,6 @@ module ivc_ctrl
    // width required to select individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // ID of current input port
-   parameter [0:port_idx_width-1] port_id = {port_idx_width{1'b0}};
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -64,9 +62,6 @@ module ivc_ctrl
    
    // width required to select individual router in network
    localparam router_addr_width = num_dimensions * dim_addr_width;
-   
-   // current router's address
-   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
    
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
@@ -112,6 +107,12 @@ module ivc_ctrl
    
    input clk;
    input reset;
+   
+   // current router's address
+   input [0:router_addr_width-1] router_address;
+   
+   // ID of current input port
+   input [0:port_idx_width-1] port_id;
    
    // valid flit data available
    input flit_valid_in;
@@ -430,13 +431,13 @@ module ivc_ctrl
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
-       .router_address(router_address),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .routing_function_type(routing_function_type),
        .reset_type(reset_type))
    rtl
      (.clk(clk),
       .reset(reset),
+      .router_address(router_address),
       .route_info(next_route_info),
       .port_id(port_id),
       .vc_id(vc_id),
@@ -589,7 +590,7 @@ module ivc_ctrl
 	     assign has_cred_s
 	       = (vc_gnt ?
 		  ~sw_gnt_spec :
-		  ((has_cred_q & ~sw_gnt_nonspec) | |cred_hold_q)) | cred;
+		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | cred;
 	     dff
 	       #(.width(1),
 		 .reset_type(reset_type))

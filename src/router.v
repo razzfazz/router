@@ -1,5 +1,5 @@
 module router
-  (clk, reset, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
+  (clk, reset, router_address, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
    flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
    flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
    flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
@@ -37,6 +37,9 @@ module router
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // width required to select individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -48,9 +51,6 @@ module router
    
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
-   
-   // current router's address
-   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
    
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
@@ -108,6 +108,9 @@ module router
    
    input clk;
    input reset;
+   
+   // current router's address
+   input [0:router_addr_width-1] router_address;
    
    // valid flit data available at input port(s)
    input [0:num_ports-1] flit_valid_in_ip;
@@ -208,6 +211,9 @@ module router
 	   // input controller
 	   //-------------------------------------------------------------------
 	   
+	   wire [0:port_idx_width-1] port_id;
+	   assign port_id = ip;
+	   
 	   wire flit_valid_in;
 	   assign flit_valid_in = flit_valid_in_ip[ip];
 	   
@@ -256,10 +262,8 @@ module router
 	       .num_traffic_classes(num_traffic_classes),
 	       .num_routing_classes(num_routing_classes),
 	       .num_ports(num_ports),
-	       .port_id(ip),
 	       .num_dimensions(num_dimensions),
 	       .num_routers_per_dim(num_routers_per_dim),
-	       .router_address(router_address),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .data_width(data_width),
 	       .routing_function_type(routing_function_type),
@@ -275,6 +279,8 @@ module router
 	   ipc
 	     (.clk(clk),
 	      .reset(reset),
+	      .router_address(router_address),
+	      .port_id(port_id),
 	      .flit_valid_in(flit_valid_in),
 	      .flit_vc_in(flit_vc_in),
 	      .flit_head_in(flit_head_in),

@@ -1,6 +1,7 @@
 // abstraction for routing logic
 module routing_logic
-  (clk, reset, route_info, port_id, vc_id, next_port, next_vcs, error);
+  (clk, reset, router_address, port_id, vc_id, route_info, next_port, next_vcs,
+   error);
    
 `include "constants.v"
    
@@ -50,9 +51,6 @@ module routing_logic
    // width required to select individual router in network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
-   // current router's address
-   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
-   
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
    
@@ -77,14 +75,17 @@ module routing_logic
    input clk;
    input reset;
    
-   // routing data
-   input [0:route_info_width-1] route_info;
+   // current router's address
+   input [0:router_addr_width-1] router_address;
    
    // ID of current port
    input [0:port_idx_width-1] port_id;
    
    // ID of current VC
    input [0:vc_idx_width-1] vc_id;
+   
+   // routing data
+   input [0:route_info_width-1] route_info;
    
    // output port to forward to
    output [0:num_ports-1] next_port;
