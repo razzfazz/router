@@ -387,7 +387,7 @@ module op_ctrl
 	 .errors_in(error_cred_ovc),
 	 .errors_out(errors_out_ovc));
       
-      assign error = |error_hct_ovc | |errors_out_ovc;
+      assign error = (|error_hct_ovc) | (|errors_out_ovc);
       
       case(credit_handling_type)
 	`CREDIT_HANDLING_TYPE_LEVEL:
