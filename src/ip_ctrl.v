@@ -116,8 +116,8 @@ module ip_ctrl
    
    // wdith of the flit buffer register file
    localparam fbf_data_width = (num_header_buffers > 1) ?
-			       (data_width+1) :
-			       (data_width+2);
+			       (1+data_width) :
+			       (2+data_width);
    
    input clk;
    input reset;
@@ -428,20 +428,29 @@ module ip_ctrl
       .write_data(fbf_write_data),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));
-
-   assign fbf_write_data[0:data_width-1] = flit_data_muxed;
-   assign fbf_write_data[data_width] = flit_head_in;
-   
-   assign flit_data_out = fbf_read_data[0:data_width-1];
-   assign flit_head_out = fbf_read_data[data_width];
    
    generate
       
       if(num_header_buffers == 1)
 	begin
 	   
-	   assign fbf_write_data[data_width+1] = flit_tail_in;
-	   assign flit_tail_out = fbf_read_data[data_width+1];
+	   assign fbf_write_data[0] = flit_head_in;
+	   assign fbf_write_data[1] = flit_tail_in;
+	   assign fbf_write_data[2:data_width+1] = flit_data_muxed;
+	   
+	   assign flit_head_out = fbf_read_data[0];
+	   assign flit_tail_out = fbf_read_data[1];
+	   assign flit_data_out = fbf_read_data[2:data_width+1];
+	   
+	end
+      else
+	begin
+	   
+	   assign fbf_write_data[0] = flit_head_in;
+	   assign fbf_write_data[1:data_width] = flit_data_muxed;
+	   
+	   assign flit_head_out = fbf_read_data[0];
+	   assign flit_data_out = fbf_read_data[1:data_width];
 	   
 	end
       
