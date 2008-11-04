@@ -1,6 +1,6 @@
 module packet_source
-  (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
-   cred_vc, run, error);
+_q  (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
+   cred_vc, run, out_flits, error);
    
 `include "constants.v"
    
@@ -60,20 +60,23 @@ module packet_source
    
    input run;
    
+   output [0:packet_count_width-1] out_flits;
+   wire [0:packet_count_width-1] out_flits;
+   
    output error;
-   wire 		   error;
+   wire 			 error;
    
    
-   integer 		   seed = initial_seed;
+   integer 			 seed = initial_seed;
    
-   integer 		   i;
+   integer 			 i;
    
-   reg 			   new_packet;   
-   reg [0:data_width-1]    random_data;
-   reg [0:vc_idx_width-1]  random_vc;
-   reg [0:addr_width-1]    random_next_addr;
-   reg [0:addr_width-1]    random_final_addr;
-   reg [0:head_info_width-1] random_head_info;
+   reg 				 new_packet;   
+   reg [0:data_width-1] 	 random_data;
+   reg [0:vc_idx_width-1] 	 random_vc;
+   reg [0:addr_width-1] 	 random_next_addr;
+   reg [0:addr_width-1] 	 random_final_addr;
+   reg [0:head_info_width-1] 	 random_head_info;
    
    always @(posedge clk, posedge reset)
      begin
@@ -327,16 +330,28 @@ module packet_source
       .data_in(head_free_ovc),
       .data_out(head_free));
    
-   assign flit_sent
-     = ~ready_packet_count_zero & free & (head_free | ~flit_count_max);
+   wire 			       flit_valid_q;
+   assign flit_sent = flit_valid_q & free & (head_free | ~flit_count_max);
    
    assign packet_sent = flit_count_zero & flit_sent;
+   
+   wire 			       flit_valid_s;
+   assign flit_valid_s = (packet_sent & ~ready_packet_count_zero) |
+			 (flit_valid_q & ~(flit_sent & flit_count_zero));
+   dff
+     #(.width(1),
+       .reset_value(1'b1))
+   flit_validq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_valid_s),
+      .q(flit_valid_q));
    
    generate
       
       if(max_packet_length > 1)
 	begin
-
+	   
 	   wire [0:packet_length_width-1] packet_length;
 	   assign packet_length
 	     = random_head_info[route_info_width:
@@ -413,5 +428,17 @@ module packet_source
    assign flit_data = data_q;
    
    assign error = |error_hct_ovc | |error_cred_ovc;
+   
+   wire [0:packet_count_width-1] out_flits_s, out_flits_q;
+   assign out_flits_s = out_flits_q + flit_valid;
+   dff
+     #(.width(packet_count_width))
+   out_flitsq
+     (.clk(clk),
+      .reset(reset),
+      .d(out_flits_s),
+      .q(out_flits_q));
+   
+   assign out_flits = out_flits_s;
    
 endmodule
