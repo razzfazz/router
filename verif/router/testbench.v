@@ -285,7 +285,9 @@ module testbench
 		wire 			flit_tail;
 		wire [0:data_width-1] 	flit_data;
 		
-		wire 			ps_error;
+		wire [0:packet_count_width-1] ps_out_flits;
+		
+		wire 			      ps_error;
 		packet_source
 		  #(.max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
@@ -314,9 +316,10 @@ module testbench
 		   .cred_valid(cred_valid),
 		   .cred_vc(cred_vc),
 		   .run(run),
+		   .out_flits(ps_out_flits),
 		   .error(ps_error));
-
-		wire [0:port_idx_width-1] port_id;
+		
+		wire [0:port_idx_width-1]     port_id;
 		assign port_id = ip;
 		
 		assign flit_valid_in_ip[ip] = flit_valid;
@@ -328,15 +331,15 @@ module testbench
 			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
 		
-		wire [0:head_info_width-1] head_info;
+		wire [0:head_info_width-1]    head_info;
 		assign head_info = flit_data[0:head_info_width-1];
 		
-		wire [0:route_info_width-1] route_info;
+		wire [0:route_info_width-1]   route_info;
 		assign route_info = head_info[0:route_info_width-1];
 		
-		wire [0:num_ports-1] 	next_port;
-		wire [0:num_vcs-1] 	next_vcs;
-		wire 			rtl_error_unmasked;
+		wire [0:num_ports-1] 	      next_port;
+		wire [0:num_vcs-1] 	      next_vcs;
+		wire 			      rtl_error_unmasked;
 		routing_logic
 		  #(.num_vcs(num_vcs),
 		    .num_traffic_classes(num_traffic_classes),
@@ -357,23 +360,23 @@ module testbench
 		   .next_vcs(next_vcs),
 		   .error(rtl_error_unmasked));
 		
-		wire [0:port_idx_width-1] next_port_enc;
+		wire [0:port_idx_width-1]     next_port_enc;
 		encoder
 		  #(.num_ports(num_ports))
 		next_port_enc_enc
 		  (.data_in(next_port),
 		   .data_out(next_port_enc));
 		
-		wire 			  rtl_error;
+		wire 			      rtl_error;
 		assign rtl_error = rtl_error_unmasked & flit_valid &  flit_head;
 		
 		assign rtl_error_ip[ip] = rtl_error;
 		
-		wire [0:port_idx_width-1] dest_port_s, dest_port_q;
+		wire [0:port_idx_width-1]     dest_port_s, dest_port_q;
 		assign dest_port_s = flit_valid ?
 				     ((flit_head ?
-				      next_port_enc :
-				      dest_port_q) &
+				       next_port_enc :
+				       dest_port_q) &
 				      {port_idx_width{~flit_tail}}) :
 				     dest_port_q;
 		dff
@@ -384,12 +387,12 @@ module testbench
 		   .d(dest_port_s),
 		   .q(dest_port_q));
 		
-		wire [0:port_idx_width-1] dest_port;
+		wire [0:port_idx_width-1]     dest_port;
 		assign dest_port = (flit_valid & flit_head) ?
 				   next_port_enc :
 				   dest_port_q;
 		
-		wire [0:num_vcs-1]   dest_vcs_s, dest_vcs_q;
+		wire [0:num_vcs-1] 	      dest_vcs_s, dest_vcs_q;
 		assign dest_vcs_s = flit_valid ?
 				    ((flit_head ?
 				      next_vcs :
@@ -404,27 +407,27 @@ module testbench
 		   .d(dest_vcs_s),
 		   .q(dest_vcs_q));
 		
-		wire [0:num_vcs-1]   dest_vcs;
+		wire [0:num_vcs-1] 	      dest_vcs;
 		assign dest_vcs = (flit_valid & flit_head) ?
 				  next_vcs :
 				  dest_vcs_q;
 		
-		wire [0:addr_width-1] 	    next_address;
+		wire [0:addr_width-1] 	      next_address;
 		assign next_address = route_info[0:addr_width-1];
 		
-		wire [0:addr_width-1] 	    final_address;
+		wire [0:addr_width-1] 	      final_address;
 		assign final_address = route_info[addr_width:2*addr_width-1];
 		
-		wire 			    update_addr;
+		wire 			      update_addr;
 		assign update_addr
 		  = flit_head &&
 		    (router_address == next_address[0:router_addr_width-1]);
 		
-		wire [0:route_info_width-1] next_route_info;
+		wire [0:route_info_width-1]   next_route_info;
 		assign next_route_info
 		  = {update_addr ? final_address : next_address, final_address};
 		
-		wire [0:data_width-1] 	    flit_data_muxed;
+		wire [0:data_width-1] 	      flit_data_muxed;
 		assign flit_data_muxed[0:route_info_width-1] = next_route_info;
 		assign flit_data_muxed[route_info_width:data_width-1]
 			 = flit_data[route_info_width:data_width-1];
@@ -494,15 +497,17 @@ module testbench
 		     wire 					    match_vcs;
 		     assign match_vcs = ref_vcs[check_vc];
 		     
+		     wire 					    fifo_empty;
+		     
 		     wire 					    match;
 		     assign match
-		       = flit_valid_out_op[ref_port] &
+		       = flit_valid_out_op[ref_port] & ~fifo_empty &
 			 match_head & match_tail & match_data & match_vcs;
 		     
 		     wire 					    pop;
 		     assign pop = match;
 		     
-		     wire 					    full, empty;
+		     wire 					    fifo_full;
 		     wire 					    fifo_error;
 		     
 		     fifo
@@ -511,10 +516,10 @@ module testbench
 		     ref_fifo
 		       (.clk(clk),
 			.reset(reset),
-			.full(full),
+			.full(fifo_full),
 			.data_in(data_in),
 			.push(push),
-			.empty(empty),
+			.empty(fifo_empty),
 			.data_out(data_out),
 			.pop(pop),
 			.error(fifo_error));
