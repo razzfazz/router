@@ -1,5 +1,5 @@
 module packet_source
-_q  (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
+  (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
    cred_vc, run, out_flits, error);
    
 `include "constants.v"
