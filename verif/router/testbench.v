@@ -13,13 +13,6 @@ module testbench
       end
    endfunction
    
-   // test for undefined bits
-   function is_x(input integer net);
-      begin
-	 is_x = (^net === 1'bx);
-      end
-   endfunction
-   
    // population count (count ones)
    function integer pop_count(input integer argument);
       integer i;
@@ -595,6 +588,7 @@ module testbench
       .error(rtr_error));
    
    wire [0:num_ports*num_vcs-1] 	pkt_error_op_ovc;
+   wire [0:num_ports-1] 		x_error_op;
    
    generate
       
@@ -713,6 +707,29 @@ module testbench
 		
 	     end
 	   
+	   wire 				    flit_valid_out;
+	   assign flit_valid_out = flit_valid_out_op[op];
+	   
+	   wire 				    flit_head_out;
+	   assign flit_head_out = flit_head_out_op[op];
+	   
+	   wire 				    flit_tail_out;
+	   assign flit_tail_out = flit_tail_out_op[op];
+	   
+	   wire [0:vc_idx_width-1] 		    flit_vc_out;
+	   assign flit_vc_out = flit_vc_out_op[op*vc_idx_width +: vc_idx_width];
+	   
+	   wire [0:data_width-1] 		    flit_data_out;
+	   assign flit_data_out = flit_data_out_op[op*data_width +: data_width];
+	   
+	   assign x_error_op[op]
+		    = (flit_valid_out === 1'bx) ||
+		      ((flit_valid_out === 1'b1) &&
+		       (^{flit_head_out,
+			  flit_tail_out,
+			  flit_vc_out,
+			  flit_data_out} === 1'bx));
+	   
 	end
       
    endgenerate
@@ -726,7 +743,7 @@ module testbench
       .data_out(match_op));
    
    wire [0:num_ports-1] 			    check_error_op;
-   assign check_error_op = flit_valid_out_op & ~match_op;
+   assign check_error_op = (flit_valid_out_op & ~match_op);
 
    integer 					    port;
    always @(negedge clk)
@@ -742,13 +759,24 @@ module testbench
 			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
 			   flit_data_out_op[port*data_width +: data_width]);
 	       end
+	     if(x_error_op[port])
+	       begin
+		  $display("X value error: op=%d, cyc=%d", port, $time);
+		  $display("valid = %d, head=%d, tail=%d, vc=%d, data=%x",
+			   flit_valid_out_op[port],
+			   flit_head_out_op[port],
+			   flit_tail_out_op[port],
+			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
+			   flit_data_out_op[port*data_width +: data_width]);
+	       end
 	  end
      end
    
-   wire [0:5] errors;
+   wire [0:6] errors;
    assign errors = {|ps_error_ip,
 		    |rtl_error_ip,
 		    |check_error_op,
+		    |x_error_op,
 		    |fifo_error_ip_ivc,
 		    rtr_error,
 		    |pkt_error_op_ovc};
