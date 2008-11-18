@@ -3,6 +3,8 @@ module regfile
   (clk, write_enable, write_address, write_data, read_enable, read_address,
    read_data);
    
+`include "constants.v"
+   
    function integer clogb(input integer argument);
       integer i;
       begin
@@ -17,6 +19,9 @@ module regfile
    
    // width of each entry
    parameter width = 64;
+   
+   // select implementation variant
+   parameter regfile_type = `REGFILE_TYPE_FF_1D_MUX;
    
    // width required to swelect an entry
    localparam addr_width = clogb(depth);
@@ -43,16 +48,85 @@ module regfile
    wire [0:width-1] read_data;
    
    reg [0:addr_width-1] read_address_q;
-   reg [0:width-1] 	storage [0:depth-1];
    
-   always @(posedge clk)
-     begin
-	if(write_enable)
-	  storage[write_address] <= write_data;
+   genvar 		level;
+   
+   generate
+      
+      always @(posedge clk)
 	if(read_enable)
 	  read_address_q <= read_address;
-     end
-   
-   assign read_data = storage[read_address_q];
+      
+      case(regfile_type)
+	
+	`REGFILE_TYPE_FF_2D:
+	  begin
+	     
+	     reg [0:width-1] 	storage [0:depth-1];
+	     
+	     always @(posedge clk)
+	       if(write_enable)
+		 storage[write_address] <= write_data;
+	     
+	     assign read_data = storage[read_address_q];
+	     
+	  end
+	
+	`REGFILE_TYPE_FF_1D_MUX:
+	  begin
+	     
+	     wire [0:depth*width-1] read_data_lvl;
+	     
+	     for(level = 0; level < depth; level = level + 1)
+	       begin:levels
+		  
+		  wire write;
+		  assign write = write_enable && (write_address == level);
+		  
+		  reg [0:width-1] storage;
+		  
+		  always @(posedge clk)
+		    if(write)
+		      storage <= write_data;
+		  
+		  assign read_data_lvl[level*width:(level+1)*width-1] = storage;
+		  
+	       end
+	     
+	     assign read_data = read_data_lvl[read_address_q*width +: width];
+	     
+	  end
+	
+	`REGFILE_TYPE_FF_1D_TRISTATE:
+	  begin
+	     
+	     reg 		    read_enable_q;
+	     
+	     always @(posedge clk)
+	       read_enable_q <= read_enable;
+	     
+	     for(level = 0; level < depth; level = level + 1)
+	       begin:levels
+		  
+		  wire write;
+		  assign write = write_enable && (write_address == level);
+		  
+		  reg [0:width-1] storage;
+		  always @(posedge clk)
+		    if(write)
+		      storage <= write_data;
+		  
+		  wire 		  read;
+		  assign read = read_enable_q && (read_address_q == level);
+		  
+		  assign read_data = read ? storage : {width{1'bz}};
+		  
+	       end
+	     
+	  end
+	
+      endcase
+      
+   endgenerate
    
 endmodule

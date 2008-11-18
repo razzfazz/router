@@ -76,6 +76,20 @@
 
 
 //------------------------------------------------------------------------------
+// register file implemetation variants
+//------------------------------------------------------------------------------
+
+// 2D array implemented using flipflops
+`define REGFILE_TYPE_FF_2D          0
+
+// 1D array of flipflops, read using a combinational mux
+`define REGFILE_TYPE_FF_1D_MUX      1
+
+// 1D array of flipflops, read using a tristate mux
+`define REGFILE_TYPE_FF_1D_TRISTATE 2
+
+
+//------------------------------------------------------------------------------
 // FIFO implementation variants
 //------------------------------------------------------------------------------
 
