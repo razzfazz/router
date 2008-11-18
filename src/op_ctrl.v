@@ -131,13 +131,13 @@ module op_ctrl
 		
 		genvar 			    idx;
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr;
+		wire [0:flit_buffer_idx_width-1] push_ptr_q;
 		
 		for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
 		  begin:idxs
 		     
 		     wire capture;
-		     assign capture = debit && (push_ptr == idx);
+		     assign capture = debit && (push_ptr_q == idx);
 		     
 		     assign tail_queue_s[idx] = capture ?
 						flit_tail_in :
@@ -154,46 +154,52 @@ module op_ctrl
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr_early, push_ptr_next,
-						 push_ptr_prev;
-		mod_ctr
-		  #(.num_values(num_flit_buffers),
-		    .reset_type(reset_type))
-		push_ptr_ctr
-		  (.clk(clk),
-		   .reset(reset),
-		   .incr(debit),
-		   .decr(1'b0),
-		   .load(1'b0),
-		   .load_value({flit_buffer_idx_width{1'b0}}),
-		   .value(push_ptr),
-		   .early_value(push_ptr_early),
-		   .next_value(push_ptr_next),
-		   .prev_value(push_ptr_prev));
+		wire [0:flit_buffer_idx_width-1] push_ptr_next;
+		incr
+		  #(.width(flit_buffer_idx_width),
+		    .min_value(0),
+		    .max_value(num_flit_buffers-1))
+		push_ptr_incr
+		  (.data_in(push_ptr_q),
+		   .data_out(push_ptr_next));
 		
-		wire [0:flit_buffer_idx_width-1] pop_ptr, pop_ptr_early,
-						 pop_ptr_next, pop_ptr_prev;
-		mod_ctr
-		  #(.num_values(num_flit_buffers),
+		wire [0:flit_buffer_idx_width-1] push_ptr_s;
+		assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
+		dff
+		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
-		pop_ptr_ctr
+		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
-		   .incr(credit),
-		   .decr(1'b0),
-		   .load(1'b0),
-		   .load_value({flit_buffer_idx_width{1'b0}}),
-		   .value(pop_ptr),
-		   .early_value(pop_ptr_early),
-		   .next_value(pop_ptr_next),
-		   .prev_value(pop_ptr_prev));
+		   .d(push_ptr_s),
+		   .q(push_ptr_q));
+		
+		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
+		incr
+		  #(.width(flit_buffer_idx_width),
+		    .min_value(0),
+		    .max_value(num_flit_buffers-1))
+		pop_ptr_incr
+		  (.data_in(pop_ptr_q),
+		   .data_out(pop_ptr_next));
+		
+		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
+		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
+		dff
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
+		pop_ptrq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(pop_ptr_s),
+		   .q(pop_ptr_q));
 		
 		wire 				 tail;
 		mux_nto1
 		  #(.num_ports(num_flit_buffers),
 		    .width(1))
 		tail_mux
-		  (.select(pop_ptr),
+		  (.select(pop_ptr_q),
 		   .data_in(tail_queue_q),
 		   .data_out(tail));
 		

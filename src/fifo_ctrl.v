@@ -63,42 +63,48 @@ module fifo_ctrl
    output error;
    wire 		error;
    
-   wire [0:idx_width-1] read_ptr, read_ptr_early, read_ptr_next,
-			read_ptr_prev;
-   mod_ctr
-     #(.num_values(depth),
-       .reset_type(reset_type))
-   read_ptr_ctr
-     (.clk(clk),
-      .reset(reset),
-      .incr(pop),
-      .decr(1'b0),
-      .load(1'b0),
-      .load_value({idx_width{1'b0}}),
-      .value(read_ptr),
-      .early_value(read_ptr_early),
-      .next_value(read_ptr_next),
-      .prev_value(read_ptr_prev));
+   wire [0:idx_width-1] read_ptr_next, read_ptr_q;
+   incr
+     #(.width(idx_width),
+       .min_value(0),
+       .max_value(depth-1))
+   read_ptr_incr
+     (.data_in(read_ptr_q),
+      .data_out(read_ptr_next));
    
-   wire [0:idx_width-1] write_ptr, write_ptr_early, write_ptr_next,
-			write_ptr_prev;
-   mod_ctr
-     #(.num_values(depth),
+   wire [0:idx_width-1] read_ptr_s;
+   assign read_ptr_s = pop ? read_ptr_next : read_ptr_q;
+   dff
+     #(.width(idx_width),
        .reset_type(reset_type))
-   write_ptr_ctr
+   read_ptrq
      (.clk(clk),
       .reset(reset),
-      .incr(push),
-      .decr(1'b0),
-      .load(1'b0),
-      .load_value({idx_width{1'b0}}),
-      .value(write_ptr),
-      .early_value(write_ptr_early),
-      .next_value(write_ptr_next),
-      .prev_value(write_ptr_prev));
+      .d(read_ptr_s),
+      .q(read_ptr_q));
+   
+   wire [0:idx_width-1] write_ptr_next, write_ptr_q;
+   incr
+     #(.width(idx_width),
+       .min_value(0),
+       .max_value(depth-1))
+   write_ptr_incr
+     (.data_in(write_ptr_q),
+      .data_out(write_ptr_next));
+   
+   wire [0:idx_width-1] write_ptr_s;
+   assign write_ptr_s = push ? write_ptr_next : write_ptr_q;
+   dff
+     #(.width(idx_width),
+       .reset_type(reset_type))
+   write_ptrq
+     (.clk(clk),
+      .reset(reset),
+      .d(write_ptr_s),
+      .q(write_ptr_q));
    
    wire 		almost_empty;
-   assign almost_empty = (read_ptr_next == write_ptr);
+   assign almost_empty = (read_ptr_next == write_ptr_q);
    
    wire 		empty_s, empty_q;
    assign empty_s = (empty_q | (almost_empty & pop)) & ~push;
@@ -113,12 +119,12 @@ module fifo_ctrl
       .d(empty_s),
       .q(empty_q));
    
-   assign read_addr = read_ptr;
-   assign write_addr = write_ptr;
+   assign read_addr = read_ptr_q;
+   assign write_addr = write_ptr_q;
    assign empty = empty_q;
    assign empty_early = empty_s;
-   assign full = (read_ptr == write_ptr) && !empty_q;
-   assign full_early = (read_ptr_early == write_ptr_early) && !empty_s;
+   assign full = (read_ptr_q == write_ptr_q) && !empty_q;
+   assign full_early = (read_ptr_s == write_ptr_s) && !empty_s;
    
    wire 		error_underflow;
    assign error_underflow = empty & pop;

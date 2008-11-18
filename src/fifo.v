@@ -73,26 +73,47 @@ module fifo
 	`FIFO_TYPE_SHIFTING:
 	  begin
 	     
-	     wire [0:insert_ptr_width-1] insert_ptr, insert_ptr_early,
-					 insert_ptr_next, insert_ptr_prev;
-	     mod_ctr
-	       #(.num_values(depth),
+	     wire [0:insert_ptr_width-1] insert_ptr_q, insert_ptr_next;
+	     incr
+	       #(.width(insert_ptr_width),
+		 .min_value(0),
+		 .max_value(depth-1))
+	     insert_ptr_incr
+	       (.data_in(insert_ptr_q),
+		.data_out(insert_ptr_next));
+	     
+	     wire [0:insert_ptr_width-1] insert_ptr_prev;
+	     decr
+	       #(.width(insert_ptr_width),
+		 .min_value(0),
+		 .max_value(depth-1))
+	     insert_ptr_decr
+	       (.data_in(insert_ptr_q),
+		.data_out(insert_ptr_prev));
+	     
+	     wire [0:insert_ptr_width-1] insert_ptr_s;
+	     mux_nto1
+	       #(.num_ports(4),
+		 .width(insert_ptr_width))
+	     insert_ptr_s_mux
+	       (.select({push, pop}),
+		.data_in({insert_ptr_q,
+			  insert_ptr_prev,
+			  insert_ptr_next,
+			  insert_ptr_q}),
+		.data_out(insert_ptr_s));
+	     dff
+	       #(.width(insert_ptr_width),
 		 .reset_type(reset_type),
 		 .reset_value(insert_ptr_reset_value))
-	     insert_ptr_ctr
+	     insert_ptrq
 	       (.clk(clk),
 		.reset(reset),
-		.incr(push),
-		.decr(pop),
-		.load(1'b0),
-		.load_value({insert_ptr_width{1'b0}}),
-		.value(insert_ptr),
-		.early_value(insert_ptr_early),
-		.next_value(insert_ptr_next),
-		.prev_value(insert_ptr_prev));
+		.d(insert_ptr_s),
+		.q(insert_ptr_q));
 	     
-	     assign full = (insert_ptr == 0);
-	     assign empty = (insert_ptr == depth);
+	     assign full = (insert_ptr_q == 0);
+	     assign empty = (insert_ptr_q == depth);
 	     
 	     wire [0:(depth+1)*width-1] data;
 	     
@@ -100,7 +121,7 @@ module fifo
 	       begin:shifting_levels
 		  
 		  wire capture;
-		  assign capture = push && (level + 1 == insert_ptr + pop);
+		  assign capture = push && (level + 1 == insert_ptr_q + pop);
 		  
 		  wire shift;
 		  assign shift = pop;

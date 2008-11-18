@@ -40,17 +40,25 @@ module wf_alloc_core_rot
    
    wire [0:num_ports*num_ports-1] y;
    
-   wire [0:prio_width-1] 	  current_prio, early_prio, next_prio;
-   mod_ctr
-     #(.num_values(num_ports),
+   wire [0:prio_width-1] 	  prio_next, prio_q;
+   incr
+     #(.width(prio_width),
+       .min_value(0),
+       .max_value(num_ports-1))
+   prio_incr
+     (.data_in(prio_q),
+      .data_out(prio_next));
+   
+   wire [0:prio_width-1] 	  prio_s;
+   assign prio_s = update ? prio_next : prio_q;
+   dff
+     #(.width(prio_width),
        .reset_type(reset_type))
-   prio_ctr
+   prioq
      (.clk(clk),
       .reset(reset),
-      .incr(update),
-      .value(current_prio),
-      .early_value(early_prio),
-      .next_value(next_prio));
+      .d(prio_s),
+      .q(prio_q));
    
    generate
       
@@ -78,7 +86,7 @@ module wf_alloc_core_rot
 	     #(.width(num_ports),
 	       .rotate_dir(`ROTATE_DIR_LEFT))
 	   req_in_rot
-	     (.amount(current_prio),
+	     (.amount(prio_q),
 	      .data_in(req_tmp),
 	      .data_out(req_in));
 	   
@@ -104,7 +112,7 @@ module wf_alloc_core_rot
 	     #(.width(num_ports),
 	       .rotate_dir(`ROTATE_DIR_RIGHT))
 	   gnt_tmp_rot
-	     (.amount(current_prio),
+	     (.amount(prio_q),
 	      .data_in(gnt_out),
 	      .data_out(gnt_tmp));
 	   
