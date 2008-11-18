@@ -1,6 +1,7 @@
 // generic register file
 module regfile
-  (clk, write_enable, write_address, write_data, read_address, read_data);
+  (clk, write_enable, write_address, write_data, read_enable, read_address,
+   read_data);
    
    function integer clogb(input integer argument);
       integer i;
@@ -31,6 +32,9 @@ module regfile
    // data to be written
    input [0:width-1] write_data;
    
+   // if high, enable read for next cycle
+   input read_enable;
+   
    // entry to read out
    input [0:addr_width-1] read_address;
    
@@ -45,7 +49,8 @@ module regfile
      begin
 	if(write_enable)
 	  storage[write_address] <= write_data;
-	read_address_q <= read_address;
+	if(read_enable)
+	  read_address_q <= read_address;
      end
    
    assign read_data = storage[read_address_q];

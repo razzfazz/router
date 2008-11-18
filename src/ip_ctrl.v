@@ -416,7 +416,10 @@ module ip_ctrl
    
    wire 				    fbf_write_enable;
    assign fbf_write_enable = flit_valid_in;
-
+   
+   wire 				    fbf_read_enable;
+   assign fbf_read_enable = |flit_sent_ivc;
+   
    wire [0:fbf_data_width-1] 		    fbf_write_data, fbf_read_data;
    regfile
      #(.width(fbf_data_width),
@@ -426,6 +429,7 @@ module ip_ctrl
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
+      .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));
    
