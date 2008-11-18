@@ -336,11 +336,10 @@ module packet_source
    assign packet_sent = flit_count_zero & flit_sent;
    
    wire 			       flit_valid_s;
-   assign flit_valid_s = (packet_sent & ~ready_packet_count_zero) |
+   assign flit_valid_s = ~ready_packet_count_zero |
 			 (flit_valid_q & ~(flit_sent & flit_count_zero));
    dff
-     #(.width(1),
-       .reset_value(1'b1))
+     #(.width(1))
    flit_validq
      (.clk(clk),
       .reset(reset),
