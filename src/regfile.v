@@ -14,7 +14,7 @@ module regfile
       end
    endfunction
    
-   // number fo entries
+   // number of entries
    parameter depth = 8;
    
    // width of each entry
