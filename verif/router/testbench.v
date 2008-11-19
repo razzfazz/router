@@ -142,6 +142,12 @@ module testbench
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // select implementation variant for header FIFO
+   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // select method for credit checking
    // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
    parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
@@ -559,6 +565,8 @@ module testbench
        .checker_capture_mode(checker_capture_mode),
        .routing_function_type(routing_function_type),
        .credit_handling_type(credit_handling_type),
+       .header_fifo_type(header_fifo_type),
+       .fbf_regfile_type(fbf_regfile_type),
        .sw_spec_cred_check(sw_spec_cred_check),
        .vc_allocator_type(vc_allocator_type),
        .vc_arbiter_type(vc_arbiter_type),
