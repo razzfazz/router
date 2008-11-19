@@ -78,7 +78,7 @@ module regfile
 	     wire [0:depth*width-1] read_data_lvl;
 	     
 	     for(level = 0; level < depth; level = level + 1)
-	       begin:levels
+	       begin:mux_levels
 		  
 		  wire write;
 		  assign write = write_enable && (write_address == level);
@@ -106,7 +106,7 @@ module regfile
 	       read_enable_q <= read_enable;
 	     
 	     for(level = 0; level < depth; level = level + 1)
-	       begin:levels
+	       begin:tristate_levels
 		  
 		  wire write;
 		  assign write = write_enable && (write_address == level);
