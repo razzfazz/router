@@ -126,20 +126,16 @@ module fifo
 		  wire shift;
 		  assign shift = pop;
 		  
-		  wire [0:width-1] data_s, data_q;
+		  reg [0:width-1] data_q;
+		  wire [0:width-1] data_s;
 		  assign data_s = capture ?
 				  data_in :
 				  shift ?
 				  data[level*width:(level+1)*width-1] :
 				  data_q;
-		  dff
-		    #(.width(width),
-		      .reset_type(reset_type))
-		  dataq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(data_s),
-		     .q(data_q));
+		  
+		  always @(posedge clk)
+		    data_q <= data_s;
 		  
 		  assign data[(level+1)*width:(level+2)*width-1] = data_q;
 		  
@@ -193,36 +189,13 @@ module fifo
 		.full_early(full_early),
 		.error(error));
 	     
-	     wire [0:depth*width-1]  data;
+	     reg [0:width-1] 	     storage [0:depth-1];
 	     
-	     for(level = 0; level < depth; level = level + 1)
-	       begin:indexed_levels
-		  
-		  wire capture;
-		  assign capture = push && (level == write_ptr);
-
-		  wire [0:width-1] data_s, data_q;
-		  assign data_s = capture ? data_in : data_q;
-		  dff
-		    #(.width(width),
-		      .reset_type(reset_type))
-		  dataq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(data_s),
-		     .q(data_q));
-		  
-		  assign data[level*width:(level+1)*width-1] = data_q;
-		  
-	       end
+	     always @(posedge clk)
+	       if(push)
+		 storage[write_ptr] <= data_in;
 	     
-	     mux_nto1
-	       #(.num_ports(depth),
-		 .width(width))
-	     data_mux
-	       (.select(read_ptr),
-		.data_in(data),
-		.data_out(data_out));
+	     assign data_out = storage[read_ptr];
 	     
 	  end
       endcase
