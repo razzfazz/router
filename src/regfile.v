@@ -21,7 +21,7 @@ module regfile
    parameter width = 64;
    
    // select implementation variant
-   parameter regfile_type = `REGFILE_TYPE_FF_1D_MUX;
+   parameter regfile_type = `REGFILE_TYPE_FF_2D;
    
    // width required to swelect an entry
    localparam addr_width = clogb(depth);
