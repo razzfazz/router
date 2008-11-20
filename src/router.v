@@ -399,13 +399,14 @@ module router
    
    wire [0:num_ports*crossbar_width-1] 	xbr_data_out_op;
    crossbar
-     #(.num_ports(num_ports),
+     #(.num_in_ports(num_ports),
+       .num_out_ports(num_ports),
        .width(crossbar_width),
        .crossbar_type(crossbar_type))
    xbr_data
      (.ctrl_ip_op(xbr_ctrl_ip_op_q),
-      .data_ip(xbr_data_in_ip),
-      .data_op(xbr_data_out_op));
+      .data_in_ip(xbr_data_in_ip),
+      .data_out_op(xbr_data_out_op));
    
    
    //---------------------------------------------------------------------------
