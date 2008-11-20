@@ -1,3 +1,4 @@
+// $Id$
 module packet_source
   (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
    cred_vc, run, out_flits, error);

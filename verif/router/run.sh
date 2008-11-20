@@ -1,3 +1,4 @@
+# $Id$
 #!/bin/sh
 
 source ~/.profile

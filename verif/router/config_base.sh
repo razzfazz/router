@@ -1,3 +1,4 @@
+# $Id$
 tclk=2
 sim_cycles=10000
 warmup_cycles=100

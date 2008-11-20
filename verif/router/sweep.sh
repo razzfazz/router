@@ -1,3 +1,4 @@
+# $Id$
 #!/bin/sh
 
 for restrict in 0 1

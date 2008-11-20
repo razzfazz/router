@@ -1,3 +1,4 @@
+# $Id$
 #!/bin/sh
 
 basedir=${1}
