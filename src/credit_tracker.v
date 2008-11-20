@@ -1,3 +1,4 @@
+$Id$
 // module for tracking available credit in a buffer
 module credit_tracker
   (clk, reset, debit, credit, free, free_early, error);

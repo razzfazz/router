@@ -1,3 +1,4 @@
+$Id$
 // wavefron allocator variant implementing a Diagonal Propagation Arbiter as
 // described in Hurt et al, "Design and Implementation of High-Speed Symmetric 
 // Crossbar Schedulers"

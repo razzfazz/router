@@ -1,3 +1,4 @@
+$Id$
 // simple FIFO controller
 module fifo_ctrl
    (clk, reset, push, pop, write_addr, read_addr, empty, empty_early, full,

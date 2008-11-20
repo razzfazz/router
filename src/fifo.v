@@ -1,3 +1,4 @@
+$Id$
 // generic FIFO buffer built from registers
 module fifo
   (clk, reset, full, data_in, push, empty, data_out, pop, error);

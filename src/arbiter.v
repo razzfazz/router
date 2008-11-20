@@ -1,3 +1,4 @@
+$Id$
 // generic arbiter
 module arbiter
   (clk, reset, update, req, gnt);

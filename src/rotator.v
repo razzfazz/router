@@ -1,3 +1,4 @@
+$Id$
 // rotate bit vector by given amount
 module rotator
   (amount, data_in, data_out);

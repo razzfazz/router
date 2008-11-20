@@ -1,3 +1,4 @@
+$Id$
 // generic modulo decrementer (i.e., decrementer with wraparound)
 module decr
   (data_in, data_out);

@@ -1,3 +1,4 @@
+$Id$
 // wavefront allocator variant which rotates inputs and outputs based on 
 // priority
 module wf_alloc_core_rot

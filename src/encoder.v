@@ -1,3 +1,4 @@
+$Id$
 // encoder from one-hot to binary
 module encoder
   (data_in, data_out);

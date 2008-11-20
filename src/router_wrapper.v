@@ -1,3 +1,4 @@
+$Id$
 module router_wrapper
   (clk, reset, router_address, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
    flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,

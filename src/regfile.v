@@ -1,3 +1,4 @@
+$Id$
 // generic register file
 module regfile
   (clk, write_enable, write_address, write_data, read_enable, read_address,
