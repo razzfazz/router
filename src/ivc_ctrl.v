@@ -2,8 +2,8 @@ module ivc_ctrl
   (clk, reset, router_address, port_id, flit_valid_in, flit_head_in,
    flit_tail_in, route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op,
    vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec,
-   sw_gnt_spec, flit_sent, flit_vc_out, flit_tail_out, buff_write_addr,
-   buff_read_addr, error, events);
+   sw_gnt_spec, flit_sent, flit_vc_out, flit_tail_out, fbf_write_addr,
+   fbf_read_addr, error, events);
    
 `include "constants.v"
    
@@ -24,9 +24,6 @@ module ivc_ctrl
    // (note: this parameter is only used for CREDIT_HANDLING_TYPE_PUSH)
    localparam cred_hold_width = clogb(num_flit_buffers);
    
-   // width required to select a buffer
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
@@ -38,6 +35,12 @@ module ivc_ctrl
    
    // ID of current input VC
    parameter [0:vc_idx_width-1] vc_id = {vc_idx_width{1'b0}};
+   
+   // required address size for flit buffer
+   localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
+   
+   // index of leftmost entry in shared flit buffer
+   localparam fbf_min_addr = vc_id*num_flit_buffers;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -182,32 +185,32 @@ module ivc_ctrl
    wire 		   flit_tail_out;
    
    // write pointer for shared flit buffer
-   output [0:flit_buffer_idx_width-1] buff_write_addr;
-   wire [0:flit_buffer_idx_width-1] buff_write_addr;
+   output [0:fbf_addr_width-1] fbf_write_addr;
+   wire [0:fbf_addr_width-1] fbf_write_addr;
    
    // read pointer for shared flit buffer
-   output [0:flit_buffer_idx_width-1] buff_read_addr;
-   wire [0:flit_buffer_idx_width-1] buff_read_addr;
+   output [0:fbf_addr_width-1] fbf_read_addr;
+   wire [0:fbf_addr_width-1] fbf_read_addr;
    
    // internal error condition detected
    output error;
-   wire 			    error;
+   wire 		     error;
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
    output [0:5] events;
-   wire [0:5] 			    events;
+   wire [0:5] 		     events;
    
    
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire 			    vc_gnt;
+   wire 		     vc_gnt;
    assign vc_gnt = |vc_gnt_ovc;
    
-   wire 			    get_next_header;
-   wire 			    allocated_s, allocated_q;
+   wire 		     get_next_header;
+   wire 		     allocated_s, allocated_q;
    assign allocated_s = (allocated_q | vc_gnt) & ~get_next_header;
    dff
      #(.width(1),
@@ -218,10 +221,10 @@ module ivc_ctrl
       .d(allocated_s),
       .q(allocated_q));
    
-   wire 			    vc_allocated;
-   wire 			    sw_allocated;
-   wire 			    free_unallocated;
-   wire 			    free_allocated;
+   wire 		     vc_allocated;
+   wire 		     sw_allocated;
+   wire 		     free_unallocated;
+   wire 		     free_allocated;
    
    generate
       
@@ -293,9 +296,10 @@ module ivc_ctrl
 	     begin:idxs
 		
 		wire capture;
-		assign capture = flit_valid_in && (idx == buff_write_addr);
+		assign capture
+		  = flit_valid_in && (fbf_write_addr == (fbf_min_addr + idx));
 		
-		wire tail_s, tail_q;
+		/*wire tail_s, tail_q;
 		assign tail_s = capture ? flit_tail_in : tail_q;
 		dff
 		  #(.width(1),
@@ -304,22 +308,21 @@ module ivc_ctrl
 		  (.clk(clk),
 		   .reset(reset),
 		   .d(tail_s),
-		   .q(tail_q));
+		   .q(tail_q));*/
+		reg  tail_q;
+		always @(posedge clk)
+		  if(capture)
+		    tail_q <= flit_tail_in;
 		
-		assign tail_queue[idx] = tail_q;
+		assign tail_queue[idx]
+			 = tail_q && (fbf_read_addr == (fbf_min_addr + idx));
 		
 	     end
 	   
+	   assign flit_tail_out = |tail_queue;
+	   
 	   // overflow and underflow are already handled in fifo_ctrl
 	   assign tail_tracker_error = 1'b0;
-	   
-	   mux_nto1
-	     #(.num_ports(num_flit_buffers),
-	       .width(1))
-	   flit_tail_out_mux
-	     (.select(buff_read_addr),
-	      .data_in(tail_queue),
-	      .data_out(flit_tail_out));
 	   
 	   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
 	   
@@ -747,7 +750,9 @@ module ivc_ctrl
    wire 		       fbc_full;
    wire 		       fbc_full_early;
    fifo_ctrl
-     #(.depth(num_flit_buffers),
+     #(.addr_width(fbf_addr_width),
+       .offset(fbf_min_addr),
+       .depth(num_flit_buffers),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
        .reset_type(reset_type))
@@ -756,13 +761,14 @@ module ivc_ctrl
       .reset(reset),
       .push(fbc_push),
       .pop(fbc_pop),
-      .write_addr(buff_write_addr),
-      .read_addr(buff_read_addr),
+      .write_addr(fbf_write_addr),
+      .read_addr(fbf_read_addr),
       .empty(fbc_empty),
       .empty_early(fbc_empty_early),
       .full(fbc_full),
       .full_early(fbc_full_early),
       .error(fbc_error));
+   
    
    //---------------------------------------------------------------------------
    // error checking

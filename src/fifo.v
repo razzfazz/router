@@ -172,7 +172,9 @@ module fifo
 	     wire [0:rw_ptr_width-1] read_ptr, write_ptr;
 	     wire 		     empty_early, full_early;
 	     fifo_ctrl
-	       #(.depth(depth),
+	       #(.addr_width(rw_ptr_width),
+		 .offset(0),
+		 .depth(depth),
 		 .checker_enable(checker_enable),
 		 .checker_capture_mode(checker_capture_mode),
 		 .reset_type(reset_type))

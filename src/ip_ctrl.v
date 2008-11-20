@@ -21,9 +21,6 @@ module ip_ctrl
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
-   // width required to select a buffer
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
@@ -91,6 +88,17 @@ module ip_ctrl
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // number of entries in flit buffer
+   localparam fbf_depth = num_vcs*num_flit_buffers;
+   
+   // required address size for flit buffer
+   localparam fbf_addr_width = clogb(fbf_depth);
+   
+   // wdith of the flit buffer register file
+   localparam fbf_data_width = (num_header_buffers > 1) ?
+			       (1+data_width) :
+			       (2+data_width);
+   
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
@@ -111,17 +119,6 @@ module ip_ctrl
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
-   // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flit_buffers;
-   
-   // required address size for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
-   
-   // wdith of the flit buffer register file
-   localparam fbf_data_width = (num_header_buffers > 1) ?
-			       (1+data_width) :
-			       (2+data_width);
-   
    input clk;
    input reset;
    
@@ -237,13 +234,13 @@ module ip_ctrl
    wire [0:num_vcs-1] 		flit_sent_ivc;
    wire [0:num_vcs*vc_idx_width-1] flit_vc_ivc;
    wire [0:num_vcs-1] 		   flit_tail_ivc;
-   wire [0:num_vcs*flit_buffer_idx_width-1] buff_write_addr_ivc;
-   wire [0:num_vcs*flit_buffer_idx_width-1] buff_read_addr_ivc;
-   wire [0:num_vcs-1] 			    ivcc_error_ivc;
-   wire [0:num_vcs*6-1] 		    events_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] fbf_write_addr_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] fbf_read_addr_ivc;
+   wire [0:num_vcs-1] 		     ivcc_error_ivc;
+   wire [0:num_vcs*6-1] 	     events_ivc;
    generate
       
-      genvar 				    ivc;
+      genvar 			     ivc;
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
 	   
@@ -269,10 +266,10 @@ module ip_ctrl
 	   wire 		flit_sent;
 	   wire [0:vc_idx_width-1] flit_vc;
 	   wire 		   flit_tail;
-	   wire [0:flit_buffer_idx_width-1] buff_write_addr;
-	   wire [0:flit_buffer_idx_width-1] buff_read_addr;
-	   wire 			    ivcc_error;
-	   wire [0:5] 			    events;
+	   wire [0:fbf_addr_width-1] fbf_write_addr;
+	   wire [0:fbf_addr_width-1] fbf_read_addr;
+	   wire 		     ivcc_error;
+	   wire [0:5] 		     events;
 	   ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -315,8 +312,8 @@ module ip_ctrl
 	      .flit_sent(flit_sent),
 	      .flit_vc_out(flit_vc),
 	      .flit_tail_out(flit_tail),
-	      .buff_write_addr(buff_write_addr),
-	      .buff_read_addr(buff_read_addr),
+	      .fbf_write_addr(fbf_write_addr),
+	      .fbf_read_addr(fbf_read_addr),
 	      .error(ivcc_error),
 	      .events(events));
 	   
@@ -330,12 +327,12 @@ module ip_ctrl
 	   assign flit_vc_ivc[ivc*vc_idx_width:(ivc+1)*vc_idx_width-1]
 		    = flit_vc;
 	   assign flit_tail_ivc[ivc] = flit_tail;
-	   assign buff_write_addr_ivc[ivc*flit_buffer_idx_width:
-				      (ivc+1)*flit_buffer_idx_width-1]
-		    = buff_write_addr;
-	   assign buff_read_addr_ivc[ivc*flit_buffer_idx_width:
-				     (ivc+1)*flit_buffer_idx_width-1]
-		    = buff_read_addr;
+	   assign fbf_write_addr_ivc[ivc*fbf_addr_width:
+				     (ivc+1)*fbf_addr_width-1]
+		    = fbf_write_addr;
+	   assign fbf_read_addr_ivc[ivc*fbf_addr_width:
+				    (ivc+1)*fbf_addr_width-1]
+		    = fbf_read_addr;
 	   assign ivcc_error_ivc[ivc] = ivcc_error;
 	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
 	   
@@ -350,39 +347,23 @@ module ip_ctrl
    // address computation
    //---------------------------------------------------------------------------
    
-   wire [0:flit_buffer_idx_width-1] 	    buff_write_offset;
+   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
    mux_nto1
      #(.num_ports(num_vcs),
-       .width(flit_buffer_idx_width))
-   buff_write_offset_sel
+       .width(fbf_addr_width))
+   fbf_write_offset_sel
      (.select(flit_vc_in),
-      .data_in(buff_write_addr_ivc),
-      .data_out(buff_write_offset));
+      .data_in(fbf_write_addr_ivc),
+      .data_out(fbf_write_addr));
    
-   wire [0:flit_buffer_idx_width-1] 	    buff_read_offset;
+   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
    select_1ofn
      #(.num_ports(num_vcs),
-       .width(flit_buffer_idx_width))
-   buff_read_offset_sel
+       .width(fbf_addr_width))
+   fbf_read_offset_sel
      (.select(flit_sent_ivc),
-      .data_in(buff_read_addr_ivc),
-      .data_out(buff_read_offset));
-   
-   wire [0:vc_idx_width-1] 		    buff_write_base;
-   assign buff_write_base = flit_vc_in;
-   
-   wire [0:vc_idx_width-1] 		    buff_read_base;
-   encoder
-     #(.num_ports(num_vcs))
-   buff_read_base_enc
-     (.data_in(flit_sent_ivc),
-      .data_out(buff_read_base));
-   
-   wire [0:fbf_addr_width-1] 		    fbf_write_addr;
-   assign fbf_write_addr = {buff_write_base, buff_write_offset};
-   
-   wire [0:fbf_addr_width-1] 		    fbf_read_addr;
-   assign fbf_read_addr = {buff_read_base, buff_read_offset};
+      .data_in(fbf_read_addr_ivc),
+      .data_out(fbf_read_addr));
    
    
    //---------------------------------------------------------------------------
