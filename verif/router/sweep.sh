@@ -1,5 +1,5 @@
-# $Id$
 #!/bin/sh
+# $Id$
 
 for restrict in 0 1
 do

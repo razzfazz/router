@@ -1,5 +1,5 @@
-# $Id$
 #!/bin/sh
+# $Id$
 
 source ~/.profile
 
