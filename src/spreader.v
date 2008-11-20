@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // spread out bit vector into larger vector, zero-filling any intermediate bits
 module spreader
   (data_in, data_out);

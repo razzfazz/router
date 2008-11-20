@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // generic modulo incrementer (i.e., incrementer with wraparound)
 module incr
   (data_in, data_out);

@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // wavefront allocator variant which replicates the entire allocation logic for
 // the different priorities and selects the result from the appropriate one
 module wf_alloc_core_rep

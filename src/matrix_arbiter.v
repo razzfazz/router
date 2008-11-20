@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // generic matrix arbiter
 module matrix_arbiter
   (clk, reset, update, req, gnt);

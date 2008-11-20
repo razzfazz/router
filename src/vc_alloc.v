@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 module vc_alloc
   (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
    vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);

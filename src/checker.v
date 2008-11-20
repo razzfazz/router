@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // error checker module
 module checker
   (clk, reset, errors_in, errors_out);

@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // replicate each bit in a vector a number of times
 // (abc) --> (aaabbbccc)
 module replicator

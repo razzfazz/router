@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // n-input bitwise OR
 module or_nto1
   (data_in, data_out);

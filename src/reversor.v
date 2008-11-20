@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // module for reversing a set of bits
 module reversor
   (data_in, data_out);

@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // abstraction for routing logic
 module routing_logic
   (clk, reset, router_address, port_id, vc_id, route_info, next_port, next_vcs,

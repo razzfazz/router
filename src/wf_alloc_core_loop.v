@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // wavefron allocator variant which uses wraparound (forming a false 
 // combinational loop) as described in Dally et al, "Principles and Practices of
 // Interconnection Networks"

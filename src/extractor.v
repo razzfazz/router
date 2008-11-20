@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // module for extracting a set of bits from an input word (result is 
 // concatenation of these bits)
 module extractor

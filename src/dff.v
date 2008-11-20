@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // configurable register
 module dff
   (clk, reset, d, q);

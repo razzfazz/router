@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 module ip_ctrl
   (clk, reset, router_address, port_id, flit_valid_in, flit_vc_in, flit_head_in,
    flit_tail_in, flit_data_in, free_ivc_op, free_op_ovc, cred_op_ovc,

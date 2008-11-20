@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // generic round-robin arbiter
 module rr_arbiter
   (clk, reset, update, req, gnt);

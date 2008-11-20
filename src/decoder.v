@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // decoder from binary to one-hot
 module decoder
   (data_in, data_out);

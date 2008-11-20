@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // multi-operand adder
 module add_nto1
   (data_in, data_out);

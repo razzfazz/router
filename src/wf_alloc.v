@@ -1,4 +1,4 @@
-$Id$
+// $Id$
 // generic wavefront allocator
 module wf_alloc
   (clk, reset, update, req, gnt);
