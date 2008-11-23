@@ -166,10 +166,14 @@
 //------------------------------------------------------------------------------
 
 // separable, input-first
-`define VC_ALLOCATOR_TYPE_SEP_IF 0
+`define VC_ALLOCATOR_TYPE_SEP_IF  0
 
 // separable, output-first
-`define VC_ALLOCATOR_TYPE_SEP_OF 1
+`define VC_ALLOCATOR_TYPE_SEP_OF  1
+
+// wavefront-based
+// (note: add WF_ALLOCATOR_TYPE_* constant to select wavefront variant)
+`define VC_ALLOCATOR_TYPE_WF_BASE 2
 
 
 //------------------------------------------------------------------------------

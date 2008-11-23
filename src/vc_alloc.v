@@ -29,6 +29,10 @@ module vc_alloc
    // select implementation variant for VC allocator
    parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
+   // select implementation variant for wavefront allocator
+   // (note: only valid for VC_ALLOCATOR_TYPE_WF_BASE+x
+   localparam wf_allocator_type = vc_allocator_type-`VC_ALLOCATOR_TYPE_WF_BASE;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -91,6 +95,25 @@ module vc_alloc
 		.vc_gnt_op_ovc(vc_gnt_op_ovc));
 	  end
       endcase
+      
+      if(vc_allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE)
+	begin
+	   vc_alloc_core_wf
+	       #(.num_traffic_classes(num_traffic_classes),
+		 .num_routing_classes(num_routing_classes),
+		 .num_vcs_per_class(num_vcs_per_class),
+		 .num_ports(num_ports),
+		 .wf_allocator_type(wf_allocator_type),
+		 .reset_type(reset_type))
+	     core_wf
+	       (.clk(clk),
+		.reset(reset),
+		.vc_req_ip_ivc_op(vc_req_ip_ivc_op),
+		.vc_req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+		.elig_op_ovc(elig_op_ovc),
+		.vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
+		.vc_gnt_op_ovc(vc_gnt_op_ovc));
+	end
       
    endgenerate
    

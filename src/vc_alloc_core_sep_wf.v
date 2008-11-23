@@ -1,0 +1,153 @@
+// $Id: vc_alloc_core_sep_if.v 845 2008-11-20 01:11:38Z dub $
+module vc_alloc_core_sep_wf
+  (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
+   vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
+   
+`include "constants.v"
+   
+   // number of traffic classes (e.g. read, write)
+   parameter num_traffic_classes = 2;
+   
+   // number of routing classes (e.g. minimal, adaptive)
+   parameter num_routing_classes = 2;
+   
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
+   
+   // number of VCs
+   localparam num_vcs = num_classes * num_vcs_per_class;
+   
+   // number of input and output ports on switch
+   parameter num_ports = 5;
+   
+   // select which wavefront allocator variant to use
+   parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   input clk;
+   input reset;
+   
+   // request VC allocation for given port (for each input VC)
+   input [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
+   
+   // allowable VCs for VC allocation (for each input VC)
+   input [0:num_ports*num_vcs*num_vcs-1] vc_req_ip_ivc_ovc;
+   
+   // output VC is eligible for allocation (i.e., not currently allocated)
+   input [0:num_ports*num_vcs-1] elig_op_ovc;
+   
+   // granted output VC (to inpt controller)
+   output [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
+   wire [0:num_ports*num_vcs*num_vcs-1] vc_gnt_ip_ivc_ovc;
+   
+   // output VC was granted (to output controller)
+   output [0:num_ports*num_vcs-1] vc_gnt_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	vc_gnt_op_ovc;
+   
+   
+   //---------------------------------------------------------------------------
+   // global wires
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc;
+   
+   
+   //---------------------------------------------------------------------------
+   // generate request vector
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      genvar 					  ip;
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
+	   
+	   genvar ivc;
+	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	     begin:ivcs
+		
+		wire [0:num_ports-1] vc_req_op;
+		assign vc_req_op
+		  = vc_req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
+				     (ip*num_vcs+ivc+1)*num_ports-1];
+		
+		wire [0:num_vcs-1]   vc_req_ovc;
+		assign vc_req_ovc
+		  = vc_req_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
+				      (ip*num_vcs+ivc+1)*num_vcs-1];
+		
+		genvar op;
+		for(op = 0; op < num_ports; op = op + 1)
+		  begin:ops
+		     
+		     wire [0:num_vcs-1] 	     elig_ovc;
+		     assign elig_ovc = elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+		     
+		     wire 			     vc_req;
+		     assign vc_req = vc_req_op[op];
+		     
+		     wire [0:num_vcs-1] 	     req_ovc;
+		     assign req_ovc
+		       = {num_vcs{vc_req}} & vc_req_ovc & elig_ovc;
+		     
+		     assign req_ip_ivc_op_ovc[((ip*num_vcs+ivc)*num_ports+op)*
+					      num_vcs:
+					      ((ip*num_vcs+ivc)*num_ports+op+1)*
+					      num_vcs-1]
+			      = req_ovc;
+		     
+		  end
+		
+		wire [0:num_ports*num_vcs-1] 	     gnt_op_ovc;
+		assign gnt_op_ovc
+		  = gnt_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
+				      (ip*num_vcs+ivc+1)*num_ports*num_vcs-1];
+		
+		wire [0:num_vcs-1] 		     gnt_ovc;
+		or_nto1
+		  #(.num_ports(num_ports),
+		    .width(num_vcs))
+		gnt_ovc_or
+		  (.data_in(gnt_op_ovc),
+		   .data_out(gnt_ovc));
+
+		assign vc_gnt_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
+					 (ip*num_vcs+ivc+1)*num_vcs-1]
+			 = gnt_ovc;
+		
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   wire 					     update_alloc;
+   assign update_alloc = |vc_req_ip_ivc_op;
+   
+   wf_alloc
+     #(.num_ports(num_ports*num_vcs),
+       .wf_allocator_type(wf_allocator_type),
+       .reset_type(reset_type))
+   gnt_ip_ivc_op_ovc_alloc
+     (.clk(clk),
+      .reset(reset),
+      .update(update_alloc),
+      .req(req_ip_ivc_op_ovc),
+      .gnt(gnt_ip_ivc_op_ovc));
+   
+   wire [0:num_ports*num_vcs-1] 		     gnt_op_ovc;
+   or_nto1
+     #(.num_ports(num_ports*num_vcs),
+       .width(num_ports*num_vcs))
+   gnt_op_ovc_or
+     (.data_in(gnt_ip_ivc_op_ovc),
+      .data_out(gnt_op_ovc));
+   
+   assign vc_gnt_op_ovc = gnt_op_ovc;
+   
+endmodule
