@@ -244,7 +244,9 @@ module op_ctrl
 	   assign error_hct_ovc[ovc] = error_hct;
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
-	   assign cred_count_s = cred_count_q + credit - debit;
+	   assign cred_count_s = (cred_valid_in | flit_valid_in) ?
+				 (cred_count_q + credit - debit) :
+				 cred_count_q;
 	   dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
@@ -267,11 +269,13 @@ module op_ctrl
 	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  wire [0:cred_level_width-1] free_s, free_q;
-		  assign free_s = (cred_count_s > max_cred_level) ?
-				  max_cred_level :
-				  cred_count_s[cred_count_width-
-					       cred_level_width:
-					       cred_count_width-1];
+		  assign free_s = (cred_valid_in | flit_valid_in) ?
+				  ((cred_count_s > max_cred_level) ?
+				   max_cred_level :
+				   cred_count_s[cred_count_width-
+						cred_level_width:
+						cred_count_width-1]) :
+				  free_q;
 		  dff
 		    #(.width(cred_level_width),
 		      .reset_type(reset_type),
@@ -334,9 +338,9 @@ module op_ctrl
 		  assign cred_hold_s
 		    = reset_allocated ?
 		      cred_hold_copy :
-		      (vc_gnt | allocated_q) ?
-		      (cred_hold_q - (|cred_hold_q & ~credit)) :
-		      cred_hold_q;
+		      ((vc_gnt | allocated_q) ?
+		       (cred_hold_q - (|cred_hold_q & ~credit)) :
+		       cred_hold_q);
 		  dff
 		    #(.width(cred_hold_width),
 		      .reset_type(reset_type),

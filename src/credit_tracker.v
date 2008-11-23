@@ -105,7 +105,9 @@ module credit_tracker
 	   
 	   wire [0:credit_idx_width-1] cred_count_s;
 	   assign cred_count_s
-	     = (cred_count_q - decr_count) + incr_count;
+	     = (incr | decr) ?
+	       ((cred_count_q - decr_count) + incr_count) :
+	       cred_count_q;
 	   dff
 	     #(.width(credit_idx_width),
 	       .reset_type(reset_type),
