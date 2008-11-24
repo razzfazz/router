@@ -42,7 +42,7 @@ module ivc_ctrl
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
    
    // index of leftmost entry in shared flit buffer
-   localparam fbf_min_addr = vc_id*num_flit_buffers;
+   localparam fbf_min_addr = vc_id * num_flit_buffers;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
