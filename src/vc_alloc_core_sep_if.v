@@ -235,9 +235,6 @@ module vc_alloc_core_sep_if
 		wire [0:num_ports-1] 	     gnt_out_ip;
 		wire [0:num_ports*num_vcs-1] gnt_out_ip_ivc;
 		
-		wire 			     elig;
-		assign elig = elig_op_ovc[op*num_vcs+ovc];
-		
 		wire [0:num_ports-1] 	     update_arb_ip;
 		assign update_arb_ip = gnt_out_ip;
 		
