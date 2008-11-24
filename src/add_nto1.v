@@ -1,5 +1,5 @@
 // $Id$
-// multi-operand adder
+// generic n-input adder
 module add_nto1
   (data_in, data_out);
    

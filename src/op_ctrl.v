@@ -1,4 +1,5 @@
 // $Id$
+// output port controller (tracks state of buffers in downstream router)
 module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
    flit_tail_in, elig_ovc, free_ovc, free_ivc, cred_ovc, error);

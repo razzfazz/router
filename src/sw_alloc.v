@@ -1,4 +1,5 @@
 // $Id$
+// switch allocator
 module sw_alloc
   (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op,
    sw_gnt_nonspec_ip_ivc, sw_gnt_spec_ip_ivc, sw_gnt_ip_op);

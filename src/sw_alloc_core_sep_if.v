@@ -1,4 +1,5 @@
 // $Id$
+// switch allocator variant usign separable input-first allocation
 module sw_alloc_core_sep_if
   (clk, reset, sw_req_nonspec_ip_ivc_op, sw_req_spec_ip_ivc_op,
    sw_gnt_nonspec_ip_ivc, sw_gnt_spec_ip_ivc, sw_gnt_ip_op);

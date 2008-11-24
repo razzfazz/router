@@ -1,5 +1,5 @@
 // $Id$
-// generic multiplexer
+// generic n-input multiplexer
 module mux_nto1
   (select, data_in, data_out);
    

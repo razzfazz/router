@@ -1,4 +1,5 @@
 // $Id$
+// input VC controller
 module ivc_ctrl
   (clk, reset, router_address, port_id, flit_valid_in, flit_head_in,
    flit_tail_in, route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op,

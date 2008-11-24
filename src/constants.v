@@ -1,4 +1,6 @@
 // $Id$
+// global constant definitions
+
 `ifndef _CONSTANTS_V_
 `define _CONSTANTS_V_
 

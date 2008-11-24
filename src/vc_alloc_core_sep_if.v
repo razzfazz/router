@@ -1,4 +1,5 @@
 // $Id$
+// VC allocator variant using separable input-first allocation
 module vc_alloc_core_sep_if
   (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
    vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);

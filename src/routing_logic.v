@@ -1,5 +1,6 @@
 // $Id$
-// abstraction for routing logic
+// module to determine the output port and VC based on routing information 
+// (e.g. destination address) and the current input port and VC)
 module routing_logic
   (clk, reset, router_address, port_id, vc_id, route_info, next_port, next_vcs,
    error);
