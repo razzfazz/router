@@ -1,6 +1,6 @@
 // $Id: vc_alloc_core_sep_if.v 845 2008-11-20 01:11:38Z dub $
 // VC allocator variant based using wavefront allocation
-module vc_alloc_core_sep_wf
+module vc_alloc_core_wf
   (clk, reset, vc_req_ip_ivc_op, vc_req_ip_ivc_ovc, elig_op_ovc,
    vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc);
    
