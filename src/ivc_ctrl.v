@@ -292,36 +292,38 @@ module ivc_ctrl
 	   // know when to get the next header data from header FIFO
 	   wire [0:num_flit_buffers-1] tail_queue;
 	   
+	   wire [0:num_flit_buffers-1] write_sel;
+	   wire [0:num_flit_buffers-1] read_sel;
+	   
 	   genvar 		       idx;
 	   
 	   for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
 	     begin:idxs
 		
-		wire capture;
-		assign capture
-		  = flit_valid_in && (fbf_write_addr == (fbf_min_addr + idx));
+		assign write_sel[idx]
+			 = (fbf_write_addr == (fbf_min_addr + idx));
+		assign read_sel[idx]
+			 = (fbf_read_addr == (fbf_min_addr + idx));
 		
-		/*wire tail_s, tail_q;
-		assign tail_s = capture ? flit_tail_in : tail_q;
-		dff
-		  #(.width(1),
-		    .reset_type(reset_type))
-		tailq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(tail_s),
-		   .q(tail_q));*/
+		wire capture;
+		assign capture = flit_valid_in && write_sel[idx];
+		
 		reg  tail_q;
 		always @(posedge clk)
 		  if(capture)
 		    tail_q <= flit_tail_in;
 		
-		assign tail_queue[idx]
-			 = tail_q && (fbf_read_addr == (fbf_min_addr + idx));
+		assign tail_queue[idx] = tail_q;
 		
 	     end
 	   
-	   assign flit_tail_out = |tail_queue;
+	   select_1ofn
+	     #(.num_ports(num_flit_buffers),
+	       .width(1))
+	   flit_tail_out_sel
+	     (.select(read_sel),
+	      .data_in(tail_queue),
+	      .data_out(flit_tail_out));
 	   
 	   // overflow and underflow are already handled in fifo_ctrl
 	   assign tail_tracker_error = 1'b0;
