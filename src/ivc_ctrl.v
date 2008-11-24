@@ -306,7 +306,7 @@ module ivc_ctrl
 			 = (fbf_read_addr == (fbf_min_addr + idx));
 		
 		wire capture;
-		assign capture = flit_valid_in && write_sel[idx];
+		assign capture = flit_valid_in & write_sel[idx];
 		
 		reg  tail_q;
 		always @(posedge clk)
