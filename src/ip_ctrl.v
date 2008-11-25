@@ -1,7 +1,7 @@
 // $Id$
 // input port controller
 module ip_ctrl
-  (clk, reset, router_address, port_id, flit_valid_in, flit_vc_in, flit_head_in,
+  (clk, reset, router_address, flit_valid_in, flit_vc_in, flit_head_in,
    flit_tail_in, flit_data_in, free_ivc_op, free_op_ovc, cred_op_ovc,
    vc_req_ivc_op, vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op,
    sw_req_spec_ivc_op, sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out,
@@ -46,9 +46,6 @@ module ip_ctrl
    
    // number of input and output ports on router
    parameter num_ports = 5;
-   
-   // width required to select individual port
-   localparam port_idx_width = clogb(num_ports);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -122,6 +119,9 @@ module ip_ctrl
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
+   // ID of current input port
+   parameter port_id = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
       
    input clk;
@@ -129,9 +129,6 @@ module ip_ctrl
    
    // current router's address
    input [0:router_addr_width-1] router_address;
-   
-   // ID of current input port
-   input [0:port_idx_width-1] port_id;
    
    // valid flit data available
    input flit_valid_in;
@@ -281,7 +278,6 @@ module ip_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_vcs(num_vcs),
-	       .vc_id(ivc),
 	       .num_traffic_classes(num_traffic_classes),
 	       .num_routing_classes(num_routing_classes),
 	       .num_ports(num_ports),
@@ -296,12 +292,13 @@ module ip_ctrl
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
+	       .port_id(port_id),
+	       .vc_id(ivc),
 	       .reset_type(reset_type))
 	   ivcc
 	     (.clk(clk),
 	      .reset(reset),
 	      .router_address(router_address),
-	      .port_id(port_id),
 	      .flit_valid_in(flit_valid),
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),

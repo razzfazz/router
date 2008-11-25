@@ -1,7 +1,7 @@
 // $Id$
 // input VC controller
 module ivc_ctrl
-  (clk, reset, router_address, port_id, flit_valid_in, flit_head_in,
+  (clk, reset, router_address, flit_valid_in, flit_head_in,
    flit_tail_in, route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op,
    vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec,
    sw_gnt_spec, flit_sent, flit_vc_out, flit_tail_out, fbf_write_addr,
@@ -35,15 +35,6 @@ module ivc_ctrl
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
-   // ID of current input VC
-   parameter [0:vc_idx_width-1] vc_id = {vc_idx_width{1'b0}};
-   
-   // required address size for flit buffer
-   localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
-   
-   // index of leftmost entry in shared flit buffer
-   localparam fbf_min_addr = vc_id * num_flit_buffers;
-   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
@@ -52,9 +43,6 @@ module ivc_ctrl
    
    // number of input and output ports on router
    parameter num_ports = 5;
-   
-   // width required to select individual port
-   localparam port_idx_width = clogb(num_ports);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -108,6 +96,18 @@ module ivc_ctrl
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
+   // ID of current input port
+   parameter port_id = 0;
+   
+   // ID of current input VC
+   parameter vc_id = 0;
+   
+   // required address size for flit buffer
+   localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
+   
+   // index of leftmost entry in shared flit buffer
+   localparam fbf_min_addr = vc_id * num_flit_buffers;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -115,9 +115,6 @@ module ivc_ctrl
    
    // current router's address
    input [0:router_addr_width-1] router_address;
-   
-   // ID of current input port
-   input [0:port_idx_width-1] port_id;
    
    // valid flit data available
    input flit_valid_in;
@@ -440,14 +437,14 @@ module ivc_ctrl
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .routing_function_type(routing_function_type),
+       .port_id(port_id),
+       .vc_id(vc_id),
        .reset_type(reset_type))
    rtl
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
       .route_info(next_route_info),
-      .port_id(port_id),
-      .vc_id(vc_id),
       .next_port(rtl_next_port),
       .next_vcs(rtl_next_vcs),
       .error(rtl_error_unmasked));

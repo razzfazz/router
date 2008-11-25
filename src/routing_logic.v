@@ -2,8 +2,7 @@
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module routing_logic
-  (clk, reset, router_address, port_id, vc_id, route_info, next_port, next_vcs,
-   error);
+  (clk, reset, router_address, route_info, next_port, next_vcs, error);
    
 `include "constants.v"
    
@@ -38,9 +37,6 @@ module routing_logic
    // number of input and output ports on router
    parameter num_ports = 5;
    
-   // width required to select individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -72,6 +68,12 @@ module routing_logic
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
    
+   // ID of current port
+   parameter port_id = 0;
+   
+   // ID of current VC
+   parameter vc_id = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -79,12 +81,6 @@ module routing_logic
    
    // current router's address
    input [0:router_addr_width-1] router_address;
-   
-   // ID of current port
-   input [0:port_idx_width-1] port_id;
-   
-   // ID of current VC
-   input [0:vc_idx_width-1] vc_id;
    
    // routing data
    input [0:route_info_width-1] route_info;
@@ -127,7 +123,7 @@ module routing_logic
    // function to extract traffic class from VC index
    // (this implementation handles the case where we have only a single traffic
    // class correctly)
-   function integer get_traffic_class(input [0:vc_idx_width-1] vc);
+   function integer get_traffic_class(input integer vc);
       begin
 	 get_traffic_class
 	   = (vc >> (clogb(num_routing_classes) + clogb(num_vcs_per_class))) %
@@ -138,7 +134,7 @@ module routing_logic
    // function to extract routing class from VC index
    // (this implementation handles the case where we have only a single routing
    // class correctly)
-   function integer get_routing_class(input [0:vc_idx_width-1] vc);
+   function integer get_routing_class(input integer vc);
       begin
 	 get_routing_class
 	   = (vc >> clogb(num_vcs_per_class)) % num_routing_classes;
@@ -148,6 +144,7 @@ module routing_logic
    generate
       
       genvar 		     ovc;
+      
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
@@ -161,6 +158,7 @@ module routing_logic
 	end
       
       genvar 		     dim;
+      
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
 	   
@@ -173,6 +171,7 @@ module routing_logic
 						  (dim+1)*dim_addr_width-1]);
 	   
 	   wire 		     route_here;
+	   
 	   if(dim == 0)
 	     assign route_here
 	       = ~dim_addr_match[dim];
@@ -249,6 +248,7 @@ module routing_logic
 	assign next_port_int[num_ports-1] = &dim_addr_match;
       
       genvar 		   op;
+      
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   

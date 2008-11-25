@@ -319,9 +319,6 @@ module testbench
 		   .out_flits(ps_out_flits),
 		   .error(ps_error));
 		
-		wire [0:port_idx_width-1]     port_id;
-		assign port_id = ip;
-		
 		assign flit_valid_in_ip[ip] = flit_valid;
 		assign flit_vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]
 			 = flit_vc;
@@ -337,42 +334,71 @@ module testbench
 		wire [0:route_info_width-1]   route_info;
 		assign route_info = head_info[0:route_info_width-1];
 		
-		wire [0:num_ports-1] 	      next_port;
-		wire [0:num_vcs-1] 	      next_vcs;
-		wire 			      rtl_error_unmasked;
-		routing_logic
-		  #(.num_vcs(num_vcs),
-		    .num_traffic_classes(num_traffic_classes),
-		    .num_routing_classes(num_routing_classes),
-		    .num_ports(num_ports),
-		    .num_dimensions(num_dimensions),
-		    .num_routers_per_dim(num_routers_per_dim),
-		    .num_neighbors_per_dim(num_neighbors_per_dim),
-		    .routing_function_type(routing_function_type))
-		rtl
-		  (.clk(clk),
-		   .reset(reset),
-		   .router_address(router_address),
-		   .port_id(port_id),
-		   .vc_id(flit_vc),
-		   .route_info(route_info),
-		   .next_port(next_port),
-		   .next_vcs(next_vcs),
-		   .error(rtl_error_unmasked));
+		wire [0:num_vcs*num_ports-1]  next_port_ivc;
+		wire [0:num_vcs*num_vcs-1]    next_vcs_ivc;
+		wire [0:num_vcs-1] 	      rtl_error_ivc;
+
+		genvar 			      ivc;
+
+		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+		  begin:ivs
+
+		     wire [0:num_ports-1]  next_port;
+		     wire [0:num_vcs-1]    next_vcs;
+		     wire 		   rtl_error_unmasked;
+		     
+		     routing_logic
+		       #(.num_vcs(num_vcs),
+			 .num_traffic_classes(num_traffic_classes),
+			 .num_routing_classes(num_routing_classes),
+			 .num_ports(num_ports),
+			 .num_dimensions(num_dimensions),
+			 .num_routers_per_dim(num_routers_per_dim),
+			 .num_neighbors_per_dim(num_neighbors_per_dim),
+			 .routing_function_type(routing_function_type),
+			 .port_id(ip),
+			 .vc_id(ivc))
+		     rtl
+		       (.clk(clk),
+			.reset(reset),
+			.router_address(router_address),
+			.route_info(route_info),
+			.next_port(next_port),
+			.next_vcs(next_vcs),
+			.error(rtl_error_unmasked));
+		     
+		     assign next_port_ivc[ivc*num_ports:(ivc+1)*num_ports-1]
+			      = next_port;
+		     assign next_vcs_ivc[ivc*num_vcs:(ivc+1)*num_vcs-1]
+			      = next_vcs;
+		     
+		     wire 		   rtl_error;
+		     assign rtl_error
+		       = rtl_error_unmasked & flit_valid &  flit_head;
+		     
+		     assign rtl_error_ivc[ivc] = rtl_error;
+		     
+		  end
 		
-		wire [0:port_idx_width-1]     next_port_enc;
+		wire [0:num_ports-1] 	   next_port;
+		mux_nto1
+		  #(.num_ports(num_vcs),
+		    .width(num_ports))
+		next_port_mux
+		  (.select(flit_vc),
+		   .data_in(next_port_ivc),
+		   .data_out(next_port));
+		
+		wire [0:port_idx_width-1]  next_port_enc;
 		encoder
 		  #(.num_ports(num_ports))
 		next_port_enc_enc
 		  (.data_in(next_port),
 		   .data_out(next_port_enc));
 		
-		wire 			      rtl_error;
-		assign rtl_error = rtl_error_unmasked & flit_valid &  flit_head;
+		assign rtl_error_ip[ip] = |rtl_error_ivc;
 		
-		assign rtl_error_ip[ip] = rtl_error;
-		
-		wire [0:port_idx_width-1]     dest_port_s, dest_port_q;
+		wire [0:port_idx_width-1]  dest_port_s, dest_port_q;
 		assign dest_port_s = flit_valid ?
 				     ((flit_head ?
 				       next_port_enc :
@@ -391,6 +417,15 @@ module testbench
 		assign dest_port = (flit_valid & flit_head) ?
 				   next_port_enc :
 				   dest_port_q;
+
+		wire [0:num_vcs-1] 	      next_vcs;
+		mux_nto1
+		  #(.num_ports(num_vcs),
+		    .width(num_vcs))
+		next_vcs_mux
+		  (.select(flit_vc),
+		   .data_in(next_vcs_ivc),
+		   .data_out(next_vcs));
 		
 		wire [0:num_vcs-1] 	      dest_vcs_s, dest_vcs_q;
 		assign dest_vcs_s = flit_valid ?

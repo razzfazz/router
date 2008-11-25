@@ -45,9 +45,6 @@ module router
    // number of input and output ports on router
    parameter num_ports = 5;
    
-   // width required to select individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -222,9 +219,6 @@ module router
 	   // input controller
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:port_idx_width-1] port_id;
-	   assign port_id = ip;
-	   
 	   wire flit_valid_in;
 	   assign flit_valid_in = flit_valid_in_ip[ip];
 	   
@@ -287,12 +281,12 @@ module router
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
+	       .port_id(ip),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),
 	      .reset(reset),
 	      .router_address(router_address),
-	      .port_id(port_id),
 	      .flit_valid_in(flit_valid_in),
 	      .flit_vc_in(flit_vc_in),
 	      .flit_head_in(flit_head_in),
