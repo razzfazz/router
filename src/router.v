@@ -106,11 +106,17 @@ module router
    
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
-   // select crossbar implementation variant
-   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
+   // select implementation variant for control crossbar
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
    
-   // width of each crossbar port
-   localparam crossbar_width = 1 + vc_idx_width + 2 + data_width;
+   // select implementation variant for data crossbar
+   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
+   
+   // width of each crossbar port for control crossbar
+   localparam xbc_width = 1 + 2 + vc_idx_width;
+   
+   // width of each crossbar port for data crossbar
+   localparam xbd_width = data_width;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -204,9 +210,10 @@ module router
    wire [0:num_ports*num_vcs-1] 	  sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
    
-   wire [0:num_ports*crossbar_width-1] 	  xbr_data_in_ip;
+   wire [0:num_ports*xbc_width-1] xbc_data_in_ip;
+   wire [0:num_ports*xbd_width-1] xbd_data_in_ip;
    
-   wire [0:num_ports-1] 		  ipc_error_ip;
+   wire [0:num_ports-1] 		   ipc_error_ip;
    
    generate
       
@@ -321,9 +328,13 @@ module router
 	   assign sw_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
 					(ip+1)*num_vcs*num_ports-1]
 		    = sw_req_spec_ivc_op;
-	   assign xbr_data_in_ip[ip*crossbar_width:(ip+1)*crossbar_width-1]
-		    = {flit_valid_out, flit_vc_out, flit_head_out,
-		       flit_tail_out, flit_data_out};
+	   assign xbc_data_in_ip[ip*xbc_width:
+				 (ip+1)*xbc_width-1]
+		    = {flit_valid_out, flit_head_out, flit_tail_out,
+		       flit_vc_out};
+	   assign xbd_data_in_ip[ip*xbd_width:
+				 (ip+1)*xbd_width-1]
+		    = flit_data_out;
 	   assign cred_valid_out_ip[ip] = cred_valid_out;
 	   assign cred_vc_out_ip[ip*vc_idx_width:
 				 (ip+1)*vc_idx_width-1] = cred_vc_out;
@@ -392,51 +403,66 @@ module router
       .d(xbr_ctrl_ip_op_s),
       .q(xbr_ctrl_ip_op_q));
    
-   wire [0:num_ports*crossbar_width-1] 	xbr_data_out_op;
+   wire [0:num_ports*xbc_width-1] xbc_data_out_op;
    crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
-       .width(crossbar_width),
-       .crossbar_type(crossbar_type))
-   xbr_data
+       .width(xbc_width),
+       .crossbar_type(xbc_crossbar_type))
+   xbc
      (.ctrl_ip_op(xbr_ctrl_ip_op_q),
-      .data_in_ip(xbr_data_in_ip),
-      .data_out_op(xbr_data_out_op));
+      .data_in_ip(xbc_data_in_ip),
+      .data_out_op(xbc_data_out_op));
+   
+   wire [0:num_ports*xbd_width-1] xbd_data_out_op;
+   crossbar
+     #(.num_in_ports(num_ports),
+       .num_out_ports(num_ports),
+       .width(xbd_width),
+       .crossbar_type(xbd_crossbar_type))
+   xbd
+     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
+      .data_in_ip(xbd_data_in_ip),
+      .data_out_op(xbd_data_out_op));
    
    
    //---------------------------------------------------------------------------
    // output ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 	free_op_ivc;
+   wire [0:num_ports*num_vcs-1]   free_op_ivc;
    
-   wire [0:num_ports-1] 		opc_error_op;
+   wire [0:num_ports-1] 	  opc_error_op;
    
    generate
       
       genvar 			  op;
+      
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire [0:crossbar_width-1] xbr_data_out;
-	   assign xbr_data_out = xbr_data_out_op[op*crossbar_width:
-						 (op+1)*crossbar_width-1];
+	   wire [0:xbc_width-1] xbc_data_out;
+	   assign xbc_data_out
+	     = xbc_data_out_op[op*xbc_width:(op+1)*xbc_width-1];
 	   
-	   wire 		     flit_valid;
-	   assign flit_valid = xbr_data_out[0];
+	   wire 		flit_valid;
+	   assign flit_valid = xbc_data_out[0];
 	   
-	   wire [0:vc_idx_width-1]   flit_vc;
-	   assign flit_vc = xbr_data_out[1:vc_idx_width];
+	   wire 		flit_head;
+	   assign flit_head = xbc_data_out[1];
 	   
-	   wire 		     flit_head;
-	   assign flit_head = xbr_data_out[vc_idx_width+1];
+	   wire 		flit_tail;
+	   assign flit_tail = xbc_data_out[2];
 	   
-	   wire 		     flit_tail;
-	   assign flit_tail = xbr_data_out[vc_idx_width+2];
+	   wire [0:vc_idx_width-1] flit_vc;
+	   assign flit_vc = xbc_data_out[3:3+vc_idx_width-1];
+	   
+	   wire [0:data_width-1]   xbd_data_out;
+	   assign xbd_data_out
+	     = xbd_data_out_op[op*data_width:(op+1)*data_width-1];
 	   
 	   wire [0:data_width-1]     flit_data;
-	   assign flit_data = xbr_data_out[(vc_idx_width+3):
-					   (vc_idx_width+3+data_width)-1];
+	   assign flit_data = xbd_data_out;
 	   
 	   wire 		     cred_valid_in;
 	   assign cred_valid_in = cred_valid_in_op[op];

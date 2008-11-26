@@ -1,10 +1,10 @@
 // $Id$
 // input VC controller
 module ivc_ctrl
-  (clk, reset, router_address, flit_valid_in, flit_head_in,
-   flit_tail_in, route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op,
-   vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec,
-   sw_gnt_spec, flit_sent, flit_vc_out, flit_tail_out, fbf_write_addr,
+  (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
+   route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, 
+   vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
+   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, fbf_write_addr, 
    fbf_read_addr, error, events);
    
 `include "constants.v"
@@ -169,19 +169,24 @@ module ivc_ctrl
    // speculative switch allocator grants
    input sw_gnt_spec;
    
-   // outgoing flit indicator
-   output flit_sent;
-   wire 		flit_sent;
+   // outgoing flit valid
+   output flit_valid_out;
+   wire 		flit_valid_out;
    
-   // destination VC for outgoing flit
-   // (note: only valid if flit_sent=1)
-   output [0:vc_idx_width-1] flit_vc_out;
-   wire [0:vc_idx_width-1] flit_vc_out;
+   // outgoing flit is head
+   // (note: only valid if flit_valid_out=1)
+   output flit_head_out;
+   wire 		flit_head_out;
    
    // outgoing flit is tail
-   // (note: only valid if flit_sent=1 and num_header_buffers>1)
+   // (note: only valid if flit_valid_out=1)
    output flit_tail_out;
-   wire 		   flit_tail_out;
+   wire 		flit_tail_out;
+   
+   // destination VC for outgoing flit
+   // (note: only valid if flit_valid_out=1)
+   output [0:vc_idx_width-1] flit_vc_out;
+   wire [0:vc_idx_width-1] flit_vc_out;
    
    // write pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbf_write_addr;
@@ -270,23 +275,20 @@ module ivc_ctrl
    
    wire 		       valid_q;
    
-   assign flit_sent = valid_q & all_allocated;
+   assign flit_valid_out = valid_q & all_allocated;
    
    
    //---------------------------------------------------------------------------
    // keep track of when to get next header
    //---------------------------------------------------------------------------
    
-   wire 		       fbc_empty_early;
-   wire 		       tail_tracker_error;
-   
    generate
       
       if(num_header_buffers > 1)
 	begin
 	   
-	   // keep track of location(s) of all tail flits in flit buffer so we
-	   // know when to get the next header data from header FIFO
+	   // keep track of location(s) of head and tail flits in flit buffer
+	   wire [0:num_flit_buffers-1] head_queue;
 	   wire [0:num_flit_buffers-1] tail_queue;
 	   
 	   wire [0:num_flit_buffers-1] write_sel;
@@ -305,14 +307,26 @@ module ivc_ctrl
 		wire capture;
 		assign capture = flit_valid_in & write_sel[idx];
 		
-		reg  tail_q;
+		reg  head_q, tail_q;
 		always @(posedge clk)
 		  if(capture)
-		    tail_q <= flit_tail_in;
+		    begin
+		       head_q <= flit_head_in;
+		       tail_q <= flit_tail_in;
+		    end
 		
+		assign head_queue[idx] = head_q;
 		assign tail_queue[idx] = tail_q;
 		
 	     end
+	   
+	   select_1ofn
+	     #(.num_ports(num_flit_buffers),
+	       .width(1))
+	   flit_head_out_sel
+	     (.select(read_sel),
+	      .data_in(head_queue),
+	      .data_out(flit_head_out));
 	   
 	   select_1ofn
 	     #(.num_ports(num_flit_buffers),
@@ -322,44 +336,71 @@ module ivc_ctrl
 	      .data_in(tail_queue),
 	      .data_out(flit_tail_out));
 	   
-	   // overflow and underflow are already handled in fifo_ctrl
-	   assign tail_tracker_error = 1'b0;
-	   
-	   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
-	   
 	end
       else
 	begin
 	   
-	   // after we've seen a tail flit coming in, we need to wait for the
-	   // whole flit buffer to drain before we accept the next heeader
-	   wire wait_vc_empty_s, wait_vc_empty_q;
-	   assign wait_vc_empty_s
-	     = (wait_vc_empty_q | (flit_valid_in & flit_tail_in)) &
-	       ~fbc_empty_early;
+	   wire head_in;
+	   assign head_in = flit_valid_in & flit_head_in;
+	   
+	   wire [0:fbf_addr_width-1] head_idx_s, head_idx_q;
+	   assign head_idx_s = head_in ? fbf_write_addr : head_idx_q;
+	   dff
+	     #(.width(fbf_addr_width),
+	       .reset_type(reset_type))
+	   head_idxq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(head_idx_s),
+	      .q(head_idx_q));
+	   
+	   wire 		     head_valid_s, head_valid_q;
+	   assign head_valid_s
+	     = (head_valid_q & ~(all_allocated & flit_head_out)) | head_in;
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
-	   wait_vc_emptyq
+	   head_validq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(wait_vc_empty_s),
-	      .q(wait_vc_empty_q));
+	      .d(head_valid_s),
+	      .q(head_valid_q));
 	   
-	   // we should not see new flits come in until the VC has been fully
-	   // drained after the last packet
-	   assign tail_tracker_error = wait_vc_empty_q & flit_valid_in;
+	   assign flit_head_out = head_valid_q && (fbf_read_addr == head_idx_q);
 	   
-	   assign flit_tail_out = 1'b0;
+	   wire 		     tail_in;
+	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
-	   // start accepting new packets once VC buffer is fully drained after
-	   // last one
-	   assign get_next_header
-	     = ~valid_q | (wait_vc_empty_q & fbc_empty_early);
+	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
+	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
+	   dff
+	     #(.width(fbf_addr_width),
+	       .reset_type(reset_type))
+	   tail_idxq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(tail_idx_s),
+	      .q(tail_idx_q));
+	   
+	   wire 		     tail_valid_s, tail_valid_q;
+	   assign tail_valid_s
+	     = (tail_valid_q & ~(all_allocated & flit_tail_out)) | tail_in;
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   tail_validq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(tail_valid_s),
+	      .q(tail_valid_q));
+	   
+	   assign flit_tail_out = tail_valid_q && (fbf_read_addr == tail_idx_q);
 	   
 	end
       
    endgenerate
+   
+   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
    
    
    //---------------------------------------------------------------------------
@@ -526,7 +567,7 @@ module ivc_ctrl
 		.data_out(free_ovc));
 	     
 	     wire 			 flit_sent_prev_s, flit_sent_prev_q;
-	     assign flit_sent_prev_s = flit_sent & ~get_next_header;
+	     assign flit_sent_prev_s = flit_valid_out & ~get_next_header;
 	     dff
 	       #(.width(1),
 		 .reset_type(reset_type))
@@ -537,9 +578,9 @@ module ivc_ctrl
 		.q(flit_sent_prev_q));
 	     
 	     wire [0:2] 		 flit_sent_count;
-	     assign flit_sent_count = {flit_sent_prev_q & flit_sent,
-				       flit_sent_prev_q ^ flit_sent,
-				       ~(flit_sent_prev_q | flit_sent)};
+	     assign flit_sent_count = {flit_sent_prev_q & flit_valid_out,
+				       flit_sent_prev_q ^ flit_valid_out,
+				       ~(flit_sent_prev_q | flit_valid_out)};
 	     
 	     wire [0:num_vcs-1] 	 next_free_ovc;
 	     
@@ -642,7 +683,7 @@ module ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   wire 				       fbc_empty;
+   wire 				       fbc_empty_early;
    
    wire [0:num_ports-1] 		       sw_req_nonspec_op_s,
 					       sw_req_nonspec_op_q;
@@ -722,7 +763,7 @@ module ivc_ctrl
    
    //---------------------------------------------------------------------------
    // generate target output VC to send along with flit data
-   // (valid when flit_sent=1)
+   // (valid when flit_valid_out=1)
    //---------------------------------------------------------------------------
    
    // NOTE: don't need to use vc_gnt_ovc here, as flit_valid would not be
@@ -743,6 +784,8 @@ module ivc_ctrl
    
    wire 		       fbc_push;
    assign fbc_push = flit_valid_in;
+   
+   wire 		       fbc_empty;
    
    wire 		       fbc_pop;
    assign fbc_pop = all_allocated & ~fbc_empty;
@@ -775,16 +818,15 @@ module ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:4] 		       errors_in;
+   wire [0:3] 		       errors_in;
    assign errors_in = {~hdff_empty & ~valid_q,
                        ~fbc_empty & ~valid_q,
-		       tail_tracker_error,
 		       cred_tracker_error,
 		       rtl_error};
    
-   wire [0:4] 		       errors_out;
+   wire [0:3] 		       errors_out;
    checker
-     #(.num_errors(5),
+     #(.num_errors(4),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),
        .reset_type(reset_type))

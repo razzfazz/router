@@ -96,11 +96,6 @@ module ip_ctrl
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
-   // wdith of the flit buffer register file
-   localparam fbf_data_width = (num_header_buffers > 1) ?
-			       (1+data_width) :
-			       (2+data_width);
-   
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
    parameter sw_spec_enable = 1;
@@ -235,6 +230,7 @@ module ip_ctrl
    
    wire [0:num_vcs-1] 		flit_sent_ivc;
    wire [0:num_vcs*vc_idx_width-1] flit_vc_ivc;
+   wire [0:num_vcs-1] 		   flit_head_ivc;
    wire [0:num_vcs-1] 		   flit_tail_ivc;
    wire [0:num_vcs*fbf_addr_width-1] fbf_write_addr_ivc;
    wire [0:num_vcs*fbf_addr_width-1] fbf_read_addr_ivc;
@@ -269,6 +265,7 @@ module ip_ctrl
 	   wire [0:num_ports-1] sw_req_spec_op;
 	   wire 		flit_sent;
 	   wire [0:vc_idx_width-1] flit_vc;
+	   wire 		   flit_head;
 	   wire 		   flit_tail;
 	   wire [0:fbf_addr_width-1] fbf_write_addr;
 	   wire [0:fbf_addr_width-1] fbf_read_addr;
@@ -313,8 +310,9 @@ module ip_ctrl
 	      .sw_req_spec_op(sw_req_spec_op),
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
-	      .flit_sent(flit_sent),
+	      .flit_valid_out(flit_sent),
 	      .flit_vc_out(flit_vc),
+	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
 	      .fbf_write_addr(fbf_write_addr),
 	      .fbf_read_addr(fbf_read_addr),
@@ -330,6 +328,7 @@ module ip_ctrl
 	   assign flit_sent_ivc[ivc] = flit_sent;
 	   assign flit_vc_ivc[ivc*vc_idx_width:(ivc+1)*vc_idx_width-1]
 		    = flit_vc;
+	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
 	   assign fbf_write_addr_ivc[ivc*fbf_addr_width:
 				     (ivc+1)*fbf_addr_width-1]
@@ -463,46 +462,19 @@ module ip_ctrl
    wire 				    fbf_read_enable;
    assign fbf_read_enable = |flit_sent_ivc;
    
-   wire [0:fbf_data_width-1] 		    fbf_write_data, fbf_read_data;
+   wire [0:data_width-1] 		    fbf_write_data, fbf_read_data;
    regfile
-     #(.width(fbf_data_width),
+     #(.width(data_width),
        .depth(fbf_depth),
        .regfile_type(fbf_regfile_type))
    fbf
      (.clk(clk),
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
-      .write_data(fbf_write_data),
+      .write_data(flit_data_muxed),
       .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
-      .read_data(fbf_read_data));
-   
-   generate
-      
-      if(num_header_buffers == 1)
-	begin
-	   
-	   assign fbf_write_data[0] = flit_head_in;
-	   assign fbf_write_data[1] = flit_tail_in;
-	   assign fbf_write_data[2:data_width+1] = flit_data_muxed;
-	   
-	   assign flit_head_out = fbf_read_data[0];
-	   assign flit_tail_out = fbf_read_data[1];
-	   assign flit_data_out = fbf_read_data[2:data_width+1];
-	   
-	end
-      else
-	begin
-	   
-	   assign fbf_write_data[0] = flit_head_in;
-	   assign fbf_write_data[1:data_width] = flit_data_muxed;
-	   
-	   assign flit_head_out = fbf_read_data[0];
-	   assign flit_data_out = fbf_read_data[1:data_width];
-	   
-	end
-      
-   endgenerate
+      .read_data(flit_data_out));
    
    
    //---------------------------------------------------------------------------
@@ -522,33 +494,43 @@ module ip_ctrl
    
    assign flit_valid_out = flit_valid_q;
    
-   generate
-      
-      if(num_header_buffers > 1)
-	begin
-	   
-	   wire flit_tail_s, flit_tail_q;
-	   select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_tail_s_sel
-	     (.select(flit_sent_ivc),
-	      .data_in(flit_tail_ivc),
-	      .data_out(flit_tail_s));
-	   dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_tailq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flit_tail_s),
-	      .q(flit_tail_q));
-	   
-	   assign flit_tail_out = flit_tail_q;
-	   
-	end
-      
-   endgenerate
+   wire 				       flit_head_s, flit_head_q;
+   select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_head_s_sel
+     (.select(flit_sent_ivc),
+      .data_in(flit_head_ivc),
+      .data_out(flit_head_s));
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_headq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_head_s),
+      .q(flit_head_q));
+   
+   assign flit_head_out = flit_head_q;
+   
+   wire 				       flit_tail_s, flit_tail_q;
+   select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_tail_s_sel
+     (.select(flit_sent_ivc),
+      .data_in(flit_tail_ivc),
+      .data_out(flit_tail_s));
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_tailq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+   
+   assign flit_tail_out = flit_tail_q;
    
    // output VCs are tracket in input VC controllers, so we can just reuse that 
    // information here

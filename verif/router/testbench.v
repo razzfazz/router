@@ -173,8 +173,11 @@ module testbench
 			       0 :
 			       1;
    
-   // select crossbar implementation variant
-   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
+   // select implementation variant for control crossbar
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   
+   // select implementation variant for data crossbar
+   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -609,7 +612,8 @@ module testbench
        .sw_allocator_type(sw_allocator_type),
        .sw_arbiter_type(sw_arbiter_type),
        .sw_spec_level(sw_spec_level),
-       .crossbar_type(crossbar_type),
+       .xbc_crossbar_type(xbc_crossbar_type),
+       .xbd_crossbar_type(xbd_crossbar_type),
        .reset_type(reset_type))
    rtr
      (.clk(clk),

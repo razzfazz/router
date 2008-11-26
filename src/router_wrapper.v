@@ -128,8 +128,11 @@ module router_wrapper
    // enable speculative switch allocation
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
-   // select crossbar implementation variant
-   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
+   // select implementation variant for control crossbar
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   
+   // select implementation variant for data crossbar
+   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -227,7 +230,8 @@ module router_wrapper
        .sw_allocator_type(sw_allocator_type),
        .sw_arbiter_type(sw_arbiter_type),
        .sw_spec_level(sw_spec_level),
-       .crossbar_type(crossbar_type),
+       .xbc_crossbar_type(xbc_crossbar_type),
+       .xbd_crossbar_type(xbd_crossbar_type),
        .reset_type(reset_type))
    rtr
      (.clk(clk),
