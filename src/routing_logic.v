@@ -19,9 +19,6 @@ module routing_logic
    // number of VCs
    parameter num_vcs = 4;
    
-   // width required to select an individual VC
-   localparam vc_idx_width = clogb(num_vcs);
-   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
@@ -76,6 +73,31 @@ module routing_logic
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
+   // function to extract traffic class from VC index
+   // (this implementation handles the case where we have only a single traffic
+   // class correctly)
+   function integer get_traffic_class(input integer vc);
+      begin
+	 get_traffic_class
+	   = (vc >> (clogb(num_routing_classes) + clogb(num_vcs_per_class))) %
+	     num_traffic_classes;
+      end
+   endfunction
+   
+   localparam traffic_class = get_traffic_class(vc_id);
+   
+   // function to extract routing class from VC index
+   // (this implementation handles the case where we have only a single routing
+   // class correctly)
+   function integer get_routing_class(input integer vc);
+      begin
+	 get_routing_class
+	   = (vc >> clogb(num_vcs_per_class)) % num_routing_classes;
+      end
+   endfunction
+   
+   localparam routing_class = get_routing_class(vc_id);
+   
    input clk;
    input reset;
    
@@ -120,40 +142,19 @@ module routing_logic
    
    wire [0:num_dimensions-1] dim_addr_match;
    
-   // function to extract traffic class from VC index
-   // (this implementation handles the case where we have only a single traffic
-   // class correctly)
-   function integer get_traffic_class(input integer vc);
-      begin
-	 get_traffic_class
-	   = (vc >> (clogb(num_routing_classes) + clogb(num_vcs_per_class))) %
-	     num_traffic_classes;
-      end
-   endfunction
-   
-   // function to extract routing class from VC index
-   // (this implementation handles the case where we have only a single routing
-   // class correctly)
-   function integer get_routing_class(input integer vc);
-      begin
-	 get_routing_class
-	   = (vc >> clogb(num_vcs_per_class)) % num_routing_classes;
-      end
-   endfunction
-   
    generate
       
       genvar 		     ovc;
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
-	   
+
 	   assign next_vcs[ovc]
-		    = ((get_traffic_class(ovc) == get_traffic_class(vc_id)) &&
-		       (get_routing_class(ovc) == 
-			((is_next && (get_routing_class(vc_id) != 0)) ?
-			 0 :
-			 get_routing_class(vc_id))));
+		    = (get_traffic_class(ovc) == traffic_class) &&
+		      (get_routing_class(ovc) == 
+		       ((is_next && (routing_class != 0)) ?
+			0 :
+			routing_class));
 	   
 	end
       
@@ -186,6 +187,7 @@ module routing_logic
 	   wire [0:num_neighbors_per_dim-1] port_dec;
 	   
 	   case(routing_function_type)
+	     
 	     `ROUTING_FUNCTION_TYPE_BY_RELATION:
 	       begin
 		  
@@ -193,6 +195,7 @@ module routing_logic
 		    = {dim_addr < local_dim_addr, dim_addr > local_dim_addr};
 		  
 	       end
+	     
 	     `ROUTING_FUNCTION_TYPE_BY_DIFFERENCE:
 	       begin
 		  
@@ -212,6 +215,7 @@ module routing_logic
 					num_neighbors_per_dim];
 		  
 	       end
+	     
 	   endcase
 	   
 	   wire [0:num_neighbors_per_dim-1] 	       mask;
@@ -252,8 +256,16 @@ module routing_logic
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   assign next_port[op] = next_port_int[op] && (op != port_id);
-	   assign error_op[op] = next_port_int[op] && (op == port_id);
+	   if(op == port_id)
+	     begin
+		assign next_port[op] = 1'b0;
+		assign error_op[op] = next_port_int[op];
+	     end
+	   else
+	     begin
+		assign next_port[op] = next_port_int[op];
+		assign error_op[op] = 1'b0;
+	     end
 	   
 	end
       
