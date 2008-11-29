@@ -267,6 +267,7 @@ module op_ctrl
 	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
 	   
 	   case(credit_handling_type)
+	     
 	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  wire [0:cred_level_width-1] free_s, free_q;
@@ -291,12 +292,14 @@ module op_ctrl
 				  (ovc+1)*cred_level_width-1]
 			   = free_q;
 	       end
+	     
 	     `CREDIT_HANDLING_TYPE_PUSH:
 	       begin
 		  assign free_ovc[ovc*cred_level_width:
 				  (ovc+1)*cred_level_width-1]
 			   = {cred_level_width{1'b0}};
 	       end
+	     
 	   endcase
 	   
 	   wire 		       set_allocated;
@@ -322,11 +325,13 @@ module op_ctrl
 	   wire 		       elig_s;
 	   
 	   case(credit_handling_type)
+	     
 	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  assign cred_ovc[ovc] = 1'b0;
 		  assign elig_s = ~allocated_s & head_free_early;
 	       end
+	     
 	     `CREDIT_HANDLING_TYPE_PUSH:
 	       begin
 		  
@@ -337,7 +342,7 @@ module op_ctrl
 		  
 		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 		  assign cred_hold_s
-		    = reset_allocated ?
+		    = vc_gnt ?
 		      cred_hold_copy :
 		      ((vc_gnt | allocated_q) ?
 		       (cred_hold_q - (|cred_hold_q & ~credit)) :
@@ -370,6 +375,7 @@ module op_ctrl
 		    = ~allocated_s & head_free_early & next_cred_ovc[ovc];
 		  
 	       end
+	     
 	   endcase
 	   
 	   wire 			      elig_q;
@@ -402,6 +408,7 @@ module op_ctrl
       assign error = (|error_hct_ovc) | (|errors_out_ovc);
       
       case(credit_handling_type)
+	
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     genvar 			       ivc;
@@ -423,10 +430,12 @@ module op_ctrl
 		  
 	       end
 	  end
+	
 	`CREDIT_HANDLING_TYPE_PUSH:
 	  begin
 	     assign free_ivc = {num_vcs{1'b0}};
-	  end  
+	  end
+	
       endcase
       
    endgenerate
