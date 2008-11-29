@@ -338,13 +338,13 @@ module op_ctrl
 		  wire [0:cred_hold_width-1]  cred_hold_copy;
 		  assign cred_hold_copy
 		    = cred_count_s[(cred_count_width-cred_hold_width):
-				   cred_count_width-1] - |cred_count_s;
+				   cred_count_width-1] - 1'b1;
 		  
 		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 		  assign cred_hold_s
 		    = vc_gnt ?
 		      cred_hold_copy :
-		      ((vc_gnt | allocated_q) ?
+		      (allocated_q ?
 		       (cred_hold_q - (|cred_hold_q & ~credit)) :
 		       cred_hold_q);
 		  dff
