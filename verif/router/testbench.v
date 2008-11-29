@@ -149,10 +149,6 @@ module testbench
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select method for credit checking
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
-   parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
-   
    // select implementation variant for VC allocator
    parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
@@ -606,7 +602,6 @@ module testbench
        .credit_handling_type(credit_handling_type),
        .header_fifo_type(header_fifo_type),
        .fbf_regfile_type(fbf_regfile_type),
-       .sw_spec_cred_check(sw_spec_cred_check),
        .vc_allocator_type(vc_allocator_type),
        .vc_arbiter_type(vc_arbiter_type),
        .sw_allocator_type(sw_allocator_type),

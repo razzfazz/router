@@ -85,10 +85,6 @@ module router
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select method for credit checking
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
-   parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
-   
    // select implementation variant for VC allocator
    parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
@@ -195,7 +191,6 @@ module router
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs-1] 	  elig_op_ovc;
-   wire [0:num_vcs*num_ports-1] 	  free_ivc_op;
    wire [0:num_ports*num_vcs*2-1] 	  free_op_ovc;
    wire [0:num_ports*num_vcs-1] 	  cred_op_ovc;
    
@@ -283,7 +278,6 @@ module router
 	       .header_fifo_type(header_fifo_type),
 	       .fbf_regfile_type(fbf_regfile_type),
 	       .sw_spec_enable(sw_spec_enable),
-	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
@@ -299,7 +293,6 @@ module router
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
-	      .free_ivc_op(free_ivc_op),
 	      .free_op_ovc(free_op_ovc),
 	      .cred_op_ovc(cred_op_ovc),
 	      .vc_req_ivc_op(vc_req_ivc_op),
@@ -430,8 +423,6 @@ module router
    // output ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1]   free_op_ivc;
-   
    wire [0:num_ports-1] 	  opc_error_op;
    
    generate
@@ -476,7 +467,6 @@ module router
 	   
 	   wire [0:num_vcs-1] 	     elig_ovc;
 	   wire [0:num_vcs*2-1]      free_ovc;
-	   wire [0:num_vcs-1] 	     free_ivc;
 	   wire [0:num_vcs-1] 	     cred_ovc;
 	   wire 		     opc_error;
 	   op_ctrl
@@ -499,13 +489,11 @@ module router
 	      .flit_tail_in(flit_tail),
 	      .elig_ovc(elig_ovc),
 	      .free_ovc(free_ovc),
-	      .free_ivc(free_ivc),
 	      .cred_ovc(cred_ovc),
 	      .error(opc_error));
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
 	   assign free_op_ovc[op*num_vcs*2:(op+1)*num_vcs*2-1] = free_ovc;
-	   assign free_op_ivc[op*num_vcs:(op+1)*num_vcs-1] = free_ivc;
 	   assign cred_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = cred_ovc;
 	   
 	   assign flit_valid_out_op[op] 
@@ -523,18 +511,6 @@ module router
 	end
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // bit shuffling to change sort order
-   //---------------------------------------------------------------------------
-   
-   interleaver
-     #(.width(num_ports*num_vcs),
-       .num_blocks(num_ports))
-   free_ivc_op_intl
-     (.data_in(free_op_ivc),
-      .data_out(free_ivc_op));
    
    
    //---------------------------------------------------------------------------

@@ -147,23 +147,6 @@
 
 
 //------------------------------------------------------------------------------
-// implementation variants for credit checking
-//------------------------------------------------------------------------------
-
-// check that credit is available at all potential output VCs before issuing 
-// request
-`define SW_SPEC_CRED_CHECK_ALL_PRE  0
-
-// check that credit is available at all potential output VCs in parallel with 
-// allocation, then mask grants
-`define SW_SPEC_CRED_CHECK_ALL_POST 1
-
-// check that credit is available at slected output VC while doing allocation, 
-// then mask grants
-`define SW_SPEC_CRED_CHECK_SEL_POST 2
-
-
-//------------------------------------------------------------------------------
 // VC allocator implementation variants
 //------------------------------------------------------------------------------
 

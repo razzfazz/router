@@ -2,7 +2,7 @@
 // output port controller (tracks state of buffers in downstream router)
 module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
-   flit_tail_in, elig_ovc, free_ovc, free_ivc, cred_ovc, error);
+   flit_tail_in, elig_ovc, free_ovc, cred_ovc, error);
    
 `include "constants.v"
    
@@ -91,12 +91,6 @@ module op_ctrl
    // (note: this is only used for CREDIT_HANDLING_TYPE_LEVEL)
    output [0:num_vcs*cred_level_width-1] free_ovc;
    wire [0:num_vcs*cred_level_width-1] free_ovc;
-   
-   // all candidate output VCs for a given input VC have at least one credit
-   // available
-   // (note: this is only used for CREDIT_HANDLING_TYPE_LEVEL)
-   output [0:num_vcs-1] free_ivc;
-   wire [0:num_vcs-1] 		       free_ivc;
    
    // credits to be sent to input controllers
    // (note: this is only used for CREDIT_HANDLING_TYPE_PUSH)
@@ -322,14 +316,11 @@ module op_ctrl
 	      .d(allocated_s),
 	      .q(allocated_q));
 	   
-	   wire 		       elig_s;
-	   
 	   case(credit_handling_type)
 	     
 	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  assign cred_ovc[ovc] = 1'b0;
-		  assign elig_s = ~allocated_s & head_free_early;
 	       end
 	     
 	     `CREDIT_HANDLING_TYPE_PUSH:
@@ -371,14 +362,12 @@ module op_ctrl
 		  
 		  assign cred_ovc[ovc] = cred_q;
 		  
-		  assign elig_s
-		    = ~allocated_s & head_free_early & next_cred_ovc[ovc];
-		  
 	       end
 	     
 	   endcase
 	   
-	   wire 			      elig_q;
+	   wire 			      elig_s, elig_q;
+	   assign elig_s = ~allocated_s & head_free_early & next_cred_ovc[ovc];
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type),
@@ -393,51 +382,20 @@ module op_ctrl
 	   
 	end
       
-      wire [0:num_vcs*2-1] 	      errors_out_ovc;
-      checker
-	#(.num_errors(num_vcs*2),
-	  .enable(checker_enable),
-	  .capture_mode(checker_capture_mode),
-	  .reset_type(reset_type))
-      chk
-	(.clk(clk),
-	 .reset(reset),
-	 .errors_in(error_cred_ovc),
-	 .errors_out(errors_out_ovc));
-      
-      assign error = (|error_hct_ovc) | (|errors_out_ovc);
-      
-      case(credit_handling_type)
-	
-	`CREDIT_HANDLING_TYPE_LEVEL:
-	  begin
-	     genvar 			       ivc;
-	     for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	       begin:ivcs
-		  
-		  wire port_cred_s, port_cred_q;
-		  assign port_cred_s = &next_cred_ovc;
-		  dff
-		    #(.width(1),
-		      .reset_type(reset_type))
-		  port_credq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(port_cred_s),
-		     .q(port_cred_q));
-		  
-		  assign free_ivc[ivc] = port_cred_q;
-		  
-	       end
-	  end
-	
-	`CREDIT_HANDLING_TYPE_PUSH:
-	  begin
-	     assign free_ivc = {num_vcs{1'b0}};
-	  end
-	
-      endcase
-      
    endgenerate
+   
+   wire [0:num_vcs*2-1] 		      errors_out_ovc;
+   checker
+     #(.num_errors(num_vcs*2),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
+       .reset_type(reset_type))
+   chk
+     (.clk(clk),
+      .reset(reset),
+      .errors_in(error_cred_ovc),
+      .errors_out(errors_out_ovc));
+   
+   assign error = (|error_hct_ovc) | (|errors_out_ovc);
    
 endmodule

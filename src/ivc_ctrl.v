@@ -2,8 +2,8 @@
 // input VC controller
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   route_info_in, free_op, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, 
-   vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
+   route_info_in, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
+   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
    flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, fbf_write_addr, 
    fbf_read_addr, error, events);
    
@@ -85,10 +85,6 @@ module ivc_ctrl
    // allocation
    parameter sw_spec_enable = 1;
    
-   // select method for credit checking
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
-   parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
-   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -130,11 +126,6 @@ module ivc_ctrl
    // routing information associated with current flit
    // (note: valid only when flit_valid_in=1 and flit_head_in=1)
    input [0:route_info_width-1] route_info_in;
-   
-   // summary signal indicating all output VCs at given output port have at 
-   // least one credit available
-   // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
-   input [0:num_ports-1] free_op;
    
    // at least one credit available for given output VC at given output port
    // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
@@ -227,40 +218,13 @@ module ivc_ctrl
    
    wire 		     vc_allocated;
    wire 		     sw_allocated;
-   wire 		     free_unallocated;
-   wire 		     free_allocated;
    
    generate
       
       if(sw_spec_enable)
 	begin
 	   assign vc_allocated = vc_gnt | allocated_q;
-	   case(credit_handling_type)
-	     `CREDIT_HANDLING_TYPE_LEVEL:
-	       begin
-		  case(sw_spec_cred_check)
-		    `SW_SPEC_CRED_CHECK_ALL_PRE:
-		      begin
-			 assign sw_allocated
-			   = sw_gnt_nonspec | sw_gnt_spec;
-		      end
-		    `SW_SPEC_CRED_CHECK_ALL_POST:
-		      begin
-			 assign sw_allocated
-			   = sw_gnt_nonspec | (sw_gnt_spec & free_unallocated);
-		      end
-		    `SW_SPEC_CRED_CHECK_SEL_POST:
-		      begin
-			 assign sw_allocated
-			   = sw_gnt_nonspec | (sw_gnt_spec & free_allocated);
-		      end
-		  endcase
-	       end
-	     `CREDIT_HANDLING_TYPE_PUSH:
-	       begin
-		  assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
-	       end
-	   endcase
+	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
 	end
       else
 	begin
@@ -541,21 +505,15 @@ module ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
+   wire 		       free_allocated;
    wire 		       cred_tracker_error;
    
    generate
       
       case(credit_handling_type)
+	
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
-	     
-	     select_1ofn
-	       #(.num_ports(num_ports),
-		 .width(1))
-	     free_sel
-	       (.select(port_q),
-		.data_in(free_op),
-		.data_out(free_unallocated));
 	     
 	     wire [0:num_vcs*2-1]        free_ovc;
 	     select_1ofn
@@ -612,10 +570,9 @@ module ivc_ctrl
 	     assign cred_tracker_error = 1'b0;
 	     
 	  end
+	
 	`CREDIT_HANDLING_TYPE_PUSH:
 	  begin
-	     
-	     assign free_unallocated = 1'b0;
 	     
 	     wire [0:num_vcs-1] 	       cred_ovc;
 	     select_1ofn
@@ -674,6 +631,7 @@ module ivc_ctrl
 		 incr_cred_hold;
 	     
 	  end
+	
       endcase
       
    endgenerate
@@ -718,26 +676,7 @@ module ivc_ctrl
 	      .d(sw_req_spec_op_s),
 	      .q(sw_req_spec_op_q));
 	   
-	   case(credit_handling_type)
-	     `CREDIT_HANDLING_TYPE_LEVEL:
-	       begin
-		  case(sw_spec_cred_check)
-		    `SW_SPEC_CRED_CHECK_ALL_PRE:
-		      begin
-			 assign sw_req_spec_op
-			   = sw_req_spec_op_q & free_unallocated;
-		      end
-		    `SW_SPEC_CRED_CHECK_ALL_POST, `SW_SPEC_CRED_CHECK_SEL_POST:
-		      begin
-			 assign sw_req_spec_op = sw_req_spec_op_q;
-		      end
-		  endcase
-	       end
-	     `CREDIT_HANDLING_TYPE_PUSH:
-	       begin
-		  assign sw_req_spec_op = sw_req_spec_op_q;
-	       end
-	   endcase
+	   assign sw_req_spec_op = sw_req_spec_op_q;
 	   
 	end
       else

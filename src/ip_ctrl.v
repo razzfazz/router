@@ -2,11 +2,11 @@
 // input port controller
 module ip_ctrl
   (clk, reset, router_address, flit_valid_in, flit_vc_in, flit_head_in,
-   flit_tail_in, flit_data_in, free_ivc_op, free_op_ovc, cred_op_ovc,
-   vc_req_ivc_op, vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op,
-   sw_req_spec_ivc_op, sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out,
-   flit_vc_out, flit_head_out, flit_tail_out, flit_data_out, cred_valid_out,
-   cred_vc_out, error);
+   flit_tail_in, flit_data_in, free_op_ovc, cred_op_ovc, vc_req_ivc_op, 
+   vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, sw_req_spec_ivc_op, 
+   sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, flit_vc_out, 
+   flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out, 
+   error);
    
 `include "constants.v"
    
@@ -100,10 +100,6 @@ module ip_ctrl
    // allocation
    parameter sw_spec_enable = 1;
    
-   // select method for credit checking
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
-   parameter sw_spec_cred_check = `SW_SPEC_CRED_CHECK_SEL_POST;
-   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -143,11 +139,6 @@ module ip_ctrl
    // flit data
    // (note: valid only when flit_valid_in=1)
    input [0:data_width-1] flit_data_in;
-   
-   // summary signal indicating all output VCs at given output port for a given 
-   // input VC have at least one credit available
-   // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
-   input [0:num_vcs*num_ports-1] free_ivc_op;
    
    // at least one credit available for given output VC at given output port
    // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
@@ -247,9 +238,6 @@ module ip_ctrl
 	   wire flit_valid;
 	   assign flit_valid = flit_valid_in && (flit_vc_in == ivc);
 	   
-	   wire [0:num_ports-1] free_op;
-	   assign free_op = free_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1];
-	   
 	   wire [0:num_vcs-1] 	vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
 	   
@@ -285,7 +273,6 @@ module ip_ctrl
 	       .credit_handling_type(credit_handling_type),
 	       .header_fifo_type(header_fifo_type),
 	       .sw_spec_enable(sw_spec_enable),
-	       .sw_spec_cred_check(sw_spec_cred_check),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
@@ -300,7 +287,6 @@ module ip_ctrl
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
 	      .route_info_in(route_info_in),
-	      .free_op(free_op),
 	      .free_op_ovc(free_op_ovc),
 	      .cred_op_ovc(cred_op_ovc),
 	      .vc_req_op(vc_req_op),
