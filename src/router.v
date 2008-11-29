@@ -79,6 +79,14 @@ module router
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // width required for internal flow control signalling
+   localparam int_flow_ctrl_width
+     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+       2 :
+       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       1 :
+       -1;
+   
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
@@ -190,29 +198,29 @@ module router
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 	  elig_op_ovc;
-   wire [0:num_ports*num_vcs*2-1] 	  free_op_ovc;
-   wire [0:num_ports*num_vcs-1] 	  cred_op_ovc;
+   wire [0:num_ports*num_vcs-1]      elig_op_ovc;
+   wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
-   wire [0:num_ports*num_vcs*num_ports-1] vc_req_ip_ivc_op;
-   wire [0:num_ports*num_vcs*num_vcs-1]   vc_req_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs-1] 	  vc_gnt_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] 	    vc_req_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_req_ip_ivc_ovc;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
+   wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
    
-   wire [0:num_ports*num_vcs*num_ports-1] sw_req_nonspec_ip_ivc_op;
-   wire [0:num_ports*num_vcs*num_ports-1] sw_req_spec_ip_ivc_op;
-   wire [0:num_ports*num_vcs-1] 	  sw_gnt_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	  sw_gnt_spec_ip_ivc;
-   wire [0:num_ports*num_ports-1] 	  sw_gnt_ip_op;
+   wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_nonspec_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_spec_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 		    sw_gnt_nonspec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		    sw_gnt_spec_ip_ivc;
+   wire [0:num_ports*num_ports-1] 		    sw_gnt_ip_op;
    
-   wire [0:num_ports*xbc_width-1] xbc_data_in_ip;
-   wire [0:num_ports*xbd_width-1] xbd_data_in_ip;
+   wire [0:num_ports*xbc_width-1] 		    xbc_data_in_ip;
+   wire [0:num_ports*xbd_width-1] 		    xbd_data_in_ip;
    
-   wire [0:num_ports-1] 		   ipc_error_ip;
+   wire [0:num_ports-1] 			    ipc_error_ip;
    
    generate
       
-      genvar 			   ip;
+      genvar 					    ip;
+      
       for (ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
@@ -293,8 +301,7 @@ module router
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
-	      .free_op_ovc(free_op_ovc),
-	      .cred_op_ovc(cred_op_ovc),
+	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
 	      .vc_req_ivc_op(vc_req_ivc_op),
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
@@ -466,9 +473,8 @@ module router
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs-1] 	     elig_ovc;
-	   wire [0:num_vcs*2-1]      free_ovc;
-	   wire [0:num_vcs-1] 	     cred_ovc;
-	   wire 		     opc_error;
+	   wire [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
+	   wire 				  opc_error;
 	   op_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -488,13 +494,13 @@ module router
 	      .flit_vc_in(flit_vc),
 	      .flit_tail_in(flit_tail),
 	      .elig_ovc(elig_ovc),
-	      .free_ovc(free_ovc),
-	      .cred_ovc(cred_ovc),
+	      .flow_ctrl_ovc(flow_ctrl_ovc),
 	      .error(opc_error));
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
-	   assign free_op_ovc[op*num_vcs*2:(op+1)*num_vcs*2-1] = free_ovc;
-	   assign cred_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = cred_ovc;
+	   assign flow_ctrl_op_ovc[op*num_vcs*int_flow_ctrl_width:
+				   (op+1)*num_vcs*int_flow_ctrl_width-1]
+		    = flow_ctrl_ovc;
 	   
 	   assign flit_valid_out_op[op] 
 		    = flit_valid;
@@ -517,10 +523,10 @@ module router
    // error reporting
    //---------------------------------------------------------------------------
    
-   wire [0:2*num_ports-1] 	     errors_in;
+   wire [0:2*num_ports-1] 			  errors_in;
    assign errors_in = {ipc_error_ip, opc_error_op};
    
-   wire [0:2*num_ports-1] 	     errors_out;
+   wire [0:2*num_ports-1] 			  errors_out;
    checker
      #(.num_errors(2*num_ports),
        .enable(checker_enable),

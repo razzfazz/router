@@ -2,8 +2,8 @@
 // input port controller
 module ip_ctrl
   (clk, reset, router_address, flit_valid_in, flit_vc_in, flit_head_in,
-   flit_tail_in, flit_data_in, free_op_ovc, cred_op_ovc, vc_req_ivc_op, 
-   vc_req_ivc_ovc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, sw_req_spec_ivc_op, 
+   flit_tail_in, flit_data_in, flow_ctrl_op_ovc, vc_req_ivc_op, vc_req_ivc_ovc, 
+   vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, sw_req_spec_ivc_op, 
    sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, flit_vc_out, 
    flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out, 
    error);
@@ -84,6 +84,14 @@ module ip_ctrl
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // width required for internal flow control signalling
+   localparam int_flow_ctrl_width
+     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+       2 :
+       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       1 :
+       -1;
+   
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
@@ -140,13 +148,9 @@ module ip_ctrl
    // (note: valid only when flit_valid_in=1)
    input [0:data_width-1] flit_data_in;
    
-   // at least one credit available for given output VC at given output port
-   // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
-   input [0:num_ports*num_vcs*2-1] free_op_ovc;
-   
-   // credits from output controller
-   // (note: only used for CREDIT_HANDLING_TYPE_PUSH)
-   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   // internal flow control signalling from output controller to input 
+   // controllers
+   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
    // request VC allocation for given port
    output [0:num_vcs*num_ports-1] vc_req_ivc_op;
@@ -287,8 +291,7 @@ module ip_ctrl
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
 	      .route_info_in(route_info_in),
-	      .free_op_ovc(free_op_ovc),
-	      .cred_op_ovc(cred_op_ovc),
+	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
 	      .vc_req_op(vc_req_op),
 	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt_ovc(vc_gnt_ovc),

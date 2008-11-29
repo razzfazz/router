@@ -2,7 +2,7 @@
 // input VC controller
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   route_info_in, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
+   route_info_in, flow_ctrl_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
    sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
    flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, fbf_write_addr, 
    fbf_read_addr, error, events);
@@ -78,6 +78,14 @@ module ivc_ctrl
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // width required for internal flow control signalling
+   localparam int_flow_ctrl_width
+     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+       2 :
+       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       1 :
+       -1;
+   
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
@@ -127,13 +135,9 @@ module ivc_ctrl
    // (note: valid only when flit_valid_in=1 and flit_head_in=1)
    input [0:route_info_width-1] route_info_in;
    
-   // at least one credit available for given output VC at given output port
-   // (note: only used for CREDIT_HANDLING_TYPE_LEVEL)
-   input [0:num_ports*num_vcs*2-1] free_op_ovc;
-   
-   // credits from output controller
-   // (note: only used for CREDIT_HANDLING_TYPE_PUSH)
-   input [0:num_ports*num_vcs-1] cred_op_ovc;
+   // internal flow control signalling from output controller to input 
+   // controllers
+   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
    // requests VC allocation for given port
    output [0:num_ports-1] vc_req_op;
@@ -505,6 +509,15 @@ module ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
+   wire [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
+   select_1ofn
+     #(.num_ports(num_ports),
+       .width(num_vcs*int_flow_ctrl_width))
+   flow_ctrl_ovc_sel
+     (.select(port_q),
+      .data_in(flow_ctrl_op_ovc),
+      .data_out(flow_ctrl_ovc));
+   
    wire 		       free_allocated;
    wire 		       cred_tracker_error;
    
@@ -515,14 +528,8 @@ module ivc_ctrl
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
-	     wire [0:num_vcs*2-1]        free_ovc;
-	     select_1ofn
-	       #(.num_ports(num_ports),
-		 .width(num_vcs*2))
-	     free_ovc_sel
-	       (.select(port_q),
-		.data_in(free_op_ovc),
-		.data_out(free_ovc));
+	     wire [0:num_vcs-1] free_ovc;
+	     assign free_ovc = flow_ctrl_ovc;
 	     
 	     wire 			 flit_sent_prev_s, flit_sent_prev_q;
 	     assign flit_sent_prev_s = flit_valid_out & ~get_next_header;
@@ -575,13 +582,7 @@ module ivc_ctrl
 	  begin
 	     
 	     wire [0:num_vcs-1] 	       cred_ovc;
-	     select_1ofn
-	       #(.num_ports(num_ports),
-		 .width(num_vcs))
-	     cred_ovc_sel
-	       (.select(port_q),
-		.data_in(cred_op_ovc),
-		.data_out(cred_ovc));
+	     assign cred_ovc = flow_ctrl_ovc;
 	     
 	     wire 			       cred;
 	     assign cred = |(cred_ovc & vcs_updated);

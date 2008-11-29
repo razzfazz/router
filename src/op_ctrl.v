@@ -2,7 +2,7 @@
 // output port controller (tracks state of buffers in downstream router)
 module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
-   flit_tail_in, elig_ovc, free_ovc, cred_ovc, error);
+   flit_tail_in, elig_ovc, flow_ctrl_ovc, error);
    
 `include "constants.v"
    
@@ -49,6 +49,14 @@ module op_ctrl
    // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
    parameter cred_level_width = 2;
    
+   // width required for internal flow control signalling
+   localparam int_flow_ctrl_width
+     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+       cred_level_width :
+       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       1 :
+       -1;
+   
    // maximum value for credit level
    localparam [0:cred_level_width-1] max_cred_level = {cred_level_width{1'b1}};
    
@@ -86,28 +94,23 @@ module op_ctrl
    output [0:num_vcs-1] elig_ovc;
    wire [0:num_vcs-1] elig_ovc;
    
-   // output VC has given number of credits available (capped at maximum 
-   // value that can be represented with cred_level_width bits)
-   // (note: this is only used for CREDIT_HANDLING_TYPE_LEVEL)
-   output [0:num_vcs*cred_level_width-1] free_ovc;
-   wire [0:num_vcs*cred_level_width-1] free_ovc;
-   
-   // credits to be sent to input controllers
-   // (note: this is only used for CREDIT_HANDLING_TYPE_PUSH)
-   output [0:num_vcs-1] cred_ovc;
-   wire [0:num_vcs-1] 		       cred_ovc;
+   // internal flow control signalling from output controller to input 
+   // controllers
+   output [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
+   wire [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
    
    // internal error condition detected
    output error;
-   wire 			       error;
+   wire 				  error;
    
-   wire [0:num_vcs-1] 		       next_cred_ovc;
-   wire [0:num_vcs-1] 		       error_hct_ovc;
-   wire [0:num_vcs*2-1] 	       error_cred_ovc;
+   wire [0:num_vcs-1] 			  next_cred_ovc;
+   wire [0:num_vcs-1] 			  error_hct_ovc;
+   wire [0:num_vcs*2-1] 		  error_cred_ovc;
    
    generate
       
-      genvar 			       ovc;
+      genvar 				  ovc;
+      
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
@@ -125,9 +128,9 @@ module op_ctrl
 		
 		wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
 		
-		genvar 			    idx;
-		
 		wire [0:flit_buffer_idx_width-1] push_ptr_q;
+		
+		genvar 				 idx;
 		
 		for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
 		  begin:idxs
@@ -215,6 +218,26 @@ module op_ctrl
 	   wire 			    vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc] & elig_ovc[ovc];
 	   
+	   wire 			    set_allocated;
+	   assign set_allocated = vc_gnt;
+	   
+	   wire 			    reset_allocated;   
+	   assign reset_allocated = debit & flit_tail_in;
+	   
+	   // per-output-VC bit indicating whether it is available for
+	   // assignment
+	   wire 			    allocated_s, allocated_q;
+	   assign allocated_s
+	     = set_allocated | (allocated_q & ~reset_allocated);
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   allocatedq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(allocated_s),
+	      .q(allocated_q));
+	   
 	   wire 			    head_debit;
 	   assign head_debit = vc_gnt;
 	   
@@ -264,6 +287,7 @@ module op_ctrl
 	     
 	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
+		  
 		  wire [0:cred_level_width-1] free_s, free_q;
 		  assign free_s = (cred_valid_in | flit_valid_in) ?
 				  ((cred_count_s > max_cred_level) ?
@@ -282,45 +306,10 @@ module op_ctrl
 		     .d(free_s),
 		     .q(free_q));
 		  
-		  assign free_ovc[ovc*cred_level_width:
-				  (ovc+1)*cred_level_width-1]
+		  assign flow_ctrl_ovc[ovc*cred_level_width:
+				       (ovc+1)*cred_level_width-1]
 			   = free_q;
-	       end
-	     
-	     `CREDIT_HANDLING_TYPE_PUSH:
-	       begin
-		  assign free_ovc[ovc*cred_level_width:
-				  (ovc+1)*cred_level_width-1]
-			   = {cred_level_width{1'b0}};
-	       end
-	     
-	   endcase
-	   
-	   wire 		       set_allocated;
-	   assign set_allocated = vc_gnt;
-	   
-	   wire 		       reset_allocated;   
-	   assign reset_allocated = debit & flit_tail_in;
-	   
-	   // per-output-VC bit indicating whether it is available for
-	   // assignment
-	   wire 		       allocated_s, allocated_q;
-	   assign allocated_s
-	     = set_allocated | (allocated_q & ~reset_allocated);
-	   dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   allocatedq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(allocated_s),
-	      .q(allocated_q));
-	   
-	   case(credit_handling_type)
-	     
-	     `CREDIT_HANDLING_TYPE_LEVEL:
-	       begin
-		  assign cred_ovc[ovc] = 1'b0;
+		  
 	       end
 	     
 	     `CREDIT_HANDLING_TYPE_PUSH:
@@ -360,7 +349,7 @@ module op_ctrl
 		     .d(cred_s),
 		     .q(cred_q));
 		  
-		  assign cred_ovc[ovc] = cred_q;
+		  assign flow_ctrl_ovc[ovc] = cred_q;
 		  
 	       end
 	     
