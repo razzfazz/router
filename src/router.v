@@ -355,16 +355,16 @@ module router
        .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .arbiter_type(vc_arbiter_type),
-       .vc_allocator_type(vc_allocator_type),
+       .allocator_type(vc_allocator_type),
        .reset_type(reset_type))
    vca
      (.clk(clk),
       .reset(reset),
-      .vc_req_ip_ivc_op(vc_req_ip_ivc_op),
-      .vc_req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+      .req_ip_ivc_op(vc_req_ip_ivc_op),
+      .req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
       .elig_op_ovc(elig_op_ovc),
-      .vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
-      .vc_gnt_op_ovc(vc_gnt_op_ovc));
+      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
+      .gnt_op_ovc(vc_gnt_op_ovc));
    
    
    //---------------------------------------------------------------------------
@@ -374,18 +374,18 @@ module router
    sw_alloc
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
-       .sw_allocator_type(sw_allocator_type),
+       .allocator_type(sw_allocator_type),
        .arbiter_type(sw_arbiter_type),
-       .sw_spec_level(sw_spec_level),
+       .spec_level(sw_spec_level),
        .reset_type(reset_type))
    swa
      (.clk(clk),
       .reset(reset),
-      .sw_req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
-      .sw_req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
-      .sw_gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
-      .sw_gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
-      .sw_gnt_ip_op(sw_gnt_ip_op));
+      .req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+      .req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
+      .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
+      .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
+      .gnt_ip_op(sw_gnt_ip_op));
    
    
    //---------------------------------------------------------------------------
