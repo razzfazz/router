@@ -399,10 +399,9 @@ module testbench
 		
 		wire [0:port_idx_width-1]  dest_port_s, dest_port_q;
 		assign dest_port_s = flit_valid ?
-				     ((flit_head ?
-				       next_port_enc :
-				       dest_port_q) &
-				      {port_idx_width{~flit_tail}}) :
+				     (flit_head ?
+				      next_port_enc :
+				      dest_port_q) :
 				     dest_port_q;
 		dff
 		  #(.width(port_idx_width))
@@ -428,10 +427,9 @@ module testbench
 		
 		wire [0:num_vcs-1] 	      dest_vcs_s, dest_vcs_q;
 		assign dest_vcs_s = flit_valid ?
-				    ((flit_head ?
-				      next_vcs :
-				      dest_vcs_q) &
-				     {num_vcs{~flit_tail}}) :
+				    (flit_head ?
+				     next_vcs :
+				     dest_vcs_q) :
 				    dest_vcs_q;
 		dff
 		  #(.width(num_vcs))
