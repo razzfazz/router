@@ -49,11 +49,11 @@ module sw_alloc_core_wf
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] req_out_nonspec_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_out_nonspec_ip_op;
+   wire [0:num_ports*num_ports-1] req_wf_nonspec_ip_op;
+   wire [0:num_ports*num_ports-1] gnt_wf_nonspec_ip_op;
    
-   wire [0:num_ports*num_ports-1] req_out_spec_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_out_spec_ip_op;
+   wire [0:num_ports*num_ports-1] req_wf_spec_ip_op;
+   wire [0:num_ports*num_ports-1] gnt_wf_spec_ip_op;
    
    
    //---------------------------------------------------------------------------
@@ -79,16 +79,16 @@ module sw_alloc_core_wf
 	   wire [0:num_vcs*num_ports-1] req_in_nonspec_ivc_op;
 	   assign req_in_nonspec_ivc_op = req_nonspec_ivc_op;
 	   
-	   wire [0:num_ports-1] 	req_out_nonspec_op;
+	   wire [0:num_ports-1] 	req_wf_nonspec_op;
 	   or_nto1
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
-	   req_out_nonspec_op_or
+	   req_wf_nonspec_op_or
 	     (.data_in(req_nonspec_ivc_op),
-	      .data_out(req_out_nonspec_op));
+	      .data_out(req_wf_nonspec_op));
 	   
-	   assign req_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = req_out_nonspec_op;
+	   assign req_wf_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+		    = req_wf_nonspec_op;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -103,9 +103,9 @@ module sw_alloc_core_wf
 	     (.data_in(req_in_nonspec_ivc_op),
 	      .data_out(req_in_nonspec_op_ivc));
 	   
-	   wire [0:num_ports-1] 	gnt_out_nonspec_op;
-	   assign gnt_out_nonspec_op
-	     = gnt_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
+	   wire [0:num_ports-1] 	gnt_wf_nonspec_op;
+	   assign gnt_wf_nonspec_op
+	     = gnt_wf_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
 	   wire [0:num_ports*num_vcs-1] gnt_in_nonspec_op_ivc;
 	   
@@ -115,7 +115,7 @@ module sw_alloc_core_wf
 	     begin:nonspec_ops
 		
 		wire 			update_arb_nonspec;
-		assign update_arb_nonspec = gnt_out_nonspec_op[op];
+		assign update_arb_nonspec = gnt_wf_nonspec_op[op];
 		
 		wire [0:num_vcs-1] 	req_in_nonspec_ivc;
 		assign req_in_nonspec_ivc
@@ -153,7 +153,7 @@ module sw_alloc_core_wf
 	   
 	   wire [0:num_vcs*num_ports-1] req_masked_nonspec_ivc_op;
 	   assign req_masked_nonspec_ivc_op
-	     = {num_vcs{gnt_out_nonspec_op}} & gnt_in_nonspec_ivc_op;
+	     = {num_vcs{gnt_wf_nonspec_op}} & gnt_in_nonspec_ivc_op;
 	   
 	   wire [0:num_ports*num_vcs-1] req_masked_nonspec_op_ivc;
 	   interleaver
@@ -193,16 +193,16 @@ module sw_alloc_core_wf
 		wire [0:num_vcs*num_ports-1] req_in_spec_ivc_op;
 		assign req_in_spec_ivc_op = req_spec_ivc_op;
 		
-		wire [0:num_ports-1] 	     req_out_spec_op;
+		wire [0:num_ports-1] 	     req_wf_spec_op;
 		or_nto1
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
-		req_out_spec_op_or
+		req_wf_spec_op_or
 		  (.data_in(req_spec_ivc_op),
-		   .data_out(req_out_spec_op));
+		   .data_out(req_wf_spec_op));
 		
-		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-			 = req_out_spec_op;
+		assign req_wf_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+			 = req_wf_spec_op;
 		
 		
 		//--------------------------------------------------------------
@@ -217,9 +217,9 @@ module sw_alloc_core_wf
 		  (.data_in(req_in_spec_ivc_op),
 		   .data_out(req_in_spec_op_ivc));
 		
-		wire [0:num_ports-1] 	     gnt_out_spec_op;
-		assign gnt_out_spec_op
-		  = gnt_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
+		wire [0:num_ports-1] 	     gnt_wf_spec_op;
+		assign gnt_wf_spec_op
+		  = gnt_wf_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 		
 		wire [0:num_ports*num_vcs-1] gnt_in_spec_op_ivc;
 		
@@ -227,7 +227,7 @@ module sw_alloc_core_wf
 		  begin:spec_ops
 		     
 		     wire update_arb_spec;
-		     assign update_arb_spec = gnt_out_spec_op[op];
+		     assign update_arb_spec = gnt_wf_spec_op[op];
 		     
 		     wire [0:num_vcs-1] req_in_spec_ivc;
 		     assign req_in_spec_ivc
@@ -265,7 +265,7 @@ module sw_alloc_core_wf
 		
 		wire [0:num_vcs*num_ports-1] req_masked_spec_ivc_op;
 		assign req_masked_spec_ivc_op
-		  = {num_vcs{gnt_out_spec_op}} & gnt_in_spec_ivc_op;
+		  = {num_vcs{gnt_wf_spec_op}} & gnt_in_spec_ivc_op;
 		
 		wire [0:num_ports*num_vcs-1] req_masked_spec_op_ivc;
 		interleaver
@@ -286,7 +286,7 @@ module sw_alloc_core_wf
 	   else
 	     begin
 		
-		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+		assign req_wf_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
 			 ={num_ports{1'b0}};
 		assign gnt_spec_ivc = {num_vcs{1'b0}};
 		
@@ -328,27 +328,27 @@ module sw_alloc_core_wf
 	  begin
 	     
 	     assign spec_mask_ip_op
-	       = {num_ports*num_ports{~|req_out_nonspec_ip_op}};
+	       = {num_ports*num_ports{~|req_wf_nonspec_ip_op}};
 	     
 	  end
 	
 	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] req_out_nonspec_op_ip;
+	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
 	     interleaver
 	       #(.width(num_ports*num_ports),
 		 .num_blocks(num_ports))
-	     req_out_nonspec_op_ip_intl
-	       (.data_in(req_out_nonspec_ip_op),
-		.data_out(req_out_nonspec_op_ip));
+	     req_wf_nonspec_op_ip_intl
+	       (.data_in(req_wf_nonspec_ip_op),
+		.data_out(req_wf_nonspec_op_ip));
 	     
 	     wire [0:num_ports-1] 	    any_req_ip;
 	     or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_req_ip_or
-	       (.data_in(req_out_nonspec_op_ip),
+	       (.data_in(req_wf_nonspec_op_ip),
 		.data_out(any_req_ip));
 	     
 	     wire [0:num_ports*num_ports-1] any_req_in_ip_op;
@@ -364,33 +364,33 @@ module sw_alloc_core_wf
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_req_op_or
-	       (.data_in(req_out_nonspec_ip_op),
+	       (.data_in(req_wf_nonspec_ip_op),
 		.data_out(any_req_op));
 	     
-	     wire [0:num_ports*num_ports-1] any_req_out_ip_op;
-	     assign any_req_out_ip_op = {num_ports{any_req_op}};
+	     wire [0:num_ports*num_ports-1] any_req_wf_ip_op;
+	     assign any_req_wf_ip_op = {num_ports{any_req_op}};
 	     
-	     assign spec_mask_ip_op = ~(any_req_in_ip_op | any_req_out_ip_op);
+	     assign spec_mask_ip_op = ~(any_req_in_ip_op | any_req_wf_ip_op);
 	     
 	  end
 	
 	`SW_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] gnt_out_nonspec_op_ip;
+	     wire [0:num_ports*num_ports-1] gnt_wf_nonspec_op_ip;
 	     interleaver
 	       #(.width(num_ports*num_ports),
 		 .num_blocks(num_ports))
-	     gnt_out_nonspec_op_ip_intl
-	       (.data_in(gnt_out_nonspec_ip_op),
-		.data_out(gnt_out_nonspec_op_ip));
+	     gnt_wf_nonspec_op_ip_intl
+	       (.data_in(gnt_wf_nonspec_ip_op),
+		.data_out(gnt_wf_nonspec_op_ip));
 	     
 	     wire [0:num_ports-1] 	    any_gnt_ip;
 	     or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_gnt_ip_or
-	       (.data_in(gnt_out_nonspec_op_ip),
+	       (.data_in(gnt_wf_nonspec_op_ip),
 		.data_out(any_gnt_ip));
 	     
 	     wire [0:num_ports*num_ports-1] any_gnt_in_ip_op;
@@ -406,13 +406,13 @@ module sw_alloc_core_wf
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_gnt_op_or
-	       (.data_in(gnt_out_nonspec_ip_op),
+	       (.data_in(gnt_wf_nonspec_ip_op),
 		.data_out(any_gnt_op));
 	     
-	     wire [0:num_ports*num_ports-1] any_gnt_out_ip_op;
-	     assign any_gnt_out_ip_op = {num_ports{any_gnt_op}};
+	     wire [0:num_ports*num_ports-1] any_gnt_wf_ip_op;
+	     assign any_gnt_wf_ip_op = {num_ports{any_gnt_op}};
 	     
-	     assign spec_mask_ip_op = ~(any_gnt_in_ip_op | any_gnt_out_ip_op);
+	     assign spec_mask_ip_op = ~(any_gnt_in_ip_op | any_gnt_wf_ip_op);
 	     
 	  end
    
@@ -428,18 +428,18 @@ module sw_alloc_core_wf
    // if there are any requests at all in a cycle, at least one of them will
    // eventually be granted, so update priorities
    wire 				    update_alloc_nonspec;
-   assign update_alloc_nonspec = |req_out_nonspec_ip_op;
+   assign update_alloc_nonspec = |req_wf_nonspec_ip_op;
    
    wf_alloc
      #(.num_ports(num_ports),
        .wf_allocator_type(wf_allocator_type),
        .reset_type(reset_type))
-   gnt_out_nonspec_ip_op_alloc
+   gnt_wf_nonspec_ip_op_alloc
      (.clk(clk),
       .reset(reset),
       .update(update_alloc_nonspec),
-      .req(req_out_nonspec_ip_op),
-      .gnt(gnt_out_nonspec_ip_op));
+      .req(req_wf_nonspec_ip_op),
+      .gnt(gnt_wf_nonspec_ip_op));
    
    generate
       
@@ -449,26 +449,26 @@ module sw_alloc_core_wf
 	   // only update priorities if there is no conflicting non-
 	   // speculative request
 	   wire update_alloc_spec;
-	   assign update_alloc_spec = |(req_out_spec_ip_op & spec_mask_ip_op);
+	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
-	   wire [0:num_ports*num_ports-1] gnt_out_unmasked_spec_ip_op;
+	   wire [0:num_ports*num_ports-1] gnt_wf_unmasked_spec_ip_op;
 	   wf_alloc
 	     #(.num_ports(num_ports),
 	       .wf_allocator_type(wf_allocator_type),
 	       .reset_type(reset_type))
-	   gnt_out_unmasked_spec_ip_op_alloc
+	   gnt_wf_unmasked_spec_ip_op_alloc
 	     (.clk(clk),
 	      .reset(reset),
 	      .update(update_alloc_spec),
-	      .req(req_out_spec_ip_op),
-	      .gnt(gnt_out_unmasked_spec_ip_op));
+	      .req(req_wf_spec_ip_op),
+	      .gnt(gnt_wf_unmasked_spec_ip_op));
 	   
-	   assign gnt_out_spec_ip_op
-	     = gnt_out_unmasked_spec_ip_op & spec_mask_ip_op;
+	   assign gnt_wf_spec_ip_op
+	     = gnt_wf_unmasked_spec_ip_op & spec_mask_ip_op;
 	   
 	end
       else
-	assign gnt_out_spec_ip_op = {num_ports*num_ports{1'b0}};
+	assign gnt_wf_spec_ip_op = {num_ports*num_ports{1'b0}};
       
    endgenerate
    
@@ -477,6 +477,6 @@ module sw_alloc_core_wf
    // generate global grants
    //---------------------------------------------------------------------------
    
-   assign gnt_ip_op = gnt_out_nonspec_ip_op | gnt_out_spec_ip_op;
+   assign gnt_ip_op = gnt_wf_nonspec_ip_op | gnt_wf_spec_ip_op;
    
 endmodule

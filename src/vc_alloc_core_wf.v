@@ -54,8 +54,8 @@ module vc_alloc_core_wf
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc;
-   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_wf_ip_ivc_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_wf_ip_ivc_op_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -95,29 +95,30 @@ module vc_alloc_core_wf
 		     wire 			     req;
 		     assign req = req_op[op];
 		     
-		     wire [0:num_vcs-1] 	     req_ovc;
-		     assign req_ovc
+		     wire [0:num_vcs-1] 	     req_wf_ovc;
+		     assign req_wf_ovc
 		       = {num_vcs{req}} & req_ovc & elig_ovc;
 		     
-		     assign req_ip_ivc_op_ovc[((ip*num_vcs+ivc)*num_ports+op)*
-					      num_vcs:
-					      ((ip*num_vcs+ivc)*num_ports+op+1)*
-					      num_vcs-1]
-			      = req_ovc;
+		     assign req_wf_ip_ivc_op_ovc[((ip*num_vcs+ivc)*
+						  num_ports+op)*num_vcs:
+						 ((ip*num_vcs+ivc)*
+						  num_ports+op+1)*num_vcs-1]
+			      = req_wf_ovc;
 		     
 		  end
 		
-		wire [0:num_ports*num_vcs-1] 	     gnt_op_ovc;
-		assign gnt_op_ovc
-		  = gnt_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
-				      (ip*num_vcs+ivc+1)*num_ports*num_vcs-1];
+		wire [0:num_ports*num_vcs-1] 	     gnt_wf_op_ovc;
+		assign gnt_wf_op_ovc
+		  = gnt_wf_ip_ivc_op_ovc[(ip*num_vcs+ivc)*num_ports*num_vcs:
+					 (ip*num_vcs+ivc+1)*num_ports*num_vcs
+					 -1];
 		
 		wire [0:num_vcs-1] 		     gnt_ovc;
 		or_nto1
 		  #(.num_ports(num_ports),
 		    .width(num_vcs))
 		gnt_ovc_or
-		  (.data_in(gnt_op_ovc),
+		  (.data_in(gnt_wf_op_ovc),
 		   .data_out(gnt_ovc));
 		
 		assign gnt_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
@@ -137,21 +138,18 @@ module vc_alloc_core_wf
      #(.num_ports(num_ports*num_vcs),
        .wf_allocator_type(wf_allocator_type),
        .reset_type(reset_type))
-   gnt_ip_ivc_op_ovc_alloc
+   gnt_wf_ip_ivc_op_ovc_alloc
      (.clk(clk),
       .reset(reset),
       .update(update_alloc),
-      .req(req_ip_ivc_op_ovc),
-      .gnt(gnt_ip_ivc_op_ovc));
+      .req(req_wf_ip_ivc_op_ovc),
+      .gnt(gnt_wf_ip_ivc_op_ovc));
    
-   wire [0:num_ports*num_vcs-1] 		     gnt_op_ovc;
    or_nto1
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports*num_vcs))
    gnt_op_ovc_or
-     (.data_in(gnt_ip_ivc_op_ovc),
+     (.data_in(gnt_wf_ip_ivc_op_ovc),
       .data_out(gnt_op_ovc));
-   
-   assign gnt_op_ovc = gnt_op_ovc;
    
 endmodule
