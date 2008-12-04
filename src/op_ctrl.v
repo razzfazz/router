@@ -121,7 +121,7 @@ module op_ctrl
 	   assign debit = flit_valid_in && (flit_vc_in == ovc);
 	   
 	   wire 			    vc_gnt;
-	   assign vc_gnt = vc_gnt_ovc[ovc] & elig_ovc[ovc];
+	   assign vc_gnt = vc_gnt_ovc[ovc];
 	   
 
 	   //-------------------------------------------------------------------
