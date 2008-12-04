@@ -120,103 +120,13 @@ module op_ctrl
 	   wire debit;
 	   assign debit = flit_valid_in && (flit_vc_in == ovc);
 	   
-	   wire head_credit;
-	   wire [0:cred_count_width-1] cred_count_s;
-	   
-	   if(num_header_buffers > 1)
-	     begin
-		
-		wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
-		
-		wire [0:flit_buffer_idx_width-1] push_ptr_q;
-		
-		genvar 				 idx;
-		
-		for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
-		  begin:idxs
-		     
-		     wire capture;
-		     assign capture = debit && (push_ptr_q == idx);
-		     
-		     assign tail_queue_s[idx] = capture ?
-						flit_tail_in :
-						tail_queue_q[idx];
-		     
-		  end
-		
-		dff
-		  #(.width(num_flit_buffers),
-		    .reset_type(reset_type))
-		tail_queueq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(tail_queue_s),
-		   .q(tail_queue_q));
-		
-		wire [0:flit_buffer_idx_width-1] push_ptr_next;
-		incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		push_ptr_incr
-		  (.data_in(push_ptr_q),
-		   .data_out(push_ptr_next));
-		
-		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
-		dff
-		  #(.width(flit_buffer_idx_width),
-		    .reset_type(reset_type))
-		push_ptrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(push_ptr_s),
-		   .q(push_ptr_q));
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
-		incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		pop_ptr_incr
-		  (.data_in(pop_ptr_q),
-		   .data_out(pop_ptr_next));
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
-		dff
-		  #(.width(flit_buffer_idx_width),
-		    .reset_type(reset_type))
-		pop_ptrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(pop_ptr_s),
-		   .q(pop_ptr_q));
-		
-		wire 				 tail;
-		mux_nto1
-		  #(.num_ports(num_flit_buffers),
-		    .width(1))
-		tail_mux
-		  (.select(pop_ptr_q),
-		   .data_in(tail_queue_q),
-		   .data_out(tail));
-		
-		assign head_credit = tail & credit;
-		
-	     end
-	   else
-	     begin
-		
-		// if we can only have one packet per buffer, we can accept the
-		// next one once the buffer has been emptied
-		assign head_credit = credit &&
-				     (cred_count_s == num_flit_buffers);
-		
-	     end
-	   
 	   wire 			    vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc] & elig_ovc[ovc];
+	   
+
+	   //-------------------------------------------------------------------
+	   // track whether this output VC is currently assigend to an input VC
+	   //-------------------------------------------------------------------
 	   
 	   wire 			    set_allocated;
 	   assign set_allocated = vc_gnt;
@@ -224,8 +134,6 @@ module op_ctrl
 	   wire 			    reset_allocated;   
 	   assign reset_allocated = debit & flit_tail_in;
 	   
-	   // per-output-VC bit indicating whether it is available for
-	   // assignment
 	   wire 			    allocated_s, allocated_q;
 	   assign allocated_s
 	     = set_allocated | (allocated_q & ~reset_allocated);
@@ -238,28 +146,153 @@ module op_ctrl
 	      .d(allocated_s),
 	      .q(allocated_q));
 	   
-	   wire 			    head_debit;
-	   assign head_debit = vc_gnt;
 	   
-	   // track header credits using stock credit tracker module
-	   wire 			    head_free;
-	   wire 			    head_free_early;
-	   wire 			    error_hct;
-	   credit_tracker
-	     #(.num_credits(num_header_buffers),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
-	       .reset_type(reset_type))
-	   hct
-	     (.clk(clk),
-	      .reset(reset),
-	      .credit(head_credit),
-	      .debit(head_debit),
-	      .free(head_free),
-	      .free_early(head_free_early),
-	      .error(error_hct));
+	   //-------------------------------------------------------------------
+	   // track number of packets that downstream buffer can still accept
+	   //-------------------------------------------------------------------
 	   
-	   assign error_hct_ovc[ovc] = error_hct;
+	   wire [0:cred_count_width-1] cred_count_s;
+	   wire 		       head_free_early;
+	   
+	   if(num_header_buffers == num_flit_buffers)
+	     begin
+		
+		// if every flit buffer entry can be a head flit, we don't need 
+		// dedicated credit tracking for headers, and can instead just
+		// rely on the normal credit tracking mechanism
+		assign head_free_early = 1'b1;
+		
+		assign error_hct_ovc[ovc] = 1'b0;
+		
+	     end
+	   else
+	     begin
+
+		// if only a subset of the flit buffer entries can be headers, 
+		// we need to keep track of how many such slots are left
+		
+		wire 			    head_credit;
+		
+		if(num_header_buffers == 1)
+		  begin
+		     
+		     // if we can only have one packet per buffer, we can accept
+		     // the next one once the buffer has been emptied
+		     assign head_credit = credit &&
+					  (cred_count_s == num_flit_buffers);
+		     
+		  end
+		else
+		  begin
+		     
+		     wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
+		     
+		     wire [0:flit_buffer_idx_width-1] push_ptr_q;
+		     
+		     genvar 			      idx;
+		     
+		     for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
+		       begin:idxs
+			  
+			  wire capture;
+			  assign capture = debit && (push_ptr_q == idx);
+			  
+			  assign tail_queue_s[idx] = capture ?
+						     flit_tail_in :
+						     tail_queue_q[idx];
+			  
+		       end
+		     
+		     dff
+		       #(.width(num_flit_buffers),
+			 .reset_type(reset_type))
+		     tail_queueq
+		       (.clk(clk),
+			.reset(reset),
+			.d(tail_queue_s),
+			.q(tail_queue_q));
+		     
+		     wire [0:flit_buffer_idx_width-1] push_ptr_next;
+		     incr
+		       #(.width(flit_buffer_idx_width),
+			 .min_value(0),
+			 .max_value(num_flit_buffers-1))
+		     push_ptr_incr
+		       (.data_in(push_ptr_q),
+			.data_out(push_ptr_next));
+		     
+		     wire [0:flit_buffer_idx_width-1] push_ptr_s;
+		     assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
+		     dff
+		       #(.width(flit_buffer_idx_width),
+			 .reset_type(reset_type))
+		     push_ptrq
+		       (.clk(clk),
+			.reset(reset),
+			.d(push_ptr_s),
+			.q(push_ptr_q));
+		     
+		     wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
+		     incr
+		       #(.width(flit_buffer_idx_width),
+			 .min_value(0),
+			 .max_value(num_flit_buffers-1))
+		     pop_ptr_incr
+		       (.data_in(pop_ptr_q),
+			.data_out(pop_ptr_next));
+		     
+		     wire [0:flit_buffer_idx_width-1] pop_ptr_s;
+		     assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
+		     dff
+		       #(.width(flit_buffer_idx_width),
+			 .reset_type(reset_type))
+		     pop_ptrq
+		       (.clk(clk),
+			.reset(reset),
+			.d(pop_ptr_s),
+		   .q(pop_ptr_q));
+		     
+		     wire 			      tail;
+		     mux_nto1
+		       #(.num_ports(num_flit_buffers),
+			 .width(1))
+		     tail_mux
+		       (.select(pop_ptr_q),
+			.data_in(tail_queue_q),
+			.data_out(tail));
+		     
+		     assign head_credit = tail & credit;
+		     
+		  end
+		
+		wire 				      head_debit;
+		assign head_debit = vc_gnt;
+		
+		// track header credits using stock credit tracker module
+		wire 				      head_free;
+		wire 				      error_hct;
+		credit_tracker
+		  #(.num_credits(num_header_buffers),
+		    .checker_enable(checker_enable),
+		    .checker_capture_mode(checker_capture_mode),
+		    .reset_type(reset_type))
+		hct
+		  (.clk(clk),
+		   .reset(reset),
+		   .credit(head_credit),
+		   .debit(head_debit),
+		   .free(head_free),
+		   .free_early(head_free_early),
+		   .error(error_hct));
+		
+		assign error_hct_ovc[ovc] = error_hct;
+		
+	     end
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // track number of flits that downstream buffer can still accept
+	   //-------------------------------------------------------------------
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
 	   assign cred_count_s = (cred_valid_in | flit_valid_in) ?
@@ -282,6 +315,11 @@ module op_ctrl
 				(cred_count_q == 0) && debit};
 	   
 	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // generate flow control signals to input controller
+	   //-------------------------------------------------------------------
 	   
 	   case(credit_handling_type)
 	     
@@ -354,6 +392,11 @@ module op_ctrl
 	       end
 	     
 	   endcase
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // keep track of whether current VC is available for allocation
+	   //-------------------------------------------------------------------
 	   
 	   wire 			      elig_s, elig_q;
 	   assign elig_s = ~allocated_s & head_free_early & next_cred_ovc[ovc];
