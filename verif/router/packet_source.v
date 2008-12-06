@@ -177,10 +177,12 @@ module packet_source
    
    wire 			  packet_sent;
    
+   wire 			  ready_packet_count_zero;
    wire [0:packet_count_width-1]  ready_packet_count_s, ready_packet_count_q;
    assign ready_packet_count_s
      = run ?
-       ready_packet_count_q - packet_sent + packet_ready :
+       ready_packet_count_q - (packet_sent & ~ready_packet_count_zero) + 
+       packet_ready :
        {packet_count_width{1'b0}};
    dff
      #(.width(packet_count_width))
@@ -190,7 +192,6 @@ module packet_source
       .d(ready_packet_count_s),
       .q(ready_packet_count_q));
    
-   wire 			  ready_packet_count_zero;
    assign ready_packet_count_zero = ~|ready_packet_count_q;
    
    wire 			  flit_count_max;
@@ -372,8 +373,9 @@ module packet_source
    assign packet_sent = flit_count_zero & flit_sent;
    
    wire 			       flit_valid_s;
-   assign flit_valid_s = ~ready_packet_count_zero |
-			 (flit_valid_q & ~(flit_sent & flit_count_zero));
+   assign flit_valid_s = flit_valid_q ?
+			 ~(flit_sent & flit_count_zero) :
+			 ~ready_packet_count_zero;
    dff
      #(.width(1))
    flit_validq
