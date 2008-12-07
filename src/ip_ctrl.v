@@ -102,7 +102,8 @@ module ip_ctrl
    localparam addr_width = router_addr_width + node_addr_width;
    
    // total number of bits required for storing routing information
-   localparam route_info_width = 2 * addr_width;
+   localparam route_info_width
+     = num_routing_classes * router_addr_width + node_addr_width;
    
    // flit width
    parameter data_width = 64;
@@ -443,34 +444,6 @@ module ip_ctrl
    
    
    //---------------------------------------------------------------------------
-   // for adaptive routing, must update route info if we're transitioning from
-   // non-minimal to minimal at this hop!
-   //---------------------------------------------------------------------------
-   
-   wire [0:route_info_width-1] 		    route_info;
-   assign route_info = flit_data_in[0:route_info_width-1];
-   
-   wire [0:addr_width-1] 		    next_address;
-   assign next_address = route_info[0:addr_width-1];
-   
-   wire [0:addr_width-1] 		    final_address;
-   assign final_address = route_info[addr_width:2*addr_width-1];
-   
-   wire 				    update_addr;
-   assign update_addr = flit_head_in &&
-			(router_address == next_address[0:router_addr_width-1]);
-   
-   wire [0:route_info_width-1] 		    next_route_info;
-   assign next_route_info
-     = {update_addr ? final_address : next_address, final_address};
-   
-   wire [0:data_width-1] 		    flit_data_muxed;
-   assign flit_data_muxed[0:route_info_width-1] = next_route_info;
-   assign flit_data_muxed[route_info_width:data_width-1]
-	    = flit_data_in[route_info_width:data_width-1];
-   
-   
-   //---------------------------------------------------------------------------
    // flit buffer
    //---------------------------------------------------------------------------
    
@@ -489,7 +462,7 @@ module ip_ctrl
      (.clk(clk),
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
-      .write_data(flit_data_muxed),
+      .write_data(flit_data_in),
       .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(flit_data_out));

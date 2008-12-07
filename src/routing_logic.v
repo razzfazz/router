@@ -89,7 +89,8 @@ module routing_logic
    localparam addr_width = router_addr_width + node_addr_width;
    
    // total number of bits required for storing routing information
-   localparam route_info_width = 2 * addr_width;
+   localparam route_info_width
+     = num_routing_classes * router_addr_width + node_addr_width;
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
@@ -148,57 +149,51 @@ module routing_logic
    output error;
    wire 		error;   
    
-   // address to route packet to next
-   // (note: for Valiant traffic, this is the address of the intermediate node)
-   wire [0:addr_width-1] next_address;
-   assign next_address = route_info[0:addr_width-1];
+   // address of destination router for current routing class
+   wire [0:router_addr_width-1] dest_router_address;
+   assign dest_router_address
+     = route_info[routing_class*router_addr_width:
+		  (routing_class+1)*router_addr_width-1];
    
-   // eventual destination address
-   // (note: for minimal traffic, this is the same as next_address)
-   wire [0:addr_width-1] final_address;
-   assign final_address = route_info[addr_width:2*addr_width-1];
+   // if we have reached our destination for the current routing class, move to 
+   // next routing class
+   wire 			chg_class;
    
-   // are we at the current destination?
-   wire 		 is_next;
-   assign is_next = (router_address == next_address[0:router_addr_width-1]);
+   wire [0:num_ports-1] 	next_port_int;
+   wire [0:num_ports-1] 	error_op;
+   wire [0:num_dimensions-1] 	dim_addr_match;
    
-   wire [0:addr_width-1] new_next_address;
-   assign new_next_address = is_next ? final_address : next_address;
-   
-   wire [0:num_ports-1]  next_port_int;
-   
-   wire [0:num_ports-1]  error_op;
-   
-   wire [0:num_dimensions-1] dim_addr_match;
-   
-   generate
+   genvar 			ovc;
+   genvar 			dim;
       
-      genvar 		     ovc;
+   generate
+   
+      if(routing_class != (num_routing_classes - 1))
+	assign chg_class = 1'b0;
+      else
+	assign chg_class = (router_address == dest_router_address);
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
-
+	   
 	   assign next_vcs[ovc]
 		    = (get_traffic_class(ovc) == traffic_class) &&
-		      (get_routing_class(ovc) == 
-		       ((is_next && (routing_class != 0)) ?
-			0 :
-			routing_class));
+		      (get_routing_class(ovc) == (routing_class + chg_class));
 	   
 	end
-      
-      genvar 		     dim;
       
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
 	   
 	   wire [0:dim_addr_width-1] dim_addr;
 	   assign dim_addr
-	     = new_next_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
+	     = dest_router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
 	   
-	   assign dim_addr_match[dim]
-		    = (dim_addr == router_address[dim*dim_addr_width:
-						  (dim+1)*dim_addr_width-1]);
+	   wire [0:dim_addr_width-1] local_dim_addr;
+	   assign local_dim_addr
+	     = router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
+	   
+	   assign dim_addr_match[dim] = (dim_addr == local_dim_addr);
 	   
 	   wire 		     route_here;
 	   
@@ -208,10 +203,6 @@ module routing_logic
 	   else
 	     assign route_here
 	       = &dim_addr_match[0:dim-1] & ~dim_addr_match[dim];
-	   
-	   wire [0:dim_addr_width-1]   local_dim_addr;
-	   assign local_dim_addr = router_address[dim*dim_addr_width:
-						  (dim+1)*dim_addr_width-1];
 	   
 	   wire [0:num_neighbors_per_dim-1] port_dec;
 	   
@@ -247,48 +238,51 @@ module routing_logic
 	     
 	   endcase
 	   
-	   wire [0:num_neighbors_per_dim-1] 	       mask;
-	   assign mask = {num_neighbors_per_dim{route_here}};
-	   
 	   assign next_port_int[dim*num_neighbors_per_dim:
 				(dim+1)*num_neighbors_per_dim-1]
-		    = port_dec & mask;
+		    = port_dec & {num_neighbors_per_dim{route_here}};
 	   
 	end
       
-      if(num_nodes_per_router > 1)
+      if(routing_class == (num_routing_classes - 1))
 	begin
 	   
-	   wire [0:node_addr_width-1] 	     node_addr;
-	   assign node_addr
-	     = new_next_address[num_dimensions*dim_addr_width:
-				num_dimensions*dim_addr_width+node_addr_width
-				-1];
-	   
-	   wire [0:num_nodes_per_router-1]   node_dec;
-	   decoder
-	     #(.num_ports(num_nodes_per_router))
-	   port_addr_dec
-	     (.data_in(node_addr),
-	      .data_out(node_dec));
-	   
-	   assign next_port_int[num_dimensions*num_neighbors_per_dim:
-				num_ports-1]
-		    = node_dec & {num_nodes_per_router{&dim_addr_match}};
+	   if(num_nodes_per_router > 1)
+	     begin
+		
+		wire [0:node_addr_width-1] 	dest_node_address;
+		assign dest_node_address
+		  = route_info[route_info_width-node_addr_width:
+			       route_info_width-1];
+		
+		wire [0:num_nodes_per_router-1] node_sel;
+		decoder
+		  #(.num_ports(num_nodes_per_router))
+		node_sel_dec
+		  (.data_in(dest_node_address),
+		   .data_out(node_sel));
+		
+		assign next_port_int[num_ports-num_nodes_per_router:num_ports-1]
+			 = node_sel & {num_nodes_per_router{&dim_addr_match}};
+		
+	     end
+	   else
+	     assign next_port_int[num_ports-1] = &dim_addr_match;
 	   
 	end
       else
-	assign next_port_int[num_ports-1] = &dim_addr_match;
+	assign next_port_int[num_ports-num_nodes_per_router:num_ports-1]
+		 = {num_nodes_per_router{1'b0}};
       
-      genvar 		   op;
+      genvar 					op;
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
 	   if(op == port_id)
 	     begin
-		assign next_port[op] = 1'b0;
-		assign error_op[op] = next_port_int[op];
+		assign next_port[op] = next_port_int[op] & chg_class;
+		assign error_op[op] = next_port_int[op] & ~chg_class;
 	     end
 	   else
 	     begin

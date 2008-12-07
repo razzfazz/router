@@ -99,7 +99,8 @@ module ivc_ctrl
    localparam addr_width = router_addr_width + node_addr_width;
    
    // total number of bits required for storing routing information
-   localparam route_info_width = 2 * addr_width;
+   localparam route_info_width
+     = num_routing_classes * router_addr_width + node_addr_width;
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
