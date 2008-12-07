@@ -601,7 +601,19 @@ module ivc_ctrl
 		  
 	       end
 	     
-	     assign free_allocated = |(next_free_ovc & vcs_updated);
+	     wire 	     free_allocated_s, free_allocated_q;
+	     assign free_allocated_s = |(next_free_ovc & vcs_updated);
+	     dff
+	       #(.width(1),
+		 .reset_value(1'b1),
+		 .reset_type(reset_type))
+	     free_allocatedq
+	       (.clk(clk),
+		.reset(reset),
+		.d(free_allocated_s),
+		.q(free_allocated_q));
+	     
+	     assign free_allocated = free_allocated_q;
 	     
 	     assign cred_tracker_error = 1'b0;
 	     
@@ -632,7 +644,7 @@ module ivc_ctrl
 		.d(has_cred_s),
 		.q(has_cred_q));
 	     
-	     assign free_allocated = has_cred_s;
+	     assign free_allocated = has_cred_q;
 	     
 	     wire 			       incr_cred_hold;
 	     assign incr_cred_hold = cred & ~sw_gnt_nonspec;
@@ -671,44 +683,17 @@ module ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   wire 				       fbc_empty_early;
+   wire 				       fbc_empty;
    
-   wire [0:num_ports-1] 		       sw_req_nonspec_op_s,
-					       sw_req_nonspec_op_q;
-   assign sw_req_nonspec_op_s
-     = port_s &
-       {num_ports{valid_s & ~fbc_empty_early & allocated_s & free_allocated}};
-   dff
-     #(.width(num_ports),
-       .reset_type(reset_type))
-   sw_req_nonspec_opq
-     (.clk(clk),
-      .reset(reset),
-      .d(sw_req_nonspec_op_s),
-      .q(sw_req_nonspec_op_q));
-   
-   assign sw_req_nonspec_op = sw_req_nonspec_op_q;
+   assign sw_req_nonspec_op
+     = port_q &
+       {num_ports{valid_q & ~fbc_empty & allocated_q & free_allocated}};
    
    generate
       
       if(sw_spec_enable)
-	begin
-	   
-	   wire [0:num_ports-1] sw_req_spec_op_s, sw_req_spec_op_q;
-	   assign sw_req_spec_op_s
-	     = port_s & {num_ports{valid_s & ~fbc_empty_early & ~allocated_s}};
-	   dff
-	     #(.width(num_ports),
-	       .reset_type(reset_type))
-	   sw_req_spec_opq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(sw_req_spec_op_s),
-	      .q(sw_req_spec_op_q));
-	   
-	   assign sw_req_spec_op = sw_req_spec_op_q;
-	   
-	end
+	assign sw_req_spec_op
+	  = port_q & {num_ports{valid_q & ~fbc_empty & ~allocated_q}};
       else
 	assign sw_req_spec_op = {num_ports{1'b0}};
       
@@ -754,12 +739,11 @@ module ivc_ctrl
    wire 		       fbc_push;
    assign fbc_push = flit_valid_in;
    
-   wire 		       fbc_empty;
-   
    wire 		       fbc_pop;
    assign fbc_pop = all_allocated & ~fbc_empty;
    
    wire 		       fbc_error;
+   wire 		       fbc_empty_early;
    wire 		       fbc_full;
    wire 		       fbc_full_early;
    fifo_ctrl
