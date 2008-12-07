@@ -543,7 +543,7 @@ module router
 	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire 				  xbr_ctrl;
-	   assign xbr_ctrl = xbr_ctrl_ip;
+	   assign xbr_ctrl = |xbr_ctrl_ip;
 	   
 	   wire 				  flit_valid_s, flit_valid_q;
 	   assign flit_valid_s = flit_valid;
