@@ -459,6 +459,14 @@ module router
    // output ports
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
+   interleaver
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   xbr_ctrl_op_ip_intl
+     (.data_in(xbr_ctrl_ip_op_q),
+      .data_out(xbr_ctrl_op_ip));
+   
    wire [0:num_ports-1] 	  opc_error_op;
    
    generate
@@ -531,16 +539,82 @@ module router
 				   (op+1)*num_vcs*int_flow_ctrl_width-1]
 		    = flow_ctrl_ovc;
 	   
+	   wire [0:num_ports-1] 		  xbr_ctrl_ip;
+	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   
+	   wire 				  xbr_ctrl;
+	   assign xbr_ctrl = xbr_ctrl_ip;
+	   
+	   wire 				  flit_valid_s, flit_valid_q;
+	   assign flit_valid_s = flit_valid;
+	   dff
+	     #(.width(1),
+	      .reset_type(reset_type))
+	     flit_validq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_valid_s),
+		.q(flit_valid_q));
+	   
 	   assign flit_valid_out_op[op] 
-		    = flit_valid;
+		    = flit_valid_q;
+	   
+	   wire [0:vc_idx_width-1] 		  flit_vc_s, flit_vc_q;
+	   assign flit_vc_s = xbr_ctrl ? flit_vc : flit_vc_q;
+	   dff
+	     #(.width(vc_idx_width),
+	       .reset_type(reset_type))
+	   flit_vcq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_vc_s),
+	      .q(flit_vc_q));
+	   
 	   assign flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1]
-		    = flit_vc;
+		    = flit_vc_q;
+	   
+	   wire 				  flit_head_s, flit_head_q;
+	   assign flit_head_s = xbr_ctrl ? flit_head : flit_head_q;
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_headq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_head_s),
+	      .q(flit_head_q));
+	   
 	   assign flit_head_out_op[op]
-		    = flit_head;
+		    = flit_head_q;
+	   
+	   wire 				  flit_tail_s, flit_tail_q;
+	   assign flit_tail_s = xbr_ctrl ? flit_tail : flit_tail_q;
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_tailq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_tail_s),
+	      .q(flit_tail_q));
+	   
 	   assign flit_tail_out_op[op]
-		    = flit_tail;
+		    = flit_tail_q;
+	   
+	   wire [0:data_width-1] 		  flit_data_s, flit_data_q;
+	   assign flit_data_s = xbr_ctrl ? flit_data : flit_data_q;
+	   dff
+	     #(.width(data_width),
+	       .reset_type(reset_type))
+	   flit_dataq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_data_s),
+	      .q(flit_data_q));
+	   
 	   assign flit_data_out_op[op*data_width:(op+1)*data_width-1]
-		    = flit_data;
+		    = flit_data_q;
+	   
 	   assign opc_error_op[op] = opc_error;
 	   
 	end
