@@ -153,9 +153,12 @@ module routing_logic
 	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
 	     begin:orcs
 		
-		assign next_class[otc*num_routing_classes+orc]
-			 = (otc == traffic_class) &&
-			   (orc == (routing_class + chg_class));
+		if((otc == traffic_class) && (orc == routing_class))
+		  assign next_class[otc*num_routing_classes+orc] = ~chg_class;
+		else if((otc == traffic_class) && (orc == (routing_class + 1)))
+		  assign next_class[otc*num_routing_classes+orc] = chg_class;
+		else
+		  assign next_class[otc*num_routing_classes+orc] = 1'b0;
 		
 	     end
 	   
