@@ -167,7 +167,7 @@ module la_routing_logic
 	   
 	end
       else
-	assign dest_router_address = route_info_width[0:router_addr_width-1];
+	assign dest_router_address = route_info[0:router_addr_width-1];
       
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
