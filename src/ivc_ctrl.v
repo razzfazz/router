@@ -511,12 +511,9 @@ module ivc_ctrl
        .routing_function_type(routing_function_type),
        .port_id(port_id),
        .traffic_class(traffic_class),
-       .routing_class(routing_class),
-       .reset_type(reset_type))
+       .routing_class(routing_class))
    rtl
-     (.clk(clk),
-      .reset(reset),
-      .router_address(router_address),
+     (.router_address(router_address),
       .route_info(next_route_info),
       .next_port(rtl_next_port),
       .next_class(rtl_next_class),

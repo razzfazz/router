@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module routing_logic
-  (clk, reset, router_address, route_info, next_port, next_class, error);
+  (router_address, route_info, next_port, next_class, error);
    
 `include "constants.v"
    
@@ -103,11 +103,6 @@ module routing_logic
    
    // current routing class
    parameter routing_class = 0;
-   
-   parameter reset_type = `RESET_TYPE_ASYNC;
-   
-   input clk;
-   input reset;
    
    // current router's address
    input [0:router_addr_width-1] router_address;

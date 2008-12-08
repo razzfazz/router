@@ -392,9 +392,7 @@ module testbench
 			      .traffic_class(itc),
 			      .routing_class(irc))
 			  rtl
-			    (.clk(clk),
-			     .reset(reset),
-			     .router_address(router_address),
+			    (.router_address(router_address),
 			     .route_info(route_info),
 			     .next_port(next_port),
 			     .next_class(next_class),
