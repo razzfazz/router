@@ -136,10 +136,6 @@ module routing_logic
    wire [0:num_ports-1] 	error_op;
    wire [0:num_dimensions-1] 	dim_addr_match;
    
-   genvar 			otc;
-   genvar 			orc;
-   genvar 			dim;
-      
    generate
    
       if(routing_class != (num_routing_classes - 1))
@@ -147,8 +143,12 @@ module routing_logic
       else
 	assign chg_class = (router_address == dest_router_address);
       
+      genvar 			otc;
+      
       for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
 	begin:otcs
+	   
+	   genvar 			orc;
 	   
 	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
 	     begin:orcs
@@ -160,6 +160,8 @@ module routing_logic
 	     end
 	   
 	end
+      
+      genvar 			dim;
       
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
