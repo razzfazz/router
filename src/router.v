@@ -379,8 +379,7 @@ module router
    //---------------------------------------------------------------------------
    
    vc_alloc
-     #(.num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
+     #(.num_vcs(num_vcs),
        .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .arbiter_type(vc_arbiter_type),

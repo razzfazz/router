@@ -35,20 +35,11 @@ module vc_alloc_core_sep_of
    
 `include "constants.v"
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
-   
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
-   
-   // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   // number of VCs
+   parameter num_vcs = 4;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
-   
-   // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
    
    // number of input and output ports on switch
    parameter num_ports = 5;
