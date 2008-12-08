@@ -264,7 +264,7 @@ module routing_logic
 	   // if it is a non-minimal packet that has reached the intermediate 
 	   // node
 	   if(op == port_id)
-	     assign mask_port = chg_class;
+	     assign mask_port = ~chg_class;
 	   else
 	     assign mask_port = 1'b0;
 	   
