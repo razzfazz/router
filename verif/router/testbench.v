@@ -74,16 +74,16 @@ module testbench
    parameter num_header_buffers = 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   parameter num_traffic_classes = 1;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_routing_classes = 1;
    
    // total number of packet classes
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 1;
+   parameter num_vcs_per_class = 2;
    
    // number of VCs
    localparam num_vcs = num_classes * num_vcs_per_class;
@@ -528,7 +528,7 @@ module testbench
 						   (itc*num_routing_classes+
 						    irc+1)*num_vcs_per_class*
 						   la_route_info_width-1]
-				   = la_route_info;
+				   = {num_vcs_per_class{la_route_info}};
 			  
 		       end
 		     
