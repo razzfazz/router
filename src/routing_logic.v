@@ -174,13 +174,13 @@ module routing_logic
 	   
 	   assign dim_addr_match[dim] = (dim_addr == local_dim_addr);
 	   
-	   wire 		     route_here;
+	   wire 		     dim_sel;
 	   
 	   if(dim == 0)
-	     assign route_here
-	       = ~dim_addr_match[dim];
+	     assign dim_sel
+	       = ~dim_addr_match[0];
 	   else
-	     assign route_here
+	     assign dim_sel
 	       = &dim_addr_match[0:dim-1] & ~dim_addr_match[dim];
 	   
 	   wire [0:num_neighbors_per_dim-1] port_dec;
@@ -219,7 +219,7 @@ module routing_logic
 	   
 	   assign next_port_int[dim*num_neighbors_per_dim:
 				(dim+1)*num_neighbors_per_dim-1]
-		    = port_dec & {num_neighbors_per_dim{route_here}};
+		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
       
