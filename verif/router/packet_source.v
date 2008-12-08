@@ -49,22 +49,100 @@ module packet_source
    parameter initial_seed = 0;
    parameter adaptive_rate = 0;
    parameter packet_count_width = 32;
+
+   // flit buffer entries per VC
    parameter num_flit_buffers = 8;
-   parameter num_header_buffers = 8;
+   
+   // maximum number of packets that can be in a given VC buffer simultaneously
+   parameter num_header_buffers = 4;
+   
+   // number of VCs
    parameter num_vcs = 4;
-   parameter max_packet_length = 4;
-   parameter min_packet_length = 1;
-   parameter packet_length_mode = 0;
-   parameter data_width = 64;
-   parameter addr_width = 6;
-   parameter [0:addr_width-1] address = {addr_width{1'b0}};
-   parameter walk_addresses = 0;
+   
+   // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
+   // number of traffic classes (e.g. read, write)
+   parameter num_traffic_classes = 2;
+   
+   // nuber of routing classes (e.g. minimal, adaptive)
+   parameter num_routing_classes = 2;
+   
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs available for each class
+   localparam num_vcs_per_class = num_vcs / num_classes;
+   
+   // number of input and output ports on router
+   parameter num_ports = 5;
+   
+   // width required to select individual port
+   localparam port_idx_width = clogb(num_ports);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // current router's address
+   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
+   
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
+   // number of nodes per router (a.k.a. consentration factor)
+   localparam num_nodes_per_router
+     = num_ports - num_dimensions * num_neighbors_per_dim;
+   
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // width of global addresses
+   localparam addr_width = router_addr_width + node_addr_width;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = num_routing_classes * router_addr_width + node_addr_width;
+   
+   // select routing function type
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   
+   // ID of current port
+   parameter port_id = 0;
+   
+   // maximum packet length (in flits)
+   parameter max_packet_length = 8;
+   
+   // minimum packet length (in flits)
+   parameter min_packet_length = 8;
+   
+   // select packet length mode (0: uniform random, 1: bimodal)
+   parameter packet_length_mode = 0;
+   
+   // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
+   
+   // total number of bits required for storing header information
+   localparam header_info_width
+     = la_route_info_width + route_info_width + packet_length_width;
+   
+   // flit width
+   parameter data_width = 64;
+   
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam cred_count_width = clogb(num_flit_buffers+1);
-   localparam route_info_width = 2 * addr_width;
-   localparam head_info_width = route_info_width + packet_length_width;
    
    input clk;
    input reset;
@@ -104,9 +182,7 @@ module packet_source
    reg 				 new_packet;   
    reg [0:data_width-1] 	 random_data;
    reg [0:vc_idx_width-1] 	 random_vc;
-   reg [0:addr_width-1] 	 random_next_addr;
-   reg [0:addr_width-1] 	 random_final_addr;
-   reg [0:head_info_width-1] 	 random_head_info;
+   reg [0:header_info_width-1] 	 random_header_info;
    
    always @(posedge clk, posedge reset)
      begin
@@ -116,35 +192,46 @@ module packet_source
 	for(i = 0; i < data_width; i = i + 1)
 	  random_data[i] = $dist_uniform(seed, 0, 1);
 	random_vc = $dist_uniform(seed, 0, num_vcs-1);
-	if(walk_addresses)
-	  random_next_addr
-	    = reset ?
-	      0 :
-	      (random_next_addr + 1 + (random_next_addr + 1 == address));
-	else
-	  begin
-	     random_next_addr[0:addr_width-1]
-	       = address + $dist_uniform(seed, 1, 2**addr_width-1);
-	  end
-	random_final_addr = address + $dist_uniform(seed, 1, 2**addr_width-1);
-	random_head_info[0:addr_width-1] = random_next_addr;
-	random_head_info[addr_width:2*addr_width-1] = random_final_addr;
+	random_header_info[0:la_route_info_width-1]
+	  = {la_route_info_width{1'b0}};
+	for(i = 0; i < num_routing_classes; i = i + 1)
+	  random_header_info[la_route_info_width+i*router_addr_width +:
+			     router_addr_width]
+	    = router_address + $dist_uniform(seed, 1, 2**router_addr_width-1);
 	if(max_packet_length > 1)
 	  case(packet_length_mode)
 	    0:
-	      random_head_info[route_info_width:
-			       route_info_width+packet_length_width-1]
+	      random_header_info[la_route_info_width+route_info_width:
+				 la_route_info_width+route_info_width+
+				 packet_length_width-1]
 	      = $dist_uniform(seed, min_packet_length-1, max_packet_length-1);
 	    1:
-	      random_head_info[route_info_width:
-			       route_info_width+packet_length_width-1]
+	      random_header_info[la_route_info_width+route_info_width:
+				 la_route_info_width+route_info_width+
+				 packet_length_width-1]
 	      = ($dist_uniform(seed, 0, 1) < 1) ?
 		min_packet_length :
 		max_packet_length;
 	  endcase
      end
    
-   wire waiting_packet_count_zero;
+   generate
+      
+      if(num_nodes_per_router > 1)
+	always @(posedge clk, posedge reset)
+	  begin
+	     random_header_info[la_route_info_width+
+				num_routing_classes*router_addr_width:
+				la_route_info_width+
+				num_routing_classes*router_addr_width+
+				node_addr_width-1]
+	       = port_id + num_nodes_per_router - num_ports +
+		 $dist_uniform(seed, 1, 2**node_addr_width-1);
+	  end
+      
+   endgenerate
+	
+   wire 				  waiting_packet_count_zero;
    
    wire packet_ready;
    assign packet_ready = new_packet & ~waiting_packet_count_zero;
@@ -391,8 +478,9 @@ module packet_source
 	   
 	   wire [0:packet_length_width-1] packet_length;
 	   assign packet_length
-	     = random_head_info[route_info_width:
-				route_info_width+packet_length_width-1];
+	     = random_header_info[la_route_info_width+route_info_width:
+				  la_route_info_width+route_info_width+
+				  packet_length_width-1];
 	   
 	   wire [0:packet_length_width-1] flit_count_s;
 	   reg [0:packet_length_width-1]  flit_count_q;
@@ -433,23 +521,24 @@ module packet_source
 
    wire [0:data_width-1] 	  data_s;
    reg [0:data_width-1] 	  data_q;
-   assign data_s[0:head_info_width-1]
+   assign data_s[0:header_info_width-1]
 	    = flit_sent ?
 	      (packet_sent ?
-	       random_head_info :
-	       random_data[0:head_info_width-1]) :
-	      data_q[0:head_info_width-1];
-   assign data_s[head_info_width:data_width-1]
+	       random_header_info[0:header_info_width-1] :
+	       random_data[0:header_info_width-1]) :
+	      data_q[0:header_info_width-1];
+   assign data_s[header_info_width:data_width-1]
 	    = flit_sent ?
-	      random_data[head_info_width:data_width-1] :
-	      data_q[head_info_width:data_width-1];
-
+	      random_data[header_info_width:data_width-1] :
+	      data_q[header_info_width:data_width-1];
+   
    always @(posedge clk, posedge reset)
      if(reset)
        begin
-	  data_q[0:head_info_width-1] <= random_head_info;
-	  data_q[head_info_width:data_width-1]
-	    <= random_data[head_info_width:data_width-1];
+	  data_q[0:header_info_width-1]
+	    <= random_header_info;
+	  data_q[header_info_width:data_width-1]
+	    <= random_data[header_info_width:data_width-1];
 	  vc_q <= random_vc;
        end
      else
@@ -458,11 +547,96 @@ module packet_source
 	  vc_q <= vc_s;
        end
    
+   wire [0:route_info_width-1] route_info;
+   assign route_info
+     = data_q[la_route_info_width:la_route_info_width+route_info_width-1];
+   
+   wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
+   wire [0:num_vcs-1] 			  rtl_error_ivc;
+   
+   generate
+      
+      genvar 				  itc;
+      
+      for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
+	begin:itcs
+	   
+	   genvar irc;
+	   
+	   for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+	     begin:ircs
+		
+		wire 		       rtl_error;
+		wire [0:num_ports-1]   next_port;
+		wire [0:num_classes-1] next_class;
+		routing_logic
+		  #(.num_vcs(num_vcs),
+		    .num_traffic_classes(num_traffic_classes),
+		    .num_routing_classes(num_routing_classes),
+		    .num_ports(num_ports),
+		    .num_dimensions(num_dimensions),
+		    .num_routers_per_dim(num_routers_per_dim),
+		    .num_neighbors_per_dim(num_neighbors_per_dim),
+		    .routing_function_type(routing_function_type),
+		    .port_id(port_id),
+		    .traffic_class(itc),
+		    .routing_class(irc))
+		rtl
+		  (.router_address(router_address),
+		   .route_info(route_info),
+		   .next_port(next_port),
+		   .next_class(next_class),
+		   .error(rtl_error));
+		
+		wire [0:la_route_info_width-1] la_route_info;
+		
+		encoder
+		  #(.num_ports(num_ports))
+		la_port_enc
+		  (.data_in(next_port),
+		   .data_out(la_route_info[0:port_idx_width-1]));
+		
+		if(num_routing_classes > 1)
+		  assign la_route_info[port_idx_width]
+			   = ~next_class[itc*num_routing_classes+irc];
+		
+		assign la_route_info_ivc[(itc*num_routing_classes+irc)*
+					 num_vcs_per_class*
+					 la_route_info_width:
+					 (itc*num_routing_classes+irc+1)*
+					 num_vcs_per_class*
+					 la_route_info_width-1]
+		    = {num_vcs_per_class{la_route_info}};
+		
+		assign rtl_error_ivc[(itc*num_routing_classes+irc)*
+				     num_vcs_per_class:
+				     (itc*num_routing_classes+irc+1)*
+				     num_vcs_per_class-1]
+			 = {num_vcs_per_class{rtl_error}};
+		
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   wire [0:la_route_info_width-1] 	  la_route_info;
+   assign la_route_info
+     = la_route_info_ivc[vc_q*la_route_info_width +: la_route_info_width];
+   
+   wire 				  rtl_error;
+   assign rtl_error = |rtl_error_ivc;
+   
    assign flit_valid = flit_sent;
    assign flit_head = flit_count_max;
    assign flit_tail = flit_count_zero;
    assign flit_vc = vc_q;
-   assign flit_data = data_q;
+   assign flit_data[0:la_route_info_width-1]
+	    = flit_count_max ?
+	      la_route_info :
+	      data_q[0:la_route_info_width-1];
+   assign flit_data[la_route_info_width:data_width-1]
+	    = data_q[la_route_info_width:data_width-1];
    
    assign error = |error_hct_ovc | |error_cred_ovc;
    

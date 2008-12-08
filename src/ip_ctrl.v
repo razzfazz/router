@@ -76,6 +76,13 @@ module ip_ctrl
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -104,6 +111,9 @@ module ip_ctrl
    // total number of bits required for storing routing information
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
+   
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width = la_route_info_width + route_info_width;
    
    // flit width
    parameter data_width = 64;
@@ -249,9 +259,9 @@ module ip_ctrl
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   // extract routing information from header data
-   wire [0:route_info_width-1] 	route_info_in;
-   assign route_info_in = flit_data_in[0:route_info_width-1];
+   // extract header information from header data
+   wire [0:header_info_width-1] header_info_in;
+   assign header_info_in = flit_data_in[0:header_info_width-1];
    
    wire [0:num_vcs-1] 		flit_sent_ivc;
    wire [0:num_vcs*vc_idx_width-1] flit_vc_ivc;
@@ -259,6 +269,7 @@ module ip_ctrl
    wire [0:num_vcs-1] 		   flit_tail_ivc;
    wire [0:num_vcs*fbf_addr_width-1] fbf_write_addr_ivc;
    wire [0:num_vcs*fbf_addr_width-1] fbf_read_addr_ivc;
+   wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbf_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbf_read_offset_ivc;
    wire [0:num_vcs-1] 			    ivcc_error_ivc;
@@ -289,10 +300,11 @@ module ip_ctrl
 	   wire [0:vc_idx_width-1] flit_vc;
 	   wire 		   flit_head;
 	   wire 		   flit_tail;
-	   wire [0:fbf_addr_width-1] fbf_write_addr;
-	   wire [0:fbf_addr_width-1] fbf_read_addr;
-	   wire 		     ivcc_error;
-	   wire [0:5] 		     events;
+	   wire [0:la_route_info_width-1] la_route_info;
+	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+	   wire 			  ivcc_error;
+	   wire [0:5] 			  events;
 	   ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -320,7 +332,7 @@ module ip_ctrl
 	      .flit_valid_in(flit_valid),
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
-	      .route_info_in(route_info_in),
+	      .header_info_in(header_info_in),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
 	      .vc_req_op(vc_req_op),
 	      .vc_req_ovc(vc_req_ovc),
@@ -333,6 +345,7 @@ module ip_ctrl
 	      .flit_vc_out(flit_vc),
 	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
+	      .la_route_info_out(la_route_info),
 	      .fbf_write_addr(fbf_write_addr),
 	      .fbf_read_addr(fbf_read_addr),
 	      .error(ivcc_error),
@@ -349,6 +362,9 @@ module ip_ctrl
 		    = flit_vc;
 	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
+	   assign la_route_info_ivc[ivc*la_route_info_width:
+				    (ivc+1)*la_route_info_width-1]
+		    = la_route_info;
 	   assign fbf_write_addr_ivc[ivc*fbf_addr_width:
 				     (ivc+1)*fbf_addr_width-1]
 		    = fbf_write_addr;
@@ -453,7 +469,7 @@ module ip_ctrl
    wire 				    fbf_read_enable;
    assign fbf_read_enable = |flit_sent_ivc;
    
-   wire [0:data_width-1] 		    fbf_write_data, fbf_read_data;
+   wire [0:data_width-1] 		    fbf_read_data;
    regfile
      #(.width(data_width),
        .depth(fbf_depth),
@@ -465,7 +481,7 @@ module ip_ctrl
       .write_data(flit_data_in),
       .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
-      .read_data(flit_data_out));
+      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------
@@ -525,7 +541,7 @@ module ip_ctrl
    
    // output VCs are tracket in input VC controllers, so we can just reuse that 
    // information here
-   wire [0:vc_idx_width-1] flit_vc_s, flit_vc_q;
+   wire [0:vc_idx_width-1] 		       flit_vc_s, flit_vc_q;
    select_1ofn
      #(.num_ports(num_vcs),
        .width(vc_idx_width))
@@ -543,6 +559,30 @@ module ip_ctrl
       .q(flit_vc_q));
    
    assign flit_vc_out = flit_vc_q;
+   
+   wire [0:la_route_info_width-1] 	       la_route_info_s, la_route_info_q;
+   select_1ofn
+     #(.num_ports(num_vcs),
+       .width(la_route_info_width))
+   la_route_info_sel
+     (.select(flit_sent_ivc),
+      .data_in(la_route_info_ivc),
+      .data_out(la_route_info_s));
+   dff
+     #(.width(la_route_info_width),
+       .reset_type(reset_type))
+   la_route_infoq
+     (.clk(clk),
+      .reset(reset),
+      .d(la_route_info_s),
+      .q(la_route_info_q));
+   
+   assign flit_data_out[0:la_route_info_width-1]
+	    = flit_head_q ? 
+	      la_route_info_q : 
+	      fbf_read_data[0:la_route_info_width-1];
+   assign flit_data_out[la_route_info_width:data_width-1]
+	    = fbf_read_data[la_route_info_width:data_width-1];
    
    
    //---------------------------------------------------------------------------

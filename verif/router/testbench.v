@@ -124,6 +124,10 @@ module testbench
    // width required to select individual port
    localparam port_idx_width = clogb(num_ports);
    
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+   
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
@@ -131,7 +135,8 @@ module testbench
    localparam addr_width = router_addr_width + node_addr_width;
    
    // total number of bits required for storing routing information
-   localparam route_info_width = 2 * addr_width;
+   localparam route_info_width
+     = num_routing_classes * router_addr_width + node_addr_width;
    
    // maximum packet length (in flits)
    parameter max_packet_length = 8;
@@ -146,7 +151,8 @@ module testbench
    localparam packet_length_width = clogb(max_packet_length);
    
    // total number of bits required for storing header information
-   localparam head_info_width = route_info_width + packet_length_width;
+   localparam header_info_width
+     = la_route_info_width + route_info_width + packet_length_width;
    
    // flit width
    parameter data_width = 64;
@@ -325,14 +331,19 @@ module testbench
 		    .num_flit_buffers(num_flit_buffers),
 		    .num_header_buffers(num_header_buffers),
 		    .num_vcs(num_vcs),
+		    .num_traffic_classes(num_traffic_classes),
+		    .num_routing_classes(num_routing_classes),
+		    .num_ports(num_ports),
+		    .port_id(ip),
+		    .num_dimensions(num_dimensions),
+		    .num_routers_per_dim(num_routers_per_dim),
+		    .router_address(router_address),
+		    .num_neighbors_per_dim(num_neighbors_per_dim),
+		    .routing_function_type(routing_function_type),
 		    .max_packet_length(max_packet_length),
 		    .min_packet_length(min_packet_length),
 		    .packet_length_mode(packet_length_mode),
-		    .data_width(data_width),
-		    .addr_width(addr_width),
-		    .address(router_address+
-			     ip-(num_ports-num_nodes_per_router)),
-		    .walk_addresses(walk_addresses))
+		    .data_width(data_width))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
@@ -356,21 +367,43 @@ module testbench
 			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
 		
-		wire [0:head_info_width-1]    head_info;
-		assign head_info = flit_data[0:head_info_width-1];
+		wire [0:header_info_width-1]  header_info;
+		assign header_info = flit_data[0:header_info_width-1];
 		
-		wire [0:route_info_width-1]   route_info;
-		assign route_info = head_info[0:route_info_width-1];
+		wire [0:la_route_info_width-1] la_route_info_in;
+		assign la_route_info_in
+		  = header_info[0:la_route_info_width-1];
 		
-		wire [0:num_vcs*num_ports-1]  next_port_ivc;
-		wire [0:num_vcs*num_vcs-1]    next_vcs_ivc;
-		wire [0:num_vcs-1] 	      rtl_error_ivc;
+		wire [0:num_ports-1] 	       la_route_port;
+		decoder
+		  #(.num_ports(num_ports))
+		la_route_port_dec
+		  (.data_in(la_route_info_in[0:port_idx_width-1]),
+		   .data_out(la_route_port));
 
-		genvar 			      itc;
-		genvar 			      irc;
-
+		wire 			       la_route_class;
+		
+		if(num_routing_classes > 1)
+		  assign la_route_class = la_route_info_in[port_idx_width];
+		else
+		  assign la_route_class = 1'b0;
+		
+		wire [0:route_info_width-1]    route_info;
+		assign route_info
+		  = header_info[la_route_info_width:
+				la_route_info_width+route_info_width-1];
+		
+		wire [0:num_vcs*num_ports-1]   next_port_ivc;
+		wire [0:num_vcs*num_vcs-1]     next_vcs_ivc;
+		wire [0:num_vcs-1] 	       rtl_error_ivc;
+		wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
+		
+		genvar 				       itc;
+		
 		for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
 		  begin:itcs
+		     
+		     genvar irc;
 		     
 		     for(irc = 0; irc < num_routing_classes; irc = irc + 1)
 		       begin:ircs
@@ -397,7 +430,7 @@ module testbench
 			     .next_port(next_port),
 			     .next_class(next_class),
 			     .error(rtl_error_unmasked));
-
+			  
 			  wire [0:num_vcs-1] 	 next_vcs;
 			  replicator
 			    #(.width(num_classes),
@@ -426,6 +459,34 @@ module testbench
 					       (itc*num_routing_classes+irc+1)*
 					       num_vcs_per_class-1]
 				   = {num_vcs_per_class{rtl_error}};
+
+			  wire [0:la_route_info_width-1] la_route_info;
+			  la_routing_logic
+			    #(.num_vcs(num_vcs),
+			      .num_traffic_classes(num_traffic_classes),
+			      .num_routing_classes(num_routing_classes),
+			      .num_ports(num_ports),
+			      .num_dimensions(num_dimensions),
+			      .num_routers_per_dim(num_routers_per_dim),
+			      .num_neighbors_per_dim(num_neighbors_per_dim),
+			      .routing_function_type(routing_function_type),
+			      .port_id(ip),
+			      .traffic_class(itc),
+			      .routing_class(irc))
+			  lar
+			    (.router_address(router_address),
+			     .route_port(la_route_port),
+			     .route_class(la_route_class),
+			     .route_info(route_info),
+			     .la_route_info(la_route_info));
+			  
+			  assign la_route_info_ivc[(itc*num_routing_classes+
+						    irc)*num_vcs_per_class*
+						   la_route_info_width:
+						   (itc*num_routing_classes+
+						    irc+1)*num_vcs_per_class*
+						   la_route_info_width-1]
+				   = la_route_info;
 			  
 		       end
 
@@ -496,31 +557,24 @@ module testbench
 				  next_vcs :
 				  dest_vcs_q;
 		
-		wire [0:addr_width-1] 	      next_address;
-		assign next_address = route_info[0:addr_width-1];
-		
-		wire [0:addr_width-1] 	      final_address;
-		assign final_address = route_info[addr_width:2*addr_width-1];
-		
-		wire 			      update_addr;
-		assign update_addr
-		  = flit_head &&
-		    (router_address == next_address[0:router_addr_width-1]);
-		
-		wire [0:route_info_width-1]   next_route_info;
-		assign next_route_info
-		  = {update_addr ? final_address : next_address, final_address};
-		
-		wire [0:data_width-1] 	      flit_data_muxed;
-		assign flit_data_muxed[0:route_info_width-1] = next_route_info;
-		assign flit_data_muxed[route_info_width:data_width-1]
-			 = flit_data[route_info_width:data_width-1];
+		wire [0:la_route_info_width-1] la_route_info_out;
+		mux_nto1
+		  #(.num_ports(num_vcs),
+		    .width(la_route_info_width))
+		la_route_info_out_mux
+		  (.select(flit_vc),
+		   .data_in(la_route_info_ivc),
+		   .data_out(la_route_info_out));
 		
 		wire [0:(2+data_width+port_idx_width+num_vcs)-1] data_in;
 		assign data_in[0] = flit_head;
 		assign data_in[1] = flit_tail;
-		assign data_in[2:2+data_width-1]
-			 = flit_data_muxed[0:data_width-1];
+		assign data_in[2:2+la_route_info_width-1]
+			 = flit_head ?
+			   la_route_info_out :
+			   flit_data[0:la_route_info_width-1];
+		assign data_in[2+la_route_info_width:2+data_width-1]
+			 = flit_data[la_route_info_width:data_width-1];
 		assign data_in[2+data_width:2+data_width+port_idx_width-1]
 			 = dest_port;
 		assign data_in[2+data_width+port_idx_width:
@@ -764,15 +818,16 @@ module testbench
 			.d(wait_head_s),
 			.q(wait_head_q));
 
-		     wire [0:head_info_width-1] head_info;
-		     assign head_info
+		     wire [0:header_info_width-1] header_info;
+		     assign header_info
 		       = flit_data_out_op[op*data_width:
-					  op*data_width+head_info_width-1];
+					  op*data_width+header_info_width-1];
 		     
 		     wire [0:packet_length_width-1] packet_length;
 		     assign packet_length
-		       = head_info[route_info_width:
-				   route_info_width+packet_length_width-1];
+		       = header_info[la_route_info_width+route_info_width:
+				     la_route_info_width+route_info_width+
+				     packet_length_width-1];
 		     
 		     wire [0:packet_length_width-1] flit_count_s, flit_count_q;
 		     assign flit_count_s
@@ -978,6 +1033,9 @@ module testbench
       clk <= 1'b0;
       #(Tclk/2);
    end
+
+   always @(posedge clk)
+     if(error) $stop;
    
    integer cycles;
    

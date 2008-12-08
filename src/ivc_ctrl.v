@@ -31,10 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   route_info_in, flow_ctrl_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
+   header_info_in, flow_ctrl_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
    sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, fbf_write_addr, 
-   fbf_read_addr, error, events);
+   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, la_route_info_out,
+   fbf_write_addr, fbf_read_addr, error, events);
    
 `include "constants.v"
    
@@ -79,6 +79,13 @@ module ivc_ctrl
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -107,6 +114,9 @@ module ivc_ctrl
    // total number of bits required for storing routing information
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
+
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width = la_route_info_width + route_info_width;
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
@@ -194,9 +204,9 @@ module ivc_ctrl
    // (note: valid only when flit_valid_in=1)
    input flit_tail_in;
    
-   // routing information associated with current flit
+   // header information associated with current flit
    // (note: valid only when flit_valid_in=1 and flit_head_in=1)
-   input [0:route_info_width-1] route_info_in;
+   input [0:header_info_width-1] header_info_in;
    
    // internal flow control signalling from output controller to input 
    // controllers
@@ -245,6 +255,11 @@ module ivc_ctrl
    // (note: only valid if flit_valid_out=1)
    output [0:vc_idx_width-1] flit_vc_out;
    wire [0:vc_idx_width-1] flit_vc_out;
+   
+   // lookahead routing information for outgoing flit
+   // (note: only valid if flit_valid_out=1 and flit_head_out=1)
+   output [0:la_route_info_width-1] la_route_info_out;
+   wire [0:la_route_info_width-1] la_route_info_out;
    
    // write pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbf_write_addr;
@@ -447,8 +462,8 @@ module ivc_ctrl
    wire 	hdff_pop;
    assign hdff_pop = get_next_header & ~hdff_empty;
    
-   wire [0:route_info_width-1] hdff_data;
-   wire 		       hdff_error;
+   wire [0:header_info_width-1] hdff_data;
+   wire 			hdff_error;
    
    generate
       
@@ -458,7 +473,7 @@ module ivc_ctrl
 	   wire 		       hdff_full;
 	   fifo
 	     #(.depth(num_header_buffers-1),
-	       .width(route_info_width),
+	       .width(header_info_width),
 	       .fifo_type(header_fifo_type),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
@@ -467,7 +482,7 @@ module ivc_ctrl
 	     (.clk(clk),
 	      .reset(reset),
 	      .full(hdff_full),
-	      .data_in(route_info_in),
+	      .data_in(header_info_in),
 	      .push(hdff_push),
 	      .empty(hdff_empty),
 	      .data_out(hdff_data),
@@ -479,7 +494,7 @@ module ivc_ctrl
 	begin
 	   
 	   assign hdff_empty = 1'b1;
-	   assign hdff_data = {route_info_width{1'b0}};
+	   assign hdff_data = {header_info_width{1'b0}};
 	   assign hdff_error = 1'b0;
 	   
 	end
@@ -489,18 +504,121 @@ module ivc_ctrl
    wire 		       next_valid;
    assign next_valid = (flit_valid_in & flit_head_in) | ~hdff_empty;
    
-   wire [0:route_info_width-1] next_route_info;
-   assign next_route_info = hdff_empty ? route_info_in : hdff_data;
+   wire [0:header_info_width-1] next_header_info;
+   assign next_header_info = hdff_empty ? header_info_in : hdff_data;
    
    
    //---------------------------------------------------------------------------
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1]        rtl_next_port;
-   wire [0:num_classes-1]      rtl_next_class;
-   wire 		       rtl_error_unmasked;
-   routing_logic
+   wire [0:la_route_info_width-1] la_route_info;
+   assign la_route_info = next_header_info[0:la_route_info_width-1];
+   
+   wire [0:port_idx_width-1] 	  rtl_next_port_enc;
+   assign rtl_next_port_enc = la_route_info[0:port_idx_width-1];
+   
+   wire [0:num_ports-1] 	  rtl_next_port;
+   wire 			  rtl_change_class;
+   wire [0:num_ports-1] 	  rtl_error_unmasked_op;
+   wire [0:num_classes-1] 	  rtl_next_class;
+   
+   generate
+      
+      if(num_routing_classes > 1)
+	assign rtl_change_class = la_route_info[port_idx_width];
+      else
+	assign rtl_change_class = 1'b0;
+      
+      genvar 			  op;
+      
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
+	   
+	   wire port_sel;
+	   assign port_sel = (rtl_next_port_enc == op);
+	   
+	   wire mask_port;
+	   
+	   if(op == port_id)
+	     assign mask_port = ~rtl_change_class;
+	   else
+	     assign mask_port = 1'b0;
+	   
+	   assign rtl_next_port[op] = port_sel & ~mask_port;
+	   assign rtl_error_unmasked_op[op] = port_sel & mask_port;
+	   
+	end
+      
+      genvar 	otc;
+      
+      for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
+	begin:otcs
+	   
+	   genvar 	orc;
+	   
+	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
+	     begin:orcs
+		
+		if((otc == traffic_class) && (orc == routing_class))
+		  assign rtl_next_class[otc*num_routing_classes+orc]
+			   = ~rtl_change_class;
+		else if((otc == traffic_class) && (orc == (routing_class + 1)))
+		  assign rtl_next_class[otc*num_routing_classes+orc]
+			   = rtl_change_class;
+		else
+		  assign rtl_next_class[otc*num_routing_classes+orc]
+			   = 1'b0;
+		
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   wire [0:num_vcs-1] rtl_next_vcs;
+   replicator
+     #(.width(num_classes),
+       .count(num_vcs_per_class))
+   rtl_next_vcs_repl
+     (.data_in(rtl_next_class),
+      .data_out(rtl_next_vcs));
+   
+   wire 	      rtl_error_unmasked;
+   assign rtl_error_unmasked = |rtl_error_unmasked_op;
+   
+   wire 	      rtl_error;
+   assign rtl_error = rtl_error_unmasked & get_next_header & next_valid;
+   
+   wire 	      change_class_s, change_class_q;
+   assign change_class_s = get_next_header ? rtl_change_class : change_class_q;
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   change_classq
+     (.clk(clk),
+      .reset(reset),
+      .d(change_class_s),
+      .q(change_class_q));
+   
+   wire [0:route_info_width-1] route_info_s, route_info_q;
+   assign route_info_s
+     = get_next_header ?
+       next_header_info[la_route_info_width:
+			la_route_info_width+route_info_width-1] :
+       route_info_q;
+   dff
+     #(.width(route_info_width),
+       .reset_type(reset_type))
+   route_infoq
+     (.clk(clk),
+      .reset(reset),
+      .d(route_info_s),
+      .q(route_info_q));
+   
+   wire [0:num_ports-1]        port_q;
+   
+   la_routing_logic
      #(.num_vcs(num_vcs),
        .num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
@@ -512,23 +630,12 @@ module ivc_ctrl
        .port_id(port_id),
        .traffic_class(traffic_class),
        .routing_class(routing_class))
-   rtl
+   lar
      (.router_address(router_address),
-      .route_info(next_route_info),
-      .next_port(rtl_next_port),
-      .next_class(rtl_next_class),
-      .error(rtl_error_unmasked));
-
-   wire [0:num_vcs-1] 	       rtl_next_vcs;
-   replicator
-     #(.width(num_classes),
-       .count(num_vcs_per_class))
-   rtl_next_vcs_repl
-     (.data_in(rtl_next_class),
-      .data_out(rtl_next_vcs));
-   
-   wire 		       rtl_error;
-   assign rtl_error = rtl_error_unmasked & get_next_header & next_valid;
+      .route_port(port_q),
+      .route_class(change_class_q),
+      .route_info(route_info_q),
+      .la_route_info(la_route_info_out));
    
    
    //---------------------------------------------------------------------------
@@ -546,7 +653,7 @@ module ivc_ctrl
       .d(valid_s),
       .q(valid_q));
    
-   wire [0:num_ports-1]        port_s, port_q;
+   wire [0:num_ports-1] port_s;
    assign port_s = get_next_header ? rtl_next_port : port_q;
    dff
      #(.width(num_ports),
@@ -619,6 +726,7 @@ module ivc_ctrl
 	     wire [0:num_vcs-1] 	 next_free_ovc;
 	     
 	     genvar 			 ovc;
+	     
 	     for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	       begin:ovcs
 		  
