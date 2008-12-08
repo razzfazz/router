@@ -258,16 +258,18 @@ module routing_logic
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
+	   wire mask_port;
+
+	   // only allow a packet to exit through the same port it came in on 
+	   // if it is a non-minimal packet that has reached the intermediate 
+	   // node
 	   if(op == port_id)
-	     begin
-		assign next_port[op] = next_port_int[op] & chg_class;
-		assign error_op[op] = next_port_int[op] & ~chg_class;
-	     end
+	     assign mask_port = chg_class;
 	   else
-	     begin
-		assign next_port[op] = next_port_int[op];
-		assign error_op[op] = 1'b0;
-	     end
+	     assign mask_port = 1'b0;
+	   
+	   assign next_port[op] = next_port_int[op] & ~mask_port;
+	   assign error_op[op] = next_port_int[op] & mask_port;
 	   
 	end
       
