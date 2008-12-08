@@ -93,7 +93,7 @@ module routing_logic
      = num_routing_classes * router_addr_width + node_addr_width;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
    // ID of current port
    parameter port_id = 0;
@@ -187,7 +187,7 @@ module routing_logic
 	   
 	   case(routing_function_type)
 	     
-	     `ROUTING_FUNCTION_TYPE_BY_RELATION:
+	     `ROUTING_FUNCTION_TYPE_MESH:
 	       begin
 		  
 		  assign port_dec
@@ -195,7 +195,7 @@ module routing_logic
 		  
 	       end
 	     
-	     `ROUTING_FUNCTION_TYPE_BY_DIFFERENCE:
+	     `ROUTING_FUNCTION_TYPE_FBFLY:
 	       begin
 		  
 		  wire [0:num_routers_per_dim-1] dim_addr_dec;

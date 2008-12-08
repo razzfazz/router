@@ -109,7 +109,7 @@ module ivc_ctrl
      = num_routing_classes * router_addr_width + node_addr_width;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;

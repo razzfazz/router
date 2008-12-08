@@ -103,7 +103,7 @@ module router
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;

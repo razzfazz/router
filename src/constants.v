@@ -50,11 +50,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // within a dimension, route based on relation between current and destination 
 // address (one port each for greater and smaller addresses)
-`define ROUTING_FUNCTION_TYPE_BY_RELATION   0
+`define ROUTING_FUNCTION_TYPE_MESH  0
 
 // within a dimension, route based on difference between current and destinatio
 // address (one port for each address other than current one)  
-`define ROUTING_FUNCTION_TYPE_BY_DIFFERENCE 1
+`define ROUTING_FUNCTION_TYPE_FBFLY 1
 
 
 //------------------------------------------------------------------------------
