@@ -566,9 +566,25 @@ module packet_source
 	   for(irc = 0; irc < num_routing_classes; irc = irc + 1)
 	     begin:ircs
 		
-		wire 		       rtl_error;
-		wire [0:num_ports-1]   next_port;
-		wire [0:num_classes-1] next_class;
+		wire [0:((irc == (num_routing_classes - 1)) ?
+			 addr_width :
+			 router_addr_width)-1] vc_route_info;
+		
+		assign vc_route_info[0:router_addr_width-1]
+			 = route_info[irc*router_addr_width:
+				      (irc+1)*router_addr_width-1];
+		
+		if((irc == (num_routing_classes - 1)) &&
+		   (num_nodes_per_router > 1))
+		  assign vc_route_info[router_addr_width:addr_width-1]
+			   = route_info[num_routing_classes*
+					router_addr_width:
+					num_routing_classes*
+					router_addr_width+node_addr_width-1];
+		
+		wire 			       rtl_error;
+		wire [0:num_ports-1] 	       next_port;
+		wire [0:num_classes-1] 	       next_class;
 		routing_logic
 		  #(.num_vcs(num_vcs),
 		    .num_traffic_classes(num_traffic_classes),
@@ -583,7 +599,7 @@ module packet_source
 		    .routing_class(irc))
 		rtl
 		  (.router_address(router_address),
-		   .route_info(route_info),
+		   .vc_route_info(vc_route_info),
 		   .next_port(next_port),
 		   .next_class(next_class),
 		   .error(rtl_error));

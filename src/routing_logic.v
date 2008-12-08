@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module routing_logic
-  (router_address, route_info, next_port, next_class, error);
+  (router_address, vc_route_info, next_port, next_class, error);
    
 `include "constants.v"
    
@@ -88,10 +88,6 @@ module routing_logic
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
-   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -104,11 +100,17 @@ module routing_logic
    // current routing class
    parameter routing_class = 0;
    
+   // total number of bits required for storing routing information
+   localparam vc_route_info_width
+     = (routing_class == (num_routing_classes - 1)) ?
+       addr_width :
+       router_addr_width;
+   
    // current router's address
    input [0:router_addr_width-1] router_address;
    
    // routing data
-   input [0:route_info_width-1] route_info;
+   input [0:vc_route_info_width-1] vc_route_info;
    
    // output port to forward to
    output [0:num_ports-1] next_port;
@@ -125,8 +127,7 @@ module routing_logic
    // address of destination router for current routing class
    wire [0:router_addr_width-1] dest_router_address;
    assign dest_router_address
-     = route_info[routing_class*router_addr_width:
-		  (routing_class+1)*router_addr_width-1];
+     = vc_route_info[0:router_addr_width-1];
    
    // if we have reached our destination for the current routing class, move to 
    // next routing class
@@ -236,8 +237,7 @@ module routing_logic
 		
 		wire [0:node_addr_width-1] 	dest_node_address;
 		assign dest_node_address
-		  = route_info[route_info_width-node_addr_width:
-			       route_info_width-1];
+		  = vc_route_info[router_addr_width:vc_route_info_width-1];
 		
 		wire [0:num_nodes_per_router-1] node_sel;
 		decoder

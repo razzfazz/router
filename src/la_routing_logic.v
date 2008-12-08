@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic
 module la_routing_logic
-  (router_address, route_port, route_class, route_info, la_route_info);
+  (router_address, route_port, route_class, vc_route_info, la_route_info);
    
 `include "constants.v"
    
@@ -94,10 +94,6 @@ module la_routing_logic
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
-   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -109,6 +105,14 @@ module la_routing_logic
    
    // current routing class
    parameter routing_class = 0;
+   
+   // total number of bits required for storing routing information
+   localparam vc_route_info_width
+     = (routing_class == (num_routing_classes - 1)) ?
+       addr_width :
+       (routing_class == (num_routing_classes - 2)) ?
+       (router_addr_width + addr_width) :
+       (2 * router_addr_width);
    
    // current router's address
    input [0:router_addr_width-1] router_address;
@@ -122,26 +126,26 @@ module la_routing_logic
    input route_class;
    
    // routing data
-   input [0:route_info_width-1] route_info;
+   input [0:vc_route_info_width-1] vc_route_info;
    
    // lookahead routing information for next router
    output [0:la_route_info_width-1] la_route_info;
    wire [0:la_route_info_width-1] la_route_info;
    
    // address of destination router for current routing class
-   wire [0:router_addr_width-1] dest_router_address;
+   wire [0:router_addr_width-1]   dest_router_address;
    
    // address of the downstream router
-   wire [0:router_addr_width-1] next_router_address;
+   wire [0:router_addr_width-1]   next_router_address;
    
-   wire [0:num_dimensions-1] 	dim_addr_match;
+   wire [0:num_dimensions-1] 	  dim_addr_match;
    
-   wire [0:num_ports-1] 	next_port_dec;
+   wire [0:num_ports-1] 	  next_port_dec;
    
-   wire 			eject;
+   wire 			  eject;
    assign eject = &dim_addr_match;
    
-   genvar 			dim;
+   genvar 			  dim;
    
    generate
       
@@ -149,16 +153,12 @@ module la_routing_logic
 	begin
 	   
 	   if(routing_class == (num_routing_classes - 1))
-	     assign dest_router_address
-	       = route_info[(num_routing_classes-1)*router_addr_width:
-			    num_routing_classes*router_addr_width-1];
+	     assign dest_router_address = vc_route_info;
 	   else
 	     assign dest_router_address
 	       = route_class ?
-		 route_info[routing_class*router_addr_width:
-			    (routing_class+1)*router_addr_width-1] :
-		 route_info[(routing_class+1)*router_addr_width:
-			    (routing_class+2)*router_addr_width-1];
+		 vc_route_info[0:router_addr_width-1] :
+		 vc_route_info[router_addr_width:2*router_addr_width-1];
 	   
 	   wire next_class;
 	   assign next_class = (next_router_address == dest_router_address);
@@ -167,7 +167,7 @@ module la_routing_logic
 	   
 	end
       else
-	assign dest_router_address = route_info[0:router_addr_width-1];
+	assign dest_router_address = vc_route_info[0:router_addr_width-1];
       
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
@@ -250,27 +250,36 @@ module la_routing_logic
 	   
 	end
       
-      if(num_nodes_per_router > 1)
+      if((routing_class == (num_routing_classes - 1)) ||
+	 (routing_class == (num_routing_classes - 2)))
 	begin
 	   
-	   wire [0:node_addr_width-1] 	dest_node_address;
-	   assign dest_node_address
-	     = route_info[route_info_width-node_addr_width:
-			  route_info_width-1];
-	   
-	   wire [0:num_nodes_per_router-1] node_sel;
-	   decoder
-	     #(.num_ports(num_nodes_per_router))
-	   node_sel_dec
-	     (.data_in(dest_node_address),
-	      .data_out(node_sel));
-	   
-	   assign next_port_dec[num_ports-num_nodes_per_router:num_ports-1]
-		    = node_sel & {num_nodes_per_router{eject}};
+	   if(num_nodes_per_router > 1)
+	     begin
+		
+		wire [0:node_addr_width-1] 	dest_node_address;
+		assign dest_node_address
+		  = vc_route_info[vc_route_info_width-node_addr_width:
+				  vc_route_info_width-1];
+		
+		wire [0:num_nodes_per_router-1] node_sel;
+		decoder
+		  #(.num_ports(num_nodes_per_router))
+		node_sel_dec
+		  (.data_in(dest_node_address),
+		   .data_out(node_sel));
+		
+		assign next_port_dec[num_ports-num_nodes_per_router:num_ports-1]
+			 = node_sel & {num_nodes_per_router{eject}};
+		
+	     end
+	   else
+	     assign next_port_dec[num_ports-1] = eject;
 	   
 	end
       else
-	assign next_port_dec[num_ports-1] = eject;
+	assign next_port_dec[num_ports-num_nodes_per_router:num_ports-1]
+		 = {num_nodes_per_router{1'b0}};
       
    endgenerate
    

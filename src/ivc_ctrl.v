@@ -114,7 +114,7 @@ module ivc_ctrl
    // total number of bits required for storing routing information
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
-
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width = la_route_info_width + route_info_width;
    
@@ -178,6 +178,17 @@ module ivc_ctrl
    
    // current routing class
    localparam routing_class = get_routing_class(vc_id);
+   
+   // width of routing information required for each VC
+   localparam vc_route_info_width
+     = (routing_class == (num_routing_classes - 1)) ?
+       addr_width :
+       (routing_class == (num_routing_classes - 2)) ?
+       (router_addr_width + addr_width) :
+       (2 * router_addr_width);
+   
+   // total number of bits of header information required for each VC
+   localparam vc_header_info_width = la_route_info_width + vc_route_info_width;
    
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
@@ -453,27 +464,53 @@ module ivc_ctrl
    // header buffer
    //---------------------------------------------------------------------------
    
-   wire 	hdff_empty;
+   wire [0:la_route_info_width-1] la_route_info_in;
+   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
    
-   wire 	hdff_push;
+   wire [0:route_info_width-1] 	  route_info_in;
+   assign route_info_in
+     = header_info_in[la_route_info_width:
+		      la_route_info_width+route_info_width-1];
+
+   wire [0:vc_route_info_width-1] vc_route_info_in;
+   
+   wire [0:vc_header_info_width-1] vc_header_info_in;
+   assign vc_header_info_in[0:la_route_info_width-1] = la_route_info_in;
+   assign vc_header_info_in[la_route_info_width:
+			    la_route_info_width+vc_route_info_width-1]
+	    = vc_route_info_in;
+   
+   wire 			     hdff_empty;
+   
+   wire 			     hdff_push;
    assign hdff_push
      = flit_valid_in & flit_head_in & (~hdff_empty | ~get_next_header);
    
-   wire 	hdff_pop;
+   wire 			     hdff_pop;
    assign hdff_pop = get_next_header & ~hdff_empty;
    
-   wire [0:header_info_width-1] hdff_data;
-   wire 			hdff_error;
+   wire [0:vc_header_info_width-1]   hdff_data;
+   wire 			     hdff_error;
    
    generate
+      
+      if((routing_class == (num_routing_classes - 1)) ||
+	 (routing_class == (num_routing_classes - 2)))
+	assign vc_route_info_in
+	  = route_info_in[route_info_width-vc_route_info_width:
+			  route_info_width-1];
+      else
+	assign vc_route_info_in
+	  = route_info_in[routing_class*router_addr_width:
+			  (routing_class+2)*router_addr_width-1];
       
       if(num_header_buffers > 1)
 	begin
 	   
-	   wire 		       hdff_full;
+	   wire hdff_full;
 	   fifo
 	     #(.depth(num_header_buffers-1),
-	       .width(header_info_width),
+	       .width(vc_header_info_width),
 	       .fifo_type(header_fifo_type),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
@@ -482,7 +519,7 @@ module ivc_ctrl
 	     (.clk(clk),
 	      .reset(reset),
 	      .full(hdff_full),
-	      .data_in(header_info_in),
+	      .data_in(vc_header_info_in),
 	      .push(hdff_push),
 	      .empty(hdff_empty),
 	      .data_out(hdff_data),
@@ -494,7 +531,7 @@ module ivc_ctrl
 	begin
 	   
 	   assign hdff_empty = 1'b1;
-	   assign hdff_data = {header_info_width{1'b0}};
+	   assign hdff_data_out = {vc_header_info_width{1'b0}};
 	   assign hdff_error = 1'b0;
 	   
 	end
@@ -504,19 +541,19 @@ module ivc_ctrl
    wire 		       next_valid;
    assign next_valid = (flit_valid_in & flit_head_in) | ~hdff_empty;
    
-   wire [0:header_info_width-1] next_header_info;
-   assign next_header_info = hdff_empty ? header_info_in : hdff_data;
+   wire [0:vc_header_info_width-1] next_vc_header_info;
+   assign next_vc_header_info = hdff_empty ? vc_header_info_in : hdff_data;
    
    
    //---------------------------------------------------------------------------
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:la_route_info_width-1] la_route_info;
-   assign la_route_info = next_header_info[0:la_route_info_width-1];
+   wire [0:la_route_info_width-1] next_la_route_info;
+   assign next_la_route_info = next_vc_header_info[0:la_route_info_width-1];
    
    wire [0:port_idx_width-1] 	  rtl_next_port_enc;
-   assign rtl_next_port_enc = la_route_info[0:port_idx_width-1];
+   assign rtl_next_port_enc = next_la_route_info[0:port_idx_width-1];
    
    wire [0:num_ports-1] 	  rtl_next_port;
    wire 			  rtl_change_class;
@@ -526,7 +563,7 @@ module ivc_ctrl
    generate
       
       if(num_routing_classes > 1)
-	assign rtl_change_class = la_route_info[port_idx_width];
+	assign rtl_change_class = next_la_route_info[port_idx_width];
       else
 	assign rtl_change_class = 1'b0;
       
@@ -601,22 +638,24 @@ module ivc_ctrl
       .d(change_class_s),
       .q(change_class_q));
    
-   wire [0:route_info_width-1] route_info_s, route_info_q;
-   assign route_info_s
-     = get_next_header ?
-       next_header_info[la_route_info_width:
-			la_route_info_width+route_info_width-1] :
-       route_info_q;
+   wire [0:vc_route_info_width-1] next_vc_route_info;
+   assign next_vc_route_info
+     = next_vc_header_info[la_route_info_width:
+			   la_route_info_width+vc_route_info_width-1];
+   
+   wire [0:vc_route_info_width-1] vc_route_info_s, vc_route_info_q;
+   assign vc_route_info_s
+     = get_next_header ? next_vc_route_info : vc_route_info_q;
    dff
-     #(.width(route_info_width),
+     #(.width(vc_route_info_width),
        .reset_type(reset_type))
-   route_infoq
+   vc_route_infoq
      (.clk(clk),
       .reset(reset),
-      .d(route_info_s),
-      .q(route_info_q));
+      .d(vc_route_info_s),
+      .q(vc_route_info_q));
    
-   wire [0:num_ports-1]        port_q;
+   wire [0:num_ports-1] 	  port_q;
    
    la_routing_logic
      #(.num_vcs(num_vcs),
@@ -634,7 +673,7 @@ module ivc_ctrl
      (.router_address(router_address),
       .route_port(port_q),
       .route_class(change_class_q),
-      .route_info(route_info_q),
+      .vc_route_info(vc_route_info_q),
       .la_route_info(la_route_info_out));
    
    
@@ -642,7 +681,7 @@ module ivc_ctrl
    // currently active header
    //---------------------------------------------------------------------------
    
-   wire 		       valid_s;
+   wire 			  valid_s;
    assign valid_s = get_next_header ? next_valid : valid_q;
    dff
      #(.width(1),
@@ -653,7 +692,7 @@ module ivc_ctrl
       .d(valid_s),
       .q(valid_q));
    
-   wire [0:num_ports-1] port_s;
+   wire [0:num_ports-1] 	  port_s;
    assign port_s = get_next_header ? rtl_next_port : port_q;
    dff
      #(.width(num_ports),
@@ -664,12 +703,12 @@ module ivc_ctrl
       .d(port_s),
       .q(port_q));
    
-   wire [0:num_vcs-1] 	       vcs_q;
+   wire [0:num_vcs-1] 		  vcs_q;
    
-   wire [0:num_vcs-1] 	       vcs_updated;
+   wire [0:num_vcs-1] 		  vcs_updated;
    assign vcs_updated = vc_gnt ? vc_gnt_ovc : vcs_q;
    
-   wire [0:num_vcs-1] 	       vcs_s;
+   wire [0:num_vcs-1] 		  vcs_s;
    assign vcs_s = get_next_header ? rtl_next_vcs : vcs_updated;
    dff
      #(.width(num_vcs),
@@ -694,8 +733,8 @@ module ivc_ctrl
       .data_in(flow_ctrl_op_ovc),
       .data_out(flow_ctrl_ovc));
    
-   wire 		       free_allocated;
-   wire 		       cred_tracker_error;
+   wire 				  free_allocated;
+   wire 				  cred_tracker_error;
    
    generate
       
@@ -707,7 +746,7 @@ module ivc_ctrl
 	     wire [0:num_vcs-1] free_ovc;
 	     assign free_ovc = flow_ctrl_ovc;
 	     
-	     wire 			 flit_sent_prev_s, flit_sent_prev_q;
+	     wire 		flit_sent_prev_s, flit_sent_prev_q;
 	     assign flit_sent_prev_s = flit_valid_out & ~get_next_header;
 	     dff
 	       #(.width(1),
@@ -718,14 +757,14 @@ module ivc_ctrl
 		.d(flit_sent_prev_s),
 		.q(flit_sent_prev_q));
 	     
-	     wire [0:2] 		 flit_sent_count;
+	     wire [0:2] 	flit_sent_count;
 	     assign flit_sent_count = {flit_sent_prev_q & flit_valid_out,
 				       flit_sent_prev_q ^ flit_valid_out,
 				       ~(flit_sent_prev_q | flit_valid_out)};
 	     
-	     wire [0:num_vcs-1] 	 next_free_ovc;
+	     wire [0:num_vcs-1] next_free_ovc;
 	     
-	     genvar 			 ovc;
+	     genvar 		ovc;
 	     
 	     for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	       begin:ovcs
