@@ -498,12 +498,34 @@ module router
 	   wire [0:data_width-1]     flit_data;
 	   assign flit_data = xbd_data_out;
 	   
+	   wire 		     cred_valid_s, cred_valid_q;
+	   assign cred_valid_s = cred_valid_in_op[op];
+	   dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   cred_validq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(cred_valid_s),
+	      .q(cred_valid_q));
+	   
 	   wire 		     cred_valid_in;
-	   assign cred_valid_in = cred_valid_in_op[op];
+	   assign cred_valid_in = cred_valid_q;
+	   
+	   wire [0:vc_idx_width-1]   cred_vc_s, cred_vc_q;
+	   assign cred_vc_s = cred_vc_in_op[op*vc_idx_width:
+					    (op+1)*vc_idx_width-1];
+	   dff
+	     #(.width(vc_idx_width),
+	       .reset_type(reset_type))
+	   cred_vcq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(cred_vc_s),
+	      .q(cred_vc_q));
 	   
 	   wire [0:vc_idx_width-1]   cred_vc_in;
-	   assign cred_vc_in = cred_vc_in_op[op*vc_idx_width:
-					     (op+1)*vc_idx_width-1];
+	   assign cred_vc_in = cred_vc_q;
 	   
 	   wire [0:num_vcs-1] 	     vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
