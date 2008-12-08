@@ -164,9 +164,9 @@ module testbench
    // select routing function type
    localparam routing_function_type
      = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_BY_RELATION :
+       `ROUTING_FUNCTION_TYPE_MESH :
        (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `ROUTING_FUNCTION_TYPE_BY_DIFFERENCE :
+       `ROUTING_FUNCTION_TYPE_FBFLY :
        -1;
    
    // select method for credit signaling from output to input controller
