@@ -70,6 +70,12 @@ module ivc_ctrl
    // number of routing classes (e.g. minimal, adaptive)
    parameter num_routing_classes = 2;
    
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs available for each class
+   localparam num_vcs_per_class = num_vcs / num_classes;
+   
    // number of input and output ports on router
    parameter num_ports = 5;
    
@@ -135,6 +141,33 @@ module ivc_ctrl
    
    // ID of current input VC
    parameter vc_id = 0;
+   
+   // function to extract traffic class from VC index
+   // (this implementation handles the case where we have only a single traffic
+   // class correctly)
+   function integer get_traffic_class(input integer vc);
+      begin
+	 get_traffic_class
+	   = (vc >> (clogb(num_routing_classes) + clogb(num_vcs_per_class))) %
+	     num_traffic_classes;
+      end
+   endfunction
+   
+   // current traffic class
+   localparam traffic_class = get_traffic_class(vc_id);
+   
+   // function to extract routing class from VC index
+   // (this implementation handles the case where we have only a single routing
+   // class correctly)
+   function integer get_routing_class(input integer vc);
+      begin
+	 get_routing_class
+	   = (vc >> clogb(num_vcs_per_class)) % num_routing_classes;
+      end
+   endfunction
+   
+   // current routing class
+   localparam routing_class = get_routing_class(vc_id);
    
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
@@ -465,7 +498,7 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:num_ports-1]        rtl_next_port;
-   wire [0:num_vcs-1] 	       rtl_next_vcs;
+   wire [0:num_classes-1]      rtl_next_class;
    wire 		       rtl_error_unmasked;
    routing_logic
      #(.num_vcs(num_vcs),
@@ -477,7 +510,8 @@ module ivc_ctrl
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .routing_function_type(routing_function_type),
        .port_id(port_id),
-       .vc_id(vc_id),
+       .traffic_class(traffic_class),
+       .routing_class(routing_class),
        .reset_type(reset_type))
    rtl
      (.clk(clk),
@@ -485,8 +519,16 @@ module ivc_ctrl
       .router_address(router_address),
       .route_info(next_route_info),
       .next_port(rtl_next_port),
-      .next_vcs(rtl_next_vcs),
+      .next_class(rtl_next_class),
       .error(rtl_error_unmasked));
+
+   wire [0:num_vcs-1] 	       rtl_next_vcs;
+   replicator
+     #(.width(num_classes),
+       .count(num_vcs_per_class))
+   rtl_next_vcs_repl
+     (.data_in(rtl_next_class),
+      .data_out(rtl_next_vcs));
    
    wire 		       rtl_error;
    assign rtl_error = rtl_error_unmasked & get_next_header & next_valid;

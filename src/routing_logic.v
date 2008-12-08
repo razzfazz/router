@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module routing_logic
-  (clk, reset, router_address, route_info, next_port, next_vcs, error);
+  (clk, reset, router_address, route_info, next_port, next_class, error);
    
 `include "constants.v"
    
@@ -98,35 +98,13 @@ module routing_logic
    // ID of current port
    parameter port_id = 0;
    
-   // ID of current VC
-   parameter vc_id = 0;
+   // current traffic class
+   parameter traffic_class = 0;
+   
+   // current routing class
+   parameter routing_class = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
-   
-   // function to extract traffic class from VC index
-   // (this implementation handles the case where we have only a single traffic
-   // class correctly)
-   function integer get_traffic_class(input integer vc);
-      begin
-	 get_traffic_class
-	   = (vc >> (clogb(num_routing_classes) + clogb(num_vcs_per_class))) %
-	     num_traffic_classes;
-      end
-   endfunction
-   
-   localparam traffic_class = get_traffic_class(vc_id);
-   
-   // function to extract routing class from VC index
-   // (this implementation handles the case where we have only a single routing
-   // class correctly)
-   function integer get_routing_class(input integer vc);
-      begin
-	 get_routing_class
-	   = (vc >> clogb(num_vcs_per_class)) % num_routing_classes;
-      end
-   endfunction
-   
-   localparam routing_class = get_routing_class(vc_id);
    
    input clk;
    input reset;
@@ -142,12 +120,12 @@ module routing_logic
    wire [0:num_ports-1] next_port;
    
    // candidate output VCs
-   output [0:num_vcs-1] next_vcs;
-   wire [0:num_vcs-1] 	next_vcs;
+   output [0:num_classes-1] next_class;
+   wire [0:num_classes-1] next_class;
    
    // internal error condition detected
    output error;
-   wire 		error;   
+   wire 		  error;   
    
    // address of destination router for current routing class
    wire [0:router_addr_width-1] dest_router_address;
@@ -163,7 +141,8 @@ module routing_logic
    wire [0:num_ports-1] 	error_op;
    wire [0:num_dimensions-1] 	dim_addr_match;
    
-   genvar 			ovc;
+   genvar 			otc;
+   genvar 			orc;
    genvar 			dim;
       
    generate
@@ -173,12 +152,17 @@ module routing_logic
       else
 	assign chg_class = (router_address == dest_router_address);
       
-      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	begin:ovcs
+      for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
+	begin:otcs
 	   
-	   assign next_vcs[ovc]
-		    = (get_traffic_class(ovc) == traffic_class) &&
-		      (get_routing_class(ovc) == (routing_class + chg_class));
+	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
+	     begin:orcs
+		
+		assign next_class[otc*num_routing_classes+orc]
+			 = (otc == traffic_class) &&
+			   (orc == (routing_class + chg_class));
+		
+	     end
 	   
 	end
       

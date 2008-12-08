@@ -366,46 +366,71 @@ module testbench
 		wire [0:num_vcs*num_vcs-1]    next_vcs_ivc;
 		wire [0:num_vcs-1] 	      rtl_error_ivc;
 
-		genvar 			      ivc;
+		genvar 			      itc;
+		genvar 			      irc;
 
-		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-		  begin:ivs
+		for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
+		  begin:itcs
+		     
+		     for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+		       begin:ircs
+			  
+			  wire [0:num_ports-1]  next_port;
+			  wire [0:num_classes-1] next_class;
+			  wire 			 rtl_error_unmasked;
+			  
+			  routing_logic
+			    #(.num_vcs(num_vcs),
+			      .num_traffic_classes(num_traffic_classes),
+			      .num_routing_classes(num_routing_classes),
+			      .num_ports(num_ports),
+			      .num_dimensions(num_dimensions),
+			      .num_routers_per_dim(num_routers_per_dim),
+			      .num_neighbors_per_dim(num_neighbors_per_dim),
+			      .routing_function_type(routing_function_type),
+			      .port_id(ip),
+			      .traffic_class(itc),
+			      .routing_class(irc))
+			  rtl
+			    (.clk(clk),
+			     .reset(reset),
+			     .router_address(router_address),
+			     .route_info(route_info),
+			     .next_port(next_port),
+			     .next_class(next_class),
+			     .error(rtl_error_unmasked));
 
-		     wire [0:num_ports-1]  next_port;
-		     wire [0:num_vcs-1]    next_vcs;
-		     wire 		   rtl_error_unmasked;
-		     
-		     routing_logic
-		       #(.num_vcs(num_vcs),
-			 .num_traffic_classes(num_traffic_classes),
-			 .num_routing_classes(num_routing_classes),
-			 .num_ports(num_ports),
-			 .num_dimensions(num_dimensions),
-			 .num_routers_per_dim(num_routers_per_dim),
-			 .num_neighbors_per_dim(num_neighbors_per_dim),
-			 .routing_function_type(routing_function_type),
-			 .port_id(ip),
-			 .vc_id(ivc))
-		     rtl
-		       (.clk(clk),
-			.reset(reset),
-			.router_address(router_address),
-			.route_info(route_info),
-			.next_port(next_port),
-			.next_vcs(next_vcs),
-			.error(rtl_error_unmasked));
-		     
-		     assign next_port_ivc[ivc*num_ports:(ivc+1)*num_ports-1]
-			      = next_port;
-		     assign next_vcs_ivc[ivc*num_vcs:(ivc+1)*num_vcs-1]
-			      = next_vcs;
-		     
-		     wire 		   rtl_error;
-		     assign rtl_error
-		       = rtl_error_unmasked & flit_valid &  flit_head;
-		     
-		     assign rtl_error_ivc[ivc] = rtl_error;
-		     
+			  wire [0:num_vcs-1] 	 next_vcs;
+			  replicator
+			    #(.width(num_classes),
+			      .count(num_vcs_per_class))
+			  next_vcs_repl
+			    (.data_in(next_class),
+			     .data_out(next_vcs));
+			  
+			  assign next_port_ivc[(itc*num_routing_classes+irc)*
+					       num_vcs_per_class*num_ports:
+					       (itc*num_routing_classes+irc+1)*
+					       num_vcs_per_class*num_ports-1]
+				   = {num_vcs_per_class{next_port}};
+			  assign next_vcs_ivc[(itc*num_routing_classes+irc)*
+					      num_vcs_per_class*num_vcs:
+					      (itc*num_routing_classes+irc+1)*
+					      num_vcs_per_class*num_vcs-1]
+				   = {num_vcs_per_class{next_vcs}};
+			  
+			  wire 			 rtl_error;
+			  assign rtl_error
+			    = rtl_error_unmasked & flit_valid &  flit_head;
+			  
+			  assign rtl_error_ivc[(itc*num_traffic_classes+irc)*
+					       num_vcs_per_class:
+					       (itc*num_routing_classes+irc+1)*
+					       num_vcs_per_class-1]
+				   = {num_vcs_per_class{rtl_error}};
+			  
+		       end
+
 		  end
 		
 		wire [0:num_ports-1] 	   next_port;
