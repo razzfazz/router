@@ -1,8 +1,8 @@
 module router_wrapper
   (clk, reset, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
-   flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
-   flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
-   flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
+   flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip, flit_valid_out_op,
+   flit_vc_out_op, flit_head_out_op, flit_data_out_op, cred_valid_in_op,
+   cred_vc_in_op, error);
    
 `include "constants.v"
    
@@ -141,10 +141,6 @@ module router_wrapper
    // (note: only valid when corresponding bit in flit_valid_in_ip is high)
    input [0:num_ports-1] flit_head_in_ip;
    
-   // incoming flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_tail_in_ip;
-   
    // flit data for each incoming flit
    // (note: only valid when corresponding bit in flit_valid_in_ip is high)
    input [0:num_ports*data_width-1] flit_data_in_ip;
@@ -171,11 +167,6 @@ module router_wrapper
    // (note: only valid when corresponding bit in flit_valid_out_op is high)
    output [0:num_ports-1] flit_head_out_op;
    wire [0:num_ports-1] 	     flit_head_out_op;
-   
-   // outgoing flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_tail_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
    
    // flit data for each outgoing flit
    // (note: only valid when corresponding bit in flit_valid_out_op is high)
@@ -226,14 +217,12 @@ module router_wrapper
       .flit_valid_in_ip(flit_valid_in_ip),
       .flit_vc_in_ip(flit_vc_in_ip),
       .flit_head_in_ip(flit_head_in_ip),
-      .flit_tail_in_ip(flit_tail_in_ip),
       .flit_data_in_ip(flit_data_in_ip),
       .cred_valid_out_ip(cred_valid_out_ip),
       .cred_vc_out_ip(cred_vc_out_ip),
       .flit_valid_out_op(flit_valid_out_op),
       .flit_vc_out_op(flit_vc_out_op),
       .flit_head_out_op(flit_head_out_op),
-      .flit_tail_out_op(flit_tail_out_op),
       .flit_data_out_op(flit_data_out_op),
       .cred_valid_in_op(cred_valid_in_op),
       .cred_vc_in_op(cred_vc_in_op),

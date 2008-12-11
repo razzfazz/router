@@ -1,8 +1,8 @@
 module router
   (clk, reset, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
-   flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
-   flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
-   flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
+   flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip, flit_valid_out_op,
+   flit_vc_out_op, flit_head_out_op, flit_data_out_op, cred_valid_in_op,
+   cred_vc_in_op, error);
    
 `include "constants.v"
    
@@ -55,6 +55,9 @@ module router
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
    
+   // maximum packet length (in flits)
+   parameter max_packet_length = 4;
+   
    // flit width
    parameter data_width = 64;
    
@@ -96,7 +99,9 @@ module router
    // select speculation level for switch allocator
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   localparam sw_spec_enable = (sw_spec_level == `SW_SPEC_LEVEL_NONE) ?
+			       0 :
+			       1;
    
    // select crossbar implementation variant
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -119,10 +124,6 @@ module router
    // incoming flit(s) is/are head(s)
    // (note: only valid when corresponding bit in flit_valid_in_ip is high)
    input [0:num_ports-1] flit_head_in_ip;
-   
-   // incoming flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_tail_in_ip;
    
    // flit data for each incoming flit
    // (note: only valid when corresponding bit in flit_valid_in_ip is high)
@@ -150,11 +151,6 @@ module router
    // (note: only valid when corresponding bit in flit_valid_out_op is high)
    output [0:num_ports-1] flit_head_out_op;
    wire [0:num_ports-1] 	     flit_head_out_op;
-   
-   // outgoing flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_tail_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
    
    // flit data for each outgoing flit
    // (note: only valid when corresponding bit in flit_valid_out_op is high)
@@ -218,9 +214,6 @@ module router
 	   wire 		   flit_head_in;
 	   assign flit_head_in = flit_head_in_ip[ip];
 	   
-	   wire 		   flit_tail_in;
-	   assign flit_tail_in = flit_tail_in_ip[ip];
-	   
 	   wire [0:data_width-1]   flit_data_in;
 	   assign flit_data_in = flit_data_in_ip[ip*data_width:
 						 (ip+1)*data_width-1];
@@ -261,6 +254,7 @@ module router
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .router_address(router_address),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
+	       .max_packet_length(max_packet_length),
 	       .data_width(data_width),
 	       .routing_function_type(routing_function_type),
 	       .credit_handling_type(credit_handling_type),
@@ -278,7 +272,6 @@ module router
 	      .flit_valid_in(flit_valid_in),
 	      .flit_vc_in(flit_vc_in),
 	      .flit_head_in(flit_head_in),
-	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
 	      .free_ivc_op(free_ivc_op),
 	      .free_op_ovc(free_op_ovc),
@@ -472,8 +465,6 @@ module router
 		    = flit_vc;
 	   assign flit_head_out_op[op]
 		    = flit_head;
-	   assign flit_tail_out_op[op]
-		    = flit_tail;
 	   assign flit_data_out_op[op*data_width:(op+1)*data_width-1]
 		    = flit_data;
 	   assign opc_error_op[op] = opc_error;
