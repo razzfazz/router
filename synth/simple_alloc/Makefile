@@ -40,7 +40,7 @@ $(proj):
 	mkdir -p $(rpt_dir) $(net_dir)
 	dc_shell-xg-t -64 -topo -f synth.tcl | tee $(rpt_dir)/$(proj).out
 	rm -f command.log *-verilog.pvl *-verilog.syn *.mr default.svf
-	$(get_rep) $@ $(rpt_dir)
+	$(get_rep) $@_syn_wrapper $(rpt_dir)
 	rm -rf dwsvf_*
 
 # ----

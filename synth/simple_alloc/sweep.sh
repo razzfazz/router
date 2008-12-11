@@ -1,11 +1,10 @@
 #!/bin/sh
 
-reset_type=1
-hold_type=1
+reset_type=reset_type_async
 
 for num_ports in 5 10 15
 do
-    for architecture in 0 1 2 3 # 4
+    for architecture in 0 1 2 3 4
     do
         for clk_period in `seq 4.0 -0.2 0.0`
         do
@@ -17,7 +16,6 @@ do
     	    cat ../../src/simple_alloc.template.v \
     		| sed s/NUM_PORTS/${num_ports}/ \
     		| sed s/RESET_TYPE/${reset_type}/ \
-    		| sed s/HOLD_TYPE/${hold_type}/ \
     		| sed s/ARCHITECTURE/${architecture}/ \
     		> ../../src/simple_alloc.v
     	    make clean > /dev/null

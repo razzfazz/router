@@ -30,10 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // top-level module for router
 module router
-  (clk, reset, router_address, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
-   flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
-   flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
-   flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
+  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
+   flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
+   error);
    
 `include "constants.v"
    
@@ -90,7 +89,7 @@ module router
    parameter num_neighbors_per_dim = 2;
    
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -102,17 +101,37 @@ module router
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
+   
+   // width of control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ?
+       // (valid + head/tail + vc_id)
+       (1 + 2 + vc_idx_width) :
+       -1;
+   
+   // select flow control type
+   parameter flow_control_type = `FLOW_CONTROL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_control_type == `FLOW_CONTROL_TYPE_CREDIT) ?
+       // (valid + vc_id)
+       (1 + vc_idx_width) :
+       -1;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
    
-   // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   // select method for internal flow control between input and output port
+   parameter int_flow_control_type = `INT_FLOW_CONTROL_TYPE_CREDIT_PUSH;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+     = (int_flow_control_type == `INT_FLOW_CONTROL_TYPE_CREDIT_LEVEL) ?
        2 :
-       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       (int_flow_control_type == `INT_FLOW_CONTROL_TYPE_CREDIT_PUSH) ?
        1 :
        -1;
    
@@ -123,16 +142,16 @@ module router
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vca_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vca_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter swa_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter swa_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
@@ -149,7 +168,7 @@ module router
    localparam xbc_width = 1 + 2 + vc_idx_width;
    
    // width of each crossbar port for data crossbar
-   localparam xbd_width = data_width;
+   localparam xbd_width = flit_data_width;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -159,90 +178,50 @@ module router
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // valid flit data available at input port(s)
-   input [0:num_ports-1] flit_valid_in_ip;
-   
-   // which VC(s) is/are incoming flit(s) travelling on
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports*vc_idx_width-1] flit_vc_in_ip;
-   
-   // incoming flit(s) is/are head(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_head_in_ip;
-   
-   // incoming flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_tail_in_ip;
+   // incoming flit control signals
+   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
    
    // flit data for each incoming flit
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports*data_width-1] flit_data_in_ip;
+   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
    
-   // outgoing credit(s) valid
-   output [0:num_ports-1] cred_valid_out_ip;
-   wire [0:num_ports-1] cred_valid_out_ip;
+   // outgoing flow control signals
+   output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
    
-   // VC indicators for outgoing credit(s)
-   // (note: only valid when corresponding bit in cred_valid_out_ip is high)
-   output [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
-   
-   // valid flit data available at output port(s)
-   output [0:num_ports-1] flit_valid_out_op;
-   wire [0:num_ports-1] 	     flit_valid_out_op;
-   
-   // which VC(s) is/are outgoing flit(s) travelling on
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   wire [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   
-   // outgoing flit(s) is/are head(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_head_out_op;
-   wire [0:num_ports-1] 	     flit_head_out_op;
-   
-   // outgoing flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_tail_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
+   // outgoing flit control signals
+   output [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
+   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
    
    // flit data for each outgoing flit
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports*data_width-1] flit_data_out_op;
-   wire [0:num_ports*data_width-1]   flit_data_out_op;
+   output [0:num_ports*flit_data_width-1] flit_data_out_op;
+   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
    
-   // incoming credit(s) available
-   input [0:num_ports-1] cred_valid_in_op;
-   
-   // VC indicators for incoming flit(s)
-   // (note: only valid when corresponding bit in cred_valid_in_op is high)
-   input [0:num_ports*vc_idx_width-1] cred_vc_in_op;
+   // incoming flow control signals
+   input [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
    
    // internal error condition detected
    output error;
-   wire 			     error;
+   wire 				error;
    
    
    //---------------------------------------------------------------------------
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1]      elig_op_ovc;
-   wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] ipc_vca_req_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_vcs-1]   ipc_vca_req_ip_ivc_ovc;
+   wire [0:num_ports*num_vcs*num_vcs-1]   vca_ipc_gnt_ip_ivc_ovc;
    
-   wire [0:num_ports*num_vcs*num_ports-1] 	    vc_req_ip_ivc_op;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_req_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] ipc_swa_req_nonspec_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_ports-1] ipc_swa_req_spec_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 	  swa_ipc_gnt_nonspec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  swa_ipc_gnt_spec_ip_ivc;
+   wire [0:num_ports*num_ports-1] 	  swa_ipc_gnt_ip_op;
    
-   wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_nonspec_ip_ivc_op;
-   wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_spec_ip_ivc_op;
-   wire [0:num_ports*num_vcs-1] 		    sw_gnt_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		    sw_gnt_spec_ip_ivc;
-   wire [0:num_ports*num_ports-1] 		    sw_gnt_ip_op;
+   wire [0:num_ports*flit_ctrl_width-1]   ipc_xbc_flit_ctrl_ip;
+   wire [0:num_ports*flit_data_width-1]   ipc_xbd_flit_data_ip;
    
-   wire [0:num_ports*xbc_width-1] 		    xbc_data_in_ip;
-   wire [0:num_ports*xbd_width-1] 		    xbd_data_in_ip;
+   wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] opc_ipc_flow_ctrl_op_ovc;
    
    wire [0:num_ports-1] 			    ipc_error_ip;
    
@@ -258,46 +237,34 @@ module router
 	   // input controller
 	   //-------------------------------------------------------------------
 	   
-	   wire flit_valid_in;
-	   assign flit_valid_in = flit_valid_in_ip[ip];
+	   wire [0:flit_ctrl_width-1] flit_ctrl_in;
+	   assign flit_ctrl_in = flit_ctrl_in_ip[ip*flit_ctrl_width:
+						 (ip+1)*flit_ctrl_width-1];
 	   
-	   wire [0:vc_idx_width-1] flit_vc_in;
-	   assign flit_vc_in = flit_vc_in_ip[ip*vc_idx_width:
-					     (ip+1)*vc_idx_width-1];
+	   wire [0:flit_data_width-1] flit_data_in;
+	   assign flit_data_in = flit_data_in_ip[ip*flit_data_width:
+						 (ip+1)*flit_data_width-1];
 	   
-	   wire 		   flit_head_in;
-	   assign flit_head_in = flit_head_in_ip[ip];
+	   wire [0:num_vcs*num_vcs-1] vca_ipc_gnt_ivc_ovc;
+	   assign vca_ipc_gnt_ivc_ovc
+	     = vca_ipc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
+				      (ip+1)*num_vcs*num_vcs-1];
 	   
-	   wire 		   flit_tail_in;
-	   assign flit_tail_in = flit_tail_in_ip[ip];
+	   wire [0:num_vcs-1] 	      swa_ipc_gnt_nonspec_ivc;
+	   assign swa_ipc_gnt_nonspec_ivc
+	     = swa_ipc_gnt_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:data_width-1]   flit_data_in;
-	   assign flit_data_in = flit_data_in_ip[ip*data_width:
-						 (ip+1)*data_width-1];
+	   wire [0:num_vcs-1] 	      swa_ipc_gnt_spec_ivc;
+	   assign swa_ipc_gnt_spec_ivc
+	     = swa_ipc_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_vcs-1] vc_gnt_ivc_ovc;
-	   assign vc_gnt_ivc_ovc = vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
-						     (ip+1)*num_vcs*num_vcs-1];
-	   
-	   wire [0:num_vcs-1] 	      sw_gnt_nonspec_ivc;
-	   assign sw_gnt_nonspec_ivc
-	     = sw_gnt_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire [0:num_vcs-1] 	      sw_gnt_spec_ivc;
-	   assign sw_gnt_spec_ivc
-	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
-	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
-	   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
-	   wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
-	   wire 			flit_valid_out;
-	   wire [0:vc_idx_width-1] 	flit_vc_out;
-	   wire 			flit_head_out;
-	   wire 			flit_tail_out;
-	   wire [0:data_width-1] 	flit_data_out;
-	   wire 			cred_valid_out;
-	   wire [0:vc_idx_width-1] 	cred_vc_out;
+	   wire [0:num_vcs*num_ports-1] ipc_vca_req_ivc_op;
+	   wire [0:num_vcs*num_vcs-1] 	ipc_vca_req_ivc_ovc;
+	   wire [0:num_vcs*num_ports-1] ipc_swa_req_nonspec_ivc_op;
+	   wire [0:num_vcs*num_ports-1] ipc_swa_req_spec_ivc_op;
+	   wire [0:flit_ctrl_width-1] 	ipc_xbc_flit_ctrl;
+	   wire [0:flit_data_width-1] 	ipc_xbd_flit_data;
+	   wire [0:flow_ctrl_width-1] 	flow_ctrl_out;
 	   wire 			ipc_error;
 	   ip_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -309,9 +276,9 @@ module router
 	       .num_dimensions(num_dimensions),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
-	       .data_width(data_width),
+	       .flit_data_width(flit_data_width),
 	       .routing_function_type(routing_function_type),
-	       .credit_handling_type(credit_handling_type),
+	       .int_flow_control_type(int_flow_control_type),
 	       .header_fifo_type(header_fifo_type),
 	       .fbf_regfile_type(fbf_regfile_type),
 	       .sw_spec_enable(sw_spec_enable),
@@ -319,54 +286,49 @@ module router
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
+	       .packet_format(packet_format),
+	       .flow_control_type(flow_control_type),
 	       .port_id(ip),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),
 	      .reset(reset),
 	      .router_address(router_address),
-	      .flit_valid_in(flit_valid_in),
-	      .flit_vc_in(flit_vc_in),
-	      .flit_head_in(flit_head_in),
-	      .flit_tail_in(flit_tail_in),
+	      .flit_ctrl_in(flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
-	      .vc_req_ivc_op(vc_req_ivc_op),
-	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
-	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
-	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ivc_op),
-	      .sw_req_spec_ivc_op(sw_req_spec_ivc_op),
-	      .sw_gnt_nonspec_ivc(sw_gnt_nonspec_ivc),
-	      .sw_gnt_spec_ivc(sw_gnt_spec_ivc),
-	      .flit_valid_out(flit_valid_out),
-	      .flit_vc_out(flit_vc_out),
-	      .flit_head_out(flit_head_out),
-	      .flit_tail_out(flit_tail_out),
-	      .flit_data_out(flit_data_out),
-	      .cred_valid_out(cred_valid_out),
-	      .cred_vc_out(cred_vc_out),
+	      .vc_req_ivc_op(ipc_vca_req_ivc_op),
+	      .vc_req_ivc_ovc(ipc_vca_req_ivc_ovc),
+	      .vc_gnt_ivc_ovc(vca_ipc_gnt_ivc_ovc),
+	      .sw_req_nonspec_ivc_op(ipc_swa_req_nonspec_ivc_op),
+	      .sw_req_spec_ivc_op(ipc_swa_req_spec_ivc_op),
+	      .sw_gnt_nonspec_ivc(swa_ipc_gnt_nonspec_ivc),
+	      .sw_gnt_spec_ivc(swa_ipc_gnt_spec_ivc),
+	      .flit_ctrl_out(ipc_xbc_flit_ctrl),
+	      .flit_data_out(ipc_xbd_flit_data),
+	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
-	   assign vc_req_ip_ivc_op[ip*num_vcs*num_ports:
-				   (ip+1)*num_vcs*num_ports-1] = vc_req_ivc_op;
-	   assign vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
-				    (ip+1)*num_vcs*num_vcs-1] = vc_req_ivc_ovc;
-	   assign sw_req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
-					   (ip+1)*num_vcs*num_ports-1]
-		    = sw_req_nonspec_ivc_op;
-	   assign sw_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
+	   assign ipc_vca_req_ip_ivc_op[ip*num_vcs*num_ports:
 					(ip+1)*num_vcs*num_ports-1]
-		    = sw_req_spec_ivc_op;
-	   assign xbc_data_in_ip[ip*xbc_width:
-				 (ip+1)*xbc_width-1]
-		    = {flit_valid_out, flit_head_out, flit_tail_out,
-		       flit_vc_out};
-	   assign xbd_data_in_ip[ip*xbd_width:
-				 (ip+1)*xbd_width-1]
-		    = flit_data_out;
-	   assign cred_valid_out_ip[ip] = cred_valid_out;
-	   assign cred_vc_out_ip[ip*vc_idx_width:
-				 (ip+1)*vc_idx_width-1] = cred_vc_out;
+		    = ipc_vca_req_ivc_op;
+	   assign ipc_vca_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
+					 (ip+1)*num_vcs*num_vcs-1]
+		    = ipc_vca_req_ivc_ovc;
+	   assign ipc_swa_req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
+						(ip+1)*num_vcs*num_ports-1]
+		    = ipc_swa_req_nonspec_ivc_op;
+	   assign ipc_swa_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
+					     (ip+1)*num_vcs*num_ports-1]
+		    = ipc_swa_req_spec_ivc_op;
+	   assign ipc_xbc_flit_ctrl_ip[ip*flit_ctrl_width:
+				       (ip+1)*flit_ctrl_width-1]
+		    = ipc_xbc_flit_ctrl;
+	   assign ipc_xbd_flit_data_ip[ip*flit_data_width:
+				       (ip+1)*flit_data_width-1]
+		    = ipc_xbd_flit_data;
+	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:(ip+1)*flow_ctrl_width-1]
+		    = flow_ctrl_out;
 	   assign ipc_error_ip[ip] = ipc_error;
 	   
 	end
@@ -378,22 +340,25 @@ module router
    // virtual channel allocator
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_vcs-1] 	opc_vca_elig_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	vca_opc_gnt_op_ovc;
+   
    vc_alloc
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
-       .arbiter_type(vc_arbiter_type),
-       .allocator_type(vc_allocator_type),
+       .allocator_type(vca_allocator_type),
+       .arbiter_type(vca_arbiter_type),
        .reset_type(reset_type))
    vca
      (.clk(clk),
       .reset(reset),
-      .req_ip_ivc_op(vc_req_ip_ivc_op),
-      .req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
-      .elig_op_ovc(elig_op_ovc),
-      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
-      .gnt_op_ovc(vc_gnt_op_ovc));
+      .req_ip_ivc_op(ipc_vca_req_ip_ivc_op),
+      .req_ip_ivc_ovc(ipc_vca_req_ip_ivc_ovc),
+      .elig_op_ovc(opc_vca_elig_op_ovc),
+      .gnt_ip_ivc_ovc(vca_ipc_gnt_ip_ivc_ovc),
+      .gnt_op_ovc(vca_opc_gnt_op_ovc));
    
    
    //---------------------------------------------------------------------------
@@ -403,106 +368,88 @@ module router
    sw_alloc
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
-       .allocator_type(sw_allocator_type),
-       .arbiter_type(sw_arbiter_type),
+       .allocator_type(swa_allocator_type),
+       .arbiter_type(swa_arbiter_type),
        .spec_level(sw_spec_level),
        .reset_type(reset_type))
    swa
      (.clk(clk),
       .reset(reset),
-      .req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
-      .req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
-      .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
-      .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
-      .gnt_ip_op(sw_gnt_ip_op));
+      .req_nonspec_ip_ivc_op(ipc_swa_req_nonspec_ip_ivc_op),
+      .req_spec_ip_ivc_op(ipc_swa_req_spec_ip_ivc_op),
+      .gnt_nonspec_ip_ivc(swa_ipc_gnt_nonspec_ip_ivc),
+      .gnt_spec_ip_ivc(swa_ipc_gnt_spec_ip_ivc),
+      .gnt_ip_op(swa_xb_gnt_ip_op));
    
    
    //---------------------------------------------------------------------------
    // crossbar
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
-   assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] 	swa_xb_gnt_ip_op_s, swa_xb_gnt_ip_op_q;
+   assign swa_xb_gnt_ip_op_s = swa_xb_gnt_ip_op;
    dff
      #(.width(num_ports*num_ports),
        .reset_type(reset_type))
-   xbr_ctrl_ip_opq
+   swa_xb_gnt_ip_opq
      (.clk(clk),
       .reset(reset),
-      .d(xbr_ctrl_ip_op_s),
-      .q(xbr_ctrl_ip_op_q));
+      .d(swa_xb_gnt_ip_op_s),
+      .q(swa_xb_gnt_ip_op_q));
    
-   wire [0:num_ports*xbc_width-1] xbc_data_out_op;
+   wire [0:num_ports*flit_ctrl_width-1] xbc_opc_flit_ctrl_op;
    crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
-       .width(xbc_width),
+       .width(flit_ctrl_width),
        .crossbar_type(xbc_crossbar_type))
    xbc
-     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
-      .data_in_ip(xbc_data_in_ip),
-      .data_out_op(xbc_data_out_op));
+     (.ctrl_ip_op(swa_xb_gnt_ip_op_q),
+      .data_in_ip(ipc_xbc_flit_ctrl_ip),
+      .data_out_op(xbc_opc_flit_ctrl_op));
    
-   wire [0:num_ports*xbd_width-1] xbd_data_out_op;
+   assign flit_ctrl_out_op = xbc_opc_flit_ctrl_op;
+   
+   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
    crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
-       .width(xbd_width),
+       .width(flit_data_width),
        .crossbar_type(xbd_crossbar_type))
    xbd
-     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
-      .data_in_ip(xbd_data_in_ip),
-      .data_out_op(xbd_data_out_op));
+     (.ctrl_ip_op(swa_xb_gnt_ip_op_q),
+      .data_in_ip(ipc_xbd_flit_data_ip),
+      .data_out_op(flit_data_out_op));
    
    
    //---------------------------------------------------------------------------
    // output ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] 	  opc_error_op;
+   wire [0:num_ports-1] 		opc_error_op;
    
    generate
       
-      genvar 			  op;
+      genvar 				op;
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire [0:xbc_width-1] xbc_data_out;
-	   assign xbc_data_out
-	     = xbc_data_out_op[op*xbc_width:(op+1)*xbc_width-1];
+	   wire [0:flit_ctrl_width-1] xbc_opc_flit_ctrl;
+	   assign xbc_opc_flit_ctrl
+	     = xbc_opc_flit_ctrl_op[op*flit_ctrl_width:
+				    (op+1)*flit_ctrl_width-1];
 	   
-	   wire 		flit_valid;
-	   assign flit_valid = xbc_data_out[0];
+	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
+	   assign flow_ctrl_in
+	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire 		flit_head;
-	   assign flit_head = xbc_data_out[1];
+	   wire [0:num_vcs-1] 	      vca_opc_gnt_ovc;
+	   assign vca_opc_gnt_ovc
+	     = vca_opc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
-	   wire 		flit_tail;
-	   assign flit_tail = xbc_data_out[2];
-	   
-	   wire [0:vc_idx_width-1] flit_vc;
-	   assign flit_vc = xbc_data_out[3:3+vc_idx_width-1];
-	   
-	   wire [0:data_width-1]   xbd_data_out;
-	   assign xbd_data_out
-	     = xbd_data_out_op[op*data_width:(op+1)*data_width-1];
-	   
-	   wire [0:data_width-1]     flit_data;
-	   assign flit_data = xbd_data_out;
-	   
-	   wire 		     cred_valid_in;
-	   assign cred_valid_in = cred_valid_in_op[op];
-	   
-	   wire [0:vc_idx_width-1]   cred_vc_in;
-	   assign cred_vc_in = cred_vc_in_op[op*vc_idx_width:
-					     (op+1)*vc_idx_width-1];
-	   
-	   wire [0:num_vcs-1] 	     vc_gnt_ovc;
-	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
-	   
-	   wire [0:num_vcs-1] 	     elig_ovc;
-	   wire [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
+	   wire [0:num_vcs-1] 	      opc_vca_elig_ovc;
+	   wire [0:num_vcs*int_flow_ctrl_width-1] opc_ipc_flow_ctrl_ovc;
 	   wire 				  opc_error;
 	   op_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -510,37 +457,27 @@ module router
 	       .num_vcs(num_vcs),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .credit_handling_type(credit_handling_type),
+	       .packet_format(packet_format),
+	       .flow_control_type(flow_control_type),
+	       .int_flow_control_type(int_flow_control_type),
 	       .cred_level_width(2),
 	       .reset_type(reset_type))
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
-	      .cred_valid_in(cred_valid_in),
-	      .cred_vc_in(cred_vc_in),
-	      .vc_gnt_ovc(vc_gnt_ovc),
-	      .flit_valid_in(flit_valid),
-	      .flit_vc_in(flit_vc),
-	      .flit_tail_in(flit_tail),
-	      .elig_ovc(elig_ovc),
+	      .flow_ctrl_in(flow_ctrl_in),
+	      .flit_ctrl_in(xbc_opc_flit_ctrl),
+	      .vc_gnt_ovc(vca_opc_gnt_ovc),
+	      .elig_ovc(opc_vca_elig_ovc),
 	      .flow_ctrl_ovc(flow_ctrl_ovc),
 	      .error(opc_error));
 	   
-	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
-	   assign flow_ctrl_op_ovc[op*num_vcs*int_flow_ctrl_width:
-				   (op+1)*num_vcs*int_flow_ctrl_width-1]
-		    = flow_ctrl_ovc;
+	   assign opc_vca_elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
+		    = opc_vca_elig_ovc;
+	   assign opc_ipc_flow_ctrl_op_ovc[op*num_vcs*int_flow_ctrl_width:
+					   (op+1)*num_vcs*int_flow_ctrl_width-1]
+		    = opc_ipc_flow_ctrl_ovc;
 	   
-	   assign flit_valid_out_op[op] 
-		    = flit_valid;
-	   assign flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1]
-		    = flit_vc;
-	   assign flit_head_out_op[op]
-		    = flit_head;
-	   assign flit_tail_out_op[op]
-		    = flit_tail;
-	   assign flit_data_out_op[op*data_width:(op+1)*data_width-1]
-		    = flit_data;
 	   assign opc_error_op[op] = opc_error;
 	   
 	end

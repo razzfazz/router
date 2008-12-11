@@ -30,10 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input VC controller
 module ivc_ctrl
-  (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   route_info_in, flow_ctrl_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
-   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, fbf_write_addr, 
+  (clk, reset, router_address, flit_ctrl_in, route_info_in, flow_ctrl_op_ovc, 
+   vc_req_op, vc_req_ovc, vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, 
+   sw_gnt_nonspec, sw_gnt_spec, flit_sent, flit_ctrl_out, fbf_write_addr, 
    fbf_read_addr, error, events);
    
 `include "constants.v"
@@ -52,7 +51,6 @@ module ivc_ctrl
    parameter num_flit_buffers = 8;
    
    // width of credit hold register
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_PUSH)
    localparam cred_hold_width = clogb(num_flit_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
@@ -105,13 +103,13 @@ module ivc_ctrl
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_BY_RELATION;
    
    // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   parameter int_flow_control_type = `INT_FLOW_CONTROL_TYPE_CREDIT_PUSH;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+     = (int_flow_control_type == `INT_FLOW_CONTROL_TYPE_CREDIT_LEVEL) ?
        2 :
-       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       (int_flow_control_type == `INT_FLOW_CONTROL_TYPE_CREDIT_PUSH) ?
        1 :
        -1;
    
@@ -128,6 +126,16 @@ module ivc_ctrl
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
+   
+   // width of control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ?
+       // (valid + head/tail + vc_id)
+       (1 + 2 + vc_idx_width) :
+       -1;
    
    // ID of current input port
    parameter port_id = 0;
@@ -149,19 +157,11 @@ module ivc_ctrl
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // valid flit data available
-   input flit_valid_in;
-   
-   // flit is head
-   // (note: valid only when flit_valid_in=1)
-   input flit_head_in;
-   
-   // flit is tail
-   // (note: valid only when flit_valid_in=1)
-   input flit_tail_in;
+   // incoming flit control signals
+   input [0:flit_ctrl_width-1] flit_ctrl_in;
    
    // routing information associated with current flit
-   // (note: valid only when flit_valid_in=1 and flit_head_in=1)
+   // (note: valid only for head flits)
    input [0:route_info_width-1] route_info_in;
    
    // internal flow control signalling from output controller to input 
@@ -193,52 +193,41 @@ module ivc_ctrl
    // speculative switch allocator grants
    input sw_gnt_spec;
    
-   // outgoing flit valid
-   output flit_valid_out;
-   wire 		flit_valid_out;
+   // a flit was sent
+   output flit_sent;
+   wire 		flit_sent;
    
-   // outgoing flit is head
-   // (note: only valid if flit_valid_out=1)
-   output flit_head_out;
-   wire 		flit_head_out;
-   
-   // outgoing flit is tail
-   // (note: only valid if flit_valid_out=1)
-   output flit_tail_out;
-   wire 		flit_tail_out;
-   
-   // destination VC for outgoing flit
-   // (note: only valid if flit_valid_out=1)
-   output [0:vc_idx_width-1] flit_vc_out;
-   wire [0:vc_idx_width-1] flit_vc_out;
+   // outgoing flit control signals
+   output [0:flit_ctrl_width-1] flit_ctrl_out;
+   wire [0:flit_ctrl_width-1] flit_ctrl_out;
    
    // write pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] fbf_write_addr;
+   wire [0:fbf_addr_width-1]  fbf_write_addr;
    
    // read pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:fbf_addr_width-1] fbf_read_addr;
+   wire [0:fbf_addr_width-1]  fbf_read_addr;
    
    // internal error condition detected
    output error;
-   wire 		     error;
+   wire 		      error;
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
    output [0:5] events;
-   wire [0:5] 		     events;
+   wire [0:5] 		      events;
    
    
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire 		     vc_gnt;
+   wire 		      vc_gnt;
    assign vc_gnt = |vc_gnt_ovc;
    
-   wire 		     get_next_header;
-   wire 		     allocated_s, allocated_q;
+   wire 		      get_next_header;
+   wire 		      allocated_s, allocated_q;
    assign allocated_s = (allocated_q | vc_gnt) & ~get_next_header;
    dff
      #(.width(1),
@@ -279,121 +268,157 @@ module ivc_ctrl
    // keep track of when to get next header
    //---------------------------------------------------------------------------
    
+   wire 		       flit_valid_in;
+   wire 		       flit_head_in;
+   wire 		       flit_tail_in;
+   wire [0:vc_idx_width-1]     flit_vc_in;
+   wire 		       flit_valid_out;
+   wire 		       flit_head_out;
+   wire 		       flit_tail_out;
+   wire [0:vc_idx_width-1]     flit_vc_out;
+   
+   wire 		       free_unallocated;
+   wire 		       free_allocated;
+   
    generate
       
-      if(num_header_buffers > 1)
-	begin
-	   
-	   // keep track of location(s) of head and tail flits in flit buffer
-	   wire [0:num_flit_buffers-1] head_queue;
-	   wire [0:num_flit_buffers-1] tail_queue;
-	   
-	   wire [0:num_flit_buffers-1] write_sel;
-	   wire [0:num_flit_buffers-1] read_sel;
-	   
-	   genvar 		       idx;
-	   
-	   for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
-	     begin:idxs
-		
-		assign write_sel[idx]
-			 = (fbf_write_addr == (fbf_min_addr + idx));
-		assign read_sel[idx]
-			 = (fbf_read_addr == (fbf_min_addr + idx));
-		
-		wire capture;
-		assign capture = flit_valid_in & write_sel[idx];
-		
-		reg  head_q, tail_q;
-		always @(posedge clk)
-		  if(capture)
-		    begin
-		       head_q <= flit_head_in;
-		       tail_q <= flit_tail_in;
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL:
+	  begin
+
+	     assign flit_valid_in = flit_ctrl_in[0] && (flit_vc_in == vc_id);
+	     assign flit_head_in = flit_ctrl_in[1];
+	     assign flit_tail_in = flit_ctrl_in[2];
+	     assign flit_vc_in = flit_ctrl_in[3:3+vc_idx_width-1];
+	     
+	     assign flit_ctrl_out[0] = flit_valid_out;
+	     assign flit_ctrl_out[1] = flit_head_out;
+	     assign flit_ctrl_out[2] = flit_tail_out;
+	     assign flit_ctrl_out[3:3+vc_idx_width-1] = flit_vc_out;
+	     
+	     if(num_header_buffers > 1)
+	       begin
+		  
+		  // keep track of location(s) of head and tail flits in flit 
+		  // buffer
+		  wire [0:num_flit_buffers-1] head_queue;
+		  wire [0:num_flit_buffers-1] tail_queue;
+		  
+		  wire [0:num_flit_buffers-1] write_sel;
+		  wire [0:num_flit_buffers-1] read_sel;
+		  
+		  genvar 		      idx;
+		  
+		  for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
+		    begin:idxs
+		       
+		       assign write_sel[idx]
+				= (fbf_write_addr == (fbf_min_addr + idx));
+		       assign read_sel[idx]
+				= (fbf_read_addr == (fbf_min_addr + idx));
+		       
+		       wire capture;
+		       assign capture = flit_valid_in & write_sel[idx];
+		       
+		       reg  head_q, tail_q;
+		       always @(posedge clk)
+			 if(capture)
+			   begin
+			      head_q <= flit_head_in;
+			      tail_q <= flit_tail_in;
+			   end
+		       
+		       assign head_queue[idx] = head_q;
+		       assign tail_queue[idx] = tail_q;
+		       
 		    end
-		
-		assign head_queue[idx] = head_q;
-		assign tail_queue[idx] = tail_q;
-		
-	     end
-	   
-	   select_1ofn
-	     #(.num_ports(num_flit_buffers),
-	       .width(1))
-	   flit_head_out_sel
-	     (.select(read_sel),
-	      .data_in(head_queue),
-	      .data_out(flit_head_out));
-	   
-	   select_1ofn
-	     #(.num_ports(num_flit_buffers),
-	       .width(1))
-	   flit_tail_out_sel
-	     (.select(read_sel),
-	      .data_in(tail_queue),
-	      .data_out(flit_tail_out));
-	   
-	end
-      else
-	begin
-	   
-	   wire head_in;
-	   assign head_in = flit_valid_in & flit_head_in;
-	   
-	   wire [0:fbf_addr_width-1] head_idx_s, head_idx_q;
-	   assign head_idx_s = head_in ? fbf_write_addr : head_idx_q;
-	   dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   head_idxq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(head_idx_s),
-	      .q(head_idx_q));
-	   
-	   wire 		     head_valid_s, head_valid_q;
-	   assign head_valid_s
-	     = (head_valid_q & ~(all_allocated & flit_head_out)) | head_in;
-	   dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   head_validq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(head_valid_s),
-	      .q(head_valid_q));
-	   
-	   assign flit_head_out = head_valid_q && (fbf_read_addr == head_idx_q);
-	   
-	   wire 		     tail_in;
-	   assign tail_in = flit_valid_in & flit_tail_in;
-	   
-	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
-	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
-	   dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   tail_idxq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(tail_idx_s),
-	      .q(tail_idx_q));
-	   
-	   wire 		     tail_valid_s, tail_valid_q;
-	   assign tail_valid_s
-	     = (tail_valid_q & ~(all_allocated & flit_tail_out)) | tail_in;
-	   dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   tail_validq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(tail_valid_s),
-	      .q(tail_valid_q));
-	   
-	   assign flit_tail_out = tail_valid_q && (fbf_read_addr == tail_idx_q);
-	   
-	end
+		  
+		  select_1ofn
+		    #(.num_ports(num_flit_buffers),
+		      .width(1))
+		  flit_head_out_sel
+		    (.select(read_sel),
+		     .data_in(head_queue),
+		     .data_out(flit_head_out));
+		  
+		  select_1ofn
+		    #(.num_ports(num_flit_buffers),
+		      .width(1))
+		  flit_tail_out_sel
+		    (.select(read_sel),
+		     .data_in(tail_queue),
+		     .data_out(flit_tail_out));
+		  
+	       end
+	     else
+	       begin
+		  
+		  wire head_in;
+		  assign head_in = flit_valid_in & flit_head_in;
+		  
+		  wire [0:fbf_addr_width-1] head_idx_s, head_idx_q;
+		  assign head_idx_s = head_in ? fbf_write_addr : head_idx_q;
+		  dff
+		    #(.width(fbf_addr_width),
+		      .reset_type(reset_type))
+		  head_idxq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(head_idx_s),
+		     .q(head_idx_q));
+		  
+		  wire 			    head_valid_s, head_valid_q;
+		  assign head_valid_s
+		    = (head_valid_q & ~(all_allocated & flit_head_out)) |
+		      head_in;
+		  dff
+		    #(.width(1),
+		      .reset_type(reset_type))
+		  head_validq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(head_valid_s),
+		     .q(head_valid_q));
+		  
+		  assign flit_head_out
+		    = head_valid_q && (fbf_read_addr == head_idx_q);
+		  
+		  wire 			    tail_in;
+		  assign tail_in = flit_valid_in & flit_tail_in;
+		  
+		  wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
+		  assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
+		  dff
+		    #(.width(fbf_addr_width),
+		      .reset_type(reset_type))
+		  tail_idxq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(tail_idx_s),
+		     .q(tail_idx_q));
+		  
+		  wire 			    tail_valid_s, tail_valid_q;
+		  assign tail_valid_s
+		    = (tail_valid_q & ~(all_allocated & flit_tail_out)) |
+		      tail_in;
+		  dff
+		    #(.width(1),
+		      .reset_type(reset_type))
+		  tail_validq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(tail_valid_s),
+		     .q(tail_valid_q));
+		  
+		  assign flit_tail_out
+		    = tail_valid_q && (fbf_read_addr == tail_idx_q);
+		  
+	       end
+	     
+	  end
+	
+      endcase
       
    endgenerate
    
@@ -552,9 +577,9 @@ module ivc_ctrl
    
    generate
       
-      case(credit_handling_type)
+      case(int_flow_control_type)
 	
-	`CREDIT_HANDLING_TYPE_LEVEL:
+	`INT_FLOW_CONTROL_TYPE_CREDIT_LEVEL:
 	  begin
 	     
 	     wire [0:num_vcs-1] free_ovc;
@@ -607,7 +632,7 @@ module ivc_ctrl
 	     
 	  end
 	
-	`CREDIT_HANDLING_TYPE_PUSH:
+	`INT_FLOW_CONTROL_TYPE_CREDIT_PUSH:
 	  begin
 	     
 	     wire [0:num_vcs-1] 	       cred_ovc;

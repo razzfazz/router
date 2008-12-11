@@ -72,6 +72,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 //------------------------------------------------------------------------------
+// packet formats
+//------------------------------------------------------------------------------
+
+// explicit head and tail indicator signals
+`define PACKET_FORMAT_HEAD_TAIL 0
+
+
+//------------------------------------------------------------------------------
+// flow control types
+//------------------------------------------------------------------------------
+
+// credit-based flow control
+`define FLOW_CONTROL_TYPE_CREDIT 0
+
+
+//------------------------------------------------------------------------------
 // arbiter types
 //------------------------------------------------------------------------------
 
@@ -165,14 +181,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 //------------------------------------------------------------------------------
-// credit handling implementation variants
+// implementation variants for internal flow control between input and output 
+// ports
 //------------------------------------------------------------------------------
 
 // indicate credit level to input side
-`define CREDIT_HANDLING_TYPE_LEVEL 0
+`define INT_FLOW_CONTROL_TYPE_CREDIT_LEVEL 0
 
 // push credits to input side one by one
-`define CREDIT_HANDLING_TYPE_PUSH  1
+`define INT_FLOW_CONTROL_TYPE_CREDIT_PUSH  1
 
 
 //------------------------------------------------------------------------------

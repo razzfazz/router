@@ -55,12 +55,12 @@ module testbench
    
    parameter Tclk = 2;
    parameter initial_seed = 0;
-   parameter walk_addresses = 0;
    parameter max_packet_count = -1;
    parameter packet_rate = 25;
    parameter adaptive_rate = 1;
    parameter packet_count_width = 32;
-   parameter credit_latency = 6;
+   parameter inj_channel_delay = 0;
+   parameter min_channel_delay = 2;
    parameter warmup_time = 1000;
    parameter measure_time = 100000;
    
@@ -149,7 +149,7 @@ module testbench
    localparam head_info_width = route_info_width + packet_length_width;
    
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -161,6 +161,26 @@ module testbench
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
+   
+   // width of control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ?
+       // (valid + head/tail + vc_id)
+       (1 + 2 + vc_idx_width) :
+       -1;
+   
+   // select flow control type
+   parameter flow_control_type = `FLOW_CONTROL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_control_type == `FLOW_CONTROL_TYPE_CREDIT) ?
+       // (valid + vc_id)
+       (1 + vc_idx_width) :
+       -1;
+   
    // select routing function type
    localparam routing_function_type
      = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
@@ -170,7 +190,7 @@ module testbench
        -1;
    
    // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   parameter int_flow_control_type = `INT_FLOW_CONTROL_TYPE_CREDIT_PUSH;
    
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
@@ -179,24 +199,19 @@ module testbench
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vca_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vca_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter swa_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter swa_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
    parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
-   
-   // enable speculative switch allocation
-   localparam sw_spec_enable = (sw_spec_level == `SW_SPEC_LEVEL_NONE) ?
-			       0 :
-			       1;
    
    // select implementation variant for control crossbar
    parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -209,24 +224,17 @@ module testbench
    reg 		    reset;
    reg 		    clk;
    
-   wire [0:num_ports-1] flit_valid_in_ip;
-   wire [0:num_ports*vc_idx_width-1] flit_vc_in_ip;
-   wire [0:num_ports-1] 	     flit_head_in_ip;
-   wire [0:num_ports-1] 	     flit_tail_in_ip;
-   wire [0:num_ports*data_width-1]   flit_data_in_ip;
-   wire [0:num_ports-1] 	     cred_valid_out_ip;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
+   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
+   wire [0:num_ports*flit_data_width-1] flit_data_in_ip;
+   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
+   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
+   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
    
-   wire [0:num_ports-1] 	     flit_valid_out_op;
-   wire [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   wire [0:num_ports-1] 	     flit_head_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
-   wire [0:num_ports*data_width-1]   flit_data_out_op;
-   wire [0:num_ports-1] 	     cred_valid_in_op;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_in_op;
+   wire [0:num_ports-1] 		flit_valid_in_ip;
    
-   wire [0:num_ports-1] 	     ps_error_ip;
-   wire [0:num_ports-1] 	     rtl_error_ip;
+   wire [0:num_ports-1] 		ps_error_ip;
+   wire [0:num_ports-1] 		rtl_error_ip;
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 	  fifo_error_ip_ivc;
    
@@ -235,19 +243,24 @@ module testbench
    generate
       
       genvar 				  ip;
+      
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
 	   if(ip < num_ports - num_nodes_per_router)
 	     begin
 		
+		// no injection port => no traffic injected
+		
+		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
+				       (ip+1)*flit_ctrl_width-1]
+			 = {flit_ctrl_width{1'b0}};
+		assign flit_data_in_ip[ip*flit_data_width:
+				       (ip+1)*flit_data_width-1]
+			 = {flit_data_width{1'b0}};
+		
 		assign flit_valid_in_ip[ip] = 1'b0;
-		assign flit_vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]
-			 = {vc_idx_width{1'b0}};
-		assign flit_head_in_ip[ip] = 1'b0;
-		assign flit_tail_in_ip[ip] = 1'b0;
-		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
-			 = {data_width{1'b0}};
+		
 		assign ps_error_ip[ip] = 1'b0;
 		assign rtl_error_ip[ip] = 1'b0;
 		assign match_ip_ivc_op[ip*num_vcs*num_ports:
@@ -260,117 +273,127 @@ module testbench
 	   else
 	     begin
 		
-		wire cred_valid;
-		wire [0:vc_idx_width-1] cred_vc;
+		// injection port => connect to packet source
 		
-		wire [0:credit_latency-1] cred_valid_dly_s,
-					  cred_valid_dly_q;
-		wire [0:credit_latency*vc_idx_width-1] cred_vc_dly_s,
-						       cred_vc_dly_q;
 		
-		if(credit_latency > 1)
-		  begin
-		     assign cred_valid_dly_s
-		       = {cred_valid_out_ip[ip],
-			  cred_valid_dly_q[0:(credit_latency-1)-1]};
-		     assign cred_valid
-		       = cred_valid_dly_q[(credit_latency-1):credit_latency-1];
-		     assign cred_vc_dly_s
-		       = {cred_vc_out_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1],
-			  cred_vc_dly_q[0:vc_idx_width*(credit_latency-1)-1]};
-		     assign cred_vc
-		       = cred_vc_dly_q[vc_idx_width*(credit_latency-1):
-				       vc_idx_width*credit_latency-1];
-		  end
-		else
-		  begin
-		     assign cred_valid_dly_s = cred_valid_out_ip[ip];
-		     assign cred_valid = cred_valid_dly_q;
-		     assign cred_vc_dly_s
-		       = cred_vc_out_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1];
-		     assign cred_vc = cred_vc_dly_q;
-		  end
+		// flow control signals are delayed by given number of cycles
 		
-		dff
-		  #(.width(credit_latency))
-		cred_valid_dlyq
+		wire [0:flow_ctrl_width-1] flow_ctrl_out;
+		assign flow_ctrl_out
+		  = flow_ctrl_out_ip[ip*flow_ctrl_width:
+				     (ip+1)*flow_ctrl_width-1];
+		
+		wire [0:flow_ctrl_width-1] flow_ctrl_in;
+		delay
+		  #(.width(flow_ctrl_width),
+		    .delay(inj_channel_delay))
+		flow_ctrl_in_delay
 		  (.clk(clk),
 		   .reset(reset),
-		   .d(cred_valid_dly_s),
-		   .q(cred_valid_dly_q));
+		   .data_in(flow_ctrl_out),
+		   .data_out(flow_ctrl_in));
 		
-		dff
-		  #(.width(vc_idx_width*credit_latency))
-		cred_vc_dlyq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(cred_vc_dly_s),
-		   .q(cred_vc_dly_q));
+		// connect packet source
 		
-		wire 			flit_valid;
-		wire [0:vc_idx_width-1] flit_vc;
-		wire 			flit_head;
-		wire 			flit_tail;
-		wire [0:data_width-1] 	flit_data;
+		wire [0:flit_ctrl_width-1] flit_ctrl_out;
+		wire [0:flit_data_width-1] flit_data_out;
 		
 		wire [0:packet_count_width-1] ps_out_flits;
 		
 		wire 			      ps_error;
 		packet_source
-		  #(.max_packet_count(max_packet_count),
+		  #(
+		    .num_flit_buffers(num_flit_buffers),
+		    .num_header_buffers(num_header_buffers),
+		    .num_vcs(num_vcs),
+		    .addr_width(addr_width),
+		    .address(router_address+
+			     ip-(num_ports-num_nodes_per_router)),
+		    .packet_format(packet_format),
+		    .max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
 		    .initial_seed(initial_seed+ip),
 		    .adaptive_rate(adaptive_rate),
 		    .packet_count_width(packet_count_width),
-		    .num_flit_buffers(num_flit_buffers),
-		    .num_header_buffers(num_header_buffers),
-		    .num_vcs(num_vcs),
 		    .max_packet_length(max_packet_length),
 		    .min_packet_length(min_packet_length),
 		    .packet_length_mode(packet_length_mode),
-		    .data_width(data_width),
-		    .addr_width(addr_width),
-		    .address(router_address+
-			     ip-(num_ports-num_nodes_per_router)),
-		    .walk_addresses(walk_addresses))
+		    .flit_data_width(flit_data_width))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
-		   .flit_valid(flit_valid),
-		   .flit_head(flit_head),
-		   .flit_tail(flit_tail),
-		   .flit_vc(flit_vc),
-		   .flit_data(flit_data),
-		   .cred_valid(cred_valid),
-		   .cred_vc(cred_vc),
+		   .flit_ctrl_out(flit_ctrl_out),
+		   .flit_data_out(flit_data_out),
+		   .flow_ctrl_in(flow_ctrl_in),
 		   .run(run),
 		   .out_flits(ps_out_flits),
 		   .error(ps_error));
 		
-		assign flit_valid_in_ip[ip] = flit_valid;
-		assign flit_vc_in_ip[ip*vc_idx_width:(ip+1)*vc_idx_width-1]
-			 = flit_vc;
-		assign flit_head_in_ip[ip] = flit_head;
-		assign flit_tail_in_ip[ip] = flit_tail;
-		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
-			 =  flit_data;
+		
+		// also delay flit data and control
+		
+		wire [0:flit_ctrl_width-1] flit_ctrl_in;
+		delay
+		  #(.width(flit_ctrl_width),
+		    .delay(inj_channel_delay))
+		flit_ctrl_in_delay
+		  (.clk(clk),
+		   .reset(reset),
+		   .data_in(flit_ctrl_out),
+		   .data_out(flit_ctrl_in));
+		
+		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
+				       (ip+1)*flit_ctrl_width-1]
+			 = flit_ctrl_in;
+		
+		wire [0:flit_data_width-1] flit_data_in;
+		delay
+		  #(.width(flit_data_width),
+		    .delay(inj_channel_delay))
+		flit_data_in_delay
+		  (.clk(clk),
+		   .reset(reset),
+		   .data_in(flit_data_out),
+		   .data_out(flit_data_in));
+		
+		assign flit_data_in_ip[ip*flit_data_width:
+				       (ip+1)*flit_data_width-1]
+			 =  flit_data_in;
+		
 		assign ps_error_ip[ip] = ps_error;
 		
-		wire [0:head_info_width-1]    head_info;
-		assign head_info = flit_data[0:head_info_width-1];
+		wire 			   flit_valid_in;
+		wire 			   flit_head_in;
+		wire 			   flit_tail_in;
 		
-		wire [0:route_info_width-1]   route_info;
+		case(packet_format)
+		  
+		  `PACKET_FORMAT_HEAD_TAIL:
+		    begin
+		       assign flit_valid_in = flit_ctrl_in[0];
+		       assign flit_head_in = flit_ctrl_in[1];
+		       assign flit_tail_in = flit_ctrl_in[2];
+		    end
+		  
+		endcase
+		
+		assign flit_valid_in_ip = flit_valid_in;
+		
+		wire [0:head_info_width-1] head_info;
+		assign head_info = flit_data_in[0:head_info_width-1];
+		
+		wire [0:route_info_width-1] route_info;
 		assign route_info = head_info[0:route_info_width-1];
 		
-		wire [0:num_vcs*num_ports-1]  next_port_ivc;
-		wire [0:num_vcs*num_vcs-1]    next_vcs_ivc;
-		wire [0:num_vcs-1] 	      rtl_error_ivc;
-
-		genvar 			      ivc;
-
+		wire [0:num_vcs*num_ports-1] next_port_ivc;
+		wire [0:num_vcs*num_vcs-1]   next_vcs_ivc;
+		wire [0:num_vcs-1] 	     rtl_error_ivc;
+		
+		genvar 			     ivc;
+		
 		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 		  begin:ivs
-
+		     
 		     wire [0:num_ports-1]  next_port;
 		     wire [0:num_vcs-1]    next_vcs;
 		     wire 		   rtl_error_unmasked;
@@ -402,20 +425,64 @@ module testbench
 		     
 		     wire 		   rtl_error;
 		     assign rtl_error
-		       = rtl_error_unmasked & flit_valid &  flit_head;
+		       = rtl_error_unmasked & flit_valid_in & flit_head_in;
 		     
 		     assign rtl_error_ivc[ivc] = rtl_error;
 		     
 		  end
 		
 		wire [0:num_ports-1] 	   next_port;
-		mux_nto1
-		  #(.num_ports(num_vcs),
-		    .width(num_ports))
-		next_port_mux
-		  (.select(flit_vc),
-		   .data_in(next_port_ivc),
-		   .data_out(next_port));
+		wire [0:num_vcs-1] 	   next_vcs;
+		wire [0:num_vcs-1] 	   flit_valid_ivc;
+		
+		if(num_vcs > 1)
+		  begin
+		     
+		     wire [0:vc_idx_width-1] flit_vc_in;
+		     
+		     case(packet_format)
+		       
+		       `PACKET_FORMAT_HEAD_TAIL:
+			 begin
+			    assign flit_vc_in
+			      = flit_ctrl_in[3:3+vc_idx_width-1];
+			 end
+		       
+		     endcase
+		     
+		     mux_nto1
+		       #(.num_ports(num_vcs),
+			 .width(num_ports))
+		     next_port_mux
+		       (.select(flit_vc_in),
+			.data_in(next_port_ivc),
+			.data_out(next_port));
+		     
+		     mux_nto1
+		       #(.num_ports(num_vcs),
+			 .width(num_vcs))
+		     next_vcs_mux
+		       (.select(flit_vc_in),
+			.data_in(next_vcs_ivc),
+			.data_out(next_vcs));
+		     
+		     wire [0:num_vcs-1] flit_vc_1hot;
+		     decoder
+		       #(.num_ports(num_vcs))
+		     flit_vc_1hot_dec
+		       (.data_in(flit_vc_in),
+			.data_out(flit_vc_1hot));
+		     
+		     assign flit_valid_ivc
+		       = {num_vcs{flit_valid_in}} & flit_vc_1hot;
+		     
+		  end
+		else
+		  begin
+		     assign next_port = next_port_ivc;
+		     assign next_vcs = next_vcs_ivc;
+		     assign flit_valid_ivc = flit_valid_in;
+		  end
 		
 		wire [0:port_idx_width-1]  next_port_enc;
 		encoder
@@ -427,8 +494,8 @@ module testbench
 		assign rtl_error_ip[ip] = |rtl_error_ivc;
 		
 		wire [0:port_idx_width-1]  dest_port_s, dest_port_q;
-		assign dest_port_s = flit_valid ?
-				     (flit_head ?
+		assign dest_port_s = flit_valid_in ?
+				     (flit_head_in ?
 				      next_port_enc :
 				      dest_port_q) :
 				     dest_port_q;
@@ -441,22 +508,13 @@ module testbench
 		   .q(dest_port_q));
 		
 		wire [0:port_idx_width-1]     dest_port;
-		assign dest_port = (flit_valid & flit_head) ?
+		assign dest_port = (flit_valid_in & flit_head_in) ?
 				   next_port_enc :
 				   dest_port_q;
 
-		wire [0:num_vcs-1] 	      next_vcs;
-		mux_nto1
-		  #(.num_ports(num_vcs),
-		    .width(num_vcs))
-		next_vcs_mux
-		  (.select(flit_vc),
-		   .data_in(next_vcs_ivc),
-		   .data_out(next_vcs));
-		
 		wire [0:num_vcs-1] 	      dest_vcs_s, dest_vcs_q;
-		assign dest_vcs_s = flit_valid ?
-				    (flit_head ?
+		assign dest_vcs_s = flit_valid_in ?
+				    (flit_head_in ?
 				     next_vcs :
 				     dest_vcs_q) :
 				    dest_vcs_q;
@@ -469,7 +527,7 @@ module testbench
 		   .q(dest_vcs_q));
 		
 		wire [0:num_vcs-1] 	      dest_vcs;
-		assign dest_vcs = (flit_valid & flit_head) ?
+		assign dest_vcs = (flit_valid_in & flit_head_in) ?
 				  next_vcs :
 				  dest_vcs_q;
 		
@@ -481,99 +539,123 @@ module testbench
 		
 		wire 			      update_addr;
 		assign update_addr
-		  = flit_head &&
+		  = flit_head_in &&
 		    (router_address == next_address[0:router_addr_width-1]);
 		
 		wire [0:route_info_width-1]   next_route_info;
 		assign next_route_info
 		  = {update_addr ? final_address : next_address, final_address};
 		
-		wire [0:data_width-1] 	      flit_data_muxed;
+		wire [0:flit_data_width-1] 	      flit_data_muxed;
 		assign flit_data_muxed[0:route_info_width-1] = next_route_info;
-		assign flit_data_muxed[route_info_width:data_width-1]
-			 = flit_data[route_info_width:data_width-1];
+		assign flit_data_muxed[route_info_width:flit_data_width-1]
+			 = flit_data_in[route_info_width:flit_data_width-1];
 		
-		wire [0:(2+data_width+port_idx_width+num_vcs)-1] data_in;
-		assign data_in[0] = flit_head;
-		assign data_in[1] = flit_tail;
-		assign data_in[2:2+data_width-1]
-			 = flit_data_muxed[0:data_width-1];
-		assign data_in[2+data_width:2+data_width+port_idx_width-1]
+		wire [0:(2+flit_data_width+port_idx_width+num_vcs)-1] data_in;
+		assign data_in[0] = flit_head_in;
+		assign data_in[1] = flit_tail_in;
+		assign data_in[2:2+flit_data_width-1]
+			 = flit_data_muxed[0:flit_data_width-1];
+		assign data_in[2+flit_data_width:
+			       2+flit_data_width+port_idx_width-1]
 			 = dest_port;
-		assign data_in[2+data_width+port_idx_width:
-			       2+data_width+port_idx_width+num_vcs-1]
+		assign data_in[2+flit_data_width+port_idx_width:
+			       2+flit_data_width+port_idx_width+num_vcs-1]
 			 = dest_vcs;
 		
-		genvar 						 ivc;
 		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 		  begin:ivcs
 		     
-		     wire [0:2+data_width+port_idx_width+num_vcs-1] data_out;
+		     wire [0:2+flit_data_width+
+			   port_idx_width+num_vcs-1] data_out;
 		     
-		     wire 					    ref_head;
+		     wire 			     ref_head;
 		     assign ref_head = data_out[0];
 		     
-		     wire 					    ref_tail;
+		     wire 			     ref_tail;
 		     assign ref_tail = data_out[1];
 		     
-		     wire [0:data_width-1] 			    ref_data;
-		     assign ref_data = data_out[2:2+data_width-1];
+		     wire [0:flit_data_width-1]      ref_data;
+		     assign ref_data = data_out[2:2+flit_data_width-1];
 		     
-		     wire [0:port_idx_width-1] 			    ref_port;
+		     wire [0:port_idx_width-1] 	     ref_port;
 		     assign ref_port
-		       = data_out[2+data_width:
-				  2+data_width+port_idx_width-1];
+		       = data_out[2+flit_data_width:
+				  2+flit_data_width+port_idx_width-1];
 		     
-		     wire [0:num_vcs-1] 			    ref_vcs;
+		     wire [0:num_vcs-1] 	     ref_vcs;
 		     assign ref_vcs
-		       = data_out[2+data_width+port_idx_width:
-				  2+data_width+port_idx_width+num_vcs-1];
+		       = data_out[2+flit_data_width+port_idx_width:
+				  2+flit_data_width+port_idx_width+num_vcs-1];
 		     
-		     wire 					    check_head;
-		     assign check_head = flit_head_out_op[ref_port];
+		     wire [0:flit_ctrl_width-1]      flit_ctrl_out;
+		     assign flit_ctrl_out
+		       = flit_ctrl_out_op[ref_port*flit_ctrl_width +:
+					  flit_ctrl_width];
 		     
-		     wire 					    check_tail;
-		     assign check_tail = flit_tail_out_op[ref_port];
+		     wire 			     flit_valid_out;
+		     wire 			     flit_head_out;
+		     wire 			     flit_tail_out;
+
+		     case(packet_format)
+
+		       `PACKET_FORMAT_HEAD_TAIL:
+			 begin
+			    assign flit_valid_out = flit_ctrl_out[0];
+			    assign flit_head_out = flit_ctrl_out[1];
+			    assign flit_tail_out = flit_ctrl_out[2];
+			 end
+
+		     endcase
 		     
-		     wire [0:data_width-1] 			    check_data;
-		     assign check_data
-		       = flit_data_out_op[ref_port*data_width +: data_width];
+		     wire [0:flit_data_width-1]      flit_data_out;
+		     assign flit_data_out
+		       = flit_data_out_op[ref_port*flit_data_width +: 
+					  flit_data_width];
+
+		     wire 			     match_head;
+		     assign match_head = ref_head == flit_head_out;
 		     
-		     wire [0:vc_idx_width-1] 			    check_vc;
-		     assign check_vc
-		       = flit_vc_out_op[ref_port*vc_idx_width +: vc_idx_width];
+		     wire 			     match_tail;
+		     assign match_tail = ref_tail == flit_tail_out;
 		     
-		     wire 					    push;
-		     assign push = flit_valid && (flit_vc == ivc);
+		     wire 			     match_data;
+		     assign match_data = ref_data == flit_data_out;
 		     
-		     wire 					    match_head;
-		     assign match_head = ref_head == check_head;
+		     wire 			     match_vcs;
 		     
-		     wire 					    match_tail;
-		     assign match_tail = ref_tail == check_tail;
+		     if(num_vcs > 1)
+		       begin
+			  
+			  wire [0:vc_idx_width-1] flit_vc_out;
+			  assign flit_vc_out
+			    = flit_ctrl_out[3:3+vc_idx_width-1];
+			  
+			  assign match_vcs = ref_vcs[flit_vc_out];
+			  
+		       end
+		     else
+		       assign match_vcs = 1'b1;
 		     
-		     wire 					    match_data;
-		     assign match_data = ref_data == check_data;
+		     wire 			  fifo_empty;
 		     
-		     wire 					    match_vcs;
-		     assign match_vcs = ref_vcs[check_vc];
-		     
-		     wire 					    fifo_empty;
-		     
-		     wire 					    match;
+		     wire 			  match;
 		     assign match
-		       = flit_valid_out_op[ref_port] & ~fifo_empty &
+		       = flit_valid_out & ~fifo_empty &
 			 match_head & match_tail & match_data & match_vcs;
 		     
-		     wire 					    pop;
+		     wire 			  push;
+		     assign push = flit_valid_ivc[ivc];
+		     
+		     wire 			  pop;
 		     assign pop = match;
 		     
-		     wire 					    fifo_full;
-		     wire 					    fifo_error;
+		     wire 			  fifo_full;
+		     wire 			  fifo_error;
 		     
 		     fifo
 		       #(.depth(num_flit_buffers),
-			 .width(2+data_width+port_idx_width+num_vcs))
+			 .width(2+flit_data_width+port_idx_width+num_vcs))
 		     ref_fifo
 		       (.clk(clk),
 			.reset(reset),
@@ -587,14 +669,14 @@ module testbench
 		     
 		     assign fifo_error_ip_ivc[ip*num_vcs+ivc] = fifo_error;
 		     
-		     wire [0:num_ports-1] 			    port_mask;
+		     wire [0:num_ports-1] 	     port_mask;
 		     decoder
 		       #(.num_ports(num_ports))
 		     port_mask_dec
 		       (.data_in(ref_port),
 			.data_out(port_mask));
 		     
-		     wire [0:num_ports-1] 			    match_op;
+		     wire [0:num_ports-1] 	     match_op;
 		     assign match_op = {num_ports{match}} & port_mask;
 		     
 		     assign match_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
@@ -607,7 +689,7 @@ module testbench
       
    endgenerate
    
-   wire 				rtr_error;
+   wire 					     rtr_error;
    
    router
      #(.num_flit_buffers(num_flit_buffers),
@@ -619,20 +701,21 @@ module testbench
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
-       /*.max_packet_length(max_packet_length),*/
-       .data_width(data_width),
+       .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
+       .packet_format(packet_format),
+       .flow_control_type(flow_control_type),
        .routing_function_type(routing_function_type),
-       .credit_handling_type(credit_handling_type),
+       .int_flow_control_type(int_flow_control_type),
        .header_fifo_type(header_fifo_type),
        .fbf_regfile_type(fbf_regfile_type),
-       .vc_allocator_type(vc_allocator_type),
-       .vc_arbiter_type(vc_arbiter_type),
-       .sw_allocator_type(sw_allocator_type),
-       .sw_arbiter_type(sw_arbiter_type),
+       .vca_allocator_type(vca_allocator_type),
+       .vca_arbiter_type(vca_arbiter_type),
+       .swa_allocator_type(swa_allocator_type),
+       .swa_arbiter_type(swa_arbiter_type),
        .sw_spec_level(sw_spec_level),
        .xbc_crossbar_type(xbc_crossbar_type),
        .xbd_crossbar_type(xbd_crossbar_type),
@@ -641,96 +724,107 @@ module testbench
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .flit_valid_in_ip(flit_valid_in_ip),
-      .flit_vc_in_ip(flit_vc_in_ip),
-      .flit_head_in_ip(flit_head_in_ip),
-      .flit_tail_in_ip(flit_tail_in_ip),
+      .flit_ctrl_in_ip(flit_ctrl_in_ip),
       .flit_data_in_ip(flit_data_in_ip),
-      .cred_valid_out_ip(cred_valid_out_ip),
-      .cred_vc_out_ip(cred_vc_out_ip),
-      .flit_valid_out_op(flit_valid_out_op),
-      .flit_vc_out_op(flit_vc_out_op),
-      .flit_head_out_op(flit_head_out_op),
-      .flit_tail_out_op(flit_tail_out_op),
+      .flow_ctrl_out_ip(flow_ctrl_out_ip),
+      .flit_ctrl_out_op(flit_ctrl_out_op),
       .flit_data_out_op(flit_data_out_op),
-      .cred_valid_in_op(cred_valid_in_op),
-      .cred_vc_in_op(cred_vc_in_op),
+      .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(rtr_error));
    
    wire [0:num_ports*num_vcs-1] 	pkt_error_op_ovc;
    wire [0:num_ports-1] 		x_error_op;
+   wire [0:num_ports-1] 		flit_valid_out_op;
    
    generate
       
-      genvar 					    op;
+      genvar 				op;
+      
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire [0:credit_latency-1] cred_valid_dly_s, cred_valid_dly_q;
-	   wire [0:credit_latency*vc_idx_width-1] cred_vc_dly_s, cred_vc_dly_q;
+	   // connect all ports to packet sinks
 	   
-	   dff
-	     #(.width(credit_latency),
-	       .reset_type(reset_type))
-	   cred_valid_dlyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(cred_valid_dly_s),
-	      .q(cred_valid_dly_q));
 	   
-	   dff
-	     #(.width(vc_idx_width*credit_latency),
-	       .reset_type(reset_type))
-	   cred_vc_dlyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(cred_vc_dly_s),
-	      .q(cred_vc_dly_q));
+	   // delay flit control and data signals
 	   
-	   if(credit_latency > 1)
-	     begin
-		assign cred_valid_dly_s
-		  = {flit_valid_out_op[op],
-		     cred_valid_dly_q[0:(credit_latency-1)-1]};
-		assign cred_valid_in_op[op]
-		  = cred_valid_dly_q[(credit_latency-1):credit_latency-1];
-		assign cred_vc_dly_s
-		  = {flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1],
-		     cred_vc_dly_q[0:vc_idx_width*(credit_latency-1)-1]};
-		assign cred_vc_in_op[op*vc_idx_width:(op+1)*vc_idx_width-1]
-		  = cred_vc_dly_q[vc_idx_width*(credit_latency-1):
-				  vc_idx_width*credit_latency-1];
-	     end
-	   else
-	     begin
-		assign cred_valid_dly_s = flit_valid_out_op[op];
-		assign cred_valid_in_op[op] = cred_valid_dly_q;
-		assign cred_vc_dly_s
-		  = flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1];
-		assign cred_vc_in_op[op*vc_idx_width:(op+1)*vc_idx_width-1]
-			 = cred_vc_dly_q;
-	     end
+	   wire [0:flit_ctrl_width-1] flit_ctrl_out;
+	   assign flit_ctrl_out = flit_ctrl_out_op[op*flit_ctrl_width:
+						   (op+1)*flit_ctrl_width-1];
+	   
+	   case(packet_format)
+	     
+	     `PACKET_FORMAT_HEAD_TAIL:
+	       begin
+		  assign flit_valid_out_op[op] = flit_ctrl_out[0];
+	       end
+	     
+	   endcase
+	   
+	   wire [0:flit_ctrl_width-1] flit_ctrl_in;
+	   delay
+	     #(.width(flit_ctrl_width),
+	       .delay(min_channel_delay))
+	   flit_ctrl_in_delay
+	     (.data_in(flit_ctrl_out),
+	      .data_out(flit_ctrl_in));
+	   
+	   wire [0:flit_data_width-1] flit_data_out;
+	   assign flit_data_out = flit_data_out[op*flit_data_width:
+						(op+1)*flit_data_width-1];
+	   
+	   wire [0:flit_data_width-1] flit_data_in;
+	   delay
+	     #(.width(flit_data_width),
+	       .delay(min_channel_delay))
+	   flit_data_in_delay
+	     (.data_in(flit_data_out),
+	      .data_out(flit_data_in));
 	   
 	   genvar ovc;
+	   
 	   for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	     begin:ovcs
 		
-		wire flit_valid;
-		assign flit_valid
-		  = flit_valid_out_op[op] &&
-		    (flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1] ==
-		     ovc);
+		wire flit_valid_in;
+		wire flit_head_in;
+		wire flit_tail_in;
+		
+		case(packet_format)
+		  
+		  `PACKET_FORMAT_HEAD_TAIL:
+		    begin
+		       
+		       assign flit_head_in = flit_ctrl_in[1];
+		       assign flit_tail_in = flit_ctrl_in[2];
+		       
+		       if(num_vcs > 1)
+			 begin
+			    
+			    wire [0:vc_idx_width-1] flit_vc_in;
+			    assign flit_vc_in
+			      = flit_ctrl_in[3:3+vc_idx_width-1];
+			    
+			    assign flit_valid_in
+			      = flit_ctrl_in[0] && (flit_vc_in == ovc);
+			    
+			 end
+		       else
+			 assign flit_valid_in = flit_ctrl_in[0];
+		       
+		    end
+		  
+		endcase
 		
 		if(max_packet_length > 1)
 		  begin
-
+		     
 		     wire flit_count_zero;
 		     
 		     wire wait_head_s, wait_head_q;
 		     assign wait_head_s = (wait_head_q &
-					   ~(flit_valid &
-					     flit_head_out_op[op])) |
-					  (flit_valid & flit_count_zero);
+					   ~(flit_valid_in & flit_head_in)) |
+					  (flit_valid_in & flit_count_zero);
 		     dff
 		       #(.width(1),
 			 .reset_type(reset_type),
@@ -740,11 +834,9 @@ module testbench
 			.reset(reset),
 			.d(wait_head_s),
 			.q(wait_head_q));
-
+		     
 		     wire [0:head_info_width-1] head_info;
-		     assign head_info
-		       = flit_data_out_op[op*data_width:
-					  op*data_width+head_info_width-1];
+		     assign head_info = flit_data_in[0:head_info_width-1];
 		     
 		     wire [0:packet_length_width-1] packet_length;
 		     assign packet_length
@@ -753,9 +845,9 @@ module testbench
 		     
 		     wire [0:packet_length_width-1] flit_count_s, flit_count_q;
 		     assign flit_count_s
-		       = (flit_valid & flit_head_out_op[op]) ?
+		       = (flit_valid_in & flit_head_in) ?
 			 packet_length :
-			 (flit_count_q - flit_valid);
+			 (flit_count_q - flit_valid_in);
 		     dff
 		       #(.width(packet_length_width),
 			 .reset_type(reset_type))
@@ -768,37 +860,21 @@ module testbench
 		     assign flit_count_zero = ~|flit_count_s;
 		     
 		     assign pkt_error_op_ovc[op*num_vcs+ovc]
-			      = flit_valid &
-				(flit_head_out_op[op] ^ wait_head_q);
+			      = flit_valid_in & (flit_head_in ^ wait_head_q);
 		     
 		  end
 		else
 		  assign pkt_error_op_ovc[op*num_vcs+ovc] = 1'b0;
 		
 	     end
-	   
+
 	   wire 				    flit_valid_out;
-	   assign flit_valid_out = flit_valid_out_op[op];
-	   
-	   wire 				    flit_head_out;
-	   assign flit_head_out = flit_head_out_op[op];
-	   
-	   wire 				    flit_tail_out;
-	   assign flit_tail_out = flit_tail_out_op[op];
-	   
-	   wire [0:vc_idx_width-1] 		    flit_vc_out;
-	   assign flit_vc_out = flit_vc_out_op[op*vc_idx_width +: vc_idx_width];
-	   
-	   wire [0:data_width-1] 		    flit_data_out;
-	   assign flit_data_out = flit_data_out_op[op*data_width +: data_width];
+	   assign flit_valid_out = flit_ctrl_out[0];
 	   
 	   assign x_error_op[op]
 		    = (flit_valid_out === 1'bx) ||
 		      ((flit_valid_out === 1'b1) &&
-		       (^{flit_head_out,
-			  flit_tail_out,
-			  flit_vc_out,
-			  flit_data_out} === 1'bx));
+		       (^{flit_ctrl_out, flit_data_out} === 1'bx));
 	   
 	end
       
@@ -814,7 +890,7 @@ module testbench
    
    wire [0:num_ports-1] 			    check_error_op;
    assign check_error_op = (flit_valid_out_op & ~match_op);
-
+   
    integer 					    port;
    always @(negedge clk)
      begin
@@ -823,21 +899,20 @@ module testbench
 	     if(check_error_op[port])
 	       begin
 		  $display("check error: op=%d, cyc=%d", port, $time);
-		  $display("head=%d, tail=%d, vc=%d, data=%x",
-			   flit_head_out_op[port],
-			   flit_tail_out_op[port],
-			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
-			   flit_data_out_op[port*data_width +: data_width]);
+		  $display("ctrl=%x, data=%x",
+			   flit_ctrl_out_op[port*flit_ctrl_width +:
+					    flit_ctrl_width],
+			   flit_data_out_op[port*flit_data_width +:
+					    flit_data_width]);
 	       end
 	     if(x_error_op[port])
 	       begin
 		  $display("X value error: op=%d, cyc=%d", port, $time);
-		  $display("valid = %d, head=%d, tail=%d, vc=%d, data=%x",
-			   flit_valid_out_op[port],
-			   flit_head_out_op[port],
-			   flit_tail_out_op[port],
-			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
-			   flit_data_out_op[port*data_width +: data_width]);
+		  $display("ctrl=%x, data=%x",
+			   flit_ctrl_out_op[port*flit_ctrl_width +:
+					    flit_ctrl_width],
+			   flit_data_out_op[port*flit_data_width +:
+					    flit_data_width]);
 	       end
 	  end
      end
@@ -868,20 +943,6 @@ module testbench
    wire [0:31] in_flits;
    assign in_flits = in_flits_s;
    
-   wire [0:31] in_creds_s, in_creds_q;
-   assign in_creds_s = in_creds_q + pop_count(cred_valid_out_ip);
-   dff
-     #(.width(32),
-       .reset_type(reset_type))
-   in_credsq
-     (.clk(clk),
-      .reset(reset),
-      .d(in_creds_s),
-      .q(in_creds_q));
-   
-   wire [0:31] in_creds;
-   assign in_creds = in_creds_q;
-   
    wire [0:31] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + pop_count(flit_valid_out_op);
    dff
@@ -895,20 +956,6 @@ module testbench
    
    wire [0:31] out_flits;
    assign out_flits = out_flits_s;
-   
-   wire [0:31] out_creds_s, out_creds_q;
-   assign out_creds_s = out_creds_q + pop_count(cred_valid_in_op);
-   dff
-     #(.width(32),
-       .reset_type(reset_type))
-   out_credsq
-     (.clk(clk),
-      .reset(reset),
-      .d(out_creds_s),
-      .q(out_creds_q));
-   
-   wire [0:31] out_creds;
-   assign out_creds = out_creds_q;
    
    reg 	       count_en;
    
@@ -1011,7 +1058,7 @@ module testbench
       
       run = 1'b0;
       
-      while((in_flits > out_flits) || (in_flits > in_creds))
+      while(in_flits > out_flits)
 	begin
 	   cycles = cycles + 1;
 	   #(Tclk);

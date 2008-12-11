@@ -31,10 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wrapper around router component (configures router parameters based on
 // selected network topology, etc.)
 module router_wrapper
-  (clk, reset, router_address, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
-   flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
-   flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
-   flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
+  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
+   flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
+   error);
    
 `include "constants.v"
    
@@ -103,7 +102,7 @@ module router_wrapper
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
 
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    // enable performance counter
    parameter perf_ctr_enable = 0;
@@ -115,8 +114,25 @@ module router_wrapper
    parameter checker_enable = 0;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
+   
+   // width of control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ?
+       // (valid + head/tail + vc_id)
+       (1 + 2 + vc_idx_width) :
+       -1;
+   
+   // select flow control type
+   parameter flow_control_type = `FLOW_CONTROL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_control_type == `FLOW_CONTROL_TYPE_CREDIT) ?
+       // (valid + vc_id)
+       (1 + vc_idx_width) :
+       -1;
    
    // select routing function type
    localparam routing_function_type
@@ -126,8 +142,8 @@ module router_wrapper
        `ROUTING_FUNCTION_TYPE_BY_DIFFERENCE :
        -1;
    
-   // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   // select method for internal flow control between input and output port
+   parameter int_flow_control_type = `INT_FLOW_CONTROL_TYPE_CREDIT_PUSH;
    
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
@@ -136,22 +152,22 @@ module router_wrapper
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vca_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vca_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter swa_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter swa_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
-   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter sw_spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
    
-   // enable speculative switch allocation
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   // select crossbar implementation variant for control crossbar
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
    
    // select implementation variant for control crossbar
    parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -167,68 +183,30 @@ module router_wrapper
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // valid flit data available at input port(s)
-   input [0:num_ports-1] flit_valid_in_ip;
-   
-   // which VC(s) is/are incoming flit(s) travelling on
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports*vc_idx_width-1] flit_vc_in_ip;
-   
-   // incoming flit(s) is/are head(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_head_in_ip;
-   
-   // incoming flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_tail_in_ip;
+   // incoming flit control signals
+   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
    
    // flit data for each incoming flit
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports*data_width-1] flit_data_in_ip;
+   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
    
-   // outgoing credit(s) valid
-   output [0:num_ports-1] cred_valid_out_ip;
-   wire [0:num_ports-1] cred_valid_out_ip;
+   // outgoing flow control signals
+   output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
    
-   // VC indicators for outgoing credit(s)
-   // (note: only valid when corresponding bit in cred_valid_out_ip is high)
-   output [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
-   
-   // valid flit data available at output port(s)
-   output [0:num_ports-1] flit_valid_out_op;
-   wire [0:num_ports-1] 	     flit_valid_out_op;
-   
-   // which VC(s) is/are outgoing flit(s) travelling on
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   wire [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   
-   // outgoing flit(s) is/are head(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_head_out_op;
-   wire [0:num_ports-1] 	     flit_head_out_op;
-   
-   // outgoing flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_tail_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
+   // outgoing flit control signals
+   output [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
+   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
    
    // flit data for each outgoing flit
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports*data_width-1] flit_data_out_op;
-   wire [0:num_ports*data_width-1]   flit_data_out_op;
+   output [0:num_ports*flit_data_width-1] flit_data_out_op;
+   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
    
-   // incoming credit(s) available
-   input [0:num_ports-1] cred_valid_in_op;
-   
-   // VC indicators for incoming flit(s)
-   // (note: only valid when corresponding bit in cred_valid_in_op is high)
-   input [0:num_ports*vc_idx_width-1] cred_vc_in_op;
+   // incoming flow control signals
+   input [0:num_ports*fliw_ctrl_width-1] flow_ctrl_in_op;
    
    // internal error condition detected
    output error;
-   wire 			     error;
+   wire 				error;
    
    router
      #(.num_flit_buffers(num_flit_buffers),
@@ -240,19 +218,21 @@ module router_wrapper
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
-       .data_width(data_width),
+       .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
+       .packet_format(packet_format),
+       .flow_ctrl_type(flow_ctrl_type),
        .routing_function_type(routing_function_type),
-       .credit_handling_type(credit_handling_type),
+       .int_flow_control_type(int_flow_control_type),
        .header_fifo_type(header_fifo_type),
        .fbf_regfile_type(fbf_regfile_type),
-       .vc_allocator_type(vc_allocator_type),
-       .vc_arbiter_type(vc_arbiter_type),
-       .sw_allocator_type(sw_allocator_type),
-       .sw_arbiter_type(sw_arbiter_type),
+       .vca_allocator_type(vca_allocator_type),
+       .vca_arbiter_type(vca_arbiter_type),
+       .swa_allocator_type(swa_allocator_type),
+       .swa_arbiter_type(swa_arbiter_type),
        .sw_spec_level(sw_spec_level),
        .xbc_crossbar_type(xbc_crossbar_type),
        .xbd_crossbar_type(xbd_crossbar_type),
@@ -261,20 +241,12 @@ module router_wrapper
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .flit_valid_in_ip(flit_valid_in_ip),
-      .flit_vc_in_ip(flit_vc_in_ip),
-      .flit_head_in_ip(flit_head_in_ip),
-      .flit_tail_in_ip(flit_tail_in_ip),
+      .flit_ctrl_in_ip(flit_ctrl_in_ip),
       .flit_data_in_ip(flit_data_in_ip),
-      .cred_valid_out_ip(cred_valid_out_ip),
-      .cred_vc_out_ip(cred_vc_out_ip),
-      .flit_valid_out_op(flit_valid_out_op),
-      .flit_vc_out_op(flit_vc_out_op),
-      .flit_head_out_op(flit_head_out_op),
-      .flit_tail_out_op(flit_tail_out_op),
+      .flow_ctrl_out_ip(flow_ctrl_out_ip),
+      .flit_ctrl_out_op(flit_ctrl_out_op),
       .flit_data_out_op(flit_data_out_op),
-      .cred_valid_in_op(cred_valid_in_op),
-      .cred_vc_in_op(cred_vc_in_op),
+      .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(error));
    
 endmodule
