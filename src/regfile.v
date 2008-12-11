@@ -35,6 +35,7 @@ module regfile
    input [0:addr_width-1] read_address;
    
    // contents of entry selected by read_address
+   // (valid in the cycle after read_address is asserted)
    output [0:width-1] read_data;
    wire [0:width-1] read_data;
    

@@ -22,7 +22,11 @@ module router_wrapper
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
+   // use shared input buffers for all VCs at a given port
+   parameter use_shared_flit_buffers = 1;
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
+   // (note: this parameter is only used if use_shared_flit_buffers=1)
    parameter num_header_buffers = 4;
    
    // number of traffic classes (e.g. read, write)
@@ -195,6 +199,7 @@ module router_wrapper
    
    router
      #(.num_flit_buffers(num_flit_buffers),
+       .use_shared_flit_buffers(use_shared_flit_buffers),
        .num_header_buffers(num_header_buffers),
        .num_vcs(num_vcs),
        .num_traffic_classes(num_traffic_classes),

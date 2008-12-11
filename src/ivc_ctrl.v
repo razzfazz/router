@@ -1,9 +1,9 @@
 module ivc_ctrl
   (clk, reset, flit_valid_in, flit_head_in, flit_tail_in, route_info_in,
    free_op, free_op_ovc, cred_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc,
-   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, flit_sent,
-   flit_vc_out, flit_head_out, flit_tail_out, buff_write_addr, buff_read_addr,
-   error, events);
+   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec,
+   flit_valid_out, flit_vc_out, flit_head_out, flit_tail_out, flit_data_out,
+   buff_write_addr, buff_read_addr, error, events);
    
 `include "constants.v"
    
@@ -27,7 +27,11 @@ module ivc_ctrl
    // width required to select a buffer
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    
+   // use shared input buffers for all VCs at a given port
+   parameter use_shared_flit_buffers = 1;
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
+   // (note: this parameter is only used if use_shared_flit_buffers=1)
    parameter num_header_buffers = 4;
    
    // number of VCs
@@ -168,23 +172,31 @@ module ivc_ctrl
    input sw_gnt_spec;
    
    // outgoing flit indicator
-   output flit_sent;
-   wire 		flit_sent;
+   output flit_valid_out;
+   wire 		flit_valid_out;
    
    // destination VC for outgoing flit
-   // (note: only valid if flit_sent=1)
+   // (note: only valid if flit_valid_out=1)
    output [0:vc_idx_width-1] flit_vc_out;
    wire [0:vc_idx_width-1] flit_vc_out;
    
    // outgoing flit is head
-   // (note: only valid if flit_sent=1 and num_header_buffers>1)
+   // (note: only valid if flit_valid_out=1 and num_header_buffers>1 or
+   // use_shared_flit_buffers=0)
    output flit_head_out;
    wire 		   flit_head_out;
    
    // outgoing flit is tail
-   // (note: only valid if flit_sent=1 and num_header_buffers>1)
+   // (note: only valid if flit_valid_out=1 and num_header_buffers>1 or
+   // use_shared_flit_buffers=0)
    output flit_tail_out;
    wire 		   flit_tail_out;
+   
+   // flit data for outgoing flit
+   // (note: only valid if flit_valid_out=1 and num_header_buffers>1 or
+   // use_shared_flit_buffers=0)
+   output [0:data_width-1] flit_data_out;
+   wire [0:data_width-1]   flit_data_out;
    
    // write pointer for shared flit buffer
    output [0:flit_buffer_idx_width-1] buff_write_addr;
@@ -273,7 +285,7 @@ module ivc_ctrl
    
    wire 		       valid_q;
    
-   assign flit_sent = valid_q & all_allocated;
+   assign flit_valid_out = valid_q & all_allocated;
    
    
    //---------------------------------------------------------------------------
@@ -287,66 +299,83 @@ module ivc_ctrl
    
    generate
       
-      if(num_header_buffers > 1)
+      if(use_shared_flit_buffers == 1)
 	begin
 	   
-	   wire 		       hvsr_push;
-	   assign hvsr_push = flit_valid_in;
-	   
-	   wire 		       hvsr_pop;
-	   assign hvsr_pop = all_allocated & ~hvsr_empty;
-	   
-	   wire [0:1] 		       hvsr_data_in;
-	   assign hvsr_data_in = {flit_head_in, flit_tail_in};
-	   
-	   wire 		       hvsr_full;
-	   wire [0:1] 		       hvsr_data_out;
-	   shift_register
-	     #(.width(2),
-	       .depth(num_flit_buffers),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
-	       .error_recovery(error_recovery),
-	       .reset_type(reset_type))
-	   hvsr
-	     (.clk(clk),
-	      .reset(reset),
-	      .full(hvsr_full),
-	      .data_in(hvsr_data_in),
-	      .push(hvsr_push),
-	      .empty(hvsr_empty),
-	      .data_out(hvsr_data_out),
-	      .pop(hvsr_pop),
-	      .error(hvsr_error));
-	   
-	   assign flit_head_out = hvsr_data_out[0];
-	   assign flit_tail_out = hvsr_data_out[1];
-	   
-	   assign get_next_header = ~valid_q | (all_allocated & flit_tail_out);
+	   if(num_header_buffers > 1)
+	     begin
+		
+		wire 		       hvsr_push;
+		assign hvsr_push = flit_valid_in;
+		
+		wire 		       hvsr_pop;
+		assign hvsr_pop = all_allocated & ~hvsr_empty;
+		
+		wire [0:1] 	       hvsr_data_in;
+		assign hvsr_data_in = {flit_head_in, flit_tail_in};
+		
+		wire 		       hvsr_full;
+		wire [0:1] 	       hvsr_data_out;
+		shift_register
+		  #(.width(2),
+		    .depth(num_flit_buffers),
+		    .checker_enable(checker_enable),
+		    .checker_capture_mode(checker_capture_mode),
+		    .error_recovery(error_recovery),
+		    .reset_type(reset_type))
+		hvsr
+		  (.clk(clk),
+		   .reset(reset),
+		   .full(hvsr_full),
+		   .data_in(hvsr_data_in),
+		   .push(hvsr_push),
+		   .empty(hvsr_empty),
+		   .data_out(hvsr_data_out),
+		   .pop(hvsr_pop),
+		   .error(hvsr_error));
+		
+		assign flit_head_out = hvsr_data_out[0];
+		assign flit_tail_out = hvsr_data_out[1];
+		
+		assign get_next_header
+		  = ~valid_q | (all_allocated & flit_tail_out);
+		
+	     end
+	   else
+	     begin
+		
+		wire wait_tail_s, wait_tail_q;
+		assign wait_tail_s
+		  = (wait_tail_q | (flit_valid_in & flit_tail_in)) &
+		    ~fbc_empty_early;
+		dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		wait_tailq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(wait_tail_s),
+		   .q(wait_tail_q));
+		
+		assign hvsr_error = wait_tail_q & flit_valid_in;
+		
+		assign hvsr_empty = 1'b1;
+		assign flit_head_out = 1'b0;
+		assign flit_tail_out = 1'b0;
+		
+		assign get_next_header
+		  = ~valid_q | (wait_tail_q & fbc_empty_early);
+		
+	     end
 	   
 	end
       else
 	begin
 	   
-	   wire wait_tail_s, wait_tail_q;
-	   assign wait_tail_s = (wait_tail_q | (flit_valid_in & flit_tail_in)) &
-				~fbc_empty_early;
-	   dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   wait_tailq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(wait_tail_s),
-	      .q(wait_tail_q));
-	   
-	   assign hvsr_error = wait_tail_q & flit_valid_in;
-	   
 	   assign hvsr_empty = 1'b1;
-	   assign flit_head_out = 1'b0;
-	   assign flit_tail_out = 1'b0;
+	   assign hvsr_error = 1'b0;
 	   
-	   assign get_next_header = ~valid_q | (wait_tail_q & fbc_empty_early);
+	   // FIXME!
 	   
 	end
       
@@ -357,49 +386,69 @@ module ivc_ctrl
    // header buffer
    //---------------------------------------------------------------------------
    
-   wire 	hdsr_empty;
+   wire 	     hdsr_empty;   
+   wire 	     hdsr_error;
    
-   wire 	hdsr_push;
-   assign hdsr_push
-     = flit_valid_in & flit_head_in & (~hdsr_empty | ~get_next_header);
-   
-   wire 	hdsr_pop;
-   assign hdsr_pop = get_next_header & ~hdsr_empty;
-   
-   wire [0:route_info_width-1] hdsr_data;
-   wire 		       hdsr_error;
+   wire [0:route_info_width-1] next_route_info;
    
    generate
       
-      if(num_header_buffers > 1)
+      if(use_shared_flit_buffer == 1)
 	begin
 	   
-	   wire 		       hdsr_full;
-	   shift_register
-	     #(.width(route_info_width),
-	       .depth(num_header_buffers-1),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
-	       .error_recovery(error_recovery),
-	       .reset_type(reset_type))
-	   hdsr
-	     (.clk(clk),
-	      .reset(reset),
-	      .full(hdsr_full),
-	      .data_in(route_info_in),
-	      .push(hdsr_push),
-	      .empty(hdsr_empty),
-	      .data_out(hdsr_data),
-	      .pop(hdsr_pop),
-	      .error(hdsr_error));
+	   if(num_header_buffers > 1)
+	     begin
+		
+		wire 	     hdsr_push;
+		assign hdsr_push
+		  = flit_valid_in & flit_head_in &
+		    (~hdsr_empty | ~get_next_header);
+		
+		wire 	     hdsr_pop;
+		assign hdsr_pop = get_next_header & ~hdsr_empty;
+		
+		wire 	     hdsr_full;
+		wire [0:route_info_width-1] hdsr_data;
+		shift_register
+		  #(.width(route_info_width),
+		    .depth(num_header_buffers-1),
+		    .checker_enable(checker_enable),
+		    .checker_capture_mode(checker_capture_mode),
+		    .error_recovery(error_recovery),
+		    .reset_type(reset_type))
+		hdsr
+		  (.clk(clk),
+		   .reset(reset),
+		   .full(hdsr_full),
+		   .data_in(route_info_in),
+		   .push(hdsr_push),
+		   .empty(hdsr_empty),
+		   .data_out(hdsr_data),
+		   .pop(hdsr_pop),
+		   .error(hdsr_error));
+		
+		assign next_route_info = hdsr_empty ? route_info_in : hdsr_data;
+		
+	     end
+	   else
+	     begin
+		
+		assign hdsr_empty = 1'b1;
+		assign hdsr_data = {route_info_width{1'b0}};
+		assign hdsr_error = 1'b0;
+		
+		assign next_route_info = route_info_in;
+		
+	     end
 	   
 	end
       else
 	begin
 	   
 	   assign hdsr_empty = 1'b1;
-	   assign hdsr_data = {route_info_width{1'b0}};
 	   assign hdsr_error = 1'b0;
+	   
+	   // FIXME!
 	   
 	end
       
@@ -407,9 +456,6 @@ module ivc_ctrl
    
    wire 		       next_valid;
    assign next_valid = (flit_valid_in & flit_head_in) | ~hdsr_empty;
-   
-   wire [0:route_info_width-1] next_route_info;
-   assign next_route_info = hdsr_empty ? route_info_in : hdsr_data;
    
    
    //---------------------------------------------------------------------------
@@ -516,21 +562,21 @@ module ivc_ctrl
 		.data_in(free_op_ovc),
 		.data_out(free_ovc));
 	     
-	     wire 			 flit_sent_prev_s, flit_sent_prev_q;
-	     assign flit_sent_prev_s = flit_sent & ~get_next_header;
+	     wire 			 flit_valid_prev_s, flit_valid_prev_q;
+	     assign flit_valid_prev_s = flit_valid_out & ~get_next_header;
 	     dff
 	       #(.width(1),
 		 .reset_type(reset_type))
-	     flit_sent_prevq
+	     flit_valid_prevq
 	       (.clk(clk),
 		.reset(reset),
-		.d(flit_sent_prev_s),
-		.q(flit_sent_prev_q));
+		.d(flit_valid_prev_s),
+		.q(flit_valid_prev_q));
 	     
-	     wire [0:2] 		 flit_sent_count;
-	     assign flit_sent_count = {flit_sent_prev_q & flit_sent,
-				       flit_sent_prev_q ^ flit_sent,
-				       ~(flit_sent_prev_q | flit_sent)};
+	     wire [0:2] 		 flit_valid_count;
+	     assign flit_valid_count = {flit_valid_prev_q & flit_valid_out,
+				       flit_valid_prev_q ^ flit_valid_out,
+				       ~(flit_valid_prev_q | flit_valid_out)};
 	     
 	     wire [0:num_vcs-1] 	 next_free_ovc;
 	     
@@ -549,7 +595,7 @@ module ivc_ctrl
 		    #(.num_ports(3),
 		      .width(1))
 		  next_free_sel
-		    (.select(flit_sent_count),
+		    (.select(flit_valid_count),
 		     .data_in(free_by_count),
 		     .data_out(next_free));
 		  
@@ -713,10 +759,10 @@ module ivc_ctrl
    
    //---------------------------------------------------------------------------
    // generate target output VC to send along with flit data
-   // (valid when flit_sent=1)
+   // (valid when flit_valid_out=1)
    //---------------------------------------------------------------------------
    
-   // NOTE: don't need to use vc_gnt_ovc here, as flit_valid would not be
+   // NOTE: don't need to use vc_gnt_ovc here, as flit_valid_out would not be
    // generated in the first place if grant was masked, so we don't care about
    // flit_vc_dec in this case!
    wire [0:num_vcs-1] 	       flit_vc_dec;

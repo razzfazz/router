@@ -19,7 +19,11 @@ module router
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
+   // use shared input buffers for all VCs at a given port
+   parameter use_shared_flit_buffers = 1;
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
+   // (note: this parameter is only used if use_shared_flit_buffers=1)
    parameter num_header_buffers = 4;
    
    // number of VCs
@@ -246,11 +250,17 @@ module router
 	   wire 			flit_head_out;
 	   wire 			flit_tail_out;
 	   wire [0:data_width-1] 	flit_data_out;
-	   wire 			cred_valid_out;
-	   wire [0:vc_idx_width-1] 	cred_vc_out;
-	   wire 			ipc_error;
+	   wire [0:num_vcs-1] 		flit_valid_out_ivc;
+	   wire [0:num_vcs*vc_idx_width-1] flit_vc_out_ivc;
+	   wire [0:num_vcs-1] 		   flit_head_out;
+	   wire [0:num_vcs-1] 		   flit_tail_out;
+	   wire [0:num_vcs*data_width-1]   flit_data_out;
+	   wire 			   cred_valid_out;
+	   wire [0:vc_idx_width-1] 	   cred_vc_out;
+	   wire 			   ipc_error;
 	   ip_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
+	       .use_shared_flit_buffers(use_shared_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_vcs(num_vcs),
 	       .num_traffic_classes(num_traffic_classes),
