@@ -49,8 +49,8 @@ module routing_logic
 		(get_routing_class(ovc) == 
 		 ((is_next && (get_routing_class(vc_id) != 0)) ?
 		  0 :
-		  get_routing_class(vc_id)))) ||
-	       !restrict_vcs;
+		  get_routing_class(vc_id))))/* ||
+	       !restrict_vcs*/;
 	end
       
       if(replicate_port_decoder)
@@ -82,7 +82,7 @@ module routing_logic
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   assign next_port[op] = next_port_int[op] &&
-				  ((op != port_id) || !ignore_same_port);
+				  ((op != port_id)/* || !ignore_same_port*/);
 	end
       
    endgenerate

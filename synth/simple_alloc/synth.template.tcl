@@ -16,13 +16,11 @@ set src_files [list \
 		   rr_arbiter.v \
 		   select_1ofn.v \
 		   simple_alloc.v \
-		   sw_alloc.v \
-		   sw_alloc_core_sep_if.v \
-		   sw_alloc_core_sep_of.v \
-		   sw_alloc_core_wf.v \
-		   vc_alloc.v \
-		   vc_alloc_core_sep_if.v \
 		   wf_alloc.v \
+		   wf_alloc_core_mux.v \
+		   wf_alloc_core_rep.v \
+		   wf_alloc_core_rot.v \
+		   wf_alloc_core_dpa.v \
 		   ${proj}_syn_wrapper.v ]
 
 read_verilog -rtl ${src_files}

@@ -99,9 +99,9 @@ localparam num_ports = num_dimensions * num_neighbors + num_nodes_per_router;
 localparam port_idx_width = clogb(num_ports);
 
 // prevent packets from exiting through same port they came in on
-parameter ignore_same_port = 1;
+parameter ignore_same_port = 0;
 
 // only allow legal ivc->ovc requests
-parameter restrict_vcs = 1;
+parameter restrict_vcs = 0;
 
 //`endif

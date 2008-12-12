@@ -12,40 +12,10 @@ srcdir="../../src"
 good_clk=""
 bad_clk=""
 
-case ${num_ports} in
-    "5")
-    echo "got 5 ports"
-    sed -i "s/\(parameter *num_neighbors *=\) [^;]*/\1 2/" \
-	${srcdir}/config.v
-    ;;
-    "10")
-    echo "got 10 ports"
-    sed -i \
-	"s/\(parameter *num_neighbors *=\) [^;]*/\1 num_routers_per_dim - 1/" \
-	${srcdir}/config.v
-    ;;
-esac
-
-case ${num_vcs} in
-    "2")
-    sed -i "s/\(parameter *num_routing_classes *=\) [^;]*/\1 1/" \
-	${srcdir}/config.v
-    sed -i "s/\(parameter *num_vcs_per_class *=\) [^;]*/\1 1/" \
-	${srcdir}/config.v
-    ;;
-    "4")
-    sed -i "s/\(parameter *num_routing_classes *=\) [^;]*/\1 2/" \
-	${srcdir}/config.v
-    sed -i "s/\(parameter *num_vcs_per_class *=\) [^;]*/\1 1/" \
-	${srcdir}/config.v
-    ;;
-    "8")
-    sed -i "s/\(parameter *num_routing_classes *=\) [^;]*/\1 2/" \
-	${srcdir}/config.v
-    sed -i "s/\(parameter *num_vcs_per_class *=\) [^;]*/\1 2/" \
-	${srcdir}/config.v
-    ;;
-esac
+sed -i "s/\(parameter *ignore_same_port *=\) [^;]*/\1 ${restrict}/" \
+    ${srcdir}/config.v
+sed -i "s/\(parameter *restrict_vcs *=\) [^;]*/\1 ${restrict}/" \
+    ${srcdir}/config.v
 
 sed -i "s/\(parameter *architecture *=\) [^;]*/\1 ${architecture}/" \
     ${srcdir}/complex_alloc_sw.v
