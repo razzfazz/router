@@ -4,7 +4,7 @@
 SHELL = /bin/sh
 
 # globals
-proj := complex_alloc_vc
+proj := router
 
 # clear suffix rules
 .SUFFIXES: 
@@ -35,8 +35,6 @@ all: $(proj)
 
 $(proj):
 	mkdir -p $(wrp_dir)
-	$(wrap) -module $(proj) -input $(rtl_dir)/$(proj).v \
-          -output $(wrp_dir)/$(proj)_syn_wrapper.v
 	mkdir -p $(rpt_dir) $(net_dir)
 	dc_shell-xg-t -64 -topo -f synth.tcl | tee $(rpt_dir)/$(proj).out
 	rm -f command.log *-verilog.pvl *-verilog.syn *.mr default.svf
@@ -47,10 +45,9 @@ $(proj):
 #  Other Targets
 # --
 clean:
-	rm -f $(rpt_dir)/$(proj).out
-	rm -f $(rpt_dir)/$(proj)_syn_wrapper.*
+	rm -f $(rpt_dir)/$(proj).*
 	rm -f $(wrp_dir)/*
-	rm -f $(net_dir)/$(proj)_syn_wrapper.*
+	rm -f $(net_dir)/$(proj).*
 	rm -f *.mr *.syn *.pvl default.svf *.log
 	rm -f *~
 

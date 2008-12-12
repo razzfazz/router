@@ -48,7 +48,7 @@ case ${num_vcs} in
 esac
 
 sed -i "s/\(parameter *architecture *=\) [^;]*/\1 ${architecture}/" \
-    ${srcdir}/complex_alloc_sw.v
+    ${srcdir}/router.v
 
 for clk_period in `seq ${clk_period_max} ${clk_period_delta} ${clk_period_min}`
 do
