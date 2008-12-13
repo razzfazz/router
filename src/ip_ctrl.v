@@ -58,20 +58,23 @@ module ip_ctrl
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of VCs
-   parameter num_vcs = 4;
-   
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
-   
-   // width of sum of event signals from all VCs
-   localparam event_width = clogb(num_vcs) + 1;
-   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
    parameter num_routing_classes = 2;
+   
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
+   
+   // number of VCs
+   localparam num_vcs = num_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -160,6 +163,9 @@ module ip_ctrl
    
    // ID of current input port
    parameter port_id = 0;
+   
+   // width of sum of event signals from all VCs
+   localparam event_width = clogb(num_vcs) + 1;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
@@ -308,9 +314,9 @@ module ip_ctrl
 	   ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_vcs(num_vcs),
 	       .num_traffic_classes(num_traffic_classes),
 	       .num_routing_classes(num_routing_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
 	       .num_dimensions(num_dimensions),
 	       .num_routers_per_dim(num_routers_per_dim),

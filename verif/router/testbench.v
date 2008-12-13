@@ -55,10 +55,8 @@ module testbench
    
    parameter Tclk = 2;
    parameter initial_seed = 0;
-   parameter walk_addresses = 0;
    parameter max_packet_count = -1;
    parameter packet_rate = 25;
-   parameter adaptive_rate = 1;
    parameter packet_count_width = 32;
    parameter credit_latency = 6;
    parameter warmup_time = 1000;
@@ -326,13 +324,12 @@ module testbench
 		  #(.max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
 		    .initial_seed(initial_seed+ip),
-		    .adaptive_rate(adaptive_rate),
 		    .packet_count_width(packet_count_width),
 		    .num_flit_buffers(num_flit_buffers),
 		    .num_header_buffers(num_header_buffers),
-		    .num_vcs(num_vcs),
 		    .num_traffic_classes(num_traffic_classes),
 		    .num_routing_classes(num_routing_classes),
+		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
 		    .port_id(ip),
 		    .num_dimensions(num_dimensions),
@@ -433,9 +430,9 @@ module testbench
 			  wire 				 rtl_error_unmasked;
 			  
 			  routing_logic
-			    #(.num_vcs(num_vcs),
-			      .num_traffic_classes(num_traffic_classes),
+			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
+			      .num_vcs_per_class(num_vcs_per_class),
 			      .num_ports(num_ports),
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
@@ -504,9 +501,9 @@ module testbench
 			  
 			  wire [0:la_route_info_width-1]     la_route_info;
 			  la_routing_logic
-			    #(.num_vcs(num_vcs),
-			      .num_traffic_classes(num_traffic_classes),
+			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
+			      .num_vcs_per_class(num_vcs_per_class),
 			      .num_ports(num_ports),
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),

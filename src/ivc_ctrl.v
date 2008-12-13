@@ -58,12 +58,6 @@ module ivc_ctrl
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of VCs
-   parameter num_vcs = 4;
-   
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
-   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
@@ -74,7 +68,13 @@ module ivc_ctrl
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
    // number of VCs available for each class
-   localparam num_vcs_per_class = num_vcs / num_classes;
+   parameter num_vcs_per_class = 1;
+   
+   // number of VCs
+   localparam num_vcs = num_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -158,7 +158,7 @@ module ivc_ctrl
    function integer get_traffic_class(input integer vc);
       begin
 	 get_traffic_class
-	   = (vc >> (clogb(num_routing_classes) + clogb(num_vcs_per_class))) %
+	   = (vc / (num_routing_classes * num_vcs_per_class)) %
 	     num_traffic_classes;
       end
    endfunction
@@ -172,7 +172,7 @@ module ivc_ctrl
    function integer get_routing_class(input integer vc);
       begin
 	 get_routing_class
-	   = (vc >> clogb(num_vcs_per_class)) % num_routing_classes;
+	   = (vc / num_vcs_per_class) % num_routing_classes;
       end
    endfunction
    
@@ -664,9 +664,9 @@ module ivc_ctrl
    wire [0:num_ports-1] 	  port_q;
    
    la_routing_logic
-     #(.num_vcs(num_vcs),
-       .num_traffic_classes(num_traffic_classes),
+     #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
+       .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),

@@ -45,9 +45,6 @@ module routing_logic
       end
    endfunction
    
-   // number of VCs
-   parameter num_vcs = 4;
-   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
@@ -57,8 +54,11 @@ module routing_logic
    // total number of packet classes
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
-   // number of VCs available for each class
-   localparam num_vcs_per_class = num_vcs / num_classes;
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
+   
+   // number of VCs
+   localparam num_vcs = num_classes * num_vcs_per_class;
    
    // number of input and output ports on router
    parameter num_ports = 5;

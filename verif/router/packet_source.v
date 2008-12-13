@@ -47,7 +47,6 @@ module packet_source
    parameter max_packet_count = 1000;
    parameter packet_rate = 25;
    parameter initial_seed = 0;
-   parameter adaptive_rate = 0;
    parameter packet_count_width = 32;
 
    // flit buffer entries per VC
@@ -55,12 +54,6 @@ module packet_source
    
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
-   
-   // number of VCs
-   parameter num_vcs = 4;
-   
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -71,8 +64,14 @@ module packet_source
    // total number of packet classes
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
-   // number of VCs available for each class
-   localparam num_vcs_per_class = num_vcs / num_classes;
+   // number of VCs per class
+   parameter num_vcs_per_class = 2;
+   
+   // number of VCs
+   localparam num_vcs = num_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -586,9 +585,9 @@ module packet_source
 		wire [0:num_ports-1] 	       next_port;
 		wire [0:num_classes-1] 	       next_class;
 		routing_logic
-		  #(.num_vcs(num_vcs),
-		    .num_traffic_classes(num_traffic_classes),
+		  #(.num_traffic_classes(num_traffic_classes),
 		    .num_routing_classes(num_routing_classes),
+		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
