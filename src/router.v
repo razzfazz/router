@@ -237,7 +237,9 @@ module router
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
    
+   wire [0:num_ports*num_vcs-1] 		    sw_req_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_nonspec_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 		    sw_req_spec_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_spec_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_spec_ip_ivc;
@@ -295,7 +297,9 @@ module router
 	   wire [0:num_vcs-1] 	      vc_req_ivc;
 	   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
 	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
+	   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
 	   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
+	   wire [0:num_vcs-1] 		sw_req_spec_ivc;
 	   wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
 	   wire 			flit_valid_out;
 	   wire [0:vc_idx_width-1] 	flit_vc_out;
@@ -342,7 +346,9 @@ module router
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
+	      .sw_req_nonspec_ivc(sw_req_nonspec_ivc),
 	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ivc_op),
+	      .sw_req_spec_ivc(sw_req_spec_ivc),
 	      .sw_req_spec_ivc_op(sw_req_spec_ivc_op),
 	      .sw_gnt_nonspec_ivc(sw_gnt_nonspec_ivc),
 	      .sw_gnt_spec_ivc(sw_gnt_spec_ivc),
@@ -360,9 +366,13 @@ module router
 				   (ip+1)*num_vcs*num_ports-1] = vc_req_ivc_op;
 	   assign vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
 				    (ip+1)*num_vcs*num_vcs-1] = vc_req_ivc_ovc;
+	   assign sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+		    = sw_req_nonspec_ivc;
 	   assign sw_req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
 					   (ip+1)*num_vcs*num_ports-1]
 		    = sw_req_nonspec_ivc_op;
+	   assign sw_req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+		    = sw_req_spec_ivc;
 	   assign sw_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
 					(ip+1)*num_vcs*num_ports-1]
 		    = sw_req_spec_ivc_op;
@@ -421,7 +431,9 @@ module router
    swa
      (.clk(clk),
       .reset(reset),
+      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
       .req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
+      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
       .req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
       .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
       .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),

@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator
 module sw_alloc
-  (clk, reset, req_nonspec_ip_ivc_op, req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, 
-   gnt_spec_ip_ivc, gnt_ip_op);
+  (clk, reset, req_nonspec_ip_ivc, req_nonspec_ip_ivc_op, req_spec_ip_ivc, 
+   req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "constants.v"
    
@@ -60,9 +60,15 @@ module sw_alloc
    input reset;
    
    // non-speculative switch requests
+   input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
+   
+   // port selects for non-speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
    
    // speculative switch requests
+   input [0:num_ports*num_vcs-1] req_spec_ip_ivc;
+   
+   // port selects for speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
    
    // grants corresponding to non-speculative requests (to input controller)
@@ -92,7 +98,9 @@ module sw_alloc
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
+		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 		.req_nonspec_ip_ivc_op(req_nonspec_ip_ivc_op),
+		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.req_spec_ip_ivc_op(req_spec_ip_ivc_op),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
 		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
@@ -109,7 +117,9 @@ module sw_alloc
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
+		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 		.req_nonspec_ip_ivc_op(req_nonspec_ip_ivc_op),
+		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.req_spec_ip_ivc_op(req_spec_ip_ivc_op),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
 		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
@@ -129,7 +139,9 @@ module sw_alloc
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
+		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 		.req_nonspec_ip_ivc_op(req_nonspec_ip_ivc_op),
+		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.req_spec_ip_ivc_op(req_spec_ip_ivc_op),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
 		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),

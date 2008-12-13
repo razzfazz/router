@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant using wavefront allocation
 module sw_alloc_core_wf
-  (clk, reset, req_nonspec_ip_ivc_op, req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, 
-   gnt_spec_ip_ivc, gnt_ip_op);
+  (clk, reset, req_nonspec_ip_ivc, req_nonspec_ip_ivc_op, req_spec_ip_ivc, 
+   req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "constants.v"
    
@@ -56,9 +56,15 @@ module sw_alloc_core_wf
    input reset;
    
    // non-speculative switch requests
+   input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
+   
+   // port selects for non-speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
    
    // speculative switch requests
+   input [0:num_ports*num_vcs-1] req_spec_ip_ivc;
+   
+   // port selects for speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
    
    // grants corresponding to non-speculative requests (to input controller)
@@ -100,6 +106,10 @@ module sw_alloc_core_wf
 	   // combine requests from all VCs
 	   //-------------------------------------------------------------------
 	   
+	   wire [0:num_vcs-1] req_nonspec_ivc;
+	   assign req_nonspec_ivc
+	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
 	   wire [0:num_vcs*num_ports-1] req_nonspec_ivc_op;
 	   assign req_nonspec_ivc_op
 	     = req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
@@ -109,11 +119,12 @@ module sw_alloc_core_wf
 	   assign req_in_nonspec_ivc_op = req_nonspec_ivc_op;
 	   
 	   wire [0:num_ports-1] 	req_wf_nonspec_op;
-	   or_nto1
+	   select_1ofn
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
-	   req_wf_nonspec_op_or
-	     (.data_in(req_nonspec_ivc_op),
+	   req_wf_nonspec_op_sel
+	     (.select(req_nonspec_ivc),
+	      .data_in(req_nonspec_ivc_op),
 	      .data_out(req_wf_nonspec_op));
 	   
 	   assign req_wf_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
@@ -180,24 +191,24 @@ module sw_alloc_core_wf
 	   // use output-side grants to select winning VC
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs*num_ports-1] req_masked_nonspec_ivc_op;
-	   assign req_masked_nonspec_ivc_op
+	   wire [0:num_vcs*num_ports-1] gnt_nonspec_ivc_op;
+	   assign gnt_nonspec_ivc_op
 	     = {num_vcs{gnt_wf_nonspec_op}} & gnt_in_nonspec_ivc_op;
 	   
-	   wire [0:num_ports*num_vcs-1] req_masked_nonspec_op_ivc;
+	   wire [0:num_ports*num_vcs-1] gnt_nonspec_op_ivc;
 	   interleaver
 	     #(.width(num_vcs*num_ports),
 	       .num_blocks(num_vcs))
-	   req_masked_nonspec_ivc_op_intl
-	     (.data_in(req_masked_nonspec_ivc_op),
-	      .data_out(req_masked_nonspec_op_ivc));
+	   gnt_nonspec_op_ivc_intl
+	     (.data_in(gnt_nonspec_ivc_op),
+	      .data_out(gnt_nonspec_op_ivc));
 	   
 	   wire [0:num_vcs-1] 		gnt_nonspec_ivc;
 	   or_nto1
 	     #(.width(num_vcs),
 	       .num_ports(num_ports))
 	   gnt_nonspec_ivc_or
-	     (.data_in(req_masked_nonspec_op_ivc),
+	     (.data_in(gnt_nonspec_op_ivc),
 	      .data_out(gnt_nonspec_ivc));
 	   
 	   
@@ -214,6 +225,10 @@ module sw_alloc_core_wf
 		// combine requests from all VCs
 		//--------------------------------------------------------------
 		
+		wire [0:num_vcs-1] req_spec_ivc;
+		assign req_spec_ivc
+		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		
 		wire [0:num_vcs*num_ports-1] req_spec_ivc_op;
 		assign req_spec_ivc_op
 		  = req_spec_ip_ivc_op[ip*num_vcs*num_ports:
@@ -223,11 +238,12 @@ module sw_alloc_core_wf
 		assign req_in_spec_ivc_op = req_spec_ivc_op;
 		
 		wire [0:num_ports-1] 	     req_wf_spec_op;
-		or_nto1
+		select_1ofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
-		req_wf_spec_op_or
-		  (.data_in(req_spec_ivc_op),
+		req_wf_spec_op_sel
+		  (.select(req_spec_ivc),
+		   .data_in(req_spec_ivc_op),
 		   .data_out(req_wf_spec_op));
 		
 		assign req_wf_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
@@ -292,23 +308,23 @@ module sw_alloc_core_wf
 		// use output-side grants to select winning VC
 		//--------------------------------------------------------------
 		
-		wire [0:num_vcs*num_ports-1] req_masked_spec_ivc_op;
-		assign req_masked_spec_ivc_op
+		wire [0:num_vcs*num_ports-1] gnt_spec_ivc_op;
+		assign gnt_spec_ivc_op
 		  = {num_vcs{gnt_wf_spec_op}} & gnt_in_spec_ivc_op;
 		
-		wire [0:num_ports*num_vcs-1] req_masked_spec_op_ivc;
+		wire [0:num_ports*num_vcs-1] gnt_spec_op_ivc;
 		interleaver
 		  #(.width(num_vcs*num_ports),
 		    .num_blocks(num_vcs))
-		req_masked_spec_ivc_op_intl
-		  (.data_in(req_masked_spec_ivc_op),
-		   .data_out(req_masked_spec_op_ivc));
+		gnt_spec_op_ivc_intl
+		  (.data_in(gnt_spec_ivc_op),
+		   .data_out(gnt_spec_op_ivc));
 		
 		or_nto1
 		  #(.width(num_vcs),
 		    .num_ports(num_ports))
 		gnt_spec_ivc_or
-		  (.data_in(req_masked_spec_op_ivc),
+		  (.data_in(gnt_spec_op_ivc),
 		   .data_out(gnt_spec_ivc));
 		
 	     end
@@ -457,7 +473,7 @@ module sw_alloc_core_wf
    // if there are any requests at all in a cycle, at least one of them will
    // eventually be granted, so update priorities
    wire 				    update_alloc_nonspec;
-   assign update_alloc_nonspec = |req_wf_nonspec_ip_op;
+   assign update_alloc_nonspec = |req_nonspec_ip_ivc;
    
    wf_alloc
      #(.num_ports(num_ports),

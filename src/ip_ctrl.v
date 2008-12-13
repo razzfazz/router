@@ -32,10 +32,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module ip_ctrl
   (clk, reset, router_address, flit_valid_in, flit_vc_in, flit_head_in,
    flit_tail_in, flit_data_in, flow_ctrl_op_ovc, vc_req_ivc, vc_req_ivc_op, 
-   vc_req_ivc_ovc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc_op, 
-   sw_req_spec_ivc_op, sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, 
-   flit_vc_out, flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, 
-   cred_vc_out, error);
+   vc_req_ivc_ovc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc, 
+   sw_req_nonspec_ivc_op, sw_req_spec_ivc, sw_req_spec_ivc_op, 
+   sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, flit_vc_out, 
+   flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out, 
+   error);
    
 `include "constants.v"
    
@@ -217,10 +218,18 @@ module ip_ctrl
    input [0:num_vcs*num_vcs-1] vc_gnt_ivc_ovc;
    
    // non-speculative switch allocator requests
+   output [0:num_vcs-1] sw_req_nonspec_ivc;
+   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
+   
+   // port selects for non-speculative switch allocator requests
    output [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
    wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
    
    // speculative switch allocator requests
+   output [0:num_vcs-1] sw_req_spec_ivc;
+   wire [0:num_vcs-1] 		sw_req_spec_ivc;
+   
+   // port selects for speculative switch allocator requests
    output [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
    wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
    
@@ -311,7 +320,9 @@ module ip_ctrl
 	   wire 	      vc_req;
 	   wire [0:num_ports-1] vc_req_op;
 	   wire [0:num_vcs-1] 	vc_req_ovc;
+	   wire 		sw_req_nonspec;
 	   wire [0:num_ports-1] sw_req_nonspec_op;
+	   wire 		sw_req_spec;
 	   wire [0:num_ports-1] sw_req_spec_op;
 	   wire 		flit_sent;
 	   wire [0:vc_idx_width-1] flit_vc;
@@ -356,7 +367,9 @@ module ip_ctrl
 	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ovc(vc_gnt_ovc),
+	      .sw_req_nonspec(sw_req_nonspec),
 	      .sw_req_nonspec_op(sw_req_nonspec_op),
+	      .sw_req_spec(sw_req_spec),
 	      .sw_req_spec_op(sw_req_spec_op),
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
@@ -373,8 +386,10 @@ module ip_ctrl
 	   assign vc_req_ivc[ivc] = vc_req;
 	   assign vc_req_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = vc_req_op;
 	   assign vc_req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1] = vc_req_ovc;
+	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
 	   assign sw_req_nonspec_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 		    = sw_req_nonspec_op;
+	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
 	   assign sw_req_spec_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 		    = sw_req_spec_op;
 	   assign flit_sent_ivc[ivc] = flit_sent;

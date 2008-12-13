@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant usign separable input-first allocation
 module sw_alloc_core_sep_if
-  (clk, reset, req_nonspec_ip_ivc_op, req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, 
-   gnt_spec_ip_ivc, gnt_ip_op);
+  (clk, reset, req_nonspec_ip_ivc, req_nonspec_ip_ivc_op, req_spec_ip_ivc, 
+   req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "constants.v"
    
@@ -53,9 +53,15 @@ module sw_alloc_core_sep_if
    input reset;
    
    // non-speculative switch requests
+   input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
+   
+   // port selects for non-speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
    
    // speculative switch requests
+   input [0:num_ports*num_vcs-1] req_spec_ip_ivc;
+   
+   // port selects for speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
    
    // grants corresponding to non-speculative requests (to input controller)
@@ -107,21 +113,17 @@ module sw_alloc_core_sep_if
 	   wire 		update_arb_nonspec;
 	   assign update_arb_nonspec = gnt_out_nonspec;
 	   
+	   wire [0:num_vcs-1] 	req_nonspec_ivc;
+	   assign req_nonspec_ivc
+	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
 	   wire [0:num_vcs*num_ports-1] req_nonspec_ivc_op;
 	   assign req_nonspec_ivc_op
 	     = req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
 				     (ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_vcs-1] 		req_in_nonspec_ivc;
-	   
-	   genvar 			ivc;
-	   
-	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	     begin:nonspec_ivcs
-		assign req_in_nonspec_ivc[ivc]
-			 = |req_nonspec_ivc_op[ivc*num_ports:
-					       (ivc+1)*num_ports-1];
-	     end
+	   assign req_in_nonspec_ivc = req_nonspec_ivc;
 	   
 	   wire [0:num_vcs-1] gnt_in_nonspec_ivc;
 	   arbiter
@@ -185,19 +187,17 @@ module sw_alloc_core_sep_if
 		wire 		     update_arb_spec;
 		assign update_arb_spec = gnt_out_spec;
 		
+		wire [0:num_vcs-1]   req_spec_ivc;
+		assign req_spec_ivc
+		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		
 		wire [0:num_vcs*num_ports-1] req_spec_ivc_op;
 		assign req_spec_ivc_op
 		  = req_spec_ip_ivc_op[ip*num_vcs*num_ports:
 				       (ip+1)*num_vcs*num_ports-1];
 		
 		wire [0:num_vcs-1] 	     req_in_spec_ivc;
-		
-		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-		  begin:spec_ivcs
-		     assign req_in_spec_ivc[ivc]
-			      = |req_spec_ivc_op[ivc*num_ports:
-						 (ivc+1)*num_ports-1];
-		  end
+		assign req_in_spec_ivc = req_spec_ivc;
 		
 		wire [0:num_vcs-1] 	gnt_in_spec_ivc;
 		arbiter

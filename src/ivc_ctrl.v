@@ -32,9 +32,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, flow_ctrl_op_ovc, vc_req, vc_req_op, vc_req_ovc, vc_gnt, 
-   vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, la_route_info_out,
-   fbf_write_addr, fbf_read_addr, error, events);
+   vc_gnt_ovc, sw_req_nonspec, sw_req_nonspec_op, sw_req_spec, sw_req_spec_op, 
+   sw_gnt_nonspec, sw_gnt_spec, flit_valid_out, flit_head_out, flit_tail_out, 
+   flit_vc_out, la_route_info_out, fbf_write_addr, fbf_read_addr, error, 
+   events);
    
 `include "constants.v"
    
@@ -242,10 +243,18 @@ module ivc_ctrl
    input [0:num_vcs-1] vc_gnt_ovc;
    
    // non-speculative switch allocator requests
+   output sw_req_nonspec;
+   wire 		sw_req_nonspec;
+   
+   // port selects for non-speculative switch allocator requests
    output [0:num_ports-1] sw_req_nonspec_op;
    wire [0:num_ports-1] sw_req_nonspec_op;
    
    // speculative switch allocator requests
+   output sw_req_spec;
+   wire 		sw_req_spec;
+   
+   // port selects for speculative switch allocator requests
    output [0:num_ports-1] sw_req_spec_op;
    wire [0:num_ports-1] sw_req_spec_op;
    
@@ -882,17 +891,21 @@ module ivc_ctrl
    
    wire 				       fbc_empty;
    
-   assign sw_req_nonspec_op
-     = port_q &
-       {num_ports{valid_q & ~fbc_empty & allocated_q & free_allocated}};
+   assign sw_req_nonspec = valid_q & ~fbc_empty & allocated_q & free_allocated;
+   assign sw_req_nonspec_op = port_q;
    
    generate
       
       if(sw_spec_enable)
-	assign sw_req_spec_op
-	  = port_q & {num_ports{valid_q & ~fbc_empty & ~allocated_q}};
+	begin
+	   assign sw_req_spec = valid_q & ~fbc_empty & ~allocated_q;
+	   assign sw_req_spec_op = port_q;
+	end
       else
-	assign sw_req_spec_op = {num_ports{1'b0}};
+	begin
+	   assign sw_req_spec = 1'b0;
+	   assign sw_req_spec_op = {num_ports{1'b0}};
+	end
       
    endgenerate
    

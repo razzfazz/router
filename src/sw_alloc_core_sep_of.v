@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant using separable output-first allocation
 module sw_alloc_core_sep_of
-  (clk, reset, req_nonspec_ip_ivc_op, req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, 
-   gnt_spec_ip_ivc, gnt_ip_op);
+  (clk, reset, req_nonspec_ip_ivc, req_nonspec_ip_ivc_op, req_spec_ip_ivc, 
+   req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "constants.v"
    
@@ -53,9 +53,15 @@ module sw_alloc_core_sep_of
    input reset;
    
    // non-speculative switch requests
+   input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
+   
+   // port selects for non-speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
    
    // speculative switch requests
+   input [0:num_ports*num_vcs-1] req_spec_ip_ivc;
+   
+   // port selects for speculative switch requests
    input [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
    
    // grants corresponding to non-speculative requests (to input controller)
@@ -99,17 +105,22 @@ module sw_alloc_core_sep_of
 	   // combine requests from all VCs
 	   //-------------------------------------------------------------------
 	   
+	   wire [0:num_vcs-1] req_nonspec_ivc;
+	   assign req_nonspec_ivc
+	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
 	   wire [0:num_vcs*num_ports-1] req_nonspec_ivc_op;
 	   assign req_nonspec_ivc_op
 	     = req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
 				     (ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_ports-1] 	req_out_nonspec_op;
-	   or_nto1
+	   select_1ofn
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
-	   req_out_nonspec_op_or
-	     (.data_in(req_nonspec_ivc_op),
+	   req_out_nonspec_op_sel
+	     (.select(req_nonspec_ivc),
+	      .data_in(req_nonspec_ivc_op),
 	      .data_out(req_out_nonspec_op));
 	   
 	   assign req_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
@@ -207,17 +218,22 @@ module sw_alloc_core_sep_of
 		// combine requests from all VCs
 		//--------------------------------------------------------------
 		
+		wire [0:num_vcs-1] req_spec_ivc;
+		assign req_spec_ivc
+		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		
 		wire [0:num_vcs*num_ports-1] req_spec_ivc_op;
 		assign req_spec_ivc_op
 		  = req_spec_ip_ivc_op[ip*num_vcs*num_ports:
 				       (ip+1)*num_vcs*num_ports-1];
 		
 		wire [0:num_ports-1] 	     req_out_spec_op;
-		or_nto1
+		select_1ofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
-		req_out_spec_op_or
-		  (.data_in(req_spec_ivc_op),
+		req_out_spec_op_sel
+		  (.select(req_spec_ivc),
+		   .data_in(req_spec_ivc_op),
 		   .data_out(req_out_spec_op));
 		
 		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
