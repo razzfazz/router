@@ -153,7 +153,7 @@ module la_routing_logic
 	begin
 	   
 	   if(routing_class == (num_routing_classes - 1))
-	     assign dest_router_address = vc_route_info;
+	     assign dest_router_address = vc_route_info[0:router_addr_width-1];
 	   else
 	     assign dest_router_address
 	       = route_class ?
