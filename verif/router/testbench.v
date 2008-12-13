@@ -72,7 +72,7 @@ module testbench
    parameter num_header_buffers = 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 1;
+   parameter num_traffic_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
    parameter num_routing_classes = 1;
@@ -471,7 +471,7 @@ module testbench
 			  assign rtl_error
 			    = rtl_error_unmasked & flit_valid &  flit_head;
 			  
-			  assign rtl_error_ivc[(itc*num_traffic_classes+irc)*
+			  assign rtl_error_ivc[(itc*num_routing_classes+irc)*
 					       num_vcs_per_class:
 					       (itc*num_routing_classes+irc+1)*
 					       num_vcs_per_class-1]
