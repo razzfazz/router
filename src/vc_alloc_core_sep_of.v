@@ -144,9 +144,6 @@ module vc_alloc_core_sep_of
 		  (.data_in(gnt_out_op_ovc),
 		   .data_out(gnt_out_ovc));
 		
-		wire 			     update_arb;
-		assign update_arb = |gnt_out_ovc;
-		
 		wire [0:num_vcs-1] 	     req_in_ovc;
 		assign req_in_ovc = gnt_out_ovc;
 		
@@ -154,6 +151,10 @@ module vc_alloc_core_sep_of
 		
 		if(num_vcs_per_class > 1)
 		  begin
+		     
+		     wire 			     update_arb;
+		     assign update_arb = |gnt_out_ovc;
+		     
 		     arbiter
 		       #(.num_ports(num_vcs),
 			 .arbiter_type(arbiter_type),
@@ -164,6 +165,7 @@ module vc_alloc_core_sep_of
 			.update(update_arb),
 			.req(req_in_ovc),
 			.gnt(gnt_in_ovc));
+		     
 		  end
 		else
 		  assign gnt_in_ovc = req_in_ovc;
