@@ -562,7 +562,7 @@ module ivc_ctrl
    
    generate
       
-      if(num_routing_classes > 1)
+      if(routing_class != (num_routing_classes - 1))
 	assign rtl_change_class = next_la_route_info[port_idx_width];
       else
 	assign rtl_change_class = 1'b0;
@@ -577,8 +577,14 @@ module ivc_ctrl
 	   
 	   wire mask_port;
 	   
-	   if(op == port_id)
+	   if((routing_class != (num_routing_classes - 1)) &&
+	      (op == port_id))
 	     assign mask_port = ~rtl_change_class;
+	   else if(((routing_class == (num_routing_classes - 1)) &&
+		    (op == port_id)) ||
+		   ((routing_class != (num_routing_classes - 1)) &&
+		    (op >= (num_ports - num_nodes_per_router))))
+	     assign mask_port = 1'b1;
 	   else
 	     assign mask_port = 1'b0;
 	   

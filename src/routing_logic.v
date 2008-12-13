@@ -265,11 +265,14 @@ module routing_logic
 	   
 	   wire mask_port;
 
-	   // only allow a packet to exit through the same port it came in on 
-	   // if it is a non-minimal packet that has reached the intermediate 
-	   // node
-	   if(op == port_id)
+	   if((routing_class != (num_routing_classes - 1)) &&
+	      (op == port_id))
 	     assign mask_port = ~chg_class;
+	   else if(((routing_class == (num_routing_classes - 1)) &&
+		    (op == port_id)) ||
+		   ((routing_class != (num_routing_classes - 1)) &&
+		    (op >= (num_ports - num_nodes_per_router))))
+	     assign mask_port = 1'b1;
 	   else
 	     assign mask_port = 1'b0;
 	   
