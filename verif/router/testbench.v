@@ -75,7 +75,7 @@ module testbench
    parameter num_traffic_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 1;
+   parameter num_routing_classes = 2;
    
    // total number of packet classes
    localparam num_classes = num_traffic_classes * num_routing_classes;
