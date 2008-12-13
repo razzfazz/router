@@ -230,8 +230,10 @@ module router
    wire [0:num_ports*num_vcs-1]      elig_op_ovc;
    wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
+   wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] 	    vc_req_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_req_ip_ivc_ovc;
+   wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
    
@@ -275,6 +277,9 @@ module router
 	   assign flit_data_in = flit_data_in_ip[ip*data_width:
 						 (ip+1)*data_width-1];
 	   
+	   wire [0:num_vcs-1] 	   vc_gnt_ivc;
+	   assign vc_gnt_ivc = vc_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
 	   wire [0:num_vcs*num_vcs-1] vc_gnt_ivc_ovc;
 	   assign vc_gnt_ivc_ovc = vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
 						     (ip+1)*num_vcs*num_vcs-1];
@@ -287,6 +292,7 @@ module router
 	   assign sw_gnt_spec_ivc
 	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
+	   wire [0:num_vcs-1] 	      vc_req_ivc;
 	   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
 	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
 	   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
@@ -331,8 +337,10 @@ module router
 	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
+	      .vc_req_ivc(vc_req_ivc),
 	      .vc_req_ivc_op(vc_req_ivc_op),
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
+	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
 	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ivc_op),
 	      .sw_req_spec_ivc_op(sw_req_spec_ivc_op),
@@ -347,6 +355,7 @@ module router
 	      .cred_vc_out(cred_vc_out),
 	      .error(ipc_error));
 	   
+	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
 	   assign vc_req_ip_ivc_op[ip*num_vcs*num_ports:
 				   (ip+1)*num_vcs*num_ports-1] = vc_req_ivc_op;
 	   assign vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
@@ -389,9 +398,11 @@ module router
    vca
      (.clk(clk),
       .reset(reset),
+      .req_ip_ivc(vc_req_ip_ivc),
       .req_ip_ivc_op(vc_req_ip_ivc_op),
       .req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
       .elig_op_ovc(elig_op_ovc),
+      .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
       .gnt_op_ovc(vc_gnt_op_ovc));
    

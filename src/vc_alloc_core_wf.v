@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant based using wavefront allocation
 module vc_alloc_core_wf
-  (clk, reset, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, gnt_ip_ivc_ovc, 
-   gnt_op_ovc);
+  (clk, reset, req_ip_ivc, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, 
+   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
    
 `include "constants.v"
    
@@ -61,7 +61,10 @@ module vc_alloc_core_wf
    input clk;
    input reset;
    
-   // request VC allocation for given port (for each input VC)
+   // request VC allocation (for each input VC)
+   input [0:num_ports*num_vcs-1] req_ip_ivc;
+   
+   // desired port for VC allocation (for each input VC)
    input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
    
    // allowable VCs for VC allocation (for each input VC)
@@ -70,7 +73,11 @@ module vc_alloc_core_wf
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] elig_op_ovc;
    
-   // granted output VC (to inpt controller)
+   // VC allocation successful (to input controller)
+   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   
+   // granted output VC (to input controller)
    output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
    wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
    
@@ -103,6 +110,9 @@ module vc_alloc_core_wf
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	     begin:ivcs
 		
+		wire req;
+		assign req = req_ip_ivc[ip*num_vcs+ivc];
+		
 		wire [0:num_ports-1] req_op;
 		assign req_op
 		  = req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
@@ -121,12 +131,9 @@ module vc_alloc_core_wf
 		     wire [0:num_vcs-1] 	     elig_ovc;
 		     assign elig_ovc = elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 		     
-		     wire 			     req;
-		     assign req = req_op[op];
-		     
 		     wire [0:num_vcs-1] 	     req_wf_ovc;
 		     assign req_wf_ovc
-		       = {num_vcs{req}} & req_ovc & elig_ovc;
+		       = {num_vcs{req & req_op[op]}} & req_ovc & elig_ovc;
 		     
 		     assign req_wf_ip_ivc_op_ovc[((ip*num_vcs+ivc)*
 						  num_ports+op)*num_vcs:
@@ -153,6 +160,11 @@ module vc_alloc_core_wf
 		assign gnt_ip_ivc_ovc[(ip*num_vcs+ivc)*num_vcs:
 				      (ip*num_vcs+ivc+1)*num_vcs-1]
 			 = gnt_ovc;
+		
+		wire 				     gnt;
+		assign gnt = |gnt_ovc;
+		
+		assign gnt_ip_ivc[ip*num_vcs+ivc] = gnt;
 		
 	     end
 	   

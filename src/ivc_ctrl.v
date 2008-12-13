@@ -31,8 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, flow_ctrl_op_ovc, vc_req_op, vc_req_ovc, vc_gnt_ovc, 
-   sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
+   header_info_in, flow_ctrl_op_ovc, vc_req, vc_req_op, vc_req_ovc, vc_gnt, 
+   vc_gnt_ovc, sw_req_nonspec_op, sw_req_spec_op, sw_gnt_nonspec, sw_gnt_spec, 
    flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, la_route_info_out,
    fbf_write_addr, fbf_read_addr, error, events);
    
@@ -223,13 +223,20 @@ module ivc_ctrl
    // controllers
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
-   // requests VC allocation for given port
+   // request VC allocation
+   output vc_req;
+   wire vc_req;
+   
+   // desired port for VC allocation
    output [0:num_ports-1] vc_req_op;
    wire [0:num_ports-1] vc_req_op;
    
    // allowable VCs for VC allocation
    output [0:num_vcs-1] vc_req_ovc;
    wire [0:num_vcs-1] 	vc_req_ovc;
+   
+   // VC allocation successful
+   input vc_gnt;
    
    // granted output VC
    input [0:num_vcs-1] vc_gnt_ovc;
@@ -293,9 +300,6 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
-   
-   wire 		     vc_gnt;
-   assign vc_gnt = |vc_gnt_ovc;
    
    wire 		     get_next_header;
    wire 		     allocated_s, allocated_q;
@@ -892,20 +896,9 @@ module ivc_ctrl
       
    endgenerate
    
+   assign vc_req = valid_q & ~allocated_q;
    assign vc_req_op = port_q;
-   
-   wire [0:num_vcs-1] 	       vc_req_ovc_s, vc_req_ovc_q;
-   assign vc_req_ovc_s = vcs_s & {num_vcs{valid_s & ~allocated_s}};
-   dff
-     #(.width(num_vcs),
-       .reset_type(reset_type))
-   vc_req_ovcq
-     (.clk(clk),
-      .reset(reset),
-      .d(vc_req_ovc_s),
-      .q(vc_req_ovc_q));
-   
-   assign vc_req_ovc = vc_req_ovc_q;
+   assign vc_req_ovc = vcs_q;
    
    
    //---------------------------------------------------------------------------
