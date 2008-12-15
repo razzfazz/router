@@ -942,9 +942,7 @@ module ivc_ctrl
    assign fbc_pop = all_allocated;
    
    wire 		       fbc_error;
-   wire 		       fbc_empty_early;
    wire 		       fbc_full;
-   wire 		       fbc_full_early;
    fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .offset(fbf_min_addr),
@@ -960,9 +958,7 @@ module ivc_ctrl
       .write_addr(fbf_write_addr),
       .read_addr(fbf_read_addr),
       .empty(fbc_empty),
-      .empty_early(fbc_empty_early),
       .full(fbc_full),
-      .full_early(fbc_full_early),
       .error(fbc_error));
    
    

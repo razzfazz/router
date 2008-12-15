@@ -30,8 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // simple FIFO controller
 module fifo_ctrl
-  (clk, reset, push, pop, write_addr, read_addr, empty, empty_early, full,
-   full_early, error);
+  (clk, reset, push, pop, write_addr, read_addr, empty, full, error);
    
 `include "constants.v"
    
@@ -101,17 +100,9 @@ module fifo_ctrl
    output empty;
    wire 		 empty;
    
-   // buffer empty indication (one cycle early)
-   output empty_early;
-   wire 		 empty_early;
-   
    // buffer full indication
    output full;
    wire 		 full;
-   
-   // buffer full indication (one cycle early)
-   output full_early;
-   wire 		 full_early;
    
    // internal error condition detected
    output error;
@@ -191,9 +182,7 @@ module fifo_ctrl
    assign write_addr[(addr_width-ctr_width):addr_width-1] = write_ptr_q;
    
    assign empty = empty_q;
-   assign empty_early = empty_s;
    assign full = (read_ptr_q == write_ptr_q) && !empty_q;
-   assign full_early = (read_ptr_s == write_ptr_s) && !empty_s;
    
    wire 		 error_underflow;
    assign error_underflow = empty & pop;

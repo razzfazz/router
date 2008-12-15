@@ -200,7 +200,6 @@ module fifo
 	  begin
 
 	     wire [0:rw_ptr_width-1] read_ptr, write_ptr;
-	     wire 		     empty_early, full_early;
 	     fifo_ctrl
 	       #(.addr_width(rw_ptr_width),
 		 .offset(0),
@@ -216,9 +215,7 @@ module fifo
 		.write_addr(write_ptr),
 		.read_addr(read_ptr),
 		.empty(empty),
-		.empty_early(empty_early),
 		.full(full),
-		.full_early(full_early),
 		.error(error));
 	     
 	     reg [0:width-1] 	     storage [0:depth-1];
