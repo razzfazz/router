@@ -939,7 +939,7 @@ module ivc_ctrl
    assign fbc_push = flit_valid_in;
    
    wire 		       fbc_pop;
-   assign fbc_pop = all_allocated & ~fbc_empty;
+   assign fbc_pop = all_allocated;
    
    wire 		       fbc_error;
    wire 		       fbc_empty_early;
