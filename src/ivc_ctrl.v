@@ -995,31 +995,33 @@ module ivc_ctrl
    // instrumentation
    //---------------------------------------------------------------------------
    
-   wire 		       ev_no_flit;
-   assign ev_no_flit = valid_q & fbc_empty;
-   
-   wire 		       ev_flit_stalled_vc;
-   assign ev_flit_stalled_vc = valid_q & ~fbc_empty & ~vc_allocated;
-   
-   wire 		       ev_flit_stalled_sw;
-   assign ev_flit_stalled_sw = valid_q & ~fbc_empty & vc_allocated &
-			       ~sw_allocated;
-   
-   wire 		       ev_spec_failed;
-   assign ev_spec_failed = valid_q & ~fbc_empty & ~vc_allocated & sw_allocated;
-   
-   wire 		       ev_flit_sent;
-   assign ev_flit_sent = valid_q & ~fbc_empty & all_allocated;
-   
-   wire 		       ev_flit_sent_spec;
-   assign ev_flit_sent_spec = valid_q & ~fbc_empty & vc_gnt &
-			      ~allocated_q & sw_allocated;
-   
    generate
       
       if(perf_ctr_enable > 0)
 	begin
-	   wire [0:5] 	       events_s, events_q;
+	   
+	   wire 		       ev_no_flit;
+	   assign ev_no_flit = valid_q & fbc_empty;
+	   
+	   wire 		       ev_flit_stalled_vc;
+	   assign ev_flit_stalled_vc = valid_q & ~fbc_empty & ~vc_allocated;
+	   
+	   wire 		       ev_flit_stalled_sw;
+	   assign ev_flit_stalled_sw
+	     = valid_q & ~fbc_empty & vc_allocated & ~sw_allocated;
+	   
+	   wire 		       ev_spec_failed;
+	   assign ev_spec_failed
+	     = valid_q & ~fbc_empty & ~vc_allocated & sw_allocated;
+	   
+	   wire 		       ev_flit_sent;
+	   assign ev_flit_sent = valid_q & ~fbc_empty & all_allocated;
+	   
+	   wire 		       ev_flit_sent_spec;
+	   assign ev_flit_sent_spec
+	     = valid_q & ~fbc_empty & vc_gnt & ~allocated_q & sw_allocated;
+	   
+	   wire [0:5] 		       events_s, events_q;
 	   assign events_s = {ev_no_flit,
 			      ev_flit_stalled_vc,
 			      ev_flit_stalled_sw,
