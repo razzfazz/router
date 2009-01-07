@@ -72,7 +72,7 @@ module testbench
    parameter num_header_buffers = 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   parameter num_traffic_classes = 1;
    
    // number of routing classes (e.g. minimal, adaptive)
    parameter num_routing_classes = 2;
@@ -81,7 +81,7 @@ module testbench
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 2;
+   parameter num_vcs_per_class = 1;
    
    // number of VCs
    localparam num_vcs = num_classes * num_vcs_per_class;
@@ -140,7 +140,7 @@ module testbench
    parameter max_packet_length = 8;
    
    // minimum packet length (in flits)
-   parameter min_packet_length = 8;
+   parameter min_packet_length = 1;
    
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
@@ -933,7 +933,7 @@ module testbench
    assign check_error_op = (flit_valid_out_op & ~match_op);
 
    integer 					    port;
-   always @(negedge clk)
+   always @(posedge clk)
      begin
 	for(port = 0; port < num_ports; port = port + 1)
 	  begin
@@ -1086,6 +1086,8 @@ module testbench
       run = 1'b0;
       count_en = 1'b0;
       cycles = 0;
+      
+      #(Tclk);
       
       #(Tclk/2);
       
