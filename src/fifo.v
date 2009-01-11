@@ -142,8 +142,24 @@ module fifo
 		.d(insert_ptr_s),
 		.q(insert_ptr_q));
 	     
-	     assign full = (insert_ptr_q == 0);
-	     assign empty = (insert_ptr_q == depth);
+	     assign full = ~|insert_ptr_q;
+	     
+	     wire 			 almost_empty;
+	     assign almost_empty = (insert_ptr_q == (depth - 1));
+	     
+	     wire 			 empty_s, empty_q;
+	     assign empty_s
+	       = (empty_q | (almost_empty & pop & ~push)) & ~(push & ~pop);
+	     dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     emptyq
+	       (.clk(clk),
+		.reset(reset),
+		.d(empty_s),
+		.q(empty_q));
+	     
+	     assign empty = empty_q;
 	     
 	     wire [0:(depth+1)*width-1] data;
 	     
@@ -174,10 +190,10 @@ module fifo
 	     assign data_out = data[depth*width:(depth+1)*width-1];
 	     
 	     wire 		   error_underflow;
-	     assign error_underflow = empty & pop;
+	     assign error_underflow = empty & pop & ~push;
 	     
 	     wire 		   error_overflow;
-	     assign error_overflow = full & push;
+	     assign error_overflow = full & push & ~pop;
 	     
 	     wire [0:1] 	   errors_in, errors_out;
 	     assign errors_in = {error_underflow,
