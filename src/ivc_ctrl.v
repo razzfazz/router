@@ -423,7 +423,7 @@ module ivc_ctrl
 	   assign head_in = flit_valid_in & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
-	   assign head_valid_s = (head_valid_q & ~flit_valid_out) | head_in;
+	   assign head_valid_s = (head_valid_q | head_in) & ~flit_valid_out;
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -451,7 +451,7 @@ module ivc_ctrl
 	   
 	   wire 		     tail_valid_s, tail_valid_q;
 	   assign tail_valid_s
-	     = (tail_valid_q & ~(flit_valid_out & flit_tail_out)) | tail_in;
+	     = (tail_valid_q | tail_in) & ~(flit_valid_out & flit_tail_out);
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
