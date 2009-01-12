@@ -343,6 +343,17 @@ module ivc_ctrl
       .d(flit_tail_in_s),
       .q(flit_tail_in_q));
    
+   wire [0:header_info_width-1] header_info_in_s, header_info_in_q;
+   assign header_info_in_s = header_info_in;
+   dff
+     #(.width(header_info_width),
+       .reset_type(reset_type))
+   header_info_inq
+     (.clk(clk),
+      .reset(reset),
+      .d(header_info_in_s),
+      .q(header_info_in_q));
+   
    
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
@@ -522,11 +533,11 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:la_route_info_width-1] la_route_info_in;
-   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
+   assign la_route_info_in = header_info_in_q[0:la_route_info_width-1];
    
    wire [0:route_info_width-1] 	  route_info_in;
    assign route_info_in
-     = header_info_in[la_route_info_width:
+     = header_info_in_q[la_route_info_width:
 			la_route_info_width+route_info_width-1];
    
    wire [0:vc_route_info_width-1] vc_route_info_in;
@@ -535,7 +546,7 @@ module ivc_ctrl
    wire 			  hdff_error;
    
    wire 			  hdff_push;
-   assign hdff_push = flit_valid_in & flit_head_in;
+   assign hdff_push = flit_valid_in_q & flit_head_in_q;
    
    wire 			  hdff_pop;
    assign hdff_pop = flit_valid_out & flit_tail_out;
@@ -586,12 +597,12 @@ module ivc_ctrl
 	      .error(hdff_error));
 	   
 	   assign hdff_la_route_info
-	     = /*hdff_empty ?
-	       la_route_info_in :*/
+	     = hdff_empty ?
+	       la_route_info_in :
 	       hdff_data_out[0:la_route_info_width-1];
 	   assign hdff_vc_route_info
-	     = /*hdff_empty ?
-	       vc_route_info_in :*/
+	     = hdff_empty ?
+	       vc_route_info_in :
 	       hdff_data_out[la_route_info_width:
 			     la_route_info_width+vc_route_info_width-1];
    
@@ -613,7 +624,7 @@ module ivc_ctrl
 	      .q(hdff_la_route_info_q));
 	   
 	   assign hdff_la_route_info
-	     = /*hdff_empty ? la_route_info_in :*/ hdff_la_route_info_q;
+	     = hdff_empty ? la_route_info_in : hdff_la_route_info_q;
 	   
 	   wire [0:vc_route_info_width-1] hdff_vc_route_info_s,
 					  hdff_vc_route_info_q;
@@ -629,10 +640,11 @@ module ivc_ctrl
 	      .q(hdff_vc_route_info_q));
 	   
 	   assign hdff_vc_route_info
-	     = /*hdff_empty ? vc_route_info_in :*/ hdff_vc_route_info_q;
+	     = hdff_empty ? vc_route_info_in : hdff_vc_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
-	   assign hdff_empty_s = (hdff_empty_q | hdff_pop) & ~hdff_push;
+	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) &
+				 ~(hdff_push & ~hdff_pop);
 	   dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -650,6 +662,9 @@ module ivc_ctrl
 	end
       
    endgenerate
+   
+   wire 	header_valid;
+   assign header_valid = ~hdff_empty | hdff_push;
    
    
    //---------------------------------------------------------------------------
@@ -693,7 +708,7 @@ module ivc_ctrl
 	     assign mask_port = 1'b0;
 	   
 	   assign rtl_port_op[op] = port_sel & ~mask_port;
-	   assign rtl_error_op[op] = port_sel & mask_port & ~hdff_empty;
+	   assign rtl_error_op[op] = port_sel & mask_port & header_valid;
 	   
 	end
       
@@ -907,14 +922,14 @@ module ivc_ctrl
    wire 				       flit_valid;
    
    assign sw_req_nonspec
-     = ~hdff_empty & flit_valid & vc_allocated_q & free_allocated;
+     = header_valid & flit_valid & vc_allocated_q & free_allocated;
    assign sw_req_nonspec_op = rtl_port_op;
    
    generate
       
       if(sw_spec_enable)
 	begin
-	   assign sw_req_spec = ~hdff_empty & flit_valid & ~vc_allocated_q;
+	   assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
 	   assign sw_req_spec_op = rtl_port_op;
 	end
       else
@@ -925,7 +940,7 @@ module ivc_ctrl
       
    endgenerate
    
-   assign vc_req = ~hdff_empty & ~vc_allocated_q;
+   assign vc_req = header_valid & ~vc_allocated_q;
    assign vc_req_op = rtl_port_op;
    assign vc_req_ovc = rtl_next_vcs;
    
@@ -994,7 +1009,7 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:2] 		       errors_in;
-   assign errors_in = {flit_valid & hdff_empty,
+   assign errors_in = {flit_valid & ~header_valid,
 		       cred_tracker_error,
 		       rtl_error};
    
@@ -1023,18 +1038,19 @@ module ivc_ctrl
 	begin
 	   
 	   wire 		       ev_no_flit;
-	   assign ev_no_flit = ~hdff_empty & ~flit_valid;
+	   assign ev_no_flit = header_valid & ~flit_valid;
 	   
 	   wire 		       ev_flit_stalled_vc;
-	   assign ev_flit_stalled_vc = ~hdff_empty & flit_valid & ~vc_allocated;
+	   assign ev_flit_stalled_vc
+	     = header_valid & flit_valid & ~vc_allocated;
 	   
 	   wire 		       ev_flit_stalled_sw;
 	   assign ev_flit_stalled_sw
-	     = ~hdff_empty & flit_valid & vc_allocated & ~sw_allocated;
+	     = header_valid & flit_valid & vc_allocated & ~sw_allocated;
 	   
 	   wire 		       ev_spec_failed;
 	   assign ev_spec_failed
-	     = ~hdff_empty & flit_valid & ~vc_allocated & sw_allocated;
+	     = header_valid & flit_valid & ~vc_allocated & sw_allocated;
 	   
 	   wire 		       ev_flit_sent;
 	   assign ev_flit_sent = flit_valid_out;
