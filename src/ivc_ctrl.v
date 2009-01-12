@@ -422,20 +422,8 @@ module ivc_ctrl
 	   wire head_in;
 	   assign head_in = flit_valid_in & flit_head_in;
 	   
-	   wire [0:fbf_addr_width-1] head_idx_s, head_idx_q;
-	   assign head_idx_s = head_in ? fbf_write_addr : head_idx_q;
-	   dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   head_idxq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(head_idx_s),
-	      .q(head_idx_q));
-	   
-	   wire 		     head_valid_s, head_valid_q;
-	   assign head_valid_s
-	     = (head_valid_q & ~(flit_valid_out & flit_head_out)) | head_in;
+	   wire head_valid_s, head_valid_q;
+	   assign head_valid_s = (head_valid_q & ~flit_valid_out) | head_in;
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -445,9 +433,9 @@ module ivc_ctrl
 	      .d(head_valid_s),
 	      .q(head_valid_q));
 	   
-	   assign flit_head_out = head_valid_q && (fbf_read_addr == head_idx_q);
+	   assign flit_head_out = head_valid_q;
 	   
-	   wire 		     tail_in;
+	   wire tail_in;
 	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
