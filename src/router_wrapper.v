@@ -48,6 +48,23 @@ module router_wrapper
       end
    endfunction
    
+   // compute ceiling of base-th root of argument
+   function integer croot(input integer argument, input integer base);
+      integer 		     i;
+      integer 		     j;
+      begin
+	 croot = 0;
+	 i = 0;
+	 while(i < argument)
+	   begin
+	      croot = croot + 1;
+	      i = 1;
+	      for(j = 0; j < base; j = j + 1)
+		i = i * croot;
+	   end
+      end
+   endfunction
+   
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
    
@@ -75,11 +92,21 @@ module router_wrapper
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
+   // total number of nodes
+   parameter num_nodes = 64;
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
+   // number of nodes per router (a.k.a. concentration factor)
+   parameter num_nodes_per_router = 4;
+   
+   // total number of routers
+   localparam num_routers
+     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+   
    // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
+   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
    
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
@@ -94,9 +121,6 @@ module router_wrapper
        (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
        (num_routers_per_dim - 1) :
        -1;
-   
-   // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 4;
    
    // number of input and output ports on router
    localparam num_ports
