@@ -69,7 +69,7 @@ module testbench
    parameter num_flit_buffers = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers = 1;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 1;
@@ -1072,9 +1072,13 @@ module testbench
       clk <= 1'b0;
       #(Tclk/2);
    end
-
+   
    always @(posedge clk)
-     if(error) $stop;
+     if(error)
+       begin
+	  $display("logic error detected, cyc=%d", $time);
+	  $stop;
+       end
    
    integer cycles;
    
