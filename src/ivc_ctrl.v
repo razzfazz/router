@@ -307,55 +307,6 @@ module ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // input stage
-   //---------------------------------------------------------------------------
-   
-   wire 		     flit_valid_in_s, flit_valid_in_q;
-   assign flit_valid_in_s = flit_valid_in;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_valid_inq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_valid_in_s),
-      .q(flit_valid_in_q));
-   
-   wire 		     flit_head_in_s, flit_head_in_q;
-   assign flit_head_in_s = flit_head_in;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_head_inq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_head_in_s),
-      .q(flit_head_in_q));
-   
-   wire 		     flit_tail_in_s, flit_tail_in_q;
-   assign flit_tail_in_s = flit_tail_in;
-   dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_tail_inq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_tail_in_s),
-      .q(flit_tail_in_q));
-   
-   wire [0:header_info_width-1] header_info_in_s, header_info_in_q;
-   assign header_info_in_s = header_info_in;
-   dff
-     #(.width(header_info_width),
-       .reset_type(reset_type))
-   header_info_inq
-     (.clk(clk),
-      .reset(reset),
-      .d(header_info_in_s),
-      .q(header_info_in_q));
-   
-   
-   //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
@@ -435,14 +386,14 @@ module ivc_ctrl
 			 = (fbf_read_addr == (fbf_min_addr + idx));
 		
 		wire capture;
-		assign capture = flit_valid_in_q & write_sel[idx];
+		assign capture = flit_valid_in & write_sel[idx];
 		
 		reg  head_q, tail_q;
 		always @(posedge clk)
 		  if(capture)
 		    begin
-		       head_q <= flit_head_in_q;
-		       tail_q <= flit_tail_in_q;
+		       head_q <= flit_head_in;
+		       tail_q <= flit_tail_in;
 		    end
 		
 		assign head_queue[idx] = head_q;
@@ -459,7 +410,7 @@ module ivc_ctrl
 	      .data_in(head_queue),
 	      .data_out(head_queue_muxed));
 	   
-	   assign flit_head_out = fbc_empty ? flit_head_in_q : head_queue_muxed;
+	   assign flit_head_out = fbc_empty ? flit_head_in : head_queue_muxed;
 	   
 	   wire tail_queue_muxed;
 	   select_1ofn
@@ -470,14 +421,14 @@ module ivc_ctrl
 	      .data_in(tail_queue),
 	      .data_out(tail_queue_muxed));
 	   
-	   assign flit_tail_out = fbc_empty ? flit_tail_in_q : tail_queue_muxed;
+	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail_queue_muxed;
 	   
 	end
       else
 	begin
 	   
 	   wire head_in;
-	   assign head_in = flit_valid_in_q & flit_head_in_q;
+	   assign head_in = flit_valid_in & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
 	   assign head_valid_s = (head_valid_q | head_in) & ~flit_valid_out;
@@ -490,10 +441,10 @@ module ivc_ctrl
 	      .d(head_valid_s),
 	      .q(head_valid_q));
 	   
-	   assign flit_head_out = fbc_empty ? flit_head_in_q : head_valid_q;
+	   assign flit_head_out = fbc_empty ? flit_head_in : head_valid_q;
 	   
 	   wire 		     tail_in;
-	   assign tail_in = flit_valid_in_q & flit_tail_in_q;
+	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
 	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
@@ -520,7 +471,7 @@ module ivc_ctrl
 	   
 	   assign flit_tail_out
 	     = fbc_empty ?
-	       flit_tail_in_q :
+	       flit_tail_in :
 	       (tail_valid_q && (fbf_read_addr == tail_idx_q));
 	   
 	end
@@ -533,12 +484,12 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:la_route_info_width-1] la_route_info_in;
-   assign la_route_info_in = header_info_in_q[0:la_route_info_width-1];
+   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
    
    wire [0:route_info_width-1] 	  route_info_in;
    assign route_info_in
-     = header_info_in_q[la_route_info_width:
-			la_route_info_width+route_info_width-1];
+     = header_info_in[la_route_info_width:
+		      la_route_info_width+route_info_width-1];
    
    wire [0:vc_route_info_width-1] vc_route_info_in;
    
@@ -546,7 +497,7 @@ module ivc_ctrl
    wire 			  hdff_error;
    
    wire 			  hdff_push;
-   assign hdff_push = flit_valid_in_q & flit_head_in_q;
+   assign hdff_push = flit_valid_in & flit_head_in;
    
    wire 			  hdff_pop;
    assign hdff_pop = flit_valid_out & flit_tail_out;
@@ -976,7 +927,7 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 		       fbc_push;
-   assign fbc_push = flit_valid_in_q;
+   assign fbc_push = flit_valid_in;
    
    wire 		       fbc_pop;
    assign fbc_pop = flit_valid_out;
@@ -1001,7 +952,7 @@ module ivc_ctrl
       .full(fbc_full),
       .error(fbc_error));
    
-   assign flit_valid = flit_valid_in_q | ~fbc_empty;
+   assign flit_valid = flit_valid_in | ~fbc_empty;
    
    
    //---------------------------------------------------------------------------

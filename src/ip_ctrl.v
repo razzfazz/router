@@ -342,8 +342,8 @@ module ip_ctrl
    //---------------------------------------------------------------------------
    
    // extract header information from header data
-   wire [0:header_info_width-1] header_info_in;
-   assign header_info_in = flit_data_in[0:header_info_width-1];
+   wire [0:header_info_width-1] header_info_in_q;
+   assign header_info_in_q = flit_data_in_q[0:header_info_width-1];
    
    wire [0:num_vcs-1] 		flit_valid_out_ivc;
    wire [0:num_vcs*vc_idx_width-1] flit_vc_out_ivc;
@@ -363,7 +363,7 @@ module ip_ctrl
 	begin:ivcs
 	   
 	   wire flit_valid_qual;
-	   assign flit_valid_qual = flit_valid_in && (flit_vc_in == ivc);
+	   assign flit_valid_qual = flit_valid_in_q && (flit_vc_in_q == ivc);
 	   
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ivc[ivc];
@@ -418,9 +418,9 @@ module ip_ctrl
 	      .reset(reset),
 	      .router_address(router_address),
 	      .flit_valid_in(flit_valid_qual),
-	      .flit_head_in(flit_head_in),
-	      .flit_tail_in(flit_tail_in),
-	      .header_info_in(header_info_in),
+	      .flit_head_in(flit_head_in_q),
+	      .flit_tail_in(flit_tail_in_q),
+	      .header_info_in(header_info_in_q),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
 	      .vc_req(vc_req),
 	      .vc_req_op(vc_req_op),
