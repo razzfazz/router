@@ -106,6 +106,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // mux-based
 `define CROSSBAR_TYPE_MUX      1
 
+// distributed multiplexers
+`define CROSSBAR_TYPE_DIST_MUX 2
+
 
 //------------------------------------------------------------------------------
 // register file implemetation variants
