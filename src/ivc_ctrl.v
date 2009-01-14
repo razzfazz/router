@@ -632,8 +632,7 @@ module ivc_ctrl
    
    generate
       
-      if((num_routing_classes > 1) &&
-	 (routing_class > (num_routing_classes - 1)))
+      if(routing_class < (num_routing_classes - 1))
 	assign rtl_change_class = hdff_la_route_info[port_idx_width];
       else
 	assign rtl_change_class = 1'b0;
@@ -650,7 +649,7 @@ module ivc_ctrl
 	       (op < (num_ports - num_nodes_per_router)) &&
 	       ((op / num_neighbors_per_dim) == 
 		(port_id / num_neighbors_per_dim))) ||
-	      ((routing_class > (num_routing_classes - 1)) &&
+	      ((routing_class < (num_routing_classes - 1)) &&
 	       (op >= (num_ports - num_nodes_per_router))))
 	     begin
 		assign rtl_port_op[op] = 1'b0;
