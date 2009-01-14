@@ -743,7 +743,7 @@ module ivc_ctrl
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
-	     wire [0:num_vcs-1] free_ovc;
+	     wire [0:num_vcs*2-1] free_ovc;
 	     assign free_ovc = flow_ctrl_ovc;
 	     
 	     wire 		flit_sent_prev_s, flit_sent_prev_q;
