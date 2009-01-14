@@ -632,7 +632,8 @@ module ivc_ctrl
    
    generate
       
-      if(num_routing_classes > 1)
+      if((num_routing_classes > 1) &&
+	 (routing_class > (num_routing_classes - 1)))
 	assign rtl_change_class = hdff_la_route_info[port_idx_width];
       else
 	assign rtl_change_class = 1'b0;
@@ -645,21 +646,21 @@ module ivc_ctrl
 	   wire port_sel;
 	   assign port_sel = (rtl_port_enc == op);
 	   
-	   wire mask_port;
-	   
-	   if((routing_class != (num_routing_classes - 1)) &&
-	      (op == port_id))
-	     assign mask_port = ~rtl_change_class;
-	   else if(((routing_class == (num_routing_classes - 1)) &&
-		    (op == port_id)) ||
-		   ((routing_class != (num_routing_classes - 1)) &&
-		    (op >= (num_ports - num_nodes_per_router))))
-	     assign mask_port = 1'b1;
+	   if(((routing_class == (num_routing_classes - 1)) &&
+	       (op < (num_ports - num_nodes_per_router)) &&
+	       ((op / num_neighbors_per_dim) == 
+		(port_id / num_neighbors_per_dim))) ||
+	      ((routing_class > (num_routing_classes - 1)) &&
+	       (op >= (num_ports - num_nodes_per_router))))
+	     begin
+		assign rtl_port_op[op] = 1'b0;
+		assign rtl_error_op[op] = port_sel & header_valid;
+	     end
 	   else
-	     assign mask_port = 1'b0;
-	   
-	   assign rtl_port_op[op] = port_sel & ~mask_port;
-	   assign rtl_error_op[op] = port_sel & mask_port & header_valid;
+	     begin
+		assign rtl_port_op[op] = port_sel;
+		assign rtl_error_op[op] = 1'b0;
+	     end
 	   
 	end
       
