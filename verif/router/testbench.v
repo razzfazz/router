@@ -227,7 +227,7 @@ module testbench
 			       1;
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_DIST_MUX;
    
    // select implementation variant for data crossbar
    parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -395,19 +395,20 @@ module testbench
 		assign la_route_info_in
 		  = header_info[0:la_route_info_width-1];
 		
-		wire [0:num_ports-1] 	       la_route_port;
+		wire [0:num_ports-1] 	       la_route_port_op;
 		decoder
 		  #(.num_ports(num_ports))
-		la_route_port_dec
+		la_route_port_op_dec
 		  (.data_in(la_route_info_in[0:port_idx_width-1]),
-		   .data_out(la_route_port));
+		   .data_out(la_route_port_op));
 
-		wire 			       la_route_class;
+		wire 			       la_route_change_class;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_class = la_route_info_in[port_idx_width];
+		  assign la_route_change_class
+		    = la_route_info_in[port_idx_width];
 		else
-		  assign la_route_class = 1'b0;
+		  assign la_route_change_class = 1'b0;
 		
 		wire [0:route_info_width-1]    route_info;
 		assign route_info
@@ -538,8 +539,8 @@ module testbench
 			      .routing_class(irc))
 			  lar
 			    (.router_address(router_address),
-			     .route_port(la_route_port),
-			     .route_class(la_route_class),
+			     .route_port_op(la_route_port_op),
+			     .route_change_class(la_route_change_class),
 			     .vc_route_info(vc_route_info_la),
 			     .la_route_info(la_route_info));
 			  

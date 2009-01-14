@@ -715,8 +715,8 @@ module ivc_ctrl
        .routing_class(routing_class))
    lar
      (.router_address(router_address),
-      .route_port(rtl_port_op),
-      .route_class(rtl_change_class),
+      .route_port_op(rtl_port_op),
+      .route_change_class(rtl_change_class),
       .vc_route_info(hdff_vc_route_info),
       .la_route_info(la_route_info_out));
    

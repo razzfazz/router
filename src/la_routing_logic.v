@@ -30,7 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic
 module la_routing_logic
-  (router_address, route_port, route_class, vc_route_info, la_route_info);
+  (router_address, route_port_op, route_change_class, vc_route_info, 
+   la_route_info);
    
 `include "constants.v"
    
@@ -118,12 +119,12 @@ module la_routing_logic
    input [0:router_addr_width-1] router_address;
    
    // port on which the packet leaves the current router
-   input [0:num_ports-1] route_port;
+   input [0:num_ports-1] route_port_op;
    
    // traffic class used at the current router
    // (0: staying on same class
    //  1: advancing to next routing class)
-   input route_class;
+   input route_change_class;
    
    // routing data
    input [0:vc_route_info_width-1] vc_route_info;
@@ -156,7 +157,7 @@ module la_routing_logic
 	     assign dest_router_address = vc_route_info[0:router_addr_width-1];
 	   else
 	     assign dest_router_address
-	       = route_class ?
+	       = route_change_class ?
 		 vc_route_info[0:router_addr_width-1] :
 		 vc_route_info[router_addr_width:2*router_addr_width-1];
 	   
@@ -183,8 +184,9 @@ module la_routing_logic
 	   wire [0:dim_addr_width-1] next_dim_addr;
 	   
 	   wire [0:num_neighbors_per_dim-1] next_neighbor;
-	   assign next_neighbor = route_port[dim*num_neighbors_per_dim:
-					     (dim+1)*num_neighbors_per_dim-1];
+	   assign next_neighbor
+	     = route_port_op[dim*num_neighbors_per_dim:
+			     (dim+1)*num_neighbors_per_dim-1];
 	   
 	   assign dim_addr_match[dim] = (next_dim_addr == dest_dim_addr);
 	   
