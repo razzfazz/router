@@ -118,6 +118,9 @@ module packet_source
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
+   // select order of dimension traversal
+   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   
    // ID of current port
    parameter port_id = 0;
    
@@ -478,6 +481,7 @@ module packet_source
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .routing_function_type(routing_function_type),
+		    .dimension_order(dimension_order),
 		    .port_id(port_id),
 		    .traffic_class(itc),
 		    .routing_class(irc))

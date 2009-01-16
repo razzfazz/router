@@ -105,6 +105,9 @@ module router
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
+   // select order of dimension traversal
+   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
@@ -321,6 +324,7 @@ module router
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .data_width(data_width),
 	       .routing_function_type(routing_function_type),
+	       .dimension_order(dimension_order),
 	       .credit_handling_type(credit_handling_type),
 	       .header_fifo_type(header_fifo_type),
 	       .fbf_regfile_type(fbf_regfile_type),

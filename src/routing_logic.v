@@ -91,6 +91,9 @@ module routing_logic
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
+   // select order of dimension traversal
+   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   
    // ID of current port
    parameter port_id = 0;
    
@@ -182,12 +185,26 @@ module routing_logic
 	   
 	   wire 		     dim_sel;
 	   
-	   if(dim == 0)
-	     assign dim_sel
-	       = ~dim_addr_match[0];
-	   else
-	     assign dim_sel
-	       = &dim_addr_match[0:dim-1] & ~dim_addr_match[dim];
+	   if((dimension_order == `DIMENSION_ORDER_ASCENDING) ||
+	      ((dimension_order == `DIMENSION_ORDER_BY_CLASS) &&
+	       ((routing_class % 2) == 0)))
+	     begin
+		if(dim == 0)
+		  assign dim_sel = ~dim_addr_match[dim];
+		else
+		  assign dim_sel = &dim_addr_match[0:dim-1] &
+				   ~dim_addr_match[dim];
+	     end
+	   else if((dimension_order == `DIMENSION_ORDER_DESCENDING) ||
+		   ((dimension_order == `DIMENSION_ORDER_BY_CLASS) &&
+		    ((routing_class % 2) == 1)))
+	     begin
+		if(dim == (num_dimensions - 1))
+		  assign dim_sel = ~dim_addr_match[dim];
+		else
+		  assign dim_sel = ~dim_addr_match[dim] &
+				   dim_addr_match[(dim+1):(num_dimensions-1)];
+	     end
 	   
 	   wire [0:num_neighbors_per_dim-1] port_dec;
 	   
