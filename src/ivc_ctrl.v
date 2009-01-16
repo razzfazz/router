@@ -85,7 +85,7 @@ module ivc_ctrl
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -625,28 +625,25 @@ module ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 	  rtl_port_enc;
-   assign rtl_port_enc = hdff_la_route_info[0:port_idx_width-1];
-   
-   wire [0:num_ports-1] 	  rtl_port_op;
-   wire 			  rtl_change_class;
-   wire [0:num_ports-1] 	  rtl_error_op;
-   wire [0:num_classes-1] 	  rtl_next_class;
+   wire [0:num_ports-1] rtl_port_op;
+   wire 		rtl_change_class;
+   wire [0:num_ports-1] rtl_error_op;
+   wire [0:num_classes-1] rtl_next_class;
    
    generate
       
       if(routing_class < (num_routing_classes - 1))
-	assign rtl_change_class = hdff_la_route_info[port_idx_width];
+	assign rtl_change_class = hdff_la_route_info[num_ports];
       else
 	assign rtl_change_class = 1'b0;
       
-      genvar 			  op;
+      genvar 		  op;
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
 	   wire port_sel;
-	   assign port_sel = (rtl_port_enc == op);
+	   assign port_sel = hdff_la_route_info[op];
 	   
 	   if(((routing_class == (num_routing_classes - 1)) &&
 	       (op < (num_ports - num_nodes_per_router)) &&
@@ -666,12 +663,12 @@ module ivc_ctrl
 	   
 	end
       
-      genvar 	otc;
+      genvar otc;
       
       for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
 	begin:otcs
 	   
-	   genvar 	orc;
+	   genvar orc;
 	   
 	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
 	     begin:orcs

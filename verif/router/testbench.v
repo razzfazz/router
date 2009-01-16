@@ -148,7 +148,7 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -400,17 +400,12 @@ module testbench
 		  = header_info[0:la_route_info_width-1];
 		
 		wire [0:num_ports-1] 	       la_route_port_op;
-		decoder
-		  #(.num_ports(num_ports))
-		la_route_port_op_dec
-		  (.data_in(la_route_info_in[0:port_idx_width-1]),
-		   .data_out(la_route_port_op));
-
+		assign la_route_port_op = la_route_info_in[0:num_ports-1];
+		
 		wire 			       la_route_change_class;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_change_class
-		    = la_route_info_in[port_idx_width];
+		  assign la_route_change_class = la_route_info_in[num_ports];
 		else
 		  assign la_route_change_class = 1'b0;
 		

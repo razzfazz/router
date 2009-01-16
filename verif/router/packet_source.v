@@ -81,7 +81,7 @@ module packet_source
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -494,14 +494,10 @@ module packet_source
 		
 		wire [0:la_route_info_width-1] la_route_info;
 		
-		encoder
-		  #(.num_ports(num_ports))
-		la_port_enc
-		  (.data_in(next_port),
-		   .data_out(la_route_info[0:port_idx_width-1]));
+		assign la_route_info[0:num_ports-1] = next_port;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_info[port_idx_width]
+		  assign la_route_info[num_ports]
 			   = ~next_class[itc*num_routing_classes+irc];
 		
 		assign la_route_info_ivc[(itc*num_routing_classes+irc)*

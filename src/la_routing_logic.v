@@ -68,7 +68,7 @@ module la_routing_logic
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -144,7 +144,7 @@ module la_routing_logic
    
    wire [0:num_dimensions-1] 	  dim_addr_match;
    
-   wire [0:num_ports-1] 	  next_port_dec;
+   wire [0:num_ports-1] 	  next_port_op;
    
    wire 			  eject;
    assign eject = &dim_addr_match;
@@ -167,7 +167,7 @@ module la_routing_logic
 	   wire next_class;
 	   assign next_class = (next_router_address == dest_router_address);
 	   
-	   assign la_route_info[port_idx_width] = next_class;
+	   assign la_route_info[num_ports] = next_class;
 	   
 	end
       else
@@ -263,8 +263,8 @@ module la_routing_logic
 	     
 	   endcase
 	   
-	   assign next_port_dec[dim*num_neighbors_per_dim:
-				(dim+1)*num_neighbors_per_dim-1]
+	   assign next_port_op[dim*num_neighbors_per_dim:
+			       (dim+1)*num_neighbors_per_dim-1]
 		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
@@ -288,27 +288,20 @@ module la_routing_logic
 		  (.data_in(dest_node_address),
 		   .data_out(node_sel));
 		
-		assign next_port_dec[num_ports-num_nodes_per_router:num_ports-1]
+		assign next_port_op[num_ports-num_nodes_per_router:num_ports-1]
 			 = node_sel & {num_nodes_per_router{eject}};
 		
 	     end
 	   else
-	     assign next_port_dec[num_ports-1] = eject;
+	     assign next_port_op[num_ports-1] = eject;
 	   
 	end
       else
-	assign next_port_dec[num_ports-num_nodes_per_router:num_ports-1]
+	assign next_port_op[num_ports-num_nodes_per_router:num_ports-1]
 		 = {num_nodes_per_router{1'b0}};
       
    endgenerate
    
-   wire [0:port_idx_width-1] 		   next_port;
-   encoder
-     #(.num_ports(num_ports))
-   next_port_enc
-     (.data_in(next_port_dec),
-      .data_out(next_port));
-   
-   assign la_route_info[0:port_idx_width-1] = next_port;
+   assign la_route_info[0:num_ports-1] = next_port_op;
    
 endmodule
