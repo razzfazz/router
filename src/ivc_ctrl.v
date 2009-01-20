@@ -326,10 +326,13 @@ module ivc_ctrl
       .reset(reset),
       .d(vc_allocated_s),
       .q(vc_allocated_q));
+
+   wire [0:num_vcs-1] 	     vc_allocated_ovc_q;
+   wire [0:num_vcs-1] 	     vc_allocated_hold_ovc;
+   assign vc_allocated_hold_ovc = vc_allocated_ovc_q | vc_gnt_ovc;
    
-   wire [0:num_vcs-1] 	     vc_allocated_ovc_s, vc_allocated_ovc_q;
-   assign vc_allocated_ovc_s = (vc_allocated_ovc_q | vc_gnt_ovc) &
-			       ~{num_vcs{packet_done}};
+   wire [0:num_vcs-1] 	     vc_allocated_ovc_s;
+   assign vc_allocated_ovc_s = vc_allocated_hold_ovc & ~{num_vcs{packet_done}};
    dff
      #(.width(num_vcs),
        .reset_type(reset_type))
@@ -790,7 +793,8 @@ module ivc_ctrl
 	       end
 	     
 	     wire 	     free_allocated_s, free_allocated_q;
-	     assign free_allocated_s = |(next_free_ovc & vc_allocated_ovc_s);
+	     assign free_allocated_s
+	       = |(next_free_ovc & vc_allocated_hold_ovc)/* & ~packet_done*/;
 	     dff
 	       #(.width(1),
 		 .reset_value(1'b1),
@@ -814,7 +818,8 @@ module ivc_ctrl
 	     assign cred_ovc = flow_ctrl_ovc;
 	     
 	     wire 			       cred;
-	     assign cred = |(cred_ovc & vc_allocated_ovc_s);
+	     assign cred
+	       = |(cred_ovc & vc_allocated_hold_ovc)/* & ~packet_done*/;
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_q;
 	     
@@ -910,7 +915,7 @@ module ivc_ctrl
    generate
       
       if(sw_spec_enable)
-	assign flit_vc_dec = vc_gnt_ovc | vc_allocated_ovc_q;
+	assign flit_vc_dec = vc_allocated_hold_ovc;
       else
 	assign flit_vc_dec = vc_allocated_ovc_q;
       
