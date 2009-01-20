@@ -200,15 +200,46 @@ module op_ctrl
 		// if only a subset of the flit buffer entries can be headers, 
 		// we need to keep track of how many such slots are left
 		
-		wire 			    head_credit;
-		
 		if(num_header_buffers == 1)
 		  begin
 		     
 		     // if we can only have one packet per buffer, we can accept
-		     // the next one once the buffer has been emptied
-		     assign head_credit = credit &&
-					  (cred_count_s == num_flit_buffers);
+		     // the next one once the buffer has been completely drained
+		     // after the tail has been sent
+		     
+		     wire buffer_drained;
+		     assign buffer_drained = (cred_count_s == num_flit_buffers);
+		     
+		     wire tail_sent_s, tail_sent_q;
+		     assign tail_sent_s
+		       = (tail_sent_q | (debit & flit_tail_in)) &
+			 ~buffer_drained;
+		     dff
+		       #(.width(1),
+			 .reset_type(reset_type))
+		     tail_sentq
+		       (.clk(clk),
+			.reset(reset),
+			.d(tail_sent_s),
+			.q(tail_sent_q));
+		     
+		     wire head_free_s, head_free_q;
+		     assign head_free_s
+		       = (head_free_q & ~vc_gnt) |
+			 (credit & tail_sent_q & buffer_drained);
+		     dff
+		       #(.width(1),
+			 .reset_type(reset_type),
+			 .reset_value(1'b1))
+		     head_freeq
+		       (.clk(clk),
+			.reset(reset),
+			.d(head_free_s),
+			.q(head_free_q));
+		     
+		     assign head_free_early = head_free_s;
+		     
+		     assign error_hct_ovc[ovc] = 1'b0;
 		     
 		  end
 		else
@@ -290,31 +321,32 @@ module op_ctrl
 			.data_in(tail_queue_q),
 			.data_out(tail));
 		     
+		     wire 			      head_credit;
 		     assign head_credit = tail & credit;
 		     
+		     wire 			      head_debit;
+		     assign head_debit = vc_gnt;
+		     
+		     // track header credits using stock credit tracker module
+		     wire 			      head_free;
+		     wire 			      error_hct;
+		     credit_tracker
+		       #(.num_credits(num_header_buffers),
+			 .checker_enable(checker_enable),
+			 .checker_capture_mode(checker_capture_mode),
+			 .reset_type(reset_type))
+		     hct
+		       (.clk(clk),
+			.reset(reset),
+			.credit(head_credit),
+			.debit(head_debit),
+			.free(head_free),
+			.free_early(head_free_early),
+			.error(error_hct));
+		     
+		     assign error_hct_ovc[ovc] = error_hct;
+		     
 		  end
-		
-		wire 				      head_debit;
-		assign head_debit = vc_gnt;
-		
-		// track header credits using stock credit tracker module
-		wire 				      head_free;
-		wire 				      error_hct;
-		credit_tracker
-		  #(.num_credits(num_header_buffers),
-		    .checker_enable(checker_enable),
-		    .checker_capture_mode(checker_capture_mode),
-		    .reset_type(reset_type))
-		hct
-		  (.clk(clk),
-		   .reset(reset),
-		   .credit(head_credit),
-		   .debit(head_debit),
-		   .free(head_free),
-		   .free_early(head_free_early),
-		   .error(error_hct));
-		
-		assign error_hct_ovc[ovc] = error_hct;
 		
 	     end
 	   
