@@ -70,14 +70,15 @@ module crossbar
 	   
 	   wire [0:width-1] data_out;
 	   
+	   genvar 	    ip;
+	   
 	   case(crossbar_type)
 	     
 	     `CROSSBAR_TYPE_TRISTATE:
 	       begin
 		  
-		  genvar ip;
 		  for(ip = 0; ip < num_in_ports; ip = ip + 1)
-		    begin:ips
+		    begin:tristate_ips
 		       
 		       wire [0:width-1] in;
 		       assign in = data_in_ip[ip*width:(ip+1)*width-1];
@@ -105,6 +106,36 @@ module crossbar
 		    (.select(ctrl_ip),
 		     .data_in(data_in_ip),
 		     .data_out(data_out));
+		  
+	       end
+	     
+	     `CROSSBAR_TYPE_DIST_MUX:
+	       begin
+		  
+		  wire [0:num_in_ports*width-1] data;
+		  assign data[0:width-1] = data_in_ip[0:width-1];
+		  
+		  for(ip = 1; ip < num_in_ports; ip = ip + 1)
+		    begin:dist_mux_ips
+		       
+		       wire [0:width-1] in;
+		       assign in = data_in_ip[ip*width:(ip+1)*width-1];
+		       
+		       wire [0:width-1] thru;
+		       assign thru = data[(ip-1)*width:ip*width-1];
+		       
+		       wire 		ctrl;
+		       assign ctrl = ctrl_op_ip[op*num_in_ports+ip];
+		       
+		       wire [0:width-1] out;
+		       assign out = ctrl ? in : thru;
+		       
+		       assign data[ip*width:(ip+1)*width-1] = out;
+		       
+		    end
+		  
+		  assign data_out
+		    = data[(num_in_ports-1)*width:num_in_ports*width-1];
 		  
 	       end
 	     

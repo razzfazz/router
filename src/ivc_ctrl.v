@@ -85,7 +85,7 @@ module ivc_ctrl
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -121,6 +121,9 @@ module ivc_ctrl
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   
+   // select order of dimension traversal
+   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
@@ -361,6 +364,8 @@ module ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
+   wire fbc_empty;
+   
    generate
       
       if(num_header_buffers > 1)
@@ -399,21 +404,27 @@ module ivc_ctrl
 		
 	     end
 	   
+	   wire head_queue_muxed;
 	   select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
 	   flit_head_out_sel
 	     (.select(read_sel),
 	      .data_in(head_queue),
-	      .data_out(flit_head_out));
+	      .data_out(head_queue_muxed));
 	   
+	   assign flit_head_out = fbc_empty ? flit_head_in : head_queue_muxed;
+	   
+	   wire tail_queue_muxed;
 	   select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
 	   flit_tail_out_sel
 	     (.select(read_sel),
 	      .data_in(tail_queue),
-	      .data_out(flit_tail_out));
+	      .data_out(tail_queue_muxed));
+	   
+	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail_queue_muxed;
 	   
 	end
       else
@@ -422,20 +433,8 @@ module ivc_ctrl
 	   wire head_in;
 	   assign head_in = flit_valid_in & flit_head_in;
 	   
-	   wire [0:fbf_addr_width-1] head_idx_s, head_idx_q;
-	   assign head_idx_s = head_in ? fbf_write_addr : head_idx_q;
-	   dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   head_idxq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(head_idx_s),
-	      .q(head_idx_q));
-	   
-	   wire 		     head_valid_s, head_valid_q;
-	   assign head_valid_s
-	     = (head_valid_q & ~(flit_valid_out & flit_head_out)) | head_in;
+	   wire head_valid_s, head_valid_q;
+	   assign head_valid_s = (head_valid_q | head_in) & ~flit_valid_out;
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -445,7 +444,7 @@ module ivc_ctrl
 	      .d(head_valid_s),
 	      .q(head_valid_q));
 	   
-	   assign flit_head_out = head_valid_q && (fbf_read_addr == head_idx_q);
+	   assign flit_head_out = fbc_empty ? flit_head_in : head_valid_q;
 	   
 	   wire 		     tail_in;
 	   assign tail_in = flit_valid_in & flit_tail_in;
@@ -463,7 +462,7 @@ module ivc_ctrl
 	   
 	   wire 		     tail_valid_s, tail_valid_q;
 	   assign tail_valid_s
-	     = (tail_valid_q & ~(flit_valid_out & flit_tail_out)) | tail_in;
+	     = (tail_valid_q | tail_in) & ~(flit_valid_out & flit_tail_out);
 	   dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -473,7 +472,10 @@ module ivc_ctrl
 	      .d(tail_valid_s),
 	      .q(tail_valid_q));
 	   
-	   assign flit_tail_out = tail_valid_q && (fbf_read_addr == tail_idx_q);
+	   assign flit_tail_out
+	     = fbc_empty ?
+	       flit_tail_in :
+	       (tail_valid_q && (fbf_read_addr == tail_idx_q));
 	   
 	end
       
@@ -503,14 +505,6 @@ module ivc_ctrl
    wire 			  hdff_pop;
    assign hdff_pop = flit_valid_out & flit_tail_out;
    
-   wire [0:hdff_width-1] 	  hdff_data_in;
-   assign hdff_data_in[0:la_route_info_width-1] = la_route_info_in;
-   assign hdff_data_in[la_route_info_width:
-		       la_route_info_width+vc_route_info_width-1]
-	    = vc_route_info_in;
-   
-   wire [0:hdff_width-1] 	  hdff_data_out;
-   
    wire [0:la_route_info_width-1] hdff_la_route_info;
    wire [0:vc_route_info_width-1] hdff_vc_route_info;
    
@@ -529,7 +523,14 @@ module ivc_ctrl
       if(num_header_buffers > 1)
 	begin
 	   
+	   wire [0:hdff_width-1] 	  hdff_data_in;
+	   assign hdff_data_in[0:la_route_info_width-1] = la_route_info_in;
+	   assign hdff_data_in[la_route_info_width:
+			       la_route_info_width+vc_route_info_width-1]
+		    = vc_route_info_in;
+	   
 	   wire hdff_full;
+	   wire [0:hdff_width-1] hdff_data_out;
 	   
 	   fifo
 	     #(.depth(num_header_buffers),
@@ -549,25 +550,55 @@ module ivc_ctrl
 	      .pop(hdff_pop),
 	      .error(hdff_error));
 	   
+	   assign hdff_la_route_info
+	     = hdff_empty ?
+	       la_route_info_in :
+	       hdff_data_out[0:la_route_info_width-1];
+	   assign hdff_vc_route_info
+	     = hdff_empty ?
+	       vc_route_info_in :
+	       hdff_data_out[la_route_info_width:
+			     la_route_info_width+vc_route_info_width-1];
+   
 	end
       else
 	begin
 	   
-	   wire [0:hdff_width-1] hdff_data_s, hdff_data_q;
-	   assign hdff_data_s = hdff_push ? hdff_data_in : hdff_data_q;
+	   wire [0:la_route_info_width-1] hdff_la_route_info_s,
+					  hdff_la_route_info_q;
+	   assign hdff_la_route_info_s
+	     = hdff_push ? la_route_info_in : hdff_la_route_info_q;
 	   dff
-	     #(.width(hdff_width),
+	     #(.width(la_route_info_width),
 	       .reset_type(reset_type))
-	   hdff_dataq
+	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(hdff_data_s),
-	      .q(hdff_data_q));
+	      .d(hdff_la_route_info_s),
+	      .q(hdff_la_route_info_q));
 	   
-	   assign hdff_data_out = hdff_data_q;
+	   assign hdff_la_route_info
+	     = hdff_empty ? la_route_info_in : hdff_la_route_info_q;
+	   
+	   wire [0:vc_route_info_width-1] hdff_vc_route_info_s,
+					  hdff_vc_route_info_q;
+	   assign hdff_vc_route_info_s
+	     = hdff_push ? vc_route_info_in : hdff_vc_route_info_q;
+	   dff
+	     #(.width(vc_route_info_width),
+	       .reset_type(reset_type))
+	   hdff_vc_route_infoq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(hdff_vc_route_info_s),
+	      .q(hdff_vc_route_info_q));
+	   
+	   assign hdff_vc_route_info
+	     = hdff_empty ? vc_route_info_in : hdff_vc_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
-	   assign hdff_empty_s = (hdff_empty_q | hdff_pop) & ~hdff_push;
+	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) &
+				 ~(hdff_push & ~hdff_pop);
 	   dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -586,64 +617,58 @@ module ivc_ctrl
       
    endgenerate
    
-   assign hdff_la_route_info
-     = hdff_data_out[0:la_route_info_width-1];
-   assign hdff_vc_route_info
-     = hdff_data_out[la_route_info_width:
-		     la_route_info_width+vc_route_info_width-1];
+   wire 	header_valid;
+   assign header_valid = ~hdff_empty | hdff_push;
    
    
    //---------------------------------------------------------------------------
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 	  rtl_port_enc;
-   assign rtl_port_enc = hdff_la_route_info[0:port_idx_width-1];
-   
-   wire [0:num_ports-1] 	  rtl_port_op;
-   wire 			  rtl_change_class;
-   wire [0:num_ports-1] 	  rtl_error_op;
-   wire [0:num_classes-1] 	  rtl_next_class;
+   wire [0:num_ports-1] rtl_port_op;
+   wire 		rtl_change_class;
+   wire [0:num_ports-1] rtl_error_op;
+   wire [0:num_classes-1] rtl_next_class;
    
    generate
       
-      if(num_routing_classes > 1)
-	assign rtl_change_class = hdff_la_route_info[port_idx_width];
+      if(routing_class < (num_routing_classes - 1))
+	assign rtl_change_class = hdff_la_route_info[num_ports];
       else
 	assign rtl_change_class = 1'b0;
       
-      genvar 			  op;
+      genvar 		  op;
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
 	   wire port_sel;
-	   assign port_sel = (rtl_port_enc == op);
+	   assign port_sel = hdff_la_route_info[op];
 	   
-	   wire mask_port;
-	   
-	   if((routing_class != (num_routing_classes - 1)) &&
-	      (op == port_id))
-	     assign mask_port = ~rtl_change_class;
-	   else if(((routing_class == (num_routing_classes - 1)) &&
-		    (op == port_id)) ||
-		   ((routing_class != (num_routing_classes - 1)) &&
-		    (op >= (num_ports - num_nodes_per_router))))
-	     assign mask_port = 1'b1;
+	   if(((routing_class == (num_routing_classes - 1)) &&
+	       (op < (num_ports - num_nodes_per_router)) &&
+	       ((op / num_neighbors_per_dim) == 
+		(port_id / num_neighbors_per_dim))) ||
+	      ((routing_class < (num_routing_classes - 1)) &&
+	       (op >= (num_ports - num_nodes_per_router))))
+	     begin
+		assign rtl_port_op[op] = 1'b0;
+		assign rtl_error_op[op] = port_sel & header_valid;
+	     end
 	   else
-	     assign mask_port = 1'b0;
-	   
-	   assign rtl_port_op[op] = port_sel & ~mask_port;
-	   assign rtl_error_op[op] = port_sel & mask_port & ~hdff_empty;
+	     begin
+		assign rtl_port_op[op] = port_sel;
+		assign rtl_error_op[op] = 1'b0;
+	     end
 	   
 	end
       
-      genvar 	otc;
+      genvar otc;
       
       for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
 	begin:otcs
 	   
-	   genvar 	orc;
+	   genvar orc;
 	   
 	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
 	     begin:orcs
@@ -684,13 +709,14 @@ module ivc_ctrl
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .routing_function_type(routing_function_type),
+       .dimension_order(dimension_order),
        .port_id(port_id),
        .traffic_class(traffic_class),
        .routing_class(routing_class))
    lar
      (.router_address(router_address),
-      .route_port(rtl_port_op),
-      .route_class(rtl_change_class),
+      .route_port_op(rtl_port_op),
+      .route_change_class(rtl_change_class),
       .vc_route_info(hdff_vc_route_info),
       .la_route_info(la_route_info_out));
    
@@ -718,7 +744,7 @@ module ivc_ctrl
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
-	     wire [0:num_vcs-1] free_ovc;
+	     wire [0:num_vcs*2-1] free_ovc;
 	     assign free_ovc = flow_ctrl_ovc;
 	     
 	     wire 		flit_sent_prev_s, flit_sent_prev_q;
@@ -845,17 +871,17 @@ module ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   wire 				       fbc_empty;
+   wire 				       flit_valid;
    
    assign sw_req_nonspec
-     = ~hdff_empty & ~fbc_empty & vc_allocated_q & free_allocated;
+     = header_valid & flit_valid & vc_allocated_q & free_allocated;
    assign sw_req_nonspec_op = rtl_port_op;
    
    generate
       
       if(sw_spec_enable)
 	begin
-	   assign sw_req_spec = ~hdff_empty & ~fbc_empty & ~vc_allocated_q;
+	   assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
 	   assign sw_req_spec_op = rtl_port_op;
 	end
       else
@@ -866,7 +892,7 @@ module ivc_ctrl
       
    endgenerate
    
-   assign vc_req = ~hdff_empty & ~vc_allocated_q;
+   assign vc_req = header_valid & ~vc_allocated_q;
    assign vc_req_op = rtl_port_op;
    assign vc_req_ovc = rtl_next_vcs;
    
@@ -927,13 +953,15 @@ module ivc_ctrl
       .full(fbc_full),
       .error(fbc_error));
    
+   assign flit_valid = flit_valid_in | ~fbc_empty;
+   
    
    //---------------------------------------------------------------------------
    // error checking
    //---------------------------------------------------------------------------
    
    wire [0:2] 		       errors_in;
-   assign errors_in = {~fbc_empty & hdff_empty,
+   assign errors_in = {flit_valid & ~header_valid,
 		       cred_tracker_error,
 		       rtl_error};
    
@@ -962,18 +990,19 @@ module ivc_ctrl
 	begin
 	   
 	   wire 		       ev_no_flit;
-	   assign ev_no_flit = ~hdff_empty & fbc_empty;
+	   assign ev_no_flit = header_valid & ~flit_valid;
 	   
 	   wire 		       ev_flit_stalled_vc;
-	   assign ev_flit_stalled_vc = ~hdff_empty & ~fbc_empty & ~vc_allocated;
+	   assign ev_flit_stalled_vc
+	     = header_valid & flit_valid & ~vc_allocated;
 	   
 	   wire 		       ev_flit_stalled_sw;
 	   assign ev_flit_stalled_sw
-	     = ~hdff_empty & ~fbc_empty & vc_allocated & ~sw_allocated;
+	     = header_valid & flit_valid & vc_allocated & ~sw_allocated;
 	   
 	   wire 		       ev_spec_failed;
 	   assign ev_spec_failed
-	     = ~hdff_empty & ~fbc_empty & ~vc_allocated & sw_allocated;
+	     = header_valid & flit_valid & ~vc_allocated & sw_allocated;
 	   
 	   wire 		       ev_flit_sent;
 	   assign ev_flit_sent = flit_valid_out;

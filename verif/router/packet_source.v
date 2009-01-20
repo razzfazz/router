@@ -81,7 +81,7 @@ module packet_source
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -117,6 +117,9 @@ module packet_source
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   
+   // select order of dimension traversal
+   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
    // ID of current port
    parameter port_id = 0;
@@ -478,6 +481,7 @@ module packet_source
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .routing_function_type(routing_function_type),
+		    .dimension_order(dimension_order),
 		    .port_id(port_id),
 		    .traffic_class(itc),
 		    .routing_class(irc))
@@ -490,14 +494,10 @@ module packet_source
 		
 		wire [0:la_route_info_width-1] la_route_info;
 		
-		encoder
-		  #(.num_ports(num_ports))
-		la_port_enc
-		  (.data_in(next_port),
-		   .data_out(la_route_info[0:port_idx_width-1]));
+		assign la_route_info[0:num_ports-1] = next_port;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_info[port_idx_width]
+		  assign la_route_info[num_ports]
 			   = ~next_class[itc*num_routing_classes+irc];
 		
 		assign la_route_info_ivc[(itc*num_routing_classes+irc)*

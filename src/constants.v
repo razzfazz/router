@@ -58,6 +58,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 //------------------------------------------------------------------------------
+// dimension order
+//------------------------------------------------------------------------------
+
+// traverse dimensions in ascending order
+`define DIMENSION_ORDER_ASCENDING  0
+
+// traverse dimensions in descending order
+`define DIMENSION_ORDER_DESCENDING 1
+
+// determine order in which dimensions are traversed by routing class
+`define DIMENSION_ORDER_BY_CLASS   2
+
+
+//------------------------------------------------------------------------------
 // reset handling
 //------------------------------------------------------------------------------
 
@@ -105,6 +119,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // mux-based
 `define CROSSBAR_TYPE_MUX      1
+
+// distributed multiplexers
+`define CROSSBAR_TYPE_DIST_MUX 2
 
 
 //------------------------------------------------------------------------------

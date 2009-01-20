@@ -154,7 +154,7 @@ module fifo_ctrl
    assign almost_empty = (read_ptr_next == write_ptr_q);
    
    wire 		 empty_s, empty_q;
-   assign empty_s = (empty_q | (almost_empty & pop)) & ~push;
+   assign empty_s = (empty_q | (almost_empty & pop & ~push)) & ~(push & ~pop);
    
    dff
      #(.width(1),
@@ -185,10 +185,10 @@ module fifo_ctrl
    assign full = (read_ptr_q == write_ptr_q) && !empty_q;
    
    wire 		 error_underflow;
-   assign error_underflow = empty & pop;
+   assign error_underflow = empty & pop & ~push;
    
    wire 		 error_overflow;
-   assign error_overflow = full & push;
+   assign error_overflow = full & push & ~pop;
    
    wire [0:1] 		 errors_in;
    assign errors_in = {error_underflow,

@@ -43,6 +43,23 @@ module testbench
       end
    endfunction
    
+   // compute ceiling of base-th root of argument
+   function integer croot(input integer argument, input integer base);
+      integer 		     i;
+      integer 		     j;
+      begin
+	 croot = 0;
+	 i = 0;
+	 while(i < argument)
+	   begin
+	      croot = croot + 1;
+	      i = 1;
+	      for(j = 0; j < base; j = j + 1)
+		i = i * croot;
+	   end
+      end
+   endfunction
+   
    // population count (count ones)
    function integer pop_count(input integer argument);
       integer i;
@@ -69,7 +86,7 @@ module testbench
    parameter num_flit_buffers = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers = 1;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 1;
@@ -89,11 +106,21 @@ module testbench
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
+   // total number of nodes
+   parameter num_nodes = 64;
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
+   // number of nodes per router (a.k.a. concentration factor)
+   parameter num_nodes_per_router = 4;
+
+   // total number of routers
+   localparam num_routers
+     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+   
    // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
+   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
    
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
@@ -112,9 +139,6 @@ module testbench
        (num_routers_per_dim - 1) :
        -1;
    
-   // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 1;
-   
    // number of input and output ports on router
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
@@ -124,7 +148,7 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -173,6 +197,9 @@ module testbench
        `ROUTING_FUNCTION_TYPE_FBFLY :
        -1;
    
+   // select order of dimension traversal
+   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
@@ -203,7 +230,7 @@ module testbench
 			       1;
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_DIST_MUX;
    
    // select implementation variant for data crossbar
    parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -337,6 +364,7 @@ module testbench
 		    .router_address(router_address),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .routing_function_type(routing_function_type),
+		    .dimension_order(dimension_order),
 		    .max_packet_length(max_packet_length),
 		    .min_packet_length(min_packet_length),
 		    .packet_length_mode(packet_length_mode),
@@ -371,19 +399,15 @@ module testbench
 		assign la_route_info_in
 		  = header_info[0:la_route_info_width-1];
 		
-		wire [0:num_ports-1] 	       la_route_port;
-		decoder
-		  #(.num_ports(num_ports))
-		la_route_port_dec
-		  (.data_in(la_route_info_in[0:port_idx_width-1]),
-		   .data_out(la_route_port));
-
-		wire 			       la_route_class;
+		wire [0:num_ports-1] 	       la_route_port_op;
+		assign la_route_port_op = la_route_info_in[0:num_ports-1];
+		
+		wire 			       la_route_change_class;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_class = la_route_info_in[port_idx_width];
+		  assign la_route_change_class = la_route_info_in[num_ports];
 		else
-		  assign la_route_class = 1'b0;
+		  assign la_route_change_class = 1'b0;
 		
 		wire [0:route_info_width-1]    route_info;
 		assign route_info
@@ -438,6 +462,7 @@ module testbench
 			      .num_routers_per_dim(num_routers_per_dim),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .routing_function_type(routing_function_type),
+			      .dimension_order(dimension_order),
 			      .port_id(ip),
 			      .traffic_class(itc),
 			      .routing_class(irc))
@@ -509,13 +534,14 @@ module testbench
 			      .num_routers_per_dim(num_routers_per_dim),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .routing_function_type(routing_function_type),
+			      .dimension_order(dimension_order),
 			      .port_id(ip),
 			      .traffic_class(itc),
 			      .routing_class(irc))
 			  lar
 			    (.router_address(router_address),
-			     .route_port(la_route_port),
-			     .route_class(la_route_class),
+			     .route_port_op(la_route_port_op),
+			     .route_change_class(la_route_change_class),
 			     .vc_route_info(vc_route_info_la),
 			     .la_route_info(la_route_info));
 			  
@@ -742,6 +768,7 @@ module testbench
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
        .routing_function_type(routing_function_type),
+       .dimension_order(dimension_order),
        .credit_handling_type(credit_handling_type),
        .header_fifo_type(header_fifo_type),
        .fbf_regfile_type(fbf_regfile_type),
@@ -1072,9 +1099,13 @@ module testbench
       clk <= 1'b0;
       #(Tclk/2);
    end
-
+   
    always @(posedge clk)
-     if(error) $stop;
+     if(error)
+       begin
+	  $display("logic error detected, cyc=%d", $time);
+	  $stop;
+       end
    
    integer cycles;
    

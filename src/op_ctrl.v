@@ -324,9 +324,7 @@ module op_ctrl
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
-	   assign cred_count_s = (cred_valid_in | flit_valid_in) ?
-				 (cred_count_q + credit - debit) :
-				 cred_count_q;
+	   assign cred_count_s = (cred_count_q + credit - debit);
 	   dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
@@ -356,13 +354,11 @@ module op_ctrl
 	       begin
 		  
 		  wire [0:cred_level_width-1] free_s, free_q;
-		  assign free_s = (cred_valid_in | flit_valid_in) ?
-				  ((cred_count_s > max_cred_level) ?
-				   max_cred_level :
-				   cred_count_s[cred_count_width-
-						cred_level_width:
-						cred_count_width-1]) :
-				  free_q;
+		  assign free_s = (cred_count_s > max_cred_level) ?
+				  max_cred_level :
+				  cred_count_s[cred_count_width-
+					       cred_level_width:
+					       cred_count_width-1];
 		  dff
 		    #(.width(cred_level_width),
 		      .reset_type(reset_type),
@@ -389,11 +385,9 @@ module op_ctrl
 		  
 		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 		  assign cred_hold_s
-		    = vc_gnt ?
-		      cred_hold_copy :
-		      (allocated_q ?
-		       (cred_hold_q - (|cred_hold_q & ~credit)) :
-		       cred_hold_q);
+		    = (vc_gnt | allocated_q) ?
+		      (cred_hold_q - (|cred_hold_q & ~credit)) :
+		      cred_hold_copy;
 		  dff
 		    #(.width(cred_hold_width),
 		      .reset_type(reset_type),
