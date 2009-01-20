@@ -122,6 +122,10 @@ module ip_ctrl
    // flit width
    parameter data_width = 64;
    
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -406,6 +410,7 @@ module ip_ctrl
 	       .num_dimensions(num_dimensions),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
+	       .track_vcs_at_output(track_vcs_at_output),
 	       .routing_function_type(routing_function_type),
 	       .dimension_order(dimension_order),
 	       .credit_handling_type(credit_handling_type),
@@ -641,16 +646,35 @@ module ip_ctrl
    
    assign flit_tail_out = flit_tail_out_q;
    
-   // output VCs are tracket in input VC controllers, so we can just reuse that 
-   // information here
    wire [0:vc_idx_width-1] 	     flit_vc_out_s, flit_vc_out_q;
-   select_1ofn
-     #(.num_ports(num_vcs),
-       .width(vc_idx_width))
-   flit_vc_out_s_sel
-     (.select(flit_valid_out_ivc),
-      .data_in(flit_vc_out_ivc),
-      .data_out(flit_vc_out_s));
+   
+   generate
+      
+      if(track_vcs_at_output)
+	begin
+	   
+	   encoder
+	     #(.num_ports(num_vcs))
+	   flit_vc_out_s_enc
+	     (.data_in(flit_valid_out_ivc),
+	      .data_out(flit_vc_out_s));
+	   
+	end
+      else
+	begin
+	   
+	   select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(vc_idx_width))
+	   flit_vc_out_s_sel
+	     (.select(flit_valid_out_ivc),
+	      .data_in(flit_vc_out_ivc),
+	      .data_out(flit_vc_out_s));
+	   
+	end
+
+   endgenerate
+   
    dff
      #(.width(vc_idx_width),
        .reset_type(reset_type))

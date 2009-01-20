@@ -119,6 +119,10 @@ module ivc_ctrl
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width = la_route_info_width + route_info_width;
    
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -907,25 +911,29 @@ module ivc_ctrl
    // (valid when flit_valid_out=1)
    //---------------------------------------------------------------------------
    
-   // NOTE: don't need to mask vc_gnt_ovc here, as flit_valid would not be
-   // generated in the first place if grant was masked, so we don't care about
-   // flit_vc_dec in this case!
-   wire [0:num_vcs-1] 	       flit_vc_dec;
-   
    generate
       
-      if(sw_spec_enable)
-	assign flit_vc_dec = vc_allocated_hold_ovc;
+      if(track_vcs_at_output)
+	assign flit_vc_out = vc_id;
       else
-	assign flit_vc_dec = vc_allocated_ovc_q;
+	begin
+	   
+	   wire [0:num_vcs-1] flit_vc_dec;
+	   
+	   if(sw_spec_enable)
+	     assign flit_vc_dec = vc_allocated_hold_ovc;
+	   else
+	     assign flit_vc_dec = vc_allocated_ovc_q;
+	   
+	   encoder
+	     #(.num_ports(num_vcs))
+	   vc_out_enc
+	     (.data_in(flit_vc_dec),
+	      .data_out(flit_vc_out));
+	   
+	end
       
    endgenerate
-   
-   encoder
-     #(.num_ports(num_vcs))
-   vc_out_enc
-     (.data_in(flit_vc_dec),
-      .data_out(flit_vc_out));
    
    
    //---------------------------------------------------------------------------

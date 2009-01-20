@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC allocator variant using separable output-first allocation
 module vc_alloc_core_sep_of
   (clk, reset, req_ip_ivc, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, 
-   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
+   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
    
@@ -84,6 +84,14 @@ module vc_alloc_core_sep_of
    // output VC was granted (to output controller)
    output [0:num_ports*num_vcs-1] gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 	gnt_op_ovc;
+   
+   // input port that each output VC was granted to
+   output [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   
+   // input VC that each output VC was granted to
+   output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
    
    
    //---------------------------------------------------------------------------
@@ -321,6 +329,7 @@ module vc_alloc_core_sep_of
 		assign elig = elig_op_ovc[op*num_vcs+ovc];
 		
 		wire [0:num_ports*num_vcs-1] gnt_out_ip_ivc;
+		wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
 		
 		genvar 			     ip;
 		
@@ -347,8 +356,19 @@ module vc_alloc_core_sep_of
 		     
 		     assign gnt_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 			      = gnt_out_ivc & {num_vcs{gnt_out_ip[ip] & elig}};
+		     assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+			      = gnt_out_ivc;
 		     
 		  end
+		
+		wire [0:num_vcs-1] 	gnt_ivc;
+		select_1ofn
+		  #(.num_ports(num_ports),
+		    .width(num_vcs))
+		gnt_ivc_sel
+		  (.select(gnt_out_ip),
+		   .data_in(gnt_ip_ivc),
+		   .data_out(gnt_ivc));
 		
 		wire 			update_arb;
 		assign update_arb = gnt_in;
@@ -368,6 +388,12 @@ module vc_alloc_core_sep_of
 					     (op*num_vcs+ovc+1)*num_ports*
 					     num_vcs-1]
 			 = gnt_out_ip_ivc;
+		assign gnt_op_ovc_ip[(op*num_vcs+ovc)*num_ports:
+				     (op*num_vcs+ovc+1)*num_ports-1]
+			 = gnt_out_ip;
+		assign gnt_op_ovc_ivc[(op*num_vcs+ovc)*num_vcs:
+				      (op*num_vcs+ovc+1)*num_vcs-1]
+			 = gnt_ivc;
 		
 	     end
 	   

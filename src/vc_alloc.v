@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC allocator
 module vc_alloc
   (clk, reset, req_ip_ivc, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, 
-   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
+   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
    
@@ -92,6 +92,14 @@ module vc_alloc
    output [0:num_ports*num_vcs-1] gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 	gnt_op_ovc;
    
+   // input port that each output VC was granted to
+   output [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   
+   // input VC that each output VC was granted to
+   output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
+   
    generate
       
       case(allocator_type)
@@ -113,7 +121,9 @@ module vc_alloc
 		.elig_op_ovc(elig_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-		.gnt_op_ovc(gnt_op_ovc));
+		.gnt_op_ovc(gnt_op_ovc),
+		.gnt_op_ovc_ip(gnt_op_ovc_ip),
+		.gnt_op_ovc_ivc(gnt_op_ovc_ivc));
 	  end
 	`VC_ALLOCATOR_TYPE_SEP_OF:
 	  begin
@@ -133,7 +143,9 @@ module vc_alloc
 		.elig_op_ovc(elig_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-		.gnt_op_ovc(gnt_op_ovc));
+		.gnt_op_ovc(gnt_op_ovc),
+		.gnt_op_ovc_ip(gnt_op_ovc_ip),
+		.gnt_op_ovc_ivc(gnt_op_ovc_ivc));
 	  end
       endcase
       
@@ -155,7 +167,9 @@ module vc_alloc
 		.elig_op_ovc(elig_op_ovc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-		.gnt_op_ovc(gnt_op_ovc));
+		.gnt_op_ovc(gnt_op_ovc),
+		.gnt_op_ovc_ip(gnt_op_ovc_ip),
+		.gnt_op_ovc_ivc(gnt_op_ovc_ivc));
 	end
       
    endgenerate

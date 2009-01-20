@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC allocator variant based using wavefront allocation
 module vc_alloc_core_wf
   (clk, reset, req_ip_ivc, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, 
-   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc);
+   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
    
@@ -85,6 +85,14 @@ module vc_alloc_core_wf
    output [0:num_ports*num_vcs-1] gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 	gnt_op_ovc;
    
+   // input port that each output VC was granted to
+   output [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   
+   // input VC that each output VC was granted to
+   output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
+   
    
    //---------------------------------------------------------------------------
    // global wires
@@ -92,6 +100,7 @@ module vc_alloc_core_wf
    
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_wf_ip_ivc_op_ovc;
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_wf_ip_ivc_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_wf_op_ovc_ip_ivc;
    
    
    //---------------------------------------------------------------------------
@@ -170,6 +179,53 @@ module vc_alloc_core_wf
 	   
 	end
       
+      genvar 					     op;
+      
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
+	   
+	   genvar ovc;
+	   
+	   for(ovc = 0; ovc < num_ports; ovc = ovc + 1)
+	     begin:ovcs
+		
+		wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+		assign gnt_ip_ivc
+		  = gnt_wf_op_ovc_ip_ivc[(op*num_vcs+ovc)*num_ports*num_vcs:
+					 (op*num_vcs+ovc+1)*num_ports*num_vcs
+					 -1];
+		
+		wire [0:num_ports-1] gnt_ip;
+		
+		genvar ip;
+		
+		for(ip = 0; ip < num_ports; ip = ip + 1)
+		  begin:ips
+		     
+		     assign gnt_ip[ip]
+			      = |gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		     
+		  end
+		
+		wire [0:num_vcs-1] gnt_ivc;
+		or_nto1
+		  #(.num_ports(num_ports),
+		    .width(num_vcs))
+		gnt_ivc_or
+		  (.data_in(gnt_ip_ivc),
+		   .data_out(gnt_ivc));
+		
+		assign gnt_op_ovc_ip[(op*num_vcs+ovc)*num_ports:
+				     (op*num_vcs+ovc+1)*num_ports-1]
+			 = gnt_ip;
+		assign gnt_op_ovc_ivc[(op*num_vcs+ovc)*num_vcs:
+				      (op*num_vcs+ovc+1)*num_vcs-1]
+			 = gnt_ivc;
+		
+	     end
+	   
+	end
+      
    endgenerate
    
    wire 					     update_alloc;
@@ -186,6 +242,13 @@ module vc_alloc_core_wf
       .req(req_wf_ip_ivc_op_ovc),
       .gnt(gnt_wf_ip_ivc_op_ovc));
    
+   interleaver
+     #(.width(num_ports*num_vcs*num_ports*num_vcs),
+       .num_blocks(num_ports*num_vcs))
+   gnt_wf_op_ovc_ip_ivc_intl
+     (.data_in(gnt_wf_ip_ivc_op_ovc),
+      .data_out(gnt_wf_op_ovc_ip_ivc));
+
    or_nto1
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports*num_vcs))

@@ -102,6 +102,10 @@ module router
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -323,6 +327,7 @@ module router
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .data_width(data_width),
+	       .track_vcs_at_output(track_vcs_at_output),
 	       .routing_function_type(routing_function_type),
 	       .dimension_order(dimension_order),
 	       .credit_handling_type(credit_handling_type),
@@ -401,6 +406,9 @@ module router
    // virtual channel allocator
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_vcs*num_ports-1] vc_gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
+   
    vc_alloc
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
@@ -418,7 +426,9 @@ module router
       .elig_op_ovc(elig_op_ovc),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
-      .gnt_op_ovc(vc_gnt_op_ovc));
+      .gnt_op_ovc(vc_gnt_op_ovc),
+      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
+      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
    
    
    //---------------------------------------------------------------------------
@@ -558,15 +568,29 @@ module router
 	   wire [0:num_vcs-1] 	     vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs-1] 	     elig_ovc;
+	   wire [0:num_vcs*num_ports-1] vc_gnt_ovc_ip;
+	   assign vc_gnt_ovc_ip = vc_gnt_op_ovc_ip[op*num_vcs*num_ports:
+						   (op+1)*num_vcs*num_ports-1];
+	   
+	   wire [0:num_vcs*num_vcs-1] 	vc_gnt_ovc_ivc;
+	   assign vc_gnt_ovc_ivc = vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:
+						     (op+1)*num_vcs*num_vcs-1];
+
+	   wire [0:num_ports-1] 		  xbr_ctrl_ip;
+	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   
+	   wire [0:vc_idx_width-1] 	flit_vc_out;
+	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
 	   wire 				  opc_error;
 	   op_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_vcs(num_vcs),
+	       .num_ports(num_ports),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
+	       .track_vcs_at_output(track_vcs_at_output),
 	       .credit_handling_type(credit_handling_type),
 	       .cred_level_width(2),
 	       .reset_type(reset_type))
@@ -576,9 +600,13 @@ module router
 	      .cred_valid_in(cred_valid_in),
 	      .cred_vc_in(cred_vc_in),
 	      .vc_gnt_ovc(vc_gnt_ovc),
+	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
+	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
 	      .flit_valid_in(flit_valid),
 	      .flit_vc_in(flit_vc),
+	      .flit_vc_out(flit_vc_out),
 	      .flit_tail_in(flit_tail),
+	      .flit_ip_in(xbr_ctrl_ip),
 	      .elig_ovc(elig_ovc),
 	      .flow_ctrl_ovc(flow_ctrl_ovc),
 	      .error(opc_error));
@@ -587,9 +615,6 @@ module router
 	   assign flow_ctrl_op_ovc[op*num_vcs*int_flow_ctrl_width:
 				   (op+1)*num_vcs*int_flow_ctrl_width-1]
 		    = flow_ctrl_ovc;
-	   
-	   wire [0:num_ports-1] 		  xbr_ctrl_ip;
-	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire 				  xbr_ctrl;
 	   assign xbr_ctrl = |xbr_ctrl_ip;
@@ -609,7 +634,12 @@ module router
 		    = flit_valid_q;
 	   
 	   wire [0:vc_idx_width-1] 		  flit_vc_s, flit_vc_q;
-	   assign flit_vc_s = xbr_ctrl ? flit_vc : flit_vc_q;
+	   
+	   if(track_vcs_at_output)
+	     assign flit_vc_s = xbr_ctrl ? flit_vc_out : flit_vc_q;
+	   else
+	     assign flit_vc_s = xbr_ctrl ? flit_vc : flit_vc_q;
+	   
 	   dff
 	     #(.width(vc_idx_width),
 	       .reset_type(reset_type))

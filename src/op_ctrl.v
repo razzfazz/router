@@ -30,8 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module op_ctrl
-  (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, flit_valid_in, flit_vc_in,
-   flit_tail_in, elig_ovc, flow_ctrl_ovc, error);
+  (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, vc_gnt_ovc_ip, 
+   vc_gnt_ovc_ivc, flit_valid_in, flit_vc_in, flit_tail_in, flit_ip_in, 
+   flit_vc_out, elig_ovc, flow_ctrl_ovc, error);
    
 `include "constants.v"
    
@@ -66,9 +67,16 @@ module op_ctrl
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
+   // number of input and output ports on router
+   parameter num_ports = 5;
+   
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
@@ -108,6 +116,12 @@ module op_ctrl
    // output VC was granted to an input VC
    input [0:num_vcs-1] vc_gnt_ovc;
    
+   // input port that each output VC was granted to
+   input [0:num_vcs*num_ports-1] vc_gnt_ovc_ip;
+   
+   // input VC that each output VC was granted to
+   input [0:num_vcs*num_vcs-1] vc_gnt_ovc_ivc;
+   
    // valid flit data available
    input flit_valid_in;
    
@@ -118,6 +132,13 @@ module op_ctrl
    // flit is tail
    // (note: only valid if flit_valid_in=1)
    input flit_tail_in;
+   
+   // flit source port
+   input [0:num_ports-1] flit_ip_in;
+   
+   // destination VC ID for current flit
+   output [0:vc_idx_width-1] flit_vc_out;
+   wire [0:vc_idx_width-1] flit_vc_out;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output [0:num_vcs-1] elig_ovc;
@@ -135,6 +156,7 @@ module op_ctrl
    wire [0:num_vcs-1] 			  next_cred_ovc;
    wire [0:num_vcs-1] 			  error_hct_ovc;
    wire [0:num_vcs*2-1] 		  error_cred_ovc;
+   wire [0:num_vcs-1] 			  match_ovc;
    
    generate
       
@@ -147,23 +169,23 @@ module op_ctrl
 	   assign credit = cred_valid_in && (cred_vc_in == ovc);
 	   
 	   wire debit;
-	   assign debit = flit_valid_in && (flit_vc_in == ovc);
+	   assign debit = flit_valid_in & match_ovc[ovc];
 	   
-	   wire 			    vc_gnt;
+	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc];
 	   
-
+	   
 	   //-------------------------------------------------------------------
 	   // track whether this output VC is currently assigend to an input VC
 	   //-------------------------------------------------------------------
 	   
-	   wire 			    set_allocated;
+	   wire set_allocated;
 	   assign set_allocated = vc_gnt;
 	   
-	   wire 			    reset_allocated;   
+	   wire reset_allocated;   
 	   assign reset_allocated = debit & flit_tail_in;
 	   
-	   wire 			    allocated_s, allocated_q;
+	   wire allocated_s, allocated_q;
 	   assign allocated_s
 	     = set_allocated | (allocated_q & ~reset_allocated);
 	   dff
@@ -174,6 +196,54 @@ module op_ctrl
 	      .reset(reset),
 	      .d(allocated_s),
 	      .q(allocated_q));
+	   
+	   if(track_vcs_at_output)
+	     begin
+		
+		wire [0:num_ports-1] vc_gnt_ip;
+		assign vc_gnt_ip
+		  = vc_gnt_ovc_ip[ovc*num_ports:(ovc+1)*num_ports-1];
+		
+		wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
+		assign allocated_ip_s = vc_gnt ? vc_gnt_ip : allocated_ip_q;
+		dff
+		  #(.width(num_ports),
+		    .reset_type(reset_type))
+		allocated_ipq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(allocated_ip_s),
+		   .q(allocated_ip_q));
+		
+		wire [0:num_vcs-1]   vc_gnt_ivc;
+		assign vc_gnt_ivc
+		  = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
+		
+		wire [0:num_vcs-1]   allocated_ivc_s, allocated_ivc_q;
+		assign allocated_ivc_s = vc_gnt ? vc_gnt_ivc : allocated_ivc_q;
+		dff
+		  #(.width(num_vcs),
+		    .reset_type(reset_type))
+		allocated_ivcq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(allocated_ivc_s),
+		   .q(allocated_ivc_q));
+		
+		wire [0:vc_idx_width-1] allocated_vc;
+		encoder
+		  #(.num_ports(num_vcs))
+		compare_vc_enc
+		  (.data_in(allocated_ivc_q),
+		   .data_out(allocated_vc));
+		
+		assign match_ovc[ovc] = allocated_q &&
+					|(allocated_ip_q & flit_ip_in) && 
+					(allocated_vc == flit_vc_in);
+
+	     end
+	   else
+	     assign match_ovc[ovc] = (flit_vc_in == ovc);
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -470,6 +540,12 @@ module op_ctrl
 	end
       
    endgenerate
+   
+   encoder
+     #(.num_ports(num_vcs))
+   flit_vc_out_enc
+     (.data_in(match_ovc),
+      .data_out(flit_vc_out));
    
    wire [0:num_vcs*2-1] 		      errors_out_ovc;
    checker

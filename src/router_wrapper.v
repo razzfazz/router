@@ -142,6 +142,10 @@ module router_wrapper
    // try to recover from errors
    parameter error_recovery = 0;
    
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
+   
    // select routing function type
    localparam routing_function_type
      = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
@@ -272,6 +276,7 @@ module router_wrapper
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
+       .track_vcs_at_output(track_vcs_at_output),
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),
        .credit_handling_type(credit_handling_type),
