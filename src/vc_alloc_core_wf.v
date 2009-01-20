@@ -173,7 +173,7 @@ module vc_alloc_core_wf
    endgenerate
    
    wire 					     update_alloc;
-   assign update_alloc = |req_ip_ivc_op;
+   assign update_alloc = |req_ip_ivc;
    
    wf_alloc
      #(.num_ports(num_ports*num_vcs),
