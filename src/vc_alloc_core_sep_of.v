@@ -228,14 +228,15 @@ module vc_alloc_core_sep_of
 			  for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
 			    begin:otcs
 			       
-			       if(otc == itc)
-				 begin
+			       genvar orc;
+			       
+			       for(orc = 0; orc < num_routing_classes;
+				   orc = orc + 1)
+				 begin:orcs
 				    
-				    genvar orc;
-				    
-				    for(orc = 0; orc < num_routing_classes;
-					orc = orc + 1)
-				      begin:orcs
+				    if((otc == itc) &&
+				       ((orc == irc) || (orc == (irc + 1))))
+				      begin
 					 
 					 wire [0:num_vcs_per_class-1]
 					   req_in_ocvc;
@@ -296,15 +297,18 @@ module vc_alloc_core_sep_of
 						  = gnt_in_ocvc;
 					 
 				      end
+				    else
+				      assign gnt_in_ovc[(otc*
+							 num_routing_classes+
+							 orc)*
+							num_vcs_per_class:
+							(otc*
+							 num_routing_classes+
+							 orc+1)*
+							num_vcs_per_class-1]
+					       = {num_vcs_per_class{1'b0}};
 				    
 				 end
-			       else
-				 assign gnt_in_ovc[otc*num_routing_classes*
-						   num_vcs_per_class:
-						   (otc+1)*num_routing_classes*
-						   num_vcs_per_class-1]
-					  = {(num_routing_classes*
-					      num_vcs_per_class){1'b0}};
 			       
 			    end
 			  
