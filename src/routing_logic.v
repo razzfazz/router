@@ -282,13 +282,16 @@ module routing_logic
 	   
 	   wire mask_port;
 
-	   if((routing_class != (num_routing_classes - 1)) &&
-	      (op == port_id))
+	   if((op < (num_ports - num_nodes_per_router)) &&
+	      (((routing_function_type == `ROUTING_FUNCTION_TYPE_MESH) &&
+		(op == port_id)) ||
+	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
+		((op / num_neighbors_per_dim) == 
+		 (port_id / num_neighbors_per_dim)))))
 	     assign mask_port = ~chg_class;
-	   else if(((routing_class == (num_routing_classes - 1)) &&
-		    (op == port_id)) ||
-		   ((routing_class != (num_routing_classes - 1)) &&
-		    (op >= (num_ports - num_nodes_per_router))))
+	   else if((op >= (num_ports - num_nodes_per_router)) &&
+		   ((routing_class < (num_routing_classes - 1)) ||
+		    (op == port_id)))
 	     assign mask_port = 1'b1;
 	   else
 	     assign mask_port = 1'b0;
