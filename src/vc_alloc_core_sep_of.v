@@ -403,99 +403,206 @@ module vc_alloc_core_sep_of
       for (op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   genvar ovc;
+	   genvar otc;
 	   
-	   for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	     begin:ovcs
+	   for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
+	     begin:otcs
 		
-		//--------------------------------------------------------------
-		// second stage arbitration (select input port and VC)
-		//--------------------------------------------------------------
+		genvar orc;
 		
-		wire gnt_in;
-		assign gnt_in = gnt_in_op_ovc[op*num_vcs+ovc];
-		
-		wire [0:num_ports*num_vcs-1] req_out_ip_ivc;
-		assign req_out_ip_ivc
-		  = req_out_op_ovc_ip_ivc[(op*num_vcs+ovc)*num_ports*num_vcs:
-					  (op*num_vcs+ovc+1)*num_ports*num_vcs
-					  -1];
-		
-		wire [0:num_ports-1] 	     req_out_ip;
-		wire [0:num_ports-1] 	     gnt_out_ip;
-		
-		wire [0:num_ports-1] 	     update_arb_ip;
-		assign update_arb_ip = {num_ports{gnt_in}} & gnt_out_ip;
-		
-		wire 			     elig;
-		assign elig = elig_op_ovc[op*num_vcs+ovc];
-		
-		wire [0:num_ports*num_vcs-1] gnt_out_ip_ivc;
-		wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
-		
-		genvar 			     ip;
-		
-		for(ip = 0; ip < num_ports; ip = ip + 1)
-		  begin:ips
+		for(orc = 0; orc < num_routing_classes; orc = orc + 1)
+		  begin:orcs
 		     
-		     wire [0:num_vcs-1] req_out_ivc;
-		     assign req_out_ivc
-		       = req_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		     genvar ocvc;
 		     
-		     assign req_out_ip[ip] = |req_out_ivc;
-		     
-		     wire [0:num_vcs-1] gnt_out_ivc;
-		     arbiter
-		       #(.num_ports(num_vcs),
-			 .arbiter_type(arbiter_type),
-			 .reset_type(reset_type))
-		     gnt_out_ivc_arb
-		       (.clk(clk),
-			.reset(reset),
-			.update(update_arb_ip[ip]),
-			.req(req_out_ivc),
-			.gnt(gnt_out_ivc));
-		     
-		     assign gnt_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			      = gnt_out_ivc & {num_vcs{gnt_out_ip[ip] & elig}};
-		     assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			      = gnt_out_ivc;
+		     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
+		       begin:ocvcs
+			  
+			  //----------------------------------------------------
+			  // second stage arbitration (select input port and VC)
+			  //----------------------------------------------------
+			  
+			  wire gnt_in;
+			  assign gnt_in
+			    = gnt_in_op_ovc[((op*num_traffic_classes+otc)*
+					     num_routing_classes+orc)*
+					    num_vcs_per_class+ocvc];
+			  
+			  wire [0:num_ports*num_vcs-1] req_out_ip_ivc;
+			  assign req_out_ip_ivc
+			    = req_out_op_ovc_ip_ivc[(((op*num_traffic_classes+
+						       otc)*
+						      num_routing_classes+orc)*
+						     num_vcs_per_class+ocvc)*
+						    num_ports*num_vcs:
+						    (((op*num_traffic_classes+
+						       otc)*
+						      num_routing_classes+orc)*
+						     num_vcs_per_class+ocvc+1)*
+						    num_ports*num_vcs-1];
+			  
+			  wire 			       elig;
+			  assign elig
+			    = elig_op_ovc[((op*num_traffic_classes+otc)*
+					   num_routing_classes+orc)*
+					  num_vcs_per_class+ocvc];
+			  
+			  wire [0:num_ports-1] 	       req_out_ip;
+			  wire [0:num_ports-1] 	       gnt_out_ip;
+			  
+			  wire [0:num_ports*num_vcs-1] gnt_out_ip_ivc;
+			  wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+			  
+			  genvar 		       ip;
+			  
+			  for(ip = 0; ip < num_ports; ip = ip + 1)
+			    begin:ips
+			       
+			       wire [0:num_vcs-1] req_out_ivc;
+			       assign req_out_ivc
+				 = req_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+			       
+			       wire [0:num_vcs-1] gnt_out_ivc;
+			       
+			       genvar 		  itc;
+			       
+			       for(itc = 0; itc < num_traffic_classes;
+				   itc = itc + 1)
+				 begin:itcs
+				    
+				    wire [0:num_routing_classes*
+					  num_vcs_per_class-1] gnt_out_irc_icvc;
+				    
+				    if(itc == otc)
+				      begin
+					 
+					 wire [0:num_routing_classes*
+					       num_vcs_per_class-1]
+					   req_out_irc_icvc;
+					 assign req_out_irc_icvc
+					   = req_out_ivc[itc*
+							 num_routing_classes*
+							 num_vcs_per_class:
+							 (itc+1)*
+							 num_routing_classes*
+							 num_vcs_per_class-1];
+					 
+					 assign req_out_ip[ip]
+						  = |req_out_irc_icvc;
+					 
+					 if((num_routing_classes > 1) ||
+					    (num_vcs_per_class > 1))
+					   begin
+					      
+					      wire update_arb;
+					      assign update_arb
+						= gnt_in & gnt_out_ip[ip];
+					      
+					      arbiter
+						#(.num_ports(
+							   num_routing_classes*
+							   num_vcs_per_class),
+						  .arbiter_type(arbiter_type),
+						  .reset_type(reset_type))
+					      gnt_out_irc_icvc_arb
+						(.clk(clk),
+						 .reset(reset),
+						 .update(update_arb),
+						 .req(req_out_irc_icvc),
+						 .gnt(gnt_out_irc_icvc));
+					      
+					   end
+					 else
+					   assign gnt_out_irc_icvc
+					     = req_out_irc_icvc;
+					 
+				      end
+				    else
+				      assign gnt_out_irc_icvc
+					= {(num_routing_classes*
+					    num_vcs_per_class){1'b0}};
+				    
+				    assign gnt_out_ivc[itc*
+						       num_routing_classes*
+						       num_vcs_per_class:
+						       (itc+1)*
+						       num_routing_classes*
+						       num_vcs_per_class-1]
+					     = gnt_out_irc_icvc;
+				    
+				 end
+			       
+			       assign gnt_out_ip_ivc[ip*num_vcs:
+						     (ip+1)*num_vcs-1]
+					= gnt_out_ivc &
+					  {num_vcs{gnt_out_ip[ip] & elig}};
+			       assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+					= gnt_out_ivc;
+			       
+			    end
+			  
+			  wire [0:num_vcs-1] 	  gnt_ivc;
+			  select_1ofn
+			    #(.num_ports(num_ports),
+			      .width(num_vcs))
+			  gnt_ivc_sel
+			    (.select(gnt_out_ip),
+			     .data_in(gnt_ip_ivc),
+			     .data_out(gnt_ivc));
+			  
+			  wire 			  update_arb;
+			  assign update_arb = gnt_in;
+			  
+			  arbiter
+			    #(.num_ports(num_ports),
+			      .arbiter_type(arbiter_type),
+			      .reset_type(reset_type))
+			  gnt_out_ip_arb
+			    (.clk(clk),
+			     .reset(reset),
+			     .update(update_arb),
+			     .req(req_out_ip),
+			     .gnt(gnt_out_ip));
+			  
+			  assign gnt_out_op_ovc_ip_ivc[(((op*
+							  num_traffic_classes+
+							  otc)*
+							 num_routing_classes+
+							 orc)*
+							num_vcs_per_class+
+							ocvc)*
+						       num_ports*num_vcs:
+						       (((op*
+							  num_traffic_classes+
+							  otc)*
+							 num_routing_classes+
+							 orc)*
+							num_vcs_per_class+
+							ocvc+1)*
+						       num_ports*num_vcs-1]
+				   = gnt_out_ip_ivc;
+			  assign gnt_op_ovc_ip[(((op*num_traffic_classes+otc)*
+						 num_routing_classes+orc)*
+						num_vcs_per_class+ocvc)*
+					       num_ports:
+					       (((op*num_traffic_classes+otc)*
+						 num_routing_classes+orc)*
+						num_vcs_per_class+ocvc+1)*
+					       num_ports-1]
+				   = gnt_out_ip;
+			  assign gnt_op_ovc_ivc[(((op*num_traffic_classes+otc)*
+						  num_routing_classes+orc)*
+						 num_vcs_per_class+ocvc)*
+						num_vcs:
+						(((op*num_traffic_classes+otc)*
+						  num_routing_classes+orc)*
+						 num_vcs_per_class+ocvc+1)*
+						num_vcs-1]
+				   = gnt_ivc;
+			  
+		       end
 		     
 		  end
-		
-		wire [0:num_vcs-1] 	gnt_ivc;
-		select_1ofn
-		  #(.num_ports(num_ports),
-		    .width(num_vcs))
-		gnt_ivc_sel
-		  (.select(gnt_out_ip),
-		   .data_in(gnt_ip_ivc),
-		   .data_out(gnt_ivc));
-		
-		wire 			update_arb;
-		assign update_arb = gnt_in;
-		
-		arbiter
-		  #(.num_ports(num_ports),
-		    .arbiter_type(arbiter_type),
-		    .reset_type(reset_type))
-		gnt_out_ip_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update_arb),
-		   .req(req_out_ip),
-		   .gnt(gnt_out_ip));
-		
-		assign gnt_out_op_ovc_ip_ivc[(op*num_vcs+ovc)*num_ports*num_vcs:
-					     (op*num_vcs+ovc+1)*num_ports*
-					     num_vcs-1]
-			 = gnt_out_ip_ivc;
-		assign gnt_op_ovc_ip[(op*num_vcs+ovc)*num_ports:
-				     (op*num_vcs+ovc+1)*num_ports-1]
-			 = gnt_out_ip;
-		assign gnt_op_ovc_ivc[(op*num_vcs+ovc)*num_vcs:
-				      (op*num_vcs+ovc+1)*num_vcs-1]
-			 = gnt_ivc;
 		
 	     end
 	   
