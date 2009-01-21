@@ -142,7 +142,7 @@ module routing_logic
    
    generate
    
-      if(routing_class != (num_routing_classes - 1))
+      if(routing_class == (num_routing_classes - 1))
 	assign chg_class = 1'b0;
       else
 	assign chg_class = (router_address == dest_router_address);
