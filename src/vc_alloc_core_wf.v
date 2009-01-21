@@ -1,4 +1,4 @@
-// $Id$
+// $Id: vc_alloc_core_sep_of.v 1026 2009-01-20 22:43:03Z dub $
 
 /*
 Copyright (c) 2007, Trustees of Leland Stanford Junior University
