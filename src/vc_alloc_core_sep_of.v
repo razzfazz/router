@@ -223,50 +223,90 @@ module vc_alloc_core_sep_of
 			  
 			  wire [0:num_vcs-1] 	       gnt_in_ovc;
 			  
-			  if(num_vcs_per_class > 1)
-			    begin
+			  genvar 		       otc;
+			  
+			  for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
+			    begin:otcs
 			       
-			       genvar opc;
-			       
-			       for(opc = 0; opc < num_classes; opc = opc + 1)
-				 begin:opcs
+			       if(otc == itc)
+				 begin
 				    
-				    wire [0:num_vcs_per_class-1] gnt_out_ocvc;
-				    assign gnt_out_ocvc
-				      = gnt_out_ovc[opc*num_vcs_per_class:
-						    (opc+1)*num_vcs_per_class
-						    -1];
+				    genvar orc;
 				    
-				    wire 			 update_arb;
-				    assign update_arb = |gnt_out_ocvc;
-				    
-				    wire [0:num_vcs_per_class-1] req_in_ocvc;
-				    assign req_in_ocvc
-				      = req_in_ovc[opc*num_vcs_per_class:
-						   (opc+1)*num_vcs_per_class-1];
-				    
-				    wire [0:num_vcs_per_class-1] gnt_in_ocvc;
-				    arbiter
-				      #(.num_ports(num_vcs_per_class),
-					.arbiter_type(arbiter_type),
-					.reset_type(reset_type))
-				    gnt_in_ocvc_arb
-				      (.clk(clk),
-				       .reset(reset),
-				       .update(update_arb),
-				       .req(req_in_ocvc),
-				       .gnt(gnt_in_ocvc));
-				    
-				    assign gnt_in_ovc[opc*num_vcs_per_class:
-						      (opc+1)*num_vcs_per_class
-						      -1]
-					     = gnt_in_ocvc;
+				    for(orc = 0; orc < num_routing_classes;
+					orc = orc + 1)
+				      begin:orcs
+					 
+					 wire [0:num_vcs_per_class-1]
+					   req_in_ocvc;
+					 
+					 assign req_in_ocvc
+					   = req_in_ovc[(otc*
+							 num_routing_classes+
+							 orc)*
+							num_vcs_per_class:
+							(otc*
+							 num_routing_classes+
+							 orc+1)*
+							num_vcs_per_class-1];
+					 
+					 wire [0:num_vcs_per_class-1]
+					   gnt_in_ocvc;
+					 
+					 if(num_vcs_per_class > 1)
+					   begin
+					      
+					      wire [0:num_vcs_per_class-1]
+						gnt_out_ocvc;
+					      
+					      assign gnt_out_ocvc
+						= gnt_out_ovc[
+						    (otc*num_routing_classes+
+						     orc)*num_vcs_per_class:
+						    (otc*num_routing_classes+
+						     orc+1)*num_vcs_per_class
+							      -1];
+					      
+					      wire update_arb;
+					      assign update_arb = |gnt_out_ocvc;
+					      
+					      arbiter
+						#(.num_ports(num_vcs_per_class),
+						  .arbiter_type(arbiter_type),
+						  .reset_type(reset_type))
+					      gnt_in_ocvc_arb
+						(.clk(clk),
+						 .reset(reset),
+						 .update(update_arb),
+						 .req(req_in_ocvc),
+						 .gnt(gnt_in_ocvc));
+
+					   end
+					 else
+					   assign gnt_in_ocvc = req_in_ocvc;
+					 
+					 assign gnt_in_ovc[(otc*
+							    num_routing_classes+
+							    orc)*
+							   num_vcs_per_class:
+							   (otc*
+							    num_routing_classes+
+							    orc+1)*
+							   num_vcs_per_class-1]
+						  = gnt_in_ocvc;
+					 
+				      end
 				    
 				 end
+			       else
+				 assign gnt_in_ovc[otc*num_routing_classes*
+						   num_vcs_per_class:
+						   (otc+1)*num_routing_classes*
+						   num_vcs_per_class-1]
+					  = {(num_routing_classes*
+					      num_vcs_per_class){1'b0}};
 			       
 			    end
-			  else
-			    assign gnt_in_ovc = req_in_ovc;
 			  
 			  wire [0:num_ports*num_vcs-1] 	     gnt_in_op_ovc;
 			  assign gnt_in_op_ovc
