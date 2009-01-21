@@ -652,21 +652,24 @@ module ivc_ctrl
 	   wire port_sel;
 	   assign port_sel = hdff_la_route_info[op];
 	   
-	   if(((routing_class == (num_routing_classes - 1)) &&
-	       (op < (num_ports - num_nodes_per_router)) &&
-	       ((op / num_neighbors_per_dim) == 
-		(port_id / num_neighbors_per_dim))) ||
-	      ((routing_class < (num_routing_classes - 1)) &&
-	       (op >= (num_ports - num_nodes_per_router))))
-	     begin
-		assign rtl_port_op[op] = 1'b0;
-		assign rtl_error_op[op] = port_sel & header_valid;
-	     end
+	   wire mask_port;
+
+	   if((op < (num_ports - num_nodes_per_router)) &&
+	      (((routing_function_type == `ROUTING_FUNCTION_TYPE_MESH) &&
+		(op == port_id)) ||
+	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
+		((op / num_neighbors_per_dim) == 
+		 (port_id / num_neighbors_per_dim)))))
+	     assign mask_port = ~rtl_change_class;
+	   else if((op >= (num_ports - num_nodes_per_router)) &&
+		   ((routing_class < (num_routing_classes - 1)) ||
+		    (op == port_id)))
+	     assign mask_port = 1'b1;
 	   else
-	     begin
-		assign rtl_port_op[op] = port_sel;
-		assign rtl_error_op[op] = 1'b0;
-	     end
+	     assign mask_port = 1'b0;
+	   
+	   assign rtl_port_op[op] = port_sel & ~mask_port;
+	   assign rtl_error_op[op] = port_sel & mask_port & header_valid;
 	   
 	end
       
