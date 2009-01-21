@@ -490,9 +490,76 @@ module vc_alloc_core_sep_of
 					 assign req_out_ip[ip]
 						  = |req_out_irc_icvc;
 					 
-					 if((num_routing_classes > 1) ||
-					    (num_vcs_per_class > 1))
+					 if(orc == 0)
 					   begin
+					      
+					      wire [0:num_vcs_per_class-1]
+						req_out_icvc;
+					      assign req_out_icvc
+						= req_out_irc_icvc[
+						    0:num_vcs_per_class-1];
+
+					      wire [0:num_vcs_per_class-1]
+						gnt_out_icvc;
+					      
+					      if(num_vcs_per_class > 1)
+						begin
+						   
+						   wire update_arb;
+						   assign update_arb
+						     = gnt_in & gnt_out_ip[ip];
+						   
+						   arbiter
+						     #(.num_ports(
+							     num_vcs_per_class),
+						       .arbiter_type(
+							     arbiter_type),
+						       .reset_type(reset_type))
+						   gnt_out_icvc_arb
+						     (.clk(clk),
+						      .reset(reset),
+						      .update(update_arb),
+						      .req(req_out_icvc),
+						      .gnt(gnt_out_icvc));
+						   
+						end
+					      else
+						assign gnt_out_icvc
+						  = req_out_icvc;
+					      
+					      assign gnt_out_irc_icvc[
+						       0:num_vcs_per_class-1]
+						       = gnt_out_icvc;
+					      if(num_routing_classes > 1)
+						assign gnt_out_irc_icvc[
+						       num_vcs_per_class:
+						       num_routing_classes*
+						       num_vcs_per_class-1]
+						  = {((num_routing_classes-1)*
+						      num_vcs_per_class){1'b0}};
+					      
+					   end
+					 else
+					   begin
+					      
+					      wire [0:num_vcs_per_class-1]
+						req_out_low_icvc;
+					      assign req_out_low_icvc
+						= req_out_irc_icvc[
+						   (orc-1)*num_vcs_per_class:
+						   orc*num_vcs_per_class-1];
+					      
+					      wire [0:num_vcs_per_class-1]
+						req_out_high_icvc;
+					      assign req_out_high_icvc
+					        = req_out_irc_icvc[
+						   orc*num_vcs_per_class:
+						   (orc+1)*num_vcs_per_class-1];
+
+					      wire [0:num_vcs_per_class-1]
+						gnt_out_low_icvc;
+					      wire [0:num_vcs_per_class-1]
+						gnt_out_high_icvc;
 					      
 					      wire update_arb;
 					      assign update_arb
@@ -500,21 +567,44 @@ module vc_alloc_core_sep_of
 					      
 					      arbiter
 						#(.num_ports(
-							   num_routing_classes*
-							   num_vcs_per_class),
+							  2*num_vcs_per_class),
 						  .arbiter_type(arbiter_type),
 						  .reset_type(reset_type))
-					      gnt_out_irc_icvc_arb
+					      gnt_out_icvc_arb
 						(.clk(clk),
 						 .reset(reset),
 						 .update(update_arb),
-						 .req(req_out_irc_icvc),
-						 .gnt(gnt_out_irc_icvc));
+						 .req({req_out_low_icvc,
+						       req_out_high_icvc}),
+						 .gnt({gnt_out_low_icvc,
+						       gnt_out_high_icvc}));
+					      
+					      if(orc > 1)
+						assign gnt_out_irc_icvc[
+						         0:(orc-1)*
+							 num_vcs_per_class-1]
+						  = {((orc-1)*
+						      num_vcs_per_class){1'b0}};
+					      
+					      assign gnt_out_irc_icvc[
+						       (orc-1)*
+						       num_vcs_per_class:
+						       (orc+1)*
+						       num_vcs_per_class-1]
+						       = {gnt_out_low_icvc,
+							  gnt_out_high_icvc};
+
+					      if(orc < (num_routing_classes-1))
+						assign gnt_out_irc_icvc[
+							 (orc+1)*
+							 num_vcs_per_class:
+							 num_routing_classes*
+							 num_vcs_per_class-1]
+						  = {(((num_routing_classes-1)-
+						       orc)*
+						      num_vcs_per_class){1'b0}};
 					      
 					   end
-					 else
-					   assign gnt_out_irc_icvc
-					     = req_out_irc_icvc;
 					 
 				      end
 				    else
