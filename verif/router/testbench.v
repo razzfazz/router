@@ -89,7 +89,7 @@ module testbench
    parameter num_header_buffers = 1;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 1;
+   parameter num_traffic_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
    parameter num_routing_classes = 2;
@@ -98,7 +98,7 @@ module testbench
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 1;
+   parameter num_vcs_per_class = 2;
    
    // number of VCs
    localparam num_vcs = num_classes * num_vcs_per_class;
@@ -188,6 +188,10 @@ module testbench
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
    
    // select routing function type
    localparam routing_function_type
@@ -767,6 +771,7 @@ module testbench
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
+       .track_vcs_at_output(track_vcs_at_output),
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),
        .credit_handling_type(credit_handling_type),
