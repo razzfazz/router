@@ -137,7 +137,6 @@ module routing_logic
    assign reached_dest = (router_address == dest_router_address);
    
    wire [0:num_ports-1] 	route_unmasked_op;
-   wire [0:num_ports-1] 	error_op;
    wire [0:num_dimensions-1] 	dim_addr_match;
    
    generate
@@ -255,34 +254,23 @@ module routing_logic
 	assign route_unmasked_op[num_ports-num_nodes_per_router:num_ports-1]
 		 = {num_nodes_per_router{1'b0}};
       
-      genvar 					op;
-      
-      for(op = 0; op < num_ports; op = op + 1)
-	begin:ops
-	   
-	   wire mask_port;
-
-	   if((op < (num_ports - num_nodes_per_router)) &&
-	      (((routing_function_type == `ROUTING_FUNCTION_TYPE_MESH) &&
-		(op == port_id)) ||
-	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
-		((op / num_neighbors_per_dim) == 
-		 (port_id / num_neighbors_per_dim)))))
-	     assign mask_port = ~inc_rc;
-	   else if((op >= (num_ports - num_nodes_per_router)) &&
-		   ((routing_class < (num_routing_classes - 1)) ||
-		    (op == port_id)))
-	     assign mask_port = 1'b1;
-	   else
-	     assign mask_port = 1'b0;
-	   
-	   assign route_op[op] = route_unmasked_op[op] & ~mask_port;
-	   assign error_op[op] = route_unmasked_op[op] & mask_port;
-	   
-	end
-      
    endgenerate
    
-   assign error = |error_op;
+   port_filter
+     #(.num_traffic_classes(num_traffic_classes),
+       .num_routing_classes(num_routing_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_ports(num_ports),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .num_nodes_per_router(num_nodes_per_router),
+       .routing_function_type(routing_function_type),
+       .port_id(port_id),
+       .traffic_class(traffic_class),
+       .routing_class(routing_class))
+   pf
+     (.route_op_in(route_unmasked_op),
+      .inc_rc(inc_rc),
+      .route_op_out(route_op),
+      .error(error));
    
 endmodule

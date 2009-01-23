@@ -664,8 +664,9 @@ module ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] rtl_route_op;
-   wire [0:num_ports-1] rtl_error_op;
+   wire [0:num_ports-1] rtl_route_unmasked_op;
+   assign rtl_route_unmasked_op = hdff_la_route_info[0:num_ports-1];
+   
    wire [0:num_classes-1] rtl_next_class;
    
    generate
@@ -674,35 +675,6 @@ module ivc_ctrl
 	assign rtl_inc_rc = hdff_la_route_info[num_ports];
       else
 	assign rtl_inc_rc = 1'b0;
-      
-      genvar 		  op;
-      
-      for(op = 0; op < num_ports; op = op + 1)
-	begin:ops
-	   
-	   wire port_sel;
-	   assign port_sel = hdff_la_route_info[op];
-	   
-	   wire mask_port;
-
-	   if((op < (num_ports - num_nodes_per_router)) &&
-	      (((routing_function_type == `ROUTING_FUNCTION_TYPE_MESH) &&
-		(op == port_id)) ||
-	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
-		((op / num_neighbors_per_dim) == 
-		 (port_id / num_neighbors_per_dim)))))
-	     assign mask_port = ~rtl_inc_rc;
-	   else if((op >= (num_ports - num_nodes_per_router)) &&
-		   ((routing_class < (num_routing_classes - 1)) ||
-		    (op == port_id)))
-	     assign mask_port = 1'b1;
-	   else
-	     assign mask_port = 1'b0;
-	   
-	   assign rtl_route_op[op] = port_sel & ~mask_port;
-	   assign rtl_error_op[op] = port_sel & mask_port & header_valid;
-	   
-	end
       
       genvar otc;
       
@@ -730,6 +702,29 @@ module ivc_ctrl
       
    endgenerate
    
+   wire [0:num_ports-1] rtl_route_op;
+   wire rtl_error_unmasked;
+   
+   port_filter
+     #(.num_traffic_classes(num_traffic_classes),
+       .num_routing_classes(num_routing_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_ports(num_ports),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .num_nodes_per_router(num_nodes_per_router),
+       .routing_function_type(routing_function_type),
+       .port_id(port_id),
+       .traffic_class(traffic_class),
+       .routing_class(routing_class))
+   pf
+     (.route_op_in(rtl_route_unmasked_op),
+      .inc_rc(rtl_inc_rc),
+      .route_op_out(rtl_route_op),
+      .error(rtl_error_unmasked));
+   
+   wire 	      rtl_error;
+   assign rtl_error = rtl_error_unmasked & header_valid;
+   
    wire [0:num_vcs-1] rtl_next_vcs;
    replicator
      #(.width(num_classes),
@@ -737,9 +732,6 @@ module ivc_ctrl
    rtl_next_vcs_repl
      (.data_in(rtl_next_class),
       .data_out(rtl_next_vcs));
-   
-   wire 	      rtl_error;
-   assign rtl_error = |rtl_error_op;
    
    la_routing_logic
      #(.num_traffic_classes(num_traffic_classes),
