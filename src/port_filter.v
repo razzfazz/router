@@ -52,6 +52,11 @@ module port_filter
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 4;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -79,6 +84,7 @@ module port_filter
    output error;
    wire error;   
    
+   wire [0:num_ports-1] route_restricted_op;
    wire [0:num_ports-1] error_op;
    
    generate
@@ -103,7 +109,7 @@ module port_filter
 	     begin
 		if(routing_class == (num_routing_classes - 1))
 		  begin
-		     assign route_op_out[op] = 1'b0;
+		     assign route_restricted_op[op] = 1'b0;
 		     assign error_op[op] = route_op_in[op];
 		  end
 		else
@@ -117,7 +123,8 @@ module port_filter
 		     // port requests -- packets just remain in the input buffer
 		     // forever; consequently, we save the gate and don't mask 
 		     // here
-		     assign route_op_out[op] = route_op_in[op] /* & inc_rc*/;
+		     assign route_restricted_op[op]
+			      = route_op_in[op] /* & inc_rc*/;
 		     
 		     assign error_op[op] = route_op_in[op] & ~inc_rc;
 		  end
@@ -131,18 +138,23 @@ module port_filter
 		   ((routing_class < (num_routing_classes - 1)) ||
 		    (op == port_id)))
 	     begin
-		assign route_op_out[op] = 1'b0;
+		assign route_restricted_op[op] = 1'b0;
 		assign error_op[op] = route_op_in[op];
 	     end
 	   
 	   // remaining port requests are valid
 	   else
 	     begin
-		assign route_op_out[op] = route_op_in[op];
+		assign route_restricted_op[op] = route_op_in[op];
 		assign error_op[op] = 1'b0;
 	     end
 	   
 	end
+      
+      if(restrict_turns != 0)
+	assign route_op_out = route_restricted_op;
+      else
+	assign route_op_out = route_op_in;
       
    endgenerate
    
