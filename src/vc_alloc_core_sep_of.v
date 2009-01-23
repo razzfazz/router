@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant using separable output-first allocation
 module vc_alloc_core_sep_of
-  (clk, reset, route_ip_ivc_op, req_ip_ivc, req_ip_ivc_ovc, elig_op_ovc, 
+  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
@@ -64,14 +64,14 @@ module vc_alloc_core_sep_of
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
-   // request VC allocation
-   input [0:num_ports*num_vcs-1] req_ip_ivc;
-   
-   // allowable VCs for VC allocation
-   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   // transition to next routing class
+   input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] elig_op_ovc;
+   
+   // request VC allocation
+   input [0:num_ports*num_vcs-1] req_ip_ivc;
    
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
@@ -149,16 +149,11 @@ module vc_alloc_core_sep_of
 					       num_vcs_per_class+icvc+1)*
 					      num_ports-1];
 			  
-			  wire [0:num_vcs-1]   req_ovc;
-			  assign req_ovc
-			    = req_ip_ivc_ovc[(((ip*num_traffic_classes+itc)*
-					       num_routing_classes+irc)*
-					      num_vcs_per_class+icvc)*
-					     num_vcs:
-					     (((ip*num_traffic_classes+itc)*
-					       num_routing_classes+irc)*
-					      num_vcs_per_class+icvc+1)*
-					     num_vcs-1];
+			  wire 		       inc_rc;
+			  assign inc_rc
+			    = inc_rc_ip_ivc[((ip*num_traffic_classes+itc)*
+					     num_routing_classes+irc)*
+					    num_vcs_per_class+icvc];
 			  
 			  wire [0:num_ports*num_vcs-1] mask_op_ovc;
 			  
@@ -167,14 +162,100 @@ module vc_alloc_core_sep_of
 			  for(op = 0; op < num_ports; op = op + 1)
 			    begin:ops
 			       
+			       wire route;
+			       assign route = route_op[op];
+			       
 			       wire [0:num_vcs-1] mask_ovc;
-			       assign mask_ovc = {num_vcs{req & route_op[op]}};
+			       wire [0:num_vcs-1] req_out_ovc;
+			       
+			       genvar 		  otc;
+			       
+			       for(otc = 0; otc < num_traffic_classes;
+				   otc = otc + 1)
+				 begin:otcs
+				    
+				    if(otc == itc)
+				      begin
+					 
+					 genvar orc;
+					 
+					 for(orc = 0; orc < num_routing_classes;
+					     orc = orc + 1)
+					   begin:orcs
+					      
+					      wire mask;
+					      
+					      if((orc == irc) ||
+						 (orc == (irc + 1)))
+						assign mask = req & route;
+					      else
+						assign mask = 1'b0;
+					      
+					      wire req_out;
+					      
+					      if(orc == irc)
+						assign req_out = mask & ~inc_rc;
+					      else if(orc == (irc + 1))
+						assign req_out = mask & inc_rc;
+					      else
+                                                assign req_out = 1'b0;
+
+					      assign mask_ovc[
+						       (otc*
+							num_routing_classes+
+							orc)*
+						       num_vcs_per_class:
+						       (otc*
+							num_routing_classes+
+							orc+1)*
+						       num_vcs_per_class-1
+							      ]
+						       = {num_vcs_per_class{
+							    mask}};
+					      
+					      assign req_out_ovc[
+						       (otc*
+							num_routing_classes+
+							orc)*
+						       num_vcs_per_class:
+						       (otc*
+							num_routing_classes+
+							orc+1)*
+						       num_vcs_per_class-1
+							      ]
+						       = {num_vcs_per_class{
+							    req_out}};
+					      
+					   end
+					 
+				      end
+				    else
+				      begin
+
+					 assign mask_ovc[otc*
+							 num_routing_classes*
+							 num_vcs_per_class:
+							 (otc+1)*
+							 num_routing_classes*
+							 num_vcs_per_class-1]
+						  = {(num_routing_classes*
+						      num_vcs_per_class){1'b0}};
+
+					 assign req_out_ovc[otc*
+							    num_routing_classes*
+							    num_vcs_per_class:
+							    (otc+1)*
+							    num_routing_classes*
+							    num_vcs_per_class-1]
+						  = {(num_routing_classes*
+						      num_vcs_per_class){1'b0}};
+
+				      end
+				    
+				 end
 			       
 			       assign mask_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
 					= mask_ovc;
-			       
-			       wire [0:num_vcs-1] req_out_ovc;
-			       assign req_out_ovc = mask_ovc & req_ovc;
 			       
 			       assign req_out_ip_ivc_op_ovc[
 					 ((((ip*num_traffic_classes+itc)*

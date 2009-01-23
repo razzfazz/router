@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant based using wavefront allocation
 module vc_alloc_core_wf
-  (clk, reset, route_ip_ivc_op, req_ip_ivc, req_ip_ivc_ovc, elig_op_ovc, 
+  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
@@ -64,14 +64,14 @@ module vc_alloc_core_wf
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
-   // request VC allocation
-   input [0:num_ports*num_vcs-1] req_ip_ivc;
-   
-   // allowable VCs for VC allocation
-   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   // transition to next routing class
+   input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] elig_op_ovc;
+   
+   // request VC allocation
+   input [0:num_ports*num_vcs-1] req_ip_ivc;
    
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
@@ -117,13 +117,12 @@ module vc_alloc_core_wf
 	   wire [0:num_vcs-1] req_ivc;
 	   assign req_ivc = req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_vcs-1] req_ivc_ovc;
-	   assign req_ivc_ovc = req_ip_ivc_ovc[ip*num_vcs*num_vcs:
-					       (ip+1)*num_vcs*num_vcs-1];
-	   
 	   wire [0:num_vcs*num_ports-1] route_ivc_op;
 	   assign route_ivc_op = route_ip_ivc_op[ip*num_vcs*num_ports:
 						 (ip+1)*num_vcs*num_ports-1];
+	   
+	   wire [0:num_vcs-1] 		inc_rc_ivc;
+	   assign inc_rc_ivc = inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs*num_ports*num_vcs-1] gnt_wf_ivc_op_ovc;
 	   assign gnt_wf_ivc_op_ovc
@@ -163,14 +162,10 @@ module vc_alloc_core_wf
 					    num_vcs_per_class+icvc+1)*
 					   num_ports-1];
 			  
-			  wire [0:num_vcs-1]   req_ovc;
-			  assign req_ovc
-			    = req_ivc_ovc[((itc*num_routing_classes+irc)*
-					   num_vcs_per_class+icvc)*
-					  num_vcs:
-					  ((itc*num_routing_classes+irc)*
-					   num_vcs_per_class+icvc+1)*
-					  num_vcs-1];
+			  wire 		       inc_rc;
+			  assign inc_rc
+			    = inc_rc_ivc[(itc*num_routing_classes+irc)*
+					 num_vcs_per_class+icvc];
 			  
 			  wire [0:num_ports*num_vcs-1] req_wf_op_ovc;
 			  
@@ -200,22 +195,19 @@ module vc_alloc_core_wf
 					orc = orc + 1)
 				      begin:orcs
 
-					 wire [0:num_vcs_per_class-1] req_ocvc;
+					 wire class_match;
 					 
-					 if((otc == itc) &&
-					    ((orc == irc) || (orc == irc + 1)))
-					       assign req_ocvc
-						 = req_ovc[(otc*
-							    num_routing_classes+
-							    orc)*
-							   num_vcs_per_class:
-							   (otc*
-							    num_routing_classes+
-							    orc+1)*
-							   num_vcs_per_class-1];
+					 if(otc == itc)
+					   begin
+					      if(orc == irc)
+						assign class_match = ~inc_rc;
+					      else if(orc == (irc + 1))
+						assign class_match  = inc_rc;
+					      else
+						assign class_match = 1'b0;
+					   end
 					 else
-					      assign req_ocvc
-						= {num_vcs_per_class{1'b0}};
+					   assign class_match = 1'b0;
 					 
 					 wire [0:num_vcs_per_class-1] elig_ocvc;
 					 assign elig_ocvc
@@ -229,8 +221,9 @@ module vc_alloc_core_wf
 					 wire [0:num_vcs_per_class-1]
 					   req_wf_ocvc;
 					 assign req_wf_ocvc
-					   = {num_vcs_per_class{req & route}} &
-					     req_ocvc & elig_ocvc;
+					   = {num_vcs_per_class{
+						(req & route & class_match)}} &
+					     elig_ocvc;
 					 
 					 assign req_wf_ovc[(otc*
 							    num_routing_classes+

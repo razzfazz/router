@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator
 module vc_alloc
-  (clk, reset, route_ip_ivc_op, req_ip_ivc, req_ip_ivc_ovc, elig_op_ovc, 
+  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
@@ -71,14 +71,14 @@ module vc_alloc
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
-   // request VC allocation
-   input [0:num_ports*num_vcs-1] req_ip_ivc;
-   
-   // allowable VCs for VC allocation
-   input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
+   // transition to next routing class
+   input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] elig_op_ovc;
+   
+   // request VC allocation
+   input [0:num_ports*num_vcs-1] req_ip_ivc;
    
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
@@ -116,9 +116,9 @@ module vc_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.route_ip_ivc_op(route_ip_ivc_op),
-		.req_ip_ivc(req_ip_ivc),
-		.req_ip_ivc_ovc(req_ip_ivc_ovc),
+		.inc_rc_ip_ivc(inc_rc_ip_ivc),
 		.elig_op_ovc(elig_op_ovc),
+		.req_ip_ivc(req_ip_ivc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 		.gnt_op_ovc(gnt_op_ovc),
@@ -138,9 +138,9 @@ module vc_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.route_ip_ivc_op(route_ip_ivc_op),
-		.req_ip_ivc(req_ip_ivc),
-		.req_ip_ivc_ovc(req_ip_ivc_ovc),
+		.inc_rc_ip_ivc(inc_rc_ip_ivc),
 		.elig_op_ovc(elig_op_ovc),
+		.req_ip_ivc(req_ip_ivc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 		.gnt_op_ovc(gnt_op_ovc),
@@ -162,9 +162,9 @@ module vc_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.route_ip_ivc_op(route_ip_ivc_op),
-		.req_ip_ivc(req_ip_ivc),
-		.req_ip_ivc_ovc(req_ip_ivc_ovc),
+		.inc_rc_ip_ivc(inc_rc_ip_ivc),
 		.elig_op_ovc(elig_op_ovc),
+		.req_ip_ivc(req_ip_ivc),
 		.gnt_ip_ivc(gnt_ip_ivc),
 		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 		.gnt_op_ovc(gnt_op_ovc),

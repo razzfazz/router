@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, flow_ctrl_op_ovc, route_op, vc_req, vc_req_ovc, vc_gnt, 
+   header_info_in, flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, 
    vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
    flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, la_route_info_out,
    fbf_write_addr, fbf_read_addr, error, events);
@@ -239,13 +239,13 @@ module ivc_ctrl
    output [0:num_ports-1] route_op;
    wire [0:num_ports-1] route_op;
    
+   // transition to next routing class
+   output inc_rc;
+   wire 		inc_rc;
+   
    // request VC allocation
    output vc_req;
    wire vc_req;
-   
-   // allowable VCs for VC allocation
-   output [0:num_vcs-1] vc_req_ovc;
-   wire [0:num_vcs-1] 	vc_req_ovc;
    
    // VC allocation successful
    input vc_gnt;
@@ -662,39 +662,12 @@ module ivc_ctrl
    wire [0:num_ports-1] route_unmasked_op;
    assign route_unmasked_op = hdff_la_route_info[0:num_ports-1];
    
-   wire 		inc_rc;
-   wire [0:num_classes-1] next_class;
-   
    generate
       
       if(routing_class < (num_routing_classes - 1))
 	assign inc_rc = hdff_la_route_info[num_ports];
       else
 	assign inc_rc = 1'b0;
-      
-      genvar otc;
-      
-      for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
-	begin:otcs
-	   
-	   genvar orc;
-	   
-	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
-	     begin:orcs
-		
-		if((otc == traffic_class) && (orc == routing_class))
-		  assign next_class[otc*num_routing_classes+orc]
-			   = ~inc_rc;
-		else if((otc == traffic_class) && (orc == (routing_class + 1)))
-		  assign next_class[otc*num_routing_classes+orc]
-			   = inc_rc;
-		else
-		  assign next_class[otc*num_routing_classes+orc]
-			   = 1'b0;
-		
-	     end
-	   
-	end
       
    endgenerate
    
@@ -720,14 +693,6 @@ module ivc_ctrl
    
    wire pf_error;
    assign pf_error = pf_error_unmasked & header_valid;
-   
-   wire [0:num_vcs-1] next_vcs;
-   replicator
-     #(.width(num_classes),
-       .count(num_vcs_per_class))
-   next_vcs_repl
-     (.data_in(next_class),
-      .data_out(next_vcs));
    
    la_routing_logic
      #(.num_traffic_classes(num_traffic_classes),
@@ -966,7 +931,6 @@ module ivc_ctrl
    endgenerate
    
    assign vc_req = header_valid & ~vc_allocated_q;
-   assign vc_req_ovc = next_vcs;
    
    
    //---------------------------------------------------------------------------

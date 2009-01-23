@@ -243,9 +243,9 @@ module router
    wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
    wire [0:num_ports*num_vcs*num_ports-1] 	    route_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 		    inc_rc_ip_ivc;
 
    wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_req_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
@@ -306,8 +306,8 @@ module router
 	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs*num_ports-1] route_ivc_op;
+	   wire [0:num_vcs-1] 		inc_rc_ivc;
 	   wire [0:num_vcs-1] 		vc_req_ivc;
-	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
 	   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
 	   wire [0:num_vcs-1] 		sw_req_spec_ivc;
 	   wire 			flit_valid_out;
@@ -354,8 +354,8 @@ module router
 	      .flit_data_in(flit_data_in),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
 	      .route_ivc_op(route_ivc_op),
+	      .inc_rc_ivc(inc_rc_ivc),
 	      .vc_req_ivc(vc_req_ivc),
-	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
 	      .sw_req_nonspec_ivc(sw_req_nonspec_ivc),
@@ -372,10 +372,10 @@ module router
 	      .error(ipc_error));
 	   
 	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1] = route_ivc_op;
+				  (ip+1)*num_vcs*num_ports-1]
+		    = route_ivc_op;
+	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = inc_rc_ivc;
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
-	   assign vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
-				    (ip+1)*num_vcs*num_vcs-1] = vc_req_ivc_ovc;
 	   assign sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = sw_req_nonspec_ivc;
 	   assign sw_req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
@@ -416,9 +416,9 @@ module router
      (.clk(clk),
       .reset(reset),
       .route_ip_ivc_op(route_ip_ivc_op),
-      .req_ip_ivc(vc_req_ip_ivc),
-      .req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
+      .inc_rc_ip_ivc(inc_rc_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
+      .req_ip_ivc(vc_req_ip_ivc),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
       .gnt_op_ovc(vc_gnt_op_ovc),

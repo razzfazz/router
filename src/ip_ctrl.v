@@ -31,11 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module ip_ctrl
   (clk, reset, router_address, flit_valid_in, flit_vc_in, flit_head_in,
-   flit_tail_in, flit_data_in, flow_ctrl_op_ovc, route_ivc_op, vc_req_ivc, 
-   vc_req_ivc_ovc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc, 
-   sw_req_spec_ivc, sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, 
-   flit_vc_out, flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, 
-   cred_vc_out, error);
+   flit_tail_in, flit_data_in, flow_ctrl_op_ovc, route_ivc_op, inc_rc_ivc, 
+   vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, 
+   sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, flit_vc_out, 
+   flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out, 
+   error);
    
 `include "constants.v"
    
@@ -214,13 +214,13 @@ module ip_ctrl
    output [0:num_vcs*num_ports-1] route_ivc_op;
    wire [0:num_vcs*num_ports-1] route_ivc_op;
    
+   // transition to next routing class
+   output [0:num_vcs-1] inc_rc_ivc;
+   wire [0:num_vcs-1] 		inc_rc_ivc;
+   
    // request VC allocation
    output [0:num_vcs-1] vc_req_ivc;
    wire [0:num_vcs-1] 		vc_req_ivc;
-   
-   // allowable VCs for VC allocation
-   output [0:num_vcs*num_vcs-1] vc_req_ivc_ovc;
-   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
    
    // VC allocation successful
    input [0:num_vcs-1] vc_gnt_ivc;
@@ -381,8 +381,8 @@ module ip_ctrl
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
 	   wire [0:num_ports-1] route_op;
+	   wire 		inc_rc;
 	   wire 		vc_req;
-	   wire [0:num_vcs-1] 	vc_req_ovc;
 	   wire 		sw_req_nonspec;
 	   wire 		sw_req_spec;
 	   wire 		flit_valid_out;
@@ -427,8 +427,8 @@ module ip_ctrl
 	      .header_info_in(header_info_in_q),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
 	      .route_op(route_op),
+	      .inc_rc(inc_rc),
 	      .vc_req(vc_req),
-	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .sw_req_nonspec(sw_req_nonspec),
@@ -446,8 +446,8 @@ module ip_ctrl
 	      .events(events));
 
 	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = route_op;
+	   assign inc_rc_ivc[ivc] = inc_rc;
 	   assign vc_req_ivc[ivc] = vc_req;
-	   assign vc_req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1] = vc_req_ovc;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
 	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
 	   assign flit_valid_out_ivc[ivc] = flit_valid_out;
