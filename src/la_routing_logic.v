@@ -141,7 +141,7 @@ module la_routing_logic
    
    wire [0:num_dimensions-1] 	  dim_addr_match;
    
-   wire [0:num_ports-1] 	  next_port_op;
+   wire [0:num_ports-1] 	  next_route_op;
    
    wire 			  eject;
    
@@ -160,10 +160,10 @@ module la_routing_logic
 		 vc_route_info[0:router_addr_width-1] :
 		 vc_route_info[router_addr_width:2*router_addr_width-1];
 	   
-	   wire next_class;
-	   assign next_class = (next_router_address == dest_router_address);
+	   wire next_inc_rc;
+	   assign next_inc_rc = (next_router_address == dest_router_address);
 	   
-	   assign la_route_info[num_ports] = next_class;
+	   assign la_route_info[num_ports] = next_inc_rc;
 	   
 	end
       else
@@ -259,8 +259,8 @@ module la_routing_logic
 	     
 	   endcase
 	   
-	   assign next_port_op[dim*num_neighbors_per_dim:
-			       (dim+1)*num_neighbors_per_dim-1]
+	   assign next_route_op[dim*num_neighbors_per_dim:
+				(dim+1)*num_neighbors_per_dim-1]
 		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
@@ -287,15 +287,15 @@ module la_routing_logic
 	     (.data_in(dest_node_address),
 	      .data_out(node_sel));
 	   
-	   assign next_port_op[num_ports-num_nodes_per_router:num_ports-1]
+	   assign next_route_op[num_ports-num_nodes_per_router:num_ports-1]
 		    = node_sel & {num_nodes_per_router{eject}};
 	   
 	end
       else
-	assign next_port_op[num_ports-1] = eject;
+	assign next_route_op[num_ports-1] = eject;
       
    endgenerate
    
-   assign la_route_info[0:num_ports-1] = next_port_op;
+   assign la_route_info[0:num_ports-1] = next_route_op;
    
 endmodule

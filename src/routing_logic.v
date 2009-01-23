@@ -136,7 +136,7 @@ module routing_logic
    wire 			reached_dest;
    assign reached_dest = (router_address == dest_router_address);
    
-   wire [0:num_ports-1] 	next_raw_op;
+   wire [0:num_ports-1] 	route_unmasked_op;
    wire [0:num_ports-1] 	error_op;
    wire [0:num_dimensions-1] 	dim_addr_match;
    
@@ -219,8 +219,8 @@ module routing_logic
 	     
 	   endcase
 	   
-	   assign next_raw_op[dim*num_neighbors_per_dim:
-			      (dim+1)*num_neighbors_per_dim-1]
+	   assign route_unmasked_op[dim*num_neighbors_per_dim:
+				    (dim+1)*num_neighbors_per_dim-1]
 		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
@@ -242,16 +242,17 @@ module routing_logic
 		  (.data_in(dest_node_address),
 		   .data_out(node_sel));
 		
-		assign next_raw_op[num_ports-num_nodes_per_router:num_ports-1]
+		assign route_unmasked_op[num_ports-num_nodes_per_router:
+					 num_ports-1]
 			 = node_sel & {num_nodes_per_router{&dim_addr_match}};
 		
 	     end
 	   else
-	     assign next_raw_op[num_ports-1] = &dim_addr_match;
+	     assign route_unmasked_op[num_ports-1] = &dim_addr_match;
 	   
 	end
       else
-	assign next_raw_op[num_ports-num_nodes_per_router:num_ports-1]
+	assign route_unmasked_op[num_ports-num_nodes_per_router:num_ports-1]
 		 = {num_nodes_per_router{1'b0}};
       
       genvar 					op;
@@ -275,8 +276,8 @@ module routing_logic
 	   else
 	     assign mask_port = 1'b0;
 	   
-	   assign route_op[op] = next_raw_op[op] & ~mask_port;
-	   assign error_op[op] = next_raw_op[op] & mask_port;
+	   assign route_op[op] = route_unmasked_op[op] & ~mask_port;
+	   assign error_op[op] = route_unmasked_op[op] & mask_port;
 	   
 	end
       
