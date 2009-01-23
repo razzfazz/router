@@ -334,7 +334,18 @@ module vc_alloc_core_sep_if
 				   = gnt_ovc;
 			  
 			  wire 				  gnt;
-			  assign gnt = |gnt_ovc;
+			  if(irc == (num_routing_classes - 1))
+			    assign gnt
+			      = |gnt_ovc[(itc*num_routing_classes+irc)*
+					 num_vcs_per_class:
+					 (itc*num_routing_classes+irc+1)*
+					 num_vcs_per_class-1];
+			  else
+			    assign gnt
+			      = |gnt_ovc[(itc*num_routing_classes+irc)*
+					 num_vcs_per_class:
+					 (itc*num_routing_classes+irc+2)*
+					 num_vcs_per_class-1];
 			  
 			  assign gnt_ip_ivc[((ip*num_traffic_classes+itc)*
 					     num_routing_classes+irc)*

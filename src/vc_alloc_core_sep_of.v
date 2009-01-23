@@ -216,7 +216,18 @@ module vc_alloc_core_sep_of
 			     .data_out(gnt_out_ovc));
 			  
 			  wire 			       gnt_out;
-			  assign gnt_out = |gnt_out_ovc;
+			  if(irc == (num_routing_classes - 1))
+			    assign gnt_out
+			      = |gnt_out_ovc[(itc*num_routing_classes+irc)*
+					     num_vcs_per_class:
+					     (itc*num_routing_classes+irc+1)*
+					     num_vcs_per_class-1];
+			  else
+			    assign gnt_out
+			      = |gnt_out_ovc[(itc*num_routing_classes+irc)*
+					     num_vcs_per_class:
+					     (itc*num_routing_classes+irc+2)*
+					     num_vcs_per_class-1];
 			  
 			  wire [0:num_vcs-1] 	       req_in_ovc;
 			  assign req_in_ovc = gnt_out_ovc;
