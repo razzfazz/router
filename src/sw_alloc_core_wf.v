@@ -159,7 +159,8 @@ module sw_alloc_core_wf
 		
 		wire [0:num_vcs-1] 	req_in_nonspec_ivc;
 		assign req_in_nonspec_ivc
-		  = req_in_nonspec_op_ivc[op*num_vcs:(op+1)*num_vcs-1];
+		  = req_in_nonspec_op_ivc[op*num_vcs:(op+1)*num_vcs-1] &
+		    req_nonspec_ivc;
 		
 		wire [0:num_vcs-1] 	gnt_in_nonspec_ivc;
 		arbiter
@@ -276,7 +277,8 @@ module sw_alloc_core_wf
 		     
 		     wire [0:num_vcs-1] req_in_spec_ivc;
 		     assign req_in_spec_ivc
-		       = req_in_spec_op_ivc[op*num_vcs:(op+1)*num_vcs-1];
+		       = req_in_spec_op_ivc[op*num_vcs:(op+1)*num_vcs-1] &
+			 req_spec_ivc;
 		     
 		     wire [0:num_vcs-1] gnt_in_spec_ivc;
 		     arbiter
