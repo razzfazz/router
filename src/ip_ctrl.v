@@ -31,12 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module ip_ctrl
   (clk, reset, router_address, flit_valid_in, flit_vc_in, flit_head_in,
-   flit_tail_in, flit_data_in, flow_ctrl_op_ovc, vc_req_ivc, vc_req_ivc_op, 
+   flit_tail_in, flit_data_in, flow_ctrl_op_ovc, route_ivc_op, vc_req_ivc, 
    vc_req_ivc_ovc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_req_nonspec_ivc, 
-   sw_req_nonspec_ivc_op, sw_req_spec_ivc, sw_req_spec_ivc_op, 
-   sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, flit_vc_out, 
-   flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, cred_vc_out, 
-   error);
+   sw_req_spec_ivc, sw_gnt_nonspec_ivc, sw_gnt_spec_ivc, flit_valid_out, 
+   flit_vc_out, flit_head_out, flit_tail_out, flit_data_out, cred_valid_out, 
+   cred_vc_out, error);
    
 `include "constants.v"
    
@@ -206,13 +205,13 @@ module ip_ctrl
    // controllers
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
+   // destination port
+   output [0:num_vcs*num_ports-1] route_ivc_op;
+   wire [0:num_vcs*num_ports-1] route_ivc_op;
+   
    // request VC allocation
    output [0:num_vcs-1] vc_req_ivc;
-   wire [0:num_vcs-1] vc_req_ivc;
-   
-   // desired port for VC allocation
-   output [0:num_vcs*num_ports-1] vc_req_ivc_op;
-   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
+   wire [0:num_vcs-1] 		vc_req_ivc;
    
    // allowable VCs for VC allocation
    output [0:num_vcs*num_vcs-1] vc_req_ivc_ovc;
@@ -228,17 +227,9 @@ module ip_ctrl
    output [0:num_vcs-1] sw_req_nonspec_ivc;
    wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
    
-   // port selects for non-speculative switch allocator requests
-   output [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
-   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
-   
    // speculative switch allocator requests
    output [0:num_vcs-1] sw_req_spec_ivc;
    wire [0:num_vcs-1] 		sw_req_spec_ivc;
-   
-   // port selects for speculative switch allocator requests
-   output [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
-   wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
    
    // non-speculative switch allocator grants
    input [0:num_vcs-1] sw_gnt_nonspec_ivc;
@@ -384,13 +375,11 @@ module ip_ctrl
 	   wire 	      sw_gnt_spec;
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
-	   wire 	      vc_req;
-	   wire [0:num_ports-1] vc_req_op;
+	   wire [0:num_ports-1] route_op;
+	   wire 		vc_req;
 	   wire [0:num_vcs-1] 	vc_req_ovc;
 	   wire 		sw_req_nonspec;
-	   wire [0:num_ports-1] sw_req_nonspec_op;
 	   wire 		sw_req_spec;
-	   wire [0:num_ports-1] sw_req_spec_op;
 	   wire 		flit_valid_out;
 	   wire [0:vc_idx_width-1] flit_vc_out;
 	   wire 		   flit_head_out;
@@ -431,15 +420,13 @@ module ip_ctrl
 	      .flit_tail_in(flit_tail_in_q),
 	      .header_info_in(header_info_in_q),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
+	      .route_op(route_op),
 	      .vc_req(vc_req),
-	      .vc_req_op(vc_req_op),
 	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .sw_req_nonspec(sw_req_nonspec),
-	      .sw_req_nonspec_op(sw_req_nonspec_op),
 	      .sw_req_spec(sw_req_spec),
-	      .sw_req_spec_op(sw_req_spec_op),
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
 	      .flit_valid_out(flit_valid_out),
@@ -451,16 +438,12 @@ module ip_ctrl
 	      .fbf_read_addr(fbf_read_addr),
 	      .error(ivcc_error),
 	      .events(events));
-	   
+
+	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = route_op;
 	   assign vc_req_ivc[ivc] = vc_req;
-	   assign vc_req_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = vc_req_op;
 	   assign vc_req_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1] = vc_req_ovc;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
-	   assign sw_req_nonspec_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
-		    = sw_req_nonspec_op;
 	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
-	   assign sw_req_spec_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
-		    = sw_req_spec_op;
 	   assign flit_valid_out_ivc[ivc] = flit_valid_out;
 	   assign flit_vc_out_ivc[ivc*vc_idx_width:(ivc+1)*vc_idx_width-1]
 		    = flit_vc_out;

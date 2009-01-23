@@ -31,11 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, flow_ctrl_op_ovc, vc_req, vc_req_op, vc_req_ovc, vc_gnt, 
-   vc_gnt_ovc, sw_req_nonspec, sw_req_nonspec_op, sw_req_spec, sw_req_spec_op, 
-   sw_gnt_nonspec, sw_gnt_spec, flit_valid_out, flit_head_out, flit_tail_out, 
-   flit_vc_out, la_route_info_out, fbf_write_addr, fbf_read_addr, error, 
-   events);
+   header_info_in, flow_ctrl_op_ovc, route_op, vc_req, vc_req_ovc, vc_gnt, 
+   vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
+   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, la_route_info_out,
+   fbf_write_addr, fbf_read_addr, error, events);
    
 `include "constants.v"
    
@@ -231,13 +230,13 @@ module ivc_ctrl
    // controllers
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
+   // destination port
+   output [0:num_ports-1] route_op;
+   wire [0:num_ports-1] route_op;
+   
    // request VC allocation
    output vc_req;
    wire vc_req;
-   
-   // desired port for VC allocation
-   output [0:num_ports-1] vc_req_op;
-   wire [0:num_ports-1] vc_req_op;
    
    // allowable VCs for VC allocation
    output [0:num_vcs-1] vc_req_ovc;
@@ -253,17 +252,9 @@ module ivc_ctrl
    output sw_req_nonspec;
    wire 		sw_req_nonspec;
    
-   // port selects for non-speculative switch allocator requests
-   output [0:num_ports-1] sw_req_nonspec_op;
-   wire [0:num_ports-1] sw_req_nonspec_op;
-   
    // speculative switch allocator requests
    output sw_req_spec;
    wire 		sw_req_spec;
-   
-   // port selects for speculative switch allocator requests
-   output [0:num_ports-1] sw_req_spec_op;
-   wire [0:num_ports-1] sw_req_spec_op;
    
    // non-speculative switch allocator grants
    input sw_gnt_nonspec;
@@ -338,7 +329,6 @@ module ivc_ctrl
 		  (traffic_class*num_routing_classes+routing_class+1)*
 		  num_vcs_per_class-1];
    
-   wire 			rtl_inc_rc;
    wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
    
    generate
@@ -664,17 +654,18 @@ module ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] rtl_route_unmasked_op;
-   assign rtl_route_unmasked_op = hdff_la_route_info[0:num_ports-1];
+   wire [0:num_ports-1] route_unmasked_op;
+   assign route_unmasked_op = hdff_la_route_info[0:num_ports-1];
    
-   wire [0:num_classes-1] rtl_next_class;
+   wire 		inc_rc;
+   wire [0:num_classes-1] next_class;
    
    generate
       
       if(routing_class < (num_routing_classes - 1))
-	assign rtl_inc_rc = hdff_la_route_info[num_ports];
+	assign inc_rc = hdff_la_route_info[num_ports];
       else
-	assign rtl_inc_rc = 1'b0;
+	assign inc_rc = 1'b0;
       
       genvar otc;
       
@@ -687,13 +678,13 @@ module ivc_ctrl
 	     begin:orcs
 		
 		if((otc == traffic_class) && (orc == routing_class))
-		  assign rtl_next_class[otc*num_routing_classes+orc]
-			   = ~rtl_inc_rc;
+		  assign next_class[otc*num_routing_classes+orc]
+			   = ~inc_rc;
 		else if((otc == traffic_class) && (orc == (routing_class + 1)))
-		  assign rtl_next_class[otc*num_routing_classes+orc]
-			   = rtl_inc_rc;
+		  assign next_class[otc*num_routing_classes+orc]
+			   = inc_rc;
 		else
-		  assign rtl_next_class[otc*num_routing_classes+orc]
+		  assign next_class[otc*num_routing_classes+orc]
 			   = 1'b0;
 		
 	     end
@@ -702,8 +693,7 @@ module ivc_ctrl
       
    endgenerate
    
-   wire [0:num_ports-1] rtl_route_op;
-   wire rtl_error_unmasked;
+   wire pf_error_unmasked;
    
    port_filter
      #(.num_traffic_classes(num_traffic_classes),
@@ -717,21 +707,21 @@ module ivc_ctrl
        .traffic_class(traffic_class),
        .routing_class(routing_class))
    pf
-     (.route_op_in(rtl_route_unmasked_op),
-      .inc_rc(rtl_inc_rc),
-      .route_op_out(rtl_route_op),
-      .error(rtl_error_unmasked));
+     (.route_op_in(route_unmasked_op),
+      .inc_rc(inc_rc),
+      .route_op_out(route_op),
+      .error(pf_error_unmasked));
    
-   wire 	      rtl_error;
-   assign rtl_error = rtl_error_unmasked & header_valid;
+   wire pf_error;
+   assign pf_error = pf_error_unmasked & header_valid;
    
-   wire [0:num_vcs-1] rtl_next_vcs;
+   wire [0:num_vcs-1] next_vcs;
    replicator
      #(.width(num_classes),
        .count(num_vcs_per_class))
-   rtl_next_vcs_repl
-     (.data_in(rtl_next_class),
-      .data_out(rtl_next_vcs));
+   next_vcs_repl
+     (.data_in(next_class),
+      .data_out(next_vcs));
    
    la_routing_logic
      #(.num_traffic_classes(num_traffic_classes),
@@ -748,8 +738,8 @@ module ivc_ctrl
        .routing_class(routing_class))
    lar
      (.router_address(router_address),
-      .route_op(rtl_route_op),
-      .inc_rc(rtl_inc_rc),
+      .route_op(route_op),
+      .inc_rc(inc_rc),
       .vc_route_info(hdff_vc_route_info),
       .la_route_info(la_route_info_out));
    
@@ -763,7 +753,7 @@ module ivc_ctrl
      #(.num_ports(num_ports),
        .width(num_vcs*int_flow_ctrl_width))
    flow_ctrl_ovc_sel
-     (.select(rtl_route_op),
+     (.select(route_op),
       .data_in(flow_ctrl_op_ovc),
       .data_out(flow_ctrl_ovc));
    
@@ -798,7 +788,7 @@ module ivc_ctrl
 				    (traffic_class*num_routing_classes+
 				     routing_class+2)*num_vcs_per_class*2-1];
 		  
-		  assign free_ocvc = rtl_inc_rc ?
+		  assign free_ocvc = inc_rc ?
 				     free_changed_ocvc :
 				     free_unchanged_ocvc;
 		  
@@ -890,7 +880,7 @@ module ivc_ctrl
 				    (traffic_class*num_routing_classes+
 				     routing_class+2)*num_vcs_per_class-1];
 		  
-		  assign cred_ocvc = rtl_inc_rc ?
+		  assign cred_ocvc = inc_rc ?
 				     cred_changed_ocvc :
 				     cred_unchanged_ocvc;
 		  
@@ -959,26 +949,18 @@ module ivc_ctrl
    
    assign sw_req_nonspec
      = header_valid & flit_valid & vc_allocated_q & free_allocated;
-   assign sw_req_nonspec_op = rtl_route_op;
    
    generate
       
       if(sw_spec_enable)
-	begin
-	   assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
-	   assign sw_req_spec_op = rtl_route_op;
-	end
+	assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
       else
-	begin
-	   assign sw_req_spec = 1'b0;
-	   assign sw_req_spec_op = {num_ports{1'b0}};
-	end
+	assign sw_req_spec = 1'b0;
       
    endgenerate
    
    assign vc_req = header_valid & ~vc_allocated_q;
-   assign vc_req_op = rtl_route_op;
-   assign vc_req_ovc = rtl_next_vcs;
+   assign vc_req_ovc = next_vcs;
    
    
    //---------------------------------------------------------------------------
@@ -1019,14 +1001,14 @@ module ivc_ctrl
 			   num_vcs_per_class:
 			   (traffic_class*num_routing_classes+routing_class+1)*
 			   num_vcs_per_class-1]
-		    = flit_ocvc & {num_vcs_per_class{~rtl_inc_rc}};
+		    = flit_ocvc & {num_vcs_per_class{~inc_rc}};
 	   
 	   if(routing_class < (num_routing_classes - 1))
 	     assign flit_ovc[(traffic_class*num_routing_classes+
 			      routing_class+1)*num_vcs_per_class:
 			     (traffic_class*num_routing_classes+
 			      routing_class+2)*num_vcs_per_class-1]
-		      = flit_ocvc & {num_vcs_per_class{rtl_inc_rc}};
+		      = flit_ocvc & {num_vcs_per_class{inc_rc}};
 
 	   if(routing_class < (num_routing_classes - 2))
 	     assign flit_ovc[(traffic_class*num_routing_classes+
@@ -1095,7 +1077,7 @@ module ivc_ctrl
    wire [0:2] 		       errors_in;
    assign errors_in = {flit_valid & ~header_valid,
 		       cred_tracker_error,
-		       rtl_error};
+		       pf_error};
    
    wire [0:2] 		       errors_out;
    checker

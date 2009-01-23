@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant using separable input-first allocation
 module vc_alloc_core_sep_if
-  (clk, reset, req_ip_ivc, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, 
+  (clk, reset, route_ip_ivc_op, req_ip_ivc, req_ip_ivc_ovc, elig_op_ovc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
@@ -61,13 +61,13 @@ module vc_alloc_core_sep_if
    input clk;
    input reset;
    
-   // request VC allocation (for each input VC)
+   // destination port select
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   
+   // request VC allocation
    input [0:num_ports*num_vcs-1] req_ip_ivc;
    
-   // desired port for VC allocation (for each input VC)
-   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
-   
-   // allowable VCs for VC allocation (for each input VC)
+   // allowable VCs for VC allocation
    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
@@ -132,14 +132,14 @@ module vc_alloc_core_sep_if
 			  // input-side arbitration stage (select output VC)
 			  //----------------------------------------------------
 			  
-			  wire [0:num_ports-1] 	     req_op;
+			  wire [0:num_ports-1] 	     route_op;
 			  
 			  wire [0:num_vcs-1] 	     elig_ovc;
 			  select_1ofn
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  elig_ovc_sel
-			    (.select(req_op),
+			    (.select(route_op),
 			     .data_in(elig_op_ovc),
 			     .data_out(elig_ovc));
 			  
@@ -278,15 +278,15 @@ module vc_alloc_core_sep_if
 						   num_routing_classes+irc)*
 						  num_vcs_per_class+icvc];
 			  
-			  assign req_op
-			    = req_ip_ivc_op[(((ip*num_traffic_classes+itc)*
-					      num_routing_classes+irc)*
-					     num_vcs_per_class+icvc)*
-					    num_ports:
-					    (((ip*num_traffic_classes+itc)*
-					      num_routing_classes+irc)*
-					     num_vcs_per_class+icvc+1)*
-					    num_ports-1];
+			  assign route_op
+			    = route_ip_ivc_op[(((ip*num_traffic_classes+itc)*
+						num_routing_classes+irc)*
+					       num_vcs_per_class+icvc)*
+					      num_ports:
+					      (((ip*num_traffic_classes+itc)*
+						num_routing_classes+irc)*
+					       num_vcs_per_class+icvc+1)*
+					      num_ports-1];
 			  
 			  genvar 				 op;
 			  
@@ -295,7 +295,7 @@ module vc_alloc_core_sep_if
 			       
 			       wire [0:num_vcs-1] 	  req_out_ovc;
 			       assign req_out_ovc
-				 = {num_vcs{req & req_op[op]}} & gnt_in_ovc;
+				 = {num_vcs{req & route_op[op]}} & gnt_in_ovc;
 			       
 			       assign req_out_ip_ivc_op_ovc[
                                   ((((ip*num_traffic_classes+itc)*

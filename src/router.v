@@ -237,17 +237,16 @@ module router
    wire [0:num_ports*num_vcs-1]      elig_op_ovc;
    wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
    
+   wire [0:num_ports*num_vcs*num_ports-1] 	    route_ip_ivc_op;
+
    wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
-   wire [0:num_ports*num_vcs*num_ports-1] 	    vc_req_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_req_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
    
    wire [0:num_ports*num_vcs-1] 		    sw_req_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_nonspec_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 		    sw_req_spec_ip_ivc;
-   wire [0:num_ports*num_vcs*num_ports-1] 	    sw_req_spec_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_ports-1] 		    sw_gnt_ip_op;
@@ -301,13 +300,11 @@ module router
 	   assign sw_gnt_spec_ivc
 	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs-1] 	      vc_req_ivc;
-	   wire [0:num_vcs*num_ports-1] vc_req_ivc_op;
+	   wire [0:num_vcs*num_ports-1] route_ivc_op;
+	   wire [0:num_vcs-1] 		vc_req_ivc;
 	   wire [0:num_vcs*num_vcs-1] 	vc_req_ivc_ovc;
 	   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
-	   wire [0:num_vcs*num_ports-1] sw_req_nonspec_ivc_op;
 	   wire [0:num_vcs-1] 		sw_req_spec_ivc;
-	   wire [0:num_vcs*num_ports-1] sw_req_spec_ivc_op;
 	   wire 			flit_valid_out;
 	   wire [0:vc_idx_width-1] 	flit_vc_out;
 	   wire 			flit_head_out;
@@ -350,15 +347,13 @@ module router
 	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
 	      .flow_ctrl_op_ovc(flow_ctrl_op_ovc),
+	      .route_ivc_op(route_ivc_op),
 	      .vc_req_ivc(vc_req_ivc),
-	      .vc_req_ivc_op(vc_req_ivc_op),
 	      .vc_req_ivc_ovc(vc_req_ivc_ovc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
 	      .sw_req_nonspec_ivc(sw_req_nonspec_ivc),
-	      .sw_req_nonspec_ivc_op(sw_req_nonspec_ivc_op),
 	      .sw_req_spec_ivc(sw_req_spec_ivc),
-	      .sw_req_spec_ivc_op(sw_req_spec_ivc_op),
 	      .sw_gnt_nonspec_ivc(sw_gnt_nonspec_ivc),
 	      .sw_gnt_spec_ivc(sw_gnt_spec_ivc),
 	      .flit_valid_out(flit_valid_out),
@@ -370,21 +365,15 @@ module router
 	      .cred_vc_out(cred_vc_out),
 	      .error(ipc_error));
 	   
+	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
+				  (ip+1)*num_vcs*num_ports-1] = route_ivc_op;
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
-	   assign vc_req_ip_ivc_op[ip*num_vcs*num_ports:
-				   (ip+1)*num_vcs*num_ports-1] = vc_req_ivc_op;
 	   assign vc_req_ip_ivc_ovc[ip*num_vcs*num_vcs:
 				    (ip+1)*num_vcs*num_vcs-1] = vc_req_ivc_ovc;
 	   assign sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = sw_req_nonspec_ivc;
-	   assign sw_req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
-					   (ip+1)*num_vcs*num_ports-1]
-		    = sw_req_nonspec_ivc_op;
 	   assign sw_req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = sw_req_spec_ivc;
-	   assign sw_req_spec_ip_ivc_op[ip*num_vcs*num_ports:
-					(ip+1)*num_vcs*num_ports-1]
-		    = sw_req_spec_ivc_op;
 	   assign xbc_data_in_ip[ip*xbc_width:
 				 (ip+1)*xbc_width-1]
 		    = {flit_valid_out, flit_head_out, flit_tail_out,
@@ -420,8 +409,8 @@ module router
    vca
      (.clk(clk),
       .reset(reset),
+      .route_ip_ivc_op(route_ip_ivc_op),
       .req_ip_ivc(vc_req_ip_ivc),
-      .req_ip_ivc_op(vc_req_ip_ivc_op),
       .req_ip_ivc_ovc(vc_req_ip_ivc_ovc),
       .elig_op_ovc(elig_op_ovc),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
@@ -445,10 +434,9 @@ module router
    swa
      (.clk(clk),
       .reset(reset),
+      .route_ip_ivc_op(route_ip_ivc_op),
       .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
-      .req_nonspec_ip_ivc_op(sw_req_nonspec_ip_ivc_op),
       .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-      .req_spec_ip_ivc_op(sw_req_spec_ip_ivc_op),
       .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
       .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
       .gnt_ip_op(sw_gnt_ip_op));

@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant using wavefront allocation
 module sw_alloc_core_wf
-  (clk, reset, req_nonspec_ip_ivc, req_nonspec_ip_ivc_op, req_spec_ip_ivc, 
-   req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
+  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "constants.v"
    
@@ -55,17 +55,14 @@ module sw_alloc_core_wf
    input clk;
    input reset;
    
+   // destination port selects
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
    
-   // port selects for non-speculative switch requests
-   input [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
-   
    // speculative switch requests
    input [0:num_ports*num_vcs-1] req_spec_ip_ivc;
-   
-   // port selects for speculative switch requests
-   input [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
    
    // grants corresponding to non-speculative requests (to input controller)
    output [0:num_ports*num_vcs-1] gnt_nonspec_ip_ivc;
@@ -102,6 +99,18 @@ module sw_alloc_core_wf
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
+	   wire [0:num_vcs*num_ports-1] route_ivc_op;
+	   assign route_ivc_op
+	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
+	   
+	   wire [0:num_ports*num_vcs-1] route_op_ivc;
+	   interleaver
+	     #(.width(num_vcs*num_ports),
+	       .num_blocks(num_vcs))
+	   route_op_ivc_intl
+	     (.data_in(route_ivc_op),
+	      .data_out(route_op_ivc));
+	   
 	   //-------------------------------------------------------------------
 	   // combine requests from all VCs
 	   //-------------------------------------------------------------------
@@ -110,21 +119,13 @@ module sw_alloc_core_wf
 	   assign req_nonspec_ivc
 	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_ports-1] req_nonspec_ivc_op;
-	   assign req_nonspec_ivc_op
-	     = req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
-				     (ip+1)*num_vcs*num_ports-1];
-	   
-	   wire [0:num_vcs*num_ports-1] req_in_nonspec_ivc_op;
-	   assign req_in_nonspec_ivc_op = req_nonspec_ivc_op;
-	   
 	   wire [0:num_ports-1] 	req_wf_nonspec_op;
 	   select_1ofn
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
 	   req_wf_nonspec_op_sel
 	     (.select(req_nonspec_ivc),
-	      .data_in(req_nonspec_ivc_op),
+	      .data_in(route_ivc_op),
 	      .data_out(req_wf_nonspec_op));
 	   
 	   assign req_wf_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
@@ -134,14 +135,6 @@ module sw_alloc_core_wf
 	   //-------------------------------------------------------------------
 	   // pre-select winning VC for each output
 	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_ports*num_vcs-1] req_in_nonspec_op_ivc;
-	   interleaver
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   req_in_nonspec_op_ivc_intl
-	     (.data_in(req_in_nonspec_ivc_op),
-	      .data_out(req_in_nonspec_op_ivc));
 	   
 	   wire [0:num_ports-1] 	gnt_wf_nonspec_op;
 	   assign gnt_wf_nonspec_op
@@ -157,10 +150,11 @@ module sw_alloc_core_wf
 		wire 			update_arb_nonspec;
 		assign update_arb_nonspec = gnt_wf_nonspec_op[op];
 		
+		wire [0:num_vcs-1] 	route_ivc;
+		assign route_ivc = route_op_ivc[op*num_vcs:(op+1)*num_vcs-1];
+		
 		wire [0:num_vcs-1] 	req_in_nonspec_ivc;
-		assign req_in_nonspec_ivc
-		  = req_in_nonspec_op_ivc[op*num_vcs:(op+1)*num_vcs-1] &
-		    req_nonspec_ivc;
+		assign req_in_nonspec_ivc = route_ivc & req_nonspec_ivc;
 		
 		wire [0:num_vcs-1] 	gnt_in_nonspec_ivc;
 		arbiter
@@ -230,21 +224,13 @@ module sw_alloc_core_wf
 		assign req_spec_ivc
 		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 		
-		wire [0:num_vcs*num_ports-1] req_spec_ivc_op;
-		assign req_spec_ivc_op
-		  = req_spec_ip_ivc_op[ip*num_vcs*num_ports:
-				       (ip+1)*num_vcs*num_ports-1];
-		
-		wire [0:num_vcs*num_ports-1] req_in_spec_ivc_op;
-		assign req_in_spec_ivc_op = req_spec_ivc_op;
-		
 		wire [0:num_ports-1] 	     req_wf_spec_op;
 		select_1ofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
 		req_wf_spec_op_sel
 		  (.select(req_spec_ivc),
-		   .data_in(req_spec_ivc_op),
+		   .data_in(route_ivc_op),
 		   .data_out(req_wf_spec_op));
 		
 		assign req_wf_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
@@ -254,14 +240,6 @@ module sw_alloc_core_wf
 		//--------------------------------------------------------------
 		// pre-select winning VC for each output
 		//--------------------------------------------------------------
-		
-		wire [0:num_ports*num_vcs-1] req_in_spec_op_ivc;
-		interleaver
-		  #(.width(num_vcs*num_ports),
-		    .num_blocks(num_vcs))
-		req_in_spec_op_ivc_intl
-		  (.data_in(req_in_spec_ivc_op),
-		   .data_out(req_in_spec_op_ivc));
 		
 		wire [0:num_ports-1] 	     gnt_wf_spec_op;
 		assign gnt_wf_spec_op
@@ -275,10 +253,12 @@ module sw_alloc_core_wf
 		     wire update_arb_spec;
 		     assign update_arb_spec = gnt_wf_spec_op[op];
 		     
+		     wire [0:num_vcs-1] route_ivc;
+		     assign route_ivc
+		       = route_op_ivc[op*num_vcs:(op+1)*num_vcs-1];
+		     
 		     wire [0:num_vcs-1] req_in_spec_ivc;
-		     assign req_in_spec_ivc
-		       = req_in_spec_op_ivc[op*num_vcs:(op+1)*num_vcs-1] &
-			 req_spec_ivc;
+		     assign req_in_spec_ivc = route_ivc & req_spec_ivc;
 		     
 		     wire [0:num_vcs-1] gnt_in_spec_ivc;
 		     arbiter

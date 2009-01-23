@@ -1,4 +1,4 @@
-// $Id: vc_alloc_core_sep_of.v 1026 2009-01-20 22:43:03Z dub $
+// $Id$
 
 /*
 Copyright (c) 2007, Trustees of Leland Stanford Junior University
@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant based using wavefront allocation
 module vc_alloc_core_wf
-  (clk, reset, req_ip_ivc, req_ip_ivc_op, req_ip_ivc_ovc, elig_op_ovc, 
+  (clk, reset, route_ip_ivc_op, req_ip_ivc, req_ip_ivc_ovc, elig_op_ovc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "constants.v"
@@ -61,13 +61,13 @@ module vc_alloc_core_wf
    input clk;
    input reset;
    
-   // request VC allocation (for each input VC)
+   // destination port selects
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   
+   // request VC allocation
    input [0:num_ports*num_vcs-1] req_ip_ivc;
    
-   // desired port for VC allocation (for each input VC)
-   input [0:num_ports*num_vcs*num_ports-1] req_ip_ivc_op;
-   
-   // allowable VCs for VC allocation (for each input VC)
+   // allowable VCs for VC allocation
    input [0:num_ports*num_vcs*num_vcs-1] req_ip_ivc_ovc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
@@ -122,10 +122,10 @@ module vc_alloc_core_wf
 		wire req;
 		assign req = req_ip_ivc[ip*num_vcs+ivc];
 		
-		wire [0:num_ports-1] req_op;
-		assign req_op
-		  = req_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
-				  (ip*num_vcs+ivc+1)*num_ports-1];
+		wire [0:num_ports-1] route_op;
+		assign route_op
+		  = route_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
+				    (ip*num_vcs+ivc+1)*num_ports-1];
 		
 		wire [0:num_vcs-1]   req_ovc;
 		assign req_ovc
@@ -142,7 +142,7 @@ module vc_alloc_core_wf
 		     
 		     wire [0:num_vcs-1] 	     req_wf_ovc;
 		     assign req_wf_ovc
-		       = {num_vcs{req & req_op[op]}} & req_ovc & elig_ovc;
+		       = {num_vcs{req & route_op[op]}} & req_ovc & elig_ovc;
 		     
 		     assign req_wf_ip_ivc_op_ovc[((ip*num_vcs+ivc)*
 						  num_ports+op)*num_vcs:

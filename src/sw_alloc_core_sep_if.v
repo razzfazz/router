@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant usign separable input-first allocation
 module sw_alloc_core_sep_if
-  (clk, reset, req_nonspec_ip_ivc, req_nonspec_ip_ivc_op, req_spec_ip_ivc, 
-   req_spec_ip_ivc_op, gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
+  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "constants.v"
    
@@ -52,17 +52,14 @@ module sw_alloc_core_sep_if
    input clk;
    input reset;
    
+   // destination port selects
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
    
-   // port selects for non-speculative switch requests
-   input [0:num_ports*num_vcs*num_ports-1] req_nonspec_ip_ivc_op;
-   
    // speculative switch requests
    input [0:num_ports*num_vcs-1] req_spec_ip_ivc;
-   
-   // port selects for speculative switch requests
-   input [0:num_ports*num_vcs*num_ports-1] req_spec_ip_ivc_op;
    
    // grants corresponding to non-speculative requests (to input controller)
    output [0:num_ports*num_vcs-1] gnt_nonspec_ip_ivc;
@@ -99,6 +96,10 @@ module sw_alloc_core_sep_if
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
+	   wire [0:num_vcs*num_ports-1] route_ivc_op;
+	   assign route_ivc_op
+	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
+	   
 	   //-------------------------------------------------------------------
 	   // perform input-side arbitration
 	   //-------------------------------------------------------------------
@@ -116,11 +117,6 @@ module sw_alloc_core_sep_if
 	   wire [0:num_vcs-1] 	req_nonspec_ivc;
 	   assign req_nonspec_ivc
 	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire [0:num_vcs*num_ports-1] req_nonspec_ivc_op;
-	   assign req_nonspec_ivc_op
-	     = req_nonspec_ip_ivc_op[ip*num_vcs*num_ports:
-				     (ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_vcs-1] 		req_in_nonspec_ivc;
 	   assign req_in_nonspec_ivc = req_nonspec_ivc;
@@ -148,7 +144,7 @@ module sw_alloc_core_sep_if
 	       .num_ports(num_vcs))
 	   req_out_nonspec_op_sel
 	     (.select(gnt_in_nonspec_ivc),
-	      .data_in(req_nonspec_ivc_op),
+	      .data_in(route_ivc_op),
 	      .data_out(req_out_nonspec_op));
 	   
 	   assign req_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
@@ -191,11 +187,6 @@ module sw_alloc_core_sep_if
 		assign req_spec_ivc
 		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 		
-		wire [0:num_vcs*num_ports-1] req_spec_ivc_op;
-		assign req_spec_ivc_op
-		  = req_spec_ip_ivc_op[ip*num_vcs*num_ports:
-				       (ip+1)*num_vcs*num_ports-1];
-		
 		wire [0:num_vcs-1] 	     req_in_spec_ivc;
 		assign req_in_spec_ivc = req_spec_ivc;
 		
@@ -222,7 +213,7 @@ module sw_alloc_core_sep_if
 		    .num_ports(num_vcs))
 		req_out_spec_op_sel
 		  (.select(gnt_in_spec_ivc),
-		   .data_in(req_spec_ivc_op),
+		   .data_in(route_ivc_op),
 		   .data_out(req_out_spec_op));
 		
 		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
