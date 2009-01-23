@@ -403,15 +403,15 @@ module testbench
 		assign la_route_info_in
 		  = header_info[0:la_route_info_width-1];
 		
-		wire [0:num_ports-1] 	       la_route_port_op;
-		assign la_route_port_op = la_route_info_in[0:num_ports-1];
+		wire [0:num_ports-1] 	       la_route_op;
+		assign la_route_op = la_route_info_in[0:num_ports-1];
 		
-		wire 			       la_route_change_class;
+		wire 			       la_inc_rc;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_change_class = la_route_info_in[num_ports];
+		  assign la_inc_rc = la_route_info_in[num_ports];
 		else
-		  assign la_route_change_class = 1'b0;
+		  assign la_inc_rc = 1'b0;
 		
 		wire [0:route_info_width-1]    route_info;
 		assign route_info
@@ -581,8 +581,8 @@ module testbench
 			      .routing_class(irc))
 			  lar
 			    (.router_address(router_address),
-			     .route_port_op(la_route_port_op),
-			     .route_change_class(la_route_change_class),
+			     .route_op(la_route_op),
+			     .inc_rc(la_inc_rc),
 			     .vc_route_info(vc_route_info_la),
 			     .la_route_info(la_route_info));
 			  

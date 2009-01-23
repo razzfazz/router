@@ -338,7 +338,7 @@ module ivc_ctrl
 		  (traffic_class*num_routing_classes+routing_class+1)*
 		  num_vcs_per_class-1];
    
-   wire 			rtl_change_class;
+   wire 			rtl_inc_rc;
    wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
    
    generate
@@ -664,16 +664,16 @@ module ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] rtl_port_op;
+   wire [0:num_ports-1] rtl_route_op;
    wire [0:num_ports-1] rtl_error_op;
    wire [0:num_classes-1] rtl_next_class;
    
    generate
       
       if(routing_class < (num_routing_classes - 1))
-	assign rtl_change_class = hdff_la_route_info[num_ports];
+	assign rtl_inc_rc = hdff_la_route_info[num_ports];
       else
-	assign rtl_change_class = 1'b0;
+	assign rtl_inc_rc = 1'b0;
       
       genvar 		  op;
       
@@ -691,7 +691,7 @@ module ivc_ctrl
 	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
-	     assign mask_port = ~rtl_change_class;
+	     assign mask_port = ~rtl_inc_rc;
 	   else if((op >= (num_ports - num_nodes_per_router)) &&
 		   ((routing_class < (num_routing_classes - 1)) ||
 		    (op == port_id)))
@@ -699,7 +699,7 @@ module ivc_ctrl
 	   else
 	     assign mask_port = 1'b0;
 	   
-	   assign rtl_port_op[op] = port_sel & ~mask_port;
+	   assign rtl_route_op[op] = port_sel & ~mask_port;
 	   assign rtl_error_op[op] = port_sel & mask_port & header_valid;
 	   
 	end
@@ -716,10 +716,10 @@ module ivc_ctrl
 		
 		if((otc == traffic_class) && (orc == routing_class))
 		  assign rtl_next_class[otc*num_routing_classes+orc]
-			   = ~rtl_change_class;
+			   = ~rtl_inc_rc;
 		else if((otc == traffic_class) && (orc == (routing_class + 1)))
 		  assign rtl_next_class[otc*num_routing_classes+orc]
-			   = rtl_change_class;
+			   = rtl_inc_rc;
 		else
 		  assign rtl_next_class[otc*num_routing_classes+orc]
 			   = 1'b0;
@@ -756,8 +756,8 @@ module ivc_ctrl
        .routing_class(routing_class))
    lar
      (.router_address(router_address),
-      .route_port_op(rtl_port_op),
-      .route_change_class(rtl_change_class),
+      .route_op(rtl_route_op),
+      .inc_rc(rtl_inc_rc),
       .vc_route_info(hdff_vc_route_info),
       .la_route_info(la_route_info_out));
    
@@ -771,7 +771,7 @@ module ivc_ctrl
      #(.num_ports(num_ports),
        .width(num_vcs*int_flow_ctrl_width))
    flow_ctrl_ovc_sel
-     (.select(rtl_port_op),
+     (.select(rtl_route_op),
       .data_in(flow_ctrl_op_ovc),
       .data_out(flow_ctrl_ovc));
    
@@ -806,7 +806,7 @@ module ivc_ctrl
 				    (traffic_class*num_routing_classes+
 				     routing_class+2)*num_vcs_per_class*2-1];
 		  
-		  assign free_ocvc = rtl_change_class ?
+		  assign free_ocvc = rtl_inc_rc ?
 				     free_changed_ocvc :
 				     free_unchanged_ocvc;
 		  
@@ -898,7 +898,7 @@ module ivc_ctrl
 				    (traffic_class*num_routing_classes+
 				     routing_class+2)*num_vcs_per_class-1];
 		  
-		  assign cred_ocvc = rtl_change_class ?
+		  assign cred_ocvc = rtl_inc_rc ?
 				     cred_changed_ocvc :
 				     cred_unchanged_ocvc;
 		  
@@ -967,14 +967,14 @@ module ivc_ctrl
    
    assign sw_req_nonspec
      = header_valid & flit_valid & vc_allocated_q & free_allocated;
-   assign sw_req_nonspec_op = rtl_port_op;
+   assign sw_req_nonspec_op = rtl_route_op;
    
    generate
       
       if(sw_spec_enable)
 	begin
 	   assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
-	   assign sw_req_spec_op = rtl_port_op;
+	   assign sw_req_spec_op = rtl_route_op;
 	end
       else
 	begin
@@ -985,7 +985,7 @@ module ivc_ctrl
    endgenerate
    
    assign vc_req = header_valid & ~vc_allocated_q;
-   assign vc_req_op = rtl_port_op;
+   assign vc_req_op = rtl_route_op;
    assign vc_req_ovc = rtl_next_vcs;
    
    
@@ -1027,14 +1027,14 @@ module ivc_ctrl
 			   num_vcs_per_class:
 			   (traffic_class*num_routing_classes+routing_class+1)*
 			   num_vcs_per_class-1]
-		    = flit_ocvc & {num_vcs_per_class{~rtl_change_class}};
+		    = flit_ocvc & {num_vcs_per_class{~rtl_inc_rc}};
 	   
 	   if(routing_class < (num_routing_classes - 1))
 	     assign flit_ovc[(traffic_class*num_routing_classes+
 			      routing_class+1)*num_vcs_per_class:
 			     (traffic_class*num_routing_classes+
 			      routing_class+2)*num_vcs_per_class-1]
-		      = flit_ocvc & {num_vcs_per_class{rtl_change_class}};
+		      = flit_ocvc & {num_vcs_per_class{rtl_inc_rc}};
 
 	   if(routing_class < (num_routing_classes - 2))
 	     assign flit_ovc[(traffic_class*num_routing_classes+
