@@ -186,7 +186,7 @@ module vc_alloc_core_wf
 	   
 	   genvar ovc;
 	   
-	   for(ovc = 0; ovc < num_ports; ovc = ovc + 1)
+	   for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	     begin:ovcs
 		
 		wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
