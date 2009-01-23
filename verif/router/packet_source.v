@@ -470,8 +470,8 @@ module packet_source
 					router_addr_width+node_addr_width-1];
 		
 		wire 			       rtl_error;
-		wire [0:num_ports-1] 	       next_port;
-		wire 			       next_inc_rc;
+		wire [0:num_ports-1] 	       route_op;
+		wire 			       inc_rc;
 		routing_logic
 		  #(.num_traffic_classes(num_traffic_classes),
 		    .num_routing_classes(num_routing_classes),
@@ -488,16 +488,16 @@ module packet_source
 		rtl
 		  (.router_address(router_address),
 		   .vc_route_info(vc_route_info),
-		   .next_op(next_port),
-		   .next_inc_rc(next_inc_rc),
+		   .route_op(route_op),
+		   .inc_rc(inc_rc),
 		   .error(rtl_error));
 		
 		wire [0:la_route_info_width-1] la_route_info;
 		
-		assign la_route_info[0:num_ports-1] = next_port;
+		assign la_route_info[0:num_ports-1] = route_op;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_info[num_ports] = next_inc_rc;
+		  assign la_route_info[num_ports] = inc_rc;
 		
 		assign la_route_info_ivc[(itc*num_routing_classes+irc)*
 					 num_vcs_per_class*

@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module routing_logic
-  (router_address, vc_route_info, next_op, next_inc_rc, error);
+  (router_address, vc_route_info, route_op, inc_rc, error);
    
 `include "constants.v"
    
@@ -116,13 +116,13 @@ module routing_logic
    input [0:vc_route_info_width-1] vc_route_info;
    
    // output port to forward to
-   output [0:num_ports-1] next_op;
-   wire [0:num_ports-1] next_op;
+   output [0:num_ports-1] route_op;
+   wire [0:num_ports-1] route_op;
    
    // if we have reached our destination for the current routing class, 
    // increment the routing class (unless it's already the highest)
-   output next_inc_rc;
-   wire 		next_inc_rc;
+   output inc_rc;
+   wire 		inc_rc;
    
    // internal error condition detected
    output error;
@@ -143,9 +143,9 @@ module routing_logic
    generate
    
       if(routing_class == (num_routing_classes - 1))
-	assign next_inc_rc = 1'b0;
+	assign inc_rc = 1'b0;
       else
-	assign next_inc_rc = reached_dest;
+	assign inc_rc = reached_dest;
       
       genvar 			dim;
       
@@ -267,7 +267,7 @@ module routing_logic
 	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
-	     assign mask_port = ~reached_dest;
+	     assign mask_port = ~inc_rc;
 	   else if((op >= (num_ports - num_nodes_per_router)) &&
 		   ((routing_class < (num_routing_classes - 1)) ||
 		    (op == port_id)))
@@ -275,7 +275,7 @@ module routing_logic
 	   else
 	     assign mask_port = 1'b0;
 	   
-	   assign next_op[op] = next_raw_op[op] & ~mask_port;
+	   assign route_op[op] = next_raw_op[op] & ~mask_port;
 	   assign error_op[op] = next_raw_op[op] & mask_port;
 	   
 	end

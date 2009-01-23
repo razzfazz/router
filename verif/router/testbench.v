@@ -418,8 +418,8 @@ module testbench
 		  = header_info[la_route_info_width:
 				la_route_info_width+route_info_width-1];
 		
-		wire [0:num_vcs*num_ports-1]   next_port_ivc;
-		wire [0:num_vcs*num_vcs-1]     next_vcs_ivc;
+		wire [0:num_vcs*num_ports-1]   route_ivc_op;
+		wire [0:num_vcs*num_vcs-1]     route_ivc_ovc;
 		wire [0:num_vcs-1] 	       rtl_error_ivc;
 		wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
 		
@@ -453,8 +453,8 @@ module testbench
 						  router_addr_width+
 						  node_addr_width-1];
 			  
-			  wire [0:num_ports-1] 		 next_port;
-			  wire 				 next_inc_rc;
+			  wire [0:num_ports-1] 		 route_op;
+			  wire 				 inc_rc;
 			  wire 				 rtl_error_unmasked;
 			  
 			  routing_logic
@@ -473,65 +473,65 @@ module testbench
 			  rtl
 			    (.router_address(router_address),
 			     .vc_route_info(vc_route_info),
-			     .next_op(next_port),
-			     .next_inc_rc(next_inc_rc),
+			     .route_op(route_op),
+			     .inc_rc(inc_rc),
 			     .error(rtl_error_unmasked));
 			  
-			  wire [0:num_vcs-1] 		 next_vcs;
+			  wire [0:num_vcs-1] 		 route_ovc;
 			  
 			  if(itc > 0)
-			    assign next_vcs[0:itc*num_routing_classes*
-					    num_vcs_per_class-1]
+			    assign route_ovc[0:itc*num_routing_classes*
+					     num_vcs_per_class-1]
 				     = {(itc*num_routing_classes*
 					 num_vcs_per_class){1'b0}};
 			  
 			  if(irc > 0)
-			    assign next_vcs[itc*num_routing_classes*
-					    num_vcs_per_class:
-					    (itc*num_routing_classes+irc)*
-					    num_vcs_per_class-1]
+			    assign route_ovc[itc*num_routing_classes*
+					     num_vcs_per_class:
+					     (itc*num_routing_classes+irc)*
+					     num_vcs_per_class-1]
 				     = {(irc*num_vcs_per_class){1'b0}};
 			  
-			  assign next_vcs[(itc*num_routing_classes+irc)*
-					  num_vcs_per_class:
-					  (itc*num_routing_classes+irc+1)*
-					  num_vcs_per_class-1]
-				   = {num_vcs_per_class{~next_inc_rc}};
+			  assign route_ovc[(itc*num_routing_classes+irc)*
+					   num_vcs_per_class:
+					   (itc*num_routing_classes+irc+1)*
+					   num_vcs_per_class-1]
+				   = {num_vcs_per_class{~inc_rc}};
 			  
 			  if(irc < (num_routing_classes - 1))
-			    assign next_vcs[(itc*num_routing_classes+irc+1)*
-					    num_vcs_per_class:
-					    (itc*num_routing_classes+irc+2)*
-					    num_vcs_per_class-1]
-				     = {num_vcs_per_class{next_inc_rc}};
+			    assign route_ovc[(itc*num_routing_classes+irc+1)*
+					     num_vcs_per_class:
+					     (itc*num_routing_classes+irc+2)*
+					     num_vcs_per_class-1]
+				     = {num_vcs_per_class{inc_rc}};
 			  
 			  if(irc < (num_routing_classes - 2))
-			    assign next_vcs[(itc*num_routing_classes+irc+2)*
-					    num_vcs_per_class:
-					    (itc+1)*num_routing_classes*
-					    num_vcs_per_class-1]
+			    assign route_ovc[(itc*num_routing_classes+irc+2)*
+					     num_vcs_per_class:
+					     (itc+1)*num_routing_classes*
+					     num_vcs_per_class-1]
 				     = {(num_routing_classes-irc-2){1'b0}};
 			  
 			  if(itc < (num_traffic_classes - 1))
-			    assign next_vcs[(itc+1)*num_routing_classes*
-					    num_vcs_per_class:
-					    num_traffic_classes*
-					    num_routing_classes*
-					    num_vcs_per_class-1]
+			    assign route_ovc[(itc+1)*num_routing_classes*
+					     num_vcs_per_class:
+					     num_traffic_classes*
+					     num_routing_classes*
+					     num_vcs_per_class-1]
 				     = {((num_traffic_classes-itc-1)*
 					 num_routing_classes*
 					 num_vcs_per_class){1'b0}};
 			  
-			  assign next_port_ivc[(itc*num_routing_classes+irc)*
-					       num_vcs_per_class*num_ports:
-					       (itc*num_routing_classes+irc+1)*
-					       num_vcs_per_class*num_ports-1]
-				   = {num_vcs_per_class{next_port}};
-			  assign next_vcs_ivc[(itc*num_routing_classes+irc)*
-					      num_vcs_per_class*num_vcs:
+			  assign route_ivc_op[(itc*num_routing_classes+irc)*
+					      num_vcs_per_class*num_ports:
 					      (itc*num_routing_classes+irc+1)*
-					      num_vcs_per_class*num_vcs-1]
-				   = {num_vcs_per_class{next_vcs}};
+					      num_vcs_per_class*num_ports-1]
+				   = {num_vcs_per_class{route_op}};
+			  assign route_ivc_ovc[(itc*num_routing_classes+irc)*
+					       num_vcs_per_class*num_vcs:
+					       (itc*num_routing_classes+irc+1)*
+					       num_vcs_per_class*num_vcs-1]
+				   = {num_vcs_per_class{route_ovc}};
 			  
 			  wire 				 rtl_error;
 			  assign rtl_error
@@ -598,28 +598,28 @@ module testbench
 		     
 		  end
 		
-		wire [0:num_ports-1] 	   next_port;
+		wire [0:num_ports-1] 	   route_op;
 		mux_nto1
 		  #(.num_ports(num_vcs),
 		    .width(num_ports))
-		next_port_mux
+		route_op_mux
 		  (.select(flit_vc),
-		   .data_in(next_port_ivc),
-		   .data_out(next_port));
+		   .data_in(route_ivc_op),
+		   .data_out(route_op));
 		
-		wire [0:port_idx_width-1]  next_port_enc;
+		wire [0:port_idx_width-1]  route_port;
 		encoder
 		  #(.num_ports(num_ports))
-		next_port_enc_enc
-		  (.data_in(next_port),
-		   .data_out(next_port_enc));
+		route_port_enc
+		  (.data_in(route_op),
+		   .data_out(route_port));
 		
 		assign rtl_error_ip[ip] = |rtl_error_ivc;
 		
 		wire [0:port_idx_width-1]  dest_port_s, dest_port_q;
 		assign dest_port_s = flit_valid ?
 				     (flit_head ?
-				      next_port_enc :
+				      route_port :
 				      dest_port_q) :
 				     dest_port_q;
 		dff
@@ -632,36 +632,36 @@ module testbench
 		
 		wire [0:port_idx_width-1]     dest_port;
 		assign dest_port = (flit_valid & flit_head) ?
-				   next_port_enc :
+				   route_port :
 				   dest_port_q;
 
-		wire [0:num_vcs-1] 	      next_vcs;
+		wire [0:num_vcs-1] 	      route_ovc;
 		mux_nto1
 		  #(.num_ports(num_vcs),
 		    .width(num_vcs))
-		next_vcs_mux
+		route_ovc_mux
 		  (.select(flit_vc),
-		   .data_in(next_vcs_ivc),
-		   .data_out(next_vcs));
+		   .data_in(route_ivc_ovc),
+		   .data_out(route_ovc));
 		
-		wire [0:num_vcs-1] 	      dest_vcs_s, dest_vcs_q;
-		assign dest_vcs_s = flit_valid ?
+		wire [0:num_vcs-1] 	      dest_ovc_s, dest_ovc_q;
+		assign dest_ovc_s = flit_valid ?
 				    (flit_head ?
-				     next_vcs :
-				     dest_vcs_q) :
-				    dest_vcs_q;
+				     route_ovc :
+				     dest_ovc_q) :
+				    dest_ovc_q;
 		dff
 		  #(.width(num_vcs))
-		dest_vcsq
+		dest_ovcq
 		  (.clk(clk),
 		   .reset(reset),
-		   .d(dest_vcs_s),
-		   .q(dest_vcs_q));
+		   .d(dest_ovc_s),
+		   .q(dest_ovc_q));
 		
-		wire [0:num_vcs-1] 	      dest_vcs;
-		assign dest_vcs = (flit_valid & flit_head) ?
-				  next_vcs :
-				  dest_vcs_q;
+		wire [0:num_vcs-1] 	      dest_ovc;
+		assign dest_ovc = (flit_valid & flit_head) ?
+				  route_ovc :
+				  dest_ovc_q;
 		
 		wire [0:la_route_info_width-1] la_route_info_out;
 		mux_nto1
@@ -685,7 +685,7 @@ module testbench
 			 = dest_port;
 		assign data_in[2+data_width+port_idx_width:
 			       2+data_width+port_idx_width+num_vcs-1]
-			 = dest_vcs;
+			 = dest_ovc;
 		
 		genvar 						 ivc;
 		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
@@ -707,8 +707,8 @@ module testbench
 		       = data_out[2+data_width:
 				  2+data_width+port_idx_width-1];
 		     
-		     wire [0:num_vcs-1] 			    ref_vcs;
-		     assign ref_vcs
+		     wire [0:num_vcs-1] 			    ref_ovc;
+		     assign ref_ovc
 		       = data_out[2+data_width+port_idx_width:
 				  2+data_width+port_idx_width+num_vcs-1];
 		     
@@ -739,7 +739,7 @@ module testbench
 		     assign match_data = ref_data == check_data;
 		     
 		     wire 					    match_vcs;
-		     assign match_vcs = ref_vcs[check_vc];
+		     assign match_vcs = ref_ovc[check_vc];
 		     
 		     wire 					    fifo_empty;
 		     
