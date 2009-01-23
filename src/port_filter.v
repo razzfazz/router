@@ -88,24 +88,59 @@ module port_filter
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire mask_port;
-
+	   // packets in the lower routing classes can only go back out through
+	   // the same port they came in on if the current router is the
+	   // destination router for their current routing class (this cannot 
+	   // happen for packets in the highest routing class); for the
+	   // flattened butterfly, this applies to all links in the same
+	   // dimension
 	   if((op < (num_ports - num_nodes_per_router)) &&
 	      (((routing_function_type == `ROUTING_FUNCTION_TYPE_MESH) &&
 		(op == port_id)) ||
 	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
-	     assign mask_port = ~inc_rc;
+	     begin
+		if(routing_class == (num_routing_classes - 1))
+		  begin
+		     assign route_op_out[op] = 1'b0;
+		     assign error_op[op] = route_op_in[op];
+		  end
+		else
+		  begin
+
+		     // we could mask this by inc_rc; however, the goal of port 
+		     // filtering is to allow synthesis to take advantage of
+		     // turn restrictions in optimizing the design, so from this
+		     // point of view, masking here would be counterproductive;
+		     // also, note that we don't actually recover from illegal 
+		     // port requests -- packets just remain in the input buffer
+		     // forever; consequently, we save the gate and don't mask 
+		     // here
+		     assign route_op_out[op] = route_op_in[op] /* & inc_rc*/;
+		     
+		     assign error_op[op] = route_op_in[op] & ~inc_rc;
+		  end
+	     end
+	   
+	   // only packets in the highest routing class can go to the injection/
+	   // ejection ports; also, a packet coming in on an injection/ejection 
+	   // port should never exit the router on the same injection/ejection 
+	   // port
 	   else if((op >= (num_ports - num_nodes_per_router)) &&
 		   ((routing_class < (num_routing_classes - 1)) ||
 		    (op == port_id)))
-	     assign mask_port = 1'b1;
-	   else
-	     assign mask_port = 1'b0;
+	     begin
+		assign route_op_out[op] = 1'b0;
+		assign error_op[op] = route_op_in[op];
+	     end
 	   
-	   assign route_op_out[op] = route_op_in[op] & ~mask_port;
-	   assign error_op[op] = route_op_in[op] & mask_port;
+	   // remaining port requests are valid
+	   else
+	     begin
+		assign route_op_out[op] = route_op_in[op];
+		assign error_op[op] = 1'b0;
+	     end
 	   
 	end
       
