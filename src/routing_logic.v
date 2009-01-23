@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module routing_logic
-  (router_address, vc_route_info, next_port, next_class, error);
+  (router_address, vc_route_info, next_op, next_inc_rc, error);
    
 `include "constants.v"
    
@@ -116,57 +116,36 @@ module routing_logic
    input [0:vc_route_info_width-1] vc_route_info;
    
    // output port to forward to
-   output [0:num_ports-1] next_port;
-   wire [0:num_ports-1] next_port;
+   output [0:num_ports-1] next_op;
+   wire [0:num_ports-1] next_op;
    
-   // candidate output VCs
-   output [0:num_classes-1] next_class;
-   wire [0:num_classes-1] next_class;
+   // if we have reached our destination for the current routing class, 
+   // increment the routing class (unless it's already the highest)
+   output next_inc_rc;
+   wire 		next_inc_rc;
    
    // internal error condition detected
    output error;
-   wire 		  error;   
+   wire 		error;   
    
    // address of destination router for current routing class
    wire [0:router_addr_width-1] dest_router_address;
    assign dest_router_address
      = vc_route_info[0:router_addr_width-1];
    
-   // if we have reached our destination for the current routing class, move to 
-   // next routing class
-   wire 			chg_class;
+   wire 			reached_dest;
+   assign reached_dest = (router_address == dest_router_address);
    
-   wire [0:num_ports-1] 	next_port_int;
+   wire [0:num_ports-1] 	next_raw_op;
    wire [0:num_ports-1] 	error_op;
    wire [0:num_dimensions-1] 	dim_addr_match;
    
    generate
    
       if(routing_class == (num_routing_classes - 1))
-	assign chg_class = 1'b0;
+	assign next_inc_rc = 1'b0;
       else
-	assign chg_class = (router_address == dest_router_address);
-      
-      genvar 			otc;
-      
-      for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
-	begin:otcs
-	   
-	   genvar 			orc;
-	   
-	   for(orc = 0; orc < num_routing_classes; orc = orc + 1)
-	     begin:orcs
-		
-		if((otc == traffic_class) && (orc == routing_class))
-		  assign next_class[otc*num_routing_classes+orc] = ~chg_class;
-		else if((otc == traffic_class) && (orc == (routing_class + 1)))
-		  assign next_class[otc*num_routing_classes+orc] = chg_class;
-		else
-		  assign next_class[otc*num_routing_classes+orc] = 1'b0;
-		
-	     end
-	   
-	end
+	assign next_inc_rc = reached_dest;
       
       genvar 			dim;
       
@@ -240,8 +219,8 @@ module routing_logic
 	     
 	   endcase
 	   
-	   assign next_port_int[dim*num_neighbors_per_dim:
-				(dim+1)*num_neighbors_per_dim-1]
+	   assign next_raw_op[dim*num_neighbors_per_dim:
+			      (dim+1)*num_neighbors_per_dim-1]
 		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
@@ -263,16 +242,16 @@ module routing_logic
 		  (.data_in(dest_node_address),
 		   .data_out(node_sel));
 		
-		assign next_port_int[num_ports-num_nodes_per_router:num_ports-1]
+		assign next_raw_op[num_ports-num_nodes_per_router:num_ports-1]
 			 = node_sel & {num_nodes_per_router{&dim_addr_match}};
 		
 	     end
 	   else
-	     assign next_port_int[num_ports-1] = &dim_addr_match;
+	     assign next_raw_op[num_ports-1] = &dim_addr_match;
 	   
 	end
       else
-	assign next_port_int[num_ports-num_nodes_per_router:num_ports-1]
+	assign next_raw_op[num_ports-num_nodes_per_router:num_ports-1]
 		 = {num_nodes_per_router{1'b0}};
       
       genvar 					op;
@@ -288,7 +267,7 @@ module routing_logic
 	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
-	     assign mask_port = ~chg_class;
+	     assign mask_port = ~reached_dest;
 	   else if((op >= (num_ports - num_nodes_per_router)) &&
 		   ((routing_class < (num_routing_classes - 1)) ||
 		    (op == port_id)))
@@ -296,8 +275,8 @@ module routing_logic
 	   else
 	     assign mask_port = 1'b0;
 	   
-	   assign next_port[op] = next_port_int[op] & ~mask_port;
-	   assign error_op[op] = next_port_int[op] & mask_port;
+	   assign next_op[op] = next_raw_op[op] & ~mask_port;
+	   assign error_op[op] = next_raw_op[op] & mask_port;
 	   
 	end
       

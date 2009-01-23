@@ -454,7 +454,7 @@ module testbench
 						  node_addr_width-1];
 			  
 			  wire [0:num_ports-1] 		 next_port;
-			  wire [0:num_classes-1] 	 next_class;
+			  wire 				 next_inc_rc;
 			  wire 				 rtl_error_unmasked;
 			  
 			  routing_logic
@@ -473,17 +473,54 @@ module testbench
 			  rtl
 			    (.router_address(router_address),
 			     .vc_route_info(vc_route_info),
-			     .next_port(next_port),
-			     .next_class(next_class),
+			     .next_op(next_port),
+			     .next_inc_rc(next_inc_rc),
 			     .error(rtl_error_unmasked));
 			  
 			  wire [0:num_vcs-1] 		 next_vcs;
-			  replicator
-			    #(.width(num_classes),
-			      .count(num_vcs_per_class))
-			  next_vcs_repl
-			    (.data_in(next_class),
-			     .data_out(next_vcs));
+			  
+			  if(itc > 0)
+			    assign next_vcs[0:itc*num_routing_classes*
+					    num_vcs_per_class-1]
+				     = {(itc*num_routing_classes*
+					 num_vcs_per_class){1'b0}};
+			  
+			  if(irc > 0)
+			    assign next_vcs[itc*num_routing_classes*
+					    num_vcs_per_class:
+					    (itc*num_routing_classes+irc)*
+					    num_vcs_per_class-1]
+				     = {(irc*num_vcs_per_class){1'b0}};
+			  
+			  assign next_vcs[(itc*num_routing_classes+irc)*
+					  num_vcs_per_class:
+					  (itc*num_routing_classes+irc+1)*
+					  num_vcs_per_class-1]
+				   = {num_vcs_per_class{~next_inc_rc}};
+			  
+			  if(irc < (num_routing_classes - 1))
+			    assign next_vcs[(itc*num_routing_classes+irc+1)*
+					    num_vcs_per_class:
+					    (itc*num_routing_classes+irc+2)*
+					    num_vcs_per_class-1]
+				     = {num_vcs_per_class{next_inc_rc}};
+			  
+			  if(irc < (num_routing_classes - 2))
+			    assign next_vcs[(itc*num_routing_classes+irc+2)*
+					    num_vcs_per_class:
+					    (itc+1)*num_routing_classes*
+					    num_vcs_per_class-1]
+				     = {(num_routing_classes-irc-2){1'b0}};
+			  
+			  if(itc < (num_traffic_classes - 1))
+			    assign next_vcs[(itc+1)*num_routing_classes*
+					    num_vcs_per_class:
+					    num_traffic_classes*
+					    num_routing_classes*
+					    num_vcs_per_class-1]
+				     = {((num_traffic_classes-itc-1)*
+					 num_routing_classes*
+					 num_vcs_per_class){1'b0}};
 			  
 			  assign next_port_ivc[(itc*num_routing_classes+irc)*
 					       num_vcs_per_class*num_ports:
@@ -991,17 +1028,16 @@ module testbench
 	  end
      end
    
-   wire [0:6] errors;
-   assign errors = {|ps_error_ip,
-		    |rtl_error_ip,
-		    |check_error_op,
-		    |x_error_op,
-		    |fifo_error_ip_ivc,
-		    rtr_error,
-		    |pkt_error_op_ovc};
+   wire [0:5] tb_errors;
+   assign tb_errors = {|ps_error_ip,
+		       |rtl_error_ip,
+		       |check_error_op,
+		       |x_error_op,
+		       |fifo_error_ip_ivc,
+		       |pkt_error_op_ovc};
    
-   wire       error;
-   assign error = |errors;
+   wire       tb_error;
+   assign tb_error = |tb_errors;
    
    wire [0:31] in_flits_s, in_flits_q;
    assign in_flits_s = in_flits_q + pop_count(flit_valid_in_ip);
@@ -1106,11 +1142,18 @@ module testbench
    end
    
    always @(posedge clk)
-     if(error)
-       begin
-	  $display("logic error detected, cyc=%d", $time);
-	  $stop;
-       end
+     begin
+	if(rtr_error)
+	  begin
+	     $display("internal error detected, cyc=%d", $time);
+	     $stop;
+	  end
+	if(tb_error)
+	  begin
+	     $display("external error detected, cyc=%d", $time);
+	     $stop;
+	  end
+     end
    
    integer cycles;
    
