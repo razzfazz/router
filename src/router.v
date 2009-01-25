@@ -456,7 +456,7 @@ module router
    assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
    dff
      #(.width(num_ports*num_ports),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    xbr_ctrl_ip_opq
      (.clk(clk),
       .reset(reset),
@@ -636,7 +636,7 @@ module router
 	   
 	   dff
 	     #(.width(vc_idx_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flit_vcq
 	     (.clk(clk),
 	      .reset(reset),
@@ -650,7 +650,7 @@ module router
 	   assign flit_head_s = xbr_ctrl ? flit_head : flit_head_q;
 	   dff
 	     #(.width(1),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flit_headq
 	     (.clk(clk),
 	      .reset(reset),
@@ -664,7 +664,7 @@ module router
 	   assign flit_tail_s = xbr_ctrl ? flit_tail : flit_tail_q;
 	   dff
 	     #(.width(1),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flit_tailq
 	     (.clk(clk),
 	      .reset(reset),
@@ -678,7 +678,7 @@ module router
 	   assign flit_data_s = xbr_ctrl ? flit_data : flit_data_q;
 	   dff
 	     #(.width(data_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flit_dataq
 	     (.clk(clk),
 	      .reset(reset),

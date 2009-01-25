@@ -449,16 +449,16 @@ module ivc_ctrl
 	   
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_queue_muxed;
 	   
-	   wire tail_queue_muxed;
+	   wire tail;
 	   select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
 	   flit_tail_out_sel
 	     (.select(read_sel),
 	      .data_in(tail_queue),
-	      .data_out(tail_queue_muxed));
+	      .data_out(tail));
 	   
-	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail_queue_muxed;
+	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail;
 	   
 	end
       else
@@ -487,7 +487,7 @@ module ivc_ctrl
 	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
 	   dff
 	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   tail_idxq
 	     (.clk(clk),
 	      .reset(reset),
@@ -604,7 +604,7 @@ module ivc_ctrl
 	     = hdff_push ? la_route_info_in : hdff_la_route_info_q;
 	   dff
 	     #(.width(la_route_info_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(reset),
@@ -620,7 +620,7 @@ module ivc_ctrl
 	     = hdff_push ? vc_route_info_in : hdff_vc_route_info_q;
 	   dff
 	     #(.width(vc_route_info_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
 	   hdff_vc_route_infoq
 	     (.clk(clk),
 	      .reset(reset),

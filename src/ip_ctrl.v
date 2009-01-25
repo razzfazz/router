@@ -299,7 +299,7 @@ module ip_ctrl
    assign flit_vc_in_s = flit_vc_in;
    dff
      #(.width(vc_idx_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_vcq
      (.clk(clk),
       .reset(reset),
@@ -310,7 +310,7 @@ module ip_ctrl
    assign flit_head_in_s = flit_head_in;
    dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_headq
      (.clk(clk),
       .reset(reset),
@@ -321,7 +321,7 @@ module ip_ctrl
    assign flit_tail_in_s = flit_tail_in;
    dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_tailq
      (.clk(clk),
       .reset(reset),
@@ -332,7 +332,7 @@ module ip_ctrl
    assign flit_data_in_s = flit_data_in;
    dff
      #(.width(data_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_dataq
      (.clk(clk),
       .reset(reset),
@@ -607,7 +607,7 @@ module ip_ctrl
       .data_out(flit_head_out_s));
    dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_head_outq
      (.clk(clk),
       .reset(reset),
@@ -626,7 +626,7 @@ module ip_ctrl
       .data_out(flit_tail_out_s));
    dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_tail_outq
      (.clk(clk),
       .reset(reset),
@@ -666,7 +666,7 @@ module ip_ctrl
    
    dff
      #(.width(vc_idx_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_vc_outq
      (.clk(clk),
       .reset(reset),
@@ -685,7 +685,7 @@ module ip_ctrl
       .data_out(la_route_info_s));
    dff
      #(.width(la_route_info_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    la_route_infoq
      (.clk(clk),
       .reset(reset),
@@ -725,7 +725,7 @@ module ip_ctrl
       .data_out(cred_vc_s));
    dff
      #(.width(vc_idx_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    cred_vcq
      (.clk(clk),
       .reset(reset),

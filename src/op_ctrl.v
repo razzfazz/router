@@ -315,34 +315,7 @@ module op_ctrl
 		else
 		  begin
 		     
-		     wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
-		     
-		     wire [0:flit_buffer_idx_width-1] push_ptr_q;
-		     
-		     genvar 			      idx;
-		     
-		     for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
-		       begin:idxs
-			  
-			  wire capture;
-			  assign capture = debit && (push_ptr_q == idx);
-			  
-			  assign tail_queue_s[idx] = capture ?
-						     flit_tail_in :
-						     tail_queue_q[idx];
-			  
-		       end
-		     
-		     dff
-		       #(.width(num_flit_buffers),
-			 .reset_type(reset_type))
-		     tail_queueq
-		       (.clk(clk),
-			.reset(reset),
-			.d(tail_queue_s),
-			.q(tail_queue_q));
-		     
-		     wire [0:flit_buffer_idx_width-1] push_ptr_next;
+		     wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
 		     incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
@@ -380,7 +353,13 @@ module op_ctrl
 		       (.clk(clk),
 			.reset(reset),
 			.d(pop_ptr_s),
-		   .q(pop_ptr_q));
+			.q(pop_ptr_q));
+		     
+		     reg [0:num_flit_buffers-1]       tail_queue;
+		     
+		     always @(posedge clk)
+		       if(debit)
+			 tail_queue[push_ptr_q] <= flit_tail_in;
 		     
 		     wire 			      tail;
 		     mux_nto1
@@ -388,7 +367,7 @@ module op_ctrl
 			 .width(1))
 		     tail_mux
 		       (.select(pop_ptr_q),
-			.data_in(tail_queue_q),
+			.data_in(tail_queue),
 			.data_out(tail));
 		     
 		     wire 			      head_credit;
