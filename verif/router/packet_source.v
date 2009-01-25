@@ -115,6 +115,11 @@ module packet_source
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -480,6 +485,7 @@ module packet_source
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
+		    .restrict_turns(restrict_turns),
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
 		    .port_id(port_id),

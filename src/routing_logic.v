@@ -88,6 +88,11 @@ module routing_logic
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -263,6 +268,7 @@ module routing_logic
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),
+       .restrict_turns(restrict_turns),
        .routing_function_type(routing_function_type),
        .port_id(port_id),
        .traffic_class(traffic_class),
