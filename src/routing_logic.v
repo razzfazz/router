@@ -268,9 +268,9 @@ module routing_logic
        .traffic_class(traffic_class),
        .routing_class(routing_class))
    pf
-     (.route_op_in(route_unmasked_op),
+     (.route_in_op(route_unmasked_op),
       .inc_rc(inc_rc),
-      .route_op_out(route_op),
+      .route_out_op(route_op),
       .error(error));
    
 endmodule

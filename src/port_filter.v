@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module to filter output port requests based on turn restrictions
 module port_filter
-  (route_op_in, inc_rc, route_op_out, error);
+  (route_in_op, inc_rc, route_out_op, error);
    
 `include "constants.v"
    
@@ -70,15 +70,15 @@ module port_filter
    parameter routing_class = 0;
    
    // unmasked output port
-   input [0:num_ports-1] route_op_in;
+   input [0:num_ports-1] route_in_op;
 
    // if we have reached our destination for the current routing class, 
    // increment the routing class (unless it's already the highest)
    input inc_rc;
    
    // filtered output port
-   output [0:num_ports-1] route_op_out;
-   wire [0:num_ports-1] route_op_out;
+   output [0:num_ports-1] route_out_op;
+   wire [0:num_ports-1] route_out_op;
    
    // internal error condition detected
    output error;
@@ -110,7 +110,7 @@ module port_filter
 		if(routing_class == (num_routing_classes - 1))
 		  begin
 		     assign route_restricted_op[op] = 1'b0;
-		     assign error_op[op] = route_op_in[op];
+		     assign error_op[op] = route_in_op[op];
 		  end
 		else
 		  begin
@@ -124,9 +124,9 @@ module port_filter
 		     // forever; consequently, we save the gate and don't mask 
 		     // here
 		     assign route_restricted_op[op]
-			      = route_op_in[op] /* & inc_rc*/;
+			      = route_in_op[op] /* & inc_rc*/;
 		     
-		     assign error_op[op] = route_op_in[op] & ~inc_rc;
+		     assign error_op[op] = route_in_op[op] & ~inc_rc;
 		  end
 	     end
 	   
@@ -139,22 +139,22 @@ module port_filter
 		    (op == port_id)))
 	     begin
 		assign route_restricted_op[op] = 1'b0;
-		assign error_op[op] = route_op_in[op];
+		assign error_op[op] = route_in_op[op];
 	     end
 	   
 	   // remaining port requests are valid
 	   else
 	     begin
-		assign route_restricted_op[op] = route_op_in[op];
+		assign route_restricted_op[op] = route_in_op[op];
 		assign error_op[op] = 1'b0;
 	     end
 	   
 	end
       
       if(restrict_turns != 0)
-	assign route_op_out = route_restricted_op;
+	assign route_out_op = route_restricted_op;
       else
-	assign route_op_out = route_op_in;
+	assign route_out_op = route_in_op;
       
    endgenerate
    
