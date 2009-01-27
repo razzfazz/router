@@ -120,7 +120,7 @@ module wf_alloc
 	       #(.num_ports(num_ports),
 		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
-	     core_rot
+	     core_loop
 	       (.clk(clk),
 		.reset(reset),
 		.update(update),
