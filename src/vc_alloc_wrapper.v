@@ -114,7 +114,7 @@ module vc_alloc_wrapper
    output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
    
-   input [0:num_ports*num_vcs*num_ports-1] route_masked_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_ports-1] route_masked_ip_ivc_op;
    
    generate
       
@@ -191,7 +191,8 @@ module vc_alloc_wrapper
 							  irc)*
 							 num_vcs_per_class+
 							 icvc+1)*
-							num_ports-1];
+							num_ports-1]
+				   = route_masked_op;
 			  
 		       end
 		     

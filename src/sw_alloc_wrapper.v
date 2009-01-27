@@ -107,7 +107,7 @@ module sw_alloc_wrapper
    output [0:num_ports*num_ports-1] gnt_ip_op;
    wire [0:num_ports*num_ports-1] gnt_ip_op;
    
-   input [0:num_ports*num_vcs*num_ports-1] route_masked_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_ports-1] route_masked_ip_ivc_op;
    
    generate
       
@@ -178,7 +178,8 @@ module sw_alloc_wrapper
 							  irc)*
 							 num_vcs_per_class+
 							 icvc+1)*
-							num_ports-1];
+							num_ports-1]
+				   = route_masked_op;
 			  
 		       end
 		     
