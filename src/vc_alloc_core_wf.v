@@ -257,10 +257,10 @@ module vc_alloc_core_wf
 			  
 			  wire [0:num_ports*num_vcs-1] gnt_wf_op_ovc;
 			  assign gnt_wf_op_ovc
-			    = gnt_wf_ivc_op_ovc[((itc*num_traffic_classes+irc)*
+			    = gnt_wf_ivc_op_ovc[((itc*num_routing_classes+irc)*
 						 num_vcs_per_class+icvc)*
 						num_ports*num_vcs:
-						((itc*num_traffic_classes+irc)*
+						((itc*num_routing_classes+irc)*
 						 num_vcs_per_class+icvc+1)*
 						num_ports*num_vcs-1];
 			  
