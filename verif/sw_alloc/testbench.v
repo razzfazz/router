@@ -28,7 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// switch allocator synthesis wrapper
+// switch allocator performance measurement testbench
 module testbench
   ();
 
