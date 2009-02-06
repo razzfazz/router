@@ -127,7 +127,7 @@ module router_wrapper
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
 
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    // enable performance counter
    parameter perf_ctr_enable = 0;
@@ -220,7 +220,7 @@ module router_wrapper
    
    // flit data for each incoming flit
    // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports*data_width-1] flit_data_in_ip;
+   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
    
    // outgoing credit(s) valid
    output [0:num_ports-1] cred_valid_out_ip;
@@ -252,8 +252,8 @@ module router_wrapper
    
    // flit data for each outgoing flit
    // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports*data_width-1] flit_data_out_op;
-   wire [0:num_ports*data_width-1]   flit_data_out_op;
+   output [0:num_ports*flit_data_width-1] flit_data_out_op;
+   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
    
    // incoming credit(s) available
    input [0:num_ports-1] cred_valid_in_op;
@@ -264,7 +264,7 @@ module router_wrapper
    
    // internal error condition detected
    output error;
-   wire 			     error;
+   wire 				error;
    
    router
      #(.num_flit_buffers(num_flit_buffers),
@@ -276,7 +276,7 @@ module router_wrapper
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
-       .data_width(data_width),
+       .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),

@@ -119,7 +119,7 @@ module ip_ctrl
    localparam header_info_width = la_route_info_width + route_info_width;
    
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
@@ -204,7 +204,7 @@ module ip_ctrl
    
    // flit data
    // (note: valid only when flit_valid_in=1)
-   input [0:data_width-1] flit_data_in;
+   input [0:flit_data_width-1] flit_data_in;
    
    // internal flow control signalling from output controller to input 
    // controllers
@@ -263,8 +263,8 @@ module ip_ctrl
    
    // flit data for outgoing flit
    // (note: only valid if flit_valid_out=1)
-   output [0:data_width-1] flit_data_out;
-   wire [0:data_width-1] 	flit_data_out;
+   output [0:flit_data_width-1] flit_data_out;
+   wire [0:flit_data_width-1] 	flit_data_out;
    
    // outgoing credit valid
    output cred_valid_out;
@@ -328,10 +328,10 @@ module ip_ctrl
       .d(flit_tail_in_s),
       .q(flit_tail_in_q));
    
-   wire [0:data_width-1] 	flit_data_in_s, flit_data_in_q;
+   wire [0:flit_data_width-1] 	flit_data_in_s, flit_data_in_q;
    assign flit_data_in_s = flit_data_in;
    dff
-     #(.width(data_width),
+     #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_dataq
      (.clk(clk),
@@ -562,12 +562,12 @@ module ip_ctrl
    wire 			     fbf_read_enable;
    assign fbf_read_enable = |flit_valid_out_ivc;
    
-   wire [0:data_width-1] 	     fbf_write_data;
+   wire [0:flit_data_width-1] 	     fbf_write_data;
    assign fbf_write_data = flit_data_in_q;
    
-   wire [0:data_width-1] 	     fbf_read_data;
+   wire [0:flit_data_width-1] 	     fbf_read_data;
    regfile
-     #(.width(data_width),
+     #(.width(flit_data_width),
        .depth(fbf_depth),
        .regfile_type(fbf_regfile_type))
    fbf
@@ -696,8 +696,8 @@ module ip_ctrl
 	    = flit_head_out_q ? 
 	      la_route_info_q : 
 	      fbf_read_data[0:la_route_info_width-1];
-   assign flit_data_out[la_route_info_width:data_width-1]
-	    = fbf_read_data[la_route_info_width:data_width-1];
+   assign flit_data_out[la_route_info_width:flit_data_width-1]
+	    = fbf_read_data[la_route_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------
