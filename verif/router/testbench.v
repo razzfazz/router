@@ -177,7 +177,7 @@ module testbench
      = la_route_info_width + route_info_width + packet_length_width;
    
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -253,20 +253,20 @@ module testbench
    wire [0:num_ports*vc_idx_width-1] flit_vc_in_ip;
    wire [0:num_ports-1] 	     flit_head_in_ip;
    wire [0:num_ports-1] 	     flit_tail_in_ip;
-   wire [0:num_ports*data_width-1]   flit_data_in_ip;
-   wire [0:num_ports-1] 	     cred_valid_out_ip;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
+   wire [0:num_ports*flit_data_width-1] flit_data_in_ip;
+   wire [0:num_ports-1] 		cred_valid_out_ip;
+   wire [0:num_ports*vc_idx_width-1] 	cred_vc_out_ip;
    
-   wire [0:num_ports-1] 	     flit_valid_out_op;
-   wire [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   wire [0:num_ports-1] 	     flit_head_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
-   wire [0:num_ports*data_width-1]   flit_data_out_op;
-   wire [0:num_ports-1] 	     cred_valid_in_op;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_in_op;
+   wire [0:num_ports-1] 		flit_valid_out_op;
+   wire [0:num_ports*vc_idx_width-1] 	flit_vc_out_op;
+   wire [0:num_ports-1] 		flit_head_out_op;
+   wire [0:num_ports-1] 		flit_tail_out_op;
+   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
+   wire [0:num_ports-1] 		cred_valid_in_op;
+   wire [0:num_ports*vc_idx_width-1] 	cred_vc_in_op;
    
-   wire [0:num_ports-1] 	     ps_error_ip;
-   wire [0:num_ports-1] 	     rtl_error_ip;
+   wire [0:num_ports-1] 		ps_error_ip;
+   wire [0:num_ports-1] 		rtl_error_ip;
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 	  fifo_error_ip_ivc;
    
@@ -286,8 +286,9 @@ module testbench
 			 = {vc_idx_width{1'b0}};
 		assign flit_head_in_ip[ip] = 1'b0;
 		assign flit_tail_in_ip[ip] = 1'b0;
-		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
-			 = {data_width{1'b0}};
+		assign flit_data_in_ip[ip*flit_data_width:
+				       (ip+1)*flit_data_width-1]
+			 = {flit_data_width{1'b0}};
 		assign ps_error_ip[ip] = 1'b0;
 		assign rtl_error_ip[ip] = 1'b0;
 		assign match_ip_ivc_op[ip*num_vcs*num_ports:
@@ -351,7 +352,7 @@ module testbench
 		wire [0:vc_idx_width-1] flit_vc;
 		wire 			flit_head;
 		wire 			flit_tail;
-		wire [0:data_width-1] 	flit_data;
+		wire [0:flit_data_width-1] flit_data;
 		
 		wire [0:packet_count_width-1] ps_out_flits;
 		
@@ -378,7 +379,7 @@ module testbench
 		    .max_packet_length(max_packet_length),
 		    .min_packet_length(min_packet_length),
 		    .packet_length_mode(packet_length_mode),
-		    .data_width(data_width))
+		    .flit_data_width(flit_data_width))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
@@ -398,7 +399,8 @@ module testbench
 			 = flit_vc;
 		assign flit_head_in_ip[ip] = flit_head;
 		assign flit_tail_in_ip[ip] = flit_tail;
-		assign flit_data_in_ip[ip*data_width:(ip+1)*data_width-1]
+		assign flit_data_in_ip[ip*flit_data_width:
+				       (ip+1)*flit_data_width-1]
 			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
 		
@@ -679,26 +681,28 @@ module testbench
 		   .data_in(la_route_info_ivc),
 		   .data_out(la_route_info_out));
 		
-		wire [0:(2+data_width+port_idx_width+num_vcs)-1] data_in;
+		wire [0:(2+flit_data_width+port_idx_width+num_vcs)-1] data_in;
 		assign data_in[0] = flit_head;
 		assign data_in[1] = flit_tail;
 		assign data_in[2:2+la_route_info_width-1]
 			 = flit_head ?
 			   la_route_info_out :
 			   flit_data[0:la_route_info_width-1];
-		assign data_in[2+la_route_info_width:2+data_width-1]
-			 = flit_data[la_route_info_width:data_width-1];
-		assign data_in[2+data_width:2+data_width+port_idx_width-1]
+		assign data_in[2+la_route_info_width:2+flit_data_width-1]
+			 = flit_data[la_route_info_width:flit_data_width-1];
+		assign data_in[2+flit_data_width:
+			       2+flit_data_width+port_idx_width-1]
 			 = dest_port;
-		assign data_in[2+data_width+port_idx_width:
-			       2+data_width+port_idx_width+num_vcs-1]
+		assign data_in[2+flit_data_width+port_idx_width:
+			       2+flit_data_width+port_idx_width+num_vcs-1]
 			 = dest_ovc;
 		
 		genvar 						 ivc;
 		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 		  begin:ivcs
 		     
-		     wire [0:2+data_width+port_idx_width+num_vcs-1] data_out;
+		     wire [0:2+flit_data_width+port_idx_width+num_vcs-1] 
+		       data_out;
 		     
 		     wire 					    ref_head;
 		     assign ref_head = data_out[0];
@@ -706,18 +710,18 @@ module testbench
 		     wire 					    ref_tail;
 		     assign ref_tail = data_out[1];
 		     
-		     wire [0:data_width-1] 			    ref_data;
-		     assign ref_data = data_out[2:2+data_width-1];
+		     wire [0:flit_data_width-1] 		    ref_data;
+		     assign ref_data = data_out[2:2+flit_data_width-1];
 		     
 		     wire [0:port_idx_width-1] 			    ref_port;
 		     assign ref_port
-		       = data_out[2+data_width:
-				  2+data_width+port_idx_width-1];
+		       = data_out[2+flit_data_width:
+				  2+flit_data_width+port_idx_width-1];
 		     
 		     wire [0:num_vcs-1] 			    ref_ovc;
 		     assign ref_ovc
-		       = data_out[2+data_width+port_idx_width:
-				  2+data_width+port_idx_width+num_vcs-1];
+		       = data_out[2+flit_data_width+port_idx_width:
+				  2+flit_data_width+port_idx_width+num_vcs-1];
 		     
 		     wire 					    check_head;
 		     assign check_head = flit_head_out_op[ref_port];
@@ -725,9 +729,10 @@ module testbench
 		     wire 					    check_tail;
 		     assign check_tail = flit_tail_out_op[ref_port];
 		     
-		     wire [0:data_width-1] 			    check_data;
+		     wire [0:flit_data_width-1] 		    check_data;
 		     assign check_data
-		       = flit_data_out_op[ref_port*data_width +: data_width];
+		       = flit_data_out_op[ref_port*flit_data_width +: 
+					  flit_data_width];
 		     
 		     wire [0:vc_idx_width-1] 			    check_vc;
 		     assign check_vc
@@ -763,7 +768,7 @@ module testbench
 		     
 		     fifo
 		       #(.depth(num_flit_buffers),
-			 .width(2+data_width+port_idx_width+num_vcs))
+			 .width(2+flit_data_width+port_idx_width+num_vcs))
 		     ref_fifo
 		       (.clk(clk),
 			.reset(reset),
@@ -810,7 +815,7 @@ module testbench
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        /*.max_packet_length(max_packet_length),*/
-       .data_width(data_width),
+       .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
@@ -936,8 +941,9 @@ module testbench
 
 		     wire [0:header_info_width-1] header_info;
 		     assign header_info
-		       = flit_data_out_op[op*data_width:
-					  op*data_width+header_info_width-1];
+		       = flit_data_out_op[op*flit_data_width:
+					  op*flit_data_width+
+					  header_info_width-1];
 		     
 		     wire [0:packet_length_width-1] packet_length;
 		     assign packet_length
@@ -983,8 +989,9 @@ module testbench
 	   wire [0:vc_idx_width-1] 		    flit_vc_out;
 	   assign flit_vc_out = flit_vc_out_op[op*vc_idx_width +: vc_idx_width];
 	   
-	   wire [0:data_width-1] 		    flit_data_out;
-	   assign flit_data_out = flit_data_out_op[op*data_width +: data_width];
+	   wire [0:flit_data_width-1] 		    flit_data_out;
+	   assign flit_data_out = flit_data_out_op[op*flit_data_width +: 
+						   flit_data_width];
 	   
 	   assign x_error_op[op]
 		    = (flit_valid_out === 1'bx) ||
@@ -1021,7 +1028,8 @@ module testbench
 			   flit_head_out_op[port],
 			   flit_tail_out_op[port],
 			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
-			   flit_data_out_op[port*data_width +: data_width]);
+			   flit_data_out_op[port*flit_data_width +: 
+					    flit_data_width]);
 	       end
 	     if(x_error_op[port])
 	       begin
@@ -1031,7 +1039,8 @@ module testbench
 			   flit_head_out_op[port],
 			   flit_tail_out_op[port],
 			   flit_vc_out_op[port*vc_idx_width +: vc_idx_width],
-			   flit_data_out_op[port*data_width +: data_width]);
+			   flit_data_out_op[port*flit_data_width +: 
+					    flit_data_width]);
 	       end
 	  end
      end

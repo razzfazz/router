@@ -146,7 +146,7 @@ module packet_source
      = la_route_info_width + route_info_width + packet_length_width;
    
    // flit width
-   parameter data_width = 64;
+   parameter flit_data_width = 64;
    
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam cred_count_width = clogb(num_flit_buffers+1);
@@ -166,8 +166,8 @@ module packet_source
    output [0:vc_idx_width-1] flit_vc;
    wire [0:vc_idx_width-1] flit_vc;
    
-   output [0:data_width-1] flit_data;
-   wire [0:data_width-1]   flit_data;
+   output [0:flit_data_width-1] flit_data;
+   wire [0:flit_data_width-1] flit_data;
    
    input cred_valid;
    
@@ -434,11 +434,11 @@ module packet_source
       .d(flit_valid_s),
       .q(flit_valid_q));
    
-   reg [0:data_width-1] 	  data_q;
+   reg [0:flit_data_width-1] 	       data_q;
    always @(posedge clk, posedge reset)
      begin
 	if(reset | flit_sent)
-	  for(i = 0; i < data_width; i = i + 1)
+	  for(i = 0; i < flit_data_width; i = i + 1)
 	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
    
@@ -650,9 +650,9 @@ module packet_source
    endgenerate
    
    assign flit_data[la_route_info_width+route_info_width+packet_length_width:
-		    data_width-1]
+		    flit_data_width-1]
 	    = data_q[la_route_info_width+route_info_width+packet_length_width:
-		     data_width-1];
+		     flit_data_width-1];
    
    always @(posedge clk, posedge reset)
      begin
