@@ -141,6 +141,10 @@ module packet_source
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
+   // total number of bits required for storing header information
+   localparam header_info_width
+     = la_route_info_width + route_info_width /*+ packet_length_width*/;
+   
    // flit width
    parameter flit_data_width = 64;
    
@@ -525,10 +529,8 @@ module packet_source
    assign la_route_info
      = la_route_info_ivc[vc_q*la_route_info_width +: la_route_info_width];
    
-   assign flit_data[0:la_route_info_width-1]
-	    = flit_head ?
-	      la_route_info :
-	      data_q[0:la_route_info_width-1];
+   wire [0:header_info_width-1] 	  header_info;
+   assign header_info[0:la_route_info_width-1] = la_route_info;
    
    generate
       
@@ -570,12 +572,9 @@ module packet_source
       
    endgenerate
    
-   assign flit_data[la_route_info_width:
-		    la_route_info_width+route_info_width-1]
-	    = flit_head ?
-	      route_info :
-	      data_q[la_route_info_width:
-		     la_route_info_width+route_info_width-1];
+   assign header_info[la_route_info_width:
+		      la_route_info_width+route_info_width-1]
+	    = route_info;
    
    generate
       
@@ -627,14 +626,10 @@ module packet_source
 	   assign flit_head = head_q;
 	   assign flit_tail = tail_q;
 	   
-	   assign flit_data[la_route_info_width+route_info_width:
-			    la_route_info_width+route_info_width+
-			    packet_length_width-1]
-		    = /*flit_head ?
-		      flit_count_q :*/
-		      data_q[la_route_info_width+route_info_width:
-			     la_route_info_width+route_info_width+
-			     packet_length_width-1];
+	   /*assign header_info[la_route_info_width+route_info_width:
+			      la_route_info_width+route_info_width+
+			      packet_length_width-1]
+		    = flit_count_q;*/
 	   
 	end
       else
@@ -645,10 +640,12 @@ module packet_source
       
    endgenerate
    
-   assign flit_data[la_route_info_width+route_info_width+packet_length_width:
-		    flit_data_width-1]
-	    = data_q[la_route_info_width+route_info_width+packet_length_width:
-		     flit_data_width-1];
+   assign flit_data[0:header_info_width-1]
+	    = flit_head ?
+	      header_info : 
+	      data_q[0:header_info_width-1];
+   assign flit_data[header_info_width:flit_data_width-1]
+	    = data_q[header_info_width:flit_data_width-1];
    
    always @(posedge clk, posedge reset)
      begin
