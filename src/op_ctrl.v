@@ -419,13 +419,7 @@ module op_ctrl
 			 tail_queue[push_ptr_q] <= flit_tail_in;
 		     
 		     wire 			      tail;
-		     mux_nto1
-		       #(.num_ports(num_flit_buffers),
-			 .width(1))
-		     tail_mux
-		       (.select(pop_ptr_q),
-			.data_in(tail_queue),
-			.data_out(tail));
+		     assign tail = tail_queue[pop_ptr_q];
 		     
 		     wire 			      head_credit;
 		     assign head_credit = tail & credit;

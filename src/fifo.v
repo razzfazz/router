@@ -121,17 +121,19 @@ module fifo
 	       (.data_in(insert_ptr_q),
 		.data_out(insert_ptr_prev));
 	     
-	     wire [0:insert_ptr_width-1] insert_ptr_s;
-	     mux_nto1
-	       #(.num_ports(4),
-		 .width(insert_ptr_width))
-	     insert_ptr_s_mux
-	       (.select({push, pop}),
-		.data_in({insert_ptr_q,
-			  insert_ptr_prev,
-			  insert_ptr_next,
-			  insert_ptr_q}),
-		.data_out(insert_ptr_s));
+	     wire [0:4*insert_ptr_width-1] insert_ptr_values;
+	     assign insert_ptr_values = {insert_ptr_q,
+					 insert_ptr_prev,
+					 insert_ptr_next,
+					 insert_ptr_q};
+	     
+	     wire [0:1] 		   insert_ptr_sel;
+	     assign insert_ptr_sel = {push, pop};
+	     
+	     wire [0:insert_ptr_width-1]   insert_ptr_s;
+	     assign insert_ptr_s
+	       = insert_ptr_values[insert_ptr_sel*insert_ptr_width +:
+				   insert_ptr_width];
 	     dff
 	       #(.width(insert_ptr_width),
 		 .reset_type(reset_type),
@@ -144,10 +146,10 @@ module fifo
 	     
 	     assign full = ~|insert_ptr_q;
 	     
-	     wire 			 almost_empty;
+	     wire 			   almost_empty;
 	     assign almost_empty = (insert_ptr_q == (depth - 1));
 	     
-	     wire 			 empty_s, empty_q;
+	     wire 			   empty_s, empty_q;
 	     assign empty_s
 	       = (empty_q | (almost_empty & pop & ~push)) & ~(push & ~pop);
 	     dff
@@ -161,7 +163,7 @@ module fifo
 	     
 	     assign empty = empty_q;
 	     
-	     wire [0:(depth+1)*width-1] data;
+	     wire [0:(depth+1)*width-1]    data;
 	     
 	     for(level = 0; level < depth; level = level + 1)
 	       begin:levels

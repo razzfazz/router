@@ -146,12 +146,6 @@ module wf_alloc_core_rep
       
    endgenerate
    
-   mux_nto1
-     #(.width(num_ports*num_ports),
-       .num_ports(num_ports))
-   gnt_mux
-     (.select(prio_q),
-      .data_in(gnt_by_prio),
-      .data_out(gnt));
+   assign gnt = gnt_by_prio[prio_q*num_ports +: num_ports];
    
 endmodule

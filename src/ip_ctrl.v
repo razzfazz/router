@@ -496,13 +496,9 @@ module ip_ctrl
 	begin
 	   
 	   wire [0:flit_buffer_idx_width-1] fbf_write_offset;
-	   mux_nto1
-	     #(.num_ports(num_vcs),
-	       .width(flit_buffer_idx_width))
-	   fbf_write_offset_sel
-	     (.select(flit_vc_in_q),
-	      .data_in(fbf_write_offset_ivc),
-	      .data_out(fbf_write_offset));
+	   assign fbf_write_offset
+	     = fbf_write_offset_ivc[flit_vc_in_q*flit_buffer_idx_width +:
+				    flit_buffer_idx_width];
 	   
 	   wire [0:vc_idx_width-1] 	    fbf_write_base;
 	   assign fbf_write_base = flit_vc_in_q;
@@ -531,13 +527,9 @@ module ip_ctrl
       else
 	begin
 	   
-	   mux_nto1
-	     #(.num_ports(num_vcs),
-	       .width(fbf_addr_width))
-	   fbf_write_addr_sel
-	     (.select(flit_vc_in_q),
-	      .data_in(fbf_write_addr_ivc),
-	      .data_out(fbf_write_addr));
+	   assign fbf_write_addr
+	     = fbf_write_addr_ivc[flit_vc_in_q*fbf_addr_width +:
+				  fbf_addr_width];
 	   
 	   select_1ofn
 	     #(.num_ports(num_vcs),
