@@ -615,7 +615,7 @@ module op_ctrl
 	   wire [0:vc_idx_width-1] match_ovc_enc;
 	   encoder
 	     #(.num_ports(num_vcs))
-	   flit_vc_s_enc
+	   match_ovc_enc_enc
 	     (.data_in(match_ovc),
 	      .data_out(match_ovc_enc));
 	   
