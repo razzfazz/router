@@ -30,11 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input VC controller
 module ivc_ctrl
-  (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, 
-   vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_valid_out, flit_head_out, flit_tail_out, flit_vc_out, la_route_info_out,
-   fbf_write_addr, fbf_read_addr, error, events);
+  (clk, reset, router_address, flit_ctrl_in, header_info_in, 
+   int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
+   sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, flit_ctrl_out, 
+   la_route_info_out, fbf_write_addr, fbf_read_addr, error, events);
    
 `include "constants.v"
    
@@ -117,6 +116,9 @@ module ivc_ctrl
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width = la_route_info_width + route_info_width;
+   
+   // width of flit control signals
+   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
@@ -216,24 +218,15 @@ module ivc_ctrl
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // valid flit data available
-   input flit_valid_in;
-   
-   // flit is head
-   // (note: valid only when flit_valid_in=1)
-   input flit_head_in;
-   
-   // flit is tail
-   // (note: valid only when flit_valid_in=1)
-   input flit_tail_in;
+   // incoming flit control signals
+   input [0:flit_ctrl_width-1] flit_ctrl_in;
    
    // header information associated with current flit
-   // (note: valid only when flit_valid_in=1 and flit_head_in=1)
    input [0:header_info_width-1] header_info_in;
    
    // internal flow control signalling from output controller to input 
    // controllers
-   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] flow_ctrl_op_ovc;
+   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
    output [0:num_ports-1] route_op;
@@ -267,27 +260,11 @@ module ivc_ctrl
    // speculative switch allocator grants
    input sw_gnt_spec;
    
-   // outgoing flit valid
-   output flit_valid_out;
-   wire 		flit_valid_out;
-   
-   // outgoing flit is head
-   // (note: only valid if flit_valid_out=1)
-   output flit_head_out;
-   wire 		flit_head_out;
-   
-   // outgoing flit is tail
-   // (note: only valid if flit_valid_out=1)
-   output flit_tail_out;
-   wire 		flit_tail_out;
-   
-   // destination VC for outgoing flit
-   // (note: only valid if flit_valid_out=1)
-   output [0:vc_idx_width-1] flit_vc_out;
-   wire [0:vc_idx_width-1] flit_vc_out;
+   // outgoing flit control signals
+   output [0:flit_ctrl_width-1] flit_ctrl_out;
+   wire [0:flit_ctrl_width-1] flit_ctrl_out;
    
    // lookahead routing information for outgoing flit
-   // (note: only valid if flit_valid_out=1 and flit_head_out=1)
    output [0:la_route_info_width-1] la_route_info_out;
    wire [0:la_route_info_width-1] la_route_info_out;
    
@@ -310,13 +287,46 @@ module ivc_ctrl
    
    
    //---------------------------------------------------------------------------
+   // decode control signals
+   //---------------------------------------------------------------------------
+   
+   wire 		     flit_valid_in;
+   
+   generate
+      
+      if(num_vcs > 1)
+	begin
+	   
+	   wire [0:vc_idx_width-1] flit_vc_in;
+	   assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
+	   
+	   assign flit_valid_in
+	     = flit_ctrl_in[0] && (flit_vc_in == vc_id);
+	   
+	end
+      else
+	assign flit_valid_in = flit_ctrl_in[0];
+      
+   endgenerate
+   
+   wire 			   flit_head_in;
+   assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
+   
+   wire 			   flit_tail_in;
+   assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
+   
+   
+   //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire 		     packet_done;
+   wire 			   flit_valid_out;
+   wire 			   flit_tail_out;
+   
+   wire 			   packet_done;
    assign packet_done = flit_valid_out & flit_tail_out;
    
-   wire 		     vc_allocated_s, vc_allocated_q;
+   wire 			   vc_allocated_s, vc_allocated_q;
    assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
    dff
      #(.width(1),
@@ -327,14 +337,14 @@ module ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
-   wire [0:num_vcs_per_class-1] vc_gnt_unchanged_ocvc;
+   wire [0:num_vcs_per_class-1]    vc_gnt_unchanged_ocvc;
    assign vc_gnt_unchanged_ocvc
      = vc_gnt_ovc[(traffic_class*num_routing_classes+routing_class)*
 		  num_vcs_per_class:
 		  (traffic_class*num_routing_classes+routing_class+1)*
 		  num_vcs_per_class-1];
    
-   wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
+   wire [0:num_vcs_per_class-1]    vc_gnt_ocvc;
    
    generate
       
@@ -356,7 +366,7 @@ module ivc_ctrl
 	end
       
    endgenerate
-
+   
    wire [0:num_vcs_per_class-1] 	vc_allocated_ocvc_q;
    wire [0:num_vcs_per_class-1] 	vc_allocated_hold_ocvc;
    assign vc_allocated_hold_ocvc = vc_allocated_ocvc_q | vc_gnt_ocvc;
@@ -399,6 +409,8 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire fbc_empty;
+   
+   wire flit_head_out;
    
    generate
       
@@ -719,14 +731,14 @@ module ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs*int_flow_ctrl_width-1] flow_ctrl_ovc;
+   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
    select_1ofn
      #(.num_ports(num_ports),
        .width(num_vcs*int_flow_ctrl_width))
-   flow_ctrl_ovc_sel
+   int_flow_ctrl_ovc_sel
      (.select(route_op),
-      .data_in(flow_ctrl_op_ovc),
-      .data_out(flow_ctrl_ovc));
+      .data_in(int_flow_ctrl_op_ovc),
+      .data_out(int_flow_ctrl_ovc));
    
    wire 				  free_allocated;
    wire 				  cred_tracker_error;
@@ -740,10 +752,10 @@ module ivc_ctrl
 	     
 	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
 	     assign free_unchanged_ocvc
-	       = flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				routing_class)*num_vcs_per_class*2:
-			       (traffic_class*num_routing_classes+
-				routing_class+1)*num_vcs_per_class*2-1];
+	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
+				    routing_class)*num_vcs_per_class*2:
+				   (traffic_class*num_routing_classes+
+				    routing_class+1)*num_vcs_per_class*2-1];
 	     
 	     wire [0:num_vcs_per_class*2-1] free_ocvc;
 	     
@@ -754,10 +766,11 @@ module ivc_ctrl
 		  
 		  wire [0:num_vcs_per_class*2-1] free_changed_ocvc;
 		  assign free_changed_ocvc
-		    = flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				     routing_class+1)*num_vcs_per_class*2:
-				    (traffic_class*num_routing_classes+
-				     routing_class+2)*num_vcs_per_class*2-1];
+		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
+					 routing_class+1)*num_vcs_per_class*2:
+					(traffic_class*num_routing_classes+
+					 routing_class+2)*num_vcs_per_class*2
+					-1];
 		  
 		  assign free_ocvc = inc_rc ?
 				     free_changed_ocvc :
@@ -832,10 +845,10 @@ module ivc_ctrl
 	     
 	     wire [0:num_vcs_per_class-1] cred_unchanged_ocvc;
 	     assign cred_unchanged_ocvc
-	       = flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				routing_class)*num_vcs_per_class:
-			       (traffic_class*num_routing_classes+
-				routing_class+1)*num_vcs_per_class-1];
+	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
+				    routing_class)*num_vcs_per_class:
+				   (traffic_class*num_routing_classes+
+				    routing_class+1)*num_vcs_per_class-1];
 	     
 	     wire [0:num_vcs_per_class-1] cred_ocvc;
 	     
@@ -846,10 +859,10 @@ module ivc_ctrl
 		  
 		  wire [0:num_vcs_per_class-1] cred_changed_ocvc;
 		  assign cred_changed_ocvc
-		    = flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				     routing_class+1)*num_vcs_per_class:
-				    (traffic_class*num_routing_classes+
-				     routing_class+2)*num_vcs_per_class-1];
+		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
+					 routing_class+1)*num_vcs_per_class:
+					(traffic_class*num_routing_classes+
+					 routing_class+2)*num_vcs_per_class-1];
 		  
 		  assign cred_ocvc = inc_rc ?
 				     cred_changed_ocvc :
@@ -934,77 +947,93 @@ module ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // generate target output VC to send along with flit data
-   // (valid when flit_valid_out=1)
+   // encode output control signals
    //---------------------------------------------------------------------------
+   
+   assign flit_ctrl_out[0] = flit_valid_out;
    
    generate
       
-      if(track_vcs_at_output)
-	assign flit_vc_out = vc_id;
-      else
+      if(num_vcs > 1)
 	begin
 	   
-	   wire [0:num_vcs_per_class-1] flit_ocvc;
+	   wire [0:vc_idx_width-1] flit_vc_out;
 	   
-	   if(sw_spec_enable)
-	     assign flit_ocvc = vc_allocated_hold_ocvc;
+	   if(track_vcs_at_output)
+	     assign flit_vc_out = vc_id;
 	   else
-	     assign flit_ocvc = vc_allocated_ocvc_q;
+	     begin
+		
+		wire [0:num_vcs_per_class-1] flit_ocvc;
+		
+		if(sw_spec_enable)
+		  assign flit_ocvc = vc_allocated_hold_ocvc;
+		else
+		  assign flit_ocvc = vc_allocated_ocvc_q;
+		
+		wire [0:num_vcs-1] 	     flit_ovc;
+		
+		if(traffic_class > 0)
+		  assign flit_ovc[0:traffic_class*num_routing_classes*
+				  num_vcs_per_class-1]
+			   = {(traffic_class*num_routing_classes*
+			       num_vcs_per_class){1'b0}};
+		
+		if(routing_class > 0)
+		  assign flit_ovc[traffic_class*num_routing_classes*
+				  num_vcs_per_class:
+				  (traffic_class*num_routing_classes+
+				   routing_class)*
+				  num_vcs_per_class-1]
+			   = {(routing_class*num_vcs_per_class){1'b0}};
+		
+		assign flit_ovc[(traffic_class*num_routing_classes+
+				 routing_class)*
+				num_vcs_per_class:
+				(traffic_class*num_routing_classes+
+				 routing_class+1)*
+				num_vcs_per_class-1]
+			 = flit_ocvc & {num_vcs_per_class{~inc_rc}};
+		
+		if(routing_class < (num_routing_classes - 1))
+		  assign flit_ovc[(traffic_class*num_routing_classes+
+				   routing_class+1)*num_vcs_per_class:
+				  (traffic_class*num_routing_classes+
+				   routing_class+2)*num_vcs_per_class-1]
+			   = flit_ocvc & {num_vcs_per_class{inc_rc}};
+		
+		if(routing_class < (num_routing_classes - 2))
+		  assign flit_ovc[(traffic_class*num_routing_classes+
+				   routing_class+2)*num_vcs_per_class:
+				  (traffic_class+1)*num_routing_classes*
+				  num_vcs_per_class-1]
+			   = {((num_routing_classes-routing_class-2)*
+			       num_vcs_per_class){1'b0}};
+		
+		if(traffic_class < (num_traffic_classes - 1))
+		  assign flit_ovc[(traffic_class+1)*num_routing_classes*
+				  num_vcs_per_class:
+				  num_traffic_classes*num_routing_classes*
+				  num_vcs_per_class-1]
+			   = {((num_traffic_classes-traffic_class-1)*
+			       num_routing_classes*num_vcs_per_class){1'b0}};
+		
+		encoder
+		  #(.num_ports(num_vcs))
+		flit_vc_out_enc
+		  (.data_in(flit_ovc),
+		   .data_out(flit_vc_out));
+		
+	     end
 	   
-	   wire [0:num_vcs-1] flit_ovc;
-	   
-	   if(traffic_class > 0)
-	     assign flit_ovc[0:traffic_class*num_routing_classes*
-			     num_vcs_per_class-1]
-		      = {(traffic_class*num_routing_classes*
-			  num_vcs_per_class){1'b0}};
-	   
-	   if(routing_class > 0)
-	     assign flit_ovc[traffic_class*num_routing_classes*
-			     num_vcs_per_class:
-			     (traffic_class*num_routing_classes+routing_class)*
-			     num_vcs_per_class-1]
-		      = {(routing_class*num_vcs_per_class){1'b0}};
-	   
-	   assign flit_ovc[(traffic_class*num_routing_classes+routing_class)*
-			   num_vcs_per_class:
-			   (traffic_class*num_routing_classes+routing_class+1)*
-			   num_vcs_per_class-1]
-		    = flit_ocvc & {num_vcs_per_class{~inc_rc}};
-	   
-	   if(routing_class < (num_routing_classes - 1))
-	     assign flit_ovc[(traffic_class*num_routing_classes+
-			      routing_class+1)*num_vcs_per_class:
-			     (traffic_class*num_routing_classes+
-			      routing_class+2)*num_vcs_per_class-1]
-		      = flit_ocvc & {num_vcs_per_class{inc_rc}};
-
-	   if(routing_class < (num_routing_classes - 2))
-	     assign flit_ovc[(traffic_class*num_routing_classes+
-			      routing_class+2)*num_vcs_per_class:
-			     (traffic_class+1)*num_routing_classes*
-			     num_vcs_per_class-1]
-		      = {((num_routing_classes-routing_class-2)*
-			  num_vcs_per_class){1'b0}};
-	   
-	   if(traffic_class < (num_traffic_classes - 1))
-	     assign flit_ovc[(traffic_class+1)*num_routing_classes*
-			     num_vcs_per_class:
-			     num_traffic_classes*num_routing_classes*
-			     num_vcs_per_class-1]
-		      = {((num_traffic_classes-traffic_class-1)*
-			  num_routing_classes*num_vcs_per_class){1'b0}};
-	   
-	   encoder
-	     #(.num_ports(num_vcs))
-	   flit_vc_out_enc
-	     (.data_in(flit_ovc),
-	      .data_out(flit_vc_out));
+	   assign flit_ctrl_out[1:1+vc_idx_width-1] = flit_vc_out;
 	   
 	end
       
    endgenerate
+   
+   assign flit_ctrl_out[1+vc_idx_width+0] = flit_head_out;
+   assign flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out;
    
    
    //---------------------------------------------------------------------------

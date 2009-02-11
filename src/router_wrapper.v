@@ -31,10 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wrapper around router component (configures router parameters based on
 // selected network topology, etc.)
 module router_wrapper
-  (clk, reset, router_address, flit_valid_in_ip, flit_vc_in_ip, flit_head_in_ip,
-   flit_tail_in_ip, flit_data_in_ip, cred_valid_out_ip, cred_vc_out_ip,
-   flit_valid_out_op, flit_vc_out_op, flit_head_out_op, flit_tail_out_op,
-   flit_data_out_op, cred_valid_in_op, cred_vc_in_op, error);
+  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
+   flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
+   error);
    
 `include "constants.v"
    
@@ -125,9 +124,15 @@ module router_wrapper
    // number of input and output ports on router
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
-
-   // flit width
+   
+   // width of flit control signals
+   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   
+   // width of flit payload data
    parameter flit_data_width = 64;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // enable performance counter
    parameter perf_ctr_enable = 0;
@@ -203,64 +208,26 @@ module router_wrapper
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // valid flit data available at input port(s)
-   input [0:num_ports-1] flit_valid_in_ip;
-   
-   // which VC(s) is/are incoming flit(s) travelling on
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports*vc_idx_width-1] flit_vc_in_ip;
-   
-   // incoming flit(s) is/are head(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_head_in_ip;
-   
-   // incoming flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
-   input [0:num_ports-1] flit_tail_in_ip;
+   // control signals for each incoming flit
+   input [0:flit_ctrl_width-1] flit_ctrl_in_ip;
    
    // flit data for each incoming flit
-   // (note: only valid when corresponding bit in flit_valid_in_ip is high)
    input [0:num_ports*flit_data_width-1] flit_data_in_ip;
    
-   // outgoing credit(s) valid
-   output [0:num_ports-1] cred_valid_out_ip;
-   wire [0:num_ports-1] cred_valid_out_ip;
+   // outgoing flow control signals
+   output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
    
-   // VC indicators for outgoing credit(s)
-   // (note: only valid when corresponding bit in cred_valid_out_ip is high)
-   output [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
-   wire [0:num_ports*vc_idx_width-1] cred_vc_out_ip;
-   
-   // valid flit data available at output port(s)
-   output [0:num_ports-1] flit_valid_out_op;
-   wire [0:num_ports-1] 	     flit_valid_out_op;
-   
-   // which VC(s) is/are outgoing flit(s) travelling on
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   wire [0:num_ports*vc_idx_width-1] flit_vc_out_op;
-   
-   // outgoing flit(s) is/are head(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_head_out_op;
-   wire [0:num_ports-1] 	     flit_head_out_op;
-   
-   // outgoing flit(s) is/are tail(s)
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
-   output [0:num_ports-1] flit_tail_out_op;
-   wire [0:num_ports-1] 	     flit_tail_out_op;
+   // control signals for each outgoing flit
+   output [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
+   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
    
    // flit data for each outgoing flit
-   // (note: only valid when corresponding bit in flit_valid_out_op is high)
    output [0:num_ports*flit_data_width-1] flit_data_out_op;
    wire [0:num_ports*flit_data_width-1] flit_data_out_op;
    
-   // incoming credit(s) available
-   input [0:num_ports-1] cred_valid_in_op;
-   
-   // VC indicators for incoming flit(s)
-   // (note: only valid when corresponding bit in cred_valid_in_op is high)
-   input [0:num_ports*vc_idx_width-1] cred_vc_in_op;
+   // incoming flow control signals
+   input [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
    
    // internal error condition detected
    output error;
@@ -300,20 +267,12 @@ module router_wrapper
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .flit_valid_in_ip(flit_valid_in_ip),
-      .flit_vc_in_ip(flit_vc_in_ip),
-      .flit_head_in_ip(flit_head_in_ip),
-      .flit_tail_in_ip(flit_tail_in_ip),
+      .flit_ctrl_in_ip(flit_ctrl_in_ip),
       .flit_data_in_ip(flit_data_in_ip),
-      .cred_valid_out_ip(cred_valid_out_ip),
-      .cred_vc_out_ip(cred_vc_out_ip),
-      .flit_valid_out_op(flit_valid_out_op),
-      .flit_vc_out_op(flit_vc_out_op),
-      .flit_head_out_op(flit_head_out_op),
-      .flit_tail_out_op(flit_tail_out_op),
+      .flow_ctrl_out_ip(flow_ctrl_out_ip),
+      .flit_ctrl_out_op(flit_ctrl_out_op),
       .flit_data_out_op(flit_data_out_op),
-      .cred_valid_in_op(cred_valid_in_op),
-      .cred_vc_in_op(cred_vc_in_op),
+      .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(error));
    
 endmodule

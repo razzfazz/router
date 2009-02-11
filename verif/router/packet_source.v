@@ -29,8 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 module packet_source
-  (clk, reset, flit_valid, flit_head, flit_tail, flit_vc, flit_data, cred_valid,
-   cred_vc, run, out_flits, error);
+  (clk, reset, flit_ctrl, flit_data, flow_ctrl, run, out_flits, error);
    
 `include "constants.v"
    
@@ -115,6 +114,15 @@ module packet_source
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
    
+   // width of flit control signals
+   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   
+   // width of flit payload data
+   parameter flit_data_width = 64;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width = 1 + vc_idx_width;
+   
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
@@ -145,33 +153,19 @@ module packet_source
    localparam header_info_width
      = la_route_info_width + route_info_width /*+ packet_length_width*/;
    
-   // flit width
-   parameter flit_data_width = 64;
-   
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam cred_count_width = clogb(num_flit_buffers+1);
    
    input clk;
    input reset;
    
-   output flit_valid;
-   wire flit_valid;
-   
-   output flit_head;
-   wire flit_head;
-   
-   output flit_tail;
-   wire flit_tail;
-   
-   output [0:vc_idx_width-1] flit_vc;
-   wire [0:vc_idx_width-1] flit_vc;
+   output [0:flit_ctrl_width-1] flit_ctrl;
+   wire [0:flit_ctrl_width-1] flit_ctrl;
    
    output [0:flit_data_width-1] flit_data;
    wire [0:flit_data_width-1] flit_data;
    
-   input cred_valid;
-   
-   input [0:vc_idx_width-1] cred_vc;
+   input [0:flow_ctrl_width-1] flow_ctrl;
    
    input run;
    
@@ -245,16 +239,21 @@ module packet_source
    assign ready_packet_count_zero = ~|ready_packet_count_q;
    
    wire 			  flit_sent;
-   assign flit_valid = flit_sent;
    
-   reg [0:vc_idx_width-1] 	  vc_q;
-   assign flit_vc = vc_q;
+   wire 			  flit_head;
+   assign flit_ctrl[1+vc_idx_width+0] = flit_head;
+   
+   wire 			  flit_tail;
+   assign flit_ctrl[1+vc_idx_width+1] = flit_tail;
    
    wire [0:num_vcs-1] 		  free_ovc;
    wire [0:num_vcs-1] 		  head_free_ovc;
    
    wire [0:num_vcs-1] 		  error_hct_ovc;
    wire [0:num_vcs*2-1] 	  error_cred_ovc;
+   
+   wire 			  free;
+   wire 			  head_free;
    
    genvar 			  ovc;
    
@@ -263,11 +262,31 @@ module packet_source
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire credit;
-	   assign credit = cred_valid && (cred_vc == ovc);
+	   wire cred_valid;
+	   assign cred_valid = flow_ctrl[0];
 	   
+	   wire credit;
 	   wire debit;
-	   assign debit = flit_sent && (vc_q == ovc);
+	   
+	   if(num_vcs > 1)
+	     begin
+
+		wire [0:vc_idx_width-1] cred_vc;
+		assign cred_vc = flow_ctrl[1:1+vc_idx_width-1];
+		
+		assign credit = cred_valid && (cred_vc == ovc);
+		
+		wire [0:vc_idx_width-1] flit_vc;
+		assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
+		
+		assign debit = flit_sent && (flit_vc == ovc);
+		
+	     end
+	   else
+	     begin
+		assign credit = cred_valid;
+		assign debit = flit_sent;
+	     end
 	   
 	   wire head_credit;
 	   wire [0:cred_count_width-1] cred_count_s;
@@ -397,28 +416,28 @@ module packet_source
 	   
 	end
       
+      if(num_vcs > 1)
+	begin
+	   
+	   wire [0:vc_idx_width-1] flit_vc;
+	   assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
+	   
+	   assign free = free_ovc[flit_vc];
+	   assign head_free = head_free_ovc[flit_vc];
+	   
+	end
+      else
+	begin
+	   assign free = free_ovc;
+	   assign head_free = head_free_ovc;
+	end
+      
    endgenerate
-   
-   wire 			       free;
-   mux_nto1
-     #(.num_ports(num_vcs),
-       .width(1))
-   free_mux
-     (.select(vc_q),
-      .data_in(free_ovc),
-      .data_out(free));
-
-   wire 			       head_free;
-   mux_nto1
-     #(.num_ports(num_vcs),
-       .width(1))
-   head_free_mux
-     (.select(vc_q),
-      .data_in(head_free_ovc),
-      .data_out(head_free));
    
    wire 			       flit_valid_q;
    assign flit_sent = flit_valid_q & free & (head_free | ~flit_head);
+   
+   assign flit_ctrl[0] = flit_sent;
    
    assign packet_sent = flit_tail & flit_sent;
    
@@ -526,15 +545,27 @@ module packet_source
    endgenerate
    
    wire [0:la_route_info_width-1] 	  la_route_info;
-   assign la_route_info
-     = la_route_info_ivc[vc_q*la_route_info_width +: la_route_info_width];
-   
+
    wire [0:header_info_width-1] 	  header_info;
    assign header_info[0:la_route_info_width-1] = la_route_info;
    
    generate
+
+      if(num_vcs > 1)
+	begin:la_route_info_mux
+
+	   wire [0:vc_idx_width-1] flit_vc;
+	   assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
+	   
+	   assign la_route_info
+	     = la_route_info_ivc[flit_vc*la_route_info_width +: 
+				 la_route_info_width];
+	   
+	end
+      else
+	assign la_route_info = la_route_info_ivc;
       
-      genvar 				  irc;
+      genvar 					       irc;
       
       for(irc = 0; irc < num_routing_classes; irc = irc + 1)
 	begin:ircs
@@ -638,6 +669,21 @@ module packet_source
 	   assign flit_tail = 1'b1;
 	end
       
+      if(num_vcs > 1)
+	begin
+	   
+	   reg [0:vc_idx_width-1] vc_q;
+	   
+	   always @(posedge clk, posedge reset)
+	     begin
+		if(reset | packet_sent)
+		  vc_q <= $dist_uniform(seed, 0, num_vcs-1);
+	     end
+	   
+	   assign flit_ctrl[1:1+vc_idx_width-1] = vc_q;
+	   
+	end
+      
    endgenerate
    
    assign flit_data[0:header_info_width-1]
@@ -646,12 +692,6 @@ module packet_source
 	      data_q[0:header_info_width-1];
    assign flit_data[header_info_width:flit_data_width-1]
 	    = data_q[header_info_width:flit_data_width-1];
-   
-   always @(posedge clk, posedge reset)
-     begin
-	if(reset | packet_sent)
-	  vc_q <= $dist_uniform(seed, 0, num_vcs-1);
-     end
    
    wire 				  rtl_error;
    assign rtl_error = |rtl_error_ivc;
