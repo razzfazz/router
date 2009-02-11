@@ -294,16 +294,9 @@ module op_ctrl
 		   .d(allocated_ivc_s),
 		   .q(allocated_ivc_q));
 		
-		wire [0:vc_idx_width-1] allocated_vc;
-		encoder
-		  #(.num_ports(num_vcs))
-		compare_vc_enc
-		  (.data_in(allocated_ivc_q),
-		   .data_out(allocated_vc));
-		
 		assign match_ovc[ovc] = allocated_q &&
 					|(allocated_ip_q & xbr_ctrl_ip) && 
-					(allocated_vc == flit_vc_in);
+					allocated_ivc_q[flit_vc_in];
 
 	     end
 	   else
@@ -589,8 +582,11 @@ module op_ctrl
    // output staging
    //---------------------------------------------------------------------------
    
+   wire 				      xbr_ctrl;
+   assign xbr_ctrl = |xbr_ctrl_ip;
+   
    wire 				      flit_valid_s, flit_valid_q;
-   assign flit_valid_s = flit_valid_in;
+   assign flit_valid_s = xbr_ctrl & flit_valid_in;
    dff
      #(.width(1),
        .reset_type(reset_type))
@@ -601,9 +597,6 @@ module op_ctrl
       .q(flit_valid_q));
    
    assign flit_valid_out = flit_valid_q;
-   
-   wire 				      xbr_ctrl;
-   assign xbr_ctrl = |xbr_ctrl_ip;
    
    wire [0:vc_idx_width-1] 		      flit_vc_s, flit_vc_q;
    
