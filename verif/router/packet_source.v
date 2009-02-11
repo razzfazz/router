@@ -141,10 +141,6 @@ module packet_source
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
-   // total number of bits required for storing header information
-   localparam header_info_width
-     = la_route_info_width + route_info_width + packet_length_width;
-   
    // flit width
    parameter flit_data_width = 64;
    
@@ -634,8 +630,8 @@ module packet_source
 	   assign flit_data[la_route_info_width+route_info_width:
 			    la_route_info_width+route_info_width+
 			    packet_length_width-1]
-		    = flit_head ?
-		      flit_count_q :
+		    = /*flit_head ?
+		      flit_count_q :*/
 		      data_q[la_route_info_width+route_info_width:
 			     la_route_info_width+route_info_width+
 			     packet_length_width-1];

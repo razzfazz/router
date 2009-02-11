@@ -174,7 +174,7 @@ module testbench
    
    // total number of bits required for storing header information
    localparam header_info_width
-     = la_route_info_width + route_info_width + packet_length_width;
+     = la_route_info_width + route_info_width /*+ packet_length_width*/;
    
    // flit width
    parameter flit_data_width = 64;
@@ -855,7 +855,6 @@ module testbench
       .cred_vc_in_op(cred_vc_in_op),
       .error(rtr_error));
    
-   wire [0:num_ports*num_vcs-1] 	pkt_error_op_ovc;
    wire [0:num_ports-1] 		x_error_op;
    
    generate
@@ -907,74 +906,6 @@ module testbench
 		  = flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1];
 		assign cred_vc_in_op[op*vc_idx_width:(op+1)*vc_idx_width-1]
 			 = cred_vc_dly_q;
-	     end
-	   
-	   genvar ovc;
-	   for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	     begin:ovcs
-		
-		wire flit_valid;
-		assign flit_valid
-		  = flit_valid_out_op[op] &&
-		    (flit_vc_out_op[op*vc_idx_width:(op+1)*vc_idx_width-1] ==
-		     ovc);
-		
-		if(max_packet_length > 1)
-		  begin
-
-		     wire flit_count_zero;
-		     
-		     wire wait_head_s, wait_head_q;
-		     assign wait_head_s = (wait_head_q &
-					   ~(flit_valid &
-					     flit_head_out_op[op])) |
-					  (flit_valid & flit_count_zero);
-		     dff
-		       #(.width(1),
-			 .reset_type(reset_type),
-			 .reset_value(1'b1))
-		     wait_headq
-		       (.clk(clk),
-			.reset(reset),
-			.d(wait_head_s),
-			.q(wait_head_q));
-
-		     wire [0:header_info_width-1] header_info;
-		     assign header_info
-		       = flit_data_out_op[op*flit_data_width:
-					  op*flit_data_width+
-					  header_info_width-1];
-		     
-		     wire [0:packet_length_width-1] packet_length;
-		     assign packet_length
-		       = header_info[la_route_info_width+route_info_width:
-				     la_route_info_width+route_info_width+
-				     packet_length_width-1];
-		     
-		     wire [0:packet_length_width-1] flit_count_s, flit_count_q;
-		     assign flit_count_s
-		       = (flit_valid & flit_head_out_op[op]) ?
-			 packet_length :
-			 (flit_count_q - flit_valid);
-		     dff
-		       #(.width(packet_length_width),
-			 .reset_type(reset_type))
-		     flit_countq
-		       (.clk(clk),
-			.reset(reset),
-			.d(flit_count_s),
-			.q(flit_count_q));
-		     
-		     assign flit_count_zero = ~|flit_count_s;
-		     
-		     assign pkt_error_op_ovc[op*num_vcs+ovc]
-			      = flit_valid &
-				(flit_head_out_op[op] ^ wait_head_q);
-		     
-		  end
-		else
-		  assign pkt_error_op_ovc[op*num_vcs+ovc] = 1'b0;
-		
 	     end
 	   
 	   wire 				    flit_valid_out;
@@ -1045,13 +976,12 @@ module testbench
 	  end
      end
    
-   wire [0:5] tb_errors;
+   wire [0:4] tb_errors;
    assign tb_errors = {|ps_error_ip,
 		       |rtl_error_ip,
 		       |check_error_op,
 		       |x_error_op,
-		       |fifo_error_ip_ivc,
-		       |pkt_error_op_ovc};
+		       |fifo_error_ip_ivc};
    
    wire       tb_error;
    assign tb_error = |tb_errors;
