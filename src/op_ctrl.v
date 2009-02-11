@@ -31,8 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // output port controller (tracks state of buffers in downstream router)
 module op_ctrl
   (clk, reset, cred_valid_in, cred_vc_in, vc_gnt_ovc, vc_gnt_ovc_ip, 
-   vc_gnt_ovc_ivc, flit_valid_in, flit_vc_in, flit_tail_in, flit_ip_in, 
-   flit_vc_out, elig_ovc, flow_ctrl_ovc, error);
+   vc_gnt_ovc_ivc, xbr_ctrl_ip, flit_valid_in, flit_vc_in, flit_head_in, 
+   flit_tail_in, flit_data_in, flit_valid_out, flit_vc_out, flit_head_out, 
+   flit_tail_out, flit_data_out, elig_ovc, flow_ctrl_ovc, error);
    
 `include "constants.v"
    
@@ -69,6 +70,9 @@ module op_ctrl
    
    // number of input and output ports on router
    parameter num_ports = 5;
+   
+   // flit width
+   parameter flit_data_width = 64;
    
    // include error checking logic
    parameter checker_enable = 1;
@@ -121,24 +125,52 @@ module op_ctrl
    
    // input VC that each output VC was granted to
    input [0:num_vcs*num_vcs-1] vc_gnt_ovc_ivc;
+
+   // port to which this output is currently connected
+   input [0:num_ports-1] xbr_ctrl_ip;
    
-   // valid flit data available
+   // valid flit data incoming
    input flit_valid_in;
    
-   // which VC is flit travelling on
+   // which VC is incoming flit travelling on
    // (note: only valid if flit_valid_in=1)
    input [0:vc_idx_width-1] flit_vc_in;
    
-   // flit is tail
+   // incoming flit is head
+   // (note: only valid if flit_valid_in=1)
+   input flit_head_in;
+   
+   // incoming flit is tail
    // (note: only valid if flit_valid_in=1)
    input flit_tail_in;
    
-   // flit source port
-   input [0:num_ports-1] flit_ip_in;
+   // flit data for each incoming flit
+   // (note: only valid when flit_valid_in=1)
+   input [0:flit_data_width-1] flit_data_in;
+   
+   // valid flit data outgoing
+   output flit_valid_out;
+   wire flit_valid_out;
    
    // destination VC ID for current flit
+   // (note: only valid if flit_valid_out=1)
    output [0:vc_idx_width-1] flit_vc_out;
    wire [0:vc_idx_width-1] flit_vc_out;
+   
+   // incoming flit is head
+   // (note: only valid if flit_valid_out=1)
+   output flit_head_out;
+   wire 		   flit_head_out;
+   
+   // incoming flit is tail
+   // (note: only valid if flit_valid_out=1)
+   output flit_tail_out;
+   wire 		   flit_tail_out;
+   
+   // flit data for each outgoing flit
+   // (note: only valid when flit_valid_out=1)
+   output [0:flit_data_width-1] flit_data_out;
+   wire [0:flit_data_width-1] flit_data_out;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output [0:num_vcs-1] elig_ovc;
@@ -153,6 +185,38 @@ module op_ctrl
    output error;
    wire 				  error;
    
+   
+   //---------------------------------------------------------------------------
+   // input staging
+   //---------------------------------------------------------------------------
+   
+   wire 				  cred_valid_s, cred_valid_q;
+   assign cred_valid_s = cred_valid_in;
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   cred_validq
+     (.clk(clk),
+      .reset(reset),
+      .d(cred_valid_s),
+      .q(cred_valid_q));
+   
+   wire [0:vc_idx_width-1] 		  cred_vc_s, cred_vc_q;
+   assign cred_vc_s = cred_vc_in;
+   dff
+     #(.width(vc_idx_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   cred_vcq
+     (.clk(clk),
+      .reset(reset),
+      .d(cred_vc_s),
+      .q(cred_vc_q));
+   
+   
+   //---------------------------------------------------------------------------
+   // output VC control logic
+   //---------------------------------------------------------------------------
+   
    wire [0:num_vcs-1] 			  next_cred_ovc;
    wire [0:num_vcs-1] 			  error_hct_ovc;
    wire [0:num_vcs*2-1] 		  error_cred_ovc;
@@ -166,7 +230,7 @@ module op_ctrl
 	begin:ovcs
 	   
 	   wire credit;
-	   assign credit = cred_valid_in && (cred_vc_in == ovc);
+	   assign credit = cred_valid_q && (cred_vc_q == ovc);
 	   
 	   wire debit;
 	   assign debit = flit_valid_in & match_ovc[ovc];
@@ -238,7 +302,7 @@ module op_ctrl
 		   .data_out(allocated_vc));
 		
 		assign match_ovc[ovc] = allocated_q &&
-					|(allocated_ip_q & flit_ip_in) && 
+					|(allocated_ip_q & xbr_ctrl_ip) && 
 					(allocated_vc == flit_vc_in);
 
 	     end
@@ -520,11 +584,103 @@ module op_ctrl
       
    endgenerate
    
-   encoder
-     #(.num_ports(num_vcs))
-   flit_vc_out_enc
-     (.data_in(match_ovc),
-      .data_out(flit_vc_out));
+   
+   //---------------------------------------------------------------------------
+   // output staging
+   //---------------------------------------------------------------------------
+   
+   wire 				      flit_valid_s, flit_valid_q;
+   assign flit_valid_s = flit_valid_in;
+   dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_validq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_valid_s),
+      .q(flit_valid_q));
+   
+   assign flit_valid_out = flit_valid_q;
+   
+   wire 				      xbr_ctrl;
+   assign xbr_ctrl = |xbr_ctrl_ip;
+   
+   wire [0:vc_idx_width-1] 		      flit_vc_s, flit_vc_q;
+   
+   generate
+      
+      if(track_vcs_at_output)
+	begin
+	   
+	   wire [0:vc_idx_width-1] match_ovc_enc;
+	   encoder
+	     #(.num_ports(num_vcs))
+	   flit_vc_s_enc
+	     (.data_in(match_ovc),
+	      .data_out(match_ovc_enc));
+	   
+	   assign flit_vc_s = xbr_ctrl ? match_ovc_enc : flit_vc_q;
+	   
+	end
+      else
+	assign flit_vc_s = xbr_ctrl ? flit_vc_in : flit_vc_q;
+      
+   endgenerate
+   
+   dff
+     #(.width(vc_idx_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_vcq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_vc_s),
+      .q(flit_vc_q));
+   
+   assign flit_vc_out = flit_vc_q;
+   
+   wire 			   flit_head_s, flit_head_q;
+   assign flit_head_s = xbr_ctrl ? flit_head_in : flit_head_q;
+   dff
+     #(.width(1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_headq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_head_s),
+      .q(flit_head_q));
+   
+   assign flit_head_out = flit_head_q;
+   
+   wire 			   flit_tail_s, flit_tail_q;
+   assign flit_tail_s = xbr_ctrl ? flit_tail_in : flit_tail_q;
+   dff
+     #(.width(1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_tailq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+   
+   assign flit_tail_out = flit_tail_q;
+   
+   wire [0:flit_data_width-1] 	   flit_data_s, flit_data_q;
+   assign flit_data_s = xbr_ctrl ? flit_data_in : flit_data_q;
+   dff
+     #(.width(flit_data_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_dataq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_data_s),
+      .q(flit_data_q));
+   
+   assign flit_data_out = flit_data_q;
+   
+   
+   //---------------------------------------------------------------------------
+   // error checker logic
+   //---------------------------------------------------------------------------
    
    wire [0:num_vcs*2-1] 		      errors_out_ovc;
    checker
