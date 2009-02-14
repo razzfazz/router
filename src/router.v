@@ -79,17 +79,33 @@ module router
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // maximum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter min_payload_length = 1;
+   
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
    
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
-   // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
-   
    // width of flit control signals
-   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
    
    // width of flit payload data
    parameter flit_data_width = 64;
@@ -276,6 +292,9 @@ module router
 	       .num_dimensions(num_dimensions),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
+	       .packet_format(packet_format),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
@@ -473,8 +492,6 @@ module router
 	   
 	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	flit_data_out;
-	   wire 			flit_head_out;
-	   wire 			flit_tail_out;
 	   wire [0:flit_data_width-1] 	flit_data_out;
 	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
@@ -482,8 +499,16 @@ module router
 	   op_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_vcs(num_vcs),
+	       .num_traffic_classes(num_traffic_classes),
+	       .num_routing_classes(num_routing_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_neighbors_per_dim(num_neighbors_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .packet_format(packet_format),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),

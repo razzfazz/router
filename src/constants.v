@@ -72,6 +72,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 //------------------------------------------------------------------------------
+// packet formats
+//------------------------------------------------------------------------------
+
+// packets are delimited by head and tail bits
+`define PACKET_FORMAT_HEAD_TAIL       0
+
+// head flits are identified by header bit, and contain encoded packet length
+`define PACKET_FORMAT_EXPLICIT_LENGTH 1
+
+
+//------------------------------------------------------------------------------
 // reset handling
 //------------------------------------------------------------------------------
 

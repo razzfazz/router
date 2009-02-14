@@ -91,18 +91,36 @@ module ivc_ctrl
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
-   // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
    
    // number of nodes per router (a.k.a. consentration factor)
    localparam num_nodes_per_router
      = num_ports - num_dimensions * num_neighbors_per_dim;
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // maximum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter min_payload_length = 1;
+   
+   // number of bits required to represent all possible payload sizes
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+
+   // width of counter for remaining flits
+   localparam flit_ctr_width = clogb(max_payload_length-1);
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -115,10 +133,20 @@ module ivc_ctrl
      = num_routing_classes * router_addr_width + node_addr_width;
    
    // total number of bits of header information encoded in header flit payload
-   localparam header_info_width = la_route_info_width + route_info_width;
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
    
    // width of flit control signals
-   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
@@ -313,7 +341,85 @@ module ivc_ctrl
    assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
    
    wire 			   flit_tail_in;
-   assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
+   
+   generate
+      
+      case(packet_format)
+	`PACKET_FORMAT_HEAD_TAIL:
+	  assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     if(max_payload_length == 0)
+	       assign flit_tail_in = flit_head_in;
+	     else if(max_payload_length == 1)
+	       begin
+		  
+		  wire has_payload;
+		  
+		  if(min_payload_length == 0)
+		    assign has_payload
+		      = header_info_in[la_route_info_width+route_info_width];
+		  else
+		    assign has_payload = 1'b1;
+		  
+		  assign flit_tail_in = ~flit_head_in | ~has_payload;
+		  
+	       end
+	     else
+	       begin
+		  
+		  wire [0:flit_ctr_width-1] flit_ctr_q;
+		  wire [0:flit_ctr_width-1] flit_ctr_next;
+		  
+		  if(payload_length_width > 0)
+		    begin
+		       
+		       wire [0:payload_length_width-1] payload_length;
+		       assign payload_length
+			 = header_info_in[la_route_info_width+
+					  route_info_width:
+					  la_route_info_width+
+					  route_info_width+
+					  payload_length_width-1];
+		       
+		       assign flit_ctr_next
+			 = (min_payload_length - 1) + payload_length;
+		       
+		       if(min_payload_length == 0)
+			 assign flit_tail_in
+			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
+		       else
+			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+		       
+		    end
+		  else
+		    begin
+		       assign flit_ctr_next = max_payload_length - 1;
+		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+		    end
+		  
+		  wire [0:flit_ctr_width-1] flit_ctr_s;
+		  assign flit_ctr_s = flit_valid_in ? 
+				      flit_head_in ? 
+				      flit_ctr_next : 
+				      (flit_ctr_q - 1'b1) : 
+				      flit_ctr_q;
+		  dff
+		    #(.width(flit_ctr_width),
+		      .reset_type(reset_type))
+		  flit_ctrq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(flit_ctr_s),
+		     .q(flit_ctr_q));
+		  
+	       end
+	     
+	  end
+      endcase
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -454,23 +560,23 @@ module ivc_ctrl
 	   select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
-	   flit_head_out_sel
+	   head_queue_muxed_sel
 	     (.select(read_sel),
 	      .data_in(head_queue),
 	      .data_out(head_queue_muxed));
 	   
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_queue_muxed;
 	   
-	   wire tail;
+	   wire tail_queue_muxed;
 	   select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
-	   flit_tail_out_sel
+	   tail_queue_muxed_sel
 	     (.select(read_sel),
 	      .data_in(tail_queue),
-	      .data_out(tail));
+	      .data_out(tail_queue_muxed));
 	   
-	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail;
+	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail_queue_muxed;
 	   
 	end
       else
@@ -951,8 +1057,12 @@ module ivc_ctrl
    //---------------------------------------------------------------------------
    
    assign flit_ctrl_out[0] = flit_valid_out;
+   assign flit_ctrl_out[1+vc_idx_width+0] = flit_head_out;
    
    generate
+      
+      if(packet_format == `PACKET_FORMAT_HEAD_TAIL)
+	assign flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out;
       
       if(num_vcs > 1)
 	begin
@@ -1031,9 +1141,6 @@ module ivc_ctrl
 	end
       
    endgenerate
-   
-   assign flit_ctrl_out[1+vc_idx_width+0] = flit_head_out;
-   assign flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out;
    
    
    //---------------------------------------------------------------------------

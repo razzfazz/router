@@ -89,16 +89,16 @@ module testbench
    parameter num_header_buffers = 1;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   parameter num_traffic_classes = 1;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_routing_classes = 1;
    
    // total number of packet classes
    localparam num_classes = num_traffic_classes * num_routing_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 2;
+   parameter num_vcs_per_class = 1;
    
    // number of VCs
    localparam num_vcs = num_classes * num_vcs_per_class;
@@ -113,7 +113,7 @@ module testbench
    parameter num_dimensions = 2;
    
    // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 4;
+   parameter num_nodes_per_router = 1;
 
    // total number of routers
    localparam num_routers
@@ -160,24 +160,41 @@ module testbench
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
    
-   // maximum packet length (in flits)
-   parameter max_packet_length = 8;
+   // select packet format
+//   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
-   // minimum packet length (in flits)
-   parameter min_packet_length = 1;
+   // maximum payload length (in flits)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   parameter min_payload_length = 0;
+   
+   // number of bits required to represent all possible payload sizes
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+
+   // width of counter for remaining flits
+   localparam flit_ctr_width = clogb(max_payload_length);
    
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
    
-   // total number of bits required to represent maximum packet length
-   localparam packet_length_width = clogb(max_packet_length);
-   
    // total number of bits required for storing header information
    localparam header_info_width
-     = la_route_info_width + route_info_width /*+ packet_length_width*/;
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
    
    // width of flit control signals
-   localparam flit_ctrl_width = 1 + vc_idx_width + 2;
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
    
    // width of flit payload data
    parameter flit_data_width = 64;
@@ -342,8 +359,9 @@ module testbench
 		    .restrict_turns(restrict_turns),
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
-		    .max_packet_length(max_packet_length),
-		    .min_packet_length(min_packet_length),
+		    .packet_format(packet_format),
+		    .max_payload_length(max_payload_length),
+		    .min_payload_length(min_payload_length),
 		    .packet_length_mode(packet_length_mode),
 		    .flit_data_width(flit_data_width))
 		ps
@@ -355,15 +373,6 @@ module testbench
 		   .run(run),
 		   .out_flits(ps_out_flits),
 		   .error(ps_error));
-		
-		wire 			      flit_valid;
-		assign flit_valid = flit_ctrl[0];
-		
-		wire 			      flit_head;
-		assign flit_head = flit_ctrl[1+vc_idx_width+0];
-		
-		wire 			      flit_tail;
-		assign flit_tail = flit_ctrl[1+vc_idx_width+1];
 		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
 				       (ip+1)*flit_ctrl_width-1]
@@ -395,6 +404,91 @@ module testbench
 		assign route_info
 		  = header_info[la_route_info_width:
 				la_route_info_width+route_info_width-1];
+		
+		wire 			      flit_valid;
+		assign flit_valid = flit_ctrl[0];
+		
+		wire 			      flit_head;
+		assign flit_head = flit_ctrl[1+vc_idx_width+0];
+		
+		wire 			      flit_tail;
+		
+		case(packet_format)
+		  `PACKET_FORMAT_HEAD_TAIL:
+		    assign flit_tail = flit_ctrl[1+vc_idx_width+1];
+		  `PACKET_FORMAT_EXPLICIT_LENGTH:
+		    begin
+		       
+		       if(max_payload_length == 0)
+			 assign flit_tail = flit_head;
+		       else if(max_payload_length == 1)
+			 begin
+			    
+			    wire has_payload;
+			    
+			    if(payload_length_width > 0)
+			      assign has_payload
+				= header_info[la_route_info_width+
+					      route_info_width];
+			    else
+			      assign has_payload = 1'b1;
+			    
+			    assign flit_tail = ~flit_head | ~has_payload;
+			    
+			 end
+		       else
+			 begin
+			    
+			    wire [0:flit_ctr_width-1] flit_ctr_q;
+			    wire [0:flit_ctr_width-1] flit_ctr_next;
+			    
+			    if(payload_length_width > 0)
+			      begin
+				 
+				 wire [0:payload_length_width-1] payload_length;
+				 assign payload_length
+				   = header_info[la_route_info_width+
+						 route_info_width:
+						 la_route_info_width+
+						 route_info_width+
+						 payload_length_width-1];
+				 
+				 assign flit_ctr_next
+				   = (min_payload_length - 1) + payload_length;
+				 
+				 if(max_payload_length == 0)
+				   assign flit_tail = flit_head ?
+						      ~|payload_length :
+						      ~|flit_ctr_q;
+				 else
+				   assign flit_tail = ~flit_head & ~|flit_ctr_q;
+				 
+			      end
+			    else
+			      begin
+				 assign flit_ctr_next = max_payload_length - 1;
+				 assign flit_tail = ~flit_head & ~|flit_ctr_q;
+			      end
+			    
+			    wire [0:flit_ctr_width-1] flit_ctr_s;
+			    assign flit_ctr_s = flit_valid ? 
+						flit_head ? 
+						flit_ctr_next : 
+						(flit_ctr_q - 1'b1) : 
+						flit_ctr_q;
+			    dff
+			      #(.width(flit_ctr_width),
+				.reset_type(reset_type))
+			    flit_ctrq
+			      (.clk(clk),
+			       .reset(reset),
+			       .d(flit_ctr_s),
+			       .q(flit_ctr_q));
+			    
+			 end
+		       
+		    end
+		endcase
 		
 		wire [0:num_vcs*num_ports-1]   route_ivc_op;
 		wire [0:num_vcs*num_vcs-1]     route_ivc_ovc;
@@ -670,65 +764,64 @@ module testbench
 		else
 		  assign la_route_info_out = la_route_info_ivc;
 		
-		wire [0:(2+flit_data_width+port_idx_width+num_vcs)-1] data_in;
-		assign data_in[0] = flit_head;
-		assign data_in[1] = flit_tail;
-		assign data_in[2:2+la_route_info_width-1]
-			 = flit_head ?
-			   la_route_info_out :
+		wire [0:(flit_ctrl_width+flit_data_width+port_idx_width+
+			 num_vcs)-1] 	     data_in;
+		assign data_in[0:flit_ctrl_width-1] = flit_ctrl;
+		assign data_in[flit_ctrl_width:
+			       flit_ctrl_width+la_route_info_width-1]
+			 = flit_head ? 
+			   la_route_info_out : 
 			   flit_data[0:la_route_info_width-1];
-		assign data_in[2+la_route_info_width:2+flit_data_width-1]
+		assign data_in[flit_ctrl_width+la_route_info_width:
+			       flit_ctrl_width+flit_data_width-1]
 			 = flit_data[la_route_info_width:flit_data_width-1];
-		assign data_in[2+flit_data_width:
-			       2+flit_data_width+port_idx_width-1]
+		assign data_in[flit_ctrl_width+flit_data_width:
+			       flit_ctrl_width+flit_data_width+port_idx_width-1]
 			 = dest_port;
-		assign data_in[2+flit_data_width+port_idx_width:
-			       2+flit_data_width+port_idx_width+num_vcs-1]
+		assign data_in[flit_ctrl_width+flit_data_width+port_idx_width:
+			       flit_ctrl_width+flit_data_width+port_idx_width+
+			       num_vcs-1]
 			 = dest_ovc;
 		
-		genvar 						      ivc;
+		genvar 			     ivc;
 		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 		  begin:ivcs
 		     
-		     wire [0:2+flit_data_width+port_idx_width+num_vcs-1] 
-		       data_out;
+		     wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
+			   num_vcs-1] data_out;
 		     
-		     wire 					    ref_head;
-		     assign ref_head = data_out[0];
+		     wire [0:flit_ctrl_width-1] ref_ctrl;
+		     assign ref_ctrl = data_out[0:flit_ctrl_width-1];
 		     
-		     wire 					    ref_tail;
-		     assign ref_tail = data_out[1];
+		     wire [0:flit_data_width-1] ref_data;
+		     assign ref_data
+		       = data_out[flit_ctrl_width:
+				  flit_ctrl_width+flit_data_width-1];
 		     
-		     wire [0:flit_data_width-1] 		    ref_data;
-		     assign ref_data = data_out[2:2+flit_data_width-1];
-		     
-		     wire [0:port_idx_width-1] 			    ref_port;
+		     wire [0:port_idx_width-1] 	ref_port;
 		     assign ref_port
-		       = data_out[2+flit_data_width:
-				  2+flit_data_width+port_idx_width-1];
+		       = data_out[flit_ctrl_width+flit_data_width:
+				  flit_ctrl_width+flit_data_width+
+				  port_idx_width-1];
 		     
-		     wire [0:num_vcs-1] 			    ref_ovc;
+		     wire [0:num_vcs-1] 	ref_ovc;
 		     assign ref_ovc
-		       = data_out[2+flit_data_width+port_idx_width:
-				  2+flit_data_width+port_idx_width+num_vcs-1];
+		       = data_out[flit_ctrl_width+flit_data_width+
+				  port_idx_width:
+				  flit_ctrl_width+flit_data_width+
+				  port_idx_width+num_vcs-1];
 		     
-		     wire [0:flit_ctrl_width-1] 		    check_ctrl;
+		     wire [0:flit_ctrl_width-1] check_ctrl;
 		     assign check_ctrl
 		       = flit_ctrl_out_op[ref_port*flit_ctrl_width +:
 					  flit_ctrl_width];
 		     
-		     wire 					    check_head;
-		     assign check_head = check_ctrl[1+vc_idx_width+0];
-		     
-		     wire 					    check_tail;
-		     assign check_tail = check_ctrl[1+vc_idx_width+1];
-		     
-		     wire [0:flit_data_width-1] 		    check_data;
+		     wire [0:flit_data_width-1] check_data;
 		     assign check_data
 		       = flit_data_out_op[ref_port*flit_data_width +: 
 					  flit_data_width];
 		     
-		     wire 					    push;
+		     wire 			push;
 		     
 		     if(num_vcs > 1)
 		       begin
@@ -745,11 +838,16 @@ module testbench
 		     wire 			  valid;
 		     assign valid = check_ctrl[0];
 		     
-		     wire 			  match_head;
-		     assign match_head = (ref_head == check_head);
+		     wire 			  match_ctrl;
 		     
-		     wire 			  match_tail;
-		     assign match_tail = (ref_tail == check_tail);
+		     if(flit_ctrl_width > (1 + vc_idx_width))
+		       assign match_ctrl = (ref_ctrl[0] == check_ctrl[0]) &&
+					   (ref_ctrl[1+vc_idx_width:
+						     flit_ctrl_width-1] ==
+					    check_ctrl[1+vc_idx_width:
+						       flit_ctrl_width-1]);
+		     else
+		       assign match_ctrl = (ref_ctrl[0] == check_ctrl[0]);
 		     
 		     wire 			  match_data;
 		     assign match_data = (ref_data == check_data);
@@ -771,9 +869,8 @@ module testbench
 		     wire 			  fifo_empty;
 		     
 		     wire 			  match;
-		     assign match
-		       = valid & ~fifo_empty & match_head & match_tail & 
-			 match_data & match_vcs;
+		     assign match = valid & ~fifo_empty & 
+				    match_ctrl & match_data & match_vcs;
 		     
 		     wire 			  pop;
 		     assign pop = match;
@@ -783,7 +880,8 @@ module testbench
 		     
 		     fifo
 		       #(.depth(num_flit_buffers),
-			 .width(2+flit_data_width+port_idx_width+num_vcs))
+			 .width(flit_ctrl_width+flit_data_width+port_idx_width+
+				num_vcs))
 		     ref_fifo
 		       (.clk(clk),
 			.reset(reset),
@@ -829,6 +927,9 @@ module testbench
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),

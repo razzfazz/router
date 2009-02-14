@@ -114,8 +114,26 @@ module packet_source
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
    
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // maximum payload length (in flits)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   parameter min_payload_length = 0;
+   
+   // number of bits required to represent all possible payload sizes
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+   
    // width of flit control signals
-   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
    
    // width of flit payload data
    parameter flit_data_width = 64;
@@ -138,20 +156,21 @@ module packet_source
    parameter port_id = 0;
    
    // maximum packet length (in flits)
-   parameter max_packet_length = 8;
-   
-   // minimum packet length (in flits)
-   parameter min_packet_length = 8;
-   
-   // select packet length mode (0: uniform random, 1: bimodal)
-   parameter packet_length_mode = 0;
+   localparam max_packet_length = 1 + max_payload_length;
    
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
+   // select packet length mode (0: uniform random, 1: bimodal)
+   parameter packet_length_mode = 0;
+   
    // total number of bits required for storing header information
    localparam header_info_width
-     = la_route_info_width + route_info_width /*+ packet_length_width*/;
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
    
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam cred_count_width = clogb(num_flit_buffers+1);
@@ -241,10 +260,18 @@ module packet_source
    wire 			  flit_sent;
    
    wire 			  flit_head;
+   wire 			  flit_tail;
+   
    assign flit_ctrl[1+vc_idx_width+0] = flit_head;
    
-   wire 			  flit_tail;
-   assign flit_ctrl[1+vc_idx_width+1] = flit_tail;
+   generate
+      
+      if(packet_format == `PACKET_FORMAT_HEAD_TAIL)
+	begin
+	   assign flit_ctrl[1+vc_idx_width+1] = flit_tail;
+	end
+      
+   endgenerate
    
    wire [0:num_vcs-1] 		  free_ovc;
    wire [0:num_vcs-1] 		  head_free_ovc;
@@ -609,7 +636,7 @@ module packet_source
    
    generate
       
-      if(max_packet_length > 1)
+      if(max_payload_length > 0)
 	begin
 	   
 	   reg [0:packet_length_width-1] random_length_q;
@@ -619,17 +646,17 @@ module packet_source
 	     begin
 		case(packet_length_mode)
 		  0:
-		    random_length_q <= $dist_uniform(seed, min_packet_length-1,
-						     max_packet_length-1);
+		    random_length_q <= $dist_uniform(seed, min_payload_length, 
+						     max_payload_length);
 		  1:
-		    random_length_q <= ($dist_uniform(seed, 0, 1) < 1) ?
-				       min_packet_length :
-				       max_packet_length;
+		    random_length_q <= ($dist_uniform(seed, 0, 1) < 1) ? 
+				       min_payload_length : 
+				       max_payload_length;
 		endcase
 		if(reset)
 		  begin
-		     flit_count_q <= min_packet_length-1;
-		     tail_q <= ~|(min_packet_length-1);
+		     flit_count_q <= min_payload_length;
+		     tail_q <= (min_payload_length == 0);
 		  end
 		else if(packet_sent)
 		  begin
@@ -657,10 +684,12 @@ module packet_source
 	   assign flit_head = head_q;
 	   assign flit_tail = tail_q;
 	   
-	   /*assign header_info[la_route_info_width+route_info_width:
-			      la_route_info_width+route_info_width+
-			      packet_length_width-1]
-		    = flit_count_q;*/
+	   if((packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) &&
+	      (payload_length_width > 0))
+	     assign header_info[la_route_info_width+route_info_width:
+				la_route_info_width+route_info_width+
+				payload_length_width-1]
+		      = (flit_count_q - min_payload_length);
 	   
 	end
       else

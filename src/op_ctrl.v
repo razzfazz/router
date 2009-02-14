@@ -61,8 +61,20 @@ module op_ctrl
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
+   // number of traffic classes (e.g. read, write)
+   parameter num_traffic_classes = 2;
+   
+   // number of routing classes (e.g. minimal, adaptive)
+   parameter num_routing_classes = 2;
+   
+   // total number of packet classes
+   localparam num_classes = num_traffic_classes * num_routing_classes;
+   
+   // number of VCs available for each class
+   parameter num_vcs_per_class = 1;
+   
    // number of VCs
-   parameter num_vcs = 4;
+   localparam num_vcs = num_classes * num_vcs_per_class;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
@@ -70,8 +82,69 @@ module op_ctrl
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in entire network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
+   // number of nodes per router (a.k.a. consentration factor)
+   localparam num_nodes_per_router
+     = num_ports - num_dimensions * num_neighbors_per_dim;
+   
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // maximum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter min_payload_length = 1;
+   
+   // number of bits required to represent all possible payload sizes
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+
+   // width of counter for remaining flits
+   localparam flit_ctr_width = clogb(max_payload_length);
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = num_routing_classes * router_addr_width + node_addr_width;
+   
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
+   
    // width of flit control signals
-   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
    
    // width of flit payload data
    parameter flit_data_width = 64;
@@ -209,13 +282,93 @@ module op_ctrl
    wire 				  flit_valid_in;
    assign flit_valid_in = flit_ctrl_in[0];
    
-   wire 				  flit_tail_in;
-   assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
-   
    wire 				  cred_valid;
    assign cred_valid = flow_ctrl_q[0];
    
+   wire 				  flit_tail_in;
+   
    generate
+      
+      case(packet_format)
+	`PACKET_FORMAT_HEAD_TAIL:
+	  assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     wire flit_head_in;
+	     assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
+
+	     wire [0:header_info_width-1] header_info_in;
+	     assign header_info_in = flit_data_in[0:header_info_width-1];
+	     
+	     if(max_payload_length == 0)
+	       assign flit_tail_in = flit_head_in;
+	     else if(max_payload_length == 1)
+	       begin
+		  
+		  wire has_payload;
+		  
+		  if(min_payload_length == 0)
+		    assign has_payload
+		      = header_info_in[la_route_info_width+route_info_width];
+		  else
+		    assign has_payload = 1'b1;
+		  
+		  assign flit_tail_in = ~flit_head_in | ~has_payload;
+		  
+	       end
+	     else
+	       begin
+		  
+		  wire [0:flit_ctr_width-1] flit_ctr_q;
+		  wire [0:flit_ctr_width-1] flit_ctr_next;
+		  
+		  if(payload_length_width > 0)
+		    begin
+		       
+		       wire [0:payload_length_width-1] payload_length;
+		       assign payload_length
+			 = header_info_in[la_route_info_width+
+					  route_info_width:
+					  la_route_info_width+
+					  route_info_width+
+					  payload_length_width-1];
+		       
+		       assign flit_ctr_next
+			 = (min_payload_length - 1) + payload_length;
+		       
+		       if(min_payload_length == 0)
+			 assign flit_tail_in
+			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
+		       else
+			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+		       
+		    end
+		  else
+		    begin
+		       assign flit_ctr_next = max_payload_length - 1;
+		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+		    end
+		  
+		  wire [0:flit_ctr_width-1] flit_ctr_s;
+		  assign flit_ctr_s = flit_valid_in ? 
+				      flit_head_in ? 
+				      flit_ctr_next : 
+				      (flit_ctr_q - |flit_ctr_q) : 
+				      flit_ctr_q;
+		  dff
+		    #(.width(flit_ctr_width),
+		      .reset_type(reset_type))
+		  flit_ctrq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(flit_ctr_s),
+		     .q(flit_ctr_q));
+		  
+	       end
+	     
+	  end
+      endcase
       
       genvar 				  ovc;
       

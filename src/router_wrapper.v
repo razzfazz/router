@@ -125,8 +125,24 @@ module router_wrapper
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // maximum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter min_payload_length = 1;
+   
    // width of flit control signals
-   localparam flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
    
    // width of flit payload data
    parameter flit_data_width = 64;
@@ -243,6 +259,9 @@ module router_wrapper
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
