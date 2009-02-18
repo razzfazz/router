@@ -509,6 +509,7 @@ module router
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
+	       .flit_data_width(flit_data_width),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),
