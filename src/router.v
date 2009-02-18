@@ -413,7 +413,7 @@ module router
    assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
    dff
      #(.width(num_ports*num_ports),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    xbr_ctrl_ip_opq
      (.clk(clk),
       .reset(reset),
