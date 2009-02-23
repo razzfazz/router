@@ -279,8 +279,11 @@ module op_ctrl
    wire [0:num_vcs*2-1] 		  error_cred_ovc;
    wire [0:num_vcs-1] 			  match_ovc;
    
+   wire 				  xbr_ctrl;
+   assign xbr_ctrl = |xbr_ctrl_ip;
+   
    wire 				  flit_valid_in;
-   assign flit_valid_in = flit_ctrl_in[0];
+   assign flit_valid_in = flit_ctrl_in[0] & xbr_ctrl;
    
    wire 				  cred_valid;
    assign cred_valid = flow_ctrl_q[0];
@@ -753,12 +756,9 @@ module op_ctrl
    // output staging
    //---------------------------------------------------------------------------
    
-   wire 				      xbr_ctrl;
-   assign xbr_ctrl = |xbr_ctrl_ip;
-   
    wire [0:flit_ctrl_width-1] 		      flit_ctrl_s, flit_ctrl_q;
    
-   assign flit_ctrl_s[0] = xbr_ctrl & flit_ctrl_in[0];
+   assign flit_ctrl_s[0] = flit_valid_in;
    
    generate
       
