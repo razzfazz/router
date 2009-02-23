@@ -225,7 +225,7 @@ module router_wrapper
    input [0:router_addr_width-1] router_address;
    
    // control signals for each incoming flit
-   input [0:flit_ctrl_width-1] flit_ctrl_in_ip;
+   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
    
    // flit data for each incoming flit
    input [0:num_ports*flit_data_width-1] flit_data_in_ip;

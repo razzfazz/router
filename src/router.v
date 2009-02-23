@@ -492,7 +492,6 @@ module router
 	   
 	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	flit_data_out;
-	   wire [0:flit_data_width-1] 	flit_data_out;
 	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
 	   wire 				  opc_error;
