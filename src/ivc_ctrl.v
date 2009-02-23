@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
    int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
-   sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, flit_ctrl_out, 
+   sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
    la_route_info_out, fbf_write_addr, fbf_read_addr, error, events);
    
 `include "constants.v"
@@ -166,6 +166,10 @@ module ivc_ctrl
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // width required for internal flit control signalling
+   localparam int_flit_ctrl_width
+     = 1 + vc_idx_width + 1 + 1;
+   
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
      = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
@@ -289,8 +293,8 @@ module ivc_ctrl
    input sw_gnt_spec;
    
    // outgoing flit control signals
-   output [0:flit_ctrl_width-1] flit_ctrl_out;
-   wire [0:flit_ctrl_width-1] flit_ctrl_out;
+   output [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
+   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
    
    // lookahead routing information for outgoing flit
    output [0:la_route_info_width-1] la_route_info_out;
@@ -298,27 +302,27 @@ module ivc_ctrl
    
    // write pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] fbf_write_addr;
+   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
    
    // read pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:fbf_addr_width-1] fbf_read_addr;
+   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
    
    // internal error condition detected
    output error;
-   wire 		     error;
+   wire 			  error;
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
    output [0:5] events;
-   wire [0:5] 		     events;
+   wire [0:5] 			  events;
    
    
    //---------------------------------------------------------------------------
    // decode control signals
    //---------------------------------------------------------------------------
    
-   wire 		     flit_valid_in;
+   wire 			  flit_valid_in;
    
    generate
       
@@ -426,13 +430,13 @@ module ivc_ctrl
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire 			   flit_valid_out;
-   wire 			   flit_tail_out;
+   wire 				    flit_valid_out;
+   wire 				    flit_tail_out;
    
-   wire 			   packet_done;
+   wire 				    packet_done;
    assign packet_done = flit_valid_out & flit_tail_out;
    
-   wire 			   vc_allocated_s, vc_allocated_q;
+   wire 				    vc_allocated_s, vc_allocated_q;
    assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
    dff
      #(.width(1),
@@ -443,14 +447,14 @@ module ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
-   wire [0:num_vcs_per_class-1]    vc_gnt_unchanged_ocvc;
+   wire [0:num_vcs_per_class-1] 	    vc_gnt_unchanged_ocvc;
    assign vc_gnt_unchanged_ocvc
      = vc_gnt_ovc[(traffic_class*num_routing_classes+routing_class)*
 		  num_vcs_per_class:
 		  (traffic_class*num_routing_classes+routing_class+1)*
 		  num_vcs_per_class-1];
    
-   wire [0:num_vcs_per_class-1]    vc_gnt_ocvc;
+   wire [0:num_vcs_per_class-1] 	    vc_gnt_ocvc;
    
    generate
       
@@ -1056,13 +1060,11 @@ module ivc_ctrl
    // encode output control signals
    //---------------------------------------------------------------------------
    
-   assign flit_ctrl_out[0] = flit_valid_out;
-   assign flit_ctrl_out[1+vc_idx_width+0] = flit_head_out;
+   assign int_flit_ctrl_out[0] = flit_valid_out;
+   assign int_flit_ctrl_out[1+vc_idx_width+0] = flit_head_out;
+   assign int_flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out;
    
    generate
-      
-      if(packet_format == `PACKET_FORMAT_HEAD_TAIL)
-	assign flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out;
       
       if(num_vcs > 1)
 	begin
@@ -1136,7 +1138,7 @@ module ivc_ctrl
 		
 	     end
 	   
-	   assign flit_ctrl_out[1:1+vc_idx_width-1] = flit_vc_out;
+	   assign int_flit_ctrl_out[1:1+vc_idx_width-1] = flit_vc_out;
 	   
 	end
       

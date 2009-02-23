@@ -141,6 +141,10 @@ module router
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // width required for internal flit control signalling
+   localparam int_flit_ctrl_width
+     = 1 + vc_idx_width + 1 + 1;
+   
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
      = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
@@ -233,7 +237,7 @@ module router
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_spec_ip_ivc;
    wire [0:num_ports*num_ports-1] 		    sw_gnt_ip_op;
    
-   wire [0:num_ports*flit_ctrl_width-1] 	    xbc_data_in_ip;
+   wire [0:num_ports*int_flit_ctrl_width-1] 	    xbc_data_in_ip;
    wire [0:num_ports*flit_data_width-1] 	    xbd_data_in_ip;
    
    wire [0:num_ports-1] 			    ipc_error_ip;
@@ -278,10 +282,10 @@ module router
 	   wire [0:num_vcs-1] 		vc_req_ivc;
 	   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
 	   wire [0:num_vcs-1] 		sw_req_spec_ivc;
-	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	flit_data_out;
-	   wire [0:flow_ctrl_width-1] 	flow_ctrl_out;
-	   wire 			ipc_error;
+	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
+	   wire [0:flit_data_width-1] 	  flit_data_out;
+	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
+	   wire 			  ipc_error;
 	   ip_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -326,7 +330,7 @@ module router
 	      .sw_req_spec_ivc(sw_req_spec_ivc),
 	      .sw_gnt_nonspec_ivc(sw_gnt_nonspec_ivc),
 	      .sw_gnt_spec_ivc(sw_gnt_spec_ivc),
-	      .flit_ctrl_out(flit_ctrl_out),
+	      .int_flit_ctrl_out(int_flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
@@ -340,8 +344,9 @@ module router
 		    = sw_req_nonspec_ivc;
 	   assign sw_req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = sw_req_spec_ivc;
-	   assign xbc_data_in_ip[ip*flit_ctrl_width:(ip+1)*flit_ctrl_width-1]
-		    = flit_ctrl_out;
+	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
+				 (ip+1)*int_flit_ctrl_width-1]
+		    = int_flit_ctrl_out;
 	   assign xbd_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
 		    = flit_data_out;
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
@@ -409,7 +414,7 @@ module router
    // crossbar
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
+   wire [0:num_ports*num_ports-1] 	  xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
    assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
    dff
      #(.width(num_ports*num_ports),
@@ -420,18 +425,18 @@ module router
       .d(xbr_ctrl_ip_op_s),
       .q(xbr_ctrl_ip_op_q));
    
-   wire [0:num_ports*flit_ctrl_width-1] xbc_data_out_op;
+   wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
    crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
-       .width(flit_ctrl_width),
+       .width(int_flit_ctrl_width),
        .crossbar_type(xbc_crossbar_type))
    xbc
      (.ctrl_ip_op(xbr_ctrl_ip_op_q),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
-   wire [0:num_ports*flit_data_width-1] xbd_data_out_op;
+   wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
    crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
@@ -464,9 +469,10 @@ module router
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl_in;
-	   assign flit_ctrl_in
-	     = xbc_data_out_op[op*flit_ctrl_width:(op+1)*flit_ctrl_width-1];
+	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
+	   assign int_flit_ctrl_in
+	     = xbc_data_out_op[op*int_flit_ctrl_width:
+			       (op+1)*int_flit_ctrl_width-1];
 	   
 	   wire [0:flit_data_width-1] flit_data_in;
 	   assign flit_data_in
@@ -523,7 +529,7 @@ module router
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
-	      .flit_ctrl_in(flit_ctrl_in),
+	      .int_flit_ctrl_in(int_flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .flit_ctrl_out(flit_ctrl_out),
 	      .flit_data_out(flit_data_out),

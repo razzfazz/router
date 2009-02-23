@@ -33,7 +33,7 @@ module ip_ctrl
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, 
    int_flow_ctrl_op_ovc, route_ivc_op, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
    vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, sw_gnt_nonspec_ivc, 
-   sw_gnt_spec_ivc, flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
+   sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
    
 `include "constants.v"
    
@@ -168,6 +168,10 @@ module ip_ctrl
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
+   // width required for internal flit control signalling
+   localparam int_flit_ctrl_width
+     = 1 + vc_idx_width + 1 + 1;
+   
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
      = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
@@ -259,30 +263,30 @@ module ip_ctrl
    input [0:num_vcs-1] sw_gnt_spec_ivc;
    
    // outgoing flit control signals
-   output [0:flit_ctrl_width-1] flit_ctrl_out;
-   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
+   output [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
+   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
    
    // outgoing flit data
    output [0:flit_data_width-1] flit_data_out;
-   wire [0:flit_data_width-1] 	flit_data_out;
-
+   wire [0:flit_data_width-1] 	  flit_data_out;
+   
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
-   wire [0:flow_ctrl_width-1] flow_ctrl_out;
+   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
    
    // internal error condition detected
    output error;
-   wire 			error;
+   wire 			  error;
    
    
    //---------------------------------------------------------------------------
    // input stage
    //---------------------------------------------------------------------------
    
-   wire [0:flit_ctrl_width-1] 	flit_ctrl_in_s, flit_ctrl_in_q;
+   wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = flit_ctrl_in;
-
-   wire 			flit_valid_in_s, flit_valid_in_q;
+   
+   wire 			  flit_valid_in_s, flit_valid_in_q;
    assign flit_valid_in_s = flit_ctrl_in_s[0];
    dff
      #(.width(1),
@@ -313,7 +317,7 @@ module ip_ctrl
       
    endgenerate
    
-   wire [0:flit_data_width-1] 	      flit_data_in_s, flit_data_in_q;
+   wire [0:flit_data_width-1] flit_data_in_s, flit_data_in_q;
    assign flit_data_in_s = flit_data_in;
    dff
      #(.width(flit_data_width),
@@ -334,9 +338,9 @@ module ip_ctrl
    assign header_info_in_q = flit_data_in_q[0:header_info_width-1];
    
    wire [0:num_vcs-1] 		flit_valid_out_ivc;
-   wire [0:num_vcs*flit_ctrl_width-1] flit_ctrl_out_ivc;
-   wire [0:num_vcs*fbf_addr_width-1]  fbf_write_addr_ivc;
-   wire [0:num_vcs*fbf_addr_width-1]  fbf_read_addr_ivc;
+   wire [0:num_vcs*int_flit_ctrl_width-1] int_flit_ctrl_out_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 	  fbf_write_addr_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 	  fbf_read_addr_ivc;
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbf_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbf_read_offset_ivc;
@@ -365,7 +369,7 @@ module ip_ctrl
 	   wire 		vc_req;
 	   wire 		sw_req_nonspec;
 	   wire 		sw_req_spec;
-	   wire [0:flit_ctrl_width-1] flit_ctrl_out;
+	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
 	   wire [0:la_route_info_width-1] la_route_info;
 	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
 	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
@@ -413,7 +417,7 @@ module ip_ctrl
 	      .sw_req_spec(sw_req_spec),
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
-	      .flit_ctrl_out(flit_ctrl_out),
+	      .int_flit_ctrl_out(int_flit_ctrl_out),
 	      .la_route_info_out(la_route_info),
 	      .fbf_write_addr(fbf_write_addr),
 	      .fbf_read_addr(fbf_read_addr),
@@ -425,10 +429,10 @@ module ip_ctrl
 	   assign vc_req_ivc[ivc] = vc_req;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
 	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
-	   assign flit_valid_out_ivc[ivc] = flit_ctrl_out[0];
-	   assign flit_ctrl_out_ivc[ivc*flit_ctrl_width:
-				    (ivc+1)*flit_ctrl_width-1]
-		    = flit_ctrl_out;
+	   assign flit_valid_out_ivc[ivc] = int_flit_ctrl_out[0];
+	   assign int_flit_ctrl_out_ivc[ivc*int_flit_ctrl_width:
+					(ivc+1)*int_flit_ctrl_width-1]
+		    = int_flit_ctrl_out;
 	   assign la_route_info_ivc[ivc*la_route_info_width:
 				    (ivc+1)*la_route_info_width-1]
 		    = la_route_info;
@@ -578,39 +582,39 @@ module ip_ctrl
       .d(flit_valid_out_s),
       .q(flit_valid_out_q));
    
-   wire [0:flit_ctrl_width-1] 	     flit_ctrl_out_s, flit_ctrl_out_q;
-   assign flit_ctrl_out_q[0] = flit_valid_out_q;
+   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
+   assign int_flit_ctrl_out_q[0] = flit_valid_out_q;
    
    generate
       
-      if(flit_ctrl_width > 1)
+      if(int_flit_ctrl_width > 1)
 	begin
 	   
 	   select_1ofn
 	     #(.num_ports(num_vcs),
-	       .width(flit_ctrl_width))
-	   flit_ctrl_out_s_sel
+	       .width(int_flit_ctrl_width))
+	   int_flit_ctrl_out_s_sel
 	     (.select(flit_valid_out_ivc),
-	      .data_in(flit_ctrl_out_ivc),
-	      .data_out(flit_ctrl_out_s));
+	      .data_in(int_flit_ctrl_out_ivc),
+	      .data_out(int_flit_ctrl_out_s));
 	   
 	   dff
-	     #(.width(flit_ctrl_width-1),
+	     #(.width(int_flit_ctrl_width-1),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   flit_ctrl_outq
+	   int_flit_ctrl_outq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(flit_ctrl_out_s[1:flit_ctrl_width-1]),
-	      .q(flit_ctrl_out_q[1:flit_ctrl_width-1]));
+	      .d(int_flit_ctrl_out_s[1:int_flit_ctrl_width-1]),
+	      .q(int_flit_ctrl_out_q[1:int_flit_ctrl_width-1]));
 	   
 	end
       
    endgenerate
    
    wire flit_head_out_q;
-   assign flit_head_out_q = flit_ctrl_out_q[1+vc_idx_width+0];
+   assign flit_head_out_q = int_flit_ctrl_out_q[1+vc_idx_width+0];
    
-   assign flit_ctrl_out = flit_ctrl_out_q;
+   assign int_flit_ctrl_out = int_flit_ctrl_out_q;
    
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
    select_1ofn

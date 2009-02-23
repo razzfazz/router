@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // output port controller (tracks state of buffers in downstream router)
 module op_ctrl
   (clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip, vc_gnt_ovc_ivc, 
-   xbr_ctrl_ip, flit_ctrl_in, flit_data_in, flit_ctrl_out, flit_data_out, 
+   xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in, flit_ctrl_out, flit_data_out, 
    elig_ovc, int_flow_ctrl_ovc, error);
    
 `include "constants.v"
@@ -168,6 +168,10 @@ module op_ctrl
    // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
    parameter cred_level_width = 2;
    
+   // width required for internal flit control signalling
+   localparam int_flit_ctrl_width
+     = 1 + vc_idx_width + 1 + 1;
+   
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
      = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
@@ -204,7 +208,7 @@ module op_ctrl
    input [0:num_ports-1] xbr_ctrl_ip;
    
    // incoming flit control signals
-   input [0:flit_ctrl_width-1] flit_ctrl_in;
+   input [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
    
    // incoming flit data
    input [0:flit_data_width-1] flit_data_in;
@@ -278,7 +282,10 @@ module op_ctrl
    assign xbr_ctrl = |xbr_ctrl_ip;
    
    wire 				  flit_valid_in;
-   assign flit_valid_in = flit_ctrl_in[0] & xbr_ctrl;
+   assign flit_valid_in = int_flit_ctrl_in[0] & xbr_ctrl;
+   
+   wire 				  flit_tail_in;
+   assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
    
    wire 				  cred_valid;
    assign cred_valid = flow_ctrl_q[0];
@@ -288,94 +295,11 @@ module op_ctrl
    wire 				  error_unmatched;
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
-   wire 				  flit_tail_in;
-   
    wire [0:num_vcs-1] 			  next_cred_ovc;
    wire [0:num_vcs-1] 			  error_hct_ovc;
    wire [0:num_vcs*2-1] 		  error_cred_ovc;
    
    generate
-      
-      case(packet_format)
-	`PACKET_FORMAT_HEAD_TAIL:
-	  assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     
-	     wire flit_head_in;
-	     assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
-
-	     wire [0:header_info_width-1] header_info_in;
-	     assign header_info_in = flit_data_in[0:header_info_width-1];
-	     
-	     if(max_payload_length == 0)
-	       assign flit_tail_in = flit_head_in;
-	     else if(max_payload_length == 1)
-	       begin
-		  
-		  wire has_payload;
-		  
-		  if(min_payload_length == 0)
-		    assign has_payload
-		      = header_info_in[la_route_info_width+route_info_width];
-		  else
-		    assign has_payload = 1'b1;
-		  
-		  assign flit_tail_in = ~flit_head_in | ~has_payload;
-		  
-	       end
-	     else
-	       begin
-		  
-		  wire [0:flit_ctr_width-1] flit_ctr_q;
-		  wire [0:flit_ctr_width-1] flit_ctr_next;
-		  
-		  if(payload_length_width > 0)
-		    begin
-		       
-		       wire [0:payload_length_width-1] payload_length;
-		       assign payload_length
-			 = header_info_in[la_route_info_width+
-					  route_info_width:
-					  la_route_info_width+
-					  route_info_width+
-					  payload_length_width-1];
-		       
-		       assign flit_ctr_next
-			 = (min_payload_length - 1) + payload_length;
-		       
-		       if(min_payload_length == 0)
-			 assign flit_tail_in
-			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
-		       else
-			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
-		       
-		    end
-		  else
-		    begin
-		       assign flit_ctr_next = max_payload_length - 1;
-		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
-		    end
-		  
-		  wire [0:flit_ctr_width-1] flit_ctr_s;
-		  assign flit_ctr_s = flit_valid_in ? 
-				      flit_head_in ? 
-				      flit_ctr_next : 
-				      (flit_ctr_q - |flit_ctr_q) : 
-				      flit_ctr_q;
-		  dff
-		    #(.width(flit_ctr_width),
-		      .reset_type(reset_type))
-		  flit_ctrq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(flit_ctr_s),
-		     .q(flit_ctr_q));
-		  
-	       end
-	     
-	  end
-      endcase
       
       genvar 				  ovc;
       
@@ -429,7 +353,7 @@ module op_ctrl
 	     begin
 		
 		wire [0:vc_idx_width-1] flit_vc_in;
-		assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
+		assign flit_vc_in = int_flit_ctrl_in[1:1+vc_idx_width-1];
 		
 		// if VC assignment is tracked at the output, each output VC 
 		// needs to check if it is currently assigned to the incoming VC
@@ -788,16 +712,31 @@ module op_ctrl
 	   else
 	     assign flit_ctrl_s[1:1+vc_idx_width-1]
 		      = xbr_ctrl ? 
-			flit_ctrl_in[1:1+vc_idx_width-1] :
+			int_flit_ctrl_in[1:1+vc_idx_width-1] :
 			flit_ctrl_q[1:1+vc_idx_width-1];
 	   
 	end
       
-      if(flit_ctrl_width > (1 + vc_idx_width))
-	assign flit_ctrl_s[1+vc_idx_width:flit_ctrl_width-1]
-		 = xbr_ctrl ? 
-		   flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1] : 
-		   flit_ctrl_q[1+vc_idx_width:flit_ctrl_width-1];
+      case(packet_format)
+	`PACKET_FORMAT_HEAD_TAIL:
+	  begin
+	     assign flit_ctrl_s[1+vc_idx_width+0]
+		      = xbr_ctrl ? 
+			int_flit_ctrl_in[1+vc_idx_width+0] : 
+			flit_ctrl_q[1+vc_idx_width+0];
+	     assign flit_ctrl_s[1+vc_idx_width+1]
+		      = xbr_ctrl ? 
+			int_flit_ctrl_in[1+vc_idx_width+1] : 
+			flit_ctrl_q[1+vc_idx_width+1];
+	  end
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     assign flit_ctrl_s[1+vc_idx_width+0]
+		      = xbr_ctrl ? 
+			int_flit_ctrl_in[1+vc_idx_width+0] : 
+			flit_ctrl_q[1+vc_idx_width+0];
+	  end
+      endcase
       
    endgenerate
    
