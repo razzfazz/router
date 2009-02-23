@@ -274,11 +274,6 @@ module op_ctrl
    // output VC control logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 			  next_cred_ovc;
-   wire [0:num_vcs-1] 			  error_hct_ovc;
-   wire [0:num_vcs*2-1] 		  error_cred_ovc;
-   wire [0:num_vcs-1] 			  match_ovc;
-   
    wire 				  xbr_ctrl;
    assign xbr_ctrl = |xbr_ctrl_ip;
    
@@ -288,7 +283,16 @@ module op_ctrl
    wire 				  cred_valid;
    assign cred_valid = flow_ctrl_q[0];
    
+   wire [0:num_vcs-1] 			  match_ovc;
+   
+   wire 				  error_unmatched;
+   assign error_unmatched = flit_valid_in & ~|match_ovc;
+   
    wire 				  flit_tail_in;
+   
+   wire [0:num_vcs-1] 			  next_cred_ovc;
+   wire [0:num_vcs-1] 			  error_hct_ovc;
+   wire [0:num_vcs*2-1] 		  error_cred_ovc;
    
    generate
       
@@ -861,6 +865,6 @@ module op_ctrl
       .errors_in(error_cred_ovc),
       .errors_out(errors_out_ovc));
    
-   assign error = (|error_hct_ovc) | (|errors_out_ovc);
+   assign error = error_unmatched | (|error_hct_ovc) | (|errors_out_ovc);
    
 endmodule
