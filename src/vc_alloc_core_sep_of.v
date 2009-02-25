@@ -114,7 +114,27 @@ module vc_alloc_core_sep_of
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   genvar itc;
+	   wire [0:num_vcs-1] req_ivc;
+	   assign req_ivc = req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs*num_ports-1] route_ivc_op;
+	   assign route_ivc_op = route_ip_ivc_op[ip*num_vcs*num_ports:
+						 (ip+1)*num_vcs*num_ports-1];
+	   
+	   wire [0:num_vcs-1] 		inc_rc_ivc;
+	   assign inc_rc_ivc = inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs*num_ports*num_vcs-1] gnt_out_ivc_op_ovc;
+	   assign gnt_out_ivc_op_ovc
+	     = gnt_out_ip_ivc_op_ovc[ip*num_vcs*num_ports*num_vcs:
+				     (ip+1)*num_vcs*num_ports*num_vcs-1];
+	   
+	   wire [0:num_vcs*num_ports*num_vcs-1] req_out_ivc_op_ovc;
+	   wire [0:num_vcs*num_ports*num_vcs-1] gnt_in_ivc_op_ovc;
+	   wire [0:num_vcs*num_vcs-1] 		gnt_ivc_ovc;
+	   wire [0:num_vcs-1] 			gnt_ivc;
+	   
+	   genvar 				itc;
 	   
 	   for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
 	     begin:itcs
@@ -134,26 +154,22 @@ module vc_alloc_core_sep_of
 			  //----------------------------------------------------
 			  
 			  wire req;
-			  assign req = req_ip_ivc[((ip*num_traffic_classes+itc)*
-						   num_routing_classes+irc)*
-						  num_vcs_per_class+icvc];
+			  assign req = req_ivc[(itc*num_routing_classes+irc)*
+					       num_vcs_per_class+icvc];
 			  
 			  wire [0:num_ports-1] route_op;
 			  assign route_op
-			    = route_ip_ivc_op[(((ip*num_traffic_classes+itc)*
-						num_routing_classes+irc)*
-					       num_vcs_per_class+icvc)*
-					      num_ports:
-					      (((ip*num_traffic_classes+itc)*
-						num_routing_classes+irc)*
-					       num_vcs_per_class+icvc+1)*
-					      num_ports-1];
+			    = route_ivc_op[((itc*num_routing_classes+irc)*
+					    num_vcs_per_class+icvc)*
+					   num_ports:
+					   ((itc*num_routing_classes+irc)*
+					    num_vcs_per_class+icvc+1)*
+					   num_ports-1];
 			  
 			  wire 		       inc_rc;
 			  assign inc_rc
-			    = inc_rc_ip_ivc[((ip*num_traffic_classes+itc)*
-					     num_routing_classes+irc)*
-					    num_vcs_per_class+icvc];
+			    = inc_rc_ivc[(itc*num_routing_classes+irc)*
+					 num_vcs_per_class+icvc];
 			  
 			  wire [0:num_ports*num_vcs-1] mask_op_ovc;
 			  
@@ -257,13 +273,11 @@ module vc_alloc_core_sep_of
 			       assign mask_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
 					= mask_ovc;
 			       
-			       assign req_out_ip_ivc_op_ovc[
-					 ((((ip*num_traffic_classes+itc)*
-					    num_routing_classes+irc)*
+			       assign req_out_ivc_op_ovc[
+					 (((itc*num_routing_classes+irc)*
 					   num_vcs_per_class+icvc)*
 					  num_ports+op)*num_vcs:
-					 ((((ip*num_traffic_classes+itc)*
-					    num_routing_classes+irc)*
+					 (((itc*num_routing_classes+irc)*
 					   num_vcs_per_class+icvc)*
 					  num_ports+op+1)*num_vcs-1]
 					= req_out_ovc;
@@ -277,16 +291,12 @@ module vc_alloc_core_sep_of
 			  
 			  wire [0:num_ports*num_vcs-1] gnt_out_op_ovc;
 			  assign gnt_out_op_ovc
-			    = gnt_out_ip_ivc_op_ovc[(((ip*num_traffic_classes+
-						       itc)*
-						      num_routing_classes+irc)*
-						     num_vcs_per_class+icvc)*
-						    num_ports*num_vcs:
-						    (((ip*num_traffic_classes+
-						       itc)*
-						      num_routing_classes+irc)*
-						     num_vcs_per_class+icvc+1)*
-						    num_ports*num_vcs-1];
+			    = gnt_out_ivc_op_ovc[((itc*num_routing_classes+irc)*
+						  num_vcs_per_class+icvc)*
+						 num_ports*num_vcs:
+						 ((itc*num_routing_classes+irc)*
+						  num_vcs_per_class+icvc+1)*
+						 num_ports*num_vcs-1];
 			  
 			  wire [0:num_vcs-1] 	       gnt_out_ovc;
 			  or_nto1
@@ -408,20 +418,16 @@ module vc_alloc_core_sep_of
 			  assign gnt_in_op_ovc
 			    = mask_op_ovc & {num_ports{gnt_in_ovc}};
 			  
-			  assign gnt_in_ip_ivc_op_ovc[(((ip*num_traffic_classes+
-							 itc)*
-							num_routing_classes+
-							irc)*
-						       num_vcs_per_class+
-						       icvc)*
-						      num_ports*num_vcs:
-						      (((ip*num_traffic_classes+
-							 itc)*
-							num_routing_classes+
-							irc)*
-						       num_vcs_per_class+
-						       icvc+1)*
-						      num_ports*num_vcs-1]
+			  assign gnt_in_ivc_op_ovc[((itc*num_routing_classes+
+						     irc)*
+						    num_vcs_per_class+
+						    icvc)*
+						   num_ports*num_vcs:
+						   ((itc*num_routing_classes+
+						     irc)*
+						    num_vcs_per_class+
+						    icvc+1)*
+						   num_ports*num_vcs-1]
 				   = gnt_in_op_ovc;
 			  
 			  
@@ -429,19 +435,16 @@ module vc_alloc_core_sep_of
 			  // generate global grants
 			  //----------------------------------------------------
 			  
-			  assign gnt_ip_ivc_ovc[(((ip*num_traffic_classes+itc)*
-						  num_routing_classes+irc)*
-						 num_vcs_per_class+icvc)*
-						num_vcs:
-						(((ip*num_traffic_classes+itc)*
-						  num_routing_classes+irc)*
-						 num_vcs_per_class+icvc+1)*
-						num_vcs-1]
+			  assign gnt_ivc_ovc[((itc*num_routing_classes+irc)*
+					      num_vcs_per_class+icvc)*
+					     num_vcs:
+					     ((itc*num_routing_classes+irc)*
+					      num_vcs_per_class+icvc+1)*
+					     num_vcs-1]
 				   = gnt_in_ovc;
 			  
-			  assign gnt_ip_ivc[((ip*num_traffic_classes+itc)*
-					     num_routing_classes+irc)*
-					    num_vcs_per_class+icvc]
+			  assign gnt_ivc[(itc*num_routing_classes+irc)*
+					 num_vcs_per_class+icvc]
 				   = gnt_out;
 			  
 		       end
@@ -449,6 +452,20 @@ module vc_alloc_core_sep_of
 		  end
 		
 	     end
+	   
+	   assign req_out_ip_ivc_op_ovc[ip*num_vcs*num_ports*num_vcs:
+					(ip+1)*num_vcs*num_ports*num_vcs-1]
+		    = req_out_ivc_op_ovc;
+	   
+	   assign gnt_in_ip_ivc_op_ovc[ip*num_vcs*num_ports*num_vcs:
+				       (ip+1)*num_vcs*num_ports*num_vcs-1]
+		    = gnt_in_ivc_op_ovc;
+	   
+	   assign gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:(ip+1)*num_vcs*num_vcs-1]
+		    = gnt_ivc_ovc;
+	   
+	   assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+		    = gnt_ivc;
 	   
 	end
       
@@ -495,7 +512,22 @@ module vc_alloc_core_sep_of
       for (op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   genvar otc;
+	   wire [0:num_vcs-1] gnt_in_ovc;
+	   assign gnt_in_ovc = gnt_in_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs*num_ports*num_vcs-1] req_out_ovc_ip_ivc;
+	   assign req_out_ovc_ip_ivc
+	     = req_out_op_ovc_ip_ivc[op*num_vcs*num_ports*num_vcs:
+				     (op+1)*num_vcs*num_ports*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 			elig_ovc;
+	   assign elig_ovc = elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs*num_ports*num_vcs-1] gnt_out_ovc_ip_ivc;
+	   wire [0:num_vcs*num_ports-1] 	gnt_ovc_ip;
+	   wire [0:num_vcs*num_vcs-1] 		gnt_ovc_ivc;
+	   
+	   genvar 				otc;
 	   
 	   for(otc = 0; otc < num_traffic_classes; otc = otc + 1)
 	     begin:otcs
@@ -516,28 +548,22 @@ module vc_alloc_core_sep_of
 			  
 			  wire gnt_in;
 			  assign gnt_in
-			    = gnt_in_op_ovc[((op*num_traffic_classes+otc)*
-					     num_routing_classes+orc)*
-					    num_vcs_per_class+ocvc];
+			    = gnt_in_ovc[(otc*num_routing_classes+orc)*
+					 num_vcs_per_class+ocvc];
 			  
 			  wire [0:num_ports*num_vcs-1] req_out_ip_ivc;
 			  assign req_out_ip_ivc
-			    = req_out_op_ovc_ip_ivc[(((op*num_traffic_classes+
-						       otc)*
-						      num_routing_classes+orc)*
-						     num_vcs_per_class+ocvc)*
-						    num_ports*num_vcs:
-						    (((op*num_traffic_classes+
-						       otc)*
-						      num_routing_classes+orc)*
-						     num_vcs_per_class+ocvc+1)*
-						    num_ports*num_vcs-1];
+			    = req_out_ovc_ip_ivc[((otc*num_routing_classes+orc)*
+						  num_vcs_per_class+ocvc)*
+						 num_ports*num_vcs:
+						 ((otc*num_routing_classes+orc)*
+						  num_vcs_per_class+ocvc+1)*
+						 num_ports*num_vcs-1];
 			  
 			  wire 			       elig;
 			  assign elig
-			    = elig_op_ovc[((op*num_traffic_classes+otc)*
-					   num_routing_classes+orc)*
-					  num_vcs_per_class+ocvc];
+			    = elig_ovc[(otc*num_routing_classes+orc)*
+				       num_vcs_per_class+ocvc];
 			  
 			  wire [0:num_ports-1] 	       req_out_ip;
 			  wire [0:num_ports-1] 	       gnt_out_ip;
@@ -746,40 +772,30 @@ module vc_alloc_core_sep_of
 			     .req(req_out_ip),
 			     .gnt(gnt_out_ip));
 			  
-			  assign gnt_out_op_ovc_ip_ivc[(((op*
-							  num_traffic_classes+
-							  otc)*
-							 num_routing_classes+
-							 orc)*
-							num_vcs_per_class+
-							ocvc)*
-						       num_ports*num_vcs:
-						       (((op*
-							  num_traffic_classes+
-							  otc)*
-							 num_routing_classes+
-							 orc)*
-							num_vcs_per_class+
-							ocvc+1)*
-						       num_ports*num_vcs-1]
+			  assign gnt_out_ovc_ip_ivc[((otc*num_routing_classes+
+						      orc)*
+						     num_vcs_per_class+
+						     ocvc)*
+						    num_ports*num_vcs:
+						    ((otc*num_routing_classes+
+						      orc)*
+						     num_vcs_per_class+
+						     ocvc+1)*
+						    num_ports*num_vcs-1]
 				   = gnt_out_ip_ivc;
-			  assign gnt_op_ovc_ip[(((op*num_traffic_classes+otc)*
-						 num_routing_classes+orc)*
-						num_vcs_per_class+ocvc)*
-					       num_ports:
-					       (((op*num_traffic_classes+otc)*
-						 num_routing_classes+orc)*
-						num_vcs_per_class+ocvc+1)*
-					       num_ports-1]
+			  assign gnt_ovc_ip[((otc*num_routing_classes+orc)*
+					     num_vcs_per_class+ocvc)*
+					    num_ports:
+					    ((otc*num_routing_classes+orc)*
+					     num_vcs_per_class+ocvc+1)*
+					    num_ports-1]
 				   = gnt_out_ip;
-			  assign gnt_op_ovc_ivc[(((op*num_traffic_classes+otc)*
-						  num_routing_classes+orc)*
-						 num_vcs_per_class+ocvc)*
-						num_vcs:
-						(((op*num_traffic_classes+otc)*
-						  num_routing_classes+orc)*
-						 num_vcs_per_class+ocvc+1)*
-						num_vcs-1]
+			  assign gnt_ovc_ivc[((otc*num_routing_classes+orc)*
+					      num_vcs_per_class+ocvc)*
+					     num_vcs:
+					     ((otc*num_routing_classes+orc)*
+					      num_vcs_per_class+ocvc+1)*
+					     num_vcs-1]
 				   = gnt_ivc;
 			  
 		       end
@@ -787,6 +803,16 @@ module vc_alloc_core_sep_of
 		  end
 		
 	     end
+	   
+	   assign gnt_out_op_ovc_ip_ivc[op*num_vcs*num_ports*num_vcs:
+					(op+1)*num_vcs*num_ports*num_vcs-1]
+		    = gnt_out_ovc_ip_ivc;
+	   
+	   assign gnt_op_ovc_ip[op*num_vcs*num_ports:(op+1)*num_vcs*num_ports-1]
+		    = gnt_ovc_ip;
+	   
+	   assign gnt_op_ovc_ivc[op*num_vcs*num_vcs:(op+1)*num_vcs*num_vcs-1]
+		    = gnt_ovc_ivc;
 	   
 	end
       

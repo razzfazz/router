@@ -420,6 +420,13 @@ module vc_alloc_core_wf
    wire 					     update_alloc;
    assign update_alloc = |req_ip_ivc;
    
+   // FIXME: The wavefront allocator is way bigger than it needs to be: First, 
+   // only requests that are in the same traffic class can conflict; 
+   // furthermore, even within that group, only requests in neighboring routing
+   // classes can conflict. Thus, instead of having one large wavefront block 
+   // with num_ports*num_vcs ports, we should split it up into 
+   // num_traffic_classes*num_ports*num_routing_classes wavefront blocks with 
+   // num_ports*2*num_vcs_per_class ports each.
    wf_alloc
      #(.num_ports(num_ports*num_vcs),
        .wf_allocator_type(wf_allocator_type),
