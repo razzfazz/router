@@ -349,6 +349,7 @@ module ip_ctrl
    generate
       
       genvar 				    ivc;
+      
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
 	   
