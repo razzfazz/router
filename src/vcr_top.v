@@ -286,7 +286,7 @@ module vcr_top
 	   wire [0:flit_data_width-1] 	  flit_data_out;
 	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
 	   wire 			  ipc_error;
-	   vcr_ip_ctrl
+	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_traffic_classes(num_traffic_classes),
@@ -501,7 +501,7 @@ module vcr_top
 	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
 	   wire 				  opc_error;
-	   vcr_op_ctrl
+	   vcr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_traffic_classes(num_traffic_classes),
