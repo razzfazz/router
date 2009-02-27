@@ -366,7 +366,7 @@ module vcr_top
    wire [0:num_ports*num_vcs*num_ports-1] vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
    
-   vc_alloc
+   vcr_vc_alloc_mac
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -392,7 +392,7 @@ module vcr_top
    // switch allocator
    //---------------------------------------------------------------------------
    
-   sw_alloc
+   vcr_sw_alloc_mac
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
        .allocator_type(sw_allocator_type),
