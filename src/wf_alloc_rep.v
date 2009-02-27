@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wavefront allocator variant which replicates the entire allocation logic for
 // the different priorities and selects the result from the appropriate one
-module wf_alloc_core_rep
+module wf_alloc_rep
   (clk, reset, update, req, gnt);
    
 `include "constants.v"

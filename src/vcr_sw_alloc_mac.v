@@ -86,7 +86,7 @@ module vcr_sw_alloc_mac
       case(allocator_type)
 	`SW_ALLOCATOR_TYPE_SEP_IF:
 	  begin
-	     sw_alloc_core_sep_if
+	     vcr_sw_alloc_sep_if
 	       #(.num_vcs(num_vcs),
 		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
@@ -104,7 +104,7 @@ module vcr_sw_alloc_mac
 	  end
 	`SW_ALLOCATOR_TYPE_SEP_OF:
 	  begin
-	     sw_alloc_core_sep_of
+	     vcr_sw_alloc_sep_of
 	       #(.num_vcs(num_vcs),
 		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
@@ -124,7 +124,7 @@ module vcr_sw_alloc_mac
       
 	if(allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE)
 	  begin
-	     sw_alloc_core_wf
+	     vcr_sw_alloc_wf
 	       #(.num_vcs(num_vcs),
 		 .num_ports(num_ports),
 		 .wf_allocator_type(wf_allocator_type),

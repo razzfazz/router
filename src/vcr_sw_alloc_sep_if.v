@@ -28,8 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// switch allocator variant using separable output-first allocation
-module vcr_sw_alloc_core_sep_of
+// switch allocator variant usign separable input-first allocation
+module vcr_sw_alloc_sep_if
   (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
@@ -78,11 +78,9 @@ module vcr_sw_alloc_core_sep_of
    // global wires
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] gnt_in_nonspec_ip_op;
    wire [0:num_ports*num_ports-1] req_out_nonspec_ip_op;
    wire [0:num_ports*num_ports-1] gnt_out_nonspec_ip_op;
    
-   wire [0:num_ports*num_ports-1] gnt_in_spec_ip_op;
    wire [0:num_ports*num_ports-1] req_out_spec_ip_op;
    wire [0:num_ports*num_ports-1] gnt_out_spec_ip_op;
    
@@ -103,64 +101,27 @@ module vcr_sw_alloc_core_sep_of
 	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
 	   
 	   //-------------------------------------------------------------------
-	   // combine requests from all VCs
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_vcs-1] req_nonspec_ivc;
-	   assign req_nonspec_ivc
-	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire [0:num_ports-1] 	req_out_nonspec_op;
-	   select_1ofn
-	     #(.width(num_ports),
-	       .num_ports(num_vcs))
-	   req_out_nonspec_op_sel
-	     (.select(req_nonspec_ivc),
-	      .data_in(route_ivc_op),
-	      .data_out(req_out_nonspec_op));
-	   
-	   assign req_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = req_out_nonspec_op;
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // use output-side grants to filter out eligible input VCs
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_ports-1] 	gnt_out_nonspec_op;
-	   assign gnt_out_nonspec_op
-	     = gnt_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
-	   
-	   wire [0:num_vcs*num_ports-1] req_masked_nonspec_ivc_op;
-	   assign req_masked_nonspec_ivc_op
-	     = {num_vcs{gnt_out_nonspec_op}} & route_ivc_op;
-	   
-	   
-	   wire [0:num_ports*num_vcs-1] req_masked_nonspec_op_ivc;
-	   interleaver
-	     #(.width(num_ports*num_vcs),
-	       .num_blocks(num_vcs))
-	   req_masked_nonspec_op_ivc_intl
-	     (.data_in(req_masked_nonspec_ivc_op),
-	      .data_out(req_masked_nonspec_op_ivc));
-	   
-	   wire [0:num_vcs-1] 		req_in_nonspec_ivc;
-	   or_nto1
-	     #(.width(num_vcs),
-	       .num_ports(num_ports))
-	   req_in_nonspec_ivc_or
-	     (.data_in(req_masked_nonspec_op_ivc),
-	      .data_out(req_in_nonspec_ivc));
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // perform input-side arbitration
 	   //-------------------------------------------------------------------
 	   
-	   wire 			update_arb_nonspec;
-	   assign update_arb_nonspec = |gnt_out_nonspec_op;
+	   wire [0:num_ports-1] gnt_out_nonspec_op;
+	   assign gnt_out_nonspec_op
+	     = gnt_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
-	   wire [0:num_vcs-1] 		gnt_in_nonspec_ivc;
+	   wire 		gnt_out_nonspec;
+	   assign gnt_out_nonspec = |gnt_out_nonspec_op;
+	   
+	   wire 		update_arb_nonspec;
+	   assign update_arb_nonspec = gnt_out_nonspec;
+	   
+	   wire [0:num_vcs-1] 	req_nonspec_ivc;
+	   assign req_nonspec_ivc
+	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 		req_in_nonspec_ivc;
+	   assign req_in_nonspec_ivc = req_nonspec_ivc;
+	   
+	   wire [0:num_vcs-1] gnt_in_nonspec_ivc;
 	   arbiter
 	     #(.num_ports(num_vcs),
 	       .reset_type(reset_type),
@@ -172,103 +133,64 @@ module vcr_sw_alloc_core_sep_of
 	      .req(req_in_nonspec_ivc),
 	      .gnt(gnt_in_nonspec_ivc));
 	   
-	   wire [0:num_vcs-1] 		gnt_nonspec_ivc;
-	   assign gnt_nonspec_ivc = gnt_in_nonspec_ivc;
+	   
+	   //-------------------------------------------------------------------
+	   // generate requests for output stage
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:num_ports-1] req_out_nonspec_op;
+	   select_1ofn
+	     #(.width(num_ports),
+	       .num_ports(num_vcs))
+	   req_out_nonspec_op_sel
+	     (.select(gnt_in_nonspec_ivc),
+	      .data_in(route_ivc_op),
+	      .data_out(req_out_nonspec_op));
+	   
+	   assign req_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+		    = req_out_nonspec_op;
 	   
 	   
 	   //-------------------------------------------------------------------
 	   // generate global grants
 	   //-------------------------------------------------------------------
 	   
-	   // since multiple ports may have been granted in the output stage, we
-	   // must select the winning one
-	   wire [0:num_ports-1] 	gnt_nonspec_op;
-	   select_1ofn
-	     #(.width(num_ports),
-	       .num_ports(num_vcs))
-	   gnt_nonspec_op_sel
-	     (.select(gnt_in_nonspec_ivc),
-	      .data_in(route_ivc_op),
-	      .data_out(gnt_nonspec_op));
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // feed grants back to output stage
-	   //-------------------------------------------------------------------
-	   
-	   assign gnt_in_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = gnt_nonspec_op;
+	   wire [0:num_vcs-1] 	gnt_nonspec_ivc;
+	   assign gnt_nonspec_ivc
+	     = {num_vcs{gnt_out_nonspec}} & gnt_in_nonspec_ivc;
 	   
 	   
 	   //-------------------------------------------------------------------
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs-1] 		gnt_spec_ivc;
-	   wire [0:num_ports-1] 	gnt_spec_op;
+	   wire [0:num_vcs-1] 	gnt_spec_ivc;
 	   
 	   if(spec_level != `SW_SPEC_LEVEL_NONE)
 	     begin
 		
 		//--------------------------------------------------------------
-		// combine requests from all VCs
+		// perform input-side arbitration (speculative)
 		//--------------------------------------------------------------
 		
-		wire [0:num_vcs-1] req_spec_ivc;
-		assign req_spec_ivc
-		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-		
-		wire [0:num_ports-1] 	     req_out_spec_op;
-		select_1ofn
-		  #(.width(num_ports),
-		    .num_ports(num_vcs))
-		req_out_spec_op_sel
-		  (.select(req_spec_ivc),
-		   .data_in(route_ivc_op),
-		   .data_out(req_out_spec_op));
-		
-		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-			 = req_out_spec_op;
-		
-		
-		//--------------------------------------------------------------
-		// use output-side grants to filter out eligible input VCs
-		//--------------------------------------------------------------
-		
-		wire [0:num_ports-1] 	     gnt_out_spec_op;
+		wire [0:num_ports-1] gnt_out_spec_op;
 		assign gnt_out_spec_op
 		  = gnt_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 		
-		wire [0:num_vcs*num_ports-1] req_masked_spec_ivc_op;
-		assign req_masked_spec_ivc_op
-		  = {num_vcs{gnt_out_spec_op}} & route_ivc_op;
+		wire 		     gnt_out_spec;
+		assign gnt_out_spec = |gnt_out_spec_op;
 		
+		wire 		     update_arb_spec;
+		assign update_arb_spec = gnt_out_spec;
 		
-		wire [0:num_ports*num_vcs-1] req_masked_spec_op_ivc;
-		interleaver
-		  #(.width(num_ports*num_vcs),
-		    .num_blocks(num_vcs))
-		req_masked_spec_op_ivc_intl
-		  (.data_in(req_masked_spec_ivc_op),
-		   .data_out(req_masked_spec_op_ivc));
+		wire [0:num_vcs-1]   req_spec_ivc;
+		assign req_spec_ivc
+		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 		
 		wire [0:num_vcs-1] 	     req_in_spec_ivc;
-		or_nto1
-		  #(.width(num_vcs),
-		    .num_ports(num_ports))
-		req_in_spec_ivc_or
-		  (.data_in(req_masked_spec_op_ivc),
-		   .data_out(req_in_spec_ivc));
+		assign req_in_spec_ivc = req_spec_ivc;
 		
-		
-		//--------------------------------------------------------------
-		// perform input-side arbitration
-		//--------------------------------------------------------------
-		
-		wire 			     update_arb_spec;
-		assign update_arb_spec = |gnt_out_spec_op;
-		
-		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
+		wire [0:num_vcs-1] 	gnt_in_spec_ivc;
 		arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
@@ -280,39 +202,38 @@ module vcr_sw_alloc_core_sep_of
 		   .req(req_in_spec_ivc),
 		   .gnt(gnt_in_spec_ivc));
 		
-		assign gnt_spec_ivc = gnt_in_spec_ivc;
+		
+		//--------------------------------------------------------------
+		// generate requests for output stage (speculative)
+		//--------------------------------------------------------------
+		
+		wire [0:num_ports-1] 	req_out_spec_op;
+		select_1ofn
+		  #(.width(num_ports),
+		    .num_ports(num_vcs))
+		req_out_spec_op_sel
+		  (.select(gnt_in_spec_ivc),
+		   .data_in(route_ivc_op),
+		   .data_out(req_out_spec_op));
+		
+		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+			 = req_out_spec_op;
 		
 		
 		//--------------------------------------------------------------
 		// generate global grants
 		//--------------------------------------------------------------
 		
-		// since multiple ports may have been granted in the output
-		// stage, we must select the winning one
-		select_1ofn
-		  #(.width(num_ports),
-		    .num_ports(num_vcs))
-		gnt_spec_op_sel
-		  (.select(gnt_in_spec_ivc),
-		   .data_in(route_ivc_op),
-		   .data_out(gnt_spec_op));
-		
-		
-		//--------------------------------------------------------------
-		// feed grants back to output stage
-		//--------------------------------------------------------------
-		
-		assign gnt_in_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-			 = gnt_spec_op;
+		assign gnt_spec_ivc
+		  = {num_vcs{gnt_out_spec}} & gnt_in_spec_ivc;
 		
 	     end
 	   else
 	     begin
 		
-		assign gnt_in_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
 			 = {num_ports{1'b0}};
 		assign gnt_spec_ivc = {num_vcs{1'b0}};
-		assign gnt_spec_op = {num_ports{1'b0}};
 		
 	     end
 	   
@@ -325,8 +246,6 @@ module vcr_sw_alloc_core_sep_of
 		    = gnt_nonspec_ivc;
 	   assign gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = gnt_spec_ivc;
-	   assign gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = gnt_nonspec_op | gnt_spec_op;
 	   
 	end
       
@@ -336,14 +255,6 @@ module vcr_sw_alloc_core_sep_of
    //---------------------------------------------------------------------------
    // bit shuffling for changing sort order
    //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] gnt_in_nonspec_op_ip;
-   interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   gnt_in_nonspec_op_ip_intl
-     (.data_in(gnt_in_nonspec_ip_op),
-      .data_out(gnt_in_nonspec_op_ip));
    
    wire [0:num_ports*num_ports-1] req_out_nonspec_op_ip;
    interleaver
@@ -357,17 +268,9 @@ module vcr_sw_alloc_core_sep_of
    interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
-   gnt_out_nonspec_ip_op_intl
+   gnt_out_nonspec_op_ip_intl
      (.data_in(gnt_out_nonspec_op_ip),
       .data_out(gnt_out_nonspec_ip_op));
-   
-   wire [0:num_ports*num_ports-1] gnt_in_spec_op_ip;
-   interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   gnt_in_spec_op_ip_intl
-     (.data_in(gnt_in_spec_ip_op),
-      .data_out(gnt_in_spec_op_ip));
    
    wire [0:num_ports*num_ports-1] req_out_spec_op_ip;
    interleaver
@@ -381,7 +284,7 @@ module vcr_sw_alloc_core_sep_of
    interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
-   gnt_out_spec_ip_op_intl
+   gnt_out_spec_op_ip_intl
      (.data_in(gnt_out_spec_op_ip),
       .data_out(gnt_out_spec_ip_op));
    
@@ -497,22 +400,18 @@ module vcr_sw_alloc_core_sep_of
 	begin:ops
 	   
 	   //-------------------------------------------------------------------
-	   // output-side arbitration stage (select input port)
+	   // perform output-side arbitration (select input port)
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] req_out_nonspec_ip;
 	   assign req_out_nonspec_ip
 	     = req_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire [0:num_ports-1] gnt_in_nonspec_ip;
-	   assign gnt_in_nonspec_ip
-	     = gnt_in_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
 	   // if any VC requesting this output port was granted at any input
-	   // port in the first stage, the corresponding second-stage grant must
-	   // have taken place before that, so we can update priorities
+	   // port in the first stage, one of these input ports will be granted
+	   // here as well, and we can thus update priorities
 	   wire 		update_arb_nonspec;
-	   assign update_arb_nonspec = |gnt_in_nonspec_ip;
+	   assign update_arb_nonspec = |req_out_nonspec_ip;
 	   
 	   wire [0:num_ports-1] gnt_out_nonspec_ip;
 	   arbiter
@@ -526,6 +425,11 @@ module vcr_sw_alloc_core_sep_of
 	      .req(req_out_nonspec_ip),
 	      .gnt(gnt_out_nonspec_ip));
 	   
+	   
+	   //-------------------------------------------------------------------
+	   // feed grants back to input stage
+	   //-------------------------------------------------------------------
+	   
 	   assign gnt_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
 		    = gnt_out_nonspec_ip;
 	   
@@ -538,51 +442,60 @@ module vcr_sw_alloc_core_sep_of
 	     begin
 		
 		//--------------------------------------------------------------
-		// output-side arbitration stage (select input port)
+		// perform output-side arbitration (speculative)
 		//--------------------------------------------------------------
 		
 		wire [0:num_ports-1] req_out_spec_ip;
 		assign req_out_spec_ip
 		  = req_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
 		
-		wire [0:num_ports-1] gnt_in_spec_ip;
-		assign gnt_in_spec_ip
-		  = gnt_in_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
+		wire [0:num_ports-1] spec_mask_ip;
+		assign spec_mask_ip
+		  = spec_mask_op_ip[op*num_ports:(op+1)*num_ports-1];
 		
-		// if any VC requesting this output port was granted at any 
-		// input port in the first stage, the corresponding second-stage
-		// grant must have taken place before that, so we can update
-		// priorities
+		// only update priorities if there is no conflicting non-
+		// speculative request
 		wire 		     update_arb_spec;
-		assign update_arb_spec = |gnt_in_spec_ip;
+		assign update_arb_spec = |(req_out_spec_ip & spec_mask_ip);
 		
 		wire [0:num_ports-1] gnt_out_unmasked_spec_ip;
 		arbiter
 		  #(.num_ports(num_ports),
 		    .arbiter_type(arbiter_type),
 		    .reset_type(reset_type))
-		gnt_out_spec_ip_arb
+		gnt_out_unmasked_spec_ip_arb
 		  (.clk(clk),
 		   .reset(reset),
 		   .update(update_arb_spec),
 		   .req(req_out_spec_ip),
 		   .gnt(gnt_out_unmasked_spec_ip));
 		
-		wire [0:num_ports-1] spec_mask_ip;
-		assign spec_mask_ip
-		  = spec_mask_op_ip[op*num_ports:(op+1)*num_ports-1];
-		
 		wire [0:num_ports-1] gnt_out_spec_ip;
 		assign gnt_out_spec_ip
 		  = gnt_out_unmasked_spec_ip & spec_mask_ip;
+		
+		
+		//--------------------------------------------------------------
+		// feed grants back to input stage (speculative)
+		//--------------------------------------------------------------
 		
 		assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
 			 = gnt_out_spec_ip;
 		
 	     end
+	   else
+	     assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
+		      = {num_ports{1'b0}};
 	   
 	end
       
    endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // generate global outputs
+   //---------------------------------------------------------------------------
+   
+   assign gnt_ip_op = gnt_out_nonspec_ip_op | gnt_out_spec_ip_op;
    
 endmodule

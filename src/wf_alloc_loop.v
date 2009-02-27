@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wavefron allocator variant which uses wraparound (forming a false 
 // combinational loop) as described in Dally et al, "Principles and Practices of
 // Interconnection Networks"
-module wf_alloc_core_loop
+module wf_alloc_loop
   (clk, reset, update, req, gnt);
    
 `include "constants.v"

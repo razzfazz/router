@@ -105,7 +105,7 @@ module vcr_vc_alloc_mac
       case(allocator_type)
 	`VC_ALLOCATOR_TYPE_SEP_IF:
 	  begin
-	     vc_alloc_core_sep_if
+	     vcr_vc_alloc_sep_if
 	       #(.num_traffic_classes(num_traffic_classes),
 		 .num_routing_classes(num_routing_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
@@ -127,7 +127,7 @@ module vcr_vc_alloc_mac
 	  end
 	`VC_ALLOCATOR_TYPE_SEP_OF:
 	  begin
-	     vc_alloc_core_sep_of
+	     vcr_vc_alloc_sep_of
 	       #(.num_traffic_classes(num_traffic_classes),
 		 .num_routing_classes(num_routing_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
@@ -151,7 +151,7 @@ module vcr_vc_alloc_mac
       
       if(allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE)
 	begin
-	   vc_alloc_core_wf
+	   vcr_vc_alloc_wf
 	       #(.num_traffic_classes(num_traffic_classes),
 		 .num_routing_classes(num_routing_classes),
 		 .num_vcs_per_class(num_vcs_per_class),

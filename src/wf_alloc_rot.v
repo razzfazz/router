@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wavefront allocator variant which rotates inputs and outputs based on 
 // priority
-module wf_alloc_core_rot
+module wf_alloc_rot
   (clk, reset, update, req, gnt);
    
 `include "constants.v"

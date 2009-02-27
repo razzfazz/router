@@ -64,7 +64,7 @@ module wf_alloc
       case(wf_allocator_type)
 	`WF_ALLOCATOR_TYPE_MUX:
 	  begin
-	     wf_alloc_core_mux
+	     wf_alloc_mux
 	       #(.num_ports(num_ports),
 		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
@@ -77,7 +77,7 @@ module wf_alloc
 	  end
 	`WF_ALLOCATOR_TYPE_REP:
 	  begin
-	     wf_alloc_core_rep
+	     wf_alloc_rep
 	       #(.num_ports(num_ports),
 		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
@@ -90,7 +90,7 @@ module wf_alloc
 	  end
 	`WF_ALLOCATOR_TYPE_DPA:
 	  begin
-	     wf_alloc_core_dpa
+	     wf_alloc_dpa
 	       #(.num_ports(num_ports),
 		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
@@ -103,7 +103,7 @@ module wf_alloc
 	  end      
 	`WF_ALLOCATOR_TYPE_ROT:
 	  begin
-	     wf_alloc_core_rot
+	     wf_alloc_rot
 	       #(.num_ports(num_ports),
 		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
@@ -116,7 +116,7 @@ module wf_alloc
 	  end
 	`WF_ALLOCATOR_TYPE_LOOP:
 	  begin
-	     wf_alloc_core_loop
+	     wf_alloc_loop
 	       #(.num_ports(num_ports),
 		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))

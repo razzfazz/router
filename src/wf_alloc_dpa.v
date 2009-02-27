@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wavefron allocator variant implementing a Diagonal Propagation Arbiter as
 // described in Hurt et al, "Design and Implementation of High-Speed Symmetric 
 // Crossbar Schedulers"
-module wf_alloc_core_dpa
+module wf_alloc_dpa
   (clk, reset, update, req, gnt);
    
 `include "constants.v"

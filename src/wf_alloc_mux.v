@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wavefront allocator variant which uses multiplexers to permute inputs and
 // outputs based on priority
-module wf_alloc_core_mux
+module wf_alloc_mux
   (clk, reset, update, req, gnt);
    
 `include "constants.v"
