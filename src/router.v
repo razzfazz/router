@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wrapper around router component (configures router parameters based on
 // selected network topology, etc.)
-module router_wrapper
+module router
   (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
@@ -249,7 +249,7 @@ module router_wrapper
    output error;
    wire 				error;
    
-   router
+   vcr_top
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
        .num_traffic_classes(num_traffic_classes),
@@ -282,7 +282,7 @@ module router_wrapper
        .xbc_crossbar_type(xbc_crossbar_type),
        .xbd_crossbar_type(xbd_crossbar_type),
        .reset_type(reset_type))
-   rtr
+   vcr
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
