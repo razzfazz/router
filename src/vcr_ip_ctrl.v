@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // input port controller
-module ip_ctrl
+module vcr_ip_ctrl
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, 
    int_flow_ctrl_op_ovc, route_ivc_op, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
    vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, sw_gnt_nonspec_ivc, 
@@ -376,7 +376,7 @@ module ip_ctrl
 	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
 	   wire 			  ivcc_error;
 	   wire [0:5] 			  events;
-	   ivc_ctrl
+	   vcr_ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_traffic_classes(num_traffic_classes),

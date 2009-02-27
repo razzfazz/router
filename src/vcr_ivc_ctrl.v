@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // input VC controller
-module ivc_ctrl
+module vcr_ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
    int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 

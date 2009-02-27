@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // top-level module for router
-module router
+module vcr_top
   (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
@@ -286,7 +286,7 @@ module router
 	   wire [0:flit_data_width-1] 	  flit_data_out;
 	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
 	   wire 			  ipc_error;
-	   ip_ctrl
+	   vcr_ip_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_traffic_classes(num_traffic_classes),
@@ -501,7 +501,7 @@ module router
 	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
 	   wire 				  opc_error;
-	   op_ctrl
+	   vcr_op_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
 	       .num_traffic_classes(num_traffic_classes),
