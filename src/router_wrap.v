@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wrapper around router component (configures router parameters based on
 // selected network topology, etc.)
-module router
+module router_wrap
   (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
