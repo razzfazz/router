@@ -33,7 +33,8 @@ module vcr_sw_alloc_sep_if
   (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of VCs
    parameter num_vcs = 4;
@@ -122,7 +123,7 @@ module vcr_sw_alloc_sep_if
 	   assign req_in_nonspec_ivc = req_nonspec_ivc;
 	   
 	   wire [0:num_vcs-1] gnt_in_nonspec_ivc;
-	   arbiter
+	   c_arbiter
 	     #(.num_ports(num_vcs),
 	       .reset_type(reset_type),
 	       .arbiter_type(arbiter_type))
@@ -139,7 +140,7 @@ module vcr_sw_alloc_sep_if
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] req_out_nonspec_op;
-	   select_1ofn
+	   c_select_1ofn
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
 	   req_out_nonspec_op_sel
@@ -191,7 +192,7 @@ module vcr_sw_alloc_sep_if
 		assign req_in_spec_ivc = req_spec_ivc;
 		
 		wire [0:num_vcs-1] 	gnt_in_spec_ivc;
-		arbiter
+		c_arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
 		    .arbiter_type(arbiter_type))
@@ -208,7 +209,7 @@ module vcr_sw_alloc_sep_if
 		//--------------------------------------------------------------
 		
 		wire [0:num_ports-1] 	req_out_spec_op;
-		select_1ofn
+		c_select_1ofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
 		req_out_spec_op_sel
@@ -257,7 +258,7 @@ module vcr_sw_alloc_sep_if
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] req_out_nonspec_op_ip;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    req_out_nonspec_op_ip_intl
@@ -265,7 +266,7 @@ module vcr_sw_alloc_sep_if
       .data_out(req_out_nonspec_op_ip));
    
    wire [0:num_ports*num_ports-1] gnt_out_nonspec_op_ip;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_out_nonspec_op_ip_intl
@@ -273,7 +274,7 @@ module vcr_sw_alloc_sep_if
       .data_out(gnt_out_nonspec_ip_op));
    
    wire [0:num_ports*num_ports-1] req_out_spec_op_ip;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    req_out_spec_op_ip_intl
@@ -281,7 +282,7 @@ module vcr_sw_alloc_sep_if
       .data_out(req_out_spec_op_ip));
    
    wire [0:num_ports*num_ports-1] gnt_out_spec_op_ip;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_out_spec_op_ip_intl
@@ -319,7 +320,7 @@ module vcr_sw_alloc_sep_if
 	  begin
 	     
 	     wire [0:num_ports-1] any_req_ip;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_req_ip_or
@@ -330,7 +331,7 @@ module vcr_sw_alloc_sep_if
 	     assign any_req_in_op_ip = {num_ports{any_req_ip}};
 	     
 	     wire [0:num_ports-1] 	    any_req_op;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_req_op_or
@@ -338,7 +339,7 @@ module vcr_sw_alloc_sep_if
 		.data_out(any_req_op));
 	     
 	     wire [0:num_ports*num_ports-1] any_req_out_op_ip;
-	     replicator
+	     c_replicator
 	       #(.width(num_ports),
 		 .count(num_ports))
 	     any_req_out_op_ip_repl
@@ -353,7 +354,7 @@ module vcr_sw_alloc_sep_if
 	  begin
 	     
 	     wire [0:num_ports-1] any_gnt_ip;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_gnt_ip_or
@@ -364,7 +365,7 @@ module vcr_sw_alloc_sep_if
 	     assign any_gnt_in_op_ip = {num_ports{any_gnt_ip}};
 	     
 	     wire [0:num_ports-1] 	    any_gnt_op;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_gnt_op_or
@@ -372,7 +373,7 @@ module vcr_sw_alloc_sep_if
 		.data_out(any_gnt_op));
 	     
 	     wire [0:num_ports*num_ports-1] any_gnt_out_op_ip;
-	     replicator
+	     c_replicator
 	       #(.width(num_ports),
 		 .count(num_ports))
 	     any_gnt_out_op_ip_repl
@@ -414,7 +415,7 @@ module vcr_sw_alloc_sep_if
 	   assign update_arb_nonspec = |req_out_nonspec_ip;
 	   
 	   wire [0:num_ports-1] gnt_out_nonspec_ip;
-	   arbiter
+	   c_arbiter
 	     #(.num_ports(num_ports),
 	       .arbiter_type(arbiter_type),
 	       .reset_type(reset_type))
@@ -459,7 +460,7 @@ module vcr_sw_alloc_sep_if
 		assign update_arb_spec = |(req_out_spec_ip & spec_mask_ip);
 		
 		wire [0:num_ports-1] gnt_out_unmasked_spec_ip;
-		arbiter
+		c_arbiter
 		  #(.num_ports(num_ports),
 		    .arbiter_type(arbiter_type),
 		    .reset_type(reset_type))

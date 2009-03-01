@@ -33,7 +33,8 @@ module sw_alloc_wrap
   (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -145,7 +146,7 @@ module sw_alloc_wrap
 			  wire [0:num_ports-1] route_masked_op;
 			  wire 		       error;
 			  
-			  port_filter
+			  vcr_port_filter
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
 			      .num_vcs_per_class(num_vcs_per_class),
@@ -191,7 +192,7 @@ module sw_alloc_wrap
       
    endgenerate
    
-   sw_alloc
+   vcr_sw_alloc
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
        .allocator_type(allocator_type),

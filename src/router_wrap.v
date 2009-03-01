@@ -35,7 +35,8 @@ module router_wrap
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);

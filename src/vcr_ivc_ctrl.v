@@ -35,7 +35,8 @@ module vcr_ivc_ctrl
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
    la_route_info_out, fbf_write_addr, fbf_read_addr, error, events);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -226,7 +227,7 @@ module vcr_ivc_ctrl
    localparam routing_class = get_routing_class(vc_id);
    
    // width of routing information required for each VC
-   localparam vc_route_info_width
+   localparam hop_route_info_width
      = (routing_class == (num_routing_classes - 1)) ?
        addr_width :
        (routing_class == (num_routing_classes - 2)) ?
@@ -234,7 +235,7 @@ module vcr_ivc_ctrl
        (2 * router_addr_width);
    
    // total number of bits of header information required for each VC
-   localparam hdff_width = la_route_info_width + vc_route_info_width;
+   localparam hdff_width = la_route_info_width + hop_route_info_width;
    
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
@@ -409,7 +410,7 @@ module vcr_ivc_ctrl
 				      flit_ctr_next : 
 				      (flit_ctr_q - 1'b1) : 
 				      flit_ctr_q;
-		  dff
+		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
 		  flit_ctrq
@@ -438,7 +439,7 @@ module vcr_ivc_ctrl
    
    wire 				    vc_allocated_s, vc_allocated_q;
    assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    vc_allocatedq
@@ -484,7 +485,7 @@ module vcr_ivc_ctrl
    wire [0:num_vcs_per_class-1] 	vc_allocated_ocvc_s;
    assign vc_allocated_ocvc_s
      = vc_allocated_hold_ocvc & ~{num_vcs_per_class{packet_done}};
-   dff
+   c_dff
      #(.width(num_vcs_per_class),
        .reset_type(reset_type))
    vc_allocated_ocvcq
@@ -561,7 +562,7 @@ module vcr_ivc_ctrl
 	     end
 	   
 	   wire head_queue_muxed;
-	   select_1ofn
+	   c_select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
 	   head_queue_muxed_sel
@@ -572,7 +573,7 @@ module vcr_ivc_ctrl
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_queue_muxed;
 	   
 	   wire tail_queue_muxed;
-	   select_1ofn
+	   c_select_1ofn
 	     #(.num_ports(num_flit_buffers),
 	       .width(1))
 	   tail_queue_muxed_sel
@@ -591,7 +592,7 @@ module vcr_ivc_ctrl
 	   
 	   wire head_valid_s, head_valid_q;
 	   assign head_valid_s = (head_valid_q | head_in) & ~flit_valid_out;
-	   dff
+	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
 	   head_validq
@@ -607,7 +608,7 @@ module vcr_ivc_ctrl
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
 	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
-	   dff
+	   c_dff
 	     #(.width(fbf_addr_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   tail_idxq
@@ -619,7 +620,7 @@ module vcr_ivc_ctrl
 	   wire 		     tail_valid_s, tail_valid_q;
 	   assign tail_valid_s
 	     = (tail_valid_q | tail_in) & ~(flit_valid_out & flit_tail_out);
-	   dff
+	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
 	   tail_validq
@@ -650,29 +651,29 @@ module vcr_ivc_ctrl
      = header_info_in[la_route_info_width:
 		      la_route_info_width+route_info_width-1];
    
-   wire [0:vc_route_info_width-1] vc_route_info_in;
+   wire [0:hop_route_info_width-1] hop_route_info_in;
    
-   wire 			  hdff_empty;
-   wire 			  hdff_error;
+   wire 			   hdff_empty;
+   wire 			   hdff_error;
    
-   wire 			  hdff_push;
+   wire 			   hdff_push;
    assign hdff_push = flit_valid_in & flit_head_in;
    
-   wire 			  hdff_pop;
+   wire 			   hdff_pop;
    assign hdff_pop = flit_valid_out & flit_tail_out;
    
-   wire [0:la_route_info_width-1] hdff_la_route_info;
-   wire [0:vc_route_info_width-1] hdff_vc_route_info;
+   wire [0:la_route_info_width-1]  hdff_la_route_info;
+   wire [0:hop_route_info_width-1] hdff_hop_route_info;
    
    generate
       
       if((routing_class == (num_routing_classes - 1)) ||
 	 (routing_class == (num_routing_classes - 2)))
-	assign vc_route_info_in
-	  = route_info_in[route_info_width-vc_route_info_width:
+	assign hop_route_info_in
+	  = route_info_in[route_info_width-hop_route_info_width:
 			  route_info_width-1];
       else
-	assign vc_route_info_in
+	assign hop_route_info_in
 	  = route_info_in[routing_class*router_addr_width:
 			  (routing_class+2)*router_addr_width-1];
       
@@ -682,13 +683,13 @@ module vcr_ivc_ctrl
 	   wire [0:hdff_width-1] 	  hdff_data_in;
 	   assign hdff_data_in[0:la_route_info_width-1] = la_route_info_in;
 	   assign hdff_data_in[la_route_info_width:
-			       la_route_info_width+vc_route_info_width-1]
-		    = vc_route_info_in;
+			       la_route_info_width+hop_route_info_width-1]
+		    = hop_route_info_in;
 	   
 	   wire hdff_full;
 	   wire [0:hdff_width-1] hdff_data_out;
 	   
-	   fifo
+	   c_fifo
 	     #(.depth(num_header_buffers),
 	       .width(hdff_width),
 	       .fifo_type(header_fifo_type),
@@ -710,11 +711,11 @@ module vcr_ivc_ctrl
 	     = hdff_empty ?
 	       la_route_info_in :
 	       hdff_data_out[0:la_route_info_width-1];
-	   assign hdff_vc_route_info
+	   assign hdff_hop_route_info
 	     = hdff_empty ?
-	       vc_route_info_in :
+	       hop_route_info_in :
 	       hdff_data_out[la_route_info_width:
-			     la_route_info_width+vc_route_info_width-1];
+			     la_route_info_width+hop_route_info_width-1];
    
 	end
       else
@@ -724,7 +725,7 @@ module vcr_ivc_ctrl
 					  hdff_la_route_info_q;
 	   assign hdff_la_route_info_s
 	     = hdff_push ? la_route_info_in : hdff_la_route_info_q;
-	   dff
+	   c_dff
 	     #(.width(la_route_info_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
 	   hdff_la_route_infoq
@@ -736,26 +737,26 @@ module vcr_ivc_ctrl
 	   assign hdff_la_route_info
 	     = hdff_empty ? la_route_info_in : hdff_la_route_info_q;
 	   
-	   wire [0:vc_route_info_width-1] hdff_vc_route_info_s,
-					  hdff_vc_route_info_q;
-	   assign hdff_vc_route_info_s
-	     = hdff_push ? vc_route_info_in : hdff_vc_route_info_q;
-	   dff
-	     #(.width(vc_route_info_width),
+	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s,
+					   hdff_hop_route_info_q;
+	   assign hdff_hop_route_info_s
+	     = hdff_push ? hop_route_info_in : hdff_hop_route_info_q;
+	   c_dff
+	     #(.width(hop_route_info_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
-	   hdff_vc_route_infoq
+	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(hdff_vc_route_info_s),
-	      .q(hdff_vc_route_info_q));
+	      .d(hdff_hop_route_info_s),
+	      .q(hdff_hop_route_info_q));
 	   
-	   assign hdff_vc_route_info
-	     = hdff_empty ? vc_route_info_in : hdff_vc_route_info_q;
+	   assign hdff_hop_route_info
+	     = hdff_empty ? hop_route_info_in : hdff_hop_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
 	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) &
 				 ~(hdff_push & ~hdff_pop);
-	   dff
+	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
 	       .reset_type(reset_type))
@@ -795,10 +796,9 @@ module vcr_ivc_ctrl
    
    wire pf_error_unmasked;
    
-   port_filter
+   c_port_filter
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
-       .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),
@@ -816,10 +816,9 @@ module vcr_ivc_ctrl
    wire pf_error;
    assign pf_error = pf_error_unmasked & header_valid;
    
-   la_routing_logic
+   c_la_routing_logic
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
-       .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
@@ -833,7 +832,7 @@ module vcr_ivc_ctrl
      (.router_address(router_address),
       .route_op(route_op),
       .inc_rc(inc_rc),
-      .vc_route_info(hdff_vc_route_info),
+      .hop_route_info(hdff_hop_route_info),
       .la_route_info(la_route_info_out));
    
    
@@ -842,7 +841,7 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-   select_1ofn
+   c_select_1ofn
      #(.num_ports(num_ports),
        .width(num_vcs*int_flow_ctrl_width))
    int_flow_ctrl_ovc_sel
@@ -891,7 +890,7 @@ module vcr_ivc_ctrl
 	     wire 				 flit_sent_prev_s,
 						 flit_sent_prev_q;
 	     assign flit_sent_prev_s = flit_valid_out & ~flit_tail_out;
-	     dff
+	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type))
 	     flit_sent_prevq
@@ -919,7 +918,7 @@ module vcr_ivc_ctrl
 		  assign free_by_count = {|free, free[0], &free};
 		  
 		  wire       next_free;
-		  select_1ofn
+		  c_select_1ofn
 		    #(.num_ports(3),
 		      .width(1))
 		  next_free_sel
@@ -934,7 +933,7 @@ module vcr_ivc_ctrl
 	     wire 	     free_allocated_s, free_allocated_q;
 	     assign free_allocated_s
 	       = |(next_free_ocvc & vc_allocated_hold_ocvc)/* & ~packet_done*/;
-	     dff
+	     c_dff
 	       #(.width(1),
 		 .reset_value(1'b1),
 		 .reset_type(reset_type))
@@ -991,7 +990,7 @@ module vcr_ivc_ctrl
 	       = (vc_gnt ?
 		  ~sw_gnt_spec :
 		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | cred;
-	     dff
+	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type))
 	     has_credq
@@ -1015,7 +1014,7 @@ module vcr_ivc_ctrl
 		 vc_allocated_q ?
 		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
 		 cred_hold_q;
-	     dff
+	     c_dff
 	       #(.width(cred_hold_width),
 		 .reset_type(reset_type))
 	     cred_holdq
@@ -1130,7 +1129,7 @@ module vcr_ivc_ctrl
 			   = {((num_traffic_classes-traffic_class-1)*
 			       num_routing_classes*num_vcs_per_class){1'b0}};
 		
-		encoder
+		c_encoder
 		  #(.num_ports(num_vcs))
 		flit_vc_out_enc
 		  (.data_in(flit_ovc),
@@ -1157,7 +1156,7 @@ module vcr_ivc_ctrl
    
    wire 		       fbc_error;
    wire 		       fbc_full;
-   fifo_ctrl
+   c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .offset(fbf_min_addr),
        .depth(num_flit_buffers),
@@ -1188,7 +1187,7 @@ module vcr_ivc_ctrl
 		       pf_error};
    
    wire [0:2] 		       errors_out;
-   checker
+   c_checker
      #(.num_errors(3),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),
@@ -1239,7 +1238,7 @@ module vcr_ivc_ctrl
 			      ev_spec_failed,
 			      ev_flit_sent,
 			      ev_flit_sent_spec};
-	   dff
+	   c_dff
 	     #(.width(6),
 	       .reset_type(reset_type))
 	   eventsq

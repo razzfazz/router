@@ -31,7 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module testbench
   ();
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -80,13 +81,13 @@ module testbench
    parameter measure_time = 100000;
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_MESH;
+   parameter network_topology = `NETWORK_TOPOLOGY_MESH;//FBFLY;
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 1;
+   parameter num_header_buffers = 4;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 1;
@@ -113,7 +114,7 @@ module testbench
    parameter num_dimensions = 2;
    
    // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 1;
+   parameter num_nodes_per_router = 4;
 
    // total number of routers
    localparam num_routers
@@ -161,8 +162,8 @@ module testbench
      = num_routing_classes * router_addr_width + node_addr_width;
    
    // select packet format
-//   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+//   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
    
    // maximum payload length (in flits)
    parameter max_payload_length = 4;
@@ -214,7 +215,7 @@ module testbench
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
-   parameter track_vcs_at_output = 0;
+   parameter track_vcs_at_output = 1;
    
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
@@ -242,19 +243,20 @@ module testbench
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_OF;
    
    // select which arbiter type to use for VC allocator
    parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter sw_allocator_type
+     = `SW_ALLOCATOR_TYPE_WF_BASE + `WF_ALLOCATOR_TYPE_DPA;
    
    // select which arbiter type to use for switch allocator
    parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
-   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter sw_spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
    
    // enable speculative switch allocation
    localparam sw_spec_enable = (sw_spec_level == `SW_SPEC_LEVEL_NONE) ?
@@ -262,10 +264,10 @@ module testbench
 			       1;
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_DIST_MUX;
+   parameter xbc_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    // select implementation variant for data crossbar
-   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter xbd_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -476,7 +478,7 @@ module testbench
 						flit_ctr_next : 
 						(flit_ctr_q - 1'b1) : 
 						flit_ctr_q;
-			    dff
+			    c_dff
 			      #(.width(flit_ctr_width),
 				.reset_type(reset_type))
 			    flit_ctrq
@@ -508,9 +510,9 @@ module testbench
 			  wire [0:((irc == 
 				    (num_routing_classes - 1)) ?
 				   addr_width :
-				   router_addr_width)-1] vc_route_info;
+				   router_addr_width)-1] hop_route_info;
 			  
-			  assign vc_route_info[0:router_addr_width-1]
+			  assign hop_route_info[0:router_addr_width-1]
 				   = route_info[irc*
 						router_addr_width:
 						(irc+1)*
@@ -518,7 +520,7 @@ module testbench
 			  
 			  if((irc == (num_routing_classes - 1)) &&
 			     (num_nodes_per_router > 1))
-			    assign vc_route_info[router_addr_width:addr_width-1]
+			    assign hop_route_info[router_addr_width:addr_width-1]
 				     = route_info[num_routing_classes*
 						  router_addr_width:
 						  num_routing_classes*
@@ -529,10 +531,9 @@ module testbench
 			  wire 				 inc_rc;
 			  wire 				 rtl_error_unmasked;
 			  
-			  routing_logic
+			  c_routing_logic
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
-			      .num_vcs_per_class(num_vcs_per_class),
 			      .num_ports(num_ports),
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
@@ -545,7 +546,7 @@ module testbench
 			      .routing_class(irc))
 			  rtl
 			    (.router_address(router_address),
-			     .vc_route_info(vc_route_info),
+			     .hop_route_info(hop_route_info),
 			     .route_op(route_op),
 			     .inc_rc(inc_rc),
 			     .error(rtl_error_unmasked));
@@ -622,27 +623,26 @@ module testbench
 				   (irc ==
 				    (num_routing_classes - 2)) ?
 				   (router_addr_width + addr_width) :
-				   (2*router_addr_width))-1] vc_route_info_la;
+				   (2*router_addr_width))-1] hop_route_info_la;
 			  
 			  if(irc == (num_routing_classes - 1))
-			    assign vc_route_info_la
+			    assign hop_route_info_la
 			      = route_info[route_info_width-addr_width:
 					   route_info_width-1];
 			  else if(irc == (num_routing_classes - 2))
-			    assign vc_route_info_la
+			    assign hop_route_info_la
 			      = route_info[route_info_width-
 					   (router_addr_width+addr_width):
 					   route_info_width-1];
 			  else
-			    assign vc_route_info_la
+			    assign hop_route_info_la
 			      = route_info[irc*router_addr_width:
 					   (irc+2)*router_addr_width-1];
 			  
 			  wire [0:la_route_info_width-1]     la_route_info;
-			  la_routing_logic
+			  c_la_routing_logic
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
-			      .num_vcs_per_class(num_vcs_per_class),
 			      .num_ports(num_ports),
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
@@ -656,7 +656,7 @@ module testbench
 			    (.router_address(router_address),
 			     .route_op(la_route_op),
 			     .inc_rc(la_inc_rc),
-			     .vc_route_info(vc_route_info_la),
+			     .hop_route_info(hop_route_info_la),
 			     .la_route_info(la_route_info));
 			  
 			  assign la_route_info_ivc[(itc*num_routing_classes+
@@ -687,7 +687,7 @@ module testbench
 		  assign route_op = route_ivc_op;
 		
 		wire [0:port_idx_width-1]    route_port;
-		encoder
+		c_encoder
 		  #(.num_ports(num_ports))
 		route_port_enc
 		  (.data_in(route_op),
@@ -701,7 +701,7 @@ module testbench
 				      route_port :
 				      dest_port_q) :
 				     dest_port_q;
-		dff
+		c_dff
 		  #(.width(port_idx_width))
 		dest_portq
 		  (.clk(clk),
@@ -735,7 +735,7 @@ module testbench
 				     route_ovc :
 				     dest_ovc_q) :
 				    dest_ovc_q;
-		dff
+		c_dff
 		  #(.width(num_vcs))
 		dest_ovcq
 		  (.clk(clk),
@@ -878,7 +878,7 @@ module testbench
 		     wire 			  fifo_full;
 		     wire 			  fifo_error;
 		     
-		     fifo
+		     c_fifo
 		       #(.depth(num_flit_buffers),
 			 .width(flit_ctrl_width+flit_data_width+port_idx_width+
 				num_vcs))
@@ -896,7 +896,7 @@ module testbench
 		     assign fifo_error_ip_ivc[ip*num_vcs+ivc] = fifo_error;
 		     
 		     wire [0:num_ports-1] 	  port_mask;
-		     decoder
+		     c_decoder
 		       #(.num_ports(num_ports))
 		     port_mask_dec
 		       (.data_in(ref_port),
@@ -917,7 +917,7 @@ module testbench
    
    wire 					  rtr_error;
    
-   router
+   vcr_top
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
        .num_traffic_classes(num_traffic_classes),
@@ -950,7 +950,7 @@ module testbench
        .xbc_crossbar_type(xbc_crossbar_type),
        .xbd_crossbar_type(xbd_crossbar_type),
        .reset_type(reset_type))
-   rtr
+   vcr
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
@@ -985,7 +985,7 @@ module testbench
 		
 		wire [0:channel_latency*flit_ctrl_width-1] flit_ctrl_dly_s,
 							   flit_ctrl_dly_q;
-		dff
+		c_dff
 		  #(.width(channel_latency*flit_ctrl_width),
 		    .reset_type(reset_type))
 		flit_ctrl_dlyq
@@ -1014,7 +1014,7 @@ module testbench
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl_s, flow_ctrl_q;
 	   assign flow_ctrl_s = flit_ctrl_dly[0:1+vc_idx_width-1];
-	   dff
+	   c_dff
 	     #(.width(flow_ctrl_width),
 	       .reset_type(reset_type))
 	   flow_ctrlq
@@ -1033,7 +1033,7 @@ module testbench
 		wire [0:channel_latency*flow_ctrl_width-1] flow_ctrl_dly_s,
 							   flow_ctrl_dly_q;
 		
-		dff
+		c_dff
 		  #(.width(channel_latency*flow_ctrl_width),
 		    .reset_type(reset_type))
 		flow_ctrl_dlyq
@@ -1081,7 +1081,7 @@ module testbench
    endgenerate
    
    wire [0:num_ports-1] 	      match_op;
-   or_nto1
+   c_or_nto1
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports))
    match_op_or
@@ -1129,7 +1129,7 @@ module testbench
    
    wire [0:31] in_flits_s, in_flits_q;
    assign in_flits_s = in_flits_q + pop_count(flit_valid_in_ip);
-   dff
+   c_dff
      #(.width(32),
        .reset_type(reset_type))
    in_flitsq
@@ -1143,7 +1143,7 @@ module testbench
    
    wire [0:31] in_creds_s, in_creds_q;
    assign in_creds_s = in_creds_q + pop_count(cred_valid_out_ip);
-   dff
+   c_dff
      #(.width(32),
        .reset_type(reset_type))
    in_credsq
@@ -1157,7 +1157,7 @@ module testbench
    
    wire [0:31] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + pop_count(flit_valid_out_op);
-   dff
+   c_dff
      #(.width(32),
        .reset_type(reset_type))
    out_flitsq
@@ -1171,7 +1171,7 @@ module testbench
    
    wire [0:31] out_creds_s, out_creds_q;
    assign out_creds_s = out_creds_q + pop_count(cred_valid_in_op);
-   dff
+   c_dff
      #(.width(32),
        .reset_type(reset_type))
    out_credsq
@@ -1190,7 +1190,7 @@ module testbench
      = count_en ?
        count_in_flits_q + pop_count(flit_valid_in_ip) :
        count_in_flits_q;
-   dff
+   c_dff
      #(.width(32),
        .reset_type(reset_type))
    count_in_flitsq
@@ -1207,7 +1207,7 @@ module testbench
      = count_en ?
        count_out_flits_q + pop_count(flit_valid_out_op) :
        count_out_flits_q;
-   dff
+   c_dff
      #(.width(32),
        .reset_type(reset_type))
    count_out_flitsq

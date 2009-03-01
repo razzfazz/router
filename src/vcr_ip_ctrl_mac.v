@@ -35,7 +35,8 @@ module vcr_ip_ctrl_mac
    vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, sw_gnt_nonspec_ivc, 
    sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -288,7 +289,7 @@ module vcr_ip_ctrl_mac
    
    wire 			  flit_valid_in_s, flit_valid_in_q;
    assign flit_valid_in_s = flit_ctrl_in_s[0];
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    flit_valid_inq
@@ -304,7 +305,7 @@ module vcr_ip_ctrl_mac
       if(flit_ctrl_width > 1)
 	begin
 	   
-	   dff
+	   c_dff
 	     #(.width(flit_ctrl_width-1),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flit_ctrl_inq
@@ -319,7 +320,7 @@ module vcr_ip_ctrl_mac
    
    wire [0:flit_data_width-1] flit_data_in_s, flit_data_in_q;
    assign flit_data_in_s = flit_data_in;
-   dff
+   c_dff
      #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_dataq
@@ -491,7 +492,7 @@ module vcr_ip_ctrl_mac
 		assign fbf_write_addr = {fbf_write_base, fbf_write_offset};
 		
 		wire [0:flit_buffer_idx_width-1] fbf_read_offset;
-		select_1ofn
+		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_buffer_idx_width))
 		fbf_read_offset_sel
@@ -500,7 +501,7 @@ module vcr_ip_ctrl_mac
 		   .data_out(fbf_read_offset));
 		
 		wire [0:vc_idx_width-1] 	 fbf_read_base;
-		encoder
+		c_encoder
 		  #(.num_ports(num_vcs))
 		fbf_read_base_enc
 		  (.data_in(flit_valid_out_ivc),
@@ -518,7 +519,7 @@ module vcr_ip_ctrl_mac
 		  = fbf_write_addr_ivc[flit_vc_in_q*fbf_addr_width +:
 				       fbf_addr_width];
 		
-		select_1ofn
+		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(fbf_addr_width))
 		fbf_read_addr_sel
@@ -554,7 +555,7 @@ module vcr_ip_ctrl_mac
    assign fbf_write_data = flit_data_in_q;
    
    wire [0:flit_data_width-1] 	     fbf_read_data;
-   regfile
+   c_regfile
      #(.width(flit_data_width),
        .depth(fbf_depth),
        .regfile_type(fbf_regfile_type))
@@ -574,7 +575,7 @@ module vcr_ip_ctrl_mac
    
    wire 			     flit_valid_out_s, flit_valid_out_q;
    assign flit_valid_out_s = |flit_valid_out_ivc;
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    flit_valid_outq
@@ -591,7 +592,7 @@ module vcr_ip_ctrl_mac
       if(int_flit_ctrl_width > 1)
 	begin
 	   
-	   select_1ofn
+	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(int_flit_ctrl_width))
 	   int_flit_ctrl_out_s_sel
@@ -599,7 +600,7 @@ module vcr_ip_ctrl_mac
 	      .data_in(int_flit_ctrl_out_ivc),
 	      .data_out(int_flit_ctrl_out_s));
 	   
-	   dff
+	   c_dff
 	     #(.width(int_flit_ctrl_width-1),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   int_flit_ctrl_outq
@@ -618,14 +619,14 @@ module vcr_ip_ctrl_mac
    assign int_flit_ctrl_out = int_flit_ctrl_out_q;
    
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
-   select_1ofn
+   c_select_1ofn
      #(.num_ports(num_vcs),
        .width(la_route_info_width))
    la_route_info_sel
      (.select(flit_valid_out_ivc),
       .data_in(la_route_info_ivc),
       .data_out(la_route_info_s));
-   dff
+   c_dff
      #(.width(la_route_info_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    la_route_infoq
@@ -648,7 +649,7 @@ module vcr_ip_ctrl_mac
    
    wire 			     cred_valid_s, cred_valid_q;
    assign cred_valid_s = |flit_valid_out_ivc;
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    cred_validq
@@ -665,12 +666,12 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:vc_idx_width-1] cred_vc_s, cred_vc_q;
-	   encoder
+	   c_encoder
 	     #(.num_ports(num_vcs))
 	   cred_vc_out_enc
 	     (.data_in(flit_valid_out_ivc),
 	      .data_out(cred_vc_s));
-	   dff
+	   c_dff
 	     #(.width(vc_idx_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   cred_vcq
@@ -691,7 +692,7 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:6*num_vcs-1] 	     events;
-   interleaver
+   c_interleaver
      #(.width(num_vcs*6),
        .num_blocks(num_vcs))
    events_intl
@@ -707,7 +708,7 @@ module vcr_ip_ctrl_mac
 	     begin:ctrs
 		
 		wire [0:event_width-1] event_sum;
-		add_nto1
+		c_add_nto1
 		  #(.num_ports(num_vcs),
 		    .width(1))
 		event_sum_add
@@ -716,7 +717,7 @@ module vcr_ip_ctrl_mac
 		
 		wire [0:perf_ctr_width-1] ctr_s, ctr_q;
 		assign ctr_s = ctr_q + event_sum;
-		dff
+		c_dff
 		  #(.width(perf_ctr_width),
 		    .reset_type(reset_type))
 		ctrq

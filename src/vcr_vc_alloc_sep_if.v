@@ -33,7 +33,8 @@ module vcr_vc_alloc_sep_if
   (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -166,7 +167,7 @@ module vcr_vc_alloc_sep_if
 					 num_vcs_per_class+icvc];
 			  
 			  wire [0:num_vcs-1] 	     elig_ovc;
-			  select_1ofn
+			  c_select_1ofn
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  elig_ovc_sel
@@ -184,7 +185,7 @@ module vcr_vc_alloc_sep_if
 						 num_ports*num_vcs-1];
 			  
 			  wire [0:num_vcs-1] 	       gnt_out_ovc;
-			  or_nto1
+			  c_or_nto1
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  gnt_out_ovc_or
@@ -259,7 +260,7 @@ module vcr_vc_alloc_sep_if
 						   assign update_arb
 						     = |gnt_out_ocvc;
 					      
-						   arbiter
+						   c_arbiter
 						     #(.num_ports(
 							  num_vcs_per_class),
 						       .arbiter_type(
@@ -340,7 +341,7 @@ module vcr_vc_alloc_sep_if
 			  //----------------------------------------------------
 			  
 			  wire [0:num_vcs-1] 		  gnt_ovc;
-			  or_nto1
+			  c_or_nto1
 			    #(.width(num_vcs),
 			      .num_ports(num_ports))
 			  gnt_ovc_or
@@ -399,7 +400,7 @@ module vcr_vc_alloc_sep_if
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_out_op_ovc_ip_ivc;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_vcs*num_ports*num_vcs),
        .num_blocks(num_ports*num_vcs))
    req_out_op_ovc_ip_ivc_intl
@@ -407,7 +408,7 @@ module vcr_vc_alloc_sep_if
       .data_out(req_out_op_ovc_ip_ivc));
    
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_out_op_ovc_ip_ivc;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_vcs*num_ports*num_vcs),
        .num_blocks(num_ports*num_vcs))
    gnt_out_op_ovc_ip_ivc_intl
@@ -465,7 +466,7 @@ module vcr_vc_alloc_sep_if
 						 num_ports*num_vcs-1];
 			  
 			  wire [0:num_vcs*num_ports-1] req_out_ivc_ip;
-			  interleaver
+			  c_interleaver
 			    #(.width(num_ports*num_vcs),
 			      .num_blocks(num_ports))
 			  req_out_ivc_op_intl
@@ -481,7 +482,7 @@ module vcr_vc_alloc_sep_if
 					     num_vcs_per_class*num_ports-1];
 			  
 			  wire [0:num_ports-1] 	       req_out_ip;
-			  or_nto1
+			  c_or_nto1
 			    #(.width(num_ports),
 			      .num_ports(num_routing_classes*num_vcs_per_class))
 			  req_out_ip_or
@@ -546,7 +547,7 @@ module vcr_vc_alloc_sep_if
 						   assign update_arb
 						     = gnt_out_ip[ip];
 						   
-						   arbiter
+						   c_arbiter
 						     #(.num_ports(
 							     num_vcs_per_class),
 						       .arbiter_type(
@@ -602,7 +603,7 @@ module vcr_vc_alloc_sep_if
 					      assign update_arb
 						= gnt_out_ip[ip];
 					      
-					      arbiter
+					      c_arbiter
 						#(.num_ports(
 							  2*num_vcs_per_class),
 						  .arbiter_type(arbiter_type),
@@ -669,7 +670,7 @@ module vcr_vc_alloc_sep_if
 			    end
 			  
 			  wire [0:num_vcs-1] 	   gnt_ivc;
-			  select_1ofn
+			  c_select_1ofn
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  gnt_ivc_sel
@@ -683,7 +684,7 @@ module vcr_vc_alloc_sep_if
 			  wire 			   update_arb;
 			  assign update_arb = req_out;
 			  
-			  arbiter
+			  c_arbiter
 			    #(.num_ports(num_ports),
 			      .arbiter_type(arbiter_type),
 			      .reset_type(reset_type))

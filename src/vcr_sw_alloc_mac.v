@@ -33,7 +33,8 @@ module vcr_sw_alloc_mac
   (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of VCs
    parameter num_vcs = 4;

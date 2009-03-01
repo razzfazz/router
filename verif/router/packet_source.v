@@ -31,7 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module packet_source
   (clk, reset, flit_ctrl, flit_data, flow_ctrl, run, out_flits, error);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -220,7 +221,7 @@ module packet_source
 					 waiting_packet_count_q;
 	   assign waiting_packet_count_s
 	     = waiting_packet_count_q - packet_ready;
-	   dff
+	   c_dff
 	     #(.width(packet_count_width),
 	       .reset_value(max_packet_count))
 	   waiting_packet_countq
@@ -247,7 +248,7 @@ module packet_source
        ready_packet_count_q - (packet_sent & ~ready_packet_count_zero) + 
        packet_ready :
        {packet_count_width{1'b0}};
-   dff
+   c_dff
      #(.width(packet_count_width))
    ready_packet_countq
      (.clk(clk),
@@ -328,7 +329,7 @@ module packet_source
 		assign tail_queue_s
 		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
 		    ({num_flit_buffers{debit & flit_tail}} & push_mask);
-		dff
+		c_dff
 		  #(.width(num_flit_buffers))
 		tail_queueq
 		  (.clk(clk),
@@ -337,7 +338,7 @@ module packet_source
 		   .q(tail_queue_q));
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_q, push_ptr_next;
-		incr
+		c_incr
 		  #(.width(flit_buffer_idx_width),
 		    .min_value(0),
 		    .max_value(num_flit_buffers-1))
@@ -347,7 +348,7 @@ module packet_source
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
 		assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
-		dff
+		c_dff
 		  #(.width(flit_buffer_idx_width))
 		push_ptrq
 		  (.clk(clk),
@@ -355,14 +356,14 @@ module packet_source
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
 		
-		decoder
+		c_decoder
 		  #(.num_ports(num_flit_buffers))
 		push_mask_dec
 		  (.data_in(push_ptr_q),
 		   .data_out(push_mask));
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_q, pop_ptr_next;
-		incr
+		c_incr
 		  #(.width(flit_buffer_idx_width),
 		    .min_value(0),
 		    .max_value(num_flit_buffers-1))
@@ -372,7 +373,7 @@ module packet_source
 
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
 		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
-		dff
+		c_dff
 		  #(.width(flit_buffer_idx_width))
 		pop_ptrq
 		  (.clk(clk),
@@ -380,7 +381,7 @@ module packet_source
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
-		decoder
+		c_decoder
 		  #(.num_ports(num_flit_buffers))
 		pop_mask_dec
 		  (.data_in(pop_ptr_q),
@@ -406,7 +407,7 @@ module packet_source
 	   wire 			    head_free;
 	   wire 			    head_free_early;
 	   wire 			    error_hct;
-	   credit_tracker
+	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
 	       .checker_enable(1),
 	       .checker_capture_mode(0))
@@ -424,7 +425,7 @@ module packet_source
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
 	   assign cred_count_s = cred_count_q + credit - debit;
-	   dff
+	   c_dff
 	     #(.width(cred_count_width),
 	       .reset_value(num_flit_buffers))
 	   cred_countq
@@ -472,7 +473,7 @@ module packet_source
    assign flit_valid_s = flit_valid_q ?
 			 ~(flit_sent & flit_tail) :
 			 ~ready_packet_count_zero;
-   dff
+   c_dff
      #(.width(1))
    flit_validq
      (.clk(clk),
@@ -506,15 +507,15 @@ module packet_source
 		
 		wire [0:((irc == (num_routing_classes - 1)) ?
 			 addr_width :
-			 router_addr_width)-1] vc_route_info;
+			 router_addr_width)-1] hop_route_info;
 		
-		assign vc_route_info[0:router_addr_width-1]
+		assign hop_route_info[0:router_addr_width-1]
 			 = route_info[irc*router_addr_width:
 				      (irc+1)*router_addr_width-1];
 		
 		if((irc == (num_routing_classes - 1)) &&
 		   (num_nodes_per_router > 1))
-		  assign vc_route_info[router_addr_width:addr_width-1]
+		  assign hop_route_info[router_addr_width:addr_width-1]
 			   = route_info[num_routing_classes*
 					router_addr_width:
 					num_routing_classes*
@@ -523,10 +524,9 @@ module packet_source
 		wire 			       rtl_error;
 		wire [0:num_ports-1] 	       route_op;
 		wire 			       inc_rc;
-		routing_logic
+		c_routing_logic
 		  #(.num_traffic_classes(num_traffic_classes),
 		    .num_routing_classes(num_routing_classes),
-		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
@@ -539,7 +539,7 @@ module packet_source
 		    .routing_class(irc))
 		rtl
 		  (.router_address(router_address),
-		   .vc_route_info(vc_route_info),
+		   .hop_route_info(hop_route_info),
 		   .route_op(route_op),
 		   .inc_rc(inc_rc),
 		   .error(rtl_error));
@@ -672,7 +672,7 @@ module packet_source
 	   
 	   wire head_s, head_q;
 	   assign head_s = (head_q & ~flit_sent) | packet_sent;
-	   dff
+	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1))
 	   headq
@@ -686,10 +686,14 @@ module packet_source
 	   
 	   if((packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) &&
 	      (payload_length_width > 0))
-	     assign header_info[la_route_info_width+route_info_width:
-				la_route_info_width+route_info_width+
-				payload_length_width-1]
-		      = (flit_count_q - min_payload_length);
+	     begin
+		wire [0:payload_length_width-1] payload_length;
+		assign payload_length = (flit_count_q - min_payload_length);
+		assign header_info[la_route_info_width+route_info_width:
+				   la_route_info_width+route_info_width+
+				   payload_length_width-1]
+			 = payload_length;
+	     end
 	   
 	end
       else
@@ -729,7 +733,7 @@ module packet_source
    
    wire [0:packet_count_width-1] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + flit_sent;
-   dff
+   c_dff
      #(.width(packet_count_width))
    out_flitsq
      (.clk(clk),

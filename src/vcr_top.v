@@ -34,7 +34,8 @@ module vcr_top
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -416,7 +417,7 @@ module vcr_top
    
    wire [0:num_ports*num_ports-1] 	  xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
    assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
-   dff
+   c_dff
      #(.width(num_ports*num_ports),
        .reset_type(reset_type))
    xbr_ctrl_ip_opq
@@ -426,7 +427,7 @@ module vcr_top
       .q(xbr_ctrl_ip_op_q));
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
-   crossbar
+   c_crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(int_flit_ctrl_width),
@@ -437,7 +438,7 @@ module vcr_top
       .data_out_op(xbc_data_out_op));
    
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
-   crossbar
+   c_crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(flit_data_width),
@@ -453,7 +454,7 @@ module vcr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    xbr_ctrl_op_ip_intl
@@ -562,7 +563,7 @@ module vcr_top
    assign errors_in = {ipc_error_ip, opc_error_op};
    
    wire [0:2*num_ports-1] 			  errors_out;
-   checker
+   c_checker
      #(.num_errors(2*num_ports),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),

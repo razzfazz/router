@@ -33,7 +33,8 @@ module vcr_sw_alloc_wf
   (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of VCs
    parameter num_vcs = 4;
@@ -104,7 +105,7 @@ module vcr_sw_alloc_wf
 	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_ports*num_vcs-1] route_op_ivc;
-	   interleaver
+	   c_interleaver
 	     #(.width(num_vcs*num_ports),
 	       .num_blocks(num_vcs))
 	   route_op_ivc_intl
@@ -120,7 +121,7 @@ module vcr_sw_alloc_wf
 	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
 	   wire [0:num_ports-1] 	req_wf_nonspec_op;
-	   select_1ofn
+	   c_select_1ofn
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
 	   req_wf_nonspec_op_sel
@@ -157,7 +158,7 @@ module vcr_sw_alloc_wf
 		assign req_in_nonspec_ivc = route_ivc & req_nonspec_ivc;
 		
 		wire [0:num_vcs-1] 	gnt_in_nonspec_ivc;
-		arbiter
+		c_arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
 		    .arbiter_type(arbiter_type))
@@ -174,7 +175,7 @@ module vcr_sw_alloc_wf
 	     end
 	   
 	   wire [0:num_vcs*num_ports-1] gnt_in_nonspec_ivc_op;
-	   interleaver
+	   c_interleaver
 	     #(.width(num_vcs*num_ports),
 	       .num_blocks(num_ports))
 	   gnt_in_nonspec_ivc_op_intl
@@ -191,7 +192,7 @@ module vcr_sw_alloc_wf
 	     = {num_vcs{gnt_wf_nonspec_op}} & gnt_in_nonspec_ivc_op;
 	   
 	   wire [0:num_ports*num_vcs-1] gnt_nonspec_op_ivc;
-	   interleaver
+	   c_interleaver
 	     #(.width(num_vcs*num_ports),
 	       .num_blocks(num_vcs))
 	   gnt_nonspec_op_ivc_intl
@@ -199,7 +200,7 @@ module vcr_sw_alloc_wf
 	      .data_out(gnt_nonspec_op_ivc));
 	   
 	   wire [0:num_vcs-1] 		gnt_nonspec_ivc;
-	   or_nto1
+	   c_or_nto1
 	     #(.width(num_vcs),
 	       .num_ports(num_ports))
 	   gnt_nonspec_ivc_or
@@ -225,7 +226,7 @@ module vcr_sw_alloc_wf
 		  = req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 		
 		wire [0:num_ports-1] 	     req_wf_spec_op;
-		select_1ofn
+		c_select_1ofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
 		req_wf_spec_op_sel
@@ -261,7 +262,7 @@ module vcr_sw_alloc_wf
 		     assign req_in_spec_ivc = route_ivc & req_spec_ivc;
 		     
 		     wire [0:num_vcs-1] gnt_in_spec_ivc;
-		     arbiter
+		     c_arbiter
 		       #(.num_ports(num_vcs),
 			 .reset_type(reset_type),
 			 .arbiter_type(arbiter_type))
@@ -278,7 +279,7 @@ module vcr_sw_alloc_wf
 		  end
 		
 		wire [0:num_vcs*num_ports-1] gnt_in_spec_ivc_op;
-		interleaver
+		c_interleaver
 		  #(.width(num_vcs*num_ports),
 		    .num_blocks(num_ports))
 		gnt_in_spec_ivc_op_intl
@@ -295,14 +296,14 @@ module vcr_sw_alloc_wf
 		  = {num_vcs{gnt_wf_spec_op}} & gnt_in_spec_ivc_op;
 		
 		wire [0:num_ports*num_vcs-1] gnt_spec_op_ivc;
-		interleaver
+		c_interleaver
 		  #(.width(num_vcs*num_ports),
 		    .num_blocks(num_vcs))
 		gnt_spec_op_ivc_intl
 		  (.data_in(gnt_spec_ivc_op),
 		   .data_out(gnt_spec_op_ivc));
 		
-		or_nto1
+		c_or_nto1
 		  #(.width(num_vcs),
 		    .num_ports(num_ports))
 		gnt_spec_ivc_or
@@ -363,7 +364,7 @@ module vcr_sw_alloc_wf
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
-	     interleaver
+	     c_interleaver
 	       #(.width(num_ports*num_ports),
 		 .num_blocks(num_ports))
 	     req_wf_nonspec_op_ip_intl
@@ -371,7 +372,7 @@ module vcr_sw_alloc_wf
 		.data_out(req_wf_nonspec_op_ip));
 	     
 	     wire [0:num_ports-1] 	    any_req_ip;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_req_ip_or
@@ -379,7 +380,7 @@ module vcr_sw_alloc_wf
 		.data_out(any_req_ip));
 	     
 	     wire [0:num_ports*num_ports-1] any_req_in_ip_op;
-	     replicator
+	     c_replicator
 	       #(.width(num_ports),
 		 .count(num_ports))
 	     any_req_in_ip_op_repl
@@ -387,7 +388,7 @@ module vcr_sw_alloc_wf
 		.data_out(any_req_in_ip_op));
 	     
 	     wire [0:num_ports-1] 	    any_req_op;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_req_op_or
@@ -405,7 +406,7 @@ module vcr_sw_alloc_wf
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] gnt_wf_nonspec_op_ip;
-	     interleaver
+	     c_interleaver
 	       #(.width(num_ports*num_ports),
 		 .num_blocks(num_ports))
 	     gnt_wf_nonspec_op_ip_intl
@@ -413,7 +414,7 @@ module vcr_sw_alloc_wf
 		.data_out(gnt_wf_nonspec_op_ip));
 	     
 	     wire [0:num_ports-1] 	    any_gnt_ip;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_gnt_ip_or
@@ -421,7 +422,7 @@ module vcr_sw_alloc_wf
 		.data_out(any_gnt_ip));
 	     
 	     wire [0:num_ports*num_ports-1] any_gnt_in_ip_op;
-	     replicator
+	     c_replicator
 	       #(.width(num_ports),
 		 .count(num_ports))
 	     any_gnt_in_ip_op_repl
@@ -429,7 +430,7 @@ module vcr_sw_alloc_wf
 		.data_out(any_gnt_in_ip_op));
 	     
 	     wire [0:num_ports-1] 	    any_gnt_op;
-	     or_nto1
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
 	     any_gnt_op_or
@@ -457,7 +458,7 @@ module vcr_sw_alloc_wf
    wire 				    update_alloc_nonspec;
    assign update_alloc_nonspec = |req_nonspec_ip_ivc;
    
-   wf_alloc
+   c_wf_alloc
      #(.num_ports(num_ports),
        .wf_allocator_type(wf_allocator_type),
        .reset_type(reset_type))
@@ -479,7 +480,7 @@ module vcr_sw_alloc_wf
 	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
 	   wire [0:num_ports*num_ports-1] gnt_wf_unmasked_spec_ip_op;
-	   wf_alloc
+	   c_wf_alloc
 	     #(.num_ports(num_ports),
 	       .wf_allocator_type(wf_allocator_type),
 	       .reset_type(reset_type))

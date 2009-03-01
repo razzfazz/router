@@ -33,7 +33,8 @@ module vcr_vc_alloc_wf
   (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -265,7 +266,7 @@ module vcr_vc_alloc_wf
 						num_ports*num_vcs-1];
 			  
 			  wire [0:num_vcs-1] 	       gnt_ovc;
-			  or_nto1
+			  c_or_nto1
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  gnt_ovc_or
@@ -380,7 +381,7 @@ module vcr_vc_alloc_wf
 			    end
 
 			  wire [0:num_vcs-1] 	  gnt_wf_ivc;
-			  or_nto1
+			  c_or_nto1
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  gnt_wf_ivc_or
@@ -427,7 +428,7 @@ module vcr_vc_alloc_wf
    // with num_ports*num_vcs ports, we should split it up into 
    // num_traffic_classes*num_ports*num_routing_classes wavefront blocks with 
    // num_ports*2*num_vcs_per_class ports each.
-   wf_alloc
+   c_wf_alloc
      #(.num_ports(num_ports*num_vcs),
        .wf_allocator_type(wf_allocator_type),
        .reset_type(reset_type))
@@ -438,14 +439,14 @@ module vcr_vc_alloc_wf
       .req(req_wf_ip_ivc_op_ovc),
       .gnt(gnt_wf_ip_ivc_op_ovc));
    
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_vcs*num_ports*num_vcs),
        .num_blocks(num_ports*num_vcs))
    gnt_wf_op_ovc_ip_ivc_intl
      (.data_in(gnt_wf_ip_ivc_op_ovc),
       .data_out(gnt_wf_op_ovc_ip_ivc));
 
-   or_nto1
+   c_or_nto1
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports*num_vcs))
    gnt_op_ovc_or

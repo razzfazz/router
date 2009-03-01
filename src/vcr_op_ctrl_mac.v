@@ -34,7 +34,8 @@ module vcr_op_ctrl_mac
    xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in, flit_ctrl_out, flit_data_out, 
    elig_ovc, int_flow_ctrl_ovc, error);
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -244,7 +245,7 @@ module vcr_op_ctrl_mac
    
    wire 				  cred_valid_s, cred_valid_q;
    assign cred_valid_s = flow_ctrl_s[0];
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    cred_validq
@@ -260,7 +261,7 @@ module vcr_op_ctrl_mac
       if(flow_ctrl_width > 1)
 	begin
 	   
-	   dff
+	   c_dff
 	     #(.width(flow_ctrl_width-1),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flow_ctrlq
@@ -340,7 +341,7 @@ module vcr_op_ctrl_mac
 	   wire allocated_s, allocated_q;
 	   assign allocated_s
 	     = set_allocated | (allocated_q & ~reset_allocated);
-	   dff
+	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
 	   allocatedq
@@ -368,7 +369,7 @@ module vcr_op_ctrl_mac
 		     wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
 		     assign allocated_ip_s
 		       = vc_gnt ? vc_gnt_ip : allocated_ip_q;
-		     dff
+		     c_dff
 		       #(.width(num_ports),
 			 .reset_type(reset_type))
 		     allocated_ipq
@@ -384,7 +385,7 @@ module vcr_op_ctrl_mac
 		     wire [0:num_vcs-1]   allocated_ivc_s, allocated_ivc_q;
 		     assign allocated_ivc_s
 		       = vc_gnt ? vc_gnt_ivc : allocated_ivc_q;
-		     dff
+		     c_dff
 		       #(.width(num_vcs),
 			 .reset_type(reset_type))
 		     allocated_ivcq
@@ -449,7 +450,7 @@ module vcr_op_ctrl_mac
 		     assign tail_sent_s
 		       = (tail_sent_q | (debit & flit_tail_in)) &
 			 ~buffer_drained;
-		     dff
+		     c_dff
 		       #(.width(1),
 			 .reset_type(reset_type))
 		     tail_sentq
@@ -462,7 +463,7 @@ module vcr_op_ctrl_mac
 		     assign head_free_s
 		       = (head_free_q & ~vc_gnt) |
 			 (credit & tail_sent_q & buffer_drained);
-		     dff
+		     c_dff
 		       #(.width(1),
 			 .reset_type(reset_type),
 			 .reset_value(1'b1))
@@ -481,7 +482,7 @@ module vcr_op_ctrl_mac
 		  begin
 		     
 		     wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
-		     incr
+		     c_incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
 			 .max_value(num_flit_buffers-1))
@@ -491,7 +492,7 @@ module vcr_op_ctrl_mac
 		     
 		     wire [0:flit_buffer_idx_width-1] push_ptr_s;
 		     assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
-		     dff
+		     c_dff
 		       #(.width(flit_buffer_idx_width),
 			 .reset_type(reset_type))
 		     push_ptrq
@@ -501,7 +502,7 @@ module vcr_op_ctrl_mac
 			.q(push_ptr_q));
 		     
 		     wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
-		     incr
+		     c_incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
 			 .max_value(num_flit_buffers-1))
@@ -511,7 +512,7 @@ module vcr_op_ctrl_mac
 		     
 		     wire [0:flit_buffer_idx_width-1] pop_ptr_s;
 		     assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
-		     dff
+		     c_dff
 		       #(.width(flit_buffer_idx_width),
 			 .reset_type(reset_type))
 		     pop_ptrq
@@ -538,7 +539,7 @@ module vcr_op_ctrl_mac
 		     // track header credits using stock credit tracker module
 		     wire 			      head_free;
 		     wire 			      error_hct;
-		     credit_tracker
+		     c_credit_tracker
 		       #(.num_credits(num_header_buffers),
 			 .checker_enable(checker_enable),
 			 .checker_capture_mode(checker_capture_mode),
@@ -565,7 +566,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
 	   assign cred_count_s = (cred_count_q + credit - debit);
-	   dff
+	   c_dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
 	       .reset_value(num_flit_buffers))
@@ -599,7 +600,7 @@ module vcr_op_ctrl_mac
 				  cred_count_s[cred_count_width-
 					       cred_level_width:
 					       cred_count_width-1];
-		  dff
+		  c_dff
 		    #(.width(cred_level_width),
 		      .reset_type(reset_type),
 		      .reset_value(free_reset_value))
@@ -628,7 +629,7 @@ module vcr_op_ctrl_mac
 		    = (vc_gnt | allocated_q) ?
 		      (cred_hold_q - (|cred_hold_q & ~credit)) :
 		      cred_hold_copy;
-		  dff
+		  c_dff
 		    #(.width(cred_hold_width),
 		      .reset_type(reset_type),
 		      .reset_value(num_flit_buffers-1))
@@ -640,7 +641,7 @@ module vcr_op_ctrl_mac
 		  
 		  wire 			      cred_s, cred_q;
 		  assign cred_s = |cred_hold_s | credit;
-		  dff
+		  c_dff
 		    #(.width(1),
 		      .reset_type(reset_type),
 		      .reset_value(1))
@@ -663,7 +664,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire 			      elig_s, elig_q;
 	   assign elig_s = ~allocated_s & head_free_early & next_cred_ovc[ovc];
-	   dff
+	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type),
 	       .reset_value(1'b1))
@@ -697,7 +698,7 @@ module vcr_op_ctrl_mac
 	     begin
 		
 		wire [0:vc_idx_width-1] match_ovc_enc;
-		encoder
+		c_encoder
 		  #(.num_ports(num_vcs))
 		match_ovc_enc_enc
 		  (.data_in(match_ovc),
@@ -742,7 +743,7 @@ module vcr_op_ctrl_mac
    
    wire 				flit_valid_s, flit_valid_q;
    assign flit_valid_s = flit_ctrl_s[0];
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    flit_validq
@@ -758,7 +759,7 @@ module vcr_op_ctrl_mac
       if(flit_ctrl_width > 1)
 	begin
 	   
-	   dff
+	   c_dff
 	     #(.width(flit_ctrl_width-1),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
 	       .offset(1))
@@ -776,7 +777,7 @@ module vcr_op_ctrl_mac
    
    wire [0:flit_data_width-1] 		  flit_data_s, flit_data_q;
    assign flit_data_s = xbr_ctrl ? flit_data_in : flit_data_q;
-   dff
+   c_dff
      #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_dataq
@@ -793,7 +794,7 @@ module vcr_op_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_vcs*2-1] 		  errors_out_ovc;
-   checker
+   c_checker
      #(.num_errors(num_vcs*2),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),
