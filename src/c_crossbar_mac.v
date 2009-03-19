@@ -29,8 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // configurable crossbar module
-module c_crossbar
-  (ctrl_ip_op, data_in_ip, data_out_op);
+module c_crossbar_mac
+  (clk, reset, ctrl_in_ip_op, ctrl_out_op_ip, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -44,8 +44,17 @@ module c_crossbar
    // select implementation variant
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
-   // control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_ip_op;
+   parameter reset_type = `RESET_TYPE_ASYNC;
+      
+   input clk;
+   input reset;
+   
+   // incoming control signals (request matrix)
+   input [0:num_in_ports*num_out_ports-1] ctrl_in_ip_op;
+   
+   // outgoing control signals (transposed request matrix, delayed by a cycle)
+   output [0:num_out_ports*num_in_ports-1] ctrl_out_op_ip;
+   wire [0:num_out_ports*num_in_ports-1] ctrl_out_op_ip;
    
    // vector of input data
    input [0:num_in_ports*width-1] data_in_ip;
@@ -54,13 +63,26 @@ module c_crossbar
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
    
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip;
+   wire [0:num_out_ports*num_in_ports-1] ctrl_in_op_ip;
    c_interleaver
      #(.width(num_in_ports*num_out_ports),
        .num_blocks(num_in_ports))
-   ctrl_intl
-     (.data_in(ctrl_ip_op),
-      .data_out(ctrl_op_ip));
+   ctrl_in_intl
+     (.data_in(ctrl_in_ip_op),
+      .data_out(ctrl_in_op_ip));
+   
+   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s, ctrl_op_ip_q;
+   assign ctrl_op_ip_s = ctrl_in_op_ip;
+   c_dff
+     #(.width(num_out_ports*num_in_ports),
+       .reset_type(reset_type))
+   ctrl_op_ipq
+     (.clk(clk),
+      .reset(reset),
+      .d(ctrl_op_ip_s),
+      .q(ctrl_op_ip_q));
+   
+   assign ctrl_out_op_ip = ctrl_op_ip_q;
    
    generate
       
@@ -83,10 +105,10 @@ module c_crossbar
 		       wire [0:width-1] in;
 		       assign in = data_in_ip[ip*width:(ip+1)*width-1];
 		       
-		       wire 		ctrl;
-		       assign ctrl = ctrl_op_ip[op*num_in_ports+ip];
+		       wire 		ctrl_q;
+		       assign ctrl_q = ctrl_op_ip_q[op*num_in_ports+ip];
 		       
-		       assign data_out = ctrl ? in : {width{1'bz}};
+		       assign data_out = ctrl_q ? in : {width{1'bz}};
 		       
 		    end
 		  
@@ -95,15 +117,15 @@ module c_crossbar
 	     `CROSSBAR_TYPE_MUX:
 	       begin
 		  
-		  wire [0:num_in_ports-1] ctrl_ip;
-		  assign ctrl_ip
-		    = ctrl_op_ip[op*num_in_ports:(op+1)*num_in_ports-1];
+		  wire [0:num_in_ports-1] ctrl_ip_q;
+		  assign ctrl_ip_q
+		    = ctrl_op_ip_q[op*num_in_ports:(op+1)*num_in_ports-1];
 		  
 		  c_select_1ofn
 		    #(.width(width),
 		      .num_ports(num_in_ports))
 		  out_mux
-		    (.select(ctrl_ip),
+		    (.select(ctrl_ip_q),
 		     .data_in(data_in_ip),
 		     .data_out(data_out));
 		  
@@ -124,11 +146,11 @@ module c_crossbar
 		       wire [0:width-1] thru;
 		       assign thru = data[(ip-1)*width:ip*width-1];
 		       
-		       wire 		ctrl;
-		       assign ctrl = ctrl_op_ip[op*num_in_ports+ip];
+		       wire 		ctrl_q;
+		       assign ctrl_q = ctrl_op_ip_q[op*num_in_ports+ip];
 		       
 		       wire [0:width-1] out;
-		       assign out = ctrl ? in : thru;
+		       assign out = ctrl_q ? in : thru;
 		       
 		       assign data[ip*width:(ip+1)*width-1] = out;
 		       

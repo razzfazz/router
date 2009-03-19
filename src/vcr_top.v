@@ -442,39 +442,44 @@ module vcr_top
    
    
    //---------------------------------------------------------------------------
-   // crossbar
+   // crossbars
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
-   assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
-   c_dff
-     #(.width(num_ports*num_ports),
-       .reset_type(reset_type))
-   xbr_ctrl_ip_opq
-     (.clk(clk),
-      .reset(reset),
-      .d(xbr_ctrl_ip_op_s),
-      .q(xbr_ctrl_ip_op_q));
+   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_ip_op;
+   assign xbc_ctrl_ip_op = sw_gnt_ip_op;
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
-   c_crossbar
+   wire [0:num_ports*num_ports-1] 	    xbc_ctrl_op_ip;
+   c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(int_flit_ctrl_width),
-       .crossbar_type(xbc_crossbar_type))
+       .crossbar_type(xbc_crossbar_type),
+       .reset_type(reset_type))
    xbc
-     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
+     (.clk(clk),
+      .reset(reset),
+      .ctrl_in_ip_op(xbc_ctrl_ip_op),
+      .ctrl_out_op_ip(xbc_ctrl_op_ip),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_ip_op;
+   assign xbd_ctrl_ip_op = sw_gnt_ip_op;
+   
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
-   c_crossbar
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip;
+   c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(flit_data_width),
-       .crossbar_type(xbd_crossbar_type))
+       .crossbar_type(xbd_crossbar_type),
+       .reset_type(reset_type))
    xbd
-     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
+     (.clk(clk),
+      .reset(reset),
+      .ctrl_in_ip_op(xbd_ctrl_ip_op),
+      .ctrl_out_op_ip(xbd_ctrl_op_ip),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
    
@@ -482,14 +487,6 @@ module vcr_top
    //---------------------------------------------------------------------------
    // output ports
    //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
-   c_interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   xbr_ctrl_op_ip_intl
-     (.data_in(xbr_ctrl_ip_op_q),
-      .data_out(xbr_ctrl_op_ip));
    
    wire [0:num_ports-1] 	  opc_error_op;
    
@@ -524,8 +521,8 @@ module vcr_top
 	   assign vc_gnt_ovc_ivc = vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:
 						     (op+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_ports-1] 	xbr_ctrl_ip;
-	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   wire [0:num_ports-1] 	xbc_ctrl_ip;
+	   assign xbc_ctrl_ip = xbc_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	flit_data_out;
@@ -559,7 +556,7 @@ module vcr_top
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
-	      .xbr_ctrl_ip(xbr_ctrl_ip),
+	      .xbr_ctrl_ip(xbc_ctrl_ip),
 	      .int_flit_ctrl_in(int_flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .flit_ctrl_out(flit_ctrl_out),
