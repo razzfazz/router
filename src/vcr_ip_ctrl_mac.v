@@ -33,7 +33,9 @@ module vcr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, 
    int_flow_ctrl_op_ovc, route_ivc_op, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
    vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, sw_gnt_nonspec_ivc, 
-   sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
+   sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
+   fbf_write_addr, fbf_write_enable, fbf_write_data, fbf_read_addr, 
+   fbf_read_enable, fbf_read_data, error);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -184,9 +186,6 @@ module vcr_ip_ctrl_mac
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
-   // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // number of entries in flit buffer
    localparam fbf_depth = num_vcs*num_flit_buffers;
    
@@ -274,6 +273,30 @@ module vcr_ip_ctrl_mac
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
+   
+   // flit buffer write address
+   output [0:fbf_addr_width-1] fbf_write_addr;
+   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+   
+   // flit buffer write enable
+   output fbf_write_enable;
+   wire 			  fbf_write_enable;
+   
+   // flit buffer write data
+   output [0:flit_data_width-1] fbf_write_data;
+   wire [0:flit_data_width-1] 	  fbf_write_data;
+   
+   // flit buffer read address
+   output [0:fbf_addr_width-1] fbf_read_addr;
+   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+   
+   // flit buffer read enable
+   output fbf_read_enable;
+   wire 			  fbf_read_enable;
+   
+   // flit buffer read data
+   output [0:flit_data_width-1] fbf_read_data;
+   wire [0:flit_data_width-1] 	  fbf_read_data;
    
    // internal error condition detected
    output error;
@@ -463,11 +486,8 @@ module vcr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // address computation
+   // flit buffer control signals
    //---------------------------------------------------------------------------
-   
-   wire [0:fbf_addr_width-1] 		  fbf_write_addr;
-   wire [0:fbf_addr_width-1] 		  fbf_read_addr;
    
    generate
       
@@ -540,33 +560,9 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   
-   //---------------------------------------------------------------------------
-   // flit buffer
-   //---------------------------------------------------------------------------
-   
-   wire 			     fbf_write_enable;
    assign fbf_write_enable = flit_valid_in_q;
-   
-   wire 			     fbf_read_enable;
    assign fbf_read_enable = |flit_valid_out_ivc;
-   
-   wire [0:flit_data_width-1] 	     fbf_write_data;
    assign fbf_write_data = flit_data_in_q;
-   
-   wire [0:flit_data_width-1] 	     fbf_read_data;
-   c_regfile
-     #(.width(flit_data_width),
-       .depth(fbf_depth),
-       .regfile_type(fbf_regfile_type))
-   fbf
-     (.clk(clk),
-      .write_enable(fbf_write_enable),
-      .write_address(fbf_write_addr),
-      .write_data(fbf_write_data),
-      .read_enable(fbf_read_enable),
-      .read_address(fbf_read_addr),
-      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------

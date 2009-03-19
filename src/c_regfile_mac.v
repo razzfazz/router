@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // generic register file
-module c_regfile
+module c_regfile_mac
   (clk, write_enable, write_address, write_data, read_enable, read_address,
    read_data);
    
