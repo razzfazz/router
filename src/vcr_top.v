@@ -230,7 +230,6 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
    
    wire [0:num_ports*num_vcs-1] 		    sw_req_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    sw_req_spec_ip_ivc;
@@ -364,6 +363,7 @@ module vcr_top
    // virtual channel allocator
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_vcs-1] 	  vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
    
