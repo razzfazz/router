@@ -40,7 +40,8 @@ module testbench
    parameter warmup_cycles = 10;
    parameter sim_cycles = 10000;
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -79,7 +80,7 @@ module testbench
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
    // select implementation variant for switch allocator
-   parameter allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
    // select implementation variant for wavefront allocator
    // select which arbiter type to use in allocator
@@ -202,10 +203,9 @@ module testbench
 			  wire [0:num_ports-1] route_masked_op;
 			  wire 		       error;
 			  
-			  port_filter
+			  c_port_filter
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
-			      .num_vcs_per_class(num_vcs_per_class),
 			      .num_ports(num_ports),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .num_nodes_per_router(num_nodes_per_router),
@@ -275,7 +275,7 @@ module testbench
 					 num_routing_classes*num_vcs_per_class){1'b0}};
 
 			  wire [0:num_ports*num_vcs-1] req_op_ovc;
-			  gate_and
+			  c_gate_and
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  req_op_ovc_gate
@@ -308,7 +308,7 @@ module testbench
 			  assign gnt_masked_ovc = {num_vcs{gnt}} & gnt_ovc;
 			  
 			  wire [0:num_ports*num_vcs-1] gnt_op_ovc;
-			  gate_and
+			  c_gate_and
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  gnt_op_ovc_gand
@@ -349,7 +349,7 @@ module testbench
       
    endgenerate
    
-   vc_alloc
+   vcr_vc_alloc_mac
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),

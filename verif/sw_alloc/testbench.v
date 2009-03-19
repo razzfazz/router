@@ -40,7 +40,8 @@ module testbench
    parameter warmup_cycles = 10;
    parameter sim_cycles = 10000;
    
-`include "constants.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -210,10 +211,9 @@ module testbench
 			  wire [0:num_ports-1] route_masked_op;
 			  wire 		       error;
 			  
-			  port_filter
+			  c_port_filter
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
-			      .num_vcs_per_class(num_vcs_per_class),
 			      .num_ports(num_ports),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .num_nodes_per_router(num_nodes_per_router),
@@ -245,7 +245,7 @@ module testbench
 	     end
 	   
 	   wire [0:num_ports-1] 	       req_op;
-	   select_1ofn
+	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(num_ports))
 	   req_op_sel
@@ -267,7 +267,7 @@ module testbench
       
    endgenerate
    
-   sw_alloc
+   vcr_sw_alloc_mac
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
        .allocator_type(allocator_type),
@@ -285,7 +285,7 @@ module testbench
       .gnt_ip_op(gnt_ip_op));
    
    wire [0:num_ports*num_ports-1] 	       gnt_op_ip;
-   interleaver
+   c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_intl
