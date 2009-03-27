@@ -273,16 +273,16 @@ module testbench
 					   num_vcs_per_class-1]
 				     = {((num_traffic_classes-itc-1)*
 					 num_routing_classes*num_vcs_per_class){1'b0}};
-
+			  
 			  wire [0:num_ports*num_vcs-1] req_op_ovc;
-			  c_gate_and
-			    #(.num_ports(num_ports),
-			      .width(num_vcs))
-			  req_op_ovc_gate
-			    (.select(route_masked_op),
-			     .data_in({num_ports{req_ovc}}),
-			     .data_out(req_op_ovc));
-
+			  c_vec_prod
+			    #(.num_rows(num_ports),
+			      .num_cols(num_vcs))
+			  req_op_ovc_vprod
+			    (.col_vec(route_masked_op),
+			     .row_vec(req_ovc),
+			     .result(req_op_ovc));
+			  
 			  assign req_ivc_op_ovc[((itc*num_routing_classes+irc)*
 						 num_vcs_per_class+icvc)*
 						num_ports*num_vcs:
@@ -308,13 +308,13 @@ module testbench
 			  assign gnt_masked_ovc = {num_vcs{gnt}} & gnt_ovc;
 			  
 			  wire [0:num_ports*num_vcs-1] gnt_op_ovc;
-			  c_gate_and
-			    #(.num_ports(num_ports),
-			      .width(num_vcs))
-			  gnt_op_ovc_gand
-			    (.select(route_masked_op),
-			     .data_in({num_ports{gnt_masked_ovc}}),
-			     .data_out(gnt_op_ovc));
+			  c_vec_prod
+			    #(.num_rows(num_ports),
+			      .num_cols(num_vcs))
+			  gnt_op_ovc_vprod
+			    (.col_vec(route_masked_op),
+			     .row_vec(gnt_masked_ovc),
+			     .result(gnt_op_ovc));
 			  
 			  assign gnt_ivc_op_ovc[((itc*num_routing_classes+irc)*
 						 num_vcs_per_class+icvc)*
