@@ -620,7 +620,7 @@ module testbench
       
       if(output_as_csv)
 	begin
-	   $display("SIM: num_ports,num_vcs,rate, inc_rc_rate,req_flow,gnt_flow,max_flow,gnt_prob,max_prob,efficiency");
+	   $display("SIM: num_ports,num_vcs,rate,inc_rc_rate,req_flow,gnt_flow,max_flow,gnt_prob,max_prob,efficiency");
 	   $display("SIM: %0d,%0d,%0d,%0d,%0d,%0d,%0d,%f,%f,%f", 
 		    num_ports, num_vcs, rate, inc_rc_rate, 
 		    req_count, gnt_count, max_count, 
