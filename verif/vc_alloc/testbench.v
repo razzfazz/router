@@ -370,10 +370,10 @@ module testbench
       .gnt_op_ovc_ip(gnt_op_ovc_ip),
       .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
    
-   function [0:num_ports*num_vcs*num_ports*num_vcs-1] augment_alloc
-     (input [0:num_ports*num_vcs*num_ports*num_vcs-1] requests,
-      input [0:num_ports*num_vcs*num_ports*num_vcs-1] grants);
-      reg [0:num_ports*num_vcs*num_ports*num_vcs-1] results;
+   function [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] augment_alloc
+     (input [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] requests,
+      input [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] grants);
+      reg [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] results;
       integer 			    i, j;
 /*      integer 			    k;*/
       reg 			    done;
@@ -381,24 +381,24 @@ module testbench
       begin
 /*	 $display("SIM: >>>augment_alloc");
 	 $display("SIM: Requests:");
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   $display("SIM: %b", requests[i*num_ports*num_vcs +: num_ports*num_vcs]);
+	 for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
+	   $display("SIM: %b", requests[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);
 	 $display("SIM: Grants:");
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   $display("SIM: %b", grants[i*num_ports*num_vcs +: num_ports*num_vcs]);*/
+	 for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
+	   $display("SIM: %b", grants[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);*/
 	 done = 1'b0;
 	 requests = requests & ~grants;
 	 while(!done)
 	   begin
 /*	      $display("SIM: begin while loop");*/
 	      done = 1'b1;
-	      for(i = 0; i < num_ports*num_vcs; i = i + 1)
+	      for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
 		begin
 /*		   $display("SIM: begin for loop (i=%d)", i);*/
 		   assigned = 1'b0;
-		   for(j = 0; j < num_ports*num_vcs; j = j + 1)
+		   for(j = 0; j < num_ports*num_routing_classes*num_vcs_per_class; j = j + 1)
 		     begin
-			if(grants[j*num_ports*num_vcs+i])
+			if(grants[j*num_ports*num_routing_classes*num_vcs_per_class+i])
 			  begin
 			     assigned = 1'b1;
 			  end
@@ -406,23 +406,23 @@ module testbench
 		   if(!assigned)
 		     begin
 /*			$display("SIM: checking port %d", i);*/
-			results = find_aug_path(i, {num_ports*num_vcs{1'b0}}, requests,
+			results = find_aug_path(i, {num_ports*num_routing_classes*num_vcs_per_class{1'b0}}, requests,
 						grants);
 			if(|results)
 			  begin
 			     requests = requests ^ results;
 			     grants = grants ^ results;
 			     done = 1'b0;
-			     i = num_ports*num_vcs;
+			     i = num_ports*num_routing_classes*num_vcs_per_class;
 /*			     $display("SIM: found path; restarting");
 			     $display("SIM: New request matrix:");
-			     for(k = 0; k < num_ports*num_vcs; k = k + 1)
+			     for(k = 0; k < num_ports*num_routing_classes*num_vcs_per_class; k = k + 1)
 			       $display("SIM: %b",
-                                        requests[k*num_ports*num_vcs +: num_ports*num_vcs]);
+                                        requests[k*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);
 			     $display("SIM: New grant matrix:");
-			     for(k = 0; k < num_ports*num_vcs; k = k + 1)
+			     for(k = 0; k < num_ports*num_routing_classes*num_vcs_per_class; k = k + 1)
 			       $display("SIM: %b",
-                                        grants[k*num_ports*num_vcs +: num_ports*num_vcs]);*/
+                                        grants[k*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);*/
 			  end
 		     end
 /*		   $display("SIM: end for loop");*/
@@ -431,43 +431,43 @@ module testbench
 	   end
 	 augment_alloc = grants;
 /*	 $display("SIM: Augmented:");
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   $display("SIM: %b", augment_alloc[i*num_ports*num_vcs +: num_ports*num_vcs]);
+	 for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
+	   $display("SIM: %b", augment_alloc[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);
 	 $display("SIM: <<<augment_alloc");*/
       end
    endfunction
    
-   function automatic [0:num_ports*num_vcs*num_ports*num_vcs-1] find_aug_path
+   function automatic [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] find_aug_path
      (input integer port_select,
-      input [0:num_ports*num_vcs-1] ports_ignore,
-      input [0:num_ports*num_vcs*num_ports*num_vcs-1] requests,
-      input [0:num_ports*num_vcs*num_ports*num_vcs-1] grants);
-      reg [0:num_ports*num_vcs*num_ports*num_vcs-1] results;
+      input [0:num_ports*num_routing_classes*num_vcs_per_class-1] ports_ignore,
+      input [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] requests,
+      input [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] grants);
+      reg [0:num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class-1] results;
       reg 			    done;
       integer 			    i, j;
       begin
 /*	 $display("SIM: >>>find_aug_path");
 	 $display("SIM: port_select=%d, ports_ignore=%b", port_select, ports_ignore);
 	 $display("SIM: Requests:");
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   $display("SIM: %b", requests[i*num_ports*num_vcs +: num_ports*num_vcs]);
+	 for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
+	   $display("SIM: %b", requests[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);
 	 $display("SIM: Grants:");
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   $display("SIM: %b", grants[i*num_ports*num_vcs +: num_ports*num_vcs]);*/
-	 find_aug_path = {num_ports*num_vcs*num_ports*num_vcs{1'b0}};
+	 for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
+	   $display("SIM: %b", grants[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);*/
+	 find_aug_path = {num_ports*num_routing_classes*num_vcs_per_class*num_ports*num_routing_classes*num_vcs_per_class{1'b0}};
 	 done = 1'b0;
-	 for(i = 0; (i < num_ports*num_vcs) && !done; i = i + 1)
+	 for(i = 0; (i < num_ports*num_routing_classes*num_vcs_per_class) && !done; i = i + 1)
 	   begin
 
 /*	      $display("SIM: checking input port %d", i);*/
 	      
 	      // check if there is an unsatisfied request from this input port
-	      if(requests[i*num_ports*num_vcs+port_select] && !ports_ignore[i])
+	      if(requests[i*num_ports*num_routing_classes*num_vcs_per_class+port_select] && !ports_ignore[i])
 		begin
 
-		   find_aug_path[i*num_ports*num_vcs+port_select] = 1'b1;
+		   find_aug_path[i*num_ports*num_routing_classes*num_vcs_per_class+port_select] = 1'b1;
 
-		   if(!(|grants[i*num_ports*num_vcs +: num_ports*num_vcs]))
+		   if(!(|grants[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]))
 		     begin
 
 /*			$display("SIM: input port %d has not been granted to anybody so far; terminating", i);*/
@@ -484,16 +484,16 @@ module testbench
 		   // has this input port been granted to someone else?
 		   // (can't be the current output, otherwise we wouldn't have
 		   // an unsatisfied request)
-		   for(j = 0; (j < num_ports*num_vcs) && !done; j = j + 1)
+		   for(j = 0; (j < num_ports*num_routing_classes*num_vcs_per_class) && !done; j = j + 1)
 		     begin
-			if(grants[i*num_ports*num_vcs+j])
+			if(grants[i*num_ports*num_routing_classes*num_vcs_per_class+j])
 			  begin
 
 /*			     $display("SIM: input port %d was previously granted to output port %d; recursing", i, j);*/
 			     
 			     // try if removing that grant helps using recursion
-			     find_aug_path[i*num_ports*num_vcs+j] = 1'b1;
-			     results = find_aug_path(j, ports_ignore | ({1'b1, {num_ports*num_vcs-1{1'b0}}} >> i),
+			     find_aug_path[i*num_ports*num_routing_classes*num_vcs_per_class+j] = 1'b1;
+			     results = find_aug_path(j, ports_ignore | ({1'b1, {num_ports*num_routing_classes*num_vcs_per_class-1{1'b0}}} >> i),
 						     requests ^ find_aug_path,
 						     grants ^ find_aug_path);
 			     if(|results)
@@ -511,7 +511,7 @@ module testbench
 
 				  // this path didn't work out, so remove from
 				  // results
-				  find_aug_path[i*num_ports*num_vcs+j] = 1'b0;
+				  find_aug_path[i*num_ports*num_routing_classes*num_vcs_per_class+j] = 1'b0;
 			     
 			       end
 			  end
@@ -522,20 +522,182 @@ module testbench
 
 			// none of the paths through this input port worked out,
 			// so remove from results
-			find_aug_path[i*num_ports*num_vcs+port_select] = 1'b0;
+			find_aug_path[i*num_ports*num_routing_classes*num_vcs_per_class+port_select] = 1'b0;
 			
 		     end
 		end
 	   end
 /*	 $display("SIM: Result:");
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   $display("SIM: %b", find_aug_path[i*num_ports*num_vcs +: num_ports*num_vcs]);
+	 for(i = 0; i < num_ports*num_routing_classes*num_vcs_per_class; i = i + 1)
+	   $display("SIM: %b", find_aug_path[i*num_ports*num_routing_classes*num_vcs_per_class +: num_ports*num_routing_classes*num_vcs_per_class]);
 	 $display("SIM: <<<find_aug_path");*/
       end
    endfunction
 
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] 	 max_ip_ivc_op_ovc;
-   assign max_ip_ivc_op_ovc = augment_alloc(req_ip_ivc_op_ovc, gnt_ip_ivc_op_ovc);
+
+   generate
+      
+      genvar 						 tc;
+      for(tc = 0; tc < num_traffic_classes; tc = tc + 1)
+	begin:tcs
+	   
+	   wire [0:num_ports*num_routing_classes*num_vcs_per_class*
+		 num_ports*num_routing_classes*num_vcs_per_class-1] req_ip_irc_icvc_op_orc_ocvc;
+	   wire [0:num_ports*num_routing_classes*num_vcs_per_class*
+		 num_ports*num_routing_classes*num_vcs_per_class-1] gnt_ip_irc_icvc_op_orc_ocvc;
+	   
+	   wire [0:num_ports*num_routing_classes*num_vcs_per_class*
+		 num_ports*num_routing_classes*num_vcs_per_class-1] max_ip_irc_icvc_op_orc_ocvc;
+	   assign max_ip_irc_icvc_op_orc_ocvc = augment_alloc(req_ip_irc_icvc_op_orc_ocvc, gnt_ip_irc_icvc_op_orc_ocvc);
+
+	   
+	   genvar ip;
+	   for(ip = 0; ip < num_ports; ip = ip + 1)
+	     begin:ips
+
+		genvar irc;
+		for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+		  begin:ircs
+
+		     genvar icvc;
+		     for(icvc = 0; icvc < num_vcs_per_class; icvc = icvc + 1)
+		       begin:icvcs
+
+			  wire [0:num_ports*num_vcs-1] req_op_ovc;
+			  assign req_op_ovc
+			    = req_ip_ivc_op_ovc[(((ip*num_traffic_classes+tc)*
+						  num_routing_classes+irc)*
+						 num_vcs_per_class+icvc)*
+						num_ports*num_vcs:
+						(((ip*num_traffic_classes+tc)*
+						  num_routing_classes+irc)*
+						 num_vcs_per_class+icvc+1)*
+						num_ports*num_vcs-1];
+			  
+			  wire [0:num_ports*num_vcs-1] gnt_op_ovc;
+			  assign gnt_op_ovc
+			    = gnt_ip_ivc_op_ovc[(((ip*num_traffic_classes+tc)*
+						  num_routing_classes+irc)*
+						 num_vcs_per_class+icvc)*
+						num_ports*num_vcs:
+						(((ip*num_traffic_classes+tc)*
+						  num_routing_classes+irc)*
+						 num_vcs_per_class+icvc+1)*
+						num_ports*num_vcs-1];
+
+			  wire [0:num_ports*num_vcs-1] max_op_ovc;
+			  assign max_ip_ivc_op_ovc[(((ip*num_traffic_classes+tc)*
+						     num_routing_classes+irc)*
+						    num_vcs_per_class+icvc)*
+						   num_ports*num_vcs:
+						   (((ip*num_traffic_classes+tc)*
+						     num_routing_classes+irc)*
+						    num_vcs_per_class+icvc+1)*
+						   num_ports*num_vcs-1]
+				   = max_op_ovc;
+			  
+			  wire [0:num_ports*num_routing_classes*num_vcs_per_class-1] req_op_orc_ocvc;
+			  wire [0:num_ports*num_routing_classes*num_vcs_per_class-1] gnt_op_orc_ocvc;
+			  
+			  genvar 		       op;
+			  for(op = 0; op < num_ports; op = op + 1)
+			    begin:ops
+			       
+			       assign req_op_orc_ocvc[op*
+						      num_routing_classes*
+						      num_vcs_per_class:
+						      (op+1)*
+						      num_routing_classes*
+						      num_vcs_per_class-1]
+				 = req_op_ovc[(op*num_traffic_classes+tc)*
+					      num_routing_classes*
+					      num_vcs_per_class:
+					      (op*num_traffic_classes+tc+1)*
+					      num_routing_classes*
+					      num_vcs_per_class-1];
+			       
+			       assign gnt_op_orc_ocvc[op*
+						      num_routing_classes*
+						      num_vcs_per_class:
+						      (op+1)*
+						      num_routing_classes*
+						      num_vcs_per_class-1]
+				 = gnt_op_ovc[(op*num_traffic_classes+tc)*
+					      num_routing_classes*
+					      num_vcs_per_class:
+					      (op*num_traffic_classes+tc+1)*
+					      num_routing_classes*
+					      num_vcs_per_class-1];
+			       
+			       wire [0:num_routing_classes*num_vcs_per_class-1] max_orc_ocvc;
+			       assign max_orc_ocvc
+				 = max_ip_irc_icvc_op_orc_ocvc[(((ip*
+								  num_routing_classes+irc)*
+								 num_vcs_per_class+icvc)*
+								num_ports+op)*
+							       num_routing_classes*
+							       num_vcs_per_class:
+							       (((ip*
+								  num_routing_classes+irc)*
+								 num_vcs_per_class+icvc)*
+								num_ports+op+1)*
+							       num_routing_classes*
+							       num_vcs_per_class-1];
+			       
+			       wire [0:num_vcs-1] 				max_ovc;
+			       if(tc > 0)
+				 assign max_ovc[0:tc*num_routing_classes*num_vcs_per_class-1]
+					  = {tc*num_routing_classes*num_vcs_per_class{1'b0}};
+			       assign max_ovc[tc*num_routing_classes*num_vcs_per_class:
+					      (tc+1)*num_routing_classes*num_vcs_per_class-1]
+					= max_orc_ocvc;
+			       if(tc < (num_traffic_classes - 1))
+				 assign max_ovc[(tc+1)*num_routing_classes*num_vcs_per_class:num_vcs-1]
+					  = {(num_traffic_classes - 1 - tc)*num_routing_classes*num_vcs_per_class{1'b0}};
+			       
+			       assign max_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
+					= max_ovc;
+			       
+			    end
+
+			  assign req_ip_irc_icvc_op_orc_ocvc[((ip*
+							       num_routing_classes+irc)*
+							      num_vcs_per_class+icvc)*
+							     num_ports*
+							     num_routing_classes*
+							     num_vcs_per_class:
+							     ((ip*
+							       num_routing_classes+irc)*
+							      num_vcs_per_class+icvc+1)*
+							     num_ports*
+							     num_routing_classes*
+							     num_vcs_per_class-1]
+				   = req_op_orc_ocvc;
+			  
+			  assign gnt_ip_irc_icvc_op_orc_ocvc[((ip*
+							       num_routing_classes+irc)*
+							      num_vcs_per_class+icvc)*
+							     num_ports*
+							     num_routing_classes*
+							     num_vcs_per_class:
+							     ((ip*
+							       num_routing_classes+irc)*
+							      num_vcs_per_class+icvc+1)*
+							     num_ports*
+							     num_routing_classes*
+							     num_vcs_per_class-1]
+				   = gnt_op_orc_ocvc;
+
+		       end
+
+		  end
+
+	     end
+	   
+	end
+
+   endgenerate
    
    function integer get_flow(input [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_matrix);
       integer 						 i;
