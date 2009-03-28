@@ -663,7 +663,7 @@ module vcr_vc_alloc_wf
 					    num_routing_classes*
 					    num_vcs_per_class-1]
 				   = gnt_wf_irc_icvc;
-			  if(tc < (num_routing_classes - 1))
+			  if(tc < (num_traffic_classes - 1))
 			    assign gnt_wf_ivc[(tc+1)*
 					      num_routing_classes*
 					      num_vcs_per_class:
