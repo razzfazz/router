@@ -229,7 +229,18 @@ module vcr_vc_alloc_sep_if
 					      wire [0:num_vcs_per_class-1] 
 						req_in_ocvc;
 					      
-					      if(orc == irc)
+					      // Perform input-side arbitration
+					      // regardless of whether there was
+					      // a request; instead, requests 
+					      // are subsequently only 
+					      // propagated to the output stage 
+					      // if there was a requests.
+					      if((orc == irc) &&
+						 (irc == 
+						  (num_routing_classes - 1)))
+						assign req_in_ocvc
+						 = elig_ocvc;
+					      else if(orc == irc)
 						assign req_in_ocvc
 						 = elig_ocvc &
 						   {num_vcs_per_class{~inc_rc}};

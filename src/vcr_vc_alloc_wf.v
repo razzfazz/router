@@ -299,7 +299,10 @@ module vcr_vc_alloc_wf
 				    
 				    wire class_match;
 				    
-				    if(orc == irc)
+				    if((orc == irc) && 
+				       (irc == (num_routing_classes - 1)))
+				      assign class_match = 1'b1;
+				    else if(orc == irc)
 				      assign class_match = ~inc_rc;
 				    else if(orc == (irc + 1))
 				      assign class_match  = inc_rc;

@@ -210,7 +210,11 @@ module vcr_vc_alloc_sep_of
 					      
 					      wire req_out;
 					      
-					      if(orc == irc)
+					      if((orc == irc) &&
+						 (irc == 
+						  (num_routing_classes - 1)))
+						assign req_out = mask;
+					      else if(orc == irc)
 						assign req_out = mask & ~inc_rc;
 					      else if(orc == (irc + 1))
 						assign req_out = mask & inc_rc;
