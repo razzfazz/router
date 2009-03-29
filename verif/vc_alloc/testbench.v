@@ -811,4 +811,14 @@ module testbench
       
    end
    
+   wire 					       error_gnt;
+   assign error_gnt = |(gnt_ip_ivc_op_ovc & ~req_ip_ivc_op_ovc);
+
+   wire 					       error_max;
+   assign error_max = |(max_ip_ivc_op_ovc & ~req_ip_ivc_op_ovc);
+
+   always @(negedge clk)
+     if(error_gnt | error_max)
+       $stop;
+   
 endmodule
