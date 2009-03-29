@@ -172,8 +172,6 @@ module vcr_vc_alloc_sep_of
 			    = inc_rc_ivc[(itc*num_routing_classes+irc)*
 					 num_vcs_per_class+icvc];
 			  
-			  wire [0:num_ports*num_vcs-1] mask_op_ovc;
-			  
 			  genvar 		       op;
 			  
 			  for(op = 0; op < num_ports; op = op + 1)
@@ -182,7 +180,6 @@ module vcr_vc_alloc_sep_of
 			       wire route;
 			       assign route = route_op[op];
 			       
-			       wire [0:num_vcs-1] mask_ovc;
 			       wire [0:num_vcs-1] req_out_ovc;
 			       
 			       genvar 		  otc;
@@ -200,39 +197,20 @@ module vcr_vc_alloc_sep_of
 					     orc = orc + 1)
 					   begin:orcs
 					      
-					      wire mask;
-					      
-					      if((orc == irc) ||
-						 (orc == (irc + 1)))
-						assign mask = req & route;
-					      else
-						assign mask = 1'b0;
-					      
 					      wire req_out;
 					      
 					      if((orc == irc) &&
 						 (irc == 
 						  (num_routing_classes - 1)))
-						assign req_out = mask;
+						assign req_out = req & route;
 					      else if(orc == irc)
-						assign req_out = mask & ~inc_rc;
+						assign req_out
+						  = req & route & ~inc_rc;
 					      else if(orc == (irc + 1))
-						assign req_out = mask & inc_rc;
+						assign req_out
+						  = req & route & inc_rc;
 					      else
                                                 assign req_out = 1'b0;
-
-					      assign mask_ovc[
-						       (otc*
-							num_routing_classes+
-							orc)*
-						       num_vcs_per_class:
-						       (otc*
-							num_routing_classes+
-							orc+1)*
-						       num_vcs_per_class-1
-							      ]
-						       = {num_vcs_per_class{
-							    mask}};
 					      
 					      assign req_out_ovc[
 						       (otc*
@@ -252,16 +230,7 @@ module vcr_vc_alloc_sep_of
 				      end
 				    else
 				      begin
-
-					 assign mask_ovc[otc*
-							 num_routing_classes*
-							 num_vcs_per_class:
-							 (otc+1)*
-							 num_routing_classes*
-							 num_vcs_per_class-1]
-						  = {(num_routing_classes*
-						      num_vcs_per_class){1'b0}};
-
+					 
 					 assign req_out_ovc[otc*
 							    num_routing_classes*
 							    num_vcs_per_class:
@@ -270,13 +239,10 @@ module vcr_vc_alloc_sep_of
 							    num_vcs_per_class-1]
 						  = {(num_routing_classes*
 						      num_vcs_per_class){1'b0}};
-
+					 
 				      end
 				    
 				 end
-			       
-			       assign mask_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
-					= mask_ovc;
 			       
 			       assign req_out_ivc_op_ovc[
 					 (((itc*num_routing_classes+irc)*
@@ -419,9 +385,14 @@ module vcr_vc_alloc_sep_of
 			       
 			    end
 			  
-			  wire [0:num_ports*num_vcs-1] 	     gnt_in_op_ovc;
-			  assign gnt_in_op_ovc
-			    = mask_op_ovc & {num_ports{gnt_in_ovc}};
+			  wire [0:num_ports*num_vcs-1] gnt_in_op_ovc;
+			  c_vec_prod
+			    #(.num_rows(num_ports),
+			      .num_cols(num_vcs))
+			  gnt_in_op_ovc_vprod
+			    (.col_vec(route_op),
+			     .row_vec(gnt_in_ovc),
+			     .result(gnt_in_op_ovc));
 			  
 			  assign gnt_in_ivc_op_ovc[((itc*num_routing_classes+
 						     irc)*
