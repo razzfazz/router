@@ -189,7 +189,10 @@ module testbench
 				 begin
 				    req <= ($dist_uniform(seed, 0, 99) < rate);
 				    route_op <= (1 << $dist_uniform(seed, 0, num_ports-1));
-				    inc_rc <= ($dist_uniform(seed, 0, 99) < inc_rc_rate);
+				    if(irc < (num_routing_classes - 1))
+				      inc_rc <= ($dist_uniform(seed, 0, 99) < inc_rc_rate);
+				    else
+				      inc_rc <= 1'b0;
 				 end
 			    end
 
@@ -269,10 +272,10 @@ module testbench
 			  if(itc < (num_traffic_classes - 1))
 			    assign req_ovc[(itc+1)*num_routing_classes*
 					   num_vcs_per_class:
-					   num_traffic_classes*num_routing_classes*
-					   num_vcs_per_class-1]
+					   num_vcs-1]
 				     = {((num_traffic_classes-itc-1)*
-					 num_routing_classes*num_vcs_per_class){1'b0}};
+					 num_routing_classes*
+					 num_vcs_per_class){1'b0}};
 			  
 			  wire [0:num_ports*num_vcs-1] req_op_ovc;
 			  c_vec_prod
@@ -348,7 +351,7 @@ module testbench
 	end
       
    endgenerate
-   
+
    vcr_vc_alloc_mac
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
@@ -721,7 +724,7 @@ module testbench
    assign req_flow = get_flow(req_ip_ivc_op_ovc);
    
    wire [0:31] gnt_flow;
-   assign gnt_flow = pop_count(gnt_ip_ivc);
+   assign gnt_flow = get_flow(gnt_ip_ivc_op_ovc);//pop_count(gnt_ip_ivc);
    
    wire [0:31] max_flow;
    assign max_flow = get_flow(max_ip_ivc_op_ovc);
