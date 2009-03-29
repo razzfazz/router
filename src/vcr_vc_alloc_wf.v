@@ -368,6 +368,7 @@ module vcr_vc_alloc_wf
 			    (.data_in(gnt_wf_op_orc_ocvc),
 			     .data_out(gnt_orc_ocvc));
 			  
+			  wire [0:num_vcs-1] gnt_ovc;
 			  /*assign gnt_icvc_orc_ocvc[icvc*
 						   num_routing_classes*
 						   num_vcs_per_class:
@@ -376,28 +377,31 @@ module vcr_vc_alloc_wf
 						   num_vcs_per_class-1]
 				   = gnt_orc_ocvc;*/
 			  if(tc > 0)
-			    assign gnt_icvc_ovc[0:
-						tc*
-						num_routing_classes*
-						num_vcs_per_class-1]
+			    assign gnt_ovc[0:
+					   tc*
+					   num_routing_classes*
+					   num_vcs_per_class-1]
 				     = {(tc*
 					 num_routing_classes*
 					 num_vcs_per_class){1'b0}};
-			  assign gnt_icvc_ovc[tc*
-					      num_routing_classes*
-					      num_vcs_per_class:
-					      (tc+1)*
-					      num_routing_classes*
-					      num_vcs_per_class-1]
+			  assign gnt_ovc[tc*
+					 num_routing_classes*
+					 num_vcs_per_class:
+					 (tc+1)*
+					 num_routing_classes*
+					 num_vcs_per_class-1]
 				   = gnt_orc_ocvc;
 			  if(tc < (num_traffic_classes - 1))
-			    assign gnt_icvc_ovc[(tc+1)*
-						num_routing_classes*
-						num_vcs_per_class:
-						num_vcs-1]
+			    assign gnt_ovc[(tc+1)*
+					   num_routing_classes*
+					   num_vcs_per_class:
+					   num_vcs-1]
 				     = {((num_traffic_classes - 1 - tc)*
 					 num_routing_classes*
 					 num_vcs_per_class){1'b0}};
+			  
+			  assign gnt_icvc_ovc[icvc*num_vcs:(icvc+1)*num_vcs-1]
+				   = gnt_ovc;
 			  
 			  if(irc == (num_routing_classes - 1))
 			    assign gnt_icvc[icvc]
@@ -413,7 +417,7 @@ module vcr_vc_alloc_wf
 						     num_vcs_per_class-1];
 			  
 		       end
-
+		     
 		     assign req_wf_irc_icvc_op_orc_ocvc[irc*
 							num_vcs_per_class*
 							num_ports*
