@@ -899,34 +899,26 @@ module vcr_ivc_ctrl
 		.d(flit_sent_prev_s),
 		.q(flit_sent_prev_q));
 	     
-	     wire [0:2] 			 flit_sent_count;
-	     assign flit_sent_count = {flit_sent_prev_q & flit_valid_out,
-				       flit_sent_prev_q ^ flit_valid_out,
-				       ~(flit_sent_prev_q | flit_valid_out)};
+	     wire [0:1] 			 flit_sent_count;
+	     assign flit_sent_count = flit_sent_prev_q + flit_valid_out;
 	     
 	     wire [0:num_vcs_per_class-1] 	 next_free_ocvc;
 	     
-	     genvar 				 cvc;
+	     genvar 				 ocvc;
 	     
-	     for(cvc = 0; cvc < num_vcs_per_class; cvc = cvc + 1)
-	       begin:cvcs
+	     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
+	       begin:ocvcs
 		  
 		  wire [0:1] free;
-		  assign free = free_ocvc[cvc*2:(cvc+1)*2-1];
+		  assign free = free_ocvc[ocvc*2:(ocvc+1)*2-1];
 		  
 		  wire [0:2] free_by_count;
-		  assign free_by_count = {|free, free[0], &free};
+		  assign free_by_count = {&free, free[0], |free};
 		  
 		  wire       next_free;
-		  c_select_1ofn
-		    #(.num_ports(3),
-		      .width(1))
-		  next_free_sel
-		    (.select(flit_sent_count),
-		     .data_in(free_by_count),
-		     .data_out(next_free));
+		  assign next_free = free_by_count[flit_sent_count*2 +: 2];
 		  
-		  assign next_free_ocvc[cvc] = next_free;
+		  assign next_free_ocvc[ocvc] = next_free;
 		  
 	       end
 	     

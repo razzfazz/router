@@ -394,8 +394,8 @@ module vcr_op_ctrl_mac
 			.d(allocated_ivc_s),
 			.q(allocated_ivc_q));
 		     
-		     assign match_ovc[ovc] = allocated_q &&
-					     |(allocated_ip_q & xbr_ctrl_ip) &&
+		     assign match_ovc[ovc] = allocated_q &
+					     |(allocated_ip_q & xbr_ctrl_ip) &
 					     allocated_ivc_q[flit_vc_in];
 		     
 		  end
