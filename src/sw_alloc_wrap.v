@@ -30,11 +30,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator synthesis wrapper
 module sw_alloc_wrap
-  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+  (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -64,10 +74,8 @@ module sw_alloc_wrap
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // filter out illegal destination ports
-   // (the intent is to allow synthesis to optimize away the logic associated 
-   // with such turns)
-   parameter restrict_turns = 1;
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
@@ -88,7 +96,7 @@ module sw_alloc_wrap
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
@@ -108,90 +116,6 @@ module sw_alloc_wrap
    output [0:num_ports*num_ports-1] gnt_ip_op;
    wire [0:num_ports*num_ports-1] gnt_ip_op;
    
-   wire [0:num_ports*num_vcs*num_ports-1] route_masked_ip_ivc_op;
-   
-   generate
-      
-      genvar 				  ip;
-      
-      for(ip = 0; ip < num_ports; ip = ip + 1)
-	begin:ips
-	   
-	   genvar itc;
-	   
-	   for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
-	     begin:itcs
-		
-		genvar irc;
-		
-		for(irc = 0; irc < num_routing_classes; irc = irc + 1)
-		  begin:ircs
-		     
-		     genvar icvc;
-		     
-		     for(icvc = 0; icvc < num_vcs_per_class; icvc = icvc + 1)
-		       begin:icvcs
-			  
-			  wire [0:num_ports-1] route_op;
-			  assign route_op
-			    = route_ip_ivc_op[(((ip*num_traffic_classes+itc)*
-						num_routing_classes+irc)*
-					       num_vcs_per_class+icvc)*
-					      num_ports:
-					      (((ip*num_traffic_classes+itc)*
-						num_routing_classes+irc)*
-					       num_vcs_per_class+icvc+1)*
-					      num_ports-1];
-			  
-			  wire [0:num_ports-1] route_masked_op;
-			  wire 		       error;
-			  
-			  vcr_port_filter
-			    #(.num_traffic_classes(num_traffic_classes),
-			      .num_routing_classes(num_routing_classes),
-			      .num_vcs_per_class(num_vcs_per_class),
-			      .num_ports(num_ports),
-			      .num_neighbors_per_dim(num_neighbors_per_dim),
-			      .num_nodes_per_router(num_nodes_per_router),
-			      .restrict_turns(restrict_turns),
-			      .routing_function_type(routing_function_type),
-			      .port_id(ip),
-			      .traffic_class(itc),
-			      .routing_class(irc))
-			  pf
-			    (.route_in_op(route_op),
-			     .inc_rc(/*inc_rc*/ 1'b0),
-			     .route_out_op(route_masked_op),
-			     .error(error));
-			  
-			  assign route_masked_ip_ivc_op[(((ip*
-							   num_traffic_classes+
-							   itc)*
-							  num_routing_classes+
-							  irc)*
-							 num_vcs_per_class+
-							 icvc)*
-							num_ports:
-							(((ip*
-							   num_traffic_classes+
-							   itc)*
-							  num_routing_classes+
-							  irc)*
-							 num_vcs_per_class+
-							 icvc+1)*
-							num_ports-1]
-				   = route_masked_op;
-			  
-		       end
-		     
-		  end
-		
-	     end
-	   
-	end
-      
-   endgenerate
-   
    vcr_sw_alloc
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
@@ -202,7 +126,7 @@ module sw_alloc_wrap
    swa
      (.clk(clk),
       .reset(reset),
-      .route_ip_ivc_op(route_masked_ip_ivc_op),
+      .route_port_ip_ivc(route_port_ip_ivc),
       .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
       .req_spec_ip_ivc(req_spec_ip_ivc),
       .gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
