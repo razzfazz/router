@@ -30,11 +30,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant using separable input-first allocation
 module vcr_vc_alloc_sep_if
-  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
+  (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -54,6 +64,9 @@ module vcr_vc_alloc_sep_if
    // number of input and output ports on switch
    parameter num_ports = 5;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -63,7 +76,7 @@ module vcr_vc_alloc_sep_if
    input reset;
    
    // destination port select
-   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
    // transition to next routing class
    input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
@@ -117,9 +130,10 @@ module vcr_vc_alloc_sep_if
 	   wire [0:num_vcs-1] req_ivc;
 	   assign req_ivc = req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_ports-1] route_ivc_op;
-	   assign route_ivc_op = route_ip_ivc_op[ip*num_vcs*num_ports:
-						 (ip+1)*num_vcs*num_ports-1];
+	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+	   assign route_port_ivc
+	     = route_port_ip_ivc[ip*num_vcs*port_idx_width:
+				 (ip+1)*num_vcs*port_idx_width-1];
 	   
 	   wire [0:num_vcs-1] 		inc_rc_ivc;
 	   assign inc_rc_ivc = inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
@@ -152,14 +166,14 @@ module vcr_vc_alloc_sep_if
 			  // input-side arbitration stage (select output VC)
 			  //----------------------------------------------------
 			  
-			  wire [0:num_ports-1] 	     route_op;
-			  assign route_op
-			    = route_ivc_op[((itc*num_routing_classes+irc)*
-					    num_vcs_per_class+icvc)*
-					   num_ports:
-					   ((itc*num_routing_classes+irc)*
-					    num_vcs_per_class+icvc+1)*
-					   num_ports-1];
+			  wire [0:port_idx_width-1] route_port;
+			  assign route_port
+			    = route_port_ivc[((itc*num_routing_classes+irc)*
+					      num_vcs_per_class+icvc)*
+					     port_idx_width:
+					     ((itc*num_routing_classes+irc)*
+					      num_vcs_per_class+icvc+1)*
+					     port_idx_width-1];
 			  
 			  wire 			     inc_rc;
 			  assign inc_rc
@@ -167,13 +181,8 @@ module vcr_vc_alloc_sep_if
 					 num_vcs_per_class+icvc];
 			  
 			  wire [0:num_vcs-1] 	     elig_ovc;
-			  c_select_1ofn
-			    #(.num_ports(num_ports),
-			      .width(num_vcs))
-			  elig_ovc_sel
-			    (.select(route_op),
-			     .data_in(elig_op_ovc),
-			     .data_out(elig_ovc));
+			  assign elig_ovc
+			    = elig_op_ovc[route_port*num_vcs +: num_vcs];
 			  
 			  wire [0:num_ports*num_vcs-1] gnt_out_op_ovc;
 			  assign gnt_out_op_ovc
@@ -331,9 +340,12 @@ module vcr_vc_alloc_sep_if
 			  for(op = 0; op < num_ports; op = op + 1)
 			    begin:ops
 			       
-			       wire [0:num_vcs-1] 	  req_out_ovc;
+			       wire route;
+			       assign route = (route_port == op);
+			       
+			       wire [0:num_vcs-1] req_out_ovc;
 			       assign req_out_ovc
-				 = {num_vcs{req & route_op[op]}} & gnt_in_ovc;
+				 = {num_vcs{req & route}} & gnt_in_ovc;
 			       
 			       assign req_out_ivc_op_ovc[
                                   (((itc*num_routing_classes+irc)*

@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, 
-   int_flow_ctrl_op_ovc, route_ivc_op, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
+   int_flow_ctrl_op_ovc, route_port_ivc, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
    vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, sw_gnt_nonspec_ivc, 
    sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
    fbf_write_addr, fbf_write_enable, fbf_write_data, fbf_read_addr, 
@@ -85,7 +85,7 @@ module vcr_ip_ctrl_mac
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -231,8 +231,8 @@ module vcr_ip_ctrl_mac
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
-   output [0:num_vcs*num_ports-1] route_ivc_op;
-   wire [0:num_vcs*num_ports-1] route_ivc_op;
+   output [0:num_vcs*port_idx_width-1] route_port_ivc;
+   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
    
    // transition to next routing class
    output [0:num_vcs-1] inc_rc_ivc;
@@ -389,11 +389,11 @@ module vcr_ip_ctrl_mac
 	   wire 	      sw_gnt_spec;
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
-	   wire [0:num_ports-1] route_op;
-	   wire 		inc_rc;
-	   wire 		vc_req;
-	   wire 		sw_req_nonspec;
-	   wire 		sw_req_spec;
+	   wire [0:port_idx_width-1] route_port;
+	   wire 		     inc_rc;
+	   wire 		     vc_req;
+	   wire 		     sw_req_nonspec;
+	   wire 		     sw_req_spec;
 	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
 	   wire [0:la_route_info_width-1] la_route_info;
 	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
@@ -433,7 +433,7 @@ module vcr_ip_ctrl_mac
 	      .flit_ctrl_in(flit_ctrl_in_q),
 	      .header_info_in(header_info_in_q),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .route_op(route_op),
+	      .route_port(route_port),
 	      .inc_rc(inc_rc),
 	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
@@ -449,7 +449,9 @@ module vcr_ip_ctrl_mac
 	      .error(ivcc_error),
 	      .events(events));
 	   
-	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = route_op;
+	   assign route_port_ivc[ivc*port_idx_width:
+				 (ivc+1)*port_idx_width-1]
+		    = route_port;
 	   assign inc_rc_ivc[ivc] = inc_rc;
 	   assign vc_req_ivc[ivc] = vc_req;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;

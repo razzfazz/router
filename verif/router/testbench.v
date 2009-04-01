@@ -149,7 +149,7 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -287,7 +287,6 @@ module testbench
    wire [0:num_ports-1] 		cred_valid_in_op;
    
    wire [0:num_ports-1] 		ps_error_ip;
-   wire [0:num_ports-1] 		rtl_error_ip;
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 	  fifo_error_ip_ivc;
    
@@ -318,7 +317,6 @@ module testbench
 		assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
 		
 		assign ps_error_ip[ip] = 1'b0;
-		assign rtl_error_ip[ip] = 1'b0;
 		assign match_ip_ivc_op[ip*num_vcs*num_ports:
 				       (ip+1)*num_vcs*num_ports-1]
 			 = {num_vcs*num_ports{1'b0}};
@@ -392,13 +390,13 @@ module testbench
 		assign la_route_info_in
 		  = header_info[0:la_route_info_width-1];
 		
-		wire [0:num_ports-1] 	       la_route_op;
-		assign la_route_op = la_route_info_in[0:num_ports-1];
+		wire [0:port_idx_width-1]      la_route_port;
+		assign la_route_port = la_route_info_in[0:port_idx_width-1];
 		
 		wire 			       la_inc_rc;
 		
 		if(num_routing_classes > 1)
-		  assign la_inc_rc = la_route_info_in[num_ports];
+		  assign la_inc_rc = la_route_info_in[port_idx_width];
 		else
 		  assign la_inc_rc = 1'b0;
 		
@@ -492,9 +490,8 @@ module testbench
 		    end
 		endcase
 		
-		wire [0:num_vcs*num_ports-1]   route_ivc_op;
-		wire [0:num_vcs*num_vcs-1]     route_ivc_ovc;
-		wire [0:num_vcs-1] 	       rtl_error_ivc;
+		wire [0:num_vcs*port_idx_width-1]     route_port_ivc;
+		wire [0:num_vcs*num_vcs-1] 	      route_ivc_ovc;
 		wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
 		
 		genvar 				       itc;
@@ -527,9 +524,8 @@ module testbench
 						  router_addr_width+
 						  node_addr_width-1];
 			  
-			  wire [0:num_ports-1] 		 route_op;
+			  wire [0:port_idx_width-1] 	 route_port;
 			  wire 				 inc_rc;
-			  wire 				 rtl_error_unmasked;
 			  
 			  c_routing_logic
 			    #(.num_traffic_classes(num_traffic_classes),
@@ -538,7 +534,6 @@ module testbench
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
-			      .restrict_turns(restrict_turns),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
 			      .port_id(ip),
@@ -547,9 +542,8 @@ module testbench
 			  rtl
 			    (.router_address(router_address),
 			     .hop_route_info(hop_route_info),
-			     .route_op(route_op),
-			     .inc_rc(inc_rc),
-			     .error(rtl_error_unmasked));
+			     .route_port(route_port),
+			     .inc_rc(inc_rc));
 			  
 			  wire [0:num_vcs-1] 		 route_ovc;
 			  
@@ -596,26 +590,18 @@ module testbench
 					 num_routing_classes*
 					 num_vcs_per_class){1'b0}};
 			  
-			  assign route_ivc_op[(itc*num_routing_classes+irc)*
-					      num_vcs_per_class*num_ports:
-					      (itc*num_routing_classes+irc+1)*
-					      num_vcs_per_class*num_ports-1]
-				   = {num_vcs_per_class{route_op}};
+			  assign route_port_ivc[(itc*num_routing_classes+irc)*
+						num_vcs_per_class*
+						port_idx_width:
+						(itc*num_routing_classes+irc+1)*
+						num_vcs_per_class*
+						port_idx_width-1]
+				   = {num_vcs_per_class{route_port}};
 			  assign route_ivc_ovc[(itc*num_routing_classes+irc)*
 					       num_vcs_per_class*num_vcs:
 					       (itc*num_routing_classes+irc+1)*
 					       num_vcs_per_class*num_vcs-1]
 				   = {num_vcs_per_class{route_ovc}};
-			  
-			  wire 				 rtl_error;
-			  assign rtl_error
-			    = rtl_error_unmasked & flit_valid &  flit_head;
-			  
-			  assign rtl_error_ivc[(itc*num_routing_classes+irc)*
-					       num_vcs_per_class:
-					       (itc*num_routing_classes+irc+1)*
-					       num_vcs_per_class-1]
-				   = {num_vcs_per_class{rtl_error}};
 			  
 			  wire [0:((irc ==
 				    (num_routing_classes - 1)) ?
@@ -654,7 +640,7 @@ module testbench
 			      .routing_class(irc))
 			  lar
 			    (.router_address(router_address),
-			     .route_op(la_route_op),
+			     .route_port(la_route_port),
 			     .inc_rc(la_inc_rc),
 			     .hop_route_info(hop_route_info_la),
 			     .la_route_info(la_route_info));
@@ -671,29 +657,21 @@ module testbench
 		     
 		  end
 		
-		wire [0:num_ports-1] 			     route_op;
+		wire [0:port_idx_width-1] 		     route_port;
 		
 		if(num_vcs > 1)
-		  begin:route_op_mux
+		  begin:route_port_mux
 		     
 		     wire [0:vc_idx_width-1] flit_vc;
 		     assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
 		     
-		     assign route_op
-		       = route_ivc_op[flit_vc*num_ports +: num_ports];
+		     assign route_port
+		       = route_port_ivc[flit_vc*port_idx_width +: 
+					port_idx_width];
 		     
 		  end
 		else
-		  assign route_op = route_ivc_op;
-		
-		wire [0:port_idx_width-1]    route_port;
-		c_encoder
-		  #(.num_ports(num_ports))
-		route_port_enc
-		  (.data_in(route_op),
-		   .data_out(route_port));
-		
-		assign rtl_error_ip[ip] = |rtl_error_ivc;
+		  assign route_port = route_port_ivc;
 		
 		wire [0:port_idx_width-1]    dest_port_s, dest_port_q;
 		assign dest_port_s = flit_valid ?
@@ -1117,9 +1095,8 @@ module testbench
 	  end
      end
    
-   wire [0:4] tb_errors;
+   wire [0:3] tb_errors;
    assign tb_errors = {|ps_error_ip,
-		       |rtl_error_ip,
 		       |check_error_op,
 		       |x_error_op,
 		       |fifo_error_ip_ivc};

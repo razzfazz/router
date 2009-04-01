@@ -74,6 +74,9 @@ module vcr_top
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -230,7 +233,7 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 	elig_op_ovc;
    wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
-   wire [0:num_ports*num_vcs*num_ports-1] 	    route_ip_ivc_op;
+   wire [0:num_ports*num_vcs*port_idx_width-1] 	    route_port_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    inc_rc_ip_ivc;
    
    wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
@@ -283,21 +286,21 @@ module vcr_top
 	   assign sw_gnt_spec_ivc
 	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_ports-1] route_ivc_op;
-	   wire [0:num_vcs-1] 		inc_rc_ivc;
-	   wire [0:num_vcs-1] 		vc_req_ivc;
-	   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
-	   wire [0:num_vcs-1] 		sw_req_spec_ivc;
-	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	  flit_data_out;
-	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
-	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
-	   wire 			  fbf_write_enable;
-	   wire [0:flit_data_width-1] 	  fbf_write_data;
-	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-	   wire 			  fbf_read_enable;
-	   wire [0:flit_data_width-1] 	  fbf_read_data;
-	   wire 			  ipc_error;
+	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+	   wire [0:num_vcs-1] 		     inc_rc_ivc;
+	   wire [0:num_vcs-1] 		     vc_req_ivc;
+	   wire [0:num_vcs-1] 		     sw_req_nonspec_ivc;
+	   wire [0:num_vcs-1] 		     sw_req_spec_ivc;
+	   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out;
+	   wire [0:flit_data_width-1] 	     flit_data_out;
+	   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out;
+	   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
+	   wire 			     fbf_write_enable;
+	   wire [0:flit_data_width-1] 	     fbf_write_data;
+	   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
+	   wire 			     fbf_read_enable;
+	   wire [0:flit_data_width-1] 	     fbf_read_data;
+	   wire 			     ipc_error;
 	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -332,7 +335,7 @@ module vcr_top
 	      .flit_ctrl_in(flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .route_ivc_op(route_ivc_op),
+	      .route_port_ivc(route_port_ivc),
 	      .inc_rc_ivc(inc_rc_ivc),
 	      .vc_req_ivc(vc_req_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
@@ -365,9 +368,9 @@ module vcr_top
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   
-	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1]
-		    = route_ivc_op;
+	   assign route_port_ip_ivc[ip*num_vcs*port_idx_width:
+				    (ip+1)*num_vcs*port_idx_width-1]
+		    = route_port_ivc;
 	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = inc_rc_ivc;
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
 	   assign sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
@@ -408,7 +411,7 @@ module vcr_top
    vca
      (.clk(clk),
       .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
+      .route_port_ip_ivc(route_port_ip_ivc),
       .inc_rc_ip_ivc(inc_rc_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),
@@ -433,7 +436,7 @@ module vcr_top
    swa
      (.clk(clk),
       .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
+      .route_port_ip_ivc(route_port_ip_ivc),
       .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
       .req_spec_ip_ivc(sw_req_spec_ip_ivc),
       .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),

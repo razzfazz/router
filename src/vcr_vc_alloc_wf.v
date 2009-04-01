@@ -30,11 +30,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant based using wavefront allocation
 module vcr_vc_alloc_wf
-  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
+  (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
@@ -54,6 +64,9 @@ module vcr_vc_alloc_wf
    // number of input and output ports on switch
    parameter num_ports = 5;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // select which wavefront allocator variant to use
    parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
    
@@ -63,7 +76,7 @@ module vcr_vc_alloc_wf
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
    // transition to next routing class
    input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
@@ -145,7 +158,7 @@ module vcr_vc_alloc_wf
 	   for(ip = 0; ip < num_ports; ip = ip + 1)
 	     begin:ips
 		
-		wire [0:num_routing_classes*num_vcs_per_class-1]    req_irc_icvc;
+		wire [0:num_routing_classes*num_vcs_per_class-1] req_irc_icvc;
 		assign req_irc_icvc
 		  = req_ip_ivc[(ip*num_traffic_classes+tc)*
 			       num_routing_classes*num_vcs_per_class:
@@ -159,15 +172,15 @@ module vcr_vc_alloc_wf
 				       num_vcs_per_class-1]
 			 = req_irc_icvc;
 		
-		wire [0:num_routing_classes*num_vcs_per_class*num_ports-1] 
-		  route_irc_icvc_op;
-		assign route_irc_icvc_op
-		  = route_ip_ivc_op[(ip*num_traffic_classes+tc)*
-				    num_routing_classes*num_vcs_per_class*
-				    num_ports:
-				    (ip*num_traffic_classes+tc+1)*
-				    num_routing_classes*num_vcs_per_class*
-				    num_ports-1];
+		wire [0:num_routing_classes*num_vcs_per_class*port_idx_width-1] 
+		  route_port_irc_icvc;
+		assign route_port_irc_icvc
+		  = route_port_ip_ivc[(ip*num_traffic_classes+tc)*
+				      num_routing_classes*num_vcs_per_class*
+				      port_idx_width:
+				      (ip*num_traffic_classes+tc+1)*
+				      num_routing_classes*num_vcs_per_class*
+				      port_idx_width-1];
 		
 		wire [0:num_routing_classes*num_vcs_per_class-1] 
                   inc_rc_irc_icvc;
@@ -213,11 +226,15 @@ module vcr_vc_alloc_wf
 		       = req_irc_icvc[irc*num_vcs_per_class:
 				      (irc+1)*num_vcs_per_class-1];
 		     
-		     wire [0:num_vcs_per_class*num_ports-1] route_icvc_op;
-		     assign route_icvc_op
-		       = route_irc_icvc_op[irc*num_vcs_per_class*num_ports:
-					   (irc+1)*num_vcs_per_class*num_ports
-					   -1];
+		     wire [0:num_vcs_per_class*port_idx_width-1] 
+                       route_port_icvc;
+		     assign route_port_icvc
+		       = route_port_irc_icvc[irc*
+					     num_vcs_per_class*
+					     port_idx_width:
+					     (irc+1)*
+					     num_vcs_per_class*
+					     port_idx_width-1];
 		     
 		     wire [0:num_vcs_per_class-1] 	    inc_rc_icvc;
 		     assign inc_rc_icvc
@@ -258,10 +275,10 @@ module vcr_vc_alloc_wf
 			  wire req;
 			  assign req = req_icvc[icvc];
 			  
-			  wire [0:num_ports-1] route_op;
-			  assign route_op
-			    = route_icvc_op[icvc*num_ports:
-					    (icvc+1)*num_ports-1];
+			  wire [0:port_idx_width-1] route_port;
+			  assign route_port
+			    = route_port_icvc[icvc*port_idx_width:
+					      (icvc+1)*port_idx_width-1];
 			  
 			  wire 		       inc_rc;
 			  assign inc_rc = inc_rc_irc_icvc[icvc];
@@ -286,7 +303,7 @@ module vcr_vc_alloc_wf
 					       num_vcs_per_class-1];
 			       
 			       wire route;
-			       assign route = route_op[op];
+			       assign route = (route_port == op);
 			       
 			       wire [0:num_routing_classes*num_vcs_per_class-1] 
                                  req_wf_orc_ocvc;

@@ -81,7 +81,7 @@ module packet_source
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -491,7 +491,6 @@ module packet_source
    
    wire [0:route_info_width-1] route_info;
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
-   wire [0:num_vcs-1] 			  rtl_error_ivc;
    
    generate
       
@@ -521,8 +520,7 @@ module packet_source
 					num_routing_classes*
 					router_addr_width+node_addr_width-1];
 		
-		wire 			       rtl_error;
-		wire [0:num_ports-1] 	       route_op;
+		wire [0:port_idx_width-1]      route_port;
 		wire 			       inc_rc;
 		c_routing_logic
 		  #(.num_traffic_classes(num_traffic_classes),
@@ -531,7 +529,6 @@ module packet_source
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
-		    .restrict_turns(restrict_turns),
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
 		    .port_id(port_id),
@@ -540,16 +537,15 @@ module packet_source
 		rtl
 		  (.router_address(router_address),
 		   .hop_route_info(hop_route_info),
-		   .route_op(route_op),
-		   .inc_rc(inc_rc),
-		   .error(rtl_error));
+		   .route_port(route_port),
+		   .inc_rc(inc_rc));
 		
 		wire [0:la_route_info_width-1] la_route_info;
 		
-		assign la_route_info[0:num_ports-1] = route_op;
+		assign la_route_info[0:port_idx_width-1] = route_port;
 		
 		if(num_routing_classes > 1)
-		  assign la_route_info[num_ports] = inc_rc;
+		  assign la_route_info[port_idx_width] = inc_rc;
 		
 		assign la_route_info_ivc[(itc*num_routing_classes+irc)*
 					 num_vcs_per_class*
@@ -558,12 +554,6 @@ module packet_source
 					 num_vcs_per_class*
 					 la_route_info_width-1]
 		    = {num_vcs_per_class{la_route_info}};
-		
-		assign rtl_error_ivc[(itc*num_routing_classes+irc)*
-				     num_vcs_per_class:
-				     (itc*num_routing_classes+irc+1)*
-				     num_vcs_per_class-1]
-			 = {num_vcs_per_class{rtl_error}};
 		
 	     end
 	   
@@ -725,9 +715,6 @@ module packet_source
 	      data_q[0:header_info_width-1];
    assign flit_data[header_info_width:flit_data_width-1]
 	    = data_q[header_info_width:flit_data_width-1];
-   
-   wire 				  rtl_error;
-   assign rtl_error = |rtl_error_ivc;
    
    assign error = |error_hct_ovc | |error_cred_ovc;
    

@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic
 module c_la_routing_logic
-  (router_address, route_op, inc_rc, hop_route_info, la_route_info);
+  (router_address, route_port, inc_rc, hop_route_info, la_route_info);
    
 `include "c_constants.v"
    
@@ -61,7 +61,7 @@ module c_la_routing_logic
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -115,7 +115,7 @@ module c_la_routing_logic
    input [0:router_addr_width-1] router_address;
    
    // port on which the packet will leave the current router
-   input [0:num_ports-1] route_op;
+   input [0:port_idx_width-1] route_port;
    
    // will the routing class be incremented at the current router?
    input inc_rc;
@@ -157,7 +157,7 @@ module c_la_routing_logic
 	   wire next_inc_rc;
 	   assign next_inc_rc = (next_router_address == dest_router_address);
 	   
-	   assign la_route_info[num_ports] = next_inc_rc;
+	   assign la_route_info[port_idx_width] = next_inc_rc;
 	   
 	end
       else
@@ -175,11 +175,6 @@ module c_la_routing_logic
 	     = router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
 	   
 	   wire [0:dim_addr_width-1] next_dim_addr;
-	   
-	   wire [0:num_neighbors_per_dim-1] next_neighbor;
-	   assign next_neighbor
-	     = route_op[dim*num_neighbors_per_dim:
-			(dim+1)*num_neighbors_per_dim-1];
 	   
 	   assign dim_addr_match[dim] = (next_dim_addr == dest_dim_addr);
 	   
@@ -217,8 +212,22 @@ module c_la_routing_logic
 	     `ROUTING_FUNCTION_TYPE_MESH:
 	       begin
 		  
-		  assign next_dim_addr
-		    = curr_dim_addr - next_neighbor[0] + next_neighbor[1];
+		  wire 			    route_down;
+		  assign route_down = (route_port == dim*num_neighbors_per_dim);
+		  
+		  wire 			    route_up;
+		  assign route_up = (route_port == dim*num_neighbors_per_dim+1);
+		  
+		  // Assemble a delta value for the address segment 
+		  // corresponding to the current dimension; the delta can have
+		  // the values -1 (i.e., all ones in two's complement), 0 or 1
+		  wire [0:dim_addr_width-1] addr_delta;
+		  if(dim_addr_width > 1)
+		    assign addr_delta[0:dim_addr_width-2]
+			     = {(dim_addr_width-1){route_down}};
+		  assign addr_delta[dim_addr_width-1] = route_down | route_up;
+		  
+		  assign next_dim_addr = curr_dim_addr + addr_delta;
 		  
 		  assign port_dec
 		    = {next_dim_addr < dest_dim_addr,
@@ -228,10 +237,14 @@ module c_la_routing_logic
 	     
 	     `ROUTING_FUNCTION_TYPE_FBFLY:
 	       begin
-
-		  assign next_dim_addr = |next_neighbor ?
-					 dest_dim_addr :
-					 curr_dim_addr;
+		  
+		  wire route_dest;
+		  assign route_dest
+		    = (route_port >= (dim*num_neighbors_per_dim)) &&
+		      (route_port < ((dim+1)*num_neighbors_per_dim));
+		  
+		  assign next_dim_addr
+		    = route_dest ? dest_dim_addr : curr_dim_addr;
 		  
 		  wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
 		  c_decoder
@@ -290,6 +303,13 @@ module c_la_routing_logic
       
    endgenerate
    
-   assign la_route_info[0:num_ports-1] = next_route_op;
+   wire [0:port_idx_width-1] 		   next_route_port;
+   c_encoder
+     #(.num_ports(num_ports))
+   next_route_port_enc
+     (.data_in(next_route_op),
+      .data_out(next_route_port));
+   
+   assign la_route_info[0:port_idx_width-1] = next_route_port;
    
 endmodule

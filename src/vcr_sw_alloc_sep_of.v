@@ -30,17 +30,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant using separable output-first allocation
 module vcr_sw_alloc_sep_of
-  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+  (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of VCs
    parameter num_vcs = 4;
    
    // number of input and output ports on switch
    parameter num_ports = 5;
+   
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -54,7 +67,7 @@ module vcr_sw_alloc_sep_of
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
@@ -99,9 +112,34 @@ module vcr_sw_alloc_sep_of
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire [0:num_vcs*num_ports-1] route_ivc_op;
-	   assign route_ivc_op
-	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
+	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+	   assign route_port_ivc
+	     = route_port_ip_ivc[ip*num_vcs*port_idx_width:
+				 (ip+1)*num_vcs*port_idx_width-1];
+	   
+	   wire [0:num_vcs*num_ports-1]      route_ivc_op;
+	   
+	   genvar 			     ivc;
+	   
+	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	     begin:ivcs
+		
+		wire [0:port_idx_width-1] route_port;
+		assign route_port = route_port_ivc[ivc*port_idx_width:
+						   (ivc+1)*port_idx_width-1];
+		
+		wire [0:num_ports-1] 	  route_op;
+		c_decoder
+		  #(.num_ports(num_ports))
+		route_op_dec
+		  (.data_in(route_port),
+		   .data_out(route_op));
+		
+		assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
+			 = route_op;
+		
+	     end
+	   
 	   
 	   //-------------------------------------------------------------------
 	   // combine requests from all VCs
