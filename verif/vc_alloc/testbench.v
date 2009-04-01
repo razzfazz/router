@@ -43,6 +43,16 @@ module testbench
 `include "c_constants.v"
 `include "vcr_constants.v"
    
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
@@ -71,10 +81,8 @@ module testbench
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // filter out illegal destination ports
-   // (the intent is to allow synthesis to optimize away the logic associated 
-   // with such turns)
-   parameter restrict_turns = 0;
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
@@ -99,13 +107,13 @@ module testbench
       #(Tclk/2);
    end
 
-   wire [0:num_ports*num_vcs*num_ports-1] route_masked_ip_ivc_op;
-   wire [0:num_ports*num_vcs-1] 	  inc_rc_ip_ivc;
+   wire [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	       inc_rc_ip_ivc;
    
-   wire [0:num_ports*num_vcs-1] 	  elig_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	       elig_op_ovc;
    assign elig_op_ovc = {num_ports*num_vcs{1'b1}};
    
-   wire [0:num_ports*num_vcs-1] 	  req_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	       req_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc;
    
    wire [0:num_ports*num_vcs*num_ports*num_vcs-1] gnt_ip_ivc_op_ovc;
@@ -154,7 +162,7 @@ module testbench
 	   
 	   wire [0:num_vcs-1] req_ivc;
 	   wire [0:num_vcs-1] inc_rc_ivc;
-	   wire [0:num_vcs*num_ports-1] route_masked_ivc_op;
+	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
 
 	   wire [0:num_vcs*num_ports*num_vcs-1] req_ivc_op_ovc;
 	   wire [0:num_vcs*num_ports*num_vcs-1] gnt_ivc_op_ovc;
@@ -175,20 +183,20 @@ module testbench
 		       begin:icvcs
 
 			  reg req;
-			  reg [0:num_ports-1] route_op;
+			  reg [0:port_idx_width-1] route_port;
 			  reg 		      inc_rc;
 			  always@ (posedge clk)
 			    begin
 			       if(reset)
 				 begin
 				    req <= 1'b0;
-				    route_op <= {num_ports{1'b0}};
+				    route_port <= {port_idx_width{1'b0}};
 				    inc_rc <= 1'b0;
 				 end
 			       else
 				 begin
 				    req <= ($dist_uniform(seed, 0, 99) < rate);
-				    route_op <= (1 << $dist_uniform(seed, 0, num_ports-1));
+				    route_port <= $dist_uniform(seed, 0, num_ports-1);
 				    if(irc < (num_routing_classes - 1))
 				      inc_rc <= ($dist_uniform(seed, 0, 99) < inc_rc_rate);
 				    else
@@ -203,35 +211,13 @@ module testbench
 					    num_vcs_per_class+icvc]
 				   = inc_rc;
 			  
-			  wire [0:num_ports-1] route_masked_op;
-			  wire 		       error;
-			  
-			  c_port_filter
-			    #(.num_traffic_classes(num_traffic_classes),
-			      .num_routing_classes(num_routing_classes),
-			      .num_ports(num_ports),
-			      .num_neighbors_per_dim(num_neighbors_per_dim),
-			      .num_nodes_per_router(num_nodes_per_router),
-			      .restrict_turns(restrict_turns),
-			      .routing_function_type(routing_function_type),
-			      .port_id(ip),
-			      .traffic_class(itc),
-			      .routing_class(irc))
-			  pf
-			    (.route_in_op(route_op),
-			     .inc_rc(inc_rc),
-			     .route_out_op(route_masked_op),
-			     .error(error));
-			  
-			  assign route_masked_ivc_op[((itc*num_routing_classes+
-						       irc)*
-						      num_vcs_per_class+icvc)*
-						     num_ports:
-						     ((itc*num_routing_classes+
-						       irc)*
-						      num_vcs_per_class+icvc+1)*
-						     num_ports-1]
-				   = route_masked_op;
+			  assign route_port_ivc[((itc*num_routing_classes+irc)*
+						 num_vcs_per_class+icvc)*
+						port_idx_width:
+						((itc*num_routing_classes+irc)*
+						 num_vcs_per_class+icvc+1)*
+						port_idx_width-1]
+				   = route_port;
 
 			  wire [0:num_vcs-1] req_ovc;
 			  
@@ -277,12 +263,19 @@ module testbench
 					 num_routing_classes*
 					 num_vcs_per_class){1'b0}};
 			  
+			  wire [0:num_ports-1] route_op;
+			  c_decoder
+			    #(.num_ports(num_ports))
+			  route_op_dec
+			    (.data_in(route_port),
+			     .data_out(route_op));
+			  
 			  wire [0:num_ports*num_vcs-1] req_op_ovc;
 			  c_vec_prod
 			    #(.num_rows(num_ports),
 			      .num_cols(num_vcs))
 			  req_op_ovc_vprod
-			    (.col_vec(route_masked_op),
+			    (.col_vec(route_op),
 			     .row_vec(req_ovc),
 			     .result(req_op_ovc));
 			  
@@ -315,7 +308,7 @@ module testbench
 			    #(.num_rows(num_ports),
 			      .num_cols(num_vcs))
 			  gnt_op_ovc_vprod
-			    (.col_vec(route_masked_op),
+			    (.col_vec(route_op),
 			     .row_vec(gnt_masked_ovc),
 			     .result(gnt_op_ovc));
 			  
@@ -338,9 +331,9 @@ module testbench
 	   assign req_ip_ivc_op_ovc[ip*num_vcs*num_ports*num_vcs:
 				    (ip+1)*num_vcs*num_ports*num_vcs-1]
 		    = req_ivc_op_ovc;
-	   assign route_masked_ip_ivc_op[ip*num_vcs*num_ports:
-					 (ip+1)*num_vcs*num_ports-1]
-		    = route_masked_ivc_op;
+	   assign route_port_ip_ivc[ip*num_vcs*port_idx_width:
+				    (ip+1)*num_vcs*port_idx_width-1]
+		    = route_port_ivc;
 	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 		    = inc_rc_ivc;
 	   
@@ -363,7 +356,7 @@ module testbench
    vca
      (.clk(clk),
       .reset(reset),
-      .route_ip_ivc_op(route_masked_ip_ivc_op),
+      .route_port_ip_ivc(route_port_ip_ivc),
       .inc_rc_ip_ivc(inc_rc_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(req_ip_ivc),
