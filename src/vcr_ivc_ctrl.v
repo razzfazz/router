@@ -891,10 +891,10 @@ module vcr_ivc_ctrl
 		  assign free = free_ocvc[ocvc*2:(ocvc+1)*2-1];
 		  
 		  wire [0:2] free_by_count;
-		  assign free_by_count = {&free, free[0], |free};
+		  assign free_by_count = {|free, free[0], &free};
 		  
 		  wire       next_free;
-		  assign next_free = free_by_count[flit_sent_count*2 +: 2];
+		  assign next_free = free_by_count[flit_sent_count];
 		  
 		  assign next_free_ocvc[ocvc] = next_free;
 		  
