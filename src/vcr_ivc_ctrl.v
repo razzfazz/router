@@ -965,7 +965,8 @@ module vcr_ivc_ctrl
 	     assign has_cred_s
 	       = (vc_gnt ?
 		  ~sw_gnt_spec :
-		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | cred;
+		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | 
+		 cred;
 	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type))
@@ -978,7 +979,7 @@ module vcr_ivc_ctrl
 	     assign free_allocated = has_cred_q;
 	     
 	     wire 			       incr_cred_hold;
-	     assign incr_cred_hold = cred & ~sw_gnt_nonspec;
+	     assign incr_cred_hold = cred & ~sw_gnt_nonspec & has_cred_q;
 	     
 	     wire 			       decr_cred_hold;
 	     assign decr_cred_hold = ~cred & sw_gnt_nonspec & |cred_hold_q;
