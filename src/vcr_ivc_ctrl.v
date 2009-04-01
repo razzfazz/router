@@ -829,9 +829,13 @@ module vcr_ivc_ctrl
       
       case(credit_handling_type)
 	
+	// the current number of credits available are transmitted from the 
+	// output controllers as a multi-level signal (0, 1, 2 or 3+ credits
+	// currently available)
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
+	     // credit status for the case where we do not change routing class
 	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
 	     assign free_unchanged_ocvc
 	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -846,6 +850,7 @@ module vcr_ivc_ctrl
 	     else
 	       begin
 		  
+		  // credit status in case we change routing class
 		  wire [0:num_vcs_per_class*2-1] free_changed_ocvc;
 		  assign free_changed_ocvc
 		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -914,9 +919,14 @@ module vcr_ivc_ctrl
 	     
 	  end
 	
+	// credits are forwarded from the output controllers individually as 
+	// pulses, accumulated at the input controllers, and used whenever a
+	// flit is sent to the crossbar
 	`CREDIT_HANDLING_TYPE_PUSH:
 	  begin
 	     
+	     // credit indicator for the case where we do not change the 
+	     // routing class
 	     wire [0:num_vcs_per_class-1] cred_unchanged_ocvc;
 	     assign cred_unchanged_ocvc
 	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -931,6 +941,7 @@ module vcr_ivc_ctrl
 	     else
 	       begin
 		  
+		  // credit status for the case where the routing class changes
 		  wire [0:num_vcs_per_class-1] cred_changed_ocvc;
 		  assign cred_changed_ocvc
 		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
