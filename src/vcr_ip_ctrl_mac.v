@@ -295,8 +295,7 @@ module vcr_ip_ctrl_mac
    wire 			  fbf_read_enable;
    
    // flit buffer read data
-   output [0:flit_data_width-1] fbf_read_data;
-   wire [0:flit_data_width-1] 	  fbf_read_data;
+   input [0:flit_data_width-1] fbf_read_data;
    
    // internal error condition detected
    output error;
