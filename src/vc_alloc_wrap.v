@@ -46,6 +46,26 @@ module vc_alloc_wrap
       end
    endfunction
    
+   // compute ceiling of base-th root of argument
+   function integer croot(input integer argument, input integer base);
+      integer 		     i;
+      integer 		     j;
+      begin
+	 croot = 0;
+	 i = 0;
+	 while(i < argument)
+	   begin
+	      croot = croot + 1;
+	      i = 1;
+	      for(j = 0; j < base; j = j + 1)
+		i = i * croot;
+	   end
+      end
+   endfunction
+   
+   // select network topology
+   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
+   
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
@@ -61,14 +81,29 @@ module vc_alloc_wrap
    // number of VCs
    localparam num_vcs = num_classes * num_vcs_per_class;
    
+   // total number of nodes
+   parameter num_nodes = 64;
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
-   // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
-   
    // number of nodes per router (a.k.a. concentration factor)
    parameter num_nodes_per_router = 4;
+   
+   // total number of routers
+   localparam num_routers
+     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+   
+   // number of routers in each dimension
+   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
+   
+   // number of adjacent routers in each dimension
+   localparam num_neighbors_per_dim
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       2 :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports
@@ -78,13 +113,18 @@ module vc_alloc_wrap
    localparam port_idx_width = clogb(num_ports);
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
-   
-   // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   localparam routing_function_type
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       `ROUTING_FUNCTION_TYPE_MESH :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       `ROUTING_FUNCTION_TYPE_FBFLY :
+       -1;
    
    // select implementation variant for VC allocator
    parameter allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   
+   // select which arbiter type to use in allocator
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -123,7 +163,7 @@ module vc_alloc_wrap
    output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
    
-   vcr_vc_alloc
+   vcr_vc_alloc_mac
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),
