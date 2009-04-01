@@ -157,11 +157,6 @@ module vcr_ip_ctrl_mac
    // controller
    parameter track_vcs_at_output = 0;
    
-   // filter out illegal destination ports
-   // (the intent is to allow synthesis to optimize away the logic associated 
-   // with such turns)
-   parameter restrict_turns = 1;
-   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -413,7 +408,6 @@ module vcr_ip_ctrl_mac
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .track_vcs_at_output(track_vcs_at_output),
-	       .restrict_turns(restrict_turns),
 	       .routing_function_type(routing_function_type),
 	       .dimension_order(dimension_order),
 	       .credit_handling_type(credit_handling_type),
