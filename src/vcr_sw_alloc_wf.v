@@ -376,7 +376,8 @@ module vcr_sw_alloc_wf
    // mask speculative requests that conflict with non-speculative ones
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] spec_mask_ip_op;
+   wire [0:num_ports-1] unused_by_nonspec_ip;
+   wire [0:num_ports-1] unused_by_nonspec_op;
    
    generate
       
@@ -385,19 +386,21 @@ module vcr_sw_alloc_wf
 	`SW_SPEC_LEVEL_NONE:
 	  begin
 	     
-	     assign spec_mask_ip_op = {num_ports*num_ports{1'b0}};
+	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
+	     assign unused_by_nonspec_op = {num_ports{1'b0}};
 	     
 	  end
 	
 	`SW_SPEC_LEVEL_ANY_NONSPEC_MASKS:
 	  begin
 	     
-	     assign spec_mask_ip_op
-	       = {num_ports*num_ports{~|req_wf_nonspec_ip_op}};
+	     assign unused_by_nonspec_ip = {num_ports{~|req_nonspec_ip_ivc}};
+	     assign unused_by_nonspec_op = {num_ports{1'b1}};
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS:
+	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS,
+	`SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
@@ -408,34 +411,19 @@ module vcr_sw_alloc_wf
 	       (.data_in(req_wf_nonspec_ip_op),
 		.data_out(req_wf_nonspec_op_ip));
 	     
-	     wire [0:num_ports-1] 	    any_req_ip;
-	     c_or_nto1
+	     c_nor_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     any_req_ip_or
+	     unused_by_nonspec_ip_nor
 	       (.data_in(req_wf_nonspec_op_ip),
-		.data_out(any_req_ip));
+		.data_out(unused_by_nonspec_ip));
 	     
-	     wire [0:num_ports*num_ports-1] any_req_in_ip_op;
-	     c_replicator
-	       #(.width(num_ports),
-		 .count(num_ports))
-	     any_req_in_ip_op_repl
-	       (.data_in(any_req_ip),
-		.data_out(any_req_in_ip_op));
-	     
-	     wire [0:num_ports-1] 	    any_req_op;
-	     c_or_nto1
+	     c_nor_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     any_req_op_or
+	     unused_by_nonspec_op_nor
 	       (.data_in(req_wf_nonspec_ip_op),
-		.data_out(any_req_op));
-	     
-	     wire [0:num_ports*num_ports-1] any_req_wf_ip_op;
-	     assign any_req_wf_ip_op = {num_ports{any_req_op}};
-	     
-	     assign spec_mask_ip_op = ~(any_req_in_ip_op | any_req_wf_ip_op);
+		.data_out(unused_by_nonspec_op));
 	     
 	  end
 	
@@ -450,40 +438,34 @@ module vcr_sw_alloc_wf
 	       (.data_in(gnt_wf_nonspec_ip_op),
 		.data_out(gnt_wf_nonspec_op_ip));
 	     
-	     wire [0:num_ports-1] 	    any_gnt_ip;
-	     c_or_nto1
+	     c_nor_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     any_gnt_ip_or
+	     unused_by_nonspec_ip_nor
 	       (.data_in(gnt_wf_nonspec_op_ip),
-		.data_out(any_gnt_ip));
+		.data_out(unused_by_nonspec_ip));
 	     
-	     wire [0:num_ports*num_ports-1] any_gnt_in_ip_op;
-	     c_replicator
-	       #(.width(num_ports),
-		 .count(num_ports))
-	     any_gnt_in_ip_op_repl
-	       (.data_in(any_gnt_ip),
-		.data_out(any_gnt_in_ip_op));
-	     
-	     wire [0:num_ports-1] 	    any_gnt_op;
-	     c_or_nto1
+	     c_nor_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     any_gnt_op_or
+	     unused_by_nonspec_op_nor
 	       (.data_in(gnt_wf_nonspec_ip_op),
-		.data_out(any_gnt_op));
-	     
-	     wire [0:num_ports*num_ports-1] any_gnt_wf_ip_op;
-	     assign any_gnt_wf_ip_op = {num_ports{any_gnt_op}};
-	     
-	     assign spec_mask_ip_op = ~(any_gnt_in_ip_op | any_gnt_wf_ip_op);
+		.data_out(unused_by_nonspec_op));
 	     
 	  end
    
       endcase
       
    endgenerate
+   
+   wire [0:num_ports*num_ports-1] 	    spec_mask_ip_op;
+   c_vec_prod
+     #(.num_rows(num_ports),
+       .num_cols(num_ports))
+   spec_mask_ip_op_vprod
+     (.col_vec(unused_by_nonspec_ip),
+      .row_vec(unused_by_nonspec_op),
+      .result(spec_mask_ip_op));
    
    
    //---------------------------------------------------------------------------
@@ -516,20 +498,30 @@ module vcr_sw_alloc_wf
 	   wire update_alloc_spec;
 	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
-	   wire [0:num_ports*num_ports-1] gnt_wf_unmasked_spec_ip_op;
+	   wire [0:num_ports*num_ports-1] req_wf_spec_int_ip_op;
+	   if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
+	     assign req_wf_spec_int_ip_op
+	       = req_wf_spec_ip_op & spec_mask_ip_op;
+	   else
+	     assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
+	   
+	   wire [0:num_ports*num_ports-1] gnt_wf_spec_int_ip_op;
 	   c_wf_alloc
 	     #(.num_ports(num_ports),
 	       .wf_allocator_type(wf_allocator_type),
 	       .reset_type(reset_type))
-	   gnt_wf_unmasked_spec_ip_op_alloc
+	   gnt_wf_spec_int_ip_op_alloc
 	     (.clk(clk),
 	      .reset(reset),
 	      .update(update_alloc_spec),
-	      .req(req_wf_spec_ip_op),
-	      .gnt(gnt_wf_unmasked_spec_ip_op));
+	      .req(req_wf_spec_int_ip_op),
+	      .gnt(gnt_wf_spec_int_ip_op));
 	   
-	   assign gnt_wf_spec_ip_op
-	     = gnt_wf_unmasked_spec_ip_op & spec_mask_ip_op;
+	   if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
+	     assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op;
+	   else
+	     assign gnt_wf_spec_ip_op
+	       = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
 	   
 	end
       else
