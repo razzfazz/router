@@ -242,7 +242,7 @@ module vcr_la_routing_logic
 		  wire route_dest;
 		  assign route_dest
 		    = (route_port >= (dim*num_neighbors_per_dim)) &&
-		      (route_port < ((dim+1)*num_neighbors_per_dim));
+		      (route_port <= ((dim+1)*num_neighbors_per_dim-1));
 		  
 		  assign next_dim_addr
 		    = route_dest ? dest_dim_addr : curr_dim_addr;
