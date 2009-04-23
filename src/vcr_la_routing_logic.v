@@ -28,10 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// module to determine the output port and VC based on routing information 
-// (e.g. destination address) and the current input port and VC)
-module c_routing_logic
-  (router_address, hop_route_info, route_port, inc_rc);
+// lookahead routing logic
+module vcr_la_routing_logic
+  (router_address, route_port, inc_rc, hop_route_info, la_route_info);
    
 `include "c_constants.v"
    
@@ -59,6 +58,10 @@ module c_routing_logic
    
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -104,57 +107,78 @@ module c_routing_logic
    localparam hop_route_info_width
      = (routing_class == (num_routing_classes - 1)) ?
        addr_width :
-       router_addr_width;
+       (routing_class == (num_routing_classes - 2)) ?
+       (router_addr_width + addr_width) :
+       (2 * router_addr_width);
    
    // current router's address
    input [0:router_addr_width-1] router_address;
    
+   // port on which the packet will leave the current router
+   input [0:port_idx_width-1] route_port;
+   
+   // will the routing class be incremented at the current router?
+   input inc_rc;
+   
    // routing data
    input [0:hop_route_info_width-1] hop_route_info;
    
-   // output port to forward to
-   output [0:port_idx_width-1] route_port;
-   wire [0:port_idx_width-1] route_port;
-   
-   // if we have reached our destination for the current routing class, 
-   // increment the routing class (unless it's already the highest)
-   output inc_rc;
-   wire 		inc_rc;
+   // lookahead routing information for next router
+   output [0:la_route_info_width-1] la_route_info;
+   wire [0:la_route_info_width-1] la_route_info;
    
    // address of destination router for current routing class
-   wire [0:router_addr_width-1] dest_router_address;
-   assign dest_router_address
-     = hop_route_info[0:router_addr_width-1];
+   wire [0:router_addr_width-1]   dest_router_address;
    
-   wire 			reached_dest;
-   assign reached_dest = (router_address == dest_router_address);
+   // address of the downstream router
+   wire [0:router_addr_width-1]   next_router_address;
    
-   wire [0:num_ports-1] 	route_op;
-   wire [0:num_dimensions-1] 	dim_addr_match;
+   wire [0:num_dimensions-1] 	  dim_addr_match;
+   
+   wire [0:num_ports-1] 	  next_route_op;
+   
+   wire 			  eject;
+   
+   genvar 			  dim;
    
    generate
-   
-      if(routing_class == (num_routing_classes - 1))
-	assign inc_rc = 1'b0;
-      else
-	assign inc_rc = reached_dest;
       
-      genvar 			dim;
+      if(num_routing_classes > 1)
+	begin
+	   
+	   if(routing_class == (num_routing_classes - 1))
+	     assign dest_router_address = hop_route_info[0:router_addr_width-1];
+	   else
+	     assign dest_router_address
+	       = inc_rc ?
+		 hop_route_info[0:router_addr_width-1] :
+		 hop_route_info[router_addr_width:2*router_addr_width-1];
+	   
+	   wire next_inc_rc;
+	   assign next_inc_rc = (next_router_address == dest_router_address);
+	   
+	   assign la_route_info[port_idx_width] = next_inc_rc;
+	   
+	end
+      else
+	assign dest_router_address = hop_route_info[0:router_addr_width-1];
       
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
 	   
-	   wire [0:dim_addr_width-1] dim_addr;
-	   assign dim_addr
+	   wire [0:dim_addr_width-1] dest_dim_addr;
+	   assign dest_dim_addr
 	     = dest_router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
 	   
-	   wire [0:dim_addr_width-1] local_dim_addr;
-	   assign local_dim_addr
+	   wire [0:dim_addr_width-1] curr_dim_addr;
+	   assign curr_dim_addr
 	     = router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
 	   
-	   assign dim_addr_match[dim] = (dim_addr == local_dim_addr);
+	   wire [0:dim_addr_width-1] next_dim_addr;
 	   
-	   wire 		     dim_sel;
+	   assign dim_addr_match[dim] = (next_dim_addr == dest_dim_addr);
+	   
+	   wire 			    dim_sel;
 	   
 	   if((dimension_order == `DIMENSION_ORDER_ASCENDING) ||
 	      ((dimension_order == `DIMENSION_ORDER_BY_CLASS) &&
@@ -179,79 +203,113 @@ module c_routing_logic
 	   
 	   wire [0:num_neighbors_per_dim-1] port_dec;
 	   
+	   assign next_router_address[dim*dim_addr_width:
+				      (dim+1)*dim_addr_width-1]
+		    = next_dim_addr;
+	   
 	   case(routing_function_type)
 	     
 	     `ROUTING_FUNCTION_TYPE_MESH:
 	       begin
 		  
+		  wire 			    route_down;
+		  assign route_down = (route_port == dim*num_neighbors_per_dim);
+		  
+		  wire 			    route_up;
+		  assign route_up = (route_port == dim*num_neighbors_per_dim+1);
+		  
+		  // Assemble a delta value for the address segment 
+		  // corresponding to the current dimension; the delta can have
+		  // the values -1 (i.e., all ones in two's complement), 0 or 1
+		  wire [0:dim_addr_width-1] addr_delta;
+		  if(dim_addr_width > 1)
+		    assign addr_delta[0:dim_addr_width-2]
+			     = {(dim_addr_width-1){route_down}};
+		  assign addr_delta[dim_addr_width-1] = route_down | route_up;
+		  
+		  assign next_dim_addr = curr_dim_addr + addr_delta;
+		  
 		  assign port_dec
-		    = {dim_addr < local_dim_addr, dim_addr > local_dim_addr};
+		    = {next_dim_addr < dest_dim_addr,
+		       next_dim_addr > dest_dim_addr};
 		  
 	       end
 	     
 	     `ROUTING_FUNCTION_TYPE_FBFLY:
 	       begin
 		  
-		  wire [0:num_routers_per_dim-1] dim_addr_dec;
+		  wire route_dest;
+		  assign route_dest
+		    = (route_port >= (dim*num_neighbors_per_dim)) &&
+		      (route_port < ((dim+1)*num_neighbors_per_dim));
+		  
+		  assign next_dim_addr
+		    = route_dest ? dest_dim_addr : curr_dim_addr;
+		  
+		  wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
 		  c_decoder
 		    #(.num_ports(num_routers_per_dim))
-		  dim_addr_dec_dec
-		    (.data_in(dim_addr),
-		     .data_out(dim_addr_dec));
+		  dest_dim_addr_dec_dec
+		    (.data_in(dest_dim_addr),
+		     .data_out(dest_dim_addr_dec));
 		  
-		  wire [0:(2*num_routers_per_dim-1)-1] dim_addr_dec_repl;
-		  assign dim_addr_dec_repl
-		    = {dim_addr_dec, dim_addr_dec[0:(num_routers_per_dim-1)-1]};
+		  wire [0:(2*num_routers_per_dim-1)-1] dest_dim_addr_dec_repl;
+		  assign dest_dim_addr_dec_repl
+		    = {dest_dim_addr_dec,
+		       dest_dim_addr_dec[0:(num_routers_per_dim-1)-1]};
 		  
 		  assign port_dec
-		    = dim_addr_dec_repl[(local_dim_addr+1) +:
-					num_neighbors_per_dim];
+		    = dest_dim_addr_dec_repl[(next_dim_addr+1) +:
+					     num_neighbors_per_dim];
 		  
 	       end
 	     
 	   endcase
 	   
-	   assign route_op[dim*num_neighbors_per_dim:
-			   (dim+1)*num_neighbors_per_dim-1]
+	   assign next_route_op[dim*num_neighbors_per_dim:
+				(dim+1)*num_neighbors_per_dim-1]
 		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
       
       if(routing_class == (num_routing_classes - 1))
+	assign eject = &dim_addr_match;
+      else if(routing_class == (num_routing_classes - 2))
+	assign eject = &dim_addr_match & inc_rc;
+      else
+	assign eject = 1'b0;
+      
+      if(num_nodes_per_router > 1)
 	begin
 	   
-	   if(num_nodes_per_router > 1)
-	     begin
-		
-		wire [0:node_addr_width-1] 	dest_node_address;
-		assign dest_node_address
-		  = hop_route_info[router_addr_width:hop_route_info_width-1];
-		
-		wire [0:num_nodes_per_router-1] node_sel;
-		c_decoder
-		  #(.num_ports(num_nodes_per_router))
-		node_sel_dec
-		  (.data_in(dest_node_address),
-		   .data_out(node_sel));
-		
-		assign route_op[num_ports-num_nodes_per_router:num_ports-1]
-			 = node_sel & {num_nodes_per_router{&dim_addr_match}};
-		
-	     end
-	   else
-	     assign route_op[num_ports-1] = &dim_addr_match;
+	   wire [0:node_addr_width-1] 	dest_node_address;
+	   assign dest_node_address
+	     = hop_route_info[hop_route_info_width-node_addr_width:
+			      hop_route_info_width-1];
+	   
+	   wire [0:num_nodes_per_router-1] node_sel;
+	   c_decoder
+	     #(.num_ports(num_nodes_per_router))
+	   node_sel_dec
+	     (.data_in(dest_node_address),
+	      .data_out(node_sel));
+	   
+	   assign next_route_op[num_ports-num_nodes_per_router:num_ports-1]
+		    = node_sel & {num_nodes_per_router{eject}};
 	   
 	end
       else
-	assign route_op[num_ports-num_nodes_per_router:num_ports-1]
-		 = {num_nodes_per_router{1'b0}};
+	assign next_route_op[num_ports-1] = eject;
       
    endgenerate
    
+   wire [0:port_idx_width-1] 		   next_route_port;
    c_encoder
      #(.num_ports(num_ports))
-   route_port_enc
-     (.data_in(route_op),
-      .data_out(route_port));
+   next_route_port_enc
+     (.data_in(next_route_op),
+      .data_out(next_route_port));
+   
+   assign la_route_info[0:port_idx_width-1] = next_route_port;
    
 endmodule

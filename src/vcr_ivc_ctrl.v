@@ -788,7 +788,7 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   c_la_routing_logic
+   vcr_la_routing_logic
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_ports(num_ports),

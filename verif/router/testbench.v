@@ -521,7 +521,7 @@ module testbench
 			  wire [0:port_idx_width-1] 	 route_port;
 			  wire 				 inc_rc;
 			  
-			  c_routing_logic
+			  vcr_routing_logic
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
 			      .num_ports(num_ports),
@@ -620,7 +620,7 @@ module testbench
 					   (irc+2)*router_addr_width-1];
 			  
 			  wire [0:la_route_info_width-1]     la_route_info;
-			  c_la_routing_logic
+			  vcr_la_routing_logic
 			    #(.num_traffic_classes(num_traffic_classes),
 			      .num_routing_classes(num_routing_classes),
 			      .num_ports(num_ports),
