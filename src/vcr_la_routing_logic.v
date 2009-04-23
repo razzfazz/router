@@ -28,7 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// lookahead routing logic
+// lookahead routing logic for VC router
 module vcr_la_routing_logic
   (router_address, route_port, inc_rc, hop_route_info, la_route_info);
    
@@ -180,26 +180,27 @@ module vcr_la_routing_logic
 	   
 	   wire 			    dim_sel;
 	   
-	   if((dimension_order == `DIMENSION_ORDER_ASCENDING) ||
-	      ((dimension_order == `DIMENSION_ORDER_BY_CLASS) &&
-	       ((routing_class % 2) == 0)))
-	     begin
-		if(dim == 0)
-		  assign dim_sel = ~dim_addr_match[dim];
-		else
-		  assign dim_sel = &dim_addr_match[0:dim-1] &
-				   ~dim_addr_match[dim];
-	     end
-	   else if((dimension_order == `DIMENSION_ORDER_DESCENDING) ||
-		   ((dimension_order == `DIMENSION_ORDER_BY_CLASS) &&
-		    ((routing_class % 2) == 1)))
-	     begin
-		if(dim == (num_dimensions - 1))
-		  assign dim_sel = ~dim_addr_match[dim];
-		else
-		  assign dim_sel = ~dim_addr_match[dim] &
-				   dim_addr_match[(dim+1):(num_dimensions-1)];
-	     end
+	   case(dimension_order)
+	     
+	     `DIMENSION_ORDER_ASCENDING:
+	       begin
+		  if(dim == 0)
+		    assign dim_sel = ~dim_addr_match[dim];
+		  else
+		    assign dim_sel = &dim_addr_match[0:dim-1] &
+				     ~dim_addr_match[dim];
+	       end
+	     
+	     `DIMENSION_ORDER_DESCENDING:
+	       begin
+		  if(dim == (num_dimensions - 1))
+		    assign dim_sel = ~dim_addr_match[dim];
+		  else
+		    assign dim_sel = ~dim_addr_match[dim] &
+				     dim_addr_match[(dim+1):(num_dimensions-1)];
+	       end
+	     
+	   endcase
 	   
 	   wire [0:num_neighbors_per_dim-1] port_dec;
 	   
