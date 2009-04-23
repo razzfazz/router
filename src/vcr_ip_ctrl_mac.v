@@ -205,7 +205,7 @@ module vcr_ip_ctrl_mac
    parameter port_id = 0;
    
    // width of sum of event signals from all VCs
-   localparam event_width = clogb(num_vcs) + 1;
+   localparam event_width = clogb(num_vcs + 1);
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
