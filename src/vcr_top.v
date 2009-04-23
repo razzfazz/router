@@ -28,7 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// top-level module for router
+// top-level module for virtual channel router
 module vcr_top
   (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
@@ -442,11 +442,11 @@ module vcr_top
    // crossbars
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_ip_op;
-   assign xbc_ctrl_ip_op = sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_ip_op_s;
+   assign xbc_ctrl_ip_op_s = sw_gnt_ip_op;
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
-   wire [0:num_ports*num_ports-1] 	    xbc_ctrl_op_ip;
+   wire [0:num_ports*num_ports-1] 	    xbc_ctrl_op_ip_q;
    c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
@@ -456,16 +456,16 @@ module vcr_top
    xbc
      (.clk(clk),
       .reset(reset),
-      .ctrl_in_ip_op(xbc_ctrl_ip_op),
-      .ctrl_out_op_ip(xbc_ctrl_op_ip),
+      .ctrl_ip_op_s(xbc_ctrl_ip_op_s),
+      .ctrl_op_ip_q(xbc_ctrl_op_ip_q),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
-   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_ip_op;
-   assign xbd_ctrl_ip_op = sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_ip_op_s;
+   assign xbd_ctrl_ip_op_s = sw_gnt_ip_op;
    
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
-   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip;
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip_q;
    c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
@@ -475,8 +475,8 @@ module vcr_top
    xbd
      (.clk(clk),
       .reset(reset),
-      .ctrl_in_ip_op(xbd_ctrl_ip_op),
-      .ctrl_out_op_ip(xbd_ctrl_op_ip),
+      .ctrl_ip_op_s(xbd_ctrl_ip_op_s),
+      .ctrl_op_ip_q(xbd_ctrl_op_ip_q),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
    
@@ -519,7 +519,8 @@ module vcr_top
 						     (op+1)*num_vcs*num_vcs-1];
 	   
 	   wire [0:num_ports-1] 	xbc_ctrl_ip;
-	   assign xbc_ctrl_ip = xbc_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   assign xbc_ctrl_ip
+	     = xbc_ctrl_op_ip_q[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	flit_data_out;

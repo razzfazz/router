@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // configurable crossbar module
 module c_crossbar_mac
-  (clk, reset, ctrl_in_ip_op, ctrl_out_op_ip, data_in_ip, data_out_op);
+  (clk, reset, ctrl_ip_op_s, ctrl_op_ip_q, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -50,11 +50,11 @@ module c_crossbar_mac
    input reset;
    
    // incoming control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_in_ip_op;
+   input [0:num_in_ports*num_out_ports-1] ctrl_ip_op_s;
    
    // outgoing control signals (transposed request matrix, delayed by a cycle)
-   output [0:num_out_ports*num_in_ports-1] ctrl_out_op_ip;
-   wire [0:num_out_ports*num_in_ports-1] ctrl_out_op_ip;
+   output [0:num_out_ports*num_in_ports-1] ctrl_op_ip_q;
+   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_q;
    
    // vector of input data
    input [0:num_in_ports*width-1] data_in_ip;
@@ -63,16 +63,14 @@ module c_crossbar_mac
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
    
-   wire [0:num_out_ports*num_in_ports-1] ctrl_in_op_ip;
+   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s;
    c_interleaver
      #(.width(num_in_ports*num_out_ports),
        .num_blocks(num_in_ports))
    ctrl_in_intl
-     (.data_in(ctrl_in_ip_op),
-      .data_out(ctrl_in_op_ip));
+     (.data_in(ctrl_ip_op_s),
+      .data_out(ctrl_op_ip_s));
    
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s, ctrl_op_ip_q;
-   assign ctrl_op_ip_s = ctrl_in_op_ip;
    c_dff
      #(.width(num_out_ports*num_in_ports),
        .reset_type(reset_type))
@@ -81,8 +79,6 @@ module c_crossbar_mac
       .reset(reset),
       .d(ctrl_op_ip_s),
       .q(ctrl_op_ip_q));
-   
-   assign ctrl_out_op_ip = ctrl_op_ip_q;
    
    generate
       
