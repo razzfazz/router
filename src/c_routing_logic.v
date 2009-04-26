@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module to determine the output port and VC based on routing information 
 // (e.g. destination address) and the current input port and VC)
 module c_routing_logic
-  (router_address, hop_route_info, route_op, inc_rc, error);
+  (router_address, hop_route_info, route_port, inc_rc);
    
 `include "c_constants.v"
    
@@ -57,6 +57,9 @@ module c_routing_logic
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
@@ -81,11 +84,6 @@ module c_routing_logic
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
-   
-   // filter out illegal destination ports
-   // (the intent is to allow synthesis to optimize away the logic associated 
-   // with such turns)
-   parameter restrict_turns = 1;
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
@@ -115,17 +113,13 @@ module c_routing_logic
    input [0:hop_route_info_width-1] hop_route_info;
    
    // output port to forward to
-   output [0:num_ports-1] route_op;
-   wire [0:num_ports-1] route_op;
+   output [0:port_idx_width-1] route_port;
+   wire [0:port_idx_width-1] route_port;
    
    // if we have reached our destination for the current routing class, 
    // increment the routing class (unless it's already the highest)
    output inc_rc;
    wire 		inc_rc;
-   
-   // internal error condition detected
-   output error;
-   wire 		error;   
    
    // address of destination router for current routing class
    wire [0:router_addr_width-1] dest_router_address;
@@ -135,7 +129,7 @@ module c_routing_logic
    wire 			reached_dest;
    assign reached_dest = (router_address == dest_router_address);
    
-   wire [0:num_ports-1] 	route_unmasked_op;
+   wire [0:num_ports-1] 	route_op;
    wire [0:num_dimensions-1] 	dim_addr_match;
    
    generate
@@ -217,8 +211,8 @@ module c_routing_logic
 	     
 	   endcase
 	   
-	   assign route_unmasked_op[dim*num_neighbors_per_dim:
-				    (dim+1)*num_neighbors_per_dim-1]
+	   assign route_op[dim*num_neighbors_per_dim:
+			   (dim+1)*num_neighbors_per_dim-1]
 		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 	   
 	end
@@ -240,36 +234,24 @@ module c_routing_logic
 		  (.data_in(dest_node_address),
 		   .data_out(node_sel));
 		
-		assign route_unmasked_op[num_ports-num_nodes_per_router:
-					 num_ports-1]
+		assign route_op[num_ports-num_nodes_per_router:num_ports-1]
 			 = node_sel & {num_nodes_per_router{&dim_addr_match}};
 		
 	     end
 	   else
-	     assign route_unmasked_op[num_ports-1] = &dim_addr_match;
+	     assign route_op[num_ports-1] = &dim_addr_match;
 	   
 	end
       else
-	assign route_unmasked_op[num_ports-num_nodes_per_router:num_ports-1]
+	assign route_op[num_ports-num_nodes_per_router:num_ports-1]
 		 = {num_nodes_per_router{1'b0}};
       
    endgenerate
    
-   c_port_filter
-     #(.num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
-       .num_ports(num_ports),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
-       .num_nodes_per_router(num_nodes_per_router),
-       .restrict_turns(restrict_turns),
-       .routing_function_type(routing_function_type),
-       .port_id(port_id),
-       .traffic_class(traffic_class),
-       .routing_class(routing_class))
-   pf
-     (.route_in_op(route_unmasked_op),
-      .inc_rc(inc_rc),
-      .route_out_op(route_op),
-      .error(error));
+   c_encoder
+     #(.num_ports(num_ports))
+   route_port_enc
+     (.data_in(route_op),
+      .data_out(route_port));
    
 endmodule

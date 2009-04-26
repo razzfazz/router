@@ -28,7 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// top-level module for router
+// top-level module for virtual channel router
 module vcr_top
   (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
@@ -73,6 +73,9 @@ module vcr_top
    
    // number of input and output ports on router
    parameter num_ports = 5;
+   
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -128,11 +131,6 @@ module vcr_top
    // controller
    parameter track_vcs_at_output = 0;
    
-   // filter out illegal destination ports
-   // (the intent is to allow synthesis to optimize away the logic associated 
-   // with such turns)
-   parameter restrict_turns = 1;
-   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -159,6 +157,12 @@ module vcr_top
    
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // number of entries in flit buffer
+   localparam fbf_depth = num_vcs*num_flit_buffers;
+   
+   // required address size for flit buffer
+   localparam fbf_addr_width = clogb(fbf_depth);
    
    // select implementation variant for VC allocator
    parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
@@ -224,13 +228,12 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 	elig_op_ovc;
    wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
-   wire [0:num_ports*num_vcs*num_ports-1] 	    route_ip_ivc_op;
+   wire [0:num_ports*num_vcs*port_idx_width-1] 	    route_port_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    inc_rc_ip_ivc;
    
    wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs-1] 		    vc_gnt_op_ovc;
    
    wire [0:num_ports*num_vcs-1] 		    sw_req_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    sw_req_spec_ip_ivc;
@@ -278,15 +281,21 @@ module vcr_top
 	   assign sw_gnt_spec_ivc
 	     = sw_gnt_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_ports-1] route_ivc_op;
-	   wire [0:num_vcs-1] 		inc_rc_ivc;
-	   wire [0:num_vcs-1] 		vc_req_ivc;
-	   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
-	   wire [0:num_vcs-1] 		sw_req_spec_ivc;
-	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	  flit_data_out;
-	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
-	   wire 			  ipc_error;
+	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+	   wire [0:num_vcs-1] 		     inc_rc_ivc;
+	   wire [0:num_vcs-1] 		     vc_req_ivc;
+	   wire [0:num_vcs-1] 		     sw_req_nonspec_ivc;
+	   wire [0:num_vcs-1] 		     sw_req_spec_ivc;
+	   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out;
+	   wire [0:flit_data_width-1] 	     flit_data_out;
+	   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out;
+	   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
+	   wire 			     fbf_write_enable;
+	   wire [0:flit_data_width-1] 	     fbf_write_data;
+	   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
+	   wire 			     fbf_read_enable;
+	   wire [0:flit_data_width-1] 	     fbf_read_data;
+	   wire 			     ipc_error;
 	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -302,12 +311,10 @@ module vcr_top
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
 	       .track_vcs_at_output(track_vcs_at_output),
-	       .restrict_turns(restrict_turns),
 	       .routing_function_type(routing_function_type),
 	       .dimension_order(dimension_order),
 	       .credit_handling_type(credit_handling_type),
 	       .header_fifo_type(header_fifo_type),
-	       .fbf_regfile_type(fbf_regfile_type),
 	       .sw_spec_enable(sw_spec_enable),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
@@ -322,7 +329,7 @@ module vcr_top
 	      .flit_ctrl_in(flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .route_ivc_op(route_ivc_op),
+	      .route_port_ivc(route_port_ivc),
 	      .inc_rc_ivc(inc_rc_ivc),
 	      .vc_req_ivc(vc_req_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
@@ -334,11 +341,30 @@ module vcr_top
 	      .int_flit_ctrl_out(int_flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
+	      .fbf_write_addr(fbf_write_addr),
+	      .fbf_write_enable(fbf_write_enable),
+	      .fbf_write_data(fbf_write_data),
+	      .fbf_read_addr(fbf_read_addr),
+	      .fbf_read_enable(fbf_read_enable),
+	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
 	   
-	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
-				  (ip+1)*num_vcs*num_ports-1]
-		    = route_ivc_op;
+	   c_regfile_mac
+	     #(.width(flit_data_width),
+	       .depth(fbf_depth),
+	       .regfile_type(fbf_regfile_type))
+	   fbf
+	     (.clk(clk),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbf_write_addr),
+	      .write_data(fbf_write_data),
+	      .read_enable(fbf_read_enable),
+	      .read_address(fbf_read_addr),
+	      .read_data(fbf_read_data));
+	   
+	   assign route_port_ip_ivc[ip*num_vcs*port_idx_width:
+				    (ip+1)*num_vcs*port_idx_width-1]
+		    = route_port_ivc;
 	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = inc_rc_ivc;
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
 	   assign sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
@@ -364,6 +390,7 @@ module vcr_top
    // virtual channel allocator
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_vcs-1] 	  vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
    
@@ -378,7 +405,7 @@ module vcr_top
    vca
      (.clk(clk),
       .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
+      .route_port_ip_ivc(route_port_ip_ivc),
       .inc_rc_ip_ivc(inc_rc_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),
@@ -403,7 +430,7 @@ module vcr_top
    swa
      (.clk(clk),
       .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
+      .route_port_ip_ivc(route_port_ip_ivc),
       .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
       .req_spec_ip_ivc(sw_req_spec_ip_ivc),
       .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
@@ -412,39 +439,44 @@ module vcr_top
    
    
    //---------------------------------------------------------------------------
-   // crossbar
+   // crossbars
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  xbr_ctrl_ip_op_s, xbr_ctrl_ip_op_q;
-   assign xbr_ctrl_ip_op_s = sw_gnt_ip_op;
-   c_dff
-     #(.width(num_ports*num_ports),
-       .reset_type(reset_type))
-   xbr_ctrl_ip_opq
-     (.clk(clk),
-      .reset(reset),
-      .d(xbr_ctrl_ip_op_s),
-      .q(xbr_ctrl_ip_op_q));
+   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_ip_op_s;
+   assign xbc_ctrl_ip_op_s = sw_gnt_ip_op;
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
-   c_crossbar
+   wire [0:num_ports*num_ports-1] 	    xbc_ctrl_op_ip_q;
+   c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(int_flit_ctrl_width),
-       .crossbar_type(xbc_crossbar_type))
+       .crossbar_type(xbc_crossbar_type),
+       .reset_type(reset_type))
    xbc
-     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
+     (.clk(clk),
+      .reset(reset),
+      .ctrl_ip_op_s(xbc_ctrl_ip_op_s),
+      .ctrl_op_ip_q(xbc_ctrl_op_ip_q),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_ip_op_s;
+   assign xbd_ctrl_ip_op_s = sw_gnt_ip_op;
+   
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
-   c_crossbar
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip_q;
+   c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(flit_data_width),
-       .crossbar_type(xbd_crossbar_type))
+       .crossbar_type(xbd_crossbar_type),
+       .reset_type(reset_type))
    xbd
-     (.ctrl_ip_op(xbr_ctrl_ip_op_q),
+     (.clk(clk),
+      .reset(reset),
+      .ctrl_ip_op_s(xbd_ctrl_ip_op_s),
+      .ctrl_op_ip_q(xbd_ctrl_op_ip_q),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
    
@@ -452,14 +484,6 @@ module vcr_top
    //---------------------------------------------------------------------------
    // output ports
    //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
-   c_interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   xbr_ctrl_op_ip_intl
-     (.data_in(xbr_ctrl_ip_op_q),
-      .data_out(xbr_ctrl_op_ip));
    
    wire [0:num_ports-1] 	  opc_error_op;
    
@@ -494,8 +518,9 @@ module vcr_top
 	   assign vc_gnt_ovc_ivc = vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:
 						     (op+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_ports-1] 	xbr_ctrl_ip;
-	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   wire [0:num_ports-1] 	xbc_ctrl_ip;
+	   assign xbc_ctrl_ip
+	     = xbc_ctrl_op_ip_q[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	flit_data_out;
@@ -529,7 +554,7 @@ module vcr_top
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
-	      .xbr_ctrl_ip(xbr_ctrl_ip),
+	      .xbr_ctrl_ip(xbc_ctrl_ip),
 	      .int_flit_ctrl_in(int_flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .flit_ctrl_out(flit_ctrl_out),

@@ -28,19 +28,32 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// switch allocator
+// switch allocator for VC router
 module vcr_sw_alloc_mac
-  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+  (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
+   
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
    
    // number of VCs
    parameter num_vcs = 4;
    
    // number of input and output ports on router
    parameter num_ports = 5;
+   
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // select implementation variant for switch allocator
    parameter allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
@@ -61,7 +74,7 @@ module vcr_sw_alloc_mac
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
@@ -96,7 +109,7 @@ module vcr_sw_alloc_mac
 	     core_sep_if
 	       (.clk(clk),
 		.reset(reset),
-		.route_ip_ivc_op(route_ip_ivc_op),
+		.route_port_ip_ivc(route_port_ip_ivc),
 		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
@@ -114,7 +127,7 @@ module vcr_sw_alloc_mac
 	     core_sep_of
 	       (.clk(clk),
 		.reset(reset),
-		.route_ip_ivc_op(route_ip_ivc_op),
+		.route_port_ip_ivc(route_port_ip_ivc),
 		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
@@ -135,7 +148,7 @@ module vcr_sw_alloc_mac
 	     core_wf
 	       (.clk(clk),
 		.reset(reset),
-		.route_ip_ivc_op(route_ip_ivc_op),
+		.route_port_ip_ivc(route_port_ip_ivc),
 		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),

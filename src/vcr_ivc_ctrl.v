@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
-   int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
+   int_flow_ctrl_op_ovc, route_port, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
    la_route_info_out, fbf_write_addr, fbf_read_addr, error, events);
    
@@ -84,7 +84,7 @@ module vcr_ivc_ctrl
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -152,11 +152,6 @@ module vcr_ivc_ctrl
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
    parameter track_vcs_at_output = 0;
-   
-   // filter out illegal destination ports
-   // (the intent is to allow synthesis to optimize away the logic associated 
-   // with such turns)
-   parameter restrict_turns = 1;
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
@@ -262,8 +257,8 @@ module vcr_ivc_ctrl
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
-   output [0:num_ports-1] route_op;
-   wire [0:num_ports-1] route_op;
+   output [0:port_idx_width-1] route_port;
+   wire [0:port_idx_width-1] route_port;
    
    // transition to next routing class
    output inc_rc;
@@ -782,41 +777,18 @@ module vcr_ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] route_unmasked_op;
-   assign route_unmasked_op = hdff_la_route_info[0:num_ports-1];
+   assign route_port = hdff_la_route_info[0:port_idx_width-1];
    
    generate
       
       if(routing_class < (num_routing_classes - 1))
-	assign inc_rc = hdff_la_route_info[num_ports];
+	assign inc_rc = hdff_la_route_info[port_idx_width];
       else
 	assign inc_rc = 1'b0;
       
    endgenerate
    
-   wire pf_error_unmasked;
-   
-   c_port_filter
-     #(.num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
-       .num_ports(num_ports),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
-       .num_nodes_per_router(num_nodes_per_router),
-       .restrict_turns(restrict_turns),
-       .routing_function_type(routing_function_type),
-       .port_id(port_id),
-       .traffic_class(traffic_class),
-       .routing_class(routing_class))
-   pf
-     (.route_in_op(route_unmasked_op),
-      .inc_rc(inc_rc),
-      .route_out_op(route_op),
-      .error(pf_error_unmasked));
-   
-   wire pf_error;
-   assign pf_error = pf_error_unmasked & header_valid;
-   
-   c_la_routing_logic
+   vcr_la_routing_logic
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_ports(num_ports),
@@ -830,7 +802,7 @@ module vcr_ivc_ctrl
        .routing_class(routing_class))
    lar
      (.router_address(router_address),
-      .route_op(route_op),
+      .route_port(route_port),
       .inc_rc(inc_rc),
       .hop_route_info(hdff_hop_route_info),
       .la_route_info(la_route_info_out));
@@ -841,13 +813,9 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-   c_select_1ofn
-     #(.num_ports(num_ports),
-       .width(num_vcs*int_flow_ctrl_width))
-   int_flow_ctrl_ovc_sel
-     (.select(route_op),
-      .data_in(int_flow_ctrl_op_ovc),
-      .data_out(int_flow_ctrl_ovc));
+   assign int_flow_ctrl_ovc
+     = int_flow_ctrl_op_ovc[route_port*num_vcs*int_flow_ctrl_width +:
+			    num_vcs*int_flow_ctrl_width];
    
    wire 				  free_allocated;
    wire 				  cred_tracker_error;
@@ -856,9 +824,13 @@ module vcr_ivc_ctrl
       
       case(credit_handling_type)
 	
+	// the current number of credits available are transmitted from the 
+	// output controllers as a multi-level signal (0, 1, 2 or 3+ credits
+	// currently available)
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
+	     // credit status for the case where we do not change routing class
 	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
 	     assign free_unchanged_ocvc
 	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -873,6 +845,7 @@ module vcr_ivc_ctrl
 	     else
 	       begin
 		  
+		  // credit status in case we change routing class
 		  wire [0:num_vcs_per_class*2-1] free_changed_ocvc;
 		  assign free_changed_ocvc
 		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -899,34 +872,26 @@ module vcr_ivc_ctrl
 		.d(flit_sent_prev_s),
 		.q(flit_sent_prev_q));
 	     
-	     wire [0:2] 			 flit_sent_count;
-	     assign flit_sent_count = {flit_sent_prev_q & flit_valid_out,
-				       flit_sent_prev_q ^ flit_valid_out,
-				       ~(flit_sent_prev_q | flit_valid_out)};
+	     wire [0:1] 			 flit_sent_count;
+	     assign flit_sent_count = flit_sent_prev_q + flit_valid_out;
 	     
 	     wire [0:num_vcs_per_class-1] 	 next_free_ocvc;
 	     
-	     genvar 				 cvc;
+	     genvar 				 ocvc;
 	     
-	     for(cvc = 0; cvc < num_vcs_per_class; cvc = cvc + 1)
-	       begin:cvcs
+	     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
+	       begin:ocvcs
 		  
 		  wire [0:1] free;
-		  assign free = free_ocvc[cvc*2:(cvc+1)*2-1];
+		  assign free = free_ocvc[ocvc*2:(ocvc+1)*2-1];
 		  
 		  wire [0:2] free_by_count;
 		  assign free_by_count = {|free, free[0], &free};
 		  
 		  wire       next_free;
-		  c_select_1ofn
-		    #(.num_ports(3),
-		      .width(1))
-		  next_free_sel
-		    (.select(flit_sent_count),
-		     .data_in(free_by_count),
-		     .data_out(next_free));
+		  assign next_free = free_by_count[flit_sent_count];
 		  
-		  assign next_free_ocvc[cvc] = next_free;
+		  assign next_free_ocvc[ocvc] = next_free;
 		  
 	       end
 	     
@@ -949,9 +914,14 @@ module vcr_ivc_ctrl
 	     
 	  end
 	
+	// credits are forwarded from the output controllers individually as 
+	// pulses, accumulated at the input controllers, and used whenever a
+	// flit is sent to the crossbar
 	`CREDIT_HANDLING_TYPE_PUSH:
 	  begin
 	     
+	     // credit indicator for the case where we do not change the 
+	     // routing class
 	     wire [0:num_vcs_per_class-1] cred_unchanged_ocvc;
 	     assign cred_unchanged_ocvc
 	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -966,6 +936,7 @@ module vcr_ivc_ctrl
 	     else
 	       begin
 		  
+		  // credit status for the case where the routing class changes
 		  wire [0:num_vcs_per_class-1] cred_changed_ocvc;
 		  assign cred_changed_ocvc
 		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
@@ -989,7 +960,8 @@ module vcr_ivc_ctrl
 	     assign has_cred_s
 	       = (vc_gnt ?
 		  ~sw_gnt_spec :
-		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | cred;
+		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | 
+		 cred;
 	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type))
@@ -1002,7 +974,7 @@ module vcr_ivc_ctrl
 	     assign free_allocated = has_cred_q;
 	     
 	     wire 			       incr_cred_hold;
-	     assign incr_cred_hold = cred & ~sw_gnt_nonspec;
+	     assign incr_cred_hold = cred & ~sw_gnt_nonspec & has_cred_q;
 	     
 	     wire 			       decr_cred_hold;
 	     assign decr_cred_hold = ~cred & sw_gnt_nonspec & |cred_hold_q;
@@ -1181,14 +1153,12 @@ module vcr_ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:2] 		       errors_in;
-   assign errors_in = {flit_valid & ~header_valid,
-		       cred_tracker_error,
-		       pf_error};
+   wire [0:1] 		       errors_in;
+   assign errors_in = {flit_valid & ~header_valid, cred_tracker_error};
    
-   wire [0:2] 		       errors_out;
+   wire [0:1] 		       errors_out;
    c_checker
-     #(.num_errors(3),
+     #(.num_errors(2),
        .enable(checker_enable),
        .capture_mode(checker_capture_mode),
        .reset_type(reset_type))
