@@ -1,4 +1,4 @@
-// $Id: c_lfsr.v 1218 2009-04-24 18:11:13Z dub $
+// $Id: c_lfsr.v 1220 2009-04-26 23:02:37Z dub $
 
 /*
 Copyright (c) 2007, Trustees of Leland Stanford Junior University
@@ -65,8 +65,11 @@ module c_lfsr
    reg [offset:(offset+width)-1] q;
 
    
+   wire 			 fb_seed;
+   assign fb_seed = lfsr_q[offset+width-1];
+   
    wire [offset:(offset+width)-1] fb_val;
-   assign fb_val = {width{lfsr_q[offset+width-1]}} & feedback;
+   assign fb_val = {width{fb_seed}} & feedback;
    
    wire [offset:(offset+width)-1] toggle_val;
    assign toggle_val = load ? d : fb_val;
