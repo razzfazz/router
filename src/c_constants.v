@@ -45,6 +45,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 //------------------------------------------------------------------------------
+// router implementations
+//------------------------------------------------------------------------------
+
+// wormhole router
+`define ROUTER_TYPE_WORMHOLE 0
+
+// virtual channel router
+`define ROUTER_TYPE_VC       1
+
+
+//------------------------------------------------------------------------------
 // routing function types
 //------------------------------------------------------------------------------
 

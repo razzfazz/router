@@ -217,6 +217,9 @@ module testbench
    // controller
    parameter track_vcs_at_output = 1;
    
+   // select router implementation
+   parameter router_type = `ROUTER_TYPE_WORMHOLE;
+   
    // select routing function type
    localparam routing_function_type
      = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
@@ -284,6 +287,9 @@ module testbench
    wire [0:num_ports-1] 		ps_error_ip;
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
    wire [0:num_ports*num_vcs-1] 	  fifo_error_ip_ivc;
+   
+   wire 				  rtr_error;
+   wire [0:num_ports-1] 		  x_error_op;
    
    reg 					  run;
    
@@ -511,7 +517,8 @@ module testbench
 			  
 			  if((irc == (num_routing_classes - 1)) &&
 			     (num_nodes_per_router > 1))
-			    assign hop_route_info[router_addr_width:addr_width-1]
+			    assign hop_route_info[router_addr_width:
+						  addr_width-1]
 				     = route_info[num_routing_classes*
 						  router_addr_width:
 						  num_routing_classes*
@@ -885,57 +892,90 @@ module testbench
 	     end
 	end
       
-   endgenerate
-   
-   wire 					  rtr_error;
-   
-   vcr_top
-     #(.num_flit_buffers(num_flit_buffers),
-       .num_header_buffers(num_header_buffers),
-       .num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
-       .num_vcs_per_class(num_vcs_per_class),
-       .num_ports(num_ports),
-       .num_dimensions(num_dimensions),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
-       .packet_format(packet_format),
-       .max_payload_length(max_payload_length),
-       .min_payload_length(min_payload_length),
-       .flit_data_width(flit_data_width),
-       .perf_ctr_enable(perf_ctr_enable),
-       .perf_ctr_width(perf_ctr_width),
-       .checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
-       .track_vcs_at_output(track_vcs_at_output),
-       .routing_function_type(routing_function_type),
-       .dimension_order(dimension_order),
-       .credit_handling_type(credit_handling_type),
-       .header_fifo_type(header_fifo_type),
-       .fbf_regfile_type(fbf_regfile_type),
-       .vc_allocator_type(vc_allocator_type),
-       .vc_arbiter_type(vc_arbiter_type),
-       .sw_allocator_type(sw_allocator_type),
-       .sw_arbiter_type(sw_arbiter_type),
-       .sw_spec_level(sw_spec_level),
-       .xbc_crossbar_type(xbc_crossbar_type),
-       .xbd_crossbar_type(xbd_crossbar_type),
-       .reset_type(reset_type))
-   vcr
-     (.clk(clk),
-      .reset(reset),
-      .router_address(router_address),
-      .flit_ctrl_in_ip(flit_ctrl_in_ip),
-      .flit_data_in_ip(flit_data_in_ip),
-      .flow_ctrl_out_ip(flow_ctrl_out_ip),
-      .flit_ctrl_out_op(flit_ctrl_out_op),
-      .flit_data_out_op(flit_data_out_op),
-      .flow_ctrl_in_op(flow_ctrl_in_op),
-      .error(rtr_error));
-   
-   wire [0:num_ports-1] 		x_error_op;
-   
-   generate
+      case(router_type)
+	`ROUTER_TYPE_WORMHOLE:
+	  begin
+	     whr_top
+	       #(.num_flit_buffers(num_flit_buffers),
+		 .num_header_buffers(num_header_buffers),
+		 .num_ports(num_ports),
+		 .num_dimensions(num_dimensions),
+		 .num_routers_per_dim(num_routers_per_dim),
+		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .packet_format(packet_format),
+		 .max_payload_length(max_payload_length),
+		 .min_payload_length(min_payload_length),
+		 .flit_data_width(flit_data_width),
+		 .perf_ctr_enable(perf_ctr_enable),
+		 .perf_ctr_width(perf_ctr_width),
+		 .checker_enable(checker_enable),
+		 .checker_capture_mode(checker_capture_mode),
+		 .routing_function_type(routing_function_type),
+		 .dimension_order(dimension_order),
+		 .header_fifo_type(header_fifo_type),
+		 .fbf_regfile_type(fbf_regfile_type),
+		 .xbc_crossbar_type(xbc_crossbar_type),
+		 .xbd_crossbar_type(xbd_crossbar_type),
+		 .reset_type(reset_type))
+	     whr
+	       (.clk(clk),
+		.reset(reset),
+		.router_address(router_address),
+		.flit_ctrl_in_ip(flit_ctrl_in_ip),
+		.flit_data_in_ip(flit_data_in_ip),
+		.flow_ctrl_out_ip(flow_ctrl_out_ip),
+		.flit_ctrl_out_op(flit_ctrl_out_op),
+		.flit_data_out_op(flit_data_out_op),
+		.flow_ctrl_in_op(flow_ctrl_in_op),
+		.error(rtr_error));
+	  end
+	`ROUTER_TYPE_VC:
+	  begin
+	     vcr_top
+	       #(.num_flit_buffers(num_flit_buffers),
+		 .num_header_buffers(num_header_buffers),
+		 .num_traffic_classes(num_traffic_classes),
+		 .num_routing_classes(num_routing_classes),
+		 .num_vcs_per_class(num_vcs_per_class),
+		 .num_ports(num_ports),
+		 .num_dimensions(num_dimensions),
+		 .num_routers_per_dim(num_routers_per_dim),
+		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .packet_format(packet_format),
+		 .max_payload_length(max_payload_length),
+		 .min_payload_length(min_payload_length),
+		 .flit_data_width(flit_data_width),
+		 .perf_ctr_enable(perf_ctr_enable),
+		 .perf_ctr_width(perf_ctr_width),
+		 .checker_enable(checker_enable),
+		 .checker_capture_mode(checker_capture_mode),
+		 .track_vcs_at_output(track_vcs_at_output),
+		 .routing_function_type(routing_function_type),
+		 .dimension_order(dimension_order),
+		 .credit_handling_type(credit_handling_type),
+		 .header_fifo_type(header_fifo_type),
+		 .fbf_regfile_type(fbf_regfile_type),
+		 .vc_allocator_type(vc_allocator_type),
+		 .vc_arbiter_type(vc_arbiter_type),
+		 .sw_allocator_type(sw_allocator_type),
+		 .sw_arbiter_type(sw_arbiter_type),
+		 .sw_spec_level(sw_spec_level),
+		 .xbc_crossbar_type(xbc_crossbar_type),
+		 .xbd_crossbar_type(xbd_crossbar_type),
+		 .reset_type(reset_type))
+	     vcr
+	       (.clk(clk),
+		.reset(reset),
+		.router_address(router_address),
+		.flit_ctrl_in_ip(flit_ctrl_in_ip),
+		.flit_data_in_ip(flit_data_in_ip),
+		.flow_ctrl_out_ip(flow_ctrl_out_ip),
+		.flit_ctrl_out_op(flit_ctrl_out_op),
+		.flit_data_out_op(flit_data_out_op),
+		.flow_ctrl_in_op(flow_ctrl_in_op),
+		.error(rtr_error));
+	  end
+      endcase
       
       genvar 					    op;
       for(op = 0; op < num_ports; op = op + 1)
