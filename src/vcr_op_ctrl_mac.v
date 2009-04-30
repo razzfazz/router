@@ -105,10 +105,6 @@ module vcr_op_ctrl_mac
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
-   // width required for lookahead routing information
-   localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -130,14 +126,6 @@ module vcr_op_ctrl_mac
    // total number of bits required for storing routing information
    localparam route_info_width
      = num_routing_classes * router_addr_width + node_addr_width;
-   
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
-       -1;
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -401,7 +389,7 @@ module vcr_op_ctrl_mac
 		  end
 		
 		// if VC assignments are tracked at the input side, we can just 
-		// check if for our own VC ID
+		// check for our own VC ID
 		else
 		  assign match_ovc[ovc] = (flit_vc_in == ovc);
 		
@@ -718,26 +706,10 @@ module vcr_op_ctrl_mac
 	   
 	end
       
-      case(packet_format)
-	`PACKET_FORMAT_HEAD_TAIL:
-	  begin
-	     assign flit_ctrl_s[1+vc_idx_width+0]
-		      = xbr_ctrl ? 
-			int_flit_ctrl_in[1+vc_idx_width+0] : 
-			flit_ctrl_q[1+vc_idx_width+0];
-	     assign flit_ctrl_s[1+vc_idx_width+1]
-		      = xbr_ctrl ? 
-			int_flit_ctrl_in[1+vc_idx_width+1] : 
-			flit_ctrl_q[1+vc_idx_width+1];
-	  end
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     assign flit_ctrl_s[1+vc_idx_width+0]
-		      = xbr_ctrl ? 
-			int_flit_ctrl_in[1+vc_idx_width+0] : 
-			flit_ctrl_q[1+vc_idx_width+0];
-	  end
-      endcase
+      assign flit_ctrl_s[1+vc_idx_width:flit_ctrl_width-1]
+	       = xbr_ctrl ?
+		 int_flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1] :
+		 flit_ctrl_q[1+vc_idx_width:flit_ctrl_width-1];
       
    endgenerate
    

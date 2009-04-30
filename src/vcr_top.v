@@ -86,6 +86,12 @@ module vcr_top
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
    
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in entire network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -96,12 +102,6 @@ module vcr_top
    // minimum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
-   
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
-   // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // width of flit control signals
    localparam flit_ctrl_width
