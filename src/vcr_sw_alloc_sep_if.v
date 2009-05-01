@@ -525,7 +525,7 @@ module vcr_sw_alloc_sep_if
 		wire [0:num_ports-1] gnt_out_spec_ip;
 		
 		if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
-		  begin
+		  begin:sslcnim2
 		     
 		     assign req_out_spec_int_ip
 		       = req_out_spec_ip & unused_by_nonspec_ip;

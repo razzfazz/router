@@ -61,8 +61,8 @@ module c_misr
    
    // data output
    output [offset:(offset+width)-1] q;
-   reg [offset:(offset+width)-1] q;
-
+   wire [offset:(offset+width)-1] q;
+   wire [offset:(offset+width)-1] misr_q;
    
    wire [offset:(offset+width)-1] fb_val;
    assign fb_val = {width{~load & misr_q[offset+width-1]}} & feedback;
@@ -73,7 +73,7 @@ module c_misr
    wire [offset:(offset+width)-1] base_val;
    assign base_val[offset] = 1'b0;
    
-   wire [offset:(offset+width)-1] misr_q;
+
    
    generate
       
