@@ -30,30 +30,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // switch allocator variant using wavefront allocation
 module vcr_sw_alloc_wf
-  (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // number of VCs
    parameter num_vcs = 4;
    
    // number of input and output ports on switch
    parameter num_ports = 5;
-   
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
    
    // select which wavefront allocator variant to use
    parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
@@ -70,7 +57,7 @@ module vcr_sw_alloc_wf
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] req_nonspec_ip_ivc;
@@ -113,33 +100,9 @@ module vcr_sw_alloc_wf
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
-	   assign route_port_ivc
-	     = route_port_ip_ivc[ip*num_vcs*port_idx_width:
-				 (ip+1)*num_vcs*port_idx_width-1];
-	   
-	   wire [0:num_vcs*num_ports-1]      route_ivc_op;
-	   
-	   genvar 			     ivc;
-	   
-	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	     begin:ivcs
-		
-		wire [0:port_idx_width-1] route_port;
-		assign route_port = route_port_ivc[ivc*port_idx_width:
-						   (ivc+1)*port_idx_width-1];
-		
-		wire [0:num_ports-1] 	  route_op;
-		c_decoder
-		  #(.num_ports(num_ports))
-		route_op_dec
-		  (.data_in(route_port),
-		   .data_out(route_op));
-		
-		assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
-			 = route_op;
-		
-	     end
+	   wire [0:num_vcs*num_ports-1] route_ivc_op;
+	   assign route_ivc_op
+	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
 	   
 	   wire [0:num_ports*num_vcs-1] route_op_ivc;
 	   c_interleaver
@@ -376,8 +339,7 @@ module vcr_sw_alloc_wf
    // mask speculative requests that conflict with non-speculative ones
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] unused_by_nonspec_ip;
-   wire [0:num_ports-1] unused_by_nonspec_op;
+   wire [0:num_ports*num_ports-1] spec_mask_ip_op;
    
    generate
       
@@ -386,21 +348,19 @@ module vcr_sw_alloc_wf
 	`SW_SPEC_LEVEL_NONE:
 	  begin
 	     
-	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
-	     assign unused_by_nonspec_op = {num_ports{1'b0}};
+	     assign spec_mask_ip_op = {num_ports*num_ports{1'b0}};
 	     
 	  end
 	
 	`SW_SPEC_LEVEL_ANY_NONSPEC_MASKS:
 	  begin
 	     
-	     assign unused_by_nonspec_ip = {num_ports{~|req_nonspec_ip_ivc}};
-	     assign unused_by_nonspec_op = {num_ports{1'b1}};
+	     assign spec_mask_ip_op
+	       = {num_ports*num_ports{~|req_wf_nonspec_ip_op}};
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS,
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
+	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
@@ -411,19 +371,34 @@ module vcr_sw_alloc_wf
 	       (.data_in(req_wf_nonspec_ip_op),
 		.data_out(req_wf_nonspec_op_ip));
 	     
-	     c_nor_nto1
+	     wire [0:num_ports-1] 	    any_req_ip;
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     unused_by_nonspec_ip_nor
+	     any_req_ip_or
 	       (.data_in(req_wf_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
+		.data_out(any_req_ip));
 	     
-	     c_nor_nto1
+	     wire [0:num_ports*num_ports-1] any_req_in_ip_op;
+	     c_replicator
+	       #(.width(num_ports),
+		 .count(num_ports))
+	     any_req_in_ip_op_repl
+	       (.data_in(any_req_ip),
+		.data_out(any_req_in_ip_op));
+	     
+	     wire [0:num_ports-1] 	    any_req_op;
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     unused_by_nonspec_op_nor
+	     any_req_op_or
 	       (.data_in(req_wf_nonspec_ip_op),
-		.data_out(unused_by_nonspec_op));
+		.data_out(any_req_op));
+	     
+	     wire [0:num_ports*num_ports-1] any_req_wf_ip_op;
+	     assign any_req_wf_ip_op = {num_ports{any_req_op}};
+	     
+	     assign spec_mask_ip_op = ~(any_req_in_ip_op | any_req_wf_ip_op);
 	     
 	  end
 	
@@ -438,34 +413,40 @@ module vcr_sw_alloc_wf
 	       (.data_in(gnt_wf_nonspec_ip_op),
 		.data_out(gnt_wf_nonspec_op_ip));
 	     
-	     c_nor_nto1
+	     wire [0:num_ports-1] 	    any_gnt_ip;
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     unused_by_nonspec_ip_nor
+	     any_gnt_ip_or
 	       (.data_in(gnt_wf_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
+		.data_out(any_gnt_ip));
 	     
-	     c_nor_nto1
+	     wire [0:num_ports*num_ports-1] any_gnt_in_ip_op;
+	     c_replicator
+	       #(.width(num_ports),
+		 .count(num_ports))
+	     any_gnt_in_ip_op_repl
+	       (.data_in(any_gnt_ip),
+		.data_out(any_gnt_in_ip_op));
+	     
+	     wire [0:num_ports-1] 	    any_gnt_op;
+	     c_or_nto1
 	       #(.width(num_ports),
 		 .num_ports(num_ports))
-	     unused_by_nonspec_op_nor
+	     any_gnt_op_or
 	       (.data_in(gnt_wf_nonspec_ip_op),
-		.data_out(unused_by_nonspec_op));
+		.data_out(any_gnt_op));
+	     
+	     wire [0:num_ports*num_ports-1] any_gnt_wf_ip_op;
+	     assign any_gnt_wf_ip_op = {num_ports{any_gnt_op}};
+	     
+	     assign spec_mask_ip_op = ~(any_gnt_in_ip_op | any_gnt_wf_ip_op);
 	     
 	  end
    
       endcase
       
    endgenerate
-   
-   wire [0:num_ports*num_ports-1] 	    spec_mask_ip_op;
-   c_vec_prod
-     #(.num_rows(num_ports),
-       .num_cols(num_ports))
-   spec_mask_ip_op_vprod
-     (.col_vec(unused_by_nonspec_ip),
-      .row_vec(unused_by_nonspec_op),
-      .result(spec_mask_ip_op));
    
    
    //---------------------------------------------------------------------------
@@ -498,30 +479,20 @@ module vcr_sw_alloc_wf
 	   wire update_alloc_spec;
 	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
-	   wire [0:num_ports*num_ports-1] req_wf_spec_int_ip_op;
-	   if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
-	     assign req_wf_spec_int_ip_op
-	       = req_wf_spec_ip_op & spec_mask_ip_op;
-	   else
-	     assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
-	   
-	   wire [0:num_ports*num_ports-1] gnt_wf_spec_int_ip_op;
+	   wire [0:num_ports*num_ports-1] gnt_wf_unmasked_spec_ip_op;
 	   c_wf_alloc
 	     #(.num_ports(num_ports),
 	       .wf_allocator_type(wf_allocator_type),
 	       .reset_type(reset_type))
-	   gnt_wf_spec_int_ip_op_alloc
+	   gnt_wf_unmasked_spec_ip_op_alloc
 	     (.clk(clk),
 	      .reset(reset),
 	      .update(update_alloc_spec),
-	      .req(req_wf_spec_int_ip_op),
-	      .gnt(gnt_wf_spec_int_ip_op));
+	      .req(req_wf_spec_ip_op),
+	      .gnt(gnt_wf_unmasked_spec_ip_op));
 	   
-	   if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
-	     assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op;
-	   else
-	     assign gnt_wf_spec_ip_op
-	       = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
+	   assign gnt_wf_spec_ip_op
+	     = gnt_wf_unmasked_spec_ip_op & spec_mask_ip_op;
 	   
 	end
       else

@@ -31,11 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, 
-   int_flow_ctrl_op_ovc, route_port_ivc, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
+   int_flow_ctrl_op_ovc, route_ivc_op, inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, 
    vc_gnt_ivc_ovc, sw_req_nonspec_ivc, sw_req_spec_ivc, sw_gnt_nonspec_ivc, 
-   sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
-   fbf_write_addr, fbf_write_enable, fbf_write_data, fbf_read_addr, 
-   fbf_read_enable, fbf_read_data, error);
+   sw_gnt_spec_ivc, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -85,7 +83,7 @@ module vcr_ip_ctrl_mac
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -157,6 +155,11 @@ module vcr_ip_ctrl_mac
    // controller
    parameter track_vcs_at_output = 0;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
    
@@ -180,6 +183,9 @@ module vcr_ip_ctrl_mac
    
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // number of entries in flit buffer
    localparam fbf_depth = num_vcs*num_flit_buffers;
@@ -205,7 +211,7 @@ module vcr_ip_ctrl_mac
    parameter port_id = 0;
    
    // width of sum of event signals from all VCs
-   localparam event_width = clogb(num_vcs + 1);
+   localparam event_width = clogb(num_vcs) + 1;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
@@ -226,8 +232,8 @@ module vcr_ip_ctrl_mac
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
-   output [0:num_vcs*port_idx_width-1] route_port_ivc;
-   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+   output [0:num_vcs*num_ports-1] route_ivc_op;
+   wire [0:num_vcs*num_ports-1] route_ivc_op;
    
    // transition to next routing class
    output [0:num_vcs-1] inc_rc_ivc;
@@ -268,29 +274,6 @@ module vcr_ip_ctrl_mac
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
-   
-   // flit buffer write address
-   output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
-   
-   // flit buffer write enable
-   output fbf_write_enable;
-   wire 			  fbf_write_enable;
-   
-   // flit buffer write data
-   output [0:flit_data_width-1] fbf_write_data;
-   wire [0:flit_data_width-1] 	  fbf_write_data;
-   
-   // flit buffer read address
-   output [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-   
-   // flit buffer read enable
-   output fbf_read_enable;
-   wire 			  fbf_read_enable;
-   
-   // flit buffer read data
-   input [0:flit_data_width-1] fbf_read_data;
    
    // internal error condition detected
    output error;
@@ -383,11 +366,11 @@ module vcr_ip_ctrl_mac
 	   wire 	      sw_gnt_spec;
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
-	   wire [0:port_idx_width-1] route_port;
-	   wire 		     inc_rc;
-	   wire 		     vc_req;
-	   wire 		     sw_req_nonspec;
-	   wire 		     sw_req_spec;
+	   wire [0:num_ports-1] route_op;
+	   wire 		inc_rc;
+	   wire 		vc_req;
+	   wire 		sw_req_nonspec;
+	   wire 		sw_req_spec;
 	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
 	   wire [0:la_route_info_width-1] la_route_info;
 	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
@@ -408,6 +391,7 @@ module vcr_ip_ctrl_mac
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .track_vcs_at_output(track_vcs_at_output),
+	       .restrict_turns(restrict_turns),
 	       .routing_function_type(routing_function_type),
 	       .dimension_order(dimension_order),
 	       .credit_handling_type(credit_handling_type),
@@ -426,7 +410,7 @@ module vcr_ip_ctrl_mac
 	      .flit_ctrl_in(flit_ctrl_in_q),
 	      .header_info_in(header_info_in_q),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .route_port(route_port),
+	      .route_op(route_op),
 	      .inc_rc(inc_rc),
 	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
@@ -442,9 +426,7 @@ module vcr_ip_ctrl_mac
 	      .error(ivcc_error),
 	      .events(events));
 	   
-	   assign route_port_ivc[ivc*port_idx_width:
-				 (ivc+1)*port_idx_width-1]
-		    = route_port;
+	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = route_op;
 	   assign inc_rc_ivc[ivc] = inc_rc;
 	   assign vc_req_ivc[ivc] = vc_req;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
@@ -481,8 +463,11 @@ module vcr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // flit buffer control signals
+   // address computation
    //---------------------------------------------------------------------------
+   
+   wire [0:fbf_addr_width-1] 		  fbf_write_addr;
+   wire [0:fbf_addr_width-1] 		  fbf_read_addr;
    
    generate
       
@@ -555,9 +540,33 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
+   
+   //---------------------------------------------------------------------------
+   // flit buffer
+   //---------------------------------------------------------------------------
+   
+   wire 			     fbf_write_enable;
    assign fbf_write_enable = flit_valid_in_q;
+   
+   wire 			     fbf_read_enable;
    assign fbf_read_enable = |flit_valid_out_ivc;
+   
+   wire [0:flit_data_width-1] 	     fbf_write_data;
    assign fbf_write_data = flit_data_in_q;
+   
+   wire [0:flit_data_width-1] 	     fbf_read_data;
+   c_regfile
+     #(.width(flit_data_width),
+       .depth(fbf_depth),
+       .regfile_type(fbf_regfile_type))
+   fbf
+     (.clk(clk),
+      .write_enable(fbf_write_enable),
+      .write_address(fbf_write_addr),
+      .write_data(fbf_write_data),
+      .read_enable(fbf_read_enable),
+      .read_address(fbf_read_addr),
+      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------

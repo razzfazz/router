@@ -90,8 +90,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // use speculative grants when not conflicting with non-spec grants
 `define SW_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS 3
 
-// use speculative grants when not conflicting with intermediate non-spec grants
-`define SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS 4
-
 
 `endif

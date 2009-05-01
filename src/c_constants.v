@@ -67,6 +67,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // traverse dimensions in descending order
 `define DIMENSION_ORDER_DESCENDING 1
 
+// determine order in which dimensions are traversed by routing class
+`define DIMENSION_ORDER_BY_CLASS   2
+
 
 //------------------------------------------------------------------------------
 // packet formats

@@ -394,8 +394,8 @@ module vcr_op_ctrl_mac
 			.d(allocated_ivc_s),
 			.q(allocated_ivc_q));
 		     
-		     assign match_ovc[ovc] = allocated_q &
-					     |(allocated_ip_q & xbr_ctrl_ip) &
+		     assign match_ovc[ovc] = allocated_q &&
+					     |(allocated_ip_q & xbr_ctrl_ip) &&
 					     allocated_ivc_q[flit_vc_in];
 		     
 		  end
@@ -622,11 +622,11 @@ module vcr_op_ctrl_mac
 		  wire [0:cred_hold_width-1]  cred_hold_copy;
 		  assign cred_hold_copy
 		    = cred_count_s[(cred_count_width-cred_hold_width):
-				   cred_count_width-1] - |cred_count_s/*1'b1*/;
+				   cred_count_width-1] - 1'b1;
 		  
 		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 		  assign cred_hold_s
-		    = allocated_s ?
+		    = (vc_gnt | allocated_q) ?
 		      (cred_hold_q - (|cred_hold_q & ~credit)) :
 		      cred_hold_copy;
 		  c_dff
@@ -640,7 +640,7 @@ module vcr_op_ctrl_mac
 		     .q(cred_hold_q));
 		  
 		  wire 			      cred_s, cred_q;
-		  assign cred_s = |cred_hold_s | (credit & allocated_s);
+		  assign cred_s = |cred_hold_s | credit;
 		  c_dff
 		    #(.width(1),
 		      .reset_type(reset_type),

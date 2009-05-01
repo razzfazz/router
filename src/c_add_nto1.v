@@ -48,7 +48,7 @@ module c_add_nto1
    parameter num_ports = 2;
    
    // result width
-   localparam out_width = clogb(num_ports * (1 << width - 1) + 1);
+   localparam out_width = clogb(num_ports) + width;
    
    // vector of inputs
    input [0:width*num_ports-1] data_in;

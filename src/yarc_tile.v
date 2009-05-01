@@ -246,7 +246,6 @@ module yarc_tile
 
 
 
-
    //flit_ctrl_in_row_bus and data are wrong!!!!
    row_bus_driver
      #(/*AUTOINSTPARAM*/
@@ -284,19 +283,19 @@ module yarc_tile
        .xbc_crossbar_type		(xbc_crossbar_type),
        .xbd_crossbar_type		(xbd_crossbar_type),
        .reset_type			(reset_type))
-   tile_input (
-	       /*AUTOINST*/
-	       // Outputs
-	       .flit_ctrl_in_row_bus	(flit_ctrl_in_row_bus[0:num_vcs*flit_ctrl_width-1]),
-	       .flit_data_in_row_bus	(flit_data_in_row_bus[0:num_vcs*flit_data_width-1]),
-	       .flow_ctrl_out_tile	(flow_ctrl_out_tile[0:flow_ctrl_width-1]),
-	       // Inputs
-	       .router_address		(router_address[0:router_addr_width-1]),
-	       .clk			(clk),
-	       .reset			(reset),
-	       .flow_ctrl_in_row_bus	(flow_ctrl_in_row_bus[0:(num_ports-1)*flow_ctrl_width-1]),
-	       .flit_ctrl_in_tile	(flit_ctrl_in_tile[0:flit_ctrl_width-1+3]),
-	       .flit_data_in_tile	(flit_data_in_tile[0:flit_data_width-1]));
+     tile_input     
+     (/*AUTOINST*/
+      // Outputs
+      .flit_ctrl_in_row_bus		(flit_ctrl_in_row_bus[0:num_vcs*flit_ctrl_width-1]),
+      .flit_data_in_row_bus		(flit_data_in_row_bus[0:num_vcs*flit_data_width-1]),
+      .flow_ctrl_out_tile		(flow_ctrl_out_tile[0:flow_ctrl_width-1]),
+      // Inputs
+      .router_address			(router_address[0:router_addr_width-1]),
+      .clk				(clk),
+      .reset				(reset),
+      .flow_ctrl_in_row_bus		(flow_ctrl_in_row_bus[0:(num_ports-1)*flow_ctrl_width-1]),
+      .flit_ctrl_in_tile		(flit_ctrl_in_tile[0:flit_ctrl_width-1]),
+      .flit_data_in_tile		(flit_data_in_tile[0:flit_data_width-1]));
    
 
    

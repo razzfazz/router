@@ -146,6 +146,6 @@ module c_wf_alloc_rep
       
    endgenerate
    
-   assign gnt = gnt_by_prio[prio_q*num_ports*num_ports +: num_ports*num_ports];
+   assign gnt = gnt_by_prio[prio_q*num_ports +: num_ports];
    
 endmodule

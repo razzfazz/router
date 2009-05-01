@@ -35,27 +35,17 @@ module c_wf_alloc_mux
    
 `include "c_constants.v"
    
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
-   
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
-   
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
    
    // try to recover from errors
    parameter error_recovery = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   // reset value for priority pointer
+   localparam [0:num_ports-1] prio_init = {1'b1, {(num_ports-1){1'b0}}};
    
    input clk;
    input reset;
@@ -72,18 +62,18 @@ module c_wf_alloc_mux
    
    // Need to make sure this stays one-hot, as bit errors can lead to
    // conflicting grants being generated!
-   wire [0:port_idx_width-1] 	  prio_s, prio_q, prio_next;
-   c_incr
-     #(.width(port_idx_width),
-       .min_value(0),
-       .max_value(num_ports-1))
-   prio_next_incr
-     (.data_in(prio_q),
-      .data_out(prio_next));
-   assign prio_s = update ? prio_next : prio_q;
+   wire [0:num_ports-1] 	  prio_s, prio_q;
+   wire 			  prio_bad;
+   assign prio_bad = ~^prio_q;
+   wire [0:num_ports-1] 	  prio_fixed;
+   assign prio_fixed = (error_recovery && prio_bad) ? prio_init : prio_q;
+   assign prio_s = update ?
+		   {prio_fixed[num_ports-1], prio_fixed[0:num_ports-2]} :
+		   prio_fixed;
    c_dff
-     #(.width(port_idx_width),
-       .reset_type(reset_type))
+     #(.width(num_ports),
+       .reset_type(reset_type),
+       .reset_value(prio_init))
    prioq
      (.clk(clk),
       .reset(reset),
@@ -138,7 +128,13 @@ module c_wf_alloc_mux
 		  = req_dup[(col+num_ports-row)%num_ports:
 			    (col+num_ports-row)%num_ports+num_ports-1];
 		
-		assign req_in[col] = req_rot[prio_q];
+		c_select_1ofn
+		  #(.width(1),
+		    .num_ports(num_ports))
+		req_sel
+		  (.select(prio_q),
+		   .data_in(req_rot),
+		   .data_out(req_in[col]));
 		
 		// need to reverse the grant vector
 		assign gnt_dup[num_ports-col-1] = gnt_out[col];
@@ -150,7 +146,13 @@ module c_wf_alloc_mux
 			    (2*num_ports-row-col-1)%num_ports+
 			    num_ports-1];
 		
-		assign gnt_row[col] = gnt_rot[prio_q];
+		c_select_1ofn
+		  #(.width(1),
+		    .num_ports(num_ports))
+		gnt_sel
+		  (.select(prio_q),
+		   .data_in(gnt_rot),
+		   .data_out(gnt_row[col]));
 		
 	     end		
 	end
