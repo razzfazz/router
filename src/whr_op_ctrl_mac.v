@@ -218,6 +218,9 @@ module whr_op_ctrl_mac
    wire 				  flit_valid_in;
    assign flit_valid_in = xbr_ctrl;
    
+   wire 				  flit_head_in;
+   assign flit_head_in = int_flit_ctrl_in[0];
+   
    wire 				  flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1];
    
@@ -243,7 +246,7 @@ module whr_op_ctrl_mac
    
    wire 				  allocated_s, allocated_q;
    assign allocated_s
-     = set_allocated | (allocated_q & ~reset_allocated);
+     = (set_allocated | allocated_q) & ~reset_allocated;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -403,25 +406,40 @@ module whr_op_ctrl_mac
       
    endgenerate
    
+   
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 					 free_early;
-   wire 					 error_ct;
-   c_credit_tracker
-     #(.num_credits(num_flit_buffers),
-       .checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   ct
+   wire [0:cred_count_width-1] 			 cred_count_q;
+   assign cred_count_s = (cred_count_q + credit - debit);
+   c_dff
+     #(.width(cred_count_width),
+       .reset_type(reset_type),
+       .reset_value(num_flit_buffers))
+   cred_countq
      (.clk(clk),
       .reset(reset),
-      .credit(credit),
-      .debit(debit),
-      .free(free),
-      .free_early(free_early),
-      .error(error_ct));
+      .d(cred_count_s),
+      .q(cred_count_q));
+   
+   wire [0:1] 					 error_cred;
+   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
+			(cred_count_q == 0) && debit};
+   
+   wire 					 cred_s, cred_q;
+   assign cred_s = |cred_count_s;
+   c_dff
+     #(.width(1),
+       .reset_value(1'b1),
+       .reset_type(reset_type))
+   credq
+     (.clk(clk),
+      .reset(reset),
+      .d(cred_s),
+      .q(cred_q));
+   
+   assign free = cred_q;
    
    
    //---------------------------------------------------------------------------
@@ -497,6 +515,18 @@ module whr_op_ctrl_mac
    // error checker logic
    //---------------------------------------------------------------------------
    
-   assign error = error_hct | error_ct;
+   wire [0:1] 				  errors_out;
+   c_checker
+     #(.num_errors(2),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
+       .reset_type(reset_type))
+   chk
+     (.clk(clk),
+      .reset(reset),
+      .errors_in(error_cred),
+      .errors_out(errors_out));
+   
+   assign error = error_hct | errors_out;
    
 endmodule
