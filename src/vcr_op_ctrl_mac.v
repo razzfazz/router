@@ -328,7 +328,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire allocated_s, allocated_q;
 	   assign allocated_s
-	     = set_allocated | (allocated_q & ~reset_allocated);
+	     = (set_allocated | allocated_q) & ~reset_allocated;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
