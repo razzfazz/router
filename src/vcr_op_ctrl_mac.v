@@ -715,37 +715,38 @@ module vcr_op_ctrl_mac
 		 int_flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1] :
 		 flit_ctrl_q[1+vc_idx_width:flit_ctrl_width-1];
       
-   endgenerate
-   
-   wire 				flit_valid_s, flit_valid_q;
-   assign flit_valid_s = flit_ctrl_s[0];
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_validq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_valid_s),
-      .q(flit_valid_q));
-   
-   assign flit_ctrl_q[0] = flit_valid_q;
-   
-   generate
-      
-      if(flit_ctrl_width > 1)
-	begin
-	   
-	   c_dff
-	     #(.width(flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
-	       .offset(1))
-	   flit_ctrlq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flit_ctrl_s[1:flit_ctrl_width-1]),
-	      .q(flit_ctrl_q[1:flit_ctrl_width-1]));
-	   
-	end
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     wire flit_valid_s, flit_valid_q;
+	     assign flit_valid_s = flit_ctrl_s[0];
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     flit_validq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_valid_s),
+		.q(flit_valid_q));
+	     
+	     assign flit_ctrl_q[0] = flit_valid_q;
+	     
+	     c_dff
+	       #(.width(flit_ctrl_width-1),
+		 .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
+		 .offset(1))
+	     flit_ctrlq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_ctrl_s[1:flit_ctrl_width-1]),
+		.q(flit_ctrl_q[1:flit_ctrl_width-1]));
+	     
+	  end
+	
+      endcase
       
    endgenerate
    

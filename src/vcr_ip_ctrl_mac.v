@@ -301,37 +301,46 @@ module vcr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
+   wire 			  flit_valid_in;
+   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = flit_ctrl_in;
    
-   wire 			  flit_valid_in_s, flit_valid_in_q;
-   assign flit_valid_in_s = flit_ctrl_in_s[0];
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_valid_inq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_valid_in_s),
-      .q(flit_valid_in_q));
-   
-   assign flit_ctrl_in_q[0] = flit_valid_in_q;
-   
    generate
       
-      if(flit_ctrl_width > 1)
-	begin
-	   
-	   c_dff
-	     #(.width(flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   flit_ctrl_inq
-	     (.clk(clk),
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     wire flit_valid_in_s, flit_valid_in_q;
+	     assign flit_valid_in_s = flit_ctrl_in_s[0];
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     flit_valid_inq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_valid_in_s),
+		.q(flit_valid_in_q));
+	     
+	     assign flit_valid_in = flit_valid_in_q;
+	     
+	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
+	     
+	     c_dff
+	       #(.width(flit_ctrl_width-1),
+		 .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     flit_ctrl_inq
+	       (.clk(clk),
 	      .reset(reset),
-	      .d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
-	      .q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
-	   
-	end
+		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
+		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
+	     
+	  end
+	
+      endcase
       
    endgenerate
    
@@ -555,7 +564,7 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   assign fbf_write_enable = flit_valid_in_q;
+   assign fbf_write_enable = flit_valid_in;
    assign fbf_read_enable = |flit_valid_out_ivc;
    assign fbf_write_data = flit_data_in_q;
    
@@ -578,31 +587,22 @@ module vcr_ip_ctrl_mac
    wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
    assign int_flit_ctrl_out_q[0] = flit_valid_out_q;
    
-   generate
-      
-      if(int_flit_ctrl_width > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(int_flit_ctrl_width))
-	   int_flit_ctrl_out_s_sel
-	     (.select(flit_valid_out_ivc),
-	      .data_in(int_flit_ctrl_out_ivc),
-	      .data_out(int_flit_ctrl_out_s));
-	   
-	   c_dff
-	     #(.width(int_flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   int_flit_ctrl_outq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(int_flit_ctrl_out_s[1:int_flit_ctrl_width-1]),
-	      .q(int_flit_ctrl_out_q[1:int_flit_ctrl_width-1]));
-	   
-	end
-      
-   endgenerate
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(int_flit_ctrl_width))
+   int_flit_ctrl_out_s_sel
+     (.select(flit_valid_out_ivc),
+      .data_in(int_flit_ctrl_out_ivc),
+      .data_out(int_flit_ctrl_out_s));
+   
+   c_dff
+     #(.width(int_flit_ctrl_width-1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   int_flit_ctrl_outq
+     (.clk(clk),
+      .reset(reset),
+      .d(int_flit_ctrl_out_s[1:int_flit_ctrl_width-1]),
+      .q(int_flit_ctrl_out_q[1:int_flit_ctrl_width-1]));
    
    wire flit_head_out_q;
    assign flit_head_out_q = int_flit_ctrl_out_q[1+vc_idx_width+0];
