@@ -309,8 +309,11 @@ module vcr_op_ctrl_mac
 	   else
 	     assign credit = cred_valid;
 	   
+	   wire 			flit_valid_in_qual;
+	   assign flit_valid_in_qual = flit_valid_in & match_ovc[ovc];
+	   
 	   wire 			debit;
-	   assign debit = flit_valid_in & match_ovc[ovc];
+	   assign debit = flit_valid_in_qual;
 	   
 	   wire 			vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc];
@@ -324,7 +327,7 @@ module vcr_op_ctrl_mac
 	   assign set_allocated = vc_gnt;
 	   
 	   wire reset_allocated;   
-	   assign reset_allocated = debit & flit_tail_in;
+	   assign reset_allocated = flit_valid_in_qual & flit_tail_in;
 	   
 	   wire allocated_s, allocated_q;
 	   assign allocated_s
@@ -436,7 +439,7 @@ module vcr_op_ctrl_mac
 		     
 		     wire tail_sent_s, tail_sent_q;
 		     assign tail_sent_s
-		       = (tail_sent_q | (debit & flit_tail_in)) &
+		       = (tail_sent_q | (flit_valid_in_qual & flit_tail_in)) &
 			 ~buffer_drained;
 		     c_dff
 		       #(.width(1),
@@ -479,7 +482,8 @@ module vcr_op_ctrl_mac
 			.data_out(push_ptr_next));
 		     
 		     wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		     assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
+		     assign push_ptr_s
+		       = flit_valid_in_qual ? push_ptr_next : push_ptr_q;
 		     c_dff
 		       #(.width(flit_buffer_idx_width),
 			 .reset_type(reset_type))
@@ -512,14 +516,14 @@ module vcr_op_ctrl_mac
 		     reg [0:num_flit_buffers-1]       tail_queue;
 		     
 		     always @(posedge clk)
-		       if(debit)
+		       if(flit_valid_in_qual)
 			 tail_queue[push_ptr_q] <= flit_tail_in;
 		     
 		     wire 			      tail;
 		     assign tail = tail_queue[pop_ptr_q];
 		     
 		     wire 			      head_credit;
-		     assign head_credit = tail & credit;
+		     assign head_credit = credit & tail;
 		     
 		     wire 			      head_debit;
 		     assign head_debit = vc_gnt;
