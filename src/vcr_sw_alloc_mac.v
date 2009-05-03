@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // switch allocator for VC router
 module vcr_sw_alloc_mac
   (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
+   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_op_ip);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -91,8 +91,8 @@ module vcr_sw_alloc_mac
    wire [0:num_ports*num_vcs-1] gnt_spec_ip_ivc;
    
    // crossbar control signals
-   output [0:num_ports*num_ports-1] gnt_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
+   output [0:num_ports*num_ports-1] gnt_op_ip;
+   wire [0:num_ports*num_ports-1] gnt_op_ip;
    
    
    generate
@@ -114,7 +114,7 @@ module vcr_sw_alloc_mac
 		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
 		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-		.gnt_ip_op(gnt_ip_op));
+		.gnt_op_ip(gnt_op_ip));
 	  end
 	`SW_ALLOCATOR_TYPE_SEP_OF:
 	  begin
@@ -132,7 +132,7 @@ module vcr_sw_alloc_mac
 		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
 		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-		.gnt_ip_op(gnt_ip_op));
+		.gnt_op_ip(gnt_op_ip));
 	  end
       endcase
       
@@ -153,7 +153,7 @@ module vcr_sw_alloc_mac
 		.req_spec_ip_ivc(req_spec_ip_ivc),
 		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
 		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-		.gnt_ip_op(gnt_ip_op));
+		.gnt_op_ip(gnt_op_ip));
 	  end
       
    endgenerate

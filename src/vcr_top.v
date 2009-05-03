@@ -239,7 +239,6 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 		    sw_req_spec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    sw_gnt_spec_ip_ivc;
-   wire [0:num_ports*num_ports-1] 		    sw_gnt_ip_op;
    
    wire [0:num_ports*int_flit_ctrl_width-1] 	    xbc_data_in_ip;
    wire [0:num_ports*flit_data_width-1] 	    xbd_data_in_ip;
@@ -420,6 +419,7 @@ module vcr_top
    // switch allocator
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_ports-1] 		    sw_gnt_op_ip;
    vcr_sw_alloc_mac
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
@@ -435,15 +435,15 @@ module vcr_top
       .req_spec_ip_ivc(sw_req_spec_ip_ivc),
       .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
       .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
-      .gnt_ip_op(sw_gnt_ip_op));
+      .gnt_op_ip(sw_gnt_op_ip));
    
    
    //---------------------------------------------------------------------------
    // crossbars
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_ip_op_s;
-   assign xbc_ctrl_ip_op_s = sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_op_ip_s;
+   assign xbc_ctrl_op_ip_s = sw_gnt_op_ip;
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
    wire [0:num_ports*num_ports-1] 	    xbc_ctrl_op_ip_q;
@@ -456,13 +456,13 @@ module vcr_top
    xbc
      (.clk(clk),
       .reset(reset),
-      .ctrl_ip_op_s(xbc_ctrl_ip_op_s),
+      .ctrl_op_ip_s(xbc_ctrl_op_ip_s),
       .ctrl_op_ip_q(xbc_ctrl_op_ip_q),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
-   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_ip_op_s;
-   assign xbd_ctrl_ip_op_s = sw_gnt_ip_op;
+   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip_s;
+   assign xbd_ctrl_op_ip_s = sw_gnt_op_ip;
    
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
    wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip_q;
@@ -475,7 +475,7 @@ module vcr_top
    xbd
      (.clk(clk),
       .reset(reset),
-      .ctrl_ip_op_s(xbd_ctrl_ip_op_s),
+      .ctrl_op_ip_s(xbd_ctrl_op_ip_s),
       .ctrl_op_ip_q(xbd_ctrl_op_ip_q),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));

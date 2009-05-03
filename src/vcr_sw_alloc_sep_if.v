@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // switch allocator variant usign separable input-first allocation
 module vcr_sw_alloc_sep_if
   (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
+   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_op_ip);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -84,8 +84,8 @@ module vcr_sw_alloc_sep_if
    wire [0:num_ports*num_vcs-1] gnt_spec_ip_ivc;
    
    // crossbar control signals
-   output [0:num_ports*num_ports-1] gnt_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
+   output [0:num_ports*num_ports-1] gnt_op_ip;
+   wire [0:num_ports*num_ports-1] gnt_op_ip;
    
    
    //---------------------------------------------------------------------------
@@ -581,7 +581,7 @@ module vcr_sw_alloc_sep_if
    //---------------------------------------------------------------------------
    // generate global outputs
    //---------------------------------------------------------------------------
-   
-   assign gnt_ip_op = gnt_out_nonspec_ip_op | gnt_out_spec_ip_op;
+
+   assign gnt_op_ip = gnt_out_nonspec_op_ip | gnt_out_spec_op_ip;
    
 endmodule

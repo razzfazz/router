@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // configurable crossbar module
 module c_crossbar_mac
-  (clk, reset, ctrl_ip_op_s, ctrl_op_ip_q, data_in_ip, data_out_op);
+  (clk, reset, ctrl_op_ip_s, ctrl_op_ip_q, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -50,7 +50,7 @@ module c_crossbar_mac
    input reset;
    
    // incoming control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_ip_op_s;
+   input [0:num_in_ports*num_out_ports-1] ctrl_op_ip_s;
    
    // outgoing control signals (transposed request matrix, delayed by a cycle)
    output [0:num_out_ports*num_in_ports-1] ctrl_op_ip_q;
@@ -62,14 +62,6 @@ module c_crossbar_mac
    // vector of output data
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
-   
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s;
-   c_interleaver
-     #(.width(num_in_ports*num_out_ports),
-       .num_blocks(num_in_ports))
-   ctrl_in_intl
-     (.data_in(ctrl_ip_op_s),
-      .data_out(ctrl_op_ip_s));
    
    c_dff
      #(.width(num_out_ports*num_in_ports),

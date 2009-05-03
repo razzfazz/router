@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // switch allocator variant using wavefront allocation
 module vcr_sw_alloc_wf
   (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
+   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_op_ip);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -87,8 +87,8 @@ module vcr_sw_alloc_wf
    wire [0:num_ports*num_vcs-1] gnt_spec_ip_ivc;
    
    // crossbar control signals
-   output [0:num_ports*num_ports-1] gnt_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
+   output [0:num_ports*num_ports-1] gnt_op_ip;
+   wire [0:num_ports*num_ports-1] gnt_op_ip;
    
    
    //---------------------------------------------------------------------------
@@ -534,6 +534,14 @@ module vcr_sw_alloc_wf
    // generate global grants
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_ports-1] gnt_ip_op;
    assign gnt_ip_op = gnt_wf_nonspec_ip_op | gnt_wf_spec_ip_op;
+   
+   c_interleaver
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   gnt_op_ip_intl
+     (.data_in(gnt_ip_op),
+      .data_out(gnt_op_ip));
    
 endmodule
