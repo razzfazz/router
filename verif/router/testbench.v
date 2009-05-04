@@ -81,13 +81,14 @@ module testbench
    parameter measure_time = 100000;
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_MESH;//FBFLY;
+   parameter network_topology = `NETWORK_TOPOLOGY_MESH;
+//   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flit_buffers = 4;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers = 2;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 1;
@@ -162,8 +163,8 @@ module testbench
      = num_routing_classes * router_addr_width + node_addr_width;
    
    // select packet format
-   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
-//   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
+//   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   parameter packet_format = `PACKET_FORMAT_HEAD_TAIL;
    
    // maximum payload length (in flits)
    parameter max_payload_length = 4;
@@ -218,7 +219,8 @@ module testbench
    parameter track_vcs_at_output = 1;
    
    // select router implementation
-   parameter router_type = `ROUTER_TYPE_VC;
+   parameter router_type = `ROUTER_TYPE_WORMHOLE;
+//   parameter router_type = `ROUTER_TYPE_VC;
    
    // select routing function type
    localparam routing_function_type
@@ -241,14 +243,13 @@ module testbench
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_OF;
+   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
    parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type
-     = `SW_ALLOCATOR_TYPE_WF_BASE + `WF_ALLOCATOR_TYPE_DPA;
+   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
    parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -257,9 +258,7 @@ module testbench
    parameter sw_spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
    
    // enable speculative switch allocation
-   localparam sw_spec_enable = (sw_spec_level == `SW_SPEC_LEVEL_NONE) ?
-			       0 :
-			       1;
+   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
@@ -843,7 +842,7 @@ module testbench
 			  
 		       end
 		     else
-		       assign match_vcs = 1'b1;
+		       assign match_vcs = ref_ovc[0];
 		     
 		     wire 			  fifo_empty;
 		     
@@ -893,6 +892,44 @@ module testbench
 	end
       
       case(router_type)
+	
+	`ROUTER_TYPE_WORMHOLE:
+	  begin
+	     whr_top
+	       #(.num_flit_buffers(num_flit_buffers),
+		 .num_header_buffers(num_header_buffers),
+		 .num_ports(num_ports),
+		 .num_dimensions(num_dimensions),
+		 .num_routers_per_dim(num_routers_per_dim),
+		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .packet_format(packet_format),
+		 .max_payload_length(max_payload_length),
+		 .min_payload_length(min_payload_length),
+		 .flit_data_width(flit_data_width),
+		 .perf_ctr_enable(perf_ctr_enable),
+		 .perf_ctr_width(perf_ctr_width),
+		 .checker_enable(checker_enable),
+		 .checker_capture_mode(checker_capture_mode),
+		 .routing_function_type(routing_function_type),
+		 .dimension_order(dimension_order),
+		 .header_fifo_type(header_fifo_type),
+		 .fbf_regfile_type(fbf_regfile_type),
+		 .arbiter_type(sw_arbiter_type),
+		 .crossbar_type(data_crossbar_type),
+		 .reset_type(reset_type))
+	     whr
+	       (.clk(clk),
+		.reset(reset),
+		.router_address(router_address),
+		.flit_ctrl_in_ip(flit_ctrl_in_ip),
+		.flit_data_in_ip(flit_data_in_ip),
+		.flow_ctrl_out_ip(flow_ctrl_out_ip),
+		.flit_ctrl_out_op(flit_ctrl_out_op),
+		.flit_data_out_op(flit_data_out_op),
+		.flow_ctrl_in_op(flow_ctrl_in_op),
+		.error(rtr_error));
+	  end
+	
 	`ROUTER_TYPE_VC:
 	  begin
 	     vcr_top
@@ -939,6 +976,7 @@ module testbench
 		.flow_ctrl_in_op(flow_ctrl_in_op),
 		.error(rtr_error));
 	  end
+	
       endcase
       
       genvar 					    op;

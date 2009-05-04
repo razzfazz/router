@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module whr_op_ctrl_mac
-  (clk, reset, flow_ctrl_in, sw_gnt, xbr_ctrl_ip, int_flit_ctrl_in, 
-   flit_data_in, flit_ctrl_out, flit_data_out, elig, free, error);
+  (clk, reset, flow_ctrl_in, req_ip, req_head_ip, req_tail_ip, gnt_ip,
+   xbr_ctrl_ip, flit_data_in, flit_ctrl_out, flit_data_out, error);
    
 `include "c_constants.v"
 `include "whr_constants.v"
@@ -121,12 +121,12 @@ module whr_op_ctrl_mac
    // width of flow control signals
    localparam flow_ctrl_width = 1;
    
+   // select which arbiter type to use in allocator
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
    // include error checking logic
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + 1;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -136,14 +136,22 @@ module whr_op_ctrl_mac
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
-   // switch slot was allocated for this output port
-   input sw_gnt;
+   // requests from input ports
+   input [0:num_ports-1] req_ip;
    
-   // port to which this output is currently connected
-   input [0:num_ports-1] xbr_ctrl_ip;
+   // requests are for head flits
+   input [0:num_ports-1] req_head_ip;
    
-   // incoming flit control signals
-   input [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
+   // requests are for tail flits
+   input [0:num_ports-1] req_tail_ip;
+   
+   // grants to input ports
+   output [0:num_ports-1] gnt_ip;
+   wire [0:num_ports-1] gnt_ip;
+   
+   // crossbar control signals
+   output [0:num_ports-1] xbr_ctrl_ip;
+   wire [0:num_ports-1] xbr_ctrl_ip;
    
    // incoming flit data
    input [0:flit_data_width-1] flit_data_in;
@@ -155,14 +163,6 @@ module whr_op_ctrl_mac
    // outgoing flit data
    output [0:flit_data_width-1] flit_data_out;
    wire [0:flit_data_width-1] flit_data_out;
-   
-   // output VC is eligible for allocation (i.e., not currently allocated)
-   output elig;
-   wire 		      elig;
-   
-   // output VC has buffer space (i.e., credits) available
-   output free;
-   wire 		      free;
    
    // internal error condition detected
    output error;
@@ -189,64 +189,64 @@ module whr_op_ctrl_mac
    
    assign flow_ctrl_q[0] = cred_valid_q;
    
-   generate
-      
-      if(flow_ctrl_width > 1)
-	begin
-	   
-	   c_dff
-	     #(.width(flow_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   flow_ctrlq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flow_ctrl_s[1:flow_ctrl_width-1]),
-	      .q(flow_ctrl_q[1:flow_ctrl_width-1]));
-	   
-	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // output VC control logic
-   //---------------------------------------------------------------------------
-   
-   wire xbr_ctrl;
-   assign xbr_ctrl = |xbr_ctrl_ip;
-   
-   wire 				  flit_valid_in;
-   assign flit_valid_in = xbr_ctrl;
-   
-   wire 				  flit_head_in;
-   assign flit_head_in = int_flit_ctrl_in[0];
-   
-   wire 				  flit_tail_in;
-   assign flit_tail_in = int_flit_ctrl_in[1];
-   
-   wire 				  cred_valid;
+   wire 		      cred_valid;
    assign cred_valid = flow_ctrl_q[0];
    
-   wire 				  credit;
-   assign credit = cred_valid;
-   
-   wire 				  debit;
-   assign debit = flit_valid_in;
-   
    
    //---------------------------------------------------------------------------
-   // track whether this output port is currently assigend to an input port
+   // arbitration
    //---------------------------------------------------------------------------
-	   
-   wire 				  set_allocated;
-   assign set_allocated = sw_gnt;
    
-   wire 				  reset_allocated;   
-   assign reset_allocated = flit_valid_in & flit_tail_in;
+   wire [0:num_ports-1] req_int_ip;
+   assign req_int_ip = req_ip;
    
-   wire 				  allocated_s, allocated_q;
-   assign allocated_s
-     = (set_allocated | allocated_q) & ~reset_allocated;
+   wire                 gnt_int;
+   assign gnt_int = |req_int_ip;
+   
+   wire                 update;
+   wire [0:num_ports-1] gnt_int_ip;
+   c_arbiter
+     #(.num_ports(num_ports),
+       .arbiter_type(arbiter_type),
+       .reset_type(reset_type))
+   gnt_int_ip_arb
+     (.clk(clk),
+      .reset(reset),
+      .update(update),
+      .req(req_int_ip),
+      .gnt(gnt_int_ip));
+   
+   wire                 head_free;
+   
+   wire [0:num_ports-1] new_gnt_ip;
+   assign new_gnt_ip = gnt_int_ip & {num_ports{head_free}};
+   
+   wire 		new_gnt;
+   assign new_gnt = gnt_int & head_free;
+   
+   wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
+   assign allocated_ip_s = update ? gnt_int_ip : allocated_ip_q;
+   c_dff
+     #(.width(num_ports),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   allocated_ipq
+     (.clk(clk),
+      .reset(reset),
+      .d(allocated_ip_s),
+      .q(allocated_ip_q));
+   
+   wire [0:num_ports-1] held_gnt_ip;
+   assign held_gnt_ip = req_ip & allocated_ip_q;
+   
+   wire                 held_gnt;
+   assign held_gnt = |held_gnt_ip;
+   
+   wire                 free;
+   
+   wire                 allocated_s, allocated_q;
+   assign allocated_s = allocated_q ?
+			(~|(held_gnt_ip & req_tail_ip) | ~free) :
+			(|(gnt_int_ip & ~req_tail_ip) & head_free);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -256,13 +256,72 @@ module whr_op_ctrl_mac
       .d(allocated_s),
       .q(allocated_q));
    
+   assign update = ~allocated_q & new_gnt;
+   
+   wire [0:num_ports-1] gnt_unqual_ip;
+   assign gnt_unqual_ip = allocated_q ? held_gnt_ip : gnt_int_ip;
+   
+   assign xbr_ctrl_ip = gnt_unqual_ip;
+   
+   assign gnt_ip = (allocated_q ? held_gnt_ip : new_gnt_ip) & {num_ports{free}};
+   
+   wire                 gnt;
+   assign gnt = (allocated_q ? held_gnt : new_gnt) & free;
+
+   
+   //---------------------------------------------------------------------------
+   // staging for flit control signals
+   //---------------------------------------------------------------------------
+   
+   wire                 flit_valid_in_s, flit_valid_in_q;
+   assign flit_valid_in_s = gnt;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_valid_inq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_valid_in_s),
+      .q(flit_valid_in_q));
+   
+   wire                 flit_valid_in;
+   assign flit_valid_in = flit_valid_in_q;
+   
+   wire                 flit_head_s, flit_head_q;
+   assign flit_head_s = ~allocated_q | |(held_gnt_ip & req_head_ip);
+   c_dff
+     #(.width(1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_headq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_head_s),
+      .q(flit_head_q));
+   
+   wire                 flit_head_in;
+   assign flit_head_in = flit_head_q;
+   
+   wire                 flit_tail_s, flit_tail_q;
+   assign flit_tail_s = |(gnt_unqual_ip & req_tail_ip);
+   c_dff
+     #(.width(1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_tailq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+   
+   wire                 flit_tail_in;
+   assign flit_tail_in = flit_tail_q;
+   
    
    //---------------------------------------------------------------------------
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
    wire [0:cred_count_width-1] 		  cred_count_s;
-   wire 				  head_free_early;
+   wire 				  head_free;
    wire 				  error_hct;
    
    generate
@@ -273,7 +332,7 @@ module whr_op_ctrl_mac
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
 	   // on the normal credit tracking mechanism
-	   assign head_free_early = 1'b1;
+	   assign head_free = 1'b1;
 	   
 	   assign error_hct = 1'b0;
 	   
@@ -309,8 +368,8 @@ module whr_op_ctrl_mac
 		
 		wire head_free_s, head_free_q;
 		assign head_free_s
-		  = (head_free_q & ~sw_gnt) |
-		    (credit & tail_sent_q & buffer_drained);
+		  = (head_free_q & ~gnt) |
+		    (cred_valid & tail_sent_q & buffer_drained);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -321,7 +380,7 @@ module whr_op_ctrl_mac
 		   .d(head_free_s),
 		   .q(head_free_q));
 		
-		assign head_free_early = head_free_s;
+		assign head_free = head_free_q;
 		
 		assign error_hct = 1'b0;
 		
@@ -339,7 +398,7 @@ module whr_op_ctrl_mac
 		   .data_out(push_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
+		assign push_ptr_s = flit_valid_in ? push_ptr_next : push_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
@@ -359,7 +418,7 @@ module whr_op_ctrl_mac
 		   .data_out(pop_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
+		assign pop_ptr_s = cred_valid ? pop_ptr_next : pop_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
@@ -372,20 +431,20 @@ module whr_op_ctrl_mac
 		reg [0:num_flit_buffers-1] 	 tail_queue;
 		
 		always @(posedge clk)
-		  if(debit)
+		  if(flit_valid_in)
 		    tail_queue[push_ptr_q] <= flit_tail_in;
 		
 		wire 				 tail;
 		assign tail = tail_queue[pop_ptr_q];
 		
 		wire 				 head_credit;
-		assign head_credit = tail & credit;
+		assign head_credit = cred_valid & tail;
 		
 		wire 				 head_debit;
-		assign head_debit = sw_gnt & ~allocated_q;
+		assign head_debit = ~allocated_q & new_gnt;
 		
 		// track header credits using stock credit tracker module
-		wire 				 head_free;
+		wire 				 head_free_early;
 		c_credit_tracker
 		  #(.num_credits(num_header_buffers),
 		    .checker_enable(checker_enable),
@@ -410,6 +469,12 @@ module whr_op_ctrl_mac
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
+   
+   wire 					 credit;
+   assign credit = cred_valid;
+
+   wire 					 debit;
+   assign debit = gnt;
    
    wire [0:cred_count_width-1] 			 cred_count_q;
    assign cred_count_s = (cred_count_q + credit - debit);
@@ -443,62 +508,69 @@ module whr_op_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // keep track of whether current VC is available for allocation
-   //---------------------------------------------------------------------------
-   
-   wire 					 elig_s, elig_q;
-   assign elig_s = ~allocated_s & head_free_early;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type),
-       .reset_value(1'b1))
-   eligq
-     (.clk(clk),
-      .reset(reset),
-      .d(elig_s),
-      .q(elig_q));
-   
-   assign elig = elig_q;
-   
-   
-   //---------------------------------------------------------------------------
    // output staging
    //---------------------------------------------------------------------------
    
-   wire [0:flit_ctrl_width-1] 		      flit_ctrl_s, flit_ctrl_q;
-   assign flit_ctrl_s[0] = flit_valid_in;
-   assign flit_ctrl_s[1:flit_ctrl_width-1]
-	    = xbr_ctrl ? 
-	      int_flit_ctrl_in[0:flit_ctrl_width-2] : 
-	      flit_ctrl_q[1:flit_ctrl_width-1];
+   wire [0:flit_ctrl_width-1] 		         flit_ctrl_s, flit_ctrl_q;
    
-   wire 				flit_valid_s, flit_valid_q;
-   assign flit_valid_s = flit_ctrl_s[0];
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_validq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_valid_s),
-      .q(flit_valid_q));
-   
-   assign flit_ctrl_q[0] = flit_valid_q;
-   
-   c_dff
-     #(.width(flit_ctrl_width-1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
-       .offset(1))
-   flit_ctrlq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_ctrl_s[1:flit_ctrl_width-1]),
-      .q(flit_ctrl_q[1:flit_ctrl_width-1]));
+   generate
+      
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     assign flit_ctrl_s[0] = flit_valid_in;
+	     
+	     wire flit_valid_s, flit_valid_q;
+	     assign flit_valid_s = flit_ctrl_s[0];
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     flit_validq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_valid_s),
+		.q(flit_valid_q));
+	     
+	     assign flit_ctrl_q[0] = flit_valid_q;
+	     
+   	     assign flit_ctrl_s[1]
+		      = flit_valid_in ? flit_head_in : flit_ctrl_q[1];
+	     
+	     c_dff
+	       #(.width(flit_ctrl_width-1),
+		 .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
+		 .offset(1))
+	     flit_ctrlq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_ctrl_s[1:flit_ctrl_width-1]),
+		.q(flit_ctrl_q[1:flit_ctrl_width-1]));
+	     
+	  end
+	
+      endcase
+      
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL:
+	  begin
+	     
+	     assign flit_ctrl_s[2]
+		      = flit_valid_in ? flit_tail_in : flit_ctrl_q[2];
+	     
+	  end
+	
+      endcase
+      
+   endgenerate
    
    assign flit_ctrl_out = flit_ctrl_q;
    
-   wire [0:flit_data_width-1] 		  flit_data_s, flit_data_q;
-   assign flit_data_s = xbr_ctrl ? flit_data_in : flit_data_q;
+   wire [0:flit_data_width-1] 		         flit_data_s, flit_data_q;
+   assign flit_data_s = flit_valid_in ? flit_data_in : flit_data_q;
    c_dff
      #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -527,6 +599,6 @@ module whr_op_ctrl_mac
       .errors_in(error_cred),
       .errors_out(errors_out));
    
-   assign error = error_hct | errors_out;
+   assign error = error_hct | (|errors_out);
    
 endmodule

@@ -112,9 +112,6 @@ module whr_top
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + 1;
-   
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
@@ -128,13 +125,10 @@ module whr_top
    localparam fbf_addr_width = clogb(fbf_depth);
    
    // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
-   
-   // select implementation variant for data crossbar
-   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -174,20 +168,14 @@ module whr_top
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] 		elig_op;
-   wire [0:num_ports-1] 		free_op;
+   wire [0:num_ports*num_ports-1] 	req_ip_op;
+   wire [0:num_ports-1] 		req_head_ip;
+   wire [0:num_ports-1] 		req_tail_ip;
+   wire [0:num_ports*num_ports-1] 	gnt_ip_op;
    
-   wire [0:num_ports*num_ports-1] 	route_ip_op;
+   wire [0:num_ports*flit_data_width-1] xbr_data_in_ip;
    
-   wire [0:num_ports-1] 		sw_req_ip;
-   wire [0:num_ports-1] 		sw_gnt_ip;
-   wire [0:num_ports*num_ports-1] 	sw_gnt_ip_op;
-   wire [0:num_ports-1] 		sw_gnt_op;
-   
-   wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_in_ip;
-   wire [0:num_ports*flit_data_width-1]     xbd_data_in_ip;
-   
-   wire [0:num_ports-1] 		    ipc_error_ip;
+   wire [0:num_ports-1] 		ipc_error_ip;
    
    generate
       
@@ -209,12 +197,12 @@ module whr_top
 	   assign flit_data_in
 	     = flit_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1];
 	   
-	   wire 		      sw_gnt;
-	   assign sw_gnt = sw_gnt_ip[ip];
+	   wire [0:num_ports-1]       gnt_op;
+	   assign gnt_op = gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
-	   wire [0:num_ports-1]       route_op;
-	   wire 		      sw_req;
-	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
+	   wire [0:num_ports-1]       req_op;
+	   wire                       req_head;
+	   wire                       req_tail;
 	   wire [0:flit_data_width-1] 	  flit_data_out;
 	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
 	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
@@ -250,10 +238,10 @@ module whr_top
 	      .router_address(router_address),
 	      .flit_ctrl_in(flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
-	      .route_op(route_op),
-	      .sw_req(sw_req),
-	      .sw_gnt(sw_gnt),
-	      .int_flit_ctrl_out(int_flit_ctrl_out),
+	      .req_op(req_op),
+	      .req_head(req_head),
+	      .req_tail(req_tail),
+	      .gnt_op(gnt_op),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .fbf_write_addr(fbf_write_addr),
@@ -277,12 +265,10 @@ module whr_top
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   
-	   assign route_ip_op[ip*num_ports:(ip+1)*num_ports-1] = route_op;
-	   assign sw_req_ip[ip] = sw_req;
-	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
-				 (ip+1)*int_flit_ctrl_width-1]
-		    = int_flit_ctrl_out;
-	   assign xbd_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
+	   assign req_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req_op;
+	   assign req_head_ip[ip] = req_head;
+	   assign req_tail_ip[ip] = req_tail;
+	   assign xbr_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
 		    = flit_data_out;
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
 				   (ip+1)*flow_ctrl_width-1]
@@ -295,71 +281,50 @@ module whr_top
    
    
    //---------------------------------------------------------------------------
-   // switch allocator
+   // crossbar
    //---------------------------------------------------------------------------
    
-   whr_sw_alloc_mac
-     #(.num_ports(num_ports),
-       .arbiter_type(sw_arbiter_type),
-       .reset_type(reset_type))
-   swa
-     (.clk(clk),
-      .reset(reset),
-      .route_ip_op(route_ip_op),
-      .elig_op(elig_op),
-      .free_op(free_op),
-      .req_ip(sw_req_ip),
-      .gnt_ip(sw_gnt_ip),
-      .gnt_ip_op(sw_gnt_ip_op),
-      .gnt_op(sw_gnt_op));
+   wire [0:num_ports*num_ports-1]           xbr_ctrl_op_ip;
    
+   wire [0:num_ports*num_ports-1] 	    xbr_ctrl_op_ip_s;
+   assign xbr_ctrl_op_ip_s = xbr_ctrl_op_ip;
    
-   //---------------------------------------------------------------------------
-   // crossbars
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_ip_op_s;
-   assign xbc_ctrl_ip_op_s = sw_gnt_ip_op;
-   
-   wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
-   wire [0:num_ports*num_ports-1] 	  xbc_ctrl_op_ip_q;
-   c_crossbar_mac
-     #(.num_in_ports(num_ports),
-       .num_out_ports(num_ports),
-       .width(int_flit_ctrl_width),
-       .crossbar_type(xbc_crossbar_type),
-       .reset_type(reset_type))
-   xbc
-     (.clk(clk),
-      .reset(reset),
-      .ctrl_ip_op_s(xbc_ctrl_ip_op_s),
-      .ctrl_op_ip_q(xbc_ctrl_op_ip_q),
-      .data_in_ip(xbc_data_in_ip),
-      .data_out_op(xbc_data_out_op));
-   
-   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_ip_op_s;
-   assign xbd_ctrl_ip_op_s = sw_gnt_ip_op;
-   
-   wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
-   wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip_q;
+   wire [0:num_ports*flit_data_width-1]     xbr_data_out_op;
+   wire [0:num_ports*num_ports-1] 	    xbr_ctrl_op_ip_q;
    c_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(flit_data_width),
-       .crossbar_type(xbd_crossbar_type),
+       .crossbar_type(crossbar_type),
        .reset_type(reset_type))
-   xbd
+   xbr
      (.clk(clk),
       .reset(reset),
-      .ctrl_ip_op_s(xbd_ctrl_ip_op_s),
-      .ctrl_op_ip_q(xbd_ctrl_op_ip_q),
-      .data_in_ip(xbd_data_in_ip),
-      .data_out_op(xbd_data_out_op));
+      .ctrl_op_ip_s(xbr_ctrl_op_ip_s),
+      .ctrl_op_ip_q(xbr_ctrl_op_ip_q),
+      .data_in_ip(xbr_data_in_ip),
+      .data_out_op(xbr_data_out_op));
    
    
    //---------------------------------------------------------------------------
    // output ports
    //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_ports-1] 	req_op_ip;
+   c_interleaver
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   req_op_ip_intl
+     (.data_in(req_ip_op),
+      .data_out(req_op_ip));
+   
+   wire [0:num_ports*num_ports-1] 	gnt_op_ip;
+   c_interleaver
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   gnt_ip_op_intl
+     (.data_in(gnt_op_ip),
+      .data_out(gnt_ip_op));
    
    wire [0:num_ports-1] 	  opc_error_op;
    
@@ -370,30 +335,21 @@ module whr_top
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
-	   assign int_flit_ctrl_in
-	     = xbc_data_out_op[op*int_flit_ctrl_width:
-			       (op+1)*int_flit_ctrl_width-1];
-	   
 	   wire [0:flit_data_width-1] 	  flit_data_in;
 	   assign flit_data_in
-	     = xbd_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1];
+	     = xbr_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1];
 	   
 	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_in;
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire 			  sw_gnt;
-	   assign sw_gnt = sw_gnt_op[op];
+	   wire [0:num_ports-1] 	  req_ip;
+	   assign req_ip = req_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire [0:num_ports-1] 	xbc_ctrl_ip;
-	   assign xbc_ctrl_ip
-	     = xbc_ctrl_op_ip_q[op*num_ports:(op+1)*num_ports-1];
-	   
+	   wire [0:num_ports-1] 	  gnt_ip;
+	   wire [0:num_ports-1] 	  xbr_ctrl_ip;
 	   wire [0:flit_ctrl_width-1] 	  flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	  flit_data_out;
-	   wire 			  elig;
-	   wire 			  free;
 	   wire 			  opc_error;
 	   whr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -406,6 +362,7 @@ module whr_top
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
+	       .arbiter_type(arbiter_type),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
@@ -413,23 +370,24 @@ module whr_top
 	     (.clk(clk),
 	      .reset(reset),
 	      .flow_ctrl_in(flow_ctrl_in),
-	      .sw_gnt(sw_gnt),
-	      .xbr_ctrl_ip(xbc_ctrl_ip),
-	      .int_flit_ctrl_in(int_flit_ctrl_in),
+	      .req_ip(req_ip),
+	      .req_head_ip(req_head_ip),
+	      .req_tail_ip(req_tail_ip),
+	      .gnt_ip(gnt_ip),
+	      .xbr_ctrl_ip(xbr_ctrl_ip),
 	      .flit_data_in(flit_data_in),
 	      .flit_ctrl_out(flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
-	      .elig(elig),
-	      .free(free),
 	      .error(opc_error));
+	   
+	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
+	   
+	   assign xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1] = xbr_ctrl_ip;
 	   
 	   assign flit_ctrl_out_op[op*flit_ctrl_width:(op+1)*flit_ctrl_width-1]
 		    = flit_ctrl_out;
 	   assign flit_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1]
 		    = flit_data_out;
-	   
-	   assign elig_op[op] = elig;
-	   assign free_op[op] = free;
 	   
 	   assign opc_error_op[op] = opc_error;
 	   

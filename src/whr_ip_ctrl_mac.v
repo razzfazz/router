@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input port controller
 module whr_ip_ctrl_mac
-  (clk, reset, router_address, flit_ctrl_in, flit_data_in, route_op, sw_req, 
-   sw_gnt, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, fbf_write_addr, 
+  (clk, reset, router_address, flit_ctrl_in, flit_data_in, req_op, req_head, 
+   req_tail, gnt_op, flit_data_out, flow_ctrl_out, fbf_write_addr, 
    fbf_write_enable, fbf_write_data, fbf_read_addr, fbf_read_enable, 
    fbf_read_data, error);
    
@@ -140,9 +140,6 @@ module whr_ip_ctrl_mac
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + 1;
-   
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
@@ -182,20 +179,20 @@ module whr_ip_ctrl_mac
    // incoming flit data
    input [0:flit_data_width-1] flit_data_in;
    
-   // destination port
-   output [0:num_ports-1] route_op;
-   wire [0:num_ports-1] route_op;
+   // request for output port
+   output [0:num_ports-1] req_op;
+   wire [0:num_ports-1]        req_op;
    
-   // switch allocator request
-   output sw_req;
-   wire sw_req;
+   // current flit is head flit
+   output req_head;
+   wire 		       req_head;
    
-   // switch allocator grant
-   input sw_gnt;
+   // current flit is tail flit
+   output req_tail;
+   wire 		       req_tail;
    
-   // outgoing flit control signals
-   output [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
-   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
+   // output port granted
+   input [0:num_ports-1] gnt_op;
    
    // outgoing flit data
    output [0:flit_data_width-1] flit_data_out;
@@ -237,37 +234,46 @@ module whr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
+   wire 			  flit_valid_in;
+   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = flit_ctrl_in;
    
-   wire 			  flit_valid_in_s, flit_valid_in_q;
-   assign flit_valid_in_s = flit_ctrl_in_s[0];
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_valid_inq
-     (.clk(clk),
-      .reset(reset),
-      .d(flit_valid_in_s),
-      .q(flit_valid_in_q));
-   
-   assign flit_ctrl_in_q[0] = flit_valid_in_q;
-   
    generate
       
-      if(flit_ctrl_width > 1)
-	begin
-	   
-	   c_dff
-	     #(.width(flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   flit_ctrl_inq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
-	      .q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
-	   
-	end
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     wire                 flit_valid_in_s, flit_valid_in_q;
+	     assign flit_valid_in_s = flit_ctrl_in_s[0];
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     flit_valid_inq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_valid_in_s),
+		.q(flit_valid_in_q));
+	     
+	     assign flit_valid_in = flit_valid_in_q;
+	     
+	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
+	     
+	     c_dff
+	       #(.width(flit_ctrl_width-1),
+		 .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     flit_ctrl_inq
+	       (.clk(clk),
+		.reset(reset),
+		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
+		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
+	     
+	  end
+	
+      endcase
       
    endgenerate
    
@@ -292,18 +298,31 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 			flit_valid_in;
-   assign flit_valid_in = flit_ctrl_in_q[0];
-   
-   wire 			flit_head_in;
-   assign flit_head_in = flit_ctrl_in_q[1];
-   
+   wire 			flit_head_in;   
    wire 			flit_tail_in;
    
    generate
       
       case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     assign flit_valid_in = flit_ctrl_in_q[0];
+	     assign flit_head_in = flit_ctrl_in_q[1];
+	     
+	  end
+	
+      endcase
+      
+      case(packet_format)
+	
 	`PACKET_FORMAT_HEAD_TAIL:
-	  assign flit_tail_in = flit_ctrl_in_q[2];
+	  begin
+	     assign flit_tail_in = flit_ctrl_in_q[2];
+	  end
+	
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
@@ -374,6 +393,7 @@ module whr_ip_ctrl_mac
 	       end
 	     
 	  end
+	
       endcase
       
    endgenerate
@@ -382,9 +402,12 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
+
+   wire                                     gnt;
+   assign gnt = |gnt_op;
    
    wire 				    flit_valid_out;
-   assign flit_valid_out = sw_gnt;
+   assign flit_valid_out = gnt;
    
    wire 				    fbc_empty;
    
@@ -638,6 +661,7 @@ module whr_ip_ctrl_mac
    wire [0:port_idx_width-1] route_port;
    assign route_port = hdff_la_route_info[0:port_idx_width-1];
    
+   wire [0:num_ports-1] route_op;
    c_decoder
      #(.num_ports(num_ports))
    route_op_dec
@@ -692,14 +716,25 @@ module whr_ip_ctrl_mac
    wire 		     flit_valid;
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
-   assign sw_req = header_valid & flit_valid;
+   
+   //---------------------------------------------------------------------------
+   // generate control signals to switch allocator
+   //---------------------------------------------------------------------------
+   
+   wire                      req;
+   assign req = header_valid & flit_valid;
+   
+   assign req_op = {num_ports{req}} & route_op;
+   
+   assign req_head = flit_head_out;
+   assign req_tail = flit_tail_out;
    
    
    //---------------------------------------------------------------------------
    // flit buffer control signals
    //---------------------------------------------------------------------------
    
-   assign fbf_write_enable = flit_valid_in_q;
+   assign fbf_write_enable = flit_valid_in;
    assign fbf_read_enable = flit_valid_out;
    assign fbf_write_data = flit_data_in_q;
    
@@ -708,23 +743,16 @@ module whr_ip_ctrl_mac
    // generate outputs to switch
    //---------------------------------------------------------------------------
    
-   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
-   assign int_flit_ctrl_out_s[0] = flit_head_out;
-   assign int_flit_ctrl_out_s[1] = flit_tail_out;
-   
+   wire                      flit_head_out_s, flit_head_out_q;
+   assign flit_head_out_s = flit_head_out;
    c_dff
-     #(.width(int_flit_ctrl_width),
+     #(.width(1),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   int_flit_ctrl_outq
+   flit_head_outq
      (.clk(clk),
       .reset(reset),
-      .d(int_flit_ctrl_out_s),
-      .q(int_flit_ctrl_out_q));
-   
-   wire flit_head_out_q;
-   assign flit_head_out_q = int_flit_ctrl_out_q[0];
-   
-   assign int_flit_ctrl_out = int_flit_ctrl_out_q;
+      .d(flit_head_out_s),
+      .q(flit_head_out_q));
    
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
    assign la_route_info_s = la_route_info_out;
@@ -749,7 +777,7 @@ module whr_ip_ctrl_mac
    // generate outgoing credits
    //---------------------------------------------------------------------------
    
-   wire 			     cred_valid_s, cred_valid_q;
+   wire 			  cred_valid_s, cred_valid_q;
    assign cred_valid_s = flit_valid_out;
    c_dff
      #(.width(1),
@@ -767,10 +795,10 @@ module whr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:0] 		       errors_in;
+   wire [0:0] 		          errors_in;
    assign errors_in = {flit_valid & ~header_valid};
    
-   wire [0:0] 		       errors_out;
+   wire [0:0] 		          errors_out;
    c_checker
      #(.num_errors(1),
        .enable(checker_enable),
@@ -798,7 +826,7 @@ module whr_ip_ctrl_mac
 	   assign ev_no_flit = header_valid & ~flit_valid;
 	   
 	   wire 		       ev_flit_stalled_sw;
-	   assign ev_flit_stalled_sw = header_valid & flit_valid & ~sw_gnt;
+	   assign ev_flit_stalled_sw = header_valid & flit_valid & ~gnt;
 	   
 	   wire 		       ev_flit_sent;
 	   assign ev_flit_sent = flit_valid_out;
