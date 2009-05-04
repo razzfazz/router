@@ -321,7 +321,6 @@ module whr_op_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:cred_count_width-1] 		  cred_count_s;
-   wire 				  head_free;
    wire 				  error_hct;
    
    generate

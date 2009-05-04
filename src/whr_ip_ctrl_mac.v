@@ -234,8 +234,6 @@ module whr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
-   wire 			  flit_valid_in;
-   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = flit_ctrl_in;
    
@@ -257,8 +255,6 @@ module whr_ip_ctrl_mac
 		.reset(reset),
 		.d(flit_valid_in_s),
 		.q(flit_valid_in_q));
-	     
-	     assign flit_valid_in = flit_valid_in_q;
 	     
 	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
 	     
