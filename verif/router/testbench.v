@@ -218,7 +218,7 @@ module testbench
    parameter track_vcs_at_output = 1;
    
    // select router implementation
-   parameter router_type = `ROUTER_TYPE_WORMHOLE;
+   parameter router_type = `ROUTER_TYPE_VC;
    
    // select routing function type
    localparam routing_function_type
@@ -262,10 +262,10 @@ module testbench
 			       1;
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
+   parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    // select implementation variant for data crossbar
-   parameter xbd_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
+   parameter data_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -893,42 +893,6 @@ module testbench
 	end
       
       case(router_type)
-	`ROUTER_TYPE_WORMHOLE:
-	  begin
-	     whr_top
-	       #(.num_flit_buffers(num_flit_buffers),
-		 .num_header_buffers(num_header_buffers),
-		 .num_ports(num_ports),
-		 .num_dimensions(num_dimensions),
-		 .num_routers_per_dim(num_routers_per_dim),
-		 .num_neighbors_per_dim(num_neighbors_per_dim),
-		 .packet_format(packet_format),
-		 .max_payload_length(max_payload_length),
-		 .min_payload_length(min_payload_length),
-		 .flit_data_width(flit_data_width),
-		 .perf_ctr_enable(perf_ctr_enable),
-		 .perf_ctr_width(perf_ctr_width),
-		 .checker_enable(checker_enable),
-		 .checker_capture_mode(checker_capture_mode),
-		 .routing_function_type(routing_function_type),
-		 .dimension_order(dimension_order),
-		 .header_fifo_type(header_fifo_type),
-		 .fbf_regfile_type(fbf_regfile_type),
-		 .xbc_crossbar_type(xbc_crossbar_type),
-		 .xbd_crossbar_type(xbd_crossbar_type),
-		 .reset_type(reset_type))
-	     whr
-	       (.clk(clk),
-		.reset(reset),
-		.router_address(router_address),
-		.flit_ctrl_in_ip(flit_ctrl_in_ip),
-		.flit_data_in_ip(flit_data_in_ip),
-		.flow_ctrl_out_ip(flow_ctrl_out_ip),
-		.flit_ctrl_out_op(flit_ctrl_out_op),
-		.flit_data_out_op(flit_data_out_op),
-		.flow_ctrl_in_op(flow_ctrl_in_op),
-		.error(rtr_error));
-	  end
 	`ROUTER_TYPE_VC:
 	  begin
 	     vcr_top
@@ -960,8 +924,8 @@ module testbench
 		 .sw_allocator_type(sw_allocator_type),
 		 .sw_arbiter_type(sw_arbiter_type),
 		 .sw_spec_level(sw_spec_level),
-		 .xbc_crossbar_type(xbc_crossbar_type),
-		 .xbd_crossbar_type(xbd_crossbar_type),
+		 .ctrl_crossbar_type(ctrl_crossbar_type),
+		 .data_crossbar_type(data_crossbar_type),
 		 .reset_type(reset_type))
 	     vcr
 	       (.clk(clk),

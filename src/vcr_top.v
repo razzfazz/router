@@ -182,10 +182,10 @@ module vcr_top
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
    
    // select implementation variant for data crossbar
-   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter data_crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -451,7 +451,7 @@ module vcr_top
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(int_flit_ctrl_width),
-       .crossbar_type(xbc_crossbar_type),
+       .crossbar_type(ctrl_crossbar_type),
        .reset_type(reset_type))
    xbc
      (.clk(clk),
@@ -470,7 +470,7 @@ module vcr_top
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(flit_data_width),
-       .crossbar_type(xbd_crossbar_type),
+       .crossbar_type(data_crossbar_type),
        .reset_type(reset_type))
    xbd
      (.clk(clk),
