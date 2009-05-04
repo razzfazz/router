@@ -319,34 +319,43 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			  flit_valid_in;
-   
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc_in;
-	   assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
-	   
-	   assign flit_valid_in
-	     = flit_ctrl_in[0] && (flit_vc_in == vc_id);
-	   
-	end
-      else
-	assign flit_valid_in = flit_ctrl_in[0];
-      
-   endgenerate
-   
-   wire 			   flit_head_in;
-   assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
-   
+   wire 			   flit_head_in;   
    wire 			   flit_tail_in;
    
    generate
+
+      case(packet_format)
+	
+	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_EXPLICIT_LENGTH:
+	  begin
+	     
+	     if(num_vcs > 1)
+	       begin
+		  
+		  wire [0:vc_idx_width-1] flit_vc_in;
+		  assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
+		  
+		  assign flit_valid_in
+		    = flit_ctrl_in[0] && (flit_vc_in == vc_id);
+		  
+	       end
+	     else
+		  assign flit_valid_in = flit_ctrl_in[0];
+	     
+	     assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
+	     
+	  end
+	
+	endcase
       
       case(packet_format)
+	
 	`PACKET_FORMAT_HEAD_TAIL:
-	  assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
+	  begin
+	     assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
+	  end
+	
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
@@ -417,6 +426,7 @@ module vcr_ivc_ctrl
 	       end
 	     
 	  end
+	
       endcase
       
    endgenerate

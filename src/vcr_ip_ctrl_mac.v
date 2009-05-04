@@ -585,8 +585,6 @@ module vcr_ip_ctrl_mac
       .q(flit_valid_out_q));
    
    wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
-   assign int_flit_ctrl_out_q[0] = flit_valid_out_q;
-   
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(int_flit_ctrl_width))
@@ -603,6 +601,8 @@ module vcr_ip_ctrl_mac
       .reset(reset),
       .d(int_flit_ctrl_out_s[1:int_flit_ctrl_width-1]),
       .q(int_flit_ctrl_out_q[1:int_flit_ctrl_width-1]));
+   
+   assign int_flit_ctrl_out_q[0] = flit_valid_out_q;
    
    wire flit_head_out_q;
    assign flit_head_out_q = int_flit_ctrl_out_q[1+vc_idx_width+0];
