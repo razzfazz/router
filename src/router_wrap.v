@@ -66,19 +66,19 @@ module router_wrap
    endfunction
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
+   parameter network_topology = `NETWORK_TOPOLOGY_MESH;
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flit_buffers = 4;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers = 2;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_routing_classes = 1;
    
    // total number of packet classes
    localparam num_classes = num_traffic_classes * num_routing_classes;
@@ -99,7 +99,7 @@ module router_wrap
    parameter num_dimensions = 2;
    
    // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 4;
+   parameter num_nodes_per_router = 1;
    
    // total number of routers
    localparam num_routers
@@ -146,7 +146,7 @@ module router_wrap
        -1;
    
    // width of flit payload data
-   parameter flit_data_width = 64;
+   parameter flit_data_width = 32;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
@@ -166,7 +166,10 @@ module router_wrap
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
-   parameter track_vcs_at_output = 0;
+   parameter track_vcs_at_output = 1;
+   
+   // select router implementation
+   parameter router_type = `ROUTER_TYPE_VC;
    
    // select routing function type
    localparam routing_function_type
@@ -201,16 +204,16 @@ module router_wrap
    parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
-   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter sw_spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
    
    // enable speculative switch allocation
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    // select implementation variant for data crossbar
-   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter data_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -245,48 +248,100 @@ module router_wrap
    output error;
    wire 				error;
    
-   vcr_top
-     #(.num_flit_buffers(num_flit_buffers),
-       .num_header_buffers(num_header_buffers),
-       .num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
-       .num_vcs_per_class(num_vcs_per_class),
-       .num_ports(num_ports),
-       .num_dimensions(num_dimensions),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
-       .packet_format(packet_format),
-       .max_payload_length(max_payload_length),
-       .min_payload_length(min_payload_length),
-       .flit_data_width(flit_data_width),
-       .perf_ctr_enable(perf_ctr_enable),
-       .perf_ctr_width(perf_ctr_width),
-       .checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
-       .track_vcs_at_output(track_vcs_at_output),
-       .routing_function_type(routing_function_type),
-       .dimension_order(dimension_order),
-       .credit_handling_type(credit_handling_type),
-       .header_fifo_type(header_fifo_type),
-       .fbf_regfile_type(fbf_regfile_type),
-       .vc_allocator_type(vc_allocator_type),
-       .vc_arbiter_type(vc_arbiter_type),
-       .sw_allocator_type(sw_allocator_type),
-       .sw_arbiter_type(sw_arbiter_type),
-       .sw_spec_level(sw_spec_level),
-       .xbc_crossbar_type(xbc_crossbar_type),
-       .xbd_crossbar_type(xbd_crossbar_type),
-       .reset_type(reset_type))
-   vcr
-     (.clk(clk),
-      .reset(reset),
-      .router_address(router_address),
-      .flit_ctrl_in_ip(flit_ctrl_in_ip),
-      .flit_data_in_ip(flit_data_in_ip),
-      .flow_ctrl_out_ip(flow_ctrl_out_ip),
-      .flit_ctrl_out_op(flit_ctrl_out_op),
-      .flit_data_out_op(flit_data_out_op),
-      .flow_ctrl_in_op(flow_ctrl_in_op),
-      .error(error));
+   generate
+      
+      case(router_type)
+	
+	`ROUTER_TYPE_WORMHOLE:
+	  begin
+	     
+	     whr_top
+	       #(.num_flit_buffers(num_flit_buffers),
+		 .num_header_buffers(num_header_buffers),
+		 .num_ports(num_ports),
+		 .num_dimensions(num_dimensions),
+		 .num_routers_per_dim(num_routers_per_dim),
+		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .packet_format(packet_format),
+		 .max_payload_length(max_payload_length),
+		 .min_payload_length(min_payload_length),
+		 .flit_data_width(flit_data_width),
+		 .perf_ctr_enable(perf_ctr_enable),
+		 .perf_ctr_width(perf_ctr_width),
+		 .checker_enable(checker_enable),
+		 .checker_capture_mode(checker_capture_mode),
+		 .routing_function_type(routing_function_type),
+		 .dimension_order(dimension_order),
+		 .header_fifo_type(header_fifo_type),
+		 .fbf_regfile_type(fbf_regfile_type),
+		 .arbiter_type(sw_arbiter_type),
+		 .crossbar_type(data_crossbar_type),
+		 .reset_type(reset_type))
+	     whr
+	       (.clk(clk),
+		.reset(reset),
+		.router_address(router_address),
+		.flit_ctrl_in_ip(flit_ctrl_in_ip),
+		.flit_data_in_ip(flit_data_in_ip),
+		.flow_ctrl_out_ip(flow_ctrl_out_ip),
+		.flit_ctrl_out_op(flit_ctrl_out_op),
+		.flit_data_out_op(flit_data_out_op),
+		.flow_ctrl_in_op(flow_ctrl_in_op),
+		.error(error));
+	     
+	  end
+	
+	`ROUTER_TYPE_VC:
+	  begin
+	     
+	     vcr_top
+	       #(.num_flit_buffers(num_flit_buffers),
+		 .num_header_buffers(num_header_buffers),
+		 .num_traffic_classes(num_traffic_classes),
+		 .num_routing_classes(num_routing_classes),
+		 .num_vcs_per_class(num_vcs_per_class),
+		 .num_ports(num_ports),
+		 .num_dimensions(num_dimensions),
+		 .num_routers_per_dim(num_routers_per_dim),
+		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .packet_format(packet_format),
+		 .max_payload_length(max_payload_length),
+		 .min_payload_length(min_payload_length),
+		 .flit_data_width(flit_data_width),
+		 .perf_ctr_enable(perf_ctr_enable),
+		 .perf_ctr_width(perf_ctr_width),
+		 .checker_enable(checker_enable),
+		 .checker_capture_mode(checker_capture_mode),
+		 .track_vcs_at_output(track_vcs_at_output),
+		 .routing_function_type(routing_function_type),
+		 .dimension_order(dimension_order),
+		 .credit_handling_type(credit_handling_type),
+		 .header_fifo_type(header_fifo_type),
+		 .fbf_regfile_type(fbf_regfile_type),
+		 .vc_allocator_type(vc_allocator_type),
+		 .vc_arbiter_type(vc_arbiter_type),
+		 .sw_allocator_type(sw_allocator_type),
+		 .sw_arbiter_type(sw_arbiter_type),
+		 .sw_spec_level(sw_spec_level),
+		 .ctrl_crossbar_type(ctrl_crossbar_type),
+		 .data_crossbar_type(data_crossbar_type),
+		 .reset_type(reset_type))
+	     vcr
+	       (.clk(clk),
+		.reset(reset),
+		.router_address(router_address),
+		.flit_ctrl_in_ip(flit_ctrl_in_ip),
+		.flit_data_in_ip(flit_data_in_ip),
+		.flow_ctrl_out_ip(flow_ctrl_out_ip),
+		.flit_ctrl_out_op(flit_ctrl_out_op),
+		.flit_data_out_op(flit_data_out_op),
+		.flow_ctrl_in_op(flow_ctrl_in_op),
+		.error(error));
+	     
+	  end
+	
+      endcase
+      
+   endgenerate
    
 endmodule
