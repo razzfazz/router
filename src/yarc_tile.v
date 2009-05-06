@@ -212,10 +212,11 @@ module yarc_tile
    output [0:(num_ports-1)*flow_ctrl_width-1] flow_ctrl_out_row_bus;
 
    
-   //row bus outputs
+   //row bus outputs 
+   //** only output your own bus
    input [0:(num_ports-1)*flow_ctrl_width-1] flow_ctrl_in_row_bus;
-   output [0:num_vcs*(num_ports)*flit_data_width-1] flit_data_out_row_bus;
-   output [0:num_vcs*(num_ports)*flit_ctrl_width-1] flit_ctrl_out_row_bus;
+   output [0:num_vcs*flit_data_width-1] flit_data_out_row_bus;
+   output [0:num_vcs*flit_ctrl_width-1] flit_ctrl_out_row_bus;
 
    //col bus output
    input [0:(num_ports-1)*flow_ctrl_width-1] flow_ctrl_in_col_bus;
@@ -284,10 +285,10 @@ module yarc_tile
        .xbd_crossbar_type		(xbd_crossbar_type),
        .reset_type			(reset_type))
      tile_input     
-     (/*AUTOINST*/
+     (
       // Outputs
-      .flit_ctrl_in_row_bus		(flit_ctrl_in_row_bus[0:num_vcs*flit_ctrl_width-1]),
-      .flit_data_in_row_bus		(flit_data_in_row_bus[0:num_vcs*flit_data_width-1]),
+      .flit_ctrl_out_row_bus		(flit_ctrl_out_row_bus[0:num_vcs*flit_ctrl_width-1]),
+      .flit_data_out_row_bus		(flit_data_out_row_bus[0:num_vcs*flit_data_width-1]),
       .flow_ctrl_out_tile		(flow_ctrl_out_tile[0:flow_ctrl_width-1]),
       // Inputs
       .router_address			(router_address[0:router_addr_width-1]),

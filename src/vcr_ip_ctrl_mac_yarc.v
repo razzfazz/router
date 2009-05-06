@@ -42,96 +42,96 @@ module vcr_ip_ctrl_mac_yarc
    function integer clogb(input integer argument);
       integer 		     i;
       begin
-	 clogb = 0;
+	 clogb 			     = 0;
 	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
+	   clogb 		     = clogb + 1;
       end
    endfunction
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flit_buffers 	     = 8;
    
    // width required to select individual buffer slot
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   localparam flit_buffer_idx_width  = clogb(num_flit_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers      = 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   parameter num_traffic_classes     = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_routing_classes     = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes 	     = num_traffic_classes * num_routing_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 1;
+   parameter num_vcs_per_class 	     = 1;
    
    // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
+   localparam num_vcs 		     = num_classes * num_vcs_per_class;
    
    // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   localparam vc_idx_width 	     = clogb(num_vcs);
    
    // number of input and output ports on router
-   parameter num_ports = 5;
+   parameter num_ports 		     = 5;
    
    // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
+   localparam port_idx_width 	     = clogb(num_ports);
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+ 				     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
-   parameter num_dimensions = 2;
+   parameter num_dimensions 	     = 2;
    
    // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
+   parameter num_routers_per_dim     = 4;
    
    // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
+   localparam dim_addr_width 	     = clogb(num_routers_per_dim);
    
    // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
+   localparam router_addr_width      = num_dimensions * dim_addr_width;
    
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   parameter num_neighbors_per_dim   = 2;
    
    // number of nodes per router (a.k.a. consentration factor)
    localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
+ 				     = 1;
    
    // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
+   localparam node_addr_width 	     = clogb(num_nodes_per_router);
    
    // width of global addresses
-   localparam addr_width = router_addr_width + node_addr_width;
+   localparam addr_width 	     = router_addr_width + node_addr_width;
    
    // select packet format
-   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   parameter packet_format 	     = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length = 4;
+   parameter max_payload_length      = 4;
    
    // minimum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter min_payload_length = 1;
+   parameter min_payload_length      = 1;
    
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
-     = clogb(max_payload_length-min_payload_length+1);
+ 				     = clogb(max_payload_length-min_payload_length+1);
 
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+ 				     = num_routing_classes * router_addr_width + node_addr_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+ 				     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (la_route_info_width + route_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
@@ -349,77 +349,89 @@ module vcr_ip_ctrl_mac_yarc
    wire [0:num_vcs*6-1] 		    events_ivc;
  
 	   
-	   wire vc_gnt;
-	   assign vc_gnt = vc_gnt_ivc[port_id];
-	   
-	   wire [0:num_vcs-1] vc_gnt_ovc;
-	   assign vc_gnt_ovc = vc_gnt_ivc_ovc[port_id*num_vcs:(port_id+1)*num_vcs-1];
-	   
-	   wire 	      sw_gnt_nonspec;
-	   assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[port_id];
-	   
-	   wire 	      sw_gnt_spec;
-	   assign sw_gnt_spec = sw_gnt_spec_ivc[port_id];
-	   
-	   wire [0:num_ports-1] route_op;
-	   wire 		inc_rc;
-	   wire 		vc_req;
-	   wire 		sw_req_nonspec;
-	   wire 		sw_req_spec;
-	   wire [0:la_route_info_width-1] la_route_info;
-	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
-	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-	   wire 			  ivcc_error;
-	   wire [0:5] 			  oevents;
-	   vcr_ivc_ctrl
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
-	       .num_traffic_classes(num_traffic_classes),
-	       .num_routing_classes(num_routing_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
-	       .num_ports(num_ports),
-	       .num_dimensions(num_dimensions),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_neighbors_per_dim(num_neighbors_per_dim),
-	       .packet_format(packet_format),
-	       .max_payload_length(max_payload_length),
-	       .min_payload_length(min_payload_length),
-	       .track_vcs_at_output(track_vcs_at_output),
-	       .restrict_turns(restrict_turns),
-	       .routing_function_type(routing_function_type),
-	       .dimension_order(dimension_order),
-	       .credit_handling_type(credit_handling_type),
-	       .header_fifo_type(header_fifo_type),
-	       .sw_spec_enable(sw_spec_enable),
-	       .perf_ctr_enable(perf_ctr_enable),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
-	       .port_id(port_id),
-	       .vc_id(port_id),
-	       .reset_type(reset_type))
-	   ivcc
-	     (.clk(clk),
-	      .reset(reset),
-	      .router_address(router_address),
-	      .flit_ctrl_in(flit_ctrl_in_q),
-	      .header_info_in(header_info_in_q),
-	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .route_op(route_op),
-	      .inc_rc(inc_rc),
-	      .vc_req(vc_req),
-	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ovc(vc_gnt_ovc),
-	      .sw_req_nonspec(sw_req_nonspec),
-	      .sw_req_spec(sw_req_spec),
-	      .sw_gnt_nonspec(sw_gnt_nonspec),
-	      .sw_gnt_spec(sw_gnt_spec),
-	      .int_flit_ctrl_out(int_flit_ctrl_out),
-	      .la_route_info_out(la_route_info),
-	      .fbf_write_addr(fbf_write_addr),
-	      .fbf_read_addr(fbf_read_addr),
-	      .error(ivcc_error),
-	      .events(oevents));
-	   
+   wire vc_gnt;
+   assign vc_gnt = vc_gnt_ivc[port_id];
+   
+   wire [0:num_vcs-1] vc_gnt_ovc;
+   assign vc_gnt_ovc = vc_gnt_ivc_ovc[port_id*num_vcs:(port_id+1)*num_vcs-1];
+   
+   wire 	      sw_gnt_nonspec;
+   assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[port_id];
+   
+   wire 	      sw_gnt_spec;
+   assign sw_gnt_spec = sw_gnt_spec_ivc[port_id];
+   
+   wire [0:num_ports-1] route_op;
+   wire 		inc_rc;
+   wire 		vc_req;
+   wire 		sw_req_nonspec;
+   wire 		sw_req_spec;
+   wire [0:la_route_info_width-1] la_route_info;
+   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+   wire 			  ivcc_error;
+   wire [0:5] 			  oevents;
+   vcr_ivc_ctrl
+     #(.num_flit_buffers(num_flit_buffers),
+       .num_header_buffers(num_header_buffers),
+       .num_traffic_classes(num_traffic_classes),
+       .num_routing_classes(num_routing_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_ports(num_ports),
+       .num_dimensions(num_dimensions),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .track_vcs_at_output(track_vcs_at_output),
+       .restrict_turns(restrict_turns),
+       .routing_function_type(routing_function_type),
+       .dimension_order(dimension_order),
+       .credit_handling_type(credit_handling_type),
+       .header_fifo_type(header_fifo_type),
+       .sw_spec_enable(sw_spec_enable),
+       .perf_ctr_enable(perf_ctr_enable),
+       .checker_enable(checker_enable),
+       .checker_capture_mode(checker_capture_mode),
+       .port_id(port_id),
+       .vc_id(port_id),
+       .reset_type(reset_type))
+   ivcc
+     (
+      // Outputs
+      .route_op(route_op),
+      .inc_rc(inc_rc),
+      .vc_req(vc_req),
+      .sw_req_nonspec(sw_req_nonspec),
+      .sw_req_spec(sw_req_spec),
+      .int_flit_ctrl_out(int_flit_ctrl_out),
+      .la_route_info_out(la_route_info),
+      .fbf_write_addr(fbf_write_addr),
+      .fbf_read_addr(fbf_read_addr),
+      .error(ivcc_error),
+      .events(oevents),
+      
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .router_address(router_address),
+      .flit_ctrl_in(flit_ctrl_in_q),
+      .header_info_in(header_info_in_q),
+      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+      .vc_gnt(1'b1),
+      .vc_gnt_ovc(vc_gnt_ovc),
+      .sw_gnt_nonspec(sw_gnt_nonspec),
+      .sw_gnt_spec(sw_gnt_spec));
+   
+   
+
+
+
+
+
+
+   
 	   assign route_ivc_op[port_id*num_ports:(port_id+1)*num_ports-1] = route_op;
 	   assign inc_rc_ivc[port_id] = inc_rc;
 	   assign vc_req_ivc[port_id] = vc_req;
