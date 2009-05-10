@@ -90,14 +90,14 @@ module testbench
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 2;
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 1;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 1;
    
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 1;
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 1;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -150,7 +150,7 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -160,7 +160,7 @@ module testbench
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+     = num_resource_classes * router_addr_width + node_addr_width;
    
    // select packet format
 //   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -347,8 +347,8 @@ module testbench
 		    .packet_count_width(packet_count_width),
 		    .num_flit_buffers(num_flit_buffers),
 		    .num_header_buffers(num_header_buffers),
-		    .num_traffic_classes(num_traffic_classes),
-		    .num_routing_classes(num_routing_classes),
+		    .num_message_classes(num_message_classes),
+		    .num_resource_classes(num_resource_classes),
 		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
 		    .port_id(ip),
@@ -394,7 +394,7 @@ module testbench
 		
 		wire 			       la_inc_rc;
 		
-		if(num_routing_classes > 1)
+		if(num_resource_classes > 1)
 		  assign la_inc_rc = la_route_info_in[port_idx_width];
 		else
 		  assign la_inc_rc = 1'b0;
@@ -493,18 +493,18 @@ module testbench
 		wire [0:num_vcs*num_vcs-1] 	      route_ivc_ovc;
 		wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
 		
-		genvar 				       itc;
+		genvar 				       mc;
 		
-		for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
-		  begin:itcs
+		for(mc = 0; mc < num_message_classes; mc = mc + 1)
+		  begin:mcs
 		     
 		     genvar irc;
 		     
-		     for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+		     for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 		       begin:ircs
 			  
 			  wire [0:((irc == 
-				    (num_routing_classes - 1)) ?
+				    (num_resource_classes - 1)) ?
 				   addr_width :
 				   router_addr_width)-1] hop_route_info;
 			  
@@ -514,13 +514,13 @@ module testbench
 						(irc+1)*
 						router_addr_width-1];
 			  
-			  if((irc == (num_routing_classes - 1)) &&
+			  if((irc == (num_resource_classes - 1)) &&
 			     (num_nodes_per_router > 1))
 			    assign hop_route_info[router_addr_width:
 						  addr_width-1]
-				     = route_info[num_routing_classes*
+				     = route_info[num_resource_classes*
 						  router_addr_width:
-						  num_routing_classes*
+						  num_resource_classes*
 						  router_addr_width+
 						  node_addr_width-1];
 			  
@@ -528,8 +528,8 @@ module testbench
 			  wire 				 inc_rc;
 			  
 			  vcr_routing_logic
-			    #(.num_traffic_classes(num_traffic_classes),
-			      .num_routing_classes(num_routing_classes),
+			    #(.num_message_classes(num_message_classes),
+			      .num_resource_classes(num_resource_classes),
 			      .num_ports(num_ports),
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
@@ -537,8 +537,8 @@ module testbench
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
 			      .port_id(ip),
-			      .traffic_class(itc),
-			      .routing_class(irc))
+			      .message_class(mc),
+			      .resource_class(irc))
 			  rtl
 			    (.router_address(router_address),
 			     .hop_route_info(hop_route_info),
@@ -547,75 +547,75 @@ module testbench
 			  
 			  wire [0:num_vcs-1] 		 route_ovc;
 			  
-			  if(itc > 0)
-			    assign route_ovc[0:itc*num_routing_classes*
+			  if(mc > 0)
+			    assign route_ovc[0:mc*num_resource_classes*
 					     num_vcs_per_class-1]
-				     = {(itc*num_routing_classes*
+				     = {(mc*num_resource_classes*
 					 num_vcs_per_class){1'b0}};
 			  
 			  if(irc > 0)
-			    assign route_ovc[itc*num_routing_classes*
+			    assign route_ovc[mc*num_resource_classes*
 					     num_vcs_per_class:
-					     (itc*num_routing_classes+irc)*
+					     (mc*num_resource_classes+irc)*
 					     num_vcs_per_class-1]
 				     = {(irc*num_vcs_per_class){1'b0}};
 			  
-			  assign route_ovc[(itc*num_routing_classes+irc)*
+			  assign route_ovc[(mc*num_resource_classes+irc)*
 					   num_vcs_per_class:
-					   (itc*num_routing_classes+irc+1)*
+					   (mc*num_resource_classes+irc+1)*
 					   num_vcs_per_class-1]
 				   = {num_vcs_per_class{~inc_rc}};
 			  
-			  if(irc < (num_routing_classes - 1))
-			    assign route_ovc[(itc*num_routing_classes+irc+1)*
+			  if(irc < (num_resource_classes - 1))
+			    assign route_ovc[(mc*num_resource_classes+irc+1)*
 					     num_vcs_per_class:
-					     (itc*num_routing_classes+irc+2)*
+					     (mc*num_resource_classes+irc+2)*
 					     num_vcs_per_class-1]
 				     = {num_vcs_per_class{inc_rc}};
 			  
-			  if(irc < (num_routing_classes - 2))
-			    assign route_ovc[(itc*num_routing_classes+irc+2)*
+			  if(irc < (num_resource_classes - 2))
+			    assign route_ovc[(mc*num_resource_classes+irc+2)*
 					     num_vcs_per_class:
-					     (itc+1)*num_routing_classes*
+					     (mc+1)*num_resource_classes*
 					     num_vcs_per_class-1]
-				     = {(num_routing_classes-irc-2){1'b0}};
+				     = {(num_resource_classes-irc-2){1'b0}};
 			  
-			  if(itc < (num_traffic_classes - 1))
-			    assign route_ovc[(itc+1)*num_routing_classes*
+			  if(mc < (num_message_classes - 1))
+			    assign route_ovc[(mc+1)*num_resource_classes*
 					     num_vcs_per_class:
-					     num_traffic_classes*
-					     num_routing_classes*
+					     num_message_classes*
+					     num_resource_classes*
 					     num_vcs_per_class-1]
-				     = {((num_traffic_classes-itc-1)*
-					 num_routing_classes*
+				     = {((num_message_classes-mc-1)*
+					 num_resource_classes*
 					 num_vcs_per_class){1'b0}};
 			  
-			  assign route_port_ivc[(itc*num_routing_classes+irc)*
-						num_vcs_per_class*
+			  assign route_port_ivc[(mc*num_resource_classes+
+						 irc)*num_vcs_per_class*
 						port_idx_width:
-						(itc*num_routing_classes+irc+1)*
-						num_vcs_per_class*
+						(mc*num_resource_classes+
+						 irc+1)*num_vcs_per_class*
 						port_idx_width-1]
 				   = {num_vcs_per_class{route_port}};
-			  assign route_ivc_ovc[(itc*num_routing_classes+irc)*
+			  assign route_ivc_ovc[(mc*num_resource_classes+irc)*
 					       num_vcs_per_class*num_vcs:
-					       (itc*num_routing_classes+irc+1)*
+					       (mc*num_resource_classes+irc+1)*
 					       num_vcs_per_class*num_vcs-1]
 				   = {num_vcs_per_class{route_ovc}};
 			  
 			  wire [0:((irc ==
-				    (num_routing_classes - 1)) ?
+				    (num_resource_classes - 1)) ?
 				   addr_width :
 				   (irc ==
-				    (num_routing_classes - 2)) ?
+				    (num_resource_classes - 2)) ?
 				   (router_addr_width + addr_width) :
 				   (2*router_addr_width))-1] hop_route_info_la;
 			  
-			  if(irc == (num_routing_classes - 1))
+			  if(irc == (num_resource_classes - 1))
 			    assign hop_route_info_la
 			      = route_info[route_info_width-addr_width:
 					   route_info_width-1];
-			  else if(irc == (num_routing_classes - 2))
+			  else if(irc == (num_resource_classes - 2))
 			    assign hop_route_info_la
 			      = route_info[route_info_width-
 					   (router_addr_width+addr_width):
@@ -627,8 +627,8 @@ module testbench
 			  
 			  wire [0:la_route_info_width-1]     la_route_info;
 			  vcr_la_routing_logic
-			    #(.num_traffic_classes(num_traffic_classes),
-			      .num_routing_classes(num_routing_classes),
+			    #(.num_message_classes(num_message_classes),
+			      .num_resource_classes(num_resource_classes),
 			      .num_ports(num_ports),
 			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
@@ -636,8 +636,8 @@ module testbench
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
 			      .port_id(ip),
-			      .traffic_class(itc),
-			      .routing_class(irc))
+			      .message_class(mc),
+			      .resource_class(irc))
 			  lar
 			    (.router_address(router_address),
 			     .route_port(la_route_port),
@@ -645,10 +645,10 @@ module testbench
 			     .hop_route_info(hop_route_info_la),
 			     .la_route_info(la_route_info));
 			  
-			  assign la_route_info_ivc[(itc*num_routing_classes+
+			  assign la_route_info_ivc[(mc*num_resource_classes+
 						    irc)*num_vcs_per_class*
 						   la_route_info_width:
-						   (itc*num_routing_classes+
+						   (mc*num_resource_classes+
 						    irc+1)*num_vcs_per_class*
 						   la_route_info_width-1]
 				   = {num_vcs_per_class{la_route_info}};
@@ -935,8 +935,8 @@ module testbench
 	     vcr_top
 	       #(.num_flit_buffers(num_flit_buffers),
 		 .num_header_buffers(num_header_buffers),
-		 .num_traffic_classes(num_traffic_classes),
-		 .num_routing_classes(num_routing_classes),
+		 .num_message_classes(num_message_classes),
+		 .num_resource_classes(num_resource_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
 		 .num_ports(num_ports),
 		 .num_dimensions(num_dimensions),

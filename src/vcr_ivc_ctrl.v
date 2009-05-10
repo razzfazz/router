@@ -58,14 +58,14 @@ module vcr_ivc_ctrl
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs available for each class
    parameter num_vcs_per_class = 1;
@@ -84,7 +84,7 @@ module vcr_ivc_ctrl
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -131,7 +131,7 @@ module vcr_ivc_ctrl
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+     = num_resource_classes * router_addr_width + node_addr_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
@@ -194,38 +194,38 @@ module vcr_ivc_ctrl
    // ID of current input VC
    parameter vc_id = 0;
    
-   // function to extract traffic class from VC index
+   // function to extract message class from VC index
    // (this implementation handles the case where we have only a single traffic
    // class correctly)
-   function integer get_traffic_class(input integer vc);
+   function integer get_message_class(input integer vc);
       begin
-	 get_traffic_class
-	   = (vc / (num_routing_classes * num_vcs_per_class)) %
-	     num_traffic_classes;
+	 get_message_class
+	   = (vc / (num_resource_classes * num_vcs_per_class)) %
+	     num_message_classes;
       end
    endfunction
    
-   // current traffic class
-   localparam traffic_class = get_traffic_class(vc_id);
+   // current message class
+   localparam message_class = get_message_class(vc_id);
    
-   // function to extract routing class from VC index
-   // (this implementation handles the case where we have only a single routing
+   // function to extract resource class from VC index
+   // (this implementation handles the case where we have only a single resource
    // class correctly)
-   function integer get_routing_class(input integer vc);
+   function integer get_resource_class(input integer vc);
       begin
-	 get_routing_class
-	   = (vc / num_vcs_per_class) % num_routing_classes;
+	 get_resource_class
+	   = (vc / num_vcs_per_class) % num_resource_classes;
       end
    endfunction
    
-   // current routing class
-   localparam routing_class = get_routing_class(vc_id);
+   // current resource class
+   localparam resource_class = get_resource_class(vc_id);
    
    // width of routing information required for each VC
    localparam hop_route_info_width
-     = (routing_class == (num_routing_classes - 1)) ?
+     = (resource_class == (num_resource_classes - 1)) ?
        addr_width :
-       (routing_class == (num_routing_classes - 2)) ?
+       (resource_class == (num_resource_classes - 2)) ?
        (router_addr_width + addr_width) :
        (2 * router_addr_width);
    
@@ -260,7 +260,7 @@ module vcr_ivc_ctrl
    output [0:port_idx_width-1] route_port;
    wire [0:port_idx_width-1] route_port;
    
-   // transition to next routing class
+   // transition to next resource class
    output inc_rc;
    wire 		inc_rc;
    
@@ -455,25 +455,25 @@ module vcr_ivc_ctrl
    
    wire [0:num_vcs_per_class-1] 	    vc_gnt_unchanged_ocvc;
    assign vc_gnt_unchanged_ocvc
-     = vc_gnt_ovc[(traffic_class*num_routing_classes+routing_class)*
+     = vc_gnt_ovc[(message_class*num_resource_classes+resource_class)*
 		  num_vcs_per_class:
-		  (traffic_class*num_routing_classes+routing_class+1)*
+		  (message_class*num_resource_classes+resource_class+1)*
 		  num_vcs_per_class-1];
    
    wire [0:num_vcs_per_class-1] 	    vc_gnt_ocvc;
    
    generate
       
-      if(routing_class == (num_routing_classes - 1))
+      if(resource_class == (num_resource_classes - 1))
 	assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
       else
 	begin
 	   
 	   wire [0:num_vcs_per_class-1] vc_gnt_changed_ocvc;
 	   assign vc_gnt_changed_ocvc
-	     = vc_gnt_ovc[(traffic_class*num_routing_classes+routing_class+1)*
+	     = vc_gnt_ovc[(message_class*num_resource_classes+resource_class+1)*
 			  num_vcs_per_class:
-			  (traffic_class*num_routing_classes+routing_class+2)*
+			  (message_class*num_resource_classes+resource_class+2)*
 			  num_vcs_per_class-1];
 	   
 	   // only one of the two will have a bit set, so we can just OR them
@@ -672,15 +672,15 @@ module vcr_ivc_ctrl
    
    generate
       
-      if((routing_class == (num_routing_classes - 1)) ||
-	 (routing_class == (num_routing_classes - 2)))
+      if((resource_class == (num_resource_classes - 1)) ||
+	 (resource_class == (num_resource_classes - 2)))
 	assign hop_route_info_in
 	  = route_info_in[route_info_width-hop_route_info_width:
 			  route_info_width-1];
       else
 	assign hop_route_info_in
-	  = route_info_in[routing_class*router_addr_width:
-			  (routing_class+2)*router_addr_width-1];
+	  = route_info_in[resource_class*router_addr_width:
+			  (resource_class+2)*router_addr_width-1];
       
       if(num_header_buffers > 1)
 	begin
@@ -791,7 +791,7 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(routing_class < (num_routing_classes - 1))
+      if(resource_class < (num_resource_classes - 1))
 	assign inc_rc = hdff_la_route_info[port_idx_width];
       else
 	assign inc_rc = 1'b0;
@@ -799,8 +799,8 @@ module vcr_ivc_ctrl
    endgenerate
    
    vcr_la_routing_logic
-     #(.num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
@@ -808,8 +808,8 @@ module vcr_ivc_ctrl
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),
        .port_id(port_id),
-       .traffic_class(traffic_class),
-       .routing_class(routing_class))
+       .message_class(message_class),
+       .resource_class(resource_class))
    lar
      (.router_address(router_address),
       .route_port(route_port),
@@ -840,28 +840,28 @@ module vcr_ivc_ctrl
 	`CREDIT_HANDLING_TYPE_LEVEL:
 	  begin
 	     
-	     // credit status for the case where we do not change routing class
+	     // credit status for the case where we do not change resource class
 	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
 	     assign free_unchanged_ocvc
-	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				    routing_class)*num_vcs_per_class*2:
-				   (traffic_class*num_routing_classes+
-				    routing_class+1)*num_vcs_per_class*2-1];
+	       = int_flow_ctrl_ovc[(message_class*num_resource_classes+
+				    resource_class)*num_vcs_per_class*2:
+				   (message_class*num_resource_classes+
+				    resource_class+1)*num_vcs_per_class*2-1];
 	     
 	     wire [0:num_vcs_per_class*2-1] free_ocvc;
 	     
-	     if(routing_class == (num_routing_classes - 1))
+	     if(resource_class == (num_resource_classes - 1))
 	       assign free_ocvc = free_unchanged_ocvc;
 	     else
 	       begin
 		  
-		  // credit status in case we change routing class
+		  // credit status in case we change resource class
 		  wire [0:num_vcs_per_class*2-1] free_changed_ocvc;
 		  assign free_changed_ocvc
-		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
-					 routing_class+1)*num_vcs_per_class*2:
-					(traffic_class*num_routing_classes+
-					 routing_class+2)*num_vcs_per_class*2
+		    = int_flow_ctrl_ovc[(message_class*num_resource_classes+
+					 resource_class+1)*num_vcs_per_class*2:
+					(message_class*num_resource_classes+
+					 resource_class+2)*num_vcs_per_class*2
 					-1];
 		  
 		  assign free_ocvc = inc_rc ?
@@ -931,28 +931,28 @@ module vcr_ivc_ctrl
 	  begin
 	     
 	     // credit indicator for the case where we do not change the 
-	     // routing class
+	     // resource class
 	     wire [0:num_vcs_per_class-1] cred_unchanged_ocvc;
 	     assign cred_unchanged_ocvc
-	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				    routing_class)*num_vcs_per_class:
-				   (traffic_class*num_routing_classes+
-				    routing_class+1)*num_vcs_per_class-1];
+	       = int_flow_ctrl_ovc[(message_class*num_resource_classes+
+				    resource_class)*num_vcs_per_class:
+				   (message_class*num_resource_classes+
+				    resource_class+1)*num_vcs_per_class-1];
 	     
 	     wire [0:num_vcs_per_class-1] cred_ocvc;
 	     
-	     if(routing_class == (num_routing_classes - 1))
+	     if(resource_class == (num_resource_classes - 1))
 	       assign cred_ocvc = cred_unchanged_ocvc;
 	     else
 	       begin
 		  
-		  // credit status for the case where the routing class changes
+		  // credit status for the case where the resource class changes
 		  wire [0:num_vcs_per_class-1] cred_changed_ocvc;
 		  assign cred_changed_ocvc
-		    = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
-					 routing_class+1)*num_vcs_per_class:
-					(traffic_class*num_routing_classes+
-					 routing_class+2)*num_vcs_per_class-1];
+		    = int_flow_ctrl_ovc[(message_class*num_resource_classes+
+					 resource_class+1)*num_vcs_per_class:
+					(message_class*num_resource_classes+
+					 resource_class+2)*num_vcs_per_class-1];
 		  
 		  assign cred_ocvc = inc_rc ?
 				     cred_changed_ocvc :
@@ -1066,50 +1066,50 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs-1] 	     flit_ovc;
 		
-		if(traffic_class > 0)
-		  assign flit_ovc[0:traffic_class*num_routing_classes*
+		if(message_class > 0)
+		  assign flit_ovc[0:message_class*num_resource_classes*
 				  num_vcs_per_class-1]
-			   = {(traffic_class*num_routing_classes*
+			   = {(message_class*num_resource_classes*
 			       num_vcs_per_class){1'b0}};
 		
-		if(routing_class > 0)
-		  assign flit_ovc[traffic_class*num_routing_classes*
+		if(resource_class > 0)
+		  assign flit_ovc[message_class*num_resource_classes*
 				  num_vcs_per_class:
-				  (traffic_class*num_routing_classes+
-				   routing_class)*
+				  (message_class*num_resource_classes+
+				   resource_class)*
 				  num_vcs_per_class-1]
-			   = {(routing_class*num_vcs_per_class){1'b0}};
+			   = {(resource_class*num_vcs_per_class){1'b0}};
 		
-		assign flit_ovc[(traffic_class*num_routing_classes+
-				 routing_class)*
+		assign flit_ovc[(message_class*num_resource_classes+
+				 resource_class)*
 				num_vcs_per_class:
-				(traffic_class*num_routing_classes+
-				 routing_class+1)*
+				(message_class*num_resource_classes+
+				 resource_class+1)*
 				num_vcs_per_class-1]
 			 = flit_ocvc & {num_vcs_per_class{~inc_rc}};
 		
-		if(routing_class < (num_routing_classes - 1))
-		  assign flit_ovc[(traffic_class*num_routing_classes+
-				   routing_class+1)*num_vcs_per_class:
-				  (traffic_class*num_routing_classes+
-				   routing_class+2)*num_vcs_per_class-1]
+		if(resource_class < (num_resource_classes - 1))
+		  assign flit_ovc[(message_class*num_resource_classes+
+				   resource_class+1)*num_vcs_per_class:
+				  (message_class*num_resource_classes+
+				   resource_class+2)*num_vcs_per_class-1]
 			   = flit_ocvc & {num_vcs_per_class{inc_rc}};
 		
-		if(routing_class < (num_routing_classes - 2))
-		  assign flit_ovc[(traffic_class*num_routing_classes+
-				   routing_class+2)*num_vcs_per_class:
-				  (traffic_class+1)*num_routing_classes*
+		if(resource_class < (num_resource_classes - 2))
+		  assign flit_ovc[(message_class*num_resource_classes+
+				   resource_class+2)*num_vcs_per_class:
+				  (message_class+1)*num_resource_classes*
 				  num_vcs_per_class-1]
-			   = {((num_routing_classes-routing_class-2)*
+			   = {((num_resource_classes-resource_class-2)*
 			       num_vcs_per_class){1'b0}};
 		
-		if(traffic_class < (num_traffic_classes - 1))
-		  assign flit_ovc[(traffic_class+1)*num_routing_classes*
+		if(message_class < (num_message_classes - 1))
+		  assign flit_ovc[(message_class+1)*num_resource_classes*
 				  num_vcs_per_class:
-				  num_traffic_classes*num_routing_classes*
+				  num_message_classes*num_resource_classes*
 				  num_vcs_per_class-1]
-			   = {((num_traffic_classes-traffic_class-1)*
-			       num_routing_classes*num_vcs_per_class){1'b0}};
+			   = {((num_message_classes-message_class-1)*
+			       num_resource_classes*num_vcs_per_class){1'b0}};
 		
 		c_encoder
 		  #(.num_ports(num_vcs))

@@ -59,14 +59,14 @@ module vcr_ip_ctrl_mac
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -85,7 +85,7 @@ module vcr_ip_ctrl_mac
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -129,7 +129,7 @@ module vcr_ip_ctrl_mac
 
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+     = num_resource_classes * router_addr_width + node_addr_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
@@ -229,7 +229,7 @@ module vcr_ip_ctrl_mac
    output [0:num_vcs*port_idx_width-1] route_port_ivc;
    wire [0:num_vcs*port_idx_width-1] route_port_ivc;
    
-   // transition to next routing class
+   // transition to next resource class
    output [0:num_vcs-1] inc_rc_ivc;
    wire [0:num_vcs-1] 		inc_rc_ivc;
    
@@ -406,8 +406,8 @@ module vcr_ip_ctrl_mac
 	   vcr_ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_traffic_classes(num_traffic_classes),
-	       .num_routing_classes(num_routing_classes),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
 	       .num_dimensions(num_dimensions),

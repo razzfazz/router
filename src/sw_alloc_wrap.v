@@ -66,7 +66,7 @@ module sw_alloc_wrap
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
    
-   // number of traffic classes (e.g. read, write)
+   // number of traffic classes (e.g. request, reply)
    parameter num_traffic_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)

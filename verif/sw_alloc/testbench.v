@@ -73,14 +73,14 @@ module testbench
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -205,14 +205,14 @@ module testbench
 	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
 	   wire [0:num_vcs*num_ports-1]      route_ivc_op;
 	   
-	   genvar itc;
+	   genvar mc;
 	   
-	   for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
-	     begin:itcs
+	   for(mc = 0; mc < num_message_classes; mc = mc + 1)
+	     begin:mcs
 		
 		genvar irc;
 		
-		for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 		  begin:ircs
 		     
 		     genvar icvc;
@@ -246,36 +246,36 @@ module testbench
 			    (.data_in(route_port),
 			     .data_out(route_op));
 
-			  assign req_ivc[(itc*num_routing_classes+irc)*
+			  assign req_ivc[(mc*num_resource_classes+irc)*
 					 num_vcs_per_class+icvc]
 				   = req;
 			  
 			  wire req_nonspec;
 			  assign req_nonspec = req & ~spec;
 			  
-			  assign req_nonspec_ivc[(itc*num_routing_classes+irc)*
+			  assign req_nonspec_ivc[(mc*num_resource_classes+irc)*
 						 num_vcs_per_class+icvc]
 				   = req_nonspec;
 			  
 			  wire req_spec;
 			  assign req_spec = req & spec;
 			  
-			  assign req_spec_ivc[(itc*num_routing_classes+irc)*
+			  assign req_spec_ivc[(mc*num_resource_classes+irc)*
 					      num_vcs_per_class+icvc]
 				   = req_spec;
 			  
-			  assign route_port_ivc[((itc*num_routing_classes+irc)*
+			  assign route_port_ivc[((mc*num_resource_classes+irc)*
 						 num_vcs_per_class+icvc)*
 						port_idx_width:
-						((itc*num_routing_classes+irc)*
+						((mc*num_resource_classes+irc)*
 						 num_vcs_per_class+icvc+1)*
 						port_idx_width-1]
 				   = route_port;
 			  
-			  assign route_ivc_op[((itc*num_routing_classes+irc)*
+			  assign route_ivc_op[((mc*num_resource_classes+irc)*
 					       num_vcs_per_class+icvc)*
 					      num_ports:
-					      ((itc*num_routing_classes+irc)*
+					      ((mc*num_resource_classes+irc)*
 					       num_vcs_per_class+icvc+1)*
 					      num_ports-1]
 				   = route_op;

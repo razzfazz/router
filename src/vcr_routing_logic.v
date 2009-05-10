@@ -44,14 +44,14 @@ module vcr_routing_logic
       end
    endfunction
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // nuber of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // nuber of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -93,15 +93,15 @@ module vcr_routing_logic
    // ID of current port
    parameter port_id = 0;
    
-   // current traffic class
-   parameter traffic_class = 0;
+   // current message class
+   parameter message_class = 0;
    
-   // current routing class
-   parameter routing_class = 0;
+   // current resource class
+   parameter resource_class = 0;
    
    // total number of bits required for storing routing information
    localparam hop_route_info_width
-     = (routing_class == (num_routing_classes - 1)) ?
+     = (resource_class == (num_resource_classes - 1)) ?
        addr_width :
        router_addr_width;
    
@@ -115,12 +115,12 @@ module vcr_routing_logic
    output [0:port_idx_width-1] route_port;
    wire [0:port_idx_width-1] route_port;
    
-   // if we have reached our destination for the current routing class, 
-   // increment the routing class (unless it's already the highest)
+   // if we have reached our destination for the current resource class, 
+   // increment the resource class (unless it's already the highest)
    output inc_rc;
    wire 		inc_rc;
    
-   // address of destination router for current routing class
+   // address of destination router for current resource class
    wire [0:router_addr_width-1] dest_router_address;
    assign dest_router_address
      = hop_route_info[0:router_addr_width-1];
@@ -133,7 +133,7 @@ module vcr_routing_logic
    
    generate
    
-      if(routing_class == (num_routing_classes - 1))
+      if(resource_class == (num_resource_classes - 1))
 	assign inc_rc = 1'b0;
       else
 	assign inc_rc = reached_dest;
@@ -217,7 +217,7 @@ module vcr_routing_logic
 	   
 	end
       
-      if(routing_class == (num_routing_classes - 1))
+      if(resource_class == (num_resource_classes - 1))
 	begin
 	   
 	   if(num_nodes_per_router > 1)

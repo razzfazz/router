@@ -46,14 +46,14 @@ module vcr_vc_alloc_mac
       end
    endfunction
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -85,7 +85,7 @@ module vcr_vc_alloc_mac
    // destination port selects
    input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
-   // transition to next routing class
+   // transition to next resource class
    input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
@@ -120,8 +120,8 @@ module vcr_vc_alloc_mac
 	`VC_ALLOCATOR_TYPE_SEP_IF:
 	  begin
 	     vcr_vc_alloc_sep_if
-	       #(.num_traffic_classes(num_traffic_classes),
-		 .num_routing_classes(num_routing_classes),
+	       #(.num_message_classes(num_message_classes),
+		 .num_resource_classes(num_resource_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
 		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
@@ -142,8 +142,8 @@ module vcr_vc_alloc_mac
 	`VC_ALLOCATOR_TYPE_SEP_OF:
 	  begin
 	     vcr_vc_alloc_sep_of
-	       #(.num_traffic_classes(num_traffic_classes),
-		 .num_routing_classes(num_routing_classes),
+	       #(.num_message_classes(num_message_classes),
+		 .num_resource_classes(num_resource_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
 		 .num_ports(num_ports),
 		 .arbiter_type(arbiter_type),
@@ -166,8 +166,8 @@ module vcr_vc_alloc_mac
       if(allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE)
 	begin
 	   vcr_vc_alloc_wf
-	       #(.num_traffic_classes(num_traffic_classes),
-		 .num_routing_classes(num_routing_classes),
+	       #(.num_message_classes(num_message_classes),
+		 .num_resource_classes(num_resource_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
 		 .num_ports(num_ports),
 		 .wf_allocator_type(wf_allocator_type),

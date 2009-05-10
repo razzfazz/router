@@ -53,14 +53,14 @@ module vcr_top
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -298,8 +298,8 @@ module vcr_top
 	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_traffic_classes(num_traffic_classes),
-	       .num_routing_classes(num_routing_classes),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
 	       .num_dimensions(num_dimensions),
@@ -394,8 +394,8 @@ module vcr_top
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
    
    vcr_vc_alloc_mac
-     #(.num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .arbiter_type(vc_arbiter_type),
@@ -530,8 +530,8 @@ module vcr_top
 	   vcr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_traffic_classes(num_traffic_classes),
-	       .num_routing_classes(num_routing_classes),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
 	       .num_routers_per_dim(num_routers_per_dim),

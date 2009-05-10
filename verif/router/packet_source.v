@@ -55,14 +55,14 @@ module packet_source
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // nuber of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // nuber of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 2;
@@ -81,7 +81,7 @@ module packet_source
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_routing_classes > 1) ? 1 : 0);
+     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
    parameter num_dimensions = 2;
@@ -113,7 +113,7 @@ module packet_source
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+     = num_resource_classes * router_addr_width + node_addr_width;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -489,17 +489,17 @@ module packet_source
    
    generate
       
-      genvar 				  itc;
+      genvar 				  mc;
       
-      for(itc = 0; itc < num_traffic_classes; itc = itc + 1)
-	begin:itcs
+      for(mc = 0; mc < num_message_classes; mc = mc + 1)
+	begin:mcs
 	   
 	   genvar irc;
 	   
-	   for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+	   for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 	     begin:ircs
 		
-		wire [0:((irc == (num_routing_classes - 1)) ?
+		wire [0:((irc == (num_resource_classes - 1)) ?
 			 addr_width :
 			 router_addr_width)-1] hop_route_info;
 		
@@ -507,19 +507,19 @@ module packet_source
 			 = route_info[irc*router_addr_width:
 				      (irc+1)*router_addr_width-1];
 		
-		if((irc == (num_routing_classes - 1)) &&
+		if((irc == (num_resource_classes - 1)) &&
 		   (num_nodes_per_router > 1))
 		  assign hop_route_info[router_addr_width:addr_width-1]
-			   = route_info[num_routing_classes*
+			   = route_info[num_resource_classes*
 					router_addr_width:
-					num_routing_classes*
+					num_resource_classes*
 					router_addr_width+node_addr_width-1];
 		
 		wire [0:port_idx_width-1]      route_port;
 		wire 			       inc_rc;
 		vcr_routing_logic
-		  #(.num_traffic_classes(num_traffic_classes),
-		    .num_routing_classes(num_routing_classes),
+		  #(.num_message_classes(num_message_classes),
+		    .num_resource_classes(num_resource_classes),
 		    .num_ports(num_ports),
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
@@ -527,8 +527,8 @@ module packet_source
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
 		    .port_id(port_id),
-		    .traffic_class(itc),
-		    .routing_class(irc))
+		    .message_class(mc),
+		    .resource_class(irc))
 		rtl
 		  (.router_address(router_address),
 		   .hop_route_info(hop_route_info),
@@ -539,13 +539,13 @@ module packet_source
 		
 		assign la_route_info[0:port_idx_width-1] = route_port;
 		
-		if(num_routing_classes > 1)
+		if(num_resource_classes > 1)
 		  assign la_route_info[port_idx_width] = inc_rc;
 		
-		assign la_route_info_ivc[(itc*num_routing_classes+irc)*
+		assign la_route_info_ivc[(mc*num_resource_classes+irc)*
 					 num_vcs_per_class*
 					 la_route_info_width:
-					 (itc*num_routing_classes+irc+1)*
+					 (mc*num_resource_classes+irc+1)*
 					 num_vcs_per_class*
 					 la_route_info_width-1]
 		    = {num_vcs_per_class{la_route_info}};
@@ -579,7 +579,7 @@ module packet_source
       
       genvar 					       irc;
       
-      for(irc = 0; irc < num_routing_classes; irc = irc + 1)
+      for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 	begin:ircs
 	   
 	   reg [0:router_addr_width-1] 		  router_addr_q;

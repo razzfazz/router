@@ -34,11 +34,11 @@ module c_port_filter
    
 `include "c_constants.v"
    
-   // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
    
-   // nuber of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   // nuber of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -60,17 +60,17 @@ module c_port_filter
    // ID of current port
    parameter port_id = 0;
    
-   // current traffic class
-   parameter traffic_class = 0;
+   // current message class
+   parameter message_class = 0;
    
-   // current routing class
-   parameter routing_class = 0;
+   // current resource class
+   parameter resource_class = 0;
    
    // unmasked output port
    input [0:num_ports-1] route_in_op;
 
-   // if we have reached our destination for the current routing class, 
-   // increment the routing class (unless it's already the highest)
+   // if we have reached our destination for the current resource class, 
+   // increment the resource class (unless it's already the highest)
    input inc_rc;
    
    // filtered output port
@@ -91,10 +91,10 @@ module c_port_filter
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   // packets in the lower routing classes can only go back out through
+	   // packets in the lower resource classes can only go back out through
 	   // the same port they came in on if the current router is the
-	   // destination router for their current routing class (this cannot 
-	   // happen for packets in the highest routing class); for the
+	   // destination router for their current resource class (this cannot 
+	   // happen for packets in the highest resource class); for the
 	   // flattened butterfly, this applies to all links in the same
 	   // dimension
 	   if((op < (num_ports - num_nodes_per_router)) &&
@@ -104,7 +104,7 @@ module c_port_filter
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
 	     begin
-		if(routing_class == (num_routing_classes - 1))
+		if(resource_class == (num_resource_classes - 1))
 		  begin
 		     assign route_restricted_op[op] = 1'b0;
 		     assign error_op[op] = route_in_op[op];
@@ -127,12 +127,12 @@ module c_port_filter
 		  end
 	     end
 	   
-	   // only packets in the highest routing class can go to the injection/
-	   // ejection ports; also, a packet coming in on an injection/ejection 
-	   // port should never exit the router on the same injection/ejection 
-	   // port
+	   // only packets in the highest resource class can go to the 
+	   // injection/ejection ports; also, a packet coming in on an 
+	   // injection/ejection port should never exit the router on the same 
+	   // injection/ejection port
 	   else if((op >= (num_ports - num_nodes_per_router)) &&
-		   ((routing_class < (num_routing_classes - 1)) ||
+		   ((resource_class < (num_resource_classes - 1)) ||
 		    (op == port_id)))
 	     begin
 		assign route_restricted_op[op] = 1'b0;
