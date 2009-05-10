@@ -386,12 +386,10 @@ module vcr_ip_ctrl_mac
 	   for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 	     begin:ircs
 		
-		localparam pc = mc * num_resource_classes + irc;
-		
 		genvar ivc;
 		
-		for(ivc = pc*num_vcs_per_class;
-		    ivc < (pc+1)*num_vcs_per_class;
+		for(ivc = (mc*num_resource_classes+irc)*num_vcs_per_class;
+		    ivc < (mc*num_resource_classes+irc+1)*num_vcs_per_class;
 		    ivc = ivc + 1)
 		  begin:ivcs
 		     
