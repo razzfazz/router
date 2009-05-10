@@ -576,7 +576,8 @@ module testbench
 					     num_vcs_per_class:
 					     (mc+1)*num_resource_classes*
 					     num_vcs_per_class-1]
-				     = {(num_resource_classes-irc-2){1'b0}};
+				     = {((num_resource_classes-irc-2)*
+					 num_vcs_per_class){1'b0}};
 			  
 			  if(mc < (num_message_classes - 1))
 			    assign route_ovc[(mc+1)*num_resource_classes*
