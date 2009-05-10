@@ -586,7 +586,12 @@ module vcr_vc_alloc_wf
 						      num_vcs_per_class-1];
 			       
 			       if(orc == 0)
-				 assign gnt_wf_ip[ip] = |gnt_wf_irc_icvc;
+				 assign gnt_wf_ip[ip]
+					  = |gnt_wf_irc_icvc[orc*
+							     num_vcs_per_class:
+							     (orc+1)*
+							     num_vcs_per_class
+							     -1];
 			       else
 				 assign gnt_wf_ip[ip]
 					  = |gnt_wf_irc_icvc[(orc-1)*
