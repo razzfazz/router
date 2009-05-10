@@ -194,32 +194,15 @@ module vcr_ivc_ctrl
    // ID of current input VC
    parameter vc_id = 0;
    
-   // function to extract message class from VC index
-   // (this implementation handles the case where we have only a single traffic
-   // class correctly)
-   function integer get_message_class(input integer vc);
-      begin
-	 get_message_class
-	   = (vc / (num_resource_classes * num_vcs_per_class)) %
-	     num_message_classes;
-      end
-   endfunction
+   // message class to which this VC belongs
+   parameter message_class = 0;
    
-   // current message class
-   localparam message_class = get_message_class(vc_id);
+   // resource class to which this VC belongs
+   parameter resource_class = 0;
    
-   // function to extract resource class from VC index
-   // (this implementation handles the case where we have only a single resource
-   // class correctly)
-   function integer get_resource_class(input integer vc);
-      begin
-	 get_resource_class
-	   = (vc / num_vcs_per_class) % num_resource_classes;
-      end
-   endfunction
-   
-   // current resource class
-   localparam resource_class = get_resource_class(vc_id);
+   // packet class to which this VC belongs
+   localparam packet_class
+     = message_class * num_resource_classes + resource_class;
    
    // width of routing information required for each VC
    localparam hop_route_info_width
@@ -455,10 +438,8 @@ module vcr_ivc_ctrl
    
    wire [0:num_vcs_per_class-1] 	    vc_gnt_unchanged_ocvc;
    assign vc_gnt_unchanged_ocvc
-     = vc_gnt_ovc[(message_class*num_resource_classes+resource_class)*
-		  num_vcs_per_class:
-		  (message_class*num_resource_classes+resource_class+1)*
-		  num_vcs_per_class-1];
+     = vc_gnt_ovc[packet_class*num_vcs_per_class:
+		  (packet_class+1)*num_vcs_per_class-1];
    
    wire [0:num_vcs_per_class-1] 	    vc_gnt_ocvc;
    
@@ -471,10 +452,8 @@ module vcr_ivc_ctrl
 	   
 	   wire [0:num_vcs_per_class-1] vc_gnt_changed_ocvc;
 	   assign vc_gnt_changed_ocvc
-	     = vc_gnt_ovc[(message_class*num_resource_classes+resource_class+1)*
-			  num_vcs_per_class:
-			  (message_class*num_resource_classes+resource_class+2)*
-			  num_vcs_per_class-1];
+	     = vc_gnt_ovc[(packet_class+1)*num_vcs_per_class:
+			  (packet_class+2)*num_vcs_per_class-1];
 	   
 	   // only one of the two will have a bit set, so we can just OR them
 	   assign vc_gnt_ocvc = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
@@ -841,10 +820,8 @@ module vcr_ivc_ctrl
 	     // credit status for the case where we do not change resource class
 	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
 	     assign free_unchanged_ocvc
-	       = int_flow_ctrl_ovc[(message_class*num_resource_classes+
-				    resource_class)*num_vcs_per_class*2:
-				   (message_class*num_resource_classes+
-				    resource_class+1)*num_vcs_per_class*2-1];
+	       = int_flow_ctrl_ovc[packet_class*num_vcs_per_class*2:
+				   (packet_class+1)*num_vcs_per_class*2-1];
 	     
 	     wire [0:num_vcs_per_class*2-1] free_ocvc;
 	     
@@ -856,15 +833,11 @@ module vcr_ivc_ctrl
 		  // credit status in case we change resource class
 		  wire [0:num_vcs_per_class*2-1] free_changed_ocvc;
 		  assign free_changed_ocvc
-		    = int_flow_ctrl_ovc[(message_class*num_resource_classes+
-					 resource_class+1)*num_vcs_per_class*2:
-					(message_class*num_resource_classes+
-					 resource_class+2)*num_vcs_per_class*2
-					-1];
+		    = int_flow_ctrl_ovc[(packet_class+1)*num_vcs_per_class*2:
+					(packet_class+2)*num_vcs_per_class*2-1];
 		  
-		  assign free_ocvc = inc_rc ?
-				     free_changed_ocvc :
-				     free_unchanged_ocvc;
+		  assign free_ocvc
+		    = inc_rc ? free_changed_ocvc : free_unchanged_ocvc;
 		  
 	       end
 	     
@@ -932,10 +905,8 @@ module vcr_ivc_ctrl
 	     // resource class
 	     wire [0:num_vcs_per_class-1] cred_unchanged_ocvc;
 	     assign cred_unchanged_ocvc
-	       = int_flow_ctrl_ovc[(message_class*num_resource_classes+
-				    resource_class)*num_vcs_per_class:
-				   (message_class*num_resource_classes+
-				    resource_class+1)*num_vcs_per_class-1];
+	       = int_flow_ctrl_ovc[packet_class*num_vcs_per_class:
+				   (packet_class+1)*num_vcs_per_class-1];
 	     
 	     wire [0:num_vcs_per_class-1] cred_ocvc;
 	     
@@ -947,10 +918,8 @@ module vcr_ivc_ctrl
 		  // credit status for the case where the resource class changes
 		  wire [0:num_vcs_per_class-1] cred_changed_ocvc;
 		  assign cred_changed_ocvc
-		    = int_flow_ctrl_ovc[(message_class*num_resource_classes+
-					 resource_class+1)*num_vcs_per_class:
-					(message_class*num_resource_classes+
-					 resource_class+2)*num_vcs_per_class-1];
+		    = int_flow_ctrl_ovc[(packet_class+1)*num_vcs_per_class:
+					(packet_class+2)*num_vcs_per_class-1];
 		  
 		  assign cred_ocvc = inc_rc ?
 				     cred_changed_ocvc :
@@ -1064,38 +1033,21 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs-1] 	     flit_ovc;
 		
-		if(message_class > 0)
-		  assign flit_ovc[0:message_class*num_resource_classes*
-				  num_vcs_per_class-1]
-			   = {(message_class*num_resource_classes*
-			       num_vcs_per_class){1'b0}};
+		if(packet_class > 0)
+		  assign flit_ovc[0:packet_class*num_vcs_per_class-1]
+			   = {(packet_class*num_vcs_per_class){1'b0}};
 		
-		if(resource_class > 0)
-		  assign flit_ovc[message_class*num_resource_classes*
-				  num_vcs_per_class:
-				  (message_class*num_resource_classes+
-				   resource_class)*
-				  num_vcs_per_class-1]
-			   = {(resource_class*num_vcs_per_class){1'b0}};
-		
-		assign flit_ovc[(message_class*num_resource_classes+
-				 resource_class)*
-				num_vcs_per_class:
-				(message_class*num_resource_classes+
-				 resource_class+1)*
-				num_vcs_per_class-1]
+		assign flit_ovc[packet_class*num_vcs_per_class:
+				(packet_class+1)*num_vcs_per_class-1]
 			 = flit_ocvc & {num_vcs_per_class{~inc_rc}};
 		
 		if(resource_class < (num_resource_classes - 1))
-		  assign flit_ovc[(message_class*num_resource_classes+
-				   resource_class+1)*num_vcs_per_class:
-				  (message_class*num_resource_classes+
-				   resource_class+2)*num_vcs_per_class-1]
+		  assign flit_ovc[(packet_class+1)*num_vcs_per_class:
+				  (packet_class+2)*num_vcs_per_class-1]
 			   = flit_ocvc & {num_vcs_per_class{inc_rc}};
 		
 		if(resource_class < (num_resource_classes - 2))
-		  assign flit_ovc[(message_class*num_resource_classes+
-				   resource_class+2)*num_vcs_per_class:
+		  assign flit_ovc[(packet_class+2)*num_vcs_per_class:
 				  (message_class+1)*num_resource_classes*
 				  num_vcs_per_class-1]
 			   = {((num_resource_classes-resource_class-2)*
@@ -1103,9 +1055,7 @@ module vcr_ivc_ctrl
 		
 		if(message_class < (num_message_classes - 1))
 		  assign flit_ovc[(message_class+1)*num_resource_classes*
-				  num_vcs_per_class:
-				  num_message_classes*num_resource_classes*
-				  num_vcs_per_class-1]
+				  num_vcs_per_class:num_vcs-1]
 			   = {((num_message_classes-message_class-1)*
 			       num_resource_classes*num_vcs_per_class){1'b0}};
 		

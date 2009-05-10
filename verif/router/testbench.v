@@ -503,6 +503,8 @@ module testbench
 		     for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 		       begin:ircs
 			  
+			  localparam ipc = mc * num_resource_classes + irc;
+			  
 			  wire [0:((irc == 
 				    (num_resource_classes - 1)) ?
 				   addr_width :
@@ -545,35 +547,21 @@ module testbench
 			  
 			  wire [0:num_vcs-1] 		 route_ovc;
 			  
-			  if(mc > 0)
-			    assign route_ovc[0:mc*num_resource_classes*
-					     num_vcs_per_class-1]
-				     = {(mc*num_resource_classes*
-					 num_vcs_per_class){1'b0}};
+			  if(ipc > 0)
+			    assign route_ovc[0:ipc*num_vcs_per_class-1]
+				     = {(ipc*num_vcs_per_class){1'b0}};
 			  
-			  if(irc > 0)
-			    assign route_ovc[mc*num_resource_classes*
-					     num_vcs_per_class:
-					     (mc*num_resource_classes+irc)*
-					     num_vcs_per_class-1]
-				     = {(irc*num_vcs_per_class){1'b0}};
-			  
-			  assign route_ovc[(mc*num_resource_classes+irc)*
-					   num_vcs_per_class:
-					   (mc*num_resource_classes+irc+1)*
-					   num_vcs_per_class-1]
+			  assign route_ovc[ipc*num_vcs_per_class:
+					   (ipc+1)*num_vcs_per_class-1]
 				   = {num_vcs_per_class{~inc_rc}};
 			  
 			  if(irc < (num_resource_classes - 1))
-			    assign route_ovc[(mc*num_resource_classes+irc+1)*
-					     num_vcs_per_class:
-					     (mc*num_resource_classes+irc+2)*
-					     num_vcs_per_class-1]
+			    assign route_ovc[(ipc+1)*num_vcs_per_class:
+					     (ipc+2)*num_vcs_per_class-1]
 				     = {num_vcs_per_class{inc_rc}};
 			  
 			  if(irc < (num_resource_classes - 2))
-			    assign route_ovc[(mc*num_resource_classes+irc+2)*
-					     num_vcs_per_class:
+			    assign route_ovc[(ipc+2)*num_vcs_per_class:
 					     (mc+1)*num_resource_classes*
 					     num_vcs_per_class-1]
 				     = {((num_resource_classes-irc-2)*
@@ -582,23 +570,19 @@ module testbench
 			  if(mc < (num_message_classes - 1))
 			    assign route_ovc[(mc+1)*num_resource_classes*
 					     num_vcs_per_class:
-					     num_message_classes*
-					     num_resource_classes*
-					     num_vcs_per_class-1]
+					     num_vcs-1]
 				     = {((num_message_classes-mc-1)*
 					 num_resource_classes*
 					 num_vcs_per_class){1'b0}};
 			  
-			  assign route_port_ivc[(mc*num_resource_classes+
-						 irc)*num_vcs_per_class*
+			  assign route_port_ivc[ipc*num_vcs_per_class*
 						port_idx_width:
-						(mc*num_resource_classes+
-						 irc+1)*num_vcs_per_class*
+						(ipc+1)*num_vcs_per_class*
 						port_idx_width-1]
 				   = {num_vcs_per_class{route_port}};
-			  assign route_ivc_ovc[(mc*num_resource_classes+irc)*
+			  assign route_ivc_ovc[ipc*
 					       num_vcs_per_class*num_vcs:
-					       (mc*num_resource_classes+irc+1)*
+					       (ipc+1)*
 					       num_vcs_per_class*num_vcs-1]
 				   = {num_vcs_per_class{route_ovc}};
 			  
@@ -642,11 +626,9 @@ module testbench
 			     .hop_route_info(hop_route_info_la),
 			     .la_route_info(la_route_info));
 			  
-			  assign la_route_info_ivc[(mc*num_resource_classes+
-						    irc)*num_vcs_per_class*
+			  assign la_route_info_ivc[ipc*num_vcs_per_class*
 						   la_route_info_width:
-						   (mc*num_resource_classes+
-						    irc+1)*num_vcs_per_class*
+						   (ipc+1)*num_vcs_per_class*
 						   la_route_info_width-1]
 				   = {num_vcs_per_class{la_route_info}};
 			  

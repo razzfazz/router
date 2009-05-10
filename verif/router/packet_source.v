@@ -499,6 +499,8 @@ module packet_source
 	   for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 	     begin:ircs
 		
+		localparam ipc = mc * num_resource_classes + irc;
+		
 		wire [0:((irc == (num_resource_classes - 1)) ?
 			 addr_width :
 			 router_addr_width)-1] hop_route_info;
@@ -540,11 +542,9 @@ module packet_source
 		if(num_resource_classes > 1)
 		  assign la_route_info[port_idx_width] = inc_rc;
 		
-		assign la_route_info_ivc[(mc*num_resource_classes+irc)*
-					 num_vcs_per_class*
+		assign la_route_info_ivc[ipc*num_vcs_per_class*
 					 la_route_info_width:
-					 (mc*num_resource_classes+irc+1)*
-					 num_vcs_per_class*
+					 (ipc+1)*num_vcs_per_class*
 					 la_route_info_width-1]
 		    = {num_vcs_per_class{la_route_info}};
 		
