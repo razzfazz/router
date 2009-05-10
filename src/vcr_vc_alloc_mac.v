@@ -53,13 +53,13 @@ module vcr_vc_alloc_mac
    parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_message_classes * num_resource_classes;
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
    
    // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
    // number of input and output ports on switch
    parameter num_ports = 5;

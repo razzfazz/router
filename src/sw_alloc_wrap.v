@@ -73,13 +73,13 @@ module sw_alloc_wrap
    parameter num_routing_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_packet_classes = num_traffic_classes * num_routing_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
    
    // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
    // total number of nodes
    parameter num_nodes = 64;

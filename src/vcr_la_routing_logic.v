@@ -44,14 +44,8 @@ module vcr_la_routing_logic
       end
    endfunction
    
-   // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
-   
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
-   
-   // total number of packet classes
-   localparam num_classes = num_message_classes * num_resource_classes;
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -96,9 +90,6 @@ module vcr_la_routing_logic
    
    // ID of current port
    parameter port_id = 0;
-   
-   // current message class
-   parameter message_class = 0;
    
    // current resource class
    parameter resource_class = 0;

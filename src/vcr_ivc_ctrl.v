@@ -65,13 +65,13 @@ module vcr_ivc_ctrl
    parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_classes = num_message_classes * num_resource_classes;
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
    
    // number of VCs available for each class
    parameter num_vcs_per_class = 1;
    
    // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
@@ -799,8 +799,7 @@ module vcr_ivc_ctrl
    endgenerate
    
    vcr_la_routing_logic
-     #(.num_message_classes(num_message_classes),
-       .num_resource_classes(num_resource_classes),
+     #(.num_resource_classes(num_resource_classes),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
@@ -808,7 +807,6 @@ module vcr_ivc_ctrl
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),
        .port_id(port_id),
-       .message_class(message_class),
        .resource_class(resource_class))
    lar
      (.router_address(router_address),
