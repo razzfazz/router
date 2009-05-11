@@ -30,9 +30,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module vcr_op_ctrl_mac_yarc
-  (clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip, vc_gnt_ovc_ivc, 
-   xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in, flit_ctrl_out, flit_data_out, 
-   elig_ovc, int_flow_ctrl_ovc, error);
+  (/*autoarg*/
+   // Outputs
+   flit_ctrl_out, flit_data_out, elig_ovc, int_flow_ctrl_ovc, error,
+   // Inputs
+   clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip,
+   vc_gnt_ovc_ivc, xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in,
+   route_op
+   );
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -41,99 +46,99 @@ module vcr_op_ctrl_mac_yarc
    function integer clogb(input integer argument);
       integer 		     i;
       begin
-	 clogb = 0;
+	 clogb 			     = 0;
 	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
+	   clogb 		     = clogb + 1;
       end
    endfunction
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_row_buffers 	    = 32;
    
    // width required to select a buffer
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   localparam flit_buffer_idx_width  = clogb(num_row_buffers);
    
    // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_flit_buffers+1);
+   localparam cred_count_width 	     = clogb(num_row_buffers+1);
    
    // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width = clogb(num_flit_buffers);
+   localparam cred_hold_width 	     = clogb(num_row_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers      = 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   parameter num_traffic_classes     = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_routing_classes     = 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes 	     = num_traffic_classes * num_routing_classes;
    
    // number of VCs available for each class
-   parameter num_vcs_per_class = 1;
+   parameter num_vcs_per_class 	     = 1;
    
    // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
+   localparam num_vcs 		     = num_classes * num_vcs_per_class;
    
    // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   localparam vc_idx_width 	     = clogb(num_vcs);
    
    // number of input and output ports on router
-   parameter num_ports = 5;
+   parameter num_ports 		     = 5;
    
    // number of dimensions in network
-   parameter num_dimensions = 2;
+   parameter num_dimensions 	     = 2;
    
    // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
+   parameter num_routers_per_dim     = 4;
    
    // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
+   localparam dim_addr_width 	     = clogb(num_routers_per_dim);
    
    // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
+   localparam router_addr_width      = num_dimensions * dim_addr_width;
    
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   parameter num_neighbors_per_dim   = 2;
    
    // number of nodes per router (a.k.a. consentration factor)
    localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
+ 				     = num_ports - num_dimensions * num_neighbors_per_dim;
    
    // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
+   localparam node_addr_width 	     = clogb(num_nodes_per_router);
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+ 				     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // select packet format
-   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   parameter packet_format 	     = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length = 4;
+   parameter max_payload_length      = 4;
    
    // minimum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter min_payload_length = 1;
+   parameter min_payload_length      = 1;
    
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
-     = clogb(max_payload_length-min_payload_length+1);
+ 				     = clogb(max_payload_length-min_payload_length+1);
 
    // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length);
+   localparam flit_ctr_width 	     = clogb(max_payload_length);
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+ 				     = num_routing_classes * router_addr_width + node_addr_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+ 				     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (la_route_info_width + route_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
@@ -186,9 +191,11 @@ module vcr_op_ctrl_mac_yarc
    
    // capped reset value for credit level
    localparam [0:cred_level_width-1] free_reset_value
-     = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
+     = (num_row_buffers > max_cred_level) ? max_cred_level : num_row_buffers;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter reset_type 			       = `RESET_TYPE_ASYNC;
+
+   parameter vc_id 				       = 0;
    
    input clk;
    input reset;
@@ -197,7 +204,7 @@ module vcr_op_ctrl_mac_yarc
    input [0:8*flow_ctrl_width-1] flow_ctrl_in;
    
    // output VC was granted to an input VC
-   input [0:num_vcs-1] vc_gnt_ovc;
+   input [0:8-1] vc_gnt_ovc;
    
    // input port that each output VC was granted to
    input [0:num_vcs*num_ports-1] vc_gnt_ovc_ip;
@@ -234,44 +241,50 @@ module vcr_op_ctrl_mac_yarc
    // internal error condition detected
    output error;
    wire 				  error;
+
+   input [0:num_ports-1] route_op;
+   
    
    
    //---------------------------------------------------------------------------
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:flow_ctrl_width-1] 		  flow_ctrl_s, flow_ctrl_q;
+   wire [0:8*flow_ctrl_width-1] 		  flow_ctrl_s, flow_ctrl_q;
    assign flow_ctrl_s = flow_ctrl_in;
    
-   wire 				  cred_valid_s, cred_valid_q;
-   assign cred_valid_s = flow_ctrl_s[0];
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   cred_validq
-     (.clk(clk),
-      .reset(reset),
-      .d(cred_valid_s),
-      .q(cred_valid_q));
-   
-   assign flow_ctrl_q[0] = cred_valid_q;
-
+   wire [0:8-1] 				  cred_valid_s, cred_valid_q;
    generate
+      genvar row_bufs;
       
-      if(flow_ctrl_width > 1)
-	begin
-	   
+      for( row_bufs = 0; row_bufs<8; row_bufs =row_bufs+1)
+	begin: row_bufss
+	   assign cred_valid_s[row_bufs] 	= flow_ctrl_s[row_bufs*flow_ctrl_width+0];
 	   c_dff
-	     #(.width(flow_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   flow_ctrlq
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   cred_validq
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(flow_ctrl_s[1:flow_ctrl_width-1]),
-	      .q(flow_ctrl_q[1:flow_ctrl_width-1]));
+	      .d(cred_valid_s[row_bufs]),
+	      .q(cred_valid_q[row_bufs]));
 	   
-	end
-      
+	   assign flow_ctrl_q[row_bufs*flow_ctrl_width+0] = cred_valid_q[row_bufs];
+
+	   if(flow_ctrl_width > 1)
+	     begin
+		
+		c_dff
+		  #(.width(flow_ctrl_width-1),
+		    .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+		flow_ctrlq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(flow_ctrl_s[row_bufs*flow_ctrl_width+1:(row_bufs+1)*flow_ctrl_width-1]),
+		   .q(flow_ctrl_q[row_bufs*flow_ctrl_width+1:(row_bufs+1)*flow_ctrl_width-1]));
+		
+	     end // if (flow_ctrl_width > 1)
+	end // block: row_bufss      
    endgenerate
    
    
@@ -280,7 +293,8 @@ module vcr_op_ctrl_mac_yarc
    //---------------------------------------------------------------------------
    
    wire 				  xbr_ctrl;
-   assign xbr_ctrl = |xbr_ctrl_ip;
+   assign xbr_ctrl  = 1'b1;
+   
    
    wire 				  flit_valid_in;
    assign flit_valid_in = int_flit_ctrl_in[0] & xbr_ctrl;
@@ -288,44 +302,42 @@ module vcr_op_ctrl_mac_yarc
    wire 				  flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
    
-   wire 				  cred_valid;
-   assign cred_valid = flow_ctrl_q[0];
+
    
-   wire [0:num_vcs-1] 			  match_ovc;
+   wire [0:num_ports-1] 			  match_ovc;
    
    wire 				  error_unmatched;
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
-   wire [0:num_vcs-1] 			  next_cred_ovc;
-   wire [0:num_vcs-1] 			  error_hct_ovc;
-   wire [0:num_vcs*2-1] 		  error_cred_ovc;
+   wire [0:num_ports-1] 			  next_cred_ovc;
+   wire [0:num_ports-1] 			  error_hct_ovc;
+   wire [0:num_ports*2-1] 		  error_cred_ovc;
    
    generate
       
-      genvar 				  ovc;
+      genvar 				  columns;
       
-      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+      for(columns = 0; columns < 8; columns = columns + 1)
 	begin:ovcs
-	   
-	   wire credit;
-	   
+	   wire 				  cred_valid;
+	   assign cred_valid = flow_ctrl_q[columns*flow_ctrl_width+0];
+	   wire credit;	   
 	   if(num_vcs > 1)
 	     begin
 		
 		wire [0:vc_idx_width-1] cred_vc;
-		assign cred_vc = flow_ctrl_q[1:1+vc_idx_width-1];
-		
-		assign credit = cred_valid && (cred_vc == ovc);
+		assign cred_vc = flow_ctrl_q[columns*flow_ctrl_width+1:columns*flow_ctrl_width+1+vc_idx_width-1];
+		assign credit = cred_valid && (cred_vc == vc_id);
 		
 	     end
 	   else
 	     assign credit = cred_valid;
 	   
 	   wire 			debit;
-	   assign debit = flit_valid_in & match_ovc[ovc];
+	   assign debit = flit_valid_in & match_ovc[columns];
 	   
 	   wire 			vc_gnt;
-	   assign vc_gnt = vc_gnt_ovc[ovc];
+	   assign vc_gnt = vc_gnt_ovc[columns];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -352,64 +364,12 @@ module vcr_op_ctrl_mac_yarc
 	   
 	   if(num_vcs > 1)
 	     begin
-		
-		wire [0:vc_idx_width-1] flit_vc_in;
-		assign flit_vc_in = int_flit_ctrl_in[1:1+vc_idx_width-1];
-		
-		// if VC assignment is tracked at the output, each output VC 
-		// needs to check if it is currently assigned to the incoming VC
-		// ID at the selected input port
-		if(track_vcs_at_output)
-		  begin
-		     
-		     wire [0:num_ports-1] vc_gnt_ip;
-		     assign vc_gnt_ip
-		       = vc_gnt_ovc_ip[ovc*num_ports:(ovc+1)*num_ports-1];
-		     
-		     wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
-		     assign allocated_ip_s
-		       = vc_gnt ? vc_gnt_ip : allocated_ip_q;
-		     c_dff
-		       #(.width(num_ports),
-			 .reset_type(reset_type))
-		     allocated_ipq
-		       (.clk(clk),
-			.reset(reset),
-			.d(allocated_ip_s),
-			.q(allocated_ip_q));
-		     
-		     wire [0:num_vcs-1]   vc_gnt_ivc;
-		     assign vc_gnt_ivc
-		       = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
-		     
-		     wire [0:num_vcs-1]   allocated_ivc_s, allocated_ivc_q;
-		     assign allocated_ivc_s
-		       = vc_gnt ? vc_gnt_ivc : allocated_ivc_q;
-		     c_dff
-		       #(.width(num_vcs),
-			 .reset_type(reset_type))
-		     allocated_ivcq
-		       (.clk(clk),
-			.reset(reset),
-			.d(allocated_ivc_s),
-			.q(allocated_ivc_q));
-		     
-		     assign match_ovc[ovc] = allocated_q &&
-					     |(allocated_ip_q & xbr_ctrl_ip) &&
-					     allocated_ivc_q[flit_vc_in];
-		     
-		  end
-		
-		// if VC assignments are tracked at the input side, we can just 
-		// check if for our own VC ID
-		else
-		  assign match_ovc[ovc] = (flit_vc_in == ovc);
-		
+		assign match_ovc[columns]  = route_op[columns];
 	     end
 	   
 	   // if we only have a single VC to begin with, it is always selected
 	   else
-	     assign match_ovc[ovc] = 1'b1;
+	     assign match_ovc[vc_id] 	  = 1'b1;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -419,7 +379,7 @@ module vcr_op_ctrl_mac_yarc
 	   wire [0:cred_count_width-1] cred_count_s;
 	   wire 		       head_free_early;
 	   
-	   if(num_header_buffers == num_flit_buffers)
+	   if(num_header_buffers == num_row_buffers)
 	     begin
 		
 		// if every flit buffer entry can be a head flit, we don't need 
@@ -427,10 +387,10 @@ module vcr_op_ctrl_mac_yarc
 		// rely on the normal credit tracking mechanism
 		assign head_free_early = 1'b1;
 		
-		assign error_hct_ovc[ovc] = 1'b0;
+		assign error_hct_ovc[vc_id] = 1'b0;
 		
 	     end
-	   else
+	   else //yarc
 	     begin
 
 		// if only a subset of the flit buffer entries can be headers, 
@@ -444,7 +404,7 @@ module vcr_op_ctrl_mac_yarc
 		     // after the tail has been sent
 		     
 		     wire buffer_drained;
-		     assign buffer_drained = (cred_count_s == num_flit_buffers);
+		     assign buffer_drained = (cred_count_s == num_row_buffers);
 		     
 		     wire tail_sent_s, tail_sent_q;
 		     assign tail_sent_s
@@ -475,17 +435,17 @@ module vcr_op_ctrl_mac_yarc
 		     
 		     assign head_free_early = head_free_s;
 		     
-		     assign error_hct_ovc[ovc] = 1'b0;
+		     assign error_hct_ovc[vc_id] = 1'b0;
 		     
 		  end
-		else
+		else //yarc
 		  begin
 		     
 		     wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
 		     c_incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
-			 .max_value(num_flit_buffers-1))
+			 .max_value(num_row_buffers-1))
 		     push_ptr_incr
 		       (.data_in(push_ptr_q),
 			.data_out(push_ptr_next));
@@ -505,7 +465,7 @@ module vcr_op_ctrl_mac_yarc
 		     c_incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
-			 .max_value(num_flit_buffers-1))
+			 .max_value(num_row_buffers-1))
 		     pop_ptr_incr
 		       (.data_in(pop_ptr_q),
 			.data_out(pop_ptr_next));
@@ -521,7 +481,7 @@ module vcr_op_ctrl_mac_yarc
 			.d(pop_ptr_s),
 			.q(pop_ptr_q));
 		     
-		     reg [0:num_flit_buffers-1]       tail_queue;
+		     reg [0:num_row_buffers-1]       tail_queue;
 		     
 		     always @(posedge clk)
 		       if(debit)
@@ -553,7 +513,7 @@ module vcr_op_ctrl_mac_yarc
 			.free_early(head_free_early),
 			.error(error_hct));
 		     
-		     assign error_hct_ovc[ovc] = error_hct;
+		     assign error_hct_ovc[vc_id] = error_hct;
 		     
 		  end
 		
@@ -569,20 +529,20 @@ module vcr_op_ctrl_mac_yarc
 	   c_dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
-	       .reset_value(num_flit_buffers))
+	       .reset_value(num_row_buffers))
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   assign next_cred_ovc[ovc] = |cred_count_s;
+	   assign next_cred_ovc[columns] = |cred_count_s;
 	   
 	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
+	   assign error_cred = {(cred_count_q == num_row_buffers) && credit,
 				(cred_count_q == 0) && debit};
 	   
-	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
+	   assign error_cred_ovc[columns*2:(columns+1)*2-1] = error_cred;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -610,8 +570,8 @@ module vcr_op_ctrl_mac_yarc
 		     .d(free_s),
 		     .q(free_q));
 		  
-		  assign int_flow_ctrl_ovc[ovc*cred_level_width:
-					   (ovc+1)*cred_level_width-1]
+		  assign int_flow_ctrl_ovc[columns*cred_level_width:
+					   (columns+1)*cred_level_width-1]
 			   = free_q;
 		  
 	       end
@@ -632,7 +592,7 @@ module vcr_op_ctrl_mac_yarc
 		  c_dff
 		    #(.width(cred_hold_width),
 		      .reset_type(reset_type),
-		      .reset_value(num_flit_buffers-1))
+		      .reset_value(num_row_buffers-1))
 		  cred_holdq
 		    (.clk(clk),
 		     .reset(reset),
@@ -651,7 +611,7 @@ module vcr_op_ctrl_mac_yarc
 		     .d(cred_s),
 		     .q(cred_q));
 		  
-		  assign int_flow_ctrl_ovc[ovc] = cred_q;
+		  assign int_flow_ctrl_ovc[columns] = cred_q;
 		  
 	       end
 	     
@@ -663,7 +623,7 @@ module vcr_op_ctrl_mac_yarc
 	   //-------------------------------------------------------------------
 	   
 	   wire 			      elig_s, elig_q;
-	   assign elig_s = ~allocated_s & head_free_early & next_cred_ovc[ovc];
+	   assign elig_s = ~allocated_s & head_free_early & next_cred_ovc[vc_id];
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type),
@@ -674,13 +634,21 @@ module vcr_op_ctrl_mac_yarc
 	      .d(elig_s),
 	      .q(elig_q));
 	   
-	   assign elig_ovc[ovc] = elig_q;
+	   assign elig_ovc[vc_id] = elig_q;
 	   
 	end
       
    endgenerate
    
-   
+
+
+
+
+
+
+
+
+		   
    //---------------------------------------------------------------------------
    // output staging
    //---------------------------------------------------------------------------
@@ -788,23 +756,5 @@ module vcr_op_ctrl_mac_yarc
    
    assign flit_data_out = flit_data_q;
    
-   
-   //---------------------------------------------------------------------------
-   // error checker logic
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_vcs*2-1] 		  errors_out_ovc;
-   c_checker
-     #(.num_errors(num_vcs*2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(error_cred_ovc),
-      .errors_out(errors_out_ovc));
-   
-   assign error = error_unmatched | (|error_hct_ovc) | (|errors_out_ovc);
-   
+
 endmodule

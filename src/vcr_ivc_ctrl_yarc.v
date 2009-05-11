@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 // input VC controller
-module vcr_ivc_ctrl
+module vcr_ivc_ctrl_yarc
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
    int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
@@ -42,100 +42,99 @@ module vcr_ivc_ctrl
    function integer clogb(input integer argument);
       integer 		     i;
       begin
-	 clogb = 0;
+	 clogb 				= 0;
 	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
+	   clogb 			= clogb + 1;
       end
    endfunction
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flit_buffers 		= 8;
    
    // width of credit hold register
    // (note: this parameter is only used for CREDIT_HANDLING_TYPE_PUSH)
-   localparam cred_hold_width = clogb(num_flit_buffers);
+   localparam cred_hold_width 		= clogb(num_flit_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_header_buffers 	= 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes = 2;
+   parameter num_traffic_classes 	= 2;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_routing_classes 	= 2;
    
    // total number of packet classes
-   localparam num_classes = num_traffic_classes * num_routing_classes;
+   localparam num_classes 		= num_traffic_classes * num_routing_classes;
    
    // number of VCs available for each class
-   parameter num_vcs_per_class = 1;
+   parameter num_vcs_per_class 		= 1;
    
    // number of VCs
-   localparam num_vcs = num_classes * num_vcs_per_class;
+   localparam num_vcs 			= num_classes * num_vcs_per_class;
    
    // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   localparam vc_idx_width 		= clogb(num_vcs);
    
    // number of input and output ports on router
-   parameter num_ports = 5;
+   parameter num_ports 			= 5;
    
    // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
+   localparam port_idx_width 		= clogb(num_ports);
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = num_ports + ((num_routing_classes > 1) ? 1 : 0);
+ 					= num_ports + ((num_routing_classes > 1) ? 1 : 0);
    
    // number of dimensions in network
-   parameter num_dimensions = 2;
+   parameter num_dimensions 		= 2;
    
    // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
+   parameter num_routers_per_dim 	= 4;
    
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   parameter num_neighbors_per_dim 	= 2;
    
    // number of nodes per router (a.k.a. consentration factor)
-   localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
+   localparam num_nodes_per_router 	=1;
    
    // select packet format
-   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   parameter packet_format 		= `PACKET_FORMAT_EXPLICIT_LENGTH;
    
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length = 4;
+   parameter max_payload_length 	= 4;
    
    // minimum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter min_payload_length = 1;
+   parameter min_payload_length 	= 1;
    
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
-     = clogb(max_payload_length-min_payload_length+1);
+ 					= clogb(max_payload_length-min_payload_length+1);
 
    // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length-1);
+   localparam flit_ctr_width 		= clogb(max_payload_length-1);
    
    // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
+   localparam dim_addr_width 		= clogb(num_routers_per_dim);
    
    // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
+   localparam router_addr_width 	= num_dimensions * dim_addr_width;
    
    // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
+   localparam node_addr_width 		= clogb(num_nodes_per_router);
    
    // width of global addresses
-   localparam addr_width = router_addr_width + node_addr_width;
+   localparam addr_width 		= router_addr_width + node_addr_width;
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_routing_classes * router_addr_width + node_addr_width;
+ 					= num_routing_classes * router_addr_width + node_addr_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+ 					= (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (la_route_info_width + route_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
@@ -259,7 +258,7 @@ module vcr_ivc_ctrl
    
    // internal flow control signalling from output controller to input 
    // controllers
-   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   input [0:num_ports*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
    output [0:num_ports-1] route_op;
@@ -334,7 +333,7 @@ module vcr_ivc_ctrl
 	   assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
 	   
 	   assign flit_valid_in
-	     = flit_ctrl_in[0] && (flit_vc_in == vc_id);
+	     = flit_ctrl_in[0] && (flit_vc_in == vc_id); //some what redundant, valid implies vc matching
 	   
 	end
       else
@@ -371,13 +370,13 @@ module vcr_ivc_ctrl
 		  assign flit_tail_in = ~flit_head_in | ~has_payload;
 		  
 	       end
-	     else
+	     else 
 	       begin
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_q;
 		  wire [0:flit_ctr_width-1] flit_ctr_next;
 		  
-		  if(payload_length_width > 0)
+		  if(payload_length_width > 0) 
 		    begin
 		       
 		       wire [0:payload_length_width-1] payload_length;
@@ -394,7 +393,7 @@ module vcr_ivc_ctrl
 		       if(min_payload_length == 0)
 			 assign flit_tail_in
 			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
-		       else
+		       else //yarc falls here
 			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
 		       
 		    end
@@ -459,10 +458,10 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(routing_class == (num_routing_classes - 1))
+      if(routing_class == (num_routing_classes - 1)) //yarc falls here
 	assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
-      else
-	begin
+      else 
+	begin 
 	   
 	   wire [0:num_vcs_per_class-1] vc_gnt_changed_ocvc;
 	   assign vc_gnt_changed_ocvc
@@ -504,7 +503,7 @@ module vcr_ivc_ctrl
 	   assign vc_allocated = vc_gnt | vc_allocated_q;
 	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
 	end
-      else
+      else //yarc falls here
 	begin
 	   assign vc_allocated = vc_allocated_q;
 	   assign sw_allocated = sw_gnt_nonspec;
@@ -667,7 +666,7 @@ module vcr_ivc_ctrl
    
    generate
       
-      if((routing_class == (num_routing_classes - 1)) ||
+      if((routing_class == (num_routing_classes - 1)) || //yarc
 	 (routing_class == (num_routing_classes - 2)))
 	assign hop_route_info_in
 	  = route_info_in[route_info_width-hop_route_info_width:
@@ -677,7 +676,7 @@ module vcr_ivc_ctrl
 	  = route_info_in[routing_class*router_addr_width:
 			  (routing_class+2)*router_addr_width-1];
       
-      if(num_header_buffers > 1)
+      if(num_header_buffers > 1)//yarc
 	begin
 	   
 	   wire [0:hdff_width-1] 	  hdff_data_in;
@@ -789,61 +788,52 @@ module vcr_ivc_ctrl
       
       if(routing_class < (num_routing_classes - 1))
 	assign inc_rc = hdff_la_route_info[num_ports];
-      else
+      else //yarc
 	assign inc_rc = 1'b0;
       
    endgenerate
    
    wire pf_error_unmasked;
    
-   c_port_filter
-     #(.num_traffic_classes(num_traffic_classes),
-       .num_routing_classes(num_routing_classes),
-       .num_ports(num_ports),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
-       .num_nodes_per_router(num_nodes_per_router),
-       .restrict_turns(restrict_turns),
-       .routing_function_type(routing_function_type),
-       .port_id(port_id),
-       .traffic_class(traffic_class),
-       .routing_class(routing_class))
-   pf
-     (.route_in_op(route_unmasked_op),
-      .inc_rc(inc_rc),
-      .route_out_op(route_op),
-      .error(pf_error_unmasked));
+   
+   assign  route_op  = route_unmasked_op;
+   
    
    wire pf_error;
-   assign pf_error = pf_error_unmasked & header_valid;
-   
-   c_la_routing_logic
+   assign pf_error 	     = pf_error_unmasked & header_valid;
+
+
+   //look ahead for columns
+   c_routing_logic_yarc
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_ports(num_ports),
        .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
+       .restrict_turns(restrict_turns),
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),
        .port_id(port_id),
-       .traffic_class(traffic_class),
-       .routing_class(routing_class))
+       .which_dimension(1))
    lar
      (.router_address(router_address),
-      .route_op(route_op),
-      .inc_rc(inc_rc),
       .hop_route_info(hdff_hop_route_info),
-      .la_route_info(la_route_info_out));
+      .route_op(la_route_info_out ),
+      .inc_rc(inc_rc_meh),
+      .error(rtl_error_meh));
+   
+   
    
    
    //---------------------------------------------------------------------------
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:int_flow_ctrl_width-1] int_flow_ctrl_ovc;
    c_select_1ofn
      #(.num_ports(num_ports),
-       .width(num_vcs*int_flow_ctrl_width))
+       .width(int_flow_ctrl_width))
    int_flow_ctrl_ovc_sel
      (.select(route_op),
       .data_in(int_flow_ctrl_op_ovc),
@@ -856,19 +846,16 @@ module vcr_ivc_ctrl
       
       case(credit_handling_type)
 	
-	`CREDIT_HANDLING_TYPE_LEVEL:
+	`CREDIT_HANDLING_TYPE_LEVEL: //yarc
 	  begin
 	     
 	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
 	     assign free_unchanged_ocvc
-	       = int_flow_ctrl_ovc[(traffic_class*num_routing_classes+
-				    routing_class)*num_vcs_per_class*2:
-				   (traffic_class*num_routing_classes+
-				    routing_class+1)*num_vcs_per_class*2-1];
+ 					 = int_flow_ctrl_ovc;
 	     
 	     wire [0:num_vcs_per_class*2-1] free_ocvc;
 	     
-	     if(routing_class == (num_routing_classes - 1))
+	     if(routing_class == (num_routing_classes - 1)) //yarc
 	       assign free_ocvc = free_unchanged_ocvc;
 	     else
 	       begin
@@ -961,7 +948,7 @@ module vcr_ivc_ctrl
 	     
 	     wire [0:num_vcs_per_class-1] cred_ocvc;
 	     
-	     if(routing_class == (num_routing_classes - 1))
+	     if(routing_class == (num_routing_classes - 1)) 
 	       assign cred_ocvc = cred_unchanged_ocvc;
 	     else
 	       begin
@@ -1065,26 +1052,26 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(num_vcs > 1)
+      if(num_vcs > 1) //yarc
 	begin
 	   
 	   wire [0:vc_idx_width-1] flit_vc_out;
 	   
 	   if(track_vcs_at_output)
 	     assign flit_vc_out = vc_id;
-	   else
+	   else //yarc
 	     begin
 		
 		wire [0:num_vcs_per_class-1] flit_ocvc;
 		
 		if(sw_spec_enable)
 		  assign flit_ocvc = vc_allocated_hold_ocvc;
-		else
+		else //yarc
 		  assign flit_ocvc = vc_allocated_ocvc_q;
 		
 		wire [0:num_vcs-1] 	     flit_ovc;
 		
-		if(traffic_class > 0)
+		if(traffic_class > 0) //yarc
 		  assign flit_ovc[0:traffic_class*num_routing_classes*
 				  num_vcs_per_class-1]
 			   = {(traffic_class*num_routing_classes*
@@ -1143,6 +1130,10 @@ module vcr_ivc_ctrl
       
    endgenerate
    
+
+
+
+
    
    //---------------------------------------------------------------------------
    // flit buffer control

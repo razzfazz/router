@@ -189,10 +189,11 @@ module row_bus_driver (/*AUTOARG*/
    assign flit_ctrl_in_vc0[0]  = ~flit_ctrl_in_tile[1:1+vc_idx_width-1] && flit_ctrl_in_tile[0];
    assign flit_ctrl_in_vc1[0]  = flit_ctrl_in_tile[1:1+vc_idx_width-1] && flit_ctrl_in_tile[0];
    //control and data
-   assign flit_ctrl_in_vc0[1:flit_ctrl_width-1] = (~flit_ctrl_in_tile[1:1+vc_idx_width-1]  & flit_ctrl_in_tile[0])? flit_ctrl_in_tile[1:flit_ctrl_width-1]:flit_ctrl_in_vc0[1:flit_ctrl_width-1];
-   assign flit_ctrl_in_vc1[1:flit_ctrl_width-1] = (flit_ctrl_in_tile[1:1+vc_idx_width-1]  & flit_ctrl_in_tile[0])? flit_ctrl_in_tile[1:flit_ctrl_width-1]:flit_ctrl_in_vc1[1:flit_ctrl_width-1];
-   assign flit_data_in_vc0[0:flit_data_width-1] = (~flit_ctrl_in_tile[1:1+vc_idx_width-1]  & flit_ctrl_in_tile[0])? flit_data_in_tile[0:flit_data_width-1]:flit_data_in_vc0[0:flit_data_width-1];
-   assign flit_data_in_vc1[0:flit_data_width-1] = (flit_ctrl_in_tile[1:1+vc_idx_width-1]  & flit_ctrl_in_tile[0])? flit_data_in_tile[0:flit_data_width-1]:flit_data_in_vc1[0:flit_data_width-1];
+   assign flit_ctrl_in_vc0[1:flit_ctrl_width-1] = flit_ctrl_in_tile[1:flit_ctrl_width-1];
+   assign flit_ctrl_in_vc1[1:flit_ctrl_width-1] = flit_ctrl_in_tile[1:flit_ctrl_width-1];
+   assign flit_data_in_vc0[0:flit_data_width-1] =  flit_data_in_tile[0:flit_data_width-1];
+   assign flit_data_in_vc1[0:flit_data_width-1] =  flit_data_in_tile[0:flit_data_width-1];
+   
 
 
 
@@ -306,5 +307,10 @@ module row_bus_driver (/*AUTOARG*/
 
 
 
-  
+   assign flow_ctrl_in_row_bus 	    = {((num_ports-1)*flow_ctrl_width-1){1'b0}};
+   assign int_flow_ctrl_in_row_bus  = {flow_ctrl_width-1{1'b0}};
+   
+
+
+   
 endmodule

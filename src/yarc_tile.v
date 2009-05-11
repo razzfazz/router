@@ -62,7 +62,7 @@ module yarc_tile
    parameter num_col_buffers 	    = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers     = 4;
+   parameter num_header_buffers     = 8;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes    = 2;
@@ -198,6 +198,13 @@ module yarc_tile
    parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
+
+   //=================
+   //End of param
+   //=================
+
+
+
    
    input clk;
    input reset;

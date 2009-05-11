@@ -229,7 +229,7 @@ module vcr_ip_ctrl_mac_yarc
    
    // internal flow control signalling from output controller to input 
    // controllers
-   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   input [0:num_ports*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
    output [0:num_vcs*num_ports-1] route_ivc_op;
@@ -366,12 +366,13 @@ module vcr_ip_ctrl_mac_yarc
    wire 		vc_req;
    wire 		sw_req_nonspec;
    wire 		sw_req_spec;
+   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out_og;
    wire [0:la_route_info_width-1] la_route_info;
    wire [0:fbf_addr_width-1] 	  fbf_write_addr;
    wire [0:fbf_addr_width-1] 	  fbf_read_addr;
    wire 			  ivcc_error;
    wire [0:5] 			  oevents;
-   vcr_ivc_ctrl
+   vcr_ivc_ctrl_yarc
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
        .num_traffic_classes(num_traffic_classes),
@@ -405,7 +406,7 @@ module vcr_ip_ctrl_mac_yarc
       .vc_req(vc_req),
       .sw_req_nonspec(sw_req_nonspec),
       .sw_req_spec(sw_req_spec),
-      .int_flit_ctrl_out(int_flit_ctrl_out),
+      .int_flit_ctrl_out(int_flit_ctrl_out_og),
       .la_route_info_out(la_route_info),
       .fbf_write_addr(fbf_write_addr),
       .fbf_read_addr(fbf_read_addr),
@@ -420,7 +421,7 @@ module vcr_ip_ctrl_mac_yarc
       .header_info_in(header_info_in_q),
       .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
       .vc_gnt(1'b1),
-      .vc_gnt_ovc(vc_gnt_ovc),
+      .vc_gnt_ovc(2'b11),//vc_gnt_ovc),
       .sw_gnt_nonspec(sw_gnt_nonspec),
       .sw_gnt_spec(sw_gnt_spec));
    
@@ -429,39 +430,71 @@ module vcr_ip_ctrl_mac_yarc
 
 
 
-
-
+   //hack hack
+   generate
+      begin
+	 localparam other_port  = port_id ==0?1:0;
+	 assign route_ivc_op[other_port*num_ports:(other_port+1)*num_ports-1] = {num_ports{1'b0}};
+	 assign inc_rc_ivc[other_port] =  1'b0;
+	 assign vc_req_ivc[other_port] =  1'b0;
+	 assign sw_req_nonspec_ivc[other_port] =  1'b0;
+	 assign sw_req_spec_ivc[other_port] =  1'b0;
+	 assign flit_valid_out_ivc[other_port] =  1'b0;
+	 assign int_flit_ctrl_out_ivc[other_port*int_flit_ctrl_width:
+				      (other_port+1)*int_flit_ctrl_width-1]
+	   =  {int_flit_ctrl_width{1'b0}};
+	 assign la_route_info_ivc[other_port*la_route_info_width:
+				  (other_port+1)*la_route_info_width-1]
+ 	   = {la_route_info_width{1'b0}};
+	 
+	 assign fbf_write_addr_ivc[other_port*fbf_addr_width:
+				   (other_port+1)*fbf_addr_width-1]
+	   =  {fbf_addr_width{1'b0}};
+	 assign fbf_read_addr_ivc[other_port*fbf_addr_width:
+				  (other_port+1)*fbf_addr_width-1]
+	   =  {fbf_addr_width{1'b0}};
+	 assign fbf_write_offset_ivc[other_port*flit_buffer_idx_width:
+				     (other_port+1)*flit_buffer_idx_width-1]
+	   =  {flit_buffer_idx_width{1'b0}};
+	 assign fbf_read_offset_ivc[other_port*flit_buffer_idx_width:
+				    (other_port+1)*flit_buffer_idx_width-1]
+	   =  {flit_buffer_idx_width{1'b0}};
+	 assign ivcc_error_ivc[other_port] =  1'b0;
+	 assign events_ivc[other_port*6:(other_port+1)*6-1] =  6'b0;
+      end
+   endgenerate
    
-	   assign route_ivc_op[port_id*num_ports:(port_id+1)*num_ports-1] = route_op;
-	   assign inc_rc_ivc[port_id] = inc_rc;
-	   assign vc_req_ivc[port_id] = vc_req;
-	   assign sw_req_nonspec_ivc[port_id] = sw_req_nonspec;
-	   assign sw_req_spec_ivc[port_id] = sw_req_spec;
-	   assign flit_valid_out_ivc[port_id] = int_flit_ctrl_out[0];
-	   assign int_flit_ctrl_out_ivc[port_id*int_flit_ctrl_width:
-					(port_id+1)*int_flit_ctrl_width-1]
-		    = int_flit_ctrl_out;
-	   assign la_route_info_ivc[port_id*la_route_info_width:
-				    (port_id+1)*la_route_info_width-1]
-		    = la_route_info;
-	   assign fbf_write_addr_ivc[port_id*fbf_addr_width:
-				     (port_id+1)*fbf_addr_width-1]
-		    = fbf_write_addr;
-	   assign fbf_read_addr_ivc[port_id*fbf_addr_width:
-				    (port_id+1)*fbf_addr_width-1]
-		    = fbf_read_addr;
-	   assign fbf_write_offset_ivc[port_id*flit_buffer_idx_width:
-				       (port_id+1)*flit_buffer_idx_width-1]
-		    = fbf_write_addr[fbf_addr_width-flit_buffer_idx_width:
-				     fbf_addr_width-1];
-	   assign fbf_read_offset_ivc[port_id*flit_buffer_idx_width:
-				      (port_id+1)*flit_buffer_idx_width-1]
-		    = fbf_read_addr[fbf_addr_width-flit_buffer_idx_width:
-				    fbf_addr_width-1];
-	   assign ivcc_error_ivc[port_id] = ivcc_error;
-	   assign events_ivc[port_id*6:(port_id+1)*6-1] = oevents;
-	   
-
+   
+   assign route_ivc_op[port_id*num_ports:(port_id+1)*num_ports-1] = route_op;
+   assign inc_rc_ivc[port_id] = inc_rc;
+   assign vc_req_ivc[port_id] = vc_req;
+   assign sw_req_nonspec_ivc[port_id] = sw_req_nonspec;
+   assign sw_req_spec_ivc[port_id] = sw_req_spec;
+   assign flit_valid_out_ivc[port_id] = int_flit_ctrl_out_og[0];
+   assign int_flit_ctrl_out_ivc[port_id*int_flit_ctrl_width:
+				(port_id+1)*int_flit_ctrl_width-1]
+     = int_flit_ctrl_out_og;
+   assign la_route_info_ivc[port_id*la_route_info_width:
+			    (port_id+1)*la_route_info_width-1]
+     = la_route_info;
+   assign fbf_write_addr_ivc[port_id*fbf_addr_width:
+			     (port_id+1)*fbf_addr_width-1]
+     = fbf_write_addr;
+   assign fbf_read_addr_ivc[port_id*fbf_addr_width:
+			    (port_id+1)*fbf_addr_width-1]
+     = fbf_read_addr;
+   assign fbf_write_offset_ivc[port_id*flit_buffer_idx_width:
+			       (port_id+1)*flit_buffer_idx_width-1]
+     = fbf_write_addr[fbf_addr_width-flit_buffer_idx_width:
+		      fbf_addr_width-1];
+   assign fbf_read_offset_ivc[port_id*flit_buffer_idx_width:
+			      (port_id+1)*flit_buffer_idx_width-1]
+     = fbf_read_addr[fbf_addr_width-flit_buffer_idx_width:
+		     fbf_addr_width-1];
+   assign ivcc_error_ivc[port_id] = ivcc_error;
+   assign events_ivc[port_id*6:(port_id+1)*6-1] = oevents;
+   
+   
    
    assign error = |ivcc_error_ivc;
    
@@ -617,6 +650,9 @@ module vcr_ip_ctrl_mac_yarc
       
    endgenerate
    
+
+
+
    
    //---------------------------------------------------------------------------
    // performance counters

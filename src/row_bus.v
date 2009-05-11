@@ -184,7 +184,7 @@ module row_bus(/*AUTOARG*/
    // input controller VC 0
    //-------------------------------------------------------------------
    
-   wire [0:2*8*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   wire [0:8*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    //   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
    wire [0:num_vcs*num_ports-1] route_ivc_op;
    wire [0:num_vcs-1] 		     inc_rc_ivc;
@@ -193,7 +193,6 @@ module row_bus(/*AUTOARG*/
    wire [0:num_vcs-1] 		     sw_req_spec_ivc;
    wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out;
    wire [0:flit_data_width-1] 	     flit_data_out;
-   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out;
    
    wire 			     ipc_error;
    vcr_ip_ctrl_mac_yarc
@@ -222,19 +221,19 @@ module row_bus(/*AUTOARG*/
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
-       .port_id(0),
+       .port_id(port_id),
        .reset_type(reset_type))
    ipc
      (
       // Outputs
-      .route_ivc_op(route_ivc_op), //ignored no vc alloc
-      .inc_rc_ivc(inc_rc_ivc), //ignored no vc alloc
-      .vc_req_ivc(vc_req_ivc), //ignored no vc alloc
-      .sw_req_nonspec_ivc(sw_req_nonspec_ivc), //ignored no sw alloc
-      .sw_req_spec_ivc(sw_req_spec_ivc), //ignored no sw alloc
+      .route_ivc_op(route_ivc_op), //wtf??
+      .inc_rc_ivc(inc_rc_ivc), //wtf??
+      .vc_req_ivc(vc_req_ivc), //feed it right back
+      .sw_req_nonspec_ivc(sw_req_nonspec_ivc), //feed it right back
+      .sw_req_spec_ivc(sw_req_spec_ivc), //no speculation
       .int_flit_ctrl_out(int_flit_ctrl_out),
       .flit_data_out(flit_data_out),
-      .flow_ctrl_out(flow_ctrl_out),
+      .flow_ctrl_out(flow_ctrl_out_vc),
       .error(ipc_error),      
       // Inputs
       .clk(clk),
@@ -243,12 +242,14 @@ module row_bus(/*AUTOARG*/
       .flit_ctrl_in(flit_ctrl_in_vc),
       .flit_data_in(flit_data_in_vc),
       .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-      .vc_gnt_ivc(2'b11),//always grant no vc alloc
-      .vc_gnt_ivc_ovc(4'b1111), ///alwys grant no vc alloc
-      .sw_gnt_nonspec_ivc(2'b11), //always grant no sw alloc
+      .vc_gnt_ivc(vc_req_ivc),//feed it right back
+      .vc_gnt_ivc_ovc(4'b1111), ///wtf?
+      .sw_gnt_nonspec_ivc(sw_req_nonspec_ivc), //feed it right back
       .sw_gnt_spec_ivc(2'b00) //no speculation
        );
-   
+
+
+
 
       
   
@@ -270,8 +271,7 @@ module row_bus(/*AUTOARG*/
 
      
    vcr_op_ctrl_mac_yarc
-     #(.num_flit_buffers(num_flit_buffers),
-       .num_header_buffers(num_header_buffers),
+     #(.num_header_buffers(num_header_buffers),
        .num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -288,7 +288,9 @@ module row_bus(/*AUTOARG*/
        .track_vcs_at_output(track_vcs_at_output),
        .credit_handling_type(credit_handling_type),
        .cred_level_width(2),
-       .reset_type(reset_type))
+       .reset_type(reset_type),
+       .vc_id(port_id),
+       .num_row_buffers(num_row_buffers))
    opc
      (
       // Outputs
@@ -301,12 +303,13 @@ module row_bus(/*AUTOARG*/
       .clk				(clk),
       .reset				(reset),
       .flow_ctrl_in			({int_flow_ctrl_in_row_bus[0:flow_ctrl_width-1],flow_ctrl_in_row_bus[0:7*flow_ctrl_width-1]}),
-      .vc_gnt_ovc			(vc_gnt_ovc[0:num_vcs-1]),
+      .vc_gnt_ovc			(route_ivc_op[port_id*num_ports:(port_id+1)*num_ports-1]),
       .vc_gnt_ovc_ip			(vc_gnt_ovc_ip[0:num_vcs*num_ports-1]),
       .vc_gnt_ovc_ivc			(vc_gnt_ovc_ivc[0:num_vcs*num_vcs-1]),
       .xbr_ctrl_ip			(xbr_ctrl_ip[0:num_ports-1]), ///wtf?
       .int_flit_ctrl_in			(int_flit_ctrl_out[0:int_flit_ctrl_width-1]),
-      .flit_data_in			(flit_data_out[0:flit_data_width-1]));
+      .flit_data_in			(flit_data_out[0:flit_data_width-1]),
+      .route_op(route_ivc_op[port_id*num_ports:(port_id+1)*num_ports-1]));
 
 
 
