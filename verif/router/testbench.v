@@ -77,6 +77,7 @@ module testbench
    parameter packet_rate = 25;
    parameter packet_count_width = 32;
    parameter channel_latency = 1;
+   parameter inject_node_ports_only = 1;
    parameter warmup_time = 1000;
    parameter measure_time = 100000;
    
@@ -308,7 +309,7 @@ module testbench
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   if(ip < num_ports - num_nodes_per_router)
+	   if(inject_node_ports_only && (ip < num_ports - num_nodes_per_router))
 	     begin
 		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
