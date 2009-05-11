@@ -29,7 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 module packet_source
-  (clk, reset, flit_ctrl, flit_data, flow_ctrl, run, out_flits, error);
+  (clk, reset, router_address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, 
+   error);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -94,9 +95,6 @@ module packet_source
    
    // width required to select individual router in network
    localparam router_addr_width = num_dimensions * dim_addr_width;
-   
-   // current router's address
-   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
    
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
@@ -173,6 +171,8 @@ module packet_source
    
    input clk;
    input reset;
+   
+   input [0:router_addr_width-1] router_address;
    
    output [0:flit_ctrl_width-1] flit_ctrl;
    wire [0:flit_ctrl_width-1] flit_ctrl;

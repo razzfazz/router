@@ -130,8 +130,12 @@ module testbench
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
+   // address within each dimensions
+   localparam [0:dim_addr_width-1] default_dim_addr = num_routers_per_dim / 2;
+   
    // current router's address
-   parameter [0:router_addr_width-1] router_address = {router_addr_width{1'b0}};
+   localparam [0:router_addr_width-1] router_address
+     = {num_dimensions{default_dim_addr}};
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
@@ -243,7 +247,7 @@ module testbench
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_WF_BASE;
    
    // select which arbiter type to use for VC allocator
    parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -292,6 +296,12 @@ module testbench
    
    reg 					  run;
    
+   wire [0:num_ports*num_vcs-1] 	  ref_valid_ip_ivc;
+   wire [0:num_ports*num_vcs*flit_ctrl_width-1] ref_ctrl_ip_ivc;
+   wire [0:num_ports*num_vcs*flit_data_width-1] ref_data_ip_ivc;
+   wire [0:num_ports*num_vcs*port_idx_width-1] 	ref_port_ip_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	ref_vcs_ip_ivc;
+   
    generate
       
       genvar 				  ip;
@@ -317,6 +327,9 @@ module testbench
 		assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
 		
 		assign ps_error_ip[ip] = 1'b0;
+		assign ref_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+			 = {num_vcs{1'b0}};
+		
 		assign match_ip_ivc_op[ip*num_vcs*num_ports:
 				       (ip+1)*num_vcs*num_ports-1]
 			 = {num_vcs*num_ports{1'b0}};
@@ -354,7 +367,6 @@ module testbench
 		    .port_id(ip),
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
-		    .router_address(router_address),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
@@ -366,6 +378,7 @@ module testbench
 		ps
 		  (.clk(clk),
 		   .reset(reset),
+		   .router_address(router_address),
 		   .flit_ctrl(flit_ctrl),
 		   .flit_data(flit_data),
 		   .flow_ctrl(flow_ctrl),
@@ -866,6 +879,20 @@ module testbench
 					    (ip*num_vcs+ivc+1)*num_ports-1]
 			      = match_op;
 		     
+		     assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~fifo_empty;
+		     assign ref_ctrl_ip_ivc[(ip*num_vcs+ivc)*flit_ctrl_width:
+					    (ip*num_vcs+ivc+1)*flit_ctrl_width-1]
+			      = ref_ctrl;
+		     assign ref_data_ip_ivc[(ip*num_vcs+ivc)*flit_data_width:
+					    (ip*num_vcs+ivc+1)*flit_data_width-1]
+			      = ref_data;
+		     assign ref_port_ip_ivc[(ip*num_vcs+ivc)*port_idx_width:
+					    (ip*num_vcs+ivc+1)*port_idx_width-1]
+			      = ref_port;
+		     assign ref_vcs_ip_ivc[(ip*num_vcs+ivc)*num_vcs:
+					   (ip*num_vcs+ivc+1)*num_vcs-1]
+			      = ref_ovc;
+		     
 		  end
 	     end
 	end
@@ -1084,6 +1111,7 @@ module testbench
    assign check_error_op = (flit_valid_out_op & ~match_op);
    
    integer 			      port;
+   integer 			      x;
    always @(posedge clk)
      begin
 	for(port = 0; port < num_ports; port = port + 1)
@@ -1096,6 +1124,17 @@ module testbench
 					    flit_ctrl_width],
 			   flit_data_out_op[port*flit_data_width +: 
 					    flit_data_width]);
+		  $display("expected flits:");
+		  for(x = 0; x < num_ports*num_vcs; x = x + 1)
+		    begin
+		       if(ref_valid_ip_ivc[x])
+			 $display("ip=%d,ivc=%d,ctrl=%b,data=%x,op=%d,vcs=%b",
+				  x / num_vcs, x % num_vcs,
+				  ref_ctrl_ip_ivc[x*flit_ctrl_width +: flit_ctrl_width],
+				  ref_data_ip_ivc[x*flit_data_width +: flit_data_width],
+				  ref_port_ip_ivc[x*port_idx_width +: port_idx_width],
+				  ref_vcs_ip_ivc[x*num_vcs +: num_vcs]);
+		    end
 	       end
 	     if(x_error_op[port])
 	       begin
