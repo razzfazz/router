@@ -201,9 +201,6 @@ module vcr_ip_ctrl_mac
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   // ID of current input port
-   parameter port_id = 0;
-   
    // width of sum of event signals from all VCs
    localparam event_width = clogb(num_vcs + 1);
    
@@ -439,7 +436,6 @@ module vcr_ip_ctrl_mac
 			 .perf_ctr_enable(perf_ctr_enable),
 			 .checker_enable(checker_enable),
 			 .checker_capture_mode(checker_capture_mode),
-			 .port_id(port_id),
 			 .vc_id(ivc),
 			 .message_class(mc),
 			 .resource_class(irc),

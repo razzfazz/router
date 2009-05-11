@@ -88,9 +88,6 @@ module vcr_la_routing_logic
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
-   // ID of current port
-   parameter port_id = 0;
-   
    // current resource class
    parameter resource_class = 0;
    

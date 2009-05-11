@@ -230,7 +230,6 @@ module whr_top
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
 	       .checker_capture_mode(checker_capture_mode),
-	       .port_id(ip),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),

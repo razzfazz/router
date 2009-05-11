@@ -364,7 +364,6 @@ module testbench
 		    .num_resource_classes(num_resource_classes),
 		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
-		    .port_id(ip),
 		    .num_dimensions(num_dimensions),
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
@@ -550,7 +549,6 @@ module testbench
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
-			      .port_id(ip),
 			      .resource_class(irc))
 			  rtl
 			    (.router_address(router_address),
@@ -630,7 +628,6 @@ module testbench
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
-			      .port_id(ip),
 			      .resource_class(irc))
 			  lar
 			    (.router_address(router_address),

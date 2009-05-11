@@ -162,9 +162,6 @@ module whr_ip_ctrl_mac
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   // ID of current input port
-   parameter port_id = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
       
    input clk;
@@ -671,8 +668,7 @@ module whr_ip_ctrl_mac
        .num_routers_per_dim(num_routers_per_dim),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .routing_function_type(routing_function_type),
-       .dimension_order(dimension_order),
-       .port_id(port_id))
+       .dimension_order(dimension_order))
    lar
      (.router_address(router_address),
       .route_op(route_op),

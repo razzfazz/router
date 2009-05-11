@@ -527,7 +527,6 @@ module packet_source
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
-		    .port_id(port_id),
 		    .resource_class(irc))
 		rtl
 		  (.router_address(router_address),

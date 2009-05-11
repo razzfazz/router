@@ -78,9 +78,6 @@ module whr_routing_logic
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
-   // ID of current port
-   parameter port_id = 0;
-   
    // total number of bits required for storing routing information
    localparam route_info_width = addr_width;
    
