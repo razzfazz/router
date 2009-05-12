@@ -73,13 +73,30 @@ module testbench
    
    parameter Tclk = 2;
    parameter initial_seed = 0;
+   
+   // maximum number of packets to generate (-1 = no limit)
    parameter max_packet_count = -1;
+   
+   // packet injection rate (percentage of cycles)
    parameter packet_rate = 25;
+   
+   // width of packet count register
    parameter packet_count_width = 32;
+   
+   // channel latency in cycles
    parameter channel_latency = 1;
+   
+   // only inject traffic at the node ports
    parameter inject_node_ports_only = 1;
+   
+   // warmup time in cycles
    parameter warmup_time = 1000;
+   
+   // measurement interval in cycles
    parameter measure_time = 100000;
+   
+   // select packet length mode (0: uniform random, 1: bimodal)
+   parameter packet_length_mode = 0;
    
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_MESH;
@@ -183,9 +200,6 @@ module testbench
 
    // width of counter for remaining flits
    localparam flit_ctr_width = clogb(max_payload_length);
-   
-   // select packet length mode (0: uniform random, 1: bimodal)
-   parameter packet_length_mode = 0;
    
    // total number of bits required for storing header information
    localparam header_info_width
@@ -355,26 +369,26 @@ module testbench
 		
 		wire 			      ps_error;
 		packet_source
-		  #(.max_packet_count(max_packet_count),
+		  #(.initial_seed(initial_seed+ip),
+		    .max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
-		    .initial_seed(initial_seed+ip),
 		    .packet_count_width(packet_count_width),
+		    .packet_length_mode(packet_length_mode),
+		    .network_topology(network_topology),
 		    .num_flit_buffers(num_flit_buffers),
 		    .num_header_buffers(num_header_buffers),
 		    .num_message_classes(num_message_classes),
 		    .num_resource_classes(num_resource_classes),
 		    .num_vcs_per_class(num_vcs_per_class),
-		    .num_ports(num_ports),
+		    .num_nodes(num_nodes),
 		    .num_dimensions(num_dimensions),
-		    .num_routers_per_dim(num_routers_per_dim),
-		    .num_neighbors_per_dim(num_neighbors_per_dim),
-		    .routing_function_type(routing_function_type),
-		    .dimension_order(dimension_order),
+		    .num_nodes_per_router(num_nodes_per_router),
 		    .packet_format(packet_format),
 		    .max_payload_length(max_payload_length),
 		    .min_payload_length(min_payload_length),
-		    .packet_length_mode(packet_length_mode),
-		    .flit_data_width(flit_data_width))
+		    .flit_data_width(flit_data_width),
+		    .routing_function_type(routing_function_type),
+		    .dimension_order(dimension_order))
 		ps
 		  (.clk(clk),
 		   .reset(reset),

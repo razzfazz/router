@@ -45,11 +45,40 @@ module packet_source
       end
    endfunction
    
-   parameter max_packet_count = 1000;
-   parameter packet_rate = 25;
+   // compute ceiling of base-th root of argument
+   function integer croot(input integer argument, input integer base);
+      integer 		     i;
+      integer 		     j;
+      begin
+	 croot = 0;
+	 i = 0;
+	 while(i < argument)
+	   begin
+	      croot = croot + 1;
+	      i = 1;
+	      for(j = 0; j < base; j = j + 1)
+		i = i * croot;
+	   end
+      end
+   endfunction
+   
    parameter initial_seed = 0;
+   
+   // maximum number of packets to generate (-1 = no limit)
+   parameter max_packet_count = 1000;
+   
+   // packet injection rate (percentage of cycles)
+   parameter packet_rate = 25;
+   
+   // width of packet count register
    parameter packet_count_width = 32;
 
+   // select packet length mode (0: uniform random, 1: bimodal)
+   parameter packet_length_mode = 0;
+   
+   // select network topology
+   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
+   
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
@@ -74,8 +103,39 @@ module packet_source
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
+   // total number of nodes
+   parameter num_nodes = 64;
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of nodes per router (a.k.a. concentration factor)
+   parameter num_nodes_per_router = 4;
+
+   // total number of routers
+   localparam num_routers
+     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+   
+   // number of routers in each dimension
+   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in entire network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // number of adjacent routers in each dimension
+   localparam num_neighbors_per_dim
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       2 :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (num_routers_per_dim - 1) :
+       -1;
+   
    // number of input and output ports on router
-   parameter num_ports = 5;
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
    // width required to select individual port
    localparam port_idx_width = clogb(num_ports);
@@ -83,25 +143,6 @@ module packet_source
    // width required for lookahead routing information
    localparam la_route_info_width
      = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
-   // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
-   
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
-   // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
-   // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
-   
-   // number of nodes per router (a.k.a. consentration factor)
-   localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -146,17 +187,11 @@ module packet_source
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
-   // ID of current port
-   parameter port_id = 0;
-   
    // maximum packet length (in flits)
    localparam max_packet_length = 1 + max_payload_length;
    
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
-   
-   // select packet length mode (0: uniform random, 1: bimodal)
-   parameter packet_length_mode = 0;
    
    // total number of bits required for storing header information
    localparam header_info_width
@@ -578,35 +613,40 @@ module packet_source
       
       for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 	begin:ircs
-	   
-	   reg [0:router_addr_width-1] 		  router_addr_q;
-	   always @(posedge clk, posedge reset)
+
+	   if(irc == (num_resource_classes - 1))
 	     begin
-		if(reset | packet_sent)
-		  router_addr_q
-		    <= router_address + 
-		       $dist_uniform(seed, 1, 2**router_addr_width-1);
+
+		reg [0:addr_width-1] addr_q;
+		always @(posedge clk, posedge reset)
+		  begin
+		     if(reset | packet_sent)
+		       addr_q <= $dist_uniform(seed, 0, num_nodes-1);
+		  end
+		
+		assign route_info[irc*router_addr_width:route_info_width-1]
+			 = addr_q;
+		
 	     end
-	   
-	   assign route_info[irc*router_addr_width:(irc+1)*router_addr_width-1]
-		    = router_addr_q;
-	   
-	end
-      
-      if(num_nodes_per_router > 1)
-	begin
-	   
-	   reg [0:node_addr_width-1] node_addr_q;
-	   always @(posedge clk, posedge reset)
+	   else
 	     begin
-		if(reset | packet_sent)
-		  node_addr_q
-		    <= $dist_uniform(seed, 0, num_nodes_per_router-1);
+		
+		assign next_addr
+		  = route_info[(irc+1)*router_addr_width:(irc+2)*router_addr_width-1];
+		
+		reg [0:router_addr_width-1] router_addr_q;
+		always @(posedge clk, posedge reset)
+		  begin
+		     if(reset | packet_sent)
+		       router_addr_q
+			 <= (next_addr + $dist_uniform(seed, 1, num_routers-1)) %
+			    num_routers;
+		  end
+		
+		assign route_info[irc*router_addr_width:(irc+1)*router_addr_width-1]
+			 = router_addr_q;
+		
 	     end
-	   
-	   assign route_info[route_info_width-node_addr_width:
-			     route_info_width-1]
-		    = node_addr_q;
 	   
 	end
       
