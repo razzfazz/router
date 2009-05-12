@@ -80,17 +80,8 @@ module router_wrap
    // number of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 1;
    
-   // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
-   
    // number of VCs per class
    parameter num_vcs_per_class = 1;
-   
-   // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
-   
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
    
    // total number of nodes
    parameter num_nodes = 64;
@@ -100,31 +91,6 @@ module router_wrap
    
    // number of nodes per router (a.k.a. concentration factor)
    parameter num_nodes_per_router = 1;
-   
-   // total number of routers
-   localparam num_routers
-     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
-   
-   // number of routers in each dimension
-   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
-   
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
-   // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
-   // number of adjacent routers in each dimension
-   localparam num_neighbors_per_dim
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       2 :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       (num_routers_per_dim - 1) :
-       -1;
-   
-   // number of input and output ports on router
-   localparam num_ports
-     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -137,20 +103,6 @@ module router_wrap
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
    
-   // width of flit control signals
-   localparam flit_ctrl_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (1 + vc_idx_width + 1 + 1) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (1 + vc_idx_width + 1) : 
-       -1;
-   
-   // width of flit payload data
-   parameter flit_data_width = 32;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
-   
    // enable performance counter
    parameter perf_ctr_enable = 0;
    
@@ -161,9 +113,6 @@ module router_wrap
    parameter checker_enable = 0;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
    parameter track_vcs_at_output = 1;
@@ -171,13 +120,8 @@ module router_wrap
    // select router implementation
    parameter router_type = `ROUTER_TYPE_VC;
    
-   // select routing function type
-   localparam routing_function_type
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_MESH :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `ROUTING_FUNCTION_TYPE_FBFLY :
-       -1;
+   // width of flit payload data
+   parameter flit_data_width = 32;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
@@ -206,9 +150,6 @@ module router_wrap
    // select speculation level for switch allocator
    parameter sw_spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
    
-   // enable speculative switch allocation
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
-   
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
@@ -216,6 +157,64 @@ module router_wrap
    parameter data_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // number of VCs
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // total number of routers
+   localparam num_routers
+     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+   
+   // number of routers in each dimension
+   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in entire network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // number of adjacent routers in each dimension
+   localparam num_neighbors_per_dim
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       2 :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (num_routers_per_dim - 1) :
+       -1;
+   
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   
+   // width of flit control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width = 1 + vc_idx_width;
+   
+   // select routing function type
+   localparam routing_function_type
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       `ROUTING_FUNCTION_TYPE_MESH :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       `ROUTING_FUNCTION_TYPE_FBFLY :
+       -1;
+   
+   // enable speculative switch allocation
+   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   
    
    input clk;
    input reset;
