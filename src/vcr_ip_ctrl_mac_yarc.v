@@ -148,7 +148,7 @@ module vcr_ip_ctrl_mac_yarc
    // width of flit payload data
    parameter flit_data_width = 64;
    
-   // width of flow control signals
+   // width of flow control signals omg even a bigger than you can imagine
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
@@ -307,7 +307,7 @@ module vcr_ip_ctrl_mac_yarc
 	   
 	   c_dff
 	     #(.width(flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   flit_ctrl_inq
 	     (.clk(clk),
 	      .reset(reset),
@@ -322,7 +322,7 @@ module vcr_ip_ctrl_mac_yarc
    assign flit_data_in_s = flit_data_in;
    c_dff
      #(.width(flit_data_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
       .reset(reset),
@@ -566,7 +566,7 @@ module vcr_ip_ctrl_mac_yarc
 	   
 	   c_dff
 	     #(.width(int_flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   int_flit_ctrl_outq
 	     (.clk(clk),
 	      .reset(reset),
@@ -592,7 +592,7 @@ module vcr_ip_ctrl_mac_yarc
       .data_out(la_route_info_s));
    c_dff
      #(.width(la_route_info_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    la_route_infoq
      (.clk(clk),
       .reset(reset),
@@ -637,7 +637,7 @@ module vcr_ip_ctrl_mac_yarc
 	      .data_out(cred_vc_s));
 	   c_dff
 	     #(.width(vc_idx_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   cred_vcq
 	     (.clk(clk),
 	      .reset(reset),

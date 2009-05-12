@@ -124,8 +124,8 @@ module yarc_tile
    // width of flit payload data
    parameter flit_data_width = 32;
    
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
+   // width of flow control signals hack hack hack
+   localparam flow_ctrl_width = 1 + vc_idx_width+1;
    
    // enable performance counter
    parameter perf_ctr_enable = 0;

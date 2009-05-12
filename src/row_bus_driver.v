@@ -87,8 +87,8 @@ module row_bus_driver (/*AUTOARG*/
    // width of flit payload data
    parameter flit_data_width = 32;
    
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
+   // width of flow control signals hack hack hack
+   localparam flow_ctrl_width = 1 + vc_idx_width+1;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -198,8 +198,13 @@ module row_bus_driver (/*AUTOARG*/
 
 
 
-   wire [0:2*flow_ctrl_width-1] flow_ctrl_vc;
+   wire [0:flow_ctrl_width-1-1] flow_ctrl_vc0;
+   wire [0:flow_ctrl_width-1-1] flow_ctrl_vc1;
    wire [0:flow_ctrl_width-1] int_flow_ctrl_in_row_bus;
+
+   assign flow_ctrl_out_tile[0]  = flow_ctrl_vc0[0] | flow_ctrl_vc1[0];
+   assign flow_ctrl_out_tile[1]  = flow_ctrl_vc0[0];
+   assign flow_ctrl_out_tile[2]  = flow_ctrl_vc1[0];
    
    
    row_bus #(
@@ -242,7 +247,7 @@ module row_bus_driver (/*AUTOARG*/
 	// Outputs
 	.flit_ctrl_out_row_bus(flit_ctrl_out_row_bus[0:flit_ctrl_width-1]),
 	.flit_data_out_row_bus(flit_data_out_row_bus[0:flit_data_width-1]),
-	.flow_ctrl_out_vc	(flow_ctrl_vc[0:flow_ctrl_width-1]),
+	.flow_ctrl_out_vc	(flow_ctrl_vc0[0:flow_ctrl_width-1-1]),//hack
 	// Inputs
 	.int_flow_ctrl_in_row_bus(int_flow_ctrl_in_row_bus),
 	.router_address	(router_address[0:router_addr_width-1]),
@@ -294,7 +299,7 @@ module row_bus_driver (/*AUTOARG*/
 	// Outputs
 	.flit_ctrl_out_row_bus(flit_ctrl_out_row_bus[flit_ctrl_width:2*flit_ctrl_width-1]),
 	.flit_data_out_row_bus(flit_data_out_row_bus[flit_data_width:2*flit_data_width-1]),
-	.flow_ctrl_out_vc	(flow_ctrl_vc[flow_ctrl_width:2*flow_ctrl_width-1]),
+	.flow_ctrl_out_vc	(flow_ctrl_vc1[0:flow_ctrl_width-1-1]), //omg hack
 	// Inputs
 	.int_flow_ctrl_in_row_bus(int_flow_ctrl_in_row_bus),
 	.router_address	(router_address[0:router_addr_width-1]),

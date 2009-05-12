@@ -24,7 +24,7 @@ module row_bus(/*AUTOARG*/
    parameter num_col_buffers 	    = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers     = 4;
+   parameter num_header_buffers     = 8;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes    = 2;
@@ -86,8 +86,8 @@ module row_bus(/*AUTOARG*/
    // width of flit payload data
    parameter flit_data_width = 32;
    
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
+   // width of flow control signals hack hack hack
+   localparam flow_ctrl_width = 1 + vc_idx_width+1;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -178,7 +178,8 @@ module row_bus(/*AUTOARG*/
    
    input [0:flit_ctrl_width-1] flit_ctrl_in_vc;
    input [0:flit_data_width-1] flit_data_in_vc;
-   output [0:flow_ctrl_width-1] flow_ctrl_out_vc;
+   //hack, these credits are smaller
+   output [0:flow_ctrl_width-1-1] flow_ctrl_out_vc;
    
    //-------------------------------------------------------------------
    // input controller VC 0
@@ -271,7 +272,7 @@ module row_bus(/*AUTOARG*/
 
      
    vcr_op_ctrl_mac_yarc
-     #(.num_header_buffers(num_header_buffers),
+     #(.num_header_buffers(num_row_buffers), //hack
        .num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),

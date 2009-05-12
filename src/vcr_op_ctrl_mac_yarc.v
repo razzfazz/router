@@ -65,6 +65,7 @@ module vcr_op_ctrl_mac_yarc
    localparam cred_hold_width 	     = clogb(num_row_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
+   
    parameter num_header_buffers      = 4;
    
    // number of traffic classes (e.g. read, write)
@@ -155,8 +156,8 @@ module vcr_op_ctrl_mac_yarc
    // width of flit payload data
    parameter flit_data_width = 64;
    
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
+   // width of flow control signals hack hack hack
+   localparam flow_ctrl_width = 1 + vc_idx_width+1;
    
    // include error checking logic
    parameter checker_enable = 1;
@@ -320,14 +321,14 @@ module vcr_op_ctrl_mac_yarc
       for(columns = 0; columns < 8; columns = columns + 1)
 	begin:ovcs
 	   wire 				  cred_valid;
-	   assign cred_valid = flow_ctrl_q[columns*flow_ctrl_width+0];
+	   assign cred_valid = flow_ctrl_q[columns*flow_ctrl_width+0] & flow_ctrl_q[columns*flow_ctrl_width+1+vc_id];
 	   wire credit;	   
 	   if(num_vcs > 1)
 	     begin
 		
-		wire [0:vc_idx_width-1] cred_vc;
-		assign cred_vc = flow_ctrl_q[columns*flow_ctrl_width+1:columns*flow_ctrl_width+1+vc_idx_width-1];
-		assign credit = cred_valid && (cred_vc == vc_id);
+		wire  cred_vc;
+		assign cred_vc = flow_ctrl_q[columns*flow_ctrl_width+1+vc_id:columns*flow_ctrl_width+1+vc_id];
+		assign credit = cred_valid && (cred_vc);
 		
 	     end
 	   else
@@ -337,7 +338,7 @@ module vcr_op_ctrl_mac_yarc
 	   assign debit = flit_valid_in & match_ovc[columns];
 	   
 	   wire 			vc_gnt;
-	   assign vc_gnt = vc_gnt_ovc[columns];
+	   assign vc_gnt = flit_valid_in & int_flit_ctrl_in[1+vc_idx_width] & match_ovc[columns];
 	   
 	   
 	   //-------------------------------------------------------------------
