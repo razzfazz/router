@@ -631,6 +631,7 @@ module packet_source
 	   else
 	     begin
 		
+		wire [0:router_addr_width-1] next_addr;
 		assign next_addr
 		  = route_info[(irc+1)*router_addr_width:(irc+2)*router_addr_width-1];
 		
