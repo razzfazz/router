@@ -35,8 +35,6 @@ module router_wrap
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
    
-`include "c_constants.v"
-`include "vcr_constants.v"
    
    // compute ceiling of binary logarithm
    function integer clogb(input integer argument);
@@ -65,98 +63,10 @@ module router_wrap
       end
    endfunction
    
-   // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_MESH;
    
-   // flit buffer entries per VC
-   parameter num_flit_buffers = 4;
-   
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 2;
-   
-   // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
-   
-   // number of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 1;
-   
-   // number of VCs per class
-   parameter num_vcs_per_class = 1;
-   
-   // total number of nodes
-   parameter num_nodes = 64;
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
-   // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 1;
-   
-   // select packet format
-   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
-   
-   // maximum payload length (in flits)
-   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length = 4;
-   
-   // minimum payload length (in flits)
-   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter min_payload_length = 1;
-   
-   // enable performance counter
-   parameter perf_ctr_enable = 0;
-   
-   // width of each counter
-   parameter perf_ctr_width = 32;
-   
-   // include error checking logic
-   parameter checker_enable = 0;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 1;
-   
-   // select router implementation
-   parameter router_type = `ROUTER_TYPE_VC;
-   
-   // width of flit payload data
-   parameter flit_data_width = 32;
-   
-   // select order of dimension traversal
-   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
-   
-   // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
-   
-   // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
-   
-   // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
-   
-   // select which arbiter type to use for VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
-   
-   // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select speculation level for switch allocator
-   parameter sw_spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
-   
-   // select implementation variant for control crossbar
-   parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
-   
-   // select implementation variant for data crossbar
-   parameter data_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
-   
-   parameter reset_type = `RESET_TYPE_ASYNC;
+`include "c_constants.v"
+`include "vcr_constants.v"
+`include "parameters.v"
    
    
    // total number of packet classes
