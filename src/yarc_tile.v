@@ -148,7 +148,7 @@ module yarc_tile
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
    // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_LEVEL;
    
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width
@@ -218,6 +218,8 @@ module yarc_tile
    input [0:num_vcs*(num_ports-1)*flit_data_width-1] flit_data_in_row_bus;
    output [0:(num_ports-1)*flow_ctrl_width-1] flow_ctrl_out_row_bus;
 
+
+
    
    //row bus outputs 
    //** only output your own bus
@@ -225,8 +227,9 @@ module yarc_tile
    output [0:num_vcs*flit_data_width-1] flit_data_out_row_bus;
    output [0:num_vcs*flit_ctrl_width-1] flit_ctrl_out_row_bus;
 
+   
    //col bus output
-   input [0:(num_ports-1)*flow_ctrl_width-1] flow_ctrl_in_col_bus;
+   input [0:(num_ports-1)*(flow_ctrl_width-1)-1] flow_ctrl_in_col_bus;
    output [0:(num_ports-1)*flit_ctrl_width-1] flit_ctrl_out_col_bus;
    output [0:(num_ports-1)*flit_data_width-1] flit_data_out_col_bus;
 
@@ -234,10 +237,17 @@ module yarc_tile
    //col bus input
    input [0:(num_ports-1)*flit_ctrl_width-1] flit_ctrl_in_col_bus;
    input [0:(num_ports-1)*flit_data_width-1] flit_data_in_col_bus;
-   output [0:(num_ports-1)*flow_ctrl_width-1] flow_ctrl_out_col_bus;
+   output [0:(num_ports-1)*(flow_ctrl_width-1)-1] flow_ctrl_out_col_bus;
 
 
-   
+
+   //internal column or row exchanges
+   wire [0:(flow_ctrl_width-1)-1] int_flow_ctrl_col_bus;
+   wire [0:num_vcs*flit_ctrl_width-1] int_flit_ctrl_in_row_bus;
+   wire [0:num_vcs*flit_data_width-1] int_flit_data_in_row_bus;
+   wire [0:flow_ctrl_width-1] int_flow_ctrl_row_bus;
+   wire [0:flit_ctrl_width-1] int_flit_ctrl_col_bus;
+   wire [0:flit_data_width-1] int_flit_data_col_bus;
    
    //actual input port
    input [0:flit_ctrl_width-1] flit_ctrl_in_tile;
@@ -254,9 +264,8 @@ module yarc_tile
 
 
 
-   //flit_ctrl_in_row_bus and data are wrong!!!!
    row_bus_driver
-     #(/*AUTOINSTPARAM*/
+     #(
        // Parameters
        .num_flit_buffers		(num_flit_buffers),
        .num_row_buffers			(num_row_buffers),
@@ -294,17 +303,134 @@ module yarc_tile
      tile_input     
      (
       // Outputs
-      .flit_ctrl_out_row_bus		(flit_ctrl_out_row_bus[0:num_vcs*flit_ctrl_width-1]),
-      .flit_data_out_row_bus		(flit_data_out_row_bus[0:num_vcs*flit_data_width-1]),
+      .flit_ctrl_out_row_bus		(int_flit_ctrl_in_row_bus[0:num_vcs*flit_ctrl_width-1]),
+      .flit_data_out_row_bus		(int_flit_data_in_row_bus[0:num_vcs*flit_data_width-1]),
       .flow_ctrl_out_tile		(flow_ctrl_out_tile[0:flow_ctrl_width-1]),
       // Inputs
       .router_address			(router_address[0:router_addr_width-1]),
       .clk				(clk),
       .reset				(reset),
       .flow_ctrl_in_row_bus		(flow_ctrl_in_row_bus[0:(num_ports-1)*flow_ctrl_width-1]),
+      .int_flow_ctrl_in_row_bus		(int_flow_ctrl_row_bus[0:flow_ctrl_width-1]),
       .flit_ctrl_in_tile		(flit_ctrl_in_tile[0:flit_ctrl_width-1]),
       .flit_data_in_tile		(flit_data_in_tile[0:flit_data_width-1]));
+
+/*
+   ///hacks
+   assign int_flow_ctrl_row_bus  = {flow_ctrl_width{1'b0}};
+  */ 
    
+  
+   
+   //this guy is speical because it is needed internally and external
+   assign  flit_ctrl_out_row_bus  = int_flit_ctrl_in_row_bus;
+   assign  flit_data_out_row_bus  = int_flit_data_in_row_bus;
+
+   subswitch_yarc
+     #(
+       // Parameters
+       .num_flit_buffers		(num_flit_buffers),
+       .num_row_buffers			(num_row_buffers),
+       .num_col_buffers			(num_col_buffers),
+       .num_header_buffers		(num_header_buffers),
+       .num_traffic_classes		(num_traffic_classes),
+       .num_routing_classes		(num_routing_classes),
+       .num_vcs_per_class		(num_vcs_per_class),
+       .num_ports			(num_ports),
+       .num_dimensions			(num_dimensions),
+       .num_routers_per_dim		(num_routers_per_dim),
+       .num_neighbors_per_dim		(num_neighbors_per_dim),
+       .packet_format			(packet_format),
+       .max_payload_length		(max_payload_length),
+       .min_payload_length		(min_payload_length),
+       .flit_data_width			(flit_data_width),
+       .perf_ctr_enable			(perf_ctr_enable),
+       .perf_ctr_width			(perf_ctr_width),
+       .checker_enable			(checker_enable),
+       .checker_capture_mode		(checker_capture_mode),
+       .track_vcs_at_output		(track_vcs_at_output),
+       .routing_function_type		(routing_function_type),
+       .dimension_order			(dimension_order),
+       .credit_handling_type		(credit_handling_type),
+       .header_fifo_type		(header_fifo_type),
+       .fbf_regfile_type		(fbf_regfile_type),
+       .vc_allocator_type		(vc_allocator_type),
+       .vc_arbiter_type			(vc_arbiter_type),
+       .sw_allocator_type		(sw_allocator_type),
+       .sw_arbiter_type			(sw_arbiter_type),
+       .sw_spec_level			(sw_spec_level),
+       .xbc_crossbar_type		(xbc_crossbar_type),
+       .xbd_crossbar_type		(xbd_crossbar_type),
+       .reset_type			(reset_type))
+   subswitch
+     (
+      // Outputs
+      .flow_ctrl_row_bus		({int_flow_ctrl_row_bus[0:flow_ctrl_width-1],flow_ctrl_out_row_bus[0:(num_ports-1)*flow_ctrl_width-1]}),
+      .flit_ctrl_col_bus		({int_flit_ctrl_col_bus[0:flit_ctrl_width-1],flit_ctrl_out_col_bus[0:(num_ports-1)*flit_ctrl_width-1]}),
+      .flit_data_col_bus		({int_flit_data_col_bus[0:flit_data_width-1],flit_data_out_col_bus[0:(num_ports-1)*flit_data_width-1]}),
+      // Inputs
+      .router_address(router_address),
+      .flit_ctrl_row_bus		({flit_ctrl_out_row_bus,flit_ctrl_in_row_bus}),
+      .flit_data_row_bus		({flit_data_out_row_bus,flit_data_in_row_bus}),
+      .flow_ctrl_col_bus		({int_flow_ctrl_col_bus, flow_ctrl_in_col_bus}),
+      .clk				(clk),
+      .reset				(reset));
+
+
+
+   tile_output_yarc
+     #(
+       // Parameters
+       .num_flit_buffers		(num_flit_buffers),
+       .num_row_buffers			(num_row_buffers),
+       .num_col_buffers			(num_col_buffers),
+       .num_header_buffers		(num_header_buffers),
+       .num_traffic_classes		(num_traffic_classes),
+       .num_routing_classes		(num_routing_classes),
+       .num_vcs_per_class		(num_vcs_per_class),
+       .num_ports			(num_ports),
+       .num_dimensions			(num_dimensions),
+       .num_routers_per_dim		(num_routers_per_dim),
+       .num_neighbors_per_dim		(num_neighbors_per_dim),
+       .packet_format			(packet_format),
+       .max_payload_length		(max_payload_length),
+       .min_payload_length		(min_payload_length),
+       .flit_data_width			(flit_data_width),
+       .perf_ctr_enable			(perf_ctr_enable),
+       .perf_ctr_width			(perf_ctr_width),
+       .checker_enable			(checker_enable),
+       .checker_capture_mode		(checker_capture_mode),
+       .track_vcs_at_output		(track_vcs_at_output),
+       .routing_function_type		(routing_function_type),
+       .dimension_order			(dimension_order),
+       .credit_handling_type		(credit_handling_type),
+       .header_fifo_type		(header_fifo_type),
+       .fbf_regfile_type		(fbf_regfile_type),
+       .vc_allocator_type		(vc_allocator_type),
+       .vc_arbiter_type			(vc_arbiter_type),
+       .sw_allocator_type		(sw_allocator_type),
+       .sw_arbiter_type			(sw_arbiter_type),
+       .sw_spec_level			(sw_spec_level),
+       .xbc_crossbar_type		(xbc_crossbar_type),
+       .xbd_crossbar_type		(xbd_crossbar_type),
+       .reset_type			(reset_type))
+   tile_output
+     (
+      // Outputs
+      .flit_ctrl_out_tile		(flit_ctrl_out_tile[0:flit_ctrl_width-1]),
+      .flit_data_out_tile		(flit_data_out_tile[0:flit_data_width-1]),
+      .flow_ctrl_col_bus		({int_flow_ctrl_col_bus[0:(flow_ctrl_width-1)-1],flow_ctrl_out_col_bus[0:(num_ports-1)*(flow_ctrl_width-1)-1]}),
+      // Inputs
+      .router_address(router_address),
+      .flit_ctrl_col_bus		({int_flit_ctrl_col_bus[0:flit_ctrl_width-1],flit_ctrl_in_col_bus[0:(num_ports-1)*flit_ctrl_width-1]}),
+      .flit_data_col_bus		({int_flit_data_col_bus[0:flit_data_width-1],flit_data_in_col_bus[0:(num_ports-1)*flit_data_width-1]}),
+      .flow_ctrl_in_tile		(flow_ctrl_in_tile[0:flow_ctrl_width-1]),
+      .clk				(clk),
+      .reset				(reset));
+   
+ 
+
+//   assign int_flow_ctrl_col_bus  = {(flow_ctrl_width-1){1'b0}};
 
    
 endmodule

@@ -263,7 +263,7 @@ module vcr_op_ctrl_mac
 	   
 	   c_dff
 	     #(.width(flow_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   flow_ctrlq
 	     (.clk(clk),
 	      .reset(reset),
@@ -761,7 +761,7 @@ module vcr_op_ctrl_mac
 	   
 	   c_dff
 	     #(.width(flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
+	       .reset_type(reset_type),
 	       .offset(1))
 	   flit_ctrlq
 	     (.clk(clk),
@@ -779,7 +779,7 @@ module vcr_op_ctrl_mac
    assign flit_data_s = xbr_ctrl ? flit_data_in : flit_data_q;
    c_dff
      #(.width(flit_data_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
       .reset(reset),

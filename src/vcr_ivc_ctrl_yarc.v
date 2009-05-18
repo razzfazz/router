@@ -150,53 +150,57 @@ module vcr_ivc_ctrl_yarc
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
-   parameter track_vcs_at_output = 0;
+   parameter track_vcs_at_output    = 0;
    
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
-   parameter restrict_turns = 1;
+   parameter restrict_turns 	    = 1;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type  = `ROUTING_FUNCTION_TYPE_MESH;
    
    // select order of dimension traversal
-   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   parameter dimension_order 	    = `DIMENSION_ORDER_ASCENDING;
    
    // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   parameter credit_handling_type   = `CREDIT_HANDLING_TYPE_LEVEL;
+   
    
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width
-     = 1 + vc_idx_width + 1 + 1;
+ 				    = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+ 				    = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
        2 :
        (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
        1 :
        -1;
    
    // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   parameter header_fifo_type 	   = `FIFO_TYPE_INDEXED;
    
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
-   parameter sw_spec_enable = 1;
+   parameter sw_spec_enable 	   = 1;
    
    // enable performance counter
-   parameter perf_ctr_enable = 1;
+   parameter perf_ctr_enable 	   = 1;
    
    // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   parameter checker_enable 	   = 1;
+   parameter checker_capture_mode  = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    // ID of current input port
-   parameter port_id = 0;
+   parameter port_id 		   = 0;
    
    // ID of current input VC
-   parameter vc_id = 0;
+   parameter vc_id 		   = 0;
+
+   parameter routing_dimension 	   = 1;
+   
    
    // function to extract traffic class from VC index
    // (this implementation handles the case where we have only a single traffic
@@ -258,7 +262,7 @@ module vcr_ivc_ctrl_yarc
    
    // internal flow control signalling from output controller to input 
    // controllers
-   input [0:num_ports*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   input [0:num_vcs*num_ports*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
    output [0:num_ports-1] route_op;
@@ -796,14 +800,15 @@ module vcr_ivc_ctrl_yarc
    wire pf_error_unmasked;
    
    
-   assign  route_op  = route_unmasked_op;
+//   assign  route_op  = route_unmasked_op;
    
    
    wire pf_error;
-   assign pf_error 	     = pf_error_unmasked & header_valid;
+   assign pf_error  = pf_error_unmasked & header_valid;
 
 
    //look ahead for columns
+   
    c_routing_logic_yarc
      #(.num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
@@ -815,29 +820,37 @@ module vcr_ivc_ctrl_yarc
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),
        .port_id(port_id),
-       .which_dimension(1))
+       .which_dimension(routing_dimension))
    lar
-     (.router_address(router_address),
-      .hop_route_info(hdff_hop_route_info),
+     (
+      // Outputs
       .route_op(la_route_info_out ),
       .inc_rc(inc_rc_meh),
-      .error(rtl_error_meh));
+      .error(rtl_error_meh),
+      // Inputs
+      .router_address(router_address),
+      .hop_route_info(hdff_hop_route_info));
+
    
-   
+   assign route_op  = la_route_info_out;
    
    
    //---------------------------------------------------------------------------
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire [0:int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:2*int_flow_ctrl_width-1] temp_int_flow_ctrl_ovc;
    c_select_1ofn
      #(.num_ports(num_ports),
-       .width(int_flow_ctrl_width))
+       .width(2*int_flow_ctrl_width))
    int_flow_ctrl_ovc_sel
      (.select(route_op),
       .data_in(int_flow_ctrl_op_ovc),
-      .data_out(int_flow_ctrl_ovc));
+      .data_out(temp_int_flow_ctrl_ovc));
+   wire [0:int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   
+   assign int_flow_ctrl_ovc 	= temp_int_flow_ctrl_ovc[int_flow_ctrl_width*vc_id:(vc_id+1)*int_flow_ctrl_width-1];
+
    
    wire 				  free_allocated;
    wire 				  cred_tracker_error;

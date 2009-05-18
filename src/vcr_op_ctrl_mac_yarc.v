@@ -53,20 +53,21 @@ module vcr_op_ctrl_mac_yarc
    endfunction
    
    // flit buffer entries per VC
-   parameter num_row_buffers 	    = 32;
+   parameter num_flit_buffers 	     = 32;
    
    // width required to select a buffer
-   localparam flit_buffer_idx_width  = clogb(num_row_buffers);
+   localparam flit_buffer_idx_width  = clogb(num_flit_buffers);
    
    // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width 	     = clogb(num_row_buffers+1);
+   localparam cred_count_width 	     = clogb(num_flit_buffers+1);
    
    // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width 	     = clogb(num_row_buffers);
+   localparam cred_hold_width 	     = clogb(num_flit_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
    
-   parameter num_header_buffers      = 4;
+   parameter num_header_buffers      = num_flit_buffers;
+   
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes     = 2;
@@ -192,11 +193,13 @@ module vcr_op_ctrl_mac_yarc
    
    // capped reset value for credit level
    localparam [0:cred_level_width-1] free_reset_value
-     = (num_row_buffers > max_cred_level) ? max_cred_level : num_row_buffers;
+ 						       = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
    
    parameter reset_type 			       = `RESET_TYPE_ASYNC;
 
    parameter vc_id 				       = 0;
+   localparam other_vc 				       = 1-vc_id;
+   
    
    input clk;
    input reset;
@@ -236,8 +239,8 @@ module vcr_op_ctrl_mac_yarc
    
    // internal flow control signalling from output controller to input 
    // controllers
-   output [0:8*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-   wire [0:8*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   output [0:2*8*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:2*8*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
    
    // internal error condition detected
    output error;
@@ -277,7 +280,7 @@ module vcr_op_ctrl_mac_yarc
 		
 		c_dff
 		  #(.width(flow_ctrl_width-1),
-		    .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+		    .reset_type(reset_type))
 		flow_ctrlq
 		  (.clk(clk),
 		   .reset(reset),
@@ -380,7 +383,7 @@ module vcr_op_ctrl_mac_yarc
 	   wire [0:cred_count_width-1] cred_count_s;
 	   wire 		       head_free_early;
 	   
-	   if(num_header_buffers == num_row_buffers)
+	   if(num_header_buffers == num_flit_buffers)
 	     begin
 		
 		// if every flit buffer entry can be a head flit, we don't need 
@@ -405,7 +408,7 @@ module vcr_op_ctrl_mac_yarc
 		     // after the tail has been sent
 		     
 		     wire buffer_drained;
-		     assign buffer_drained = (cred_count_s == num_row_buffers);
+		     assign buffer_drained = (cred_count_s == num_flit_buffers);
 		     
 		     wire tail_sent_s, tail_sent_q;
 		     assign tail_sent_s
@@ -446,7 +449,7 @@ module vcr_op_ctrl_mac_yarc
 		     c_incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
-			 .max_value(num_row_buffers-1))
+			 .max_value(num_flit_buffers-1))
 		     push_ptr_incr
 		       (.data_in(push_ptr_q),
 			.data_out(push_ptr_next));
@@ -466,7 +469,7 @@ module vcr_op_ctrl_mac_yarc
 		     c_incr
 		       #(.width(flit_buffer_idx_width),
 			 .min_value(0),
-			 .max_value(num_row_buffers-1))
+			 .max_value(num_flit_buffers-1))
 		     pop_ptr_incr
 		       (.data_in(pop_ptr_q),
 			.data_out(pop_ptr_next));
@@ -482,7 +485,7 @@ module vcr_op_ctrl_mac_yarc
 			.d(pop_ptr_s),
 			.q(pop_ptr_q));
 		     
-		     reg [0:num_row_buffers-1]       tail_queue;
+		     reg [0:num_flit_buffers-1]       tail_queue;
 		     
 		     always @(posedge clk)
 		       if(debit)
@@ -530,7 +533,7 @@ module vcr_op_ctrl_mac_yarc
 	   c_dff
 	     #(.width(cred_count_width),
 	       .reset_type(reset_type),
-	       .reset_value(num_row_buffers))
+	       .reset_value(num_flit_buffers))
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
@@ -540,7 +543,7 @@ module vcr_op_ctrl_mac_yarc
 	   assign next_cred_ovc[columns] = |cred_count_s;
 	   
 	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_row_buffers) && credit,
+	   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
 				(cred_count_q == 0) && debit};
 	   
 	   assign error_cred_ovc[columns*2:(columns+1)*2-1] = error_cred;
@@ -571,9 +574,13 @@ module vcr_op_ctrl_mac_yarc
 		     .d(free_s),
 		     .q(free_q));
 		  
-		  assign int_flow_ctrl_ovc[columns*cred_level_width:
-					   (columns+1)*cred_level_width-1]
+		  assign int_flow_ctrl_ovc[(columns*num_vcs+vc_id)*cred_level_width:
+					   (columns*num_vcs+vc_id+1)*cred_level_width-1]
 			   = free_q;
+		  assign int_flow_ctrl_ovc[(columns*num_vcs+other_vc)*cred_level_width:
+					   (columns*num_vcs+other_vc+1)*cred_level_width-1]
+ 		    = {int_flow_ctrl_width{1'b0}};
+		  
 		  
 	       end
 	     
@@ -593,7 +600,7 @@ module vcr_op_ctrl_mac_yarc
 		  c_dff
 		    #(.width(cred_hold_width),
 		      .reset_type(reset_type),
-		      .reset_value(num_row_buffers-1))
+		      .reset_value(num_flit_buffers-1))
 		  cred_holdq
 		    (.clk(clk),
 		     .reset(reset),
@@ -730,7 +737,7 @@ module vcr_op_ctrl_mac_yarc
 	   
 	   c_dff
 	     #(.width(flit_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
+	       .reset_type(reset_type),
 	       .offset(1))
 	   flit_ctrlq
 	     (.clk(clk),
@@ -748,7 +755,7 @@ module vcr_op_ctrl_mac_yarc
    assign flit_data_s = xbr_ctrl ? flit_data_in : flit_data_q;
    c_dff
      #(.width(flit_data_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
       .reset(reset),

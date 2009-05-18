@@ -182,39 +182,45 @@ module vcr_ip_ctrl_mac_yarc
        -1;
    
    // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   parameter header_fifo_type 	   = `FIFO_TYPE_INDEXED;
    
    // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fbf_regfile_type 	   = `REGFILE_TYPE_FF_2D;
    
    // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flit_buffers;
+   localparam fbf_depth 	   = num_vcs*num_flit_buffers;
    
    // required address size for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
+   localparam fbf_addr_width 	   = clogb(fbf_depth);
    
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
-   parameter sw_spec_enable = 1;
+   parameter sw_spec_enable 	   = 1;
    
    // enable performance counter
-   parameter perf_ctr_enable = 1;
+   parameter perf_ctr_enable 	   = 1;
    
    // width of each counter
-   parameter perf_ctr_width = 32;
+   parameter perf_ctr_width 	   = 32;
    
    // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   parameter checker_enable 	   = 1;
+   parameter checker_capture_mode  = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    // ID of current input port
-   parameter port_id = 0;
+   parameter port_id 		   = 0;
+   parameter vc_id 		   = 0;
    
    // width of sum of event signals from all VCs
-   localparam event_width = clogb(num_vcs) + 1;
+   localparam event_width 	   = clogb(num_vcs) + 1;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
-      
+   parameter reset_type 	   = `RESET_TYPE_ASYNC;
+   
+   parameter routing_dimension 	   = 0;
+   
+
+
+   
    input clk;
    input reset;
    
@@ -229,7 +235,7 @@ module vcr_ip_ctrl_mac_yarc
    
    // internal flow control signalling from output controller to input 
    // controllers
-   input [0:num_ports*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   input [0:num_vcs*num_ports*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port
    output [0:num_vcs*num_ports-1] route_ivc_op;
@@ -350,16 +356,16 @@ module vcr_ip_ctrl_mac_yarc
  
 	   
    wire vc_gnt;
-   assign vc_gnt = vc_gnt_ivc[port_id];
+   assign vc_gnt = vc_gnt_ivc[vc_id];
    
    wire [0:num_vcs-1] vc_gnt_ovc;
-   assign vc_gnt_ovc = vc_gnt_ivc_ovc[port_id*num_vcs:(port_id+1)*num_vcs-1];
+   assign vc_gnt_ovc = vc_gnt_ivc_ovc[(vc_id)*num_vcs:(vc_id+1)*num_vcs-1];
    
    wire 	      sw_gnt_nonspec;
-   assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[port_id];
+   assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[vc_id];
    
    wire 	      sw_gnt_spec;
-   assign sw_gnt_spec = sw_gnt_spec_ivc[port_id];
+   assign sw_gnt_spec = sw_gnt_spec_ivc[vc_id];
    
    wire [0:num_ports-1] route_op;
    wire 		inc_rc;
@@ -396,7 +402,8 @@ module vcr_ip_ctrl_mac_yarc
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
        .port_id(port_id),
-       .vc_id(port_id),
+       .vc_id(vc_id),
+       .routing_dimension(routing_dimension),
        .reset_type(reset_type))
    ivcc
      (
@@ -420,8 +427,8 @@ module vcr_ip_ctrl_mac_yarc
       .flit_ctrl_in(flit_ctrl_in_q),
       .header_info_in(header_info_in_q),
       .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-      .vc_gnt(1'b1),
-      .vc_gnt_ovc(2'b11),//vc_gnt_ovc),
+      .vc_gnt(vc_gnt_ivc[vc_id]),
+      .vc_gnt_ovc(vc_gnt_ivc_ovc[vc_id*num_vcs:(vc_id+1)*num_vcs-1]),//vc_gnt_ovc),
       .sw_gnt_nonspec(sw_gnt_nonspec),
       .sw_gnt_spec(sw_gnt_spec));
    
@@ -433,7 +440,7 @@ module vcr_ip_ctrl_mac_yarc
    //hack hack
    generate
       begin
-	 localparam other_port  = port_id ==0?1:0;
+	 localparam other_port  = vc_id ==0?1:0;
 	 assign route_ivc_op[other_port*num_ports:(other_port+1)*num_ports-1] = {num_ports{1'b0}};
 	 assign inc_rc_ivc[other_port] =  1'b0;
 	 assign vc_req_ivc[other_port] =  1'b0;
@@ -465,34 +472,34 @@ module vcr_ip_ctrl_mac_yarc
    endgenerate
    
    
-   assign route_ivc_op[port_id*num_ports:(port_id+1)*num_ports-1] = route_op;
-   assign inc_rc_ivc[port_id] = inc_rc;
-   assign vc_req_ivc[port_id] = vc_req;
-   assign sw_req_nonspec_ivc[port_id] = sw_req_nonspec;
-   assign sw_req_spec_ivc[port_id] = sw_req_spec;
-   assign flit_valid_out_ivc[port_id] = int_flit_ctrl_out_og[0];
-   assign int_flit_ctrl_out_ivc[port_id*int_flit_ctrl_width:
-				(port_id+1)*int_flit_ctrl_width-1]
+   assign route_ivc_op[vc_id*num_ports:(vc_id+1)*num_ports-1] = route_op;
+   assign inc_rc_ivc[vc_id] = inc_rc;
+   assign vc_req_ivc[vc_id] = vc_req;
+   assign sw_req_nonspec_ivc[vc_id] = sw_req_nonspec;
+   assign sw_req_spec_ivc[vc_id] = sw_req_spec;
+   assign flit_valid_out_ivc[vc_id] = int_flit_ctrl_out_og[0];
+   assign int_flit_ctrl_out_ivc[vc_id*int_flit_ctrl_width:
+				(vc_id+1)*int_flit_ctrl_width-1]
      = int_flit_ctrl_out_og;
-   assign la_route_info_ivc[port_id*la_route_info_width:
-			    (port_id+1)*la_route_info_width-1]
+   assign la_route_info_ivc[vc_id*la_route_info_width:
+			    (vc_id+1)*la_route_info_width-1]
      = la_route_info;
-   assign fbf_write_addr_ivc[port_id*fbf_addr_width:
-			     (port_id+1)*fbf_addr_width-1]
+   assign fbf_write_addr_ivc[vc_id*fbf_addr_width:
+			     (vc_id+1)*fbf_addr_width-1]
      = fbf_write_addr;
-   assign fbf_read_addr_ivc[port_id*fbf_addr_width:
-			    (port_id+1)*fbf_addr_width-1]
+   assign fbf_read_addr_ivc[vc_id*fbf_addr_width:
+			    (vc_id+1)*fbf_addr_width-1]
      = fbf_read_addr;
-   assign fbf_write_offset_ivc[port_id*flit_buffer_idx_width:
-			       (port_id+1)*flit_buffer_idx_width-1]
+   assign fbf_write_offset_ivc[vc_id*flit_buffer_idx_width:
+			       (vc_id+1)*flit_buffer_idx_width-1]
      = fbf_write_addr[fbf_addr_width-flit_buffer_idx_width:
 		      fbf_addr_width-1];
-   assign fbf_read_offset_ivc[port_id*flit_buffer_idx_width:
-			      (port_id+1)*flit_buffer_idx_width-1]
+   assign fbf_read_offset_ivc[vc_id*flit_buffer_idx_width:
+			      (vc_id+1)*flit_buffer_idx_width-1]
      = fbf_read_addr[fbf_addr_width-flit_buffer_idx_width:
 		     fbf_addr_width-1];
-   assign ivcc_error_ivc[port_id] = ivcc_error;
-   assign events_ivc[port_id*6:(port_id+1)*6-1] = oevents;
+   assign ivcc_error_ivc[vc_id] = ivcc_error;
+   assign events_ivc[vc_id*6:(vc_id+1)*6-1] = oevents;
    
    
    

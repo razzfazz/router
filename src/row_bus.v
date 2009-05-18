@@ -185,7 +185,7 @@ module row_bus(/*AUTOARG*/
    // input controller VC 0
    //-------------------------------------------------------------------
    
-   wire [0:8*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   wire [0:2*8*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    //   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
    wire [0:num_vcs*num_ports-1] route_ivc_op;
    wire [0:num_vcs-1] 		     inc_rc_ivc;
@@ -222,8 +222,10 @@ module row_bus(/*AUTOARG*/
        .perf_ctr_width(perf_ctr_width),
        .checker_enable(checker_enable),
        .checker_capture_mode(checker_capture_mode),
-       .port_id(port_id),
-       .reset_type(reset_type))
+       .port_id(0),
+       .vc_id(port_id),
+       .reset_type(reset_type),
+       .routing_dimension(0))
    ipc
      (
       // Outputs
@@ -258,7 +260,7 @@ module row_bus(/*AUTOARG*/
    
 
    wire [0:num_vcs-1] 		elig_ovc;
-   wire [0:8*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:2*8*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
    wire 				  opc_error;
 
 
@@ -291,14 +293,14 @@ module row_bus(/*AUTOARG*/
        .cred_level_width(2),
        .reset_type(reset_type),
        .vc_id(port_id),
-       .num_row_buffers(num_row_buffers))
+       .num_flit_buffers(num_row_buffers))
    opc
      (
       // Outputs
       .flit_ctrl_out			(flit_ctrl_out_row_bus[0:flit_ctrl_width-1]),
       .flit_data_out			(flit_data_out_row_bus[0:flit_data_width-1]),
       .elig_ovc				(elig_ovc[0:num_vcs-1]),
-      .int_flow_ctrl_ovc		(int_flow_ctrl_ovc[0:8*int_flow_ctrl_width-1]),
+      .int_flow_ctrl_ovc		(int_flow_ctrl_ovc[0:2*8*int_flow_ctrl_width-1]),
       .error				(opc_error),
       // Inputs
       .clk				(clk),

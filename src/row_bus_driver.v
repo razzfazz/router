@@ -3,7 +3,7 @@ module row_bus_driver (/*AUTOARG*/
    flit_ctrl_out_row_bus, flit_data_out_row_bus, flow_ctrl_out_tile,
    // Inputs
    router_address, clk, reset, flow_ctrl_in_row_bus,
-   flit_ctrl_in_tile, flit_data_in_tile
+   flit_ctrl_in_tile, flit_data_in_tile, int_flow_ctrl_in_row_bus
    );
 
    `include "c_constants.v"
@@ -200,7 +200,7 @@ module row_bus_driver (/*AUTOARG*/
 
    wire [0:flow_ctrl_width-1-1] flow_ctrl_vc0;
    wire [0:flow_ctrl_width-1-1] flow_ctrl_vc1;
-   wire [0:flow_ctrl_width-1] int_flow_ctrl_in_row_bus;
+   input [0:flow_ctrl_width-1] int_flow_ctrl_in_row_bus;
 
    assign flow_ctrl_out_tile[0]  = flow_ctrl_vc0[0] | flow_ctrl_vc1[0];
    assign flow_ctrl_out_tile[1]  = flow_ctrl_vc0[0];
@@ -308,13 +308,6 @@ module row_bus_driver (/*AUTOARG*/
 	.flow_ctrl_in_row_bus(flow_ctrl_in_row_bus[0:(num_ports-1)*flow_ctrl_width-1]),
 	.flit_ctrl_in_vc	(flit_ctrl_in_vc1[0:flit_ctrl_width-1]),
 	.flit_data_in_vc	(flit_data_in_vc1[0:flit_data_width-1]));
-   
-
-
-
-   assign flow_ctrl_in_row_bus 	    = {((num_ports-1)*flow_ctrl_width-1){1'b0}};
-   assign int_flow_ctrl_in_row_bus  = {flow_ctrl_width-1{1'b0}};
-   
 
 
    
