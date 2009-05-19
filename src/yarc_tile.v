@@ -427,8 +427,6 @@ module yarc_tile
       .flow_ctrl_in_tile		(flow_ctrl_in_tile[0:flow_ctrl_width-1]),
       .clk				(clk),
       .reset				(reset));
-   
- 
 
 //   assign int_flow_ctrl_col_bus  = {(flow_ctrl_width-1){1'b0}};
 
