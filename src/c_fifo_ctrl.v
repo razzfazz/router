@@ -59,20 +59,6 @@ module c_fifo_ctrl
    // maximum (rightmost) address
    localparam [0:addr_width-1] max_value = offset + depth - 1;
    
-   function integer common_bits(input [0:addr_width-1] a,
-				input [0:addr_width-1] b);
-      integer i;
-      begin
-	 common_bits = addr_width;
-	 for(i = addr_width - 1; i >= 0; i = i - 1)
-	   if(a[i] != b[i])
-	     common_bits = i;
-      end
-   endfunction
-   
-   // required width of actual counter
-   localparam ctr_width = addr_width - common_bits(min_value, max_value);
-   
    // include error checker
    parameter checker_enable = 1;
    parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
@@ -108,19 +94,19 @@ module c_fifo_ctrl
    output error;
    wire 		 error;
    
-   wire [0:ctr_width-1]  read_ptr_next, read_ptr_q;
+   wire [0:addr_width-1] read_ptr_next, read_ptr_q;
    c_incr
-     #(.width(ctr_width),
+     #(.width(addr_width),
        .min_value(min_value),
        .max_value(max_value))
    read_ptr_incr
      (.data_in(read_ptr_q),
       .data_out(read_ptr_next));
    
-   wire [0:ctr_width-1]  read_ptr_s;
+   wire [0:addr_width-1] read_ptr_s;
    assign read_ptr_s = pop ? read_ptr_next : read_ptr_q;
    c_dff
-     #(.width(ctr_width),
+     #(.width(addr_width),
        .reset_value(min_value),
        .reset_type(reset_type))
    read_ptrq
@@ -129,19 +115,19 @@ module c_fifo_ctrl
       .d(read_ptr_s),
       .q(read_ptr_q));
    
-   wire [0:ctr_width-1]  write_ptr_next, write_ptr_q;
+   wire [0:addr_width-1] write_ptr_next, write_ptr_q;
    c_incr
-     #(.width(ctr_width),
+     #(.width(addr_width),
        .min_value(min_value),
        .max_value(max_value))
    write_ptr_incr
      (.data_in(write_ptr_q),
       .data_out(write_ptr_next));
    
-   wire [0:ctr_width-1]  write_ptr_s;
+   wire [0:addr_width-1]  write_ptr_s;
    assign write_ptr_s = push ? write_ptr_next : write_ptr_q;
    c_dff
-     #(.width(ctr_width),
+     #(.width(addr_width),
        .reset_value(min_value),
        .reset_type(reset_type))
    write_ptrq
@@ -166,20 +152,8 @@ module c_fifo_ctrl
       .d(empty_s),
       .q(empty_q));
    
-   generate
-      
-      if(ctr_width < addr_width)
-	begin
-	   assign read_addr[0:(addr_width-ctr_width)-1]
-		    = min_value[0:(addr_width-ctr_width)-1];
-	   assign write_addr[0:(addr_width-ctr_width)-1]
-		    = min_value[0:(addr_width-ctr_width)-1];
-	end
-      
-   endgenerate
-   
-   assign read_addr[(addr_width-ctr_width):addr_width-1] = read_ptr_q;
-   assign write_addr[(addr_width-ctr_width):addr_width-1] = write_ptr_q;
+   assign read_addr[0:addr_width-1] = read_ptr_q;
+   assign write_addr[0:addr_width-1] = write_ptr_q;
    
    assign empty = empty_q;
    assign full = (read_ptr_q == write_ptr_q) && !empty_q;
