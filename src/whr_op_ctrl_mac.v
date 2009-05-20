@@ -246,7 +246,7 @@ module whr_op_ctrl_mac
    wire                 allocated_s, allocated_q;
    assign allocated_s = allocated_q ?
 			(~|(held_gnt_ip & req_tail_ip) | ~free) :
-			(|(gnt_int_ip & ~req_tail_ip) & head_free);
+			(|(gnt_int_ip & ~req_tail_ip) & head_free & free);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -287,6 +287,9 @@ module whr_op_ctrl_mac
    wire                 flit_valid_in;
    assign flit_valid_in = flit_valid_in_q;
    
+   // when the output port is not allocated, the next flit must be a head flits;
+   // the second term is required to account for cases where the output port 
+   // gets allocated, but no credit is available
    wire                 flit_head_s, flit_head_q;
    assign flit_head_s = ~allocated_q | |(held_gnt_ip & req_head_ip);
    c_dff
@@ -440,7 +443,7 @@ module whr_op_ctrl_mac
 		assign head_credit = cred_valid & tail;
 		
 		wire 				 head_debit;
-		assign head_debit = ~allocated_q & new_gnt;
+		assign head_debit = ~allocated_q & new_gnt & free;
 		
 		// track header credits using stock credit tracker module
 		wire 				 head_free_early;
@@ -457,6 +460,30 @@ module whr_op_ctrl_mac
 		   .free(head_free),
 		   .free_early(head_free_early),
 		   .error(error_hct));
+
+		// synopsys_translate off
+		integer dbg_total_head_debits;
+		integer dbg_total_head_credits;
+		integer dbg_head_credits_left;
+		always @(posedge reset, posedge clk)
+		  begin
+		     if(reset)
+		       begin
+			  dbg_total_head_debits <= 0;
+			  dbg_total_head_credits <= 0;
+			  dbg_head_credits_left <= num_header_buffers;
+		       end
+		     else
+		       begin
+			  dbg_total_head_debits
+			    <= dbg_total_head_debits + head_debit;
+			  dbg_total_head_credits
+			    <= dbg_total_head_credits + head_credit;
+			  dbg_head_credits_left
+			    <= dbg_head_credits_left - head_debit + head_credit;
+		       end
+		  end
+		// synopsys_translate on
 		
 	     end
 	   
@@ -504,6 +531,36 @@ module whr_op_ctrl_mac
       .q(cred_q));
    
    assign free = cred_q;
+   // FIXME: We ought to be able to reduce the credit roundtrip latency by a 
+   // cycle by computing 'free' as follows; the reason we should be able to get 
+   // away with this is that 'free' is used to gate the arbiter outputs, and 
+   // thus is not used until late in the cycle; thus, it seems rather pointless 
+   // to have it come straight out of a register.
+   /*assign free
+     = credit | 
+       |cred_count_q[0:cred_count_width-2] | 
+       (cred_count_q[cred_count_width-1] & ~debit);*/
+   
+   // synopsys_translate off
+   integer dbg_total_debits;
+   integer dbg_total_credits;
+   integer dbg_credits_left;
+   always @(posedge reset, posedge clk)
+     begin
+	if(reset)
+	  begin
+	     dbg_total_debits <= 0;
+	     dbg_total_credits <= 0;
+	     dbg_credits_left <= num_flit_buffers;
+	  end
+	else
+	  begin
+	     dbg_total_debits <= dbg_total_debits + debit;
+	     dbg_total_credits <= dbg_total_credits + credit;
+	     dbg_credits_left <= dbg_credits_left - debit + credit;
+	  end
+     end
+   // synopsys_translate on
    
    
    //---------------------------------------------------------------------------
