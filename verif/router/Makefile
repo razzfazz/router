@@ -1,7 +1,9 @@
 # $Id$
-TOP = testbench
 
-SRCS = $(TOP).v 
+TOP_SRC = testbench.v
+DEP_SRCS = parameters.v packet_source.v
+
+SRCS = $(TOP_SRC) $(DEP_SRCS)
 
 SRC_DIR = ../../src
 
@@ -15,10 +17,10 @@ INT_CTRL=
 all: simv
 
 simv: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
-	vcs -o simv $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y . $(SRCS) $(DUMP_CTRL)
+	vcs -o simv $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
 
 simvfast: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
-	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y . $(SRCS) $(DUMP_CTRL)
+	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
 
 clean:
 	rm -rf work simv simvfast simv.daidir simvfast.daidir transcript *.vcd *.vpd ucli.key vcs.key run.args csrc DVEfiles .vcsmx_rebuild *~
