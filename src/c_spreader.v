@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // spread out bit vector into larger vector, zero-filling any intermediate bits
 module c_spreader
   (data_in, data_out);

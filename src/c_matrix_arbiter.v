@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // generic matrix arbiter
 module c_matrix_arbiter
   (clk, reset, update, req, gnt);

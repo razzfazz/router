@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // wavefron allocator variant implementing a Diagonal Propagation Arbiter as
 // described in Hurt et al, "Design and Implementation of High-Speed Symmetric 
 // Crossbar Schedulers"

@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // generic register file
 module c_regfile_mac
   (clk, write_enable, write_address, write_data, read_enable, read_address,

@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // complete feedback shift register
 module c_cfsr
   (clk, reset, load, run, feedback, d, q);

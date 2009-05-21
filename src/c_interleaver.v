@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // interleave a given number of blocks of bits
 // (a0 a1 a1 b0 b1 b2 c0 c1 c2) -> (a0 b0 c0 a1 b1 c1 a2 b2 c2)
 module c_interleaver

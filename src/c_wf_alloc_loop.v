@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // wavefron allocator variant which uses wraparound (forming a false 
 // combinational loop) as described in Dally et al, "Principles and Practices of
 // Interconnection Networks"

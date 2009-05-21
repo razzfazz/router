@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // switch allocator for VC router
 module vcr_sw_alloc_mac
   (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 

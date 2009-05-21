@@ -1,4 +1,4 @@
-// $Id: c_select_1ofn.v 1136 2009-03-01 06:56:12Z dub $
+// $Id$
 
 /*
 Copyright (c) 2007, Trustees of Leland Stanford Junior University
@@ -27,6 +27,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+`default_nettype none
 
 // vector product (column vector times row vector, result is matrix)
 module c_vec_prod

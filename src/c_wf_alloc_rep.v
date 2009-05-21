@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // wavefront allocator variant which replicates the entire allocation logic for
 // the different priorities and selects the result from the appropriate one
 module c_wf_alloc_rep

@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // top-level module for wormhole router
 module whr_top
   (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 

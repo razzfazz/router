@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // lookahead routing logic for VC router
 module vcr_la_routing_logic
   (router_address, route_port, inc_rc, hop_route_info, la_route_info);

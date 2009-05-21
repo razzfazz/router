@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // configurable crossbar module
 module c_crossbar_mac
   (clk, reset, ctrl_op_ip_s, ctrl_op_ip_q, data_in_ip, data_out_op);

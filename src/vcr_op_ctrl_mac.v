@@ -28,6 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+`default_nettype none
+
 // output port controller (tracks state of buffers in downstream router)
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip, vc_gnt_ovc_ivc, 
