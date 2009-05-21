@@ -503,12 +503,18 @@ module whr_op_ctrl_mac
    
    wire 					 credit;
    assign credit = cred_valid;
-
+   
    wire 					 debit;
    assign debit = gnt;
    
+   wire [0:cred_count_width-1] 			 cred_count_debit;
+   assign cred_count_debit = cred_count_q - ~credit;
+   
+   wire [0:cred_count_width-1] 			 cred_count_nodebit;
+   assign cred_count_nodebit = cred_count_q + credit;
+   
    wire [0:cred_count_width-1] 			 cred_count_q;
-   assign cred_count_s = (cred_count_q + credit - debit);
+   assign cred_count_s = debit ? cred_count_debit : cred_count_nodebit;
    c_dff
      #(.width(cred_count_width),
        .reset_type(reset_type),
