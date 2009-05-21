@@ -504,13 +504,16 @@ module whr_op_ctrl_mac
    wire 					 credit;
    assign credit = cred_valid;
    
+   wire 					 credit_b;
+   assign credit_b = ~credit;
+   
    wire 					 debit;
    assign debit = gnt;
    
    wire [0:cred_count_width-1] 			 cred_count_q;
    
    wire [0:cred_count_width-1] 			 cred_count_debit;
-   assign cred_count_debit = cred_count_q - ~credit;
+   assign cred_count_debit = cred_count_q - credit_b;
    
    wire [0:cred_count_width-1] 			 cred_count_nodebit;
    assign cred_count_nodebit = cred_count_q + credit;
