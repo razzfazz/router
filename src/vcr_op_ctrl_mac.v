@@ -588,6 +588,11 @@ module vcr_op_ctrl_mac
 	     `CREDIT_HANDLING_TYPE_LEVEL:
 	       begin
 		  
+		  // Having an additional register here is likely overkill, and
+		  // increases the credit round-trip delay by a cycle, so we 
+		  // just send out the value directly for now.
+		  
+		  /*
 		  wire [0:cred_level_width-1] free_s, free_q;
 		  assign free_s = (cred_count_s > max_cred_level) ?
 				  max_cred_level :
@@ -607,6 +612,14 @@ module vcr_op_ctrl_mac
 		  assign int_flow_ctrl_ovc[ovc*cred_level_width:
 					   (ovc+1)*cred_level_width-1]
 			   = free_q;
+		  */
+		  
+		  assign int_flow_ctrl_ovc[ovc*cred_level_width:
+					   (ovc+1)*cred_level_width-1]
+			   = (cred_count_s > max_cred_level) ?
+			     max_cred_level :
+			     cred_count_s[cred_count_width-cred_level_width:
+					  cred_count_width-1];
 		  
 	       end
 	     
@@ -633,6 +646,11 @@ module vcr_op_ctrl_mac
 		     .d(cred_hold_s),
 		     .q(cred_hold_q));
 		  
+		  // Having an additional register here is likely overkill, and
+		  // increases the credit round-trip delay by a cycle, so we 
+		  // just send out the value directly for now.
+		  
+		  /*
 		  wire 			      cred_s, cred_q;
 		  assign cred_s = |cred_hold_s | (credit & allocated_s);
 		  c_dff
@@ -646,6 +664,10 @@ module vcr_op_ctrl_mac
 		     .q(cred_q));
 		  
 		  assign int_flow_ctrl_ovc[ovc] = cred_q;
+		  */
+		  
+		  assign int_flow_ctrl_ovc[ovc]
+			   = |cred_hold_s | (credit & allocated_s);
 		  
 	       end
 	     
