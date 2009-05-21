@@ -1,4 +1,4 @@
-// $Id: whr_constants.v 1224 2009-04-30 22:04:24Z dub $
+// $Id$
 
 /*
 Copyright (c) 2007, Trustees of Leland Stanford Junior University
