@@ -524,7 +524,7 @@ module vcr_ip_ctrl_mac
 	   assign flit_vc_in_q = flit_ctrl_in_q[1:1+vc_idx_width-1];
 	   
 	   // use optimized version for power-of-two buffer sizes
-	   if(num_vcs == (1 << vc_idx_width))
+	   if(num_flit_buffers == (1 << flit_buffer_idx_width))
 	     begin
 		
 		wire [0:flit_buffer_idx_width-1] fbf_write_offset;
