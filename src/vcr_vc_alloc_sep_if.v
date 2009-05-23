@@ -593,16 +593,15 @@ module vcr_vc_alloc_sep_if
 						assign gnt_out_icvc
 						  = req_out_icvc;
 					      
-					      assign gnt_out_irc_icvc[
-						       0:num_vcs_per_class-1]
-						       = gnt_out_icvc;
-					      if(num_resource_classes > 1)
-						assign gnt_out_irc_icvc[
-						       num_vcs_per_class:
-						       num_resource_classes*
-						       num_vcs_per_class-1]
-						  = {((num_resource_classes-1)*
-						      num_vcs_per_class){1'b0}};
+					      c_padder
+						#(.width(num_vcs_per_class),
+						  .pad_left(0),
+						  .pad_right(
+						       (num_resource_classes-1)*
+							     num_vcs_per_class))
+					      gnt_out_irc_icvc_pad
+						(.data_in(gnt_out_icvc),
+						 .data_out(gnt_out_irc_icvc));
 					      
 					   end
 					 else
@@ -645,30 +644,17 @@ module vcr_vc_alloc_sep_if
 						 .gnt({gnt_out_low_icvc,
 						       gnt_out_high_icvc}));
 					      
-					      if(orc > 1)
-						assign gnt_out_irc_icvc[
-						         0:(orc-1)*
-							 num_vcs_per_class-1]
-						  = {((orc-1)*
-						      num_vcs_per_class){1'b0}};
-					      
-					      assign gnt_out_irc_icvc[
-						       (orc-1)*
-						       num_vcs_per_class:
-						       (orc+1)*
-						       num_vcs_per_class-1]
-						       = {gnt_out_low_icvc,
-							  gnt_out_high_icvc};
-
-					      if(orc < (num_resource_classes-1))
-						assign gnt_out_irc_icvc[
-							 (orc+1)*
-							 num_vcs_per_class:
-							 num_resource_classes*
-							 num_vcs_per_class-1]
-						  = {(((num_resource_classes-1)-
-						       orc)*
-						      num_vcs_per_class){1'b0}};
+					      c_padder
+						#(.width(2*num_vcs_per_class),
+						  .pad_left((orc-1)*
+							    num_vcs_per_class),
+						  .pad_right(
+						   (num_resource_classes-1-orc)*
+							     num_vcs_per_class))
+					      gnt_out_irc_icvc_pad
+						(.data_in({gnt_out_low_icvc,
+							   gnt_out_high_icvc}),
+						 .data_out(gnt_out_irc_icvc));
 					      
 					   end
 					 

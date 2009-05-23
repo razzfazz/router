@@ -954,10 +954,13 @@ module vcr_ivc_ctrl
 	     wire 			       decr_cred_hold;
 	     assign decr_cred_hold = ~cred & sw_gnt_nonspec & |cred_hold_q;
 	     
+	     wire [0:cred_hold_width-1]        cred_hold_new;
+	     assign cred_hold_new = cred & ~sw_gnt_spec;
+	     
 	     wire [0:cred_hold_width-1]        cred_hold_s;
 	     assign cred_hold_s
 	       = vc_gnt ?
-		 ({cred_hold_width{1'b0}} + (cred & ~sw_gnt_spec)) :
+		 cred_hold_new :
 		 vc_allocated_q ?
 		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
 		 cred_hold_q;
@@ -1031,31 +1034,33 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs-1] 	     flit_ovc;
 		
-		if(packet_class > 0)
-		  assign flit_ovc[0:packet_class*num_vcs_per_class-1]
-			   = {(packet_class*num_vcs_per_class){1'b0}};
-		
-		assign flit_ovc[packet_class*num_vcs_per_class:
-				(packet_class+1)*num_vcs_per_class-1]
-			 = flit_ocvc & {num_vcs_per_class{~inc_rc}};
-		
-		if(resource_class < (num_resource_classes - 1))
-		  assign flit_ovc[(packet_class+1)*num_vcs_per_class:
-				  (packet_class+2)*num_vcs_per_class-1]
-			   = flit_ocvc & {num_vcs_per_class{inc_rc}};
-		
-		if(resource_class < (num_resource_classes - 2))
-		  assign flit_ovc[(packet_class+2)*num_vcs_per_class:
-				  (message_class+1)*num_resource_classes*
-				  num_vcs_per_class-1]
-			   = {((num_resource_classes-resource_class-2)*
-			       num_vcs_per_class){1'b0}};
-		
-		if(message_class < (num_message_classes - 1))
-		  assign flit_ovc[(message_class+1)*num_resource_classes*
-				  num_vcs_per_class:num_vcs-1]
-			   = {((num_message_classes-message_class-1)*
-			       num_resource_classes*num_vcs_per_class){1'b0}};
+		if(resource_class == (num_resource_classes - 1))
+		  begin
+		     
+		     c_padder
+		       #(.width(num_vcs_per_class),
+			 .pad_left(packet_class*num_vcs_per_class),
+			 .pad_right((num_packet_classes - 1 - packet_class)*
+				    num_vcs_per_class))
+		     flit_ovc_pad
+		       (.data_in(flit_ocvc),
+			.data_out(flit_ovc));
+		     
+		  end
+		else
+		  begin
+		     
+		     c_padder
+		       #(.width(2*num_vcs_per_class),
+			 .pad_left(packet_class*num_vcs_per_class),
+			 .pad_right((num_packet_classes - 1 - packet_class - 1)*
+				    num_vcs_per_class))
+		     flit_ovc_pad
+		       (.data_in({flit_ocvc & {num_vcs_per_class{~inc_rc}},
+				  flit_ocvc & {num_vcs_per_class{inc_rc}}}),
+			.data_out(flit_ovc));
+		     
+		  end
 		
 		c_encoder
 		  #(.num_ports(num_vcs))

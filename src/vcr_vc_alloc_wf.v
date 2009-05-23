@@ -339,26 +339,16 @@ module vcr_vc_alloc_wf
 			     .data_out(gnt_orc_ocvc));
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
-			  if(mc > 0)
-			    assign gnt_ovc[0:mc*num_resource_classes*
-					   num_vcs_per_class-1]
-				     = {(mc*num_resource_classes*
-					 num_vcs_per_class){1'b0}};
-			  assign gnt_ovc[mc*
+			  c_padder
+			    #(.width(num_vcs),
+			      .pad_left(mc*num_resource_classes*
+					num_vcs_per_class),
+			      .pad_right((num_message_classes - 1 - mc)*
 					 num_resource_classes*
-					 num_vcs_per_class:
-					 (mc+1)*
-					 num_resource_classes*
-					 num_vcs_per_class-1]
-				   = gnt_orc_ocvc;
-			  if(mc < (num_message_classes - 1))
-			    assign gnt_ovc[(mc+1)*
-					   num_resource_classes*
-					   num_vcs_per_class:
-					   num_vcs-1]
-				     = {((num_message_classes - 1 - mc)*
-					 num_resource_classes*
-					 num_vcs_per_class){1'b0}};
+					 num_vcs_per_class))
+			  gnt_ovc_pad
+			    (.data_in(gnt_orc_ocvc),
+			     .data_out(gnt_ovc));
 			  
 			  assign gnt_ip_ivc_ovc[(ip*num_vcs+
 						 (mc*num_resource_classes+irc)*
@@ -565,26 +555,16 @@ module vcr_vc_alloc_wf
 				   = |gnt_wf_irc_icvc;
 			  
 			  wire [0:num_vcs-1] gnt_wf_ivc;
-			  if(mc > 0)
-			    assign gnt_wf_ivc[0:mc*num_resource_classes*
-					      num_vcs_per_class-1]
-				     = {(mc*num_resource_classes*
-					 num_vcs_per_class){1'b0}};
-			  assign gnt_wf_ivc[mc*
-					    num_resource_classes*
-					    num_vcs_per_class:
-					    (mc+1)*
-					    num_resource_classes*
-					    num_vcs_per_class-1]
-				   = gnt_wf_irc_icvc;
-			  if(mc < (num_message_classes - 1))
-			    assign gnt_wf_ivc[(mc+1)*
-					      num_resource_classes*
-					      num_vcs_per_class:
-					      num_vcs-1]
-				     = {((num_message_classes - 1 - mc)*
+			  c_padder
+			    #(.width(num_vcs),
+			      .pad_left(mc*num_resource_classes*
+					num_vcs_per_class),
+			      .pad_right((num_message_classes - 1 - mc)*
 					 num_resource_classes*
-					 num_vcs_per_class){1'b0}};
+					 num_vcs_per_class))
+			  gnt_wf_ivc_pad
+			    (.data_in(gnt_wf_irc_icvc),
+			     .data_out(gnt_wf_ivc));
 			  
 			  assign gnt_op_ovc_ivc[(op*num_vcs+
 						 (mc*num_resource_classes+orc)*
