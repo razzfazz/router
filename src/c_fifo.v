@@ -156,7 +156,8 @@ module c_fifo
 	       = (empty_q | (almost_empty & pop & ~push)) & ~(push & ~pop);
 	     c_dff
 	       #(.width(1),
-		 .reset_type(reset_type))
+		 .reset_type(reset_type),
+		 .reset_value(1'b1))
 	     emptyq
 	       (.clk(clk),
 		.reset(reset),
