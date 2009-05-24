@@ -340,7 +340,7 @@ module vcr_vc_alloc_wf
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
 			  c_padder
-			    #(.width(num_vcs),
+			    #(.width(num_resource_classes*num_vcs_per_class),
 			      .pad_left(mc*num_resource_classes*
 					num_vcs_per_class),
 			      .pad_right((num_message_classes - 1 - mc)*
@@ -556,7 +556,7 @@ module vcr_vc_alloc_wf
 			  
 			  wire [0:num_vcs-1] gnt_wf_ivc;
 			  c_padder
-			    #(.width(num_vcs),
+			    #(.width(num_resource_classes*num_vcs_per_class),
 			      .pad_left(mc*num_resource_classes*
 					num_vcs_per_class),
 			      .pad_right((num_message_classes - 1 - mc)*
