@@ -28,9 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// synopsys_translate off
-`default_nettype none
-// synopsys_translate on
+
 
 // module to filter output port requests based on turn restrictions
 module c_port_filter

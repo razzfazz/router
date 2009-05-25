@@ -28,9 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// synopsys_translate off
-`default_nettype none
-// synopsys_translate on
+
 
 // output port controller (tracks state of buffers in downstream router)
 module whr_op_ctrl_mac
