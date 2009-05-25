@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// synopsys_translate off
 `default_nettype none
+// synopsys_translate on
 
 // wavefron allocator variant which uses wraparound (forming a false 
 // combinational loop) as described in Dally et al, "Principles and Practices of

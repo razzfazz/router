@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// synopsys_translate off
 `default_nettype none
+// synopsys_translate on
 
 // generic modulo incrementer (i.e., incrementer with wraparound)
 module c_incr

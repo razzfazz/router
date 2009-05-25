@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// synopsys_translate off
 `default_nettype none
+// synopsys_translate on
 
 // wavefront allocator variant which replicates the entire allocation logic for
 // the different priorities and selects the result from the appropriate one
