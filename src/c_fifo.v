@@ -109,7 +109,7 @@ module c_fifo
 	     c_incr
 	       #(.width(insert_ptr_width),
 		 .min_value(0),
-		 .max_value(depth-1))
+		 .max_value(depth))
 	     insert_ptr_incr
 	       (.data_in(insert_ptr_q),
 		.data_out(insert_ptr_next));
@@ -118,15 +118,15 @@ module c_fifo
 	     c_decr
 	       #(.width(insert_ptr_width),
 		 .min_value(0),
-		 .max_value(depth-1))
+		 .max_value(depth))
 	     insert_ptr_decr
 	       (.data_in(insert_ptr_q),
 		.data_out(insert_ptr_prev));
 	     
 	     wire [0:4*insert_ptr_width-1] insert_ptr_values;
 	     assign insert_ptr_values = {insert_ptr_q,
-					 insert_ptr_prev,
 					 insert_ptr_next,
+					 insert_ptr_prev,
 					 insert_ptr_q};
 	     
 	     wire [0:1] 		   insert_ptr_sel;
@@ -177,16 +177,14 @@ module c_fifo
 		  wire shift;
 		  assign shift = pop;
 		  
-		  reg [0:width-1] data_q;
 		  wire [0:width-1] data_s;
-		  assign data_s = capture ?
-				  data_in :
-				  shift ?
-				  data[level*width:(level+1)*width-1] :
-				  data_q;
+		  assign data_s
+		    = capture ? data_in : data[level*width:(level+1)*width-1];
 		  
+		  reg [0:width-1] data_q;
 		  always @(posedge clk)
-		    data_q <= data_s;
+		    if(capture | shift)
+		      data_q <= data_s;
 		  
 		  assign data[(level+1)*width:(level+2)*width-1] = data_q;
 		  
