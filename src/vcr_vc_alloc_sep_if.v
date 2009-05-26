@@ -138,9 +138,6 @@ module vcr_vc_alloc_sep_if
 	   for(ip = 0; ip < num_ports; ip = ip + 1)
 	     begin:ips
 		
-		wire [0:num_vcs*num_vcs-1] gnt_ivc_ovc;
-		wire [0:num_vcs-1] 	   gnt_ivc;
-	   
 		genvar irc;
 		
 		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
@@ -362,12 +359,14 @@ module vcr_vc_alloc_sep_if
 			    (.data_in(gnt_orc_ocvc),
 			     .data_out(gnt_ovc));
 			  
-			  assign gnt_ivc_ovc[((mc*num_resource_classes+irc)*
-					      num_vcs_per_class+icvc)*
-					     num_vcs:
-					     ((mc*num_resource_classes+irc)*
-					      num_vcs_per_class+icvc+1)*
-					     num_vcs-1]
+			  assign gnt_ip_ivc_ovc[(((ip*num_message_classes+mc)*
+						  num_resource_classes+irc)*
+						 num_vcs_per_class+icvc)*
+						num_vcs:
+						(((ip*num_message_classes+mc)*
+						  num_resource_classes+irc)*
+						 num_vcs_per_class+icvc+1)*
+						num_vcs-1]
 				   = gnt_ovc;
 			  
 			  wire 				  gnt;
@@ -380,20 +379,14 @@ module vcr_vc_alloc_sep_if
 			      = |gnt_orc_ocvc[irc*num_vcs_per_class:
 					      (irc+2)*num_vcs_per_class-1];
 			  
-			  assign gnt_ivc[(mc*num_resource_classes+irc)*
-					 num_vcs_per_class+icvc]
+			  assign gnt_ip_ivc[((ip*num_message_classes+mc)*
+					     num_resource_classes+irc)*
+					    num_vcs_per_class+icvc]
 				   = gnt;
 			  
 		       end
 		     
 		  end
-		
-		assign gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:
-				      (ip+1)*num_vcs*num_vcs-1]
-			 = gnt_ivc_ovc;
-		
-		assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			 = gnt_ivc;
 		
 	     end
 	   
@@ -680,9 +673,16 @@ module vcr_vc_alloc_sep_if
 					 num_vcs_per_class-1]
 				   = gnt_out_ip_irc_icvc;
 			  
+			  
+			  //----------------------------------------------------
+			  // generate control signals to output controller
+			  //----------------------------------------------------
+			  
 			  assign gnt_op_ovc[((op*num_message_classes+mc)*
 					     num_resource_classes+orc)*
-					    num_vcs_per_class+ocvc] = req_out;
+					    num_vcs_per_class+ocvc]
+				   = req_out;
+			  
 			  assign gnt_op_ovc_ip[(((op*num_message_classes+mc)*
 						 num_resource_classes+orc)*
 						num_vcs_per_class+ocvc)*
@@ -692,6 +692,7 @@ module vcr_vc_alloc_sep_if
 						num_vcs_per_class+ocvc+1)*
 					       num_ports-1]
 				   = gnt_out_ip;
+			  
 			  assign gnt_op_ovc_ivc[(((op*num_message_classes+mc)*
 						  num_resource_classes+orc)*
 						 num_vcs_per_class+ocvc)*
