@@ -138,25 +138,25 @@ module vcr_sw_alloc_mac
 	  end
       endcase
       
-	if(allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE)
-	  begin
-	     vcr_sw_alloc_wf
-	       #(.num_vcs(num_vcs),
-		 .num_ports(num_ports),
-		 .wf_allocator_type(wf_allocator_type),
-		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level),
-		 .reset_type(reset_type))
-	     core_wf
-	       (.clk(clk),
-		.reset(reset),
-		.route_port_ip_ivc(route_port_ip_ivc),
-		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
-		.req_spec_ip_ivc(req_spec_ip_ivc),
-		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
-		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-		.gnt_op_ip(gnt_op_ip));
-	  end
+      if(allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE)
+	begin
+	   vcr_sw_alloc_wf
+	     #(.num_vcs(num_vcs),
+	       .num_ports(num_ports),
+	       .wf_allocator_type(wf_allocator_type),
+	       .arbiter_type(arbiter_type),
+	       .spec_level(spec_level),
+	       .reset_type(reset_type))
+	   core_wf
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
+	      .req_spec_ip_ivc(req_spec_ip_ivc),
+	      .gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
+	      .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
+	      .gnt_op_ip(gnt_op_ip));
+	end
       
    endgenerate
    

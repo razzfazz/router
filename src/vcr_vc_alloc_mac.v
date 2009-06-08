@@ -69,11 +69,11 @@ module vcr_vc_alloc_mac
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
    // select implementation variant for VC allocator
    parameter allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   
+   // select which arbiter type to use in allocator
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for wavefront allocator
    // (note: only valid for VC_ALLOCATOR_TYPE_WF_BASE+x
@@ -108,11 +108,11 @@ module vcr_vc_alloc_mac
    output [0:num_ports*num_vcs-1] gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 	gnt_op_ovc;
    
-   // input port that each output VC was granted to
+   // input port that each output VC was granted to (to output controller)
    output [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
    
-   // input VC that each output VC was granted to
+   // input VC that each output VC was granted to (to output controller)
    output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
    

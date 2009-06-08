@@ -399,8 +399,8 @@ module vcr_top
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
-       .arbiter_type(vc_arbiter_type),
        .allocator_type(vc_allocator_type),
+       .arbiter_type(vc_arbiter_type),
        .reset_type(reset_type))
    vca
      (.clk(clk),
