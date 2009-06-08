@@ -183,6 +183,9 @@ module vcr_ivc_ctrl
    // allocation
    parameter sw_spec_enable = 1;
    
+   // use combined VC and switch allocator
+   parameter comb_alloc_enable = 1;
+   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -482,7 +485,7 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(sw_spec_enable)
+      if(!comb_alloc_enable && sw_spec_enable)
 	begin
 	   assign vc_allocated = vc_gnt | vc_allocated_q;
 	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
@@ -990,12 +993,16 @@ module vcr_ivc_ctrl
    
    wire 				       flit_valid;
    
-   assign sw_req_nonspec
-     = header_valid & flit_valid & vc_allocated_q & free_allocated;
-   
    generate
       
-      if(sw_spec_enable)
+      if(comb_alloc_enable)
+	assign sw_req_nonspec
+	  = header_valid & flit_valid & (free_allocated | ~vc_allocated_q);
+      else
+	assign sw_req_nonspec
+	  = header_valid & flit_valid & vc_allocated_q & free_allocated;
+      
+      if(!comb_alloc_enable && sw_spec_enable)
 	assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
       else
 	assign sw_req_spec = 1'b0;
@@ -1027,7 +1034,7 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs_per_class-1] flit_ocvc;
 		
-		if(sw_spec_enable)
+		if(comb_alloc_enable || sw_spec_enable)
 		  assign flit_ocvc = vc_allocated_hold_ocvc;
 		else
 		  assign flit_ocvc = vc_allocated_ocvc_q;

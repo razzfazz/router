@@ -183,6 +183,9 @@ module vcr_top
    
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
+   // use combined VC and switch allocator
+   parameter comb_alloc_enable = 1;
+   
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
    
@@ -317,6 +320,7 @@ module vcr_top
 	       .credit_handling_type(credit_handling_type),
 	       .header_fifo_type(header_fifo_type),
 	       .sw_spec_enable(sw_spec_enable),
+	       .comb_alloc_enable(comb_alloc_enable),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
@@ -394,26 +398,33 @@ module vcr_top
    wire [0:num_ports*num_vcs*num_ports-1] vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
    
-   vcr_vc_alloc_mac
-     #(.num_message_classes(num_message_classes),
-       .num_resource_classes(num_resource_classes),
-       .num_vcs_per_class(num_vcs_per_class),
-       .num_ports(num_ports),
-       .allocator_type(vc_allocator_type),
-       .arbiter_type(vc_arbiter_type),
-       .reset_type(reset_type))
-   vca
-     (.clk(clk),
-      .reset(reset),
-      .route_port_ip_ivc(route_port_ip_ivc),
-      .inc_rc_ip_ivc(inc_rc_ip_ivc),
-      .elig_op_ovc(elig_op_ovc),
-      .req_ip_ivc(vc_req_ip_ivc),
-      .gnt_ip_ivc(vc_gnt_ip_ivc),
-      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
-      .gnt_op_ovc(vc_gnt_op_ovc),
-      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
-      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
+   generate
+      
+      if(!comb_alloc_enable)
+	begin
+	   vcr_vc_alloc_mac
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_ports(num_ports),
+	       .allocator_type(vc_allocator_type),
+	       .arbiter_type(vc_arbiter_type),
+	       .reset_type(reset_type))
+	   vca
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+	      .elig_op_ovc(elig_op_ovc),
+	      .req_ip_ivc(vc_req_ip_ivc),
+	      .gnt_ip_ivc(vc_gnt_ip_ivc),
+	      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
+	      .gnt_op_ovc(vc_gnt_op_ovc),
+	      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
+	      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
+	end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -421,22 +432,66 @@ module vcr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] 		    sw_gnt_op_ip;
-   vcr_sw_alloc_mac
-     #(.num_vcs(num_vcs),
-       .num_ports(num_ports),
-       .allocator_type(sw_allocator_type),
-       .arbiter_type(sw_arbiter_type),
-       .spec_level(sw_spec_level),
-       .reset_type(reset_type))
-   swa
-     (.clk(clk),
-      .reset(reset),
-      .route_port_ip_ivc(route_port_ip_ivc),
-      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
-      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-      .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
-      .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
-      .gnt_op_ip(sw_gnt_op_ip));
+   
+   generate
+      
+      if(!comb_alloc_enable)
+	begin
+	   vcr_sw_alloc_mac
+	     #(.num_vcs(num_vcs),
+	       .num_ports(num_ports),
+	       .allocator_type(sw_allocator_type),
+	       .arbiter_type(sw_arbiter_type),
+	       .spec_level(sw_spec_level),
+	       .reset_type(reset_type))
+	   swa
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
+	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
+	      .gnt_nonspec_ip_ivc(sw_gnt_nonspec_ip_ivc),
+	      .gnt_spec_ip_ivc(sw_gnt_spec_ip_ivc),
+	      .gnt_op_ip(sw_gnt_op_ip));
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // combined allocator
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      if(comb_alloc_enable)
+	begin
+	   vcr_comb_alloc_mac
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_ports(num_ports),
+	       .allocator_type(sw_allocator_type),
+	       .arbiter_type(sw_arbiter_type),
+	       .reset_type(reset_type))
+	   cba
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+	      .elig_op_ovc(elig_op_ovc),
+	      .vc_req_ip_ivc(vc_req_ip_ivc),
+	      .vc_gnt_ip_ivc(vc_gnt_ip_ivc),
+	      .vc_gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
+	      .vc_gnt_op_ovc(vc_gnt_op_ovc),
+	      .vc_gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
+	      .vc_gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc),
+	      .sw_req_ip_ivc(sw_req_nonspec_ip_ivc),
+	      .sw_gnt_ip_ivc(sw_gnt_nonspec_ip_ivc),
+	      .sw_gnt_op_ip(sw_gnt_op_ip));
+	end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------

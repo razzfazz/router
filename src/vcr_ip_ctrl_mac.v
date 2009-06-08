@@ -193,6 +193,9 @@ module vcr_ip_ctrl_mac
    // allocation
    parameter sw_spec_enable = 1;
    
+   // use combined VC and switch allocator
+   parameter comb_alloc_enable = 1;
+   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -435,6 +438,7 @@ module vcr_ip_ctrl_mac
 			 .credit_handling_type(credit_handling_type),
 			 .header_fifo_type(header_fifo_type),
 			 .sw_spec_enable(sw_spec_enable),
+			 .comb_alloc_enable(comb_alloc_enable),
 			 .perf_ctr_enable(perf_ctr_enable),
 			 .checker_enable(checker_enable),
 			 .checker_capture_mode(checker_capture_mode),

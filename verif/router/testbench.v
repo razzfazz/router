@@ -96,10 +96,10 @@ module testbench
    parameter inject_node_ports_only = 1;
    
    // warmup time in cycles
-   parameter warmup_time = 1000;
+   parameter warmup_time = 100;
    
    // measurement interval in cycles
-   parameter measure_time = 100000;
+   parameter measure_time = 10000;
    
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
@@ -132,7 +132,7 @@ module testbench
    
    // current router's address
    localparam [0:router_addr_width-1] router_address
-     = {num_dimensions{default_dim_addr}};
+     = {router_addr_width{1'b0}}/*{num_dimensions{default_dim_addr}}*/;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
@@ -852,6 +852,7 @@ module testbench
 	  .sw_allocator_type(sw_allocator_type),
 	  .sw_arbiter_type(sw_arbiter_type),
 	  .sw_spec_level(sw_spec_level),
+	  .comb_alloc_enable(comb_alloc_enable),
 	  .ctrl_crossbar_type(ctrl_crossbar_type),
 	  .data_crossbar_type(data_crossbar_type),
 	  .reset_type(reset_type))
