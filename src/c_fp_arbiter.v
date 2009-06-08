@@ -32,17 +32,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic fixed-priority arbiter (port 0 has highest priority)
 module c_fp_arbiter
-  (clk, reset, req, gnt);
+  (req, gnt);
    
 `include "c_constants.v"
    
    // number of input ports
    parameter num_ports = 32;
-   
-   parameter reset_type = `RESET_TYPE_ASYNC;
-   
-   input clk;
-   input reset;
    
    // vector of requests
    input [0:num_ports-1] req;
