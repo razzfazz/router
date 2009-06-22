@@ -633,7 +633,7 @@ module vcr_vc_alloc_sep_of
 				    c_padder
 				      #(.width(2*num_vcs_per_class),
 					.pad_left((orc-1)*num_vcs_per_class),
-					.pad_rigth((num_resource_classes-1-orc)*
+					.pad_right((num_resource_classes-1-orc)*
 						   num_vcs_per_class))
 				    gnt_raw_irc_icvc_pad
 				      (.data_in({gnt_raw_low_icvc,
