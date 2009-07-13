@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // switch allocator synthesis wrapper
 module sw_alloc_wrap
   (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_ip_op);
+   gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_op_ip);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -69,13 +69,13 @@ module sw_alloc_wrap
    parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
    
    // number of traffic classes (e.g. request, reply)
-   parameter num_traffic_classes = 2;
+   parameter num_message_classes = 2;
    
    // number of routing classes (e.g. minimal, adaptive)
-   parameter num_routing_classes = 2;
+   parameter num_resource_classes = 2;
    
    // total number of packet classes
-   localparam num_packet_classes = num_traffic_classes * num_routing_classes;
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -155,8 +155,8 @@ module sw_alloc_wrap
    wire [0:num_ports*num_vcs-1] gnt_spec_ip_ivc;
    
    // crossbar control signals
-   output [0:num_ports*num_ports-1] gnt_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
+   output [0:num_ports*num_ports-1] gnt_op_ip;
+   wire [0:num_ports*num_ports-1] gnt_op_ip;
    
    vcr_sw_alloc_mac
      #(.num_vcs(num_vcs),
@@ -173,6 +173,6 @@ module sw_alloc_wrap
       .req_spec_ip_ivc(req_spec_ip_ivc),
       .gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
       .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-      .gnt_ip_op(gnt_ip_op));
+      .gnt_op_ip(gnt_op_ip));
    
 endmodule
