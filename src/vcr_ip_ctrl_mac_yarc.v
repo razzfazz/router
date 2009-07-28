@@ -218,7 +218,7 @@ module vcr_ip_ctrl_mac_yarc
    
    parameter routing_dimension 	   = 0;
    
-
+   localparam other_port  = vc_id ==0?1:0;
 
    
    input clk;
@@ -436,40 +436,36 @@ module vcr_ip_ctrl_mac_yarc
 
 
 
-
+   
    //hack hack
-   generate
-      begin
-	 localparam other_port  = vc_id ==0?1:0;
-	 assign route_ivc_op[other_port*num_ports:(other_port+1)*num_ports-1] = {num_ports{1'b0}};
-	 assign inc_rc_ivc[other_port] =  1'b0;
-	 assign vc_req_ivc[other_port] =  1'b0;
-	 assign sw_req_nonspec_ivc[other_port] =  1'b0;
-	 assign sw_req_spec_ivc[other_port] =  1'b0;
-	 assign flit_valid_out_ivc[other_port] =  1'b0;
-	 assign int_flit_ctrl_out_ivc[other_port*int_flit_ctrl_width:
-				      (other_port+1)*int_flit_ctrl_width-1]
-	   =  {int_flit_ctrl_width{1'b0}};
-	 assign la_route_info_ivc[other_port*la_route_info_width:
-				  (other_port+1)*la_route_info_width-1]
- 	   = {la_route_info_width{1'b0}};
-	 
-	 assign fbf_write_addr_ivc[other_port*fbf_addr_width:
-				   (other_port+1)*fbf_addr_width-1]
-	   =  {fbf_addr_width{1'b0}};
-	 assign fbf_read_addr_ivc[other_port*fbf_addr_width:
-				  (other_port+1)*fbf_addr_width-1]
-	   =  {fbf_addr_width{1'b0}};
-	 assign fbf_write_offset_ivc[other_port*flit_buffer_idx_width:
-				     (other_port+1)*flit_buffer_idx_width-1]
-	   =  {flit_buffer_idx_width{1'b0}};
-	 assign fbf_read_offset_ivc[other_port*flit_buffer_idx_width:
-				    (other_port+1)*flit_buffer_idx_width-1]
-	   =  {flit_buffer_idx_width{1'b0}};
-	 assign ivcc_error_ivc[other_port] =  1'b0;
-	 assign events_ivc[other_port*6:(other_port+1)*6-1] =  6'b0;
-      end
-   endgenerate
+   assign route_ivc_op[other_port*num_ports:(other_port+1)*num_ports-1] = {num_ports{1'b0}};
+   assign inc_rc_ivc[other_port] =  1'b0;
+   assign vc_req_ivc[other_port] =  1'b0;
+   assign sw_req_nonspec_ivc[other_port] =  1'b0;
+   assign sw_req_spec_ivc[other_port] =  1'b0;
+   assign flit_valid_out_ivc[other_port] =  1'b0;
+   assign int_flit_ctrl_out_ivc[other_port*int_flit_ctrl_width:
+				(other_port+1)*int_flit_ctrl_width-1]
+	    =  {int_flit_ctrl_width{1'b0}};
+   assign la_route_info_ivc[other_port*la_route_info_width:
+			    (other_port+1)*la_route_info_width-1]
+ 	    = {la_route_info_width{1'b0}};
+   
+   assign fbf_write_addr_ivc[other_port*fbf_addr_width:
+			     (other_port+1)*fbf_addr_width-1]
+	    =  {fbf_addr_width{1'b0}};
+   assign fbf_read_addr_ivc[other_port*fbf_addr_width:
+			    (other_port+1)*fbf_addr_width-1]
+	    =  {fbf_addr_width{1'b0}};
+   assign fbf_write_offset_ivc[other_port*flit_buffer_idx_width:
+			       (other_port+1)*flit_buffer_idx_width-1]
+	    =  {flit_buffer_idx_width{1'b0}};
+   assign fbf_read_offset_ivc[other_port*flit_buffer_idx_width:
+			      (other_port+1)*flit_buffer_idx_width-1]
+	    =  {flit_buffer_idx_width{1'b0}};
+   assign ivcc_error_ivc[other_port] =  1'b0;
+   assign events_ivc[other_port*6:(other_port+1)*6-1] =  6'b0;
+   
    
    
    assign route_ivc_op[vc_id*num_ports:(vc_id+1)*num_ports-1] = route_op;

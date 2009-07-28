@@ -368,12 +368,19 @@ module vcr_op_ctrl_mac_yarc
 	   
 	   if(num_vcs > 1)
 	     begin
-		assign match_ovc[columns]  = route_op[columns];
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		match_delay
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(route_op[columns]),
+		   .q(match_ovc[columns]));
 	     end
 	   
 	   // if we only have a single VC to begin with, it is always selected
 	   else
-	     assign match_ovc[vc_id] 	  = 1'b1;
+	     assign match_ovc[vc_id] = 1'b1;
 	   
 	   
 	   //-------------------------------------------------------------------

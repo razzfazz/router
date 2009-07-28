@@ -42,7 +42,7 @@ module yarc_tile
    flit_ctrl_in_col_bus, flit_data_in_col_bus, flit_ctrl_in_tile,
    flit_data_in_tile, flow_ctrl_in_tile
    );
-   
+
 `include "c_constants.v"
 `include "vcr_constants.v"
    
@@ -58,11 +58,11 @@ module yarc_tile
    
    // flit buffer entries per VC  input buffer
    parameter num_flit_buffers 	    = 128;
-   parameter num_row_buffers 	    = 32;
-   parameter num_col_buffers 	    = 8;
+   parameter num_row_buffers 	    =8;
+   parameter num_col_buffers 	    = 4;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers     = 8;
+   parameter num_header_buffers     = num_flit_buffers;
    
    // number of traffic classes (e.g. read, write)
    parameter num_traffic_classes    = 2;
@@ -102,11 +102,11 @@ module yarc_tile
    
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length     = 10;
+   parameter max_payload_length     = 0;
    
    // minimum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter min_payload_length     = 1;
+   parameter min_payload_length     = 0;
    
    // width required to select individual router in a dimension
    localparam dim_addr_width 	    = clogb(num_routers_per_dim);
@@ -124,7 +124,7 @@ module yarc_tile
    // width of flit payload data
    parameter flit_data_width = 32;
    
-   // width of flow control signals hack hack hack
+   // width of flow control signals HACK HACK HACK
    localparam flow_ctrl_width = 1 + vc_idx_width+1;
    
    // enable performance counter
@@ -142,7 +142,7 @@ module yarc_tile
    parameter track_vcs_at_output = 0;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_FBFLY;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
@@ -163,46 +163,46 @@ module yarc_tile
        -1;
    
    // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
+   parameter header_fifo_type 	 = `FIFO_TYPE_INDEXED;
    
    // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fbf_regfile_type 	 = `REGFILE_TYPE_FF_2D;
    
    // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flit_buffers;
+   localparam fbf_depth 	 = num_vcs*num_flit_buffers;
    
    // required address size for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
+   localparam fbf_addr_width 	 = clogb(fbf_depth);
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vc_allocator_type 	 = `VC_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vc_arbiter_type 	 = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter sw_allocator_type 	 = `SW_ALLOCATOR_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter sw_arbiter_type 	 = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
-   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter sw_spec_level 	 = `SW_SPEC_LEVEL_NONE;
    
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   localparam sw_spec_enable 	 = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
    
    // select implementation variant for control crossbar
-   parameter xbc_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter xbc_crossbar_type 	 = `CROSSBAR_TYPE_MUX;
    
    // select implementation variant for data crossbar
-   parameter xbd_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter xbd_crossbar_type 	 = `CROSSBAR_TYPE_MUX;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter reset_type 	 = `RESET_TYPE_ASYNC;
 
-   //=================
-   //End of param
-   //=================
 
+   //				   =================
+   //End of yarc param
+   //				   =================
 
 
    

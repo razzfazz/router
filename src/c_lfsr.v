@@ -62,10 +62,12 @@ module c_lfsr
    
    // data output
    output [offset:(offset+width)-1] q;
-   reg [offset:(offset+width)-1] q;
+   wire [offset:(offset+width)-1] q;
 
    
    wire 			 fb_seed;
+   wire [offset:(offset+width)-1] lfsr_q;
+   
    assign fb_seed = lfsr_q[offset+width-1];
    
    wire [offset:(offset+width)-1] fb_val;
@@ -77,8 +79,7 @@ module c_lfsr
    wire [offset:(offset+width)-1] base_val;
    assign base_val[offset] = 1'b0;
    
-   wire [offset:(offset+width)-1] lfsr_q;
-   
+
    generate
       
       if(width > 1)

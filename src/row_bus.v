@@ -198,7 +198,7 @@ module row_bus(/*AUTOARG*/
    wire 			     ipc_error;
    vcr_ip_ctrl_mac_yarc
      #(.num_flit_buffers(num_flit_buffers),
-       .num_header_buffers(num_header_buffers),
+       .num_header_buffers(num_flit_buffers),
        .num_traffic_classes(num_traffic_classes),
        .num_routing_classes(num_routing_classes),
        .num_vcs_per_class(num_vcs_per_class),
