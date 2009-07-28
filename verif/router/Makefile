@@ -5,7 +5,9 @@ SRCS = $(TOP).v
 
 SRC_DIR = ../../src
 
-VCS_FLAGS = +lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
+#VCS_FLAGS = -y ~/Xilinx/src/unisims -y ~/Xilinx/src/simprims +incdir+~/Xilinx/src ~/Xilinx/src/glbl.v \+lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
+
+VCS_FLAGS = \+lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
 
 # DUMP_CTRL may be overidden by script calling this
 DUMP_CTRL=
