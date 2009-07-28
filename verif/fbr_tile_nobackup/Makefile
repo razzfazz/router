@@ -7,9 +7,9 @@ SRC_DIR = ../../src
 
 #VCS_FLAGS = -y ~/Xilinx/src/unisims -y ~/Xilinx/src/simprims +incdir+~/Xilinx/src ~/Xilinx/src/glbl.v \+lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
 
-VCS_FLAGS = \+lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
+VCS_FLAGS = \+lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64 
 
-PNR_VCS_FLAGS =  +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64 -v /home/shared/system/cad/pdks/ST/cmos045-4.0/CMOS045_SC_14_CORE_LS_SNPS-AVT-CDS_3.0/behaviour/verilog/CMOS045_SC_14_CORE_LS.v -v /home/shared/system/cad/pdks/ST/cmos045-4.0/cva/st_memories/SPREG_090108-27570@1.0/behaviour/verilog/SPREG_090108.v -v /home/charting/cmos045-4.0/CMOS045_SC_14_CLK_LS_SNPS-AVT-CDS_4.0/behaviour/verilog/CMOS045_SC_14_CLK_LS.v
+PNR_VCS_FLAGS =  +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64 -v /home/shared/system/cad/pdks/ST/cmos045-4.0/CMOS045_SC_14_CORE_LS_SNPS-AVT-CDS_3.0/behaviour/verilog/CMOS045_SC_14_CORE_LS.v -v /home/shared/system/cad/pdks/ST/cmos045-4.0/cva/st_memories/SPREG_090108-27570@1.0/behaviour/verilog/SPREG_090108.v -v /home/charting/cmos045-4.0/CMOS045_SC_14_CLK_LS_SNPS-AVT-CDS_4.0/behaviour/verilog/CMOS045_SC_14_CLK_LS.v +notimingcheck 
 
 # DUMP_CTRL may be overidden by script calling this
 DUMP_CTRL=

@@ -74,7 +74,7 @@ module testbench
    parameter Tclk 		   = 5;
    parameter initial_seed 	   = 0;
    parameter max_packet_count 	   = -1;
-   parameter packet_rate 	   = 6;
+   parameter packet_rate 	   = 12;
    parameter packet_count_width    = 32;
    parameter channel_latency 	   = 1;
    parameter warmup_time 	   = 1000;
@@ -84,7 +84,7 @@ module testbench
    parameter network_topology 	   = `NETWORK_TOPOLOGY_FBFLY;
 
    // flit buffer entries per VC
-   parameter num_flit_buffers 	    = 32;
+   parameter num_flit_buffers 	    = 64;
    parameter num_intm_buffers 	    = 8;
    parameter num_mini_buffers 	    = 4;
    
@@ -93,7 +93,7 @@ module testbench
    parameter num_header_buffers     = 4;
    
    // number of traffic classes (e.g. read, write)
-   parameter num_traffic_classes    = 2;
+   parameter num_traffic_classes    = 1;
    
    // number of routing classes (e.g. minimal, adaptive)
    parameter num_routing_classes    = 2;
@@ -127,7 +127,7 @@ module testbench
    
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length     = 1;
+   parameter max_payload_length     = 0;
    
    // minimum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
@@ -313,7 +313,7 @@ module testbench
 	   
 	   if(ip < num_ports - num_nodes_per_router)
 	     begin
-		/*
+		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
 				       (ip+1)*flit_ctrl_width-1]
 			 = {flit_ctrl_width{1'b0}};
@@ -336,7 +336,7 @@ module testbench
 			 = {num_vcs*num_ports{1'b0}};
 		assign fifo_error_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 			 = {num_vcs{1'b0}};
-		*/
+		/*
 
 
 		//simulate external sources
@@ -401,7 +401,7 @@ module testbench
 				       (ip+1)*flit_data_width-1]
 			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
-		/*
+		
 		wire [0:header_info_width-1]  header_info;
 		assign header_info = flit_data[0:header_info_width-1];
 		
@@ -928,7 +928,7 @@ module testbench
 		     
 		  end // block: ivcs
 		 */
-	     end
+	     end // if (ip < num_ports - num_nodes_per_router)
 	   else
 	     begin
 		
@@ -1520,7 +1520,7 @@ module testbench
    endgenerate
    
    wire 					  rtr_error;
-   
+   /*
    fbr_tile
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
@@ -1565,10 +1565,10 @@ module testbench
       .flit_data_out_op(flit_data_out_op),
       .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(rtr_error));
-/*
-
-fbr_tile
-   vcr
+*/
+   
+   fbr_tile
+     vcr
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
@@ -1579,7 +1579,7 @@ fbr_tile
       .flit_data_out_op(flit_data_out_op),
       .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(rtr_error)); 
-   */
+   
    wire [0:num_ports-1] 		x_error_op;
    
    generate
@@ -1717,7 +1717,7 @@ fbr_tile
 	     if(check_error_op[port])
 	       begin
 		  $display("check error: op=%d, cyc=%d", port, $time);
-		  $display("ctrl=%b, data=%x",
+		  $display("ctrl=%b, data=%b",
 			   flit_ctrl_out_op[port*flit_ctrl_width +: 
 					    flit_ctrl_width],
 			   flit_data_out_op[port*flit_data_width +: 
@@ -1846,21 +1846,21 @@ fbr_tile
       clk <= 1'b0;
       #(Tclk/2);
    end
-   /*
+   
    always @(posedge clk)
      begin
 	if(rtr_error)
 	  begin
 	     $display("internal error detected, cyc=%d", $time);
-	     $stop;
+	     //$stop;
 	  end
 	if(tb_error)
 	  begin
 	     $display("external error detected, cyc=%d", $time);
-	     $stop;
+	     //$stop;
 	  end
      end
-   */
+   
    integer cycles;
    
    initial
@@ -1918,11 +1918,11 @@ fbr_tile
       
       run = 1'b0;
       
-      while((in_flits > out_flits) || (in_flits > in_creds))
-	begin
-	   cycles = cycles + 1;
-	   #(Tclk);
-	end
+//      while((in_flits > out_flits) || (in_flits > in_creds))
+//	begin
+//	   cycles = cycles + 1;
+//	   #(Tclk);
+//	end
       
       #(Tclk*10);
       
@@ -1936,9 +1936,9 @@ fbr_tile
 
 
    initial begin : main
-      //$dumpfile("vcr.vcd");
-      //$dumpvars(0, vcr);
-      //$sdf_annotate("fbr_tile.sdf",testbench.vcr);
+      $dumpfile("vcr.vcd");
+      $dumpvars(0, vcr);
+      $sdf_annotate("fbr_tile.sdf",testbench.vcr);
       
    end   
 endmodule

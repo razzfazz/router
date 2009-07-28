@@ -575,7 +575,7 @@ module extern_packet_source
 		    .routing_class(irc))
 		lar
 		  (.router_address(router_address),
-		   .route_op((router_address<4'b0100)?10'b1000000000:10'b0001000000),
+		   .route_op((router_address==4'b0001)?10'b0010000000:(router_address==4'b0010)?10'b0100000000:(router_address==4'b0011)?10'b1000000000:(router_address==4'b0100)?10'b0000010000:(router_address==4'b1000)?10'b0000100000:(router_address==4'b1100)?10'b0001000000:10'b0),
 		   .inc_rc(1'b0),
 		   .hop_route_info(hop_route_info),
 		   .la_route_info(la_route_info_out));
