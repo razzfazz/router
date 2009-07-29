@@ -27,7 +27,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
+`timescale 1ns/1ps 
 module testbench
   ();
 
@@ -65,23 +65,25 @@ module testbench
    function integer pop_count(input integer argument);
       integer i;
       begin
-	 pop_count 		   = 0;
+	 pop_count 		    = 0;
 	 for(i = argument; i > 0; i = i >> 1)
-	   pop_count 		   = pop_count + (i & 1);
+	   pop_count 		    = pop_count + (i & 1);
       end
    endfunction
    
-   parameter Tclk 		   = 5;
-   parameter initial_seed 	   = 0;
-   parameter max_packet_count 	   = -1;
-   parameter packet_rate 	   = 12;
-   parameter packet_count_width    = 32;
-   parameter channel_latency 	   = 1;
-   parameter warmup_time 	   = 1000;
-   parameter measure_time 	   = 10000;
+   parameter Tclk 		    = 5.0;
+   
+   parameter initial_seed 	    = 0;
+   parameter max_packet_count 	    = -1;
+   parameter packet_rate 	    = 12;
+   parameter extern_packet_rate     = 13;
+   parameter packet_count_width     = 32;
+   parameter channel_latency 	    = 1;
+   parameter warmup_time 	    = 1000;
+   parameter measure_time 	    = 10000;
    
    // select network topology
-   parameter network_topology 	   = `NETWORK_TOPOLOGY_FBFLY;
+   parameter network_topology 	    = `NETWORK_TOPOLOGY_FBFLY;
 
    // flit buffer entries per VC
    parameter num_flit_buffers 	    = 64;
@@ -313,7 +315,7 @@ module testbench
 	   
 	   if(ip < num_ports - num_nodes_per_router)
 	     begin
-		
+		/*
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
 				       (ip+1)*flit_ctrl_width-1]
 			 = {flit_ctrl_width{1'b0}};
@@ -336,7 +338,7 @@ module testbench
 			 = {num_vcs*num_ports{1'b0}};
 		assign fifo_error_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 			 = {num_vcs{1'b0}};
-		/*
+		*/
 
 
 		//simulate external sources
@@ -354,16 +356,16 @@ module testbench
 		
 		wire 			      ps_error;
 
-		localparam [0:router_addr_width-1] ra = (ip==0)?4'b0001:(ip==1)?4'b0010:(ip==2)?4'b0011:(ip==3)?4'b0100:(ip==4)?4'b1000:(ip==5)?4'b1100:4'b0000;
+		localparam [0:router_addr_width-1] ra = (ip==0)?4'b1000:(ip==1)?4'b0100:(ip==2)?4'b1100:(ip==3)?4'b0010:(ip==4)?4'b0001:(ip==5)?4'b0011:4'b0000;
 		
 		
 			  
 		extern_packet_source
 		  #(.max_packet_count(max_packet_count),
-		    .packet_rate(packet_rate),
+		    .packet_rate(extern_packet_rate),
 		    .initial_seed(initial_seed+ip),
 		    .packet_count_width(packet_count_width),
-		    .num_flit_buffers(num_flit_buffers),
+		    .num_flit_buffers(num_intm_buffers ),
 		    .num_header_buffers(num_header_buffers),
 		    .num_traffic_classes(num_traffic_classes),
 		    .num_routing_classes(num_routing_classes),
@@ -401,7 +403,10 @@ module testbench
 				       (ip+1)*flit_data_width-1]
 			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
-		
+
+
+
+		/*
 		wire [0:header_info_width-1]  header_info;
 		assign header_info = flit_data[0:header_info_width-1];
 		
@@ -927,7 +932,9 @@ module testbench
 			      = match_op;
 		     
 		  end // block: ivcs
-		 */
+
+
+		*/
 	     end // if (ip < num_ports - num_nodes_per_router)
 	   else
 	     begin
@@ -1838,13 +1845,15 @@ module testbench
    assign count_out_flits = count_out_flits_s;
    
    reg 	       clk_en;
-   
+   reg [0:31] real_cycles;
    always
    begin
       clk <= clk_en;
       #(Tclk/2);
       clk <= 1'b0;
       #(Tclk/2);
+      real_cycles <= real_cycles +32'b1;
+      
    end
    
    always @(posedge clk)
@@ -1862,15 +1871,18 @@ module testbench
      end
    
    integer cycles;
+
    
    initial
    begin
 
-      reset = 1'b0;
-      clk_en = 1'b0;
-      run = 1'b0;
-      count_en = 1'b0;
-      cycles = 0;
+      reset 	   = 1'b0;
+      clk_en 	   = 1'b0;
+      run 	   = 1'b0;
+      count_en 	   = 1'b0;
+      cycles 	   = 0;
+      real_cycles  = 32'b0;
+      
       
       #(Tclk);
       
@@ -1897,6 +1909,7 @@ module testbench
 	   cycles = cycles + 1;
 	   #(Tclk);
 	end
+      //$stop;
       
       $display("measuring...");
       
@@ -1910,7 +1923,7 @@ module testbench
       
       count_en = 1'b0;
       
-      $display("measured %d cycles", measure_time);
+      $display("measured %d cycles %d", measure_time,real_cycles);
       
       $display("%d flits in, %d flits out", count_in_flits, count_out_flits);
       
@@ -1918,15 +1931,15 @@ module testbench
       
       run = 1'b0;
       
-//      while((in_flits > out_flits) || (in_flits > in_creds))
-//	begin
-//	   cycles = cycles + 1;
-//	   #(Tclk);
-//	end
+      while((in_flits > out_flits) || (in_flits > in_creds))
+	begin
+	   cycles = cycles + 1;
+	   #(Tclk);
+	end
       
       #(Tclk*10);
       
-      $display("simulation ended after %d cycles", cycles);
+      $display("simulation ended after %d cycles %d realcycles", cycles,real_cycles);
       
       $display("%d flits received, %d flits sent", in_flits, out_flits);
       
@@ -1936,9 +1949,9 @@ module testbench
 
 
    initial begin : main
-      $dumpfile("vcr.vcd");
-      $dumpvars(0, vcr);
-      $sdf_annotate("fbr_tile.sdf",testbench.vcr);
+      //$dumpfile("vcr.vcd");
+      //$dumpvars(0, vcr);
+      //$sdf_annotate("fbr_tile.sdf",testbench.vcr);
       
    end   
 endmodule

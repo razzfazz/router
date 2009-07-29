@@ -204,15 +204,15 @@ module extern_packet_source
 
    wire [0:router_addr_width-1] south_dest [0:3];
    assign south_dest[0]  = 4'b0000;
-   assign south_dest[1]  = 4'b0100;
-   assign south_dest[2]  = 4'b1000;
-   assign south_dest[3]  = 4'b1100;
+   assign south_dest[1]  = 4'b0010;
+   assign south_dest[2]  = 4'b0001;
+   assign south_dest[3]  = 4'b0011;
    
    wire [0:router_addr_width-1] east_dest [0:3];
    assign east_dest[0]  = 4'b0000;
-   assign east_dest[1]  = 4'b0001;
-   assign east_dest[2]  = 4'b0010;
-   assign east_dest[3]  = 4'b0011;
+   assign east_dest[1]  = 4'b0000;
+   assign east_dest[2]  = 4'b0000;
+   assign east_dest[3]  = 4'b0000;
    
    always @(posedge clk, posedge reset)
      begin
@@ -575,8 +575,8 @@ module extern_packet_source
 		    .routing_class(irc))
 		lar
 		  (.router_address(router_address),
-		   .route_op((router_address==4'b0001)?10'b0010000000:(router_address==4'b0010)?10'b0100000000:(router_address==4'b0011)?10'b1000000000:(router_address==4'b0100)?10'b0000010000:(router_address==4'b1000)?10'b0000100000:(router_address==4'b1100)?10'b0001000000:10'b0),
-		   .inc_rc(1'b0),
+		   .route_op((router_address==4'b0001)?10'b0000010000:(router_address==4'b0010)?10'b0000100000:(router_address==4'b0011)?10'b0000010000:(router_address==4'b0100)?10'b0100000000:(router_address==4'b1000)?10'b0010000000:(router_address==4'b1100)?10'b1000000000:10'b0),
+		   .inc_rc((irc==0)?1'b1:1'b0),
 		   .hop_route_info(hop_route_info),
 		   .la_route_info(la_route_info_out));
 		
@@ -636,7 +636,7 @@ module extern_packet_source
 	   
 	   reg [0:router_addr_width-1] 		  router_addr_q;
 
-	   if(router_address<4'b0100)
+	   if(router_address==4'b1000 || router_address==4'b0100 || router_address==4'b1100 )
 	     begin
 		always @(posedge clk, posedge reset)
 		  begin
@@ -649,8 +649,7 @@ module extern_packet_source
 		always @(posedge clk, posedge reset)
 		  begin
 		     if(reset | packet_sent)
-		       router_addr_q
- 			 <= east_dest[$dist_uniform(seed, 0, 3)];
+		       router_addr_q <= east_dest[$dist_uniform(seed, 0, 3)];
 		  end
 	     end
 	   assign route_info[irc*router_addr_width:(irc+1)*router_addr_width-1]
