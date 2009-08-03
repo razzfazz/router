@@ -228,7 +228,7 @@ module subswitch_yarc(/*autoarg*/
 		wire 			     ipc_error;
 		wire head    = flit_ctrl_row_bus[(column*2+vcs)*flit_ctrl_width] & flit_ctrl_row_bus[(column*2+vcs)*flit_ctrl_width+2];
 		wire last_access;
-		wire access  = head?flit_data_row_bus[(column*2+vcs)*flit_data_width+column]:last_access;
+		wire access  = head?flit_data_row_bus[(column*2+vcs)*flit_data_width+0]:last_access;
 	
 		
 		c_dff
