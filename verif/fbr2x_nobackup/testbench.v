@@ -76,7 +76,7 @@ module testbench
    parameter initial_seed 	    = 0;
    parameter max_packet_count 	    = -1;
    parameter packet_rate 	    = 24;
-   parameter extern_packet_rate     = 0;
+   parameter extern_packet_rate     = 13;
    parameter packet_count_width     = 32;
    parameter channel_latency 	    = 1;
    parameter warmup_time 	    = 1000;
@@ -88,7 +88,7 @@ module testbench
    // flit buffer entries per VC
    parameter num_flit_buffers 	    = 64;
    parameter num_intm_buffers 	    = 8;
-   parameter num_mini_buffers 	    = 4;
+   parameter num_mini_buffers 	    = 8;
    
        
    // maximum number of packets that can be in a given VC buffer simultaneously
@@ -293,7 +293,7 @@ module testbench
    //HACK HACK HACK
    wire [0:(2*num_ports - num_nodes_per_router)*flow_ctrl_width+num_nodes_per_router-1] flow_ctrl_out_ip;
    wire [0:2*num_ports - num_nodes_per_router-1] 		flit_valid_in_ip;
-   wire [0:2*num_ports - num_nodes_per_router-1] 		cred_valid_out_ip;
+   wire [0:2*num_ports-1] 		cred_valid_out_ip;
    
    wire [0:(2*num_ports - num_nodes_per_router)*flit_ctrl_width-1] flit_ctrl_out_op;
    wire [0:(2*num_ports - num_nodes_per_router)*flit_data_width-1] flit_data_out_op;
@@ -354,8 +354,7 @@ module testbench
 			 = {num_vcs{1'b0}};
 		*/
 		assign rtl_error_ip[ip] = 1'b0;
-		assign fifo_error_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-		  = {num_vcs{1'b0}};
+		assign fifo_error_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]= {num_vcs{1'b0}};
 		//simulate external sources
 		wire [0:flow_ctrl_width-1] flow_ctrl;
 		assign flow_ctrl
@@ -432,7 +431,8 @@ module testbench
 		  = flow_ctrl_out_ip[12*flow_ctrl_width+(ip-12)*(flow_ctrl_width+1):
 				     12*flow_ctrl_width+(ip-12+1)*(flow_ctrl_width+1)-1];
 		
-		assign cred_valid_out_ip[ip] = flow_ctrl[0];
+		assign cred_valid_out_ip[12+(ip-12)*2] 	= flow_ctrl[0] &flow_ctrl[1];
+		assign cred_valid_out_ip[12+(ip-12)*2+1]= flow_ctrl[0] &flow_ctrl[2];
 		
 		wire [0:flit_ctrl_width-1] flit_ctrl;
 		wire [0:flit_data_width-1] flit_data;
@@ -1431,10 +1431,10 @@ module testbench
 	begin
 	   cycles = cycles + 1;
 	   #(Tclk);
-	   if(cycles == 110000)
+	   if(cycles%10000== 0)
 	     begin
 		$display("%d %d %d %d",in_flits,out_flits,in_flits,in_creds);
-		$stop;
+		//$stop;
 		
 	     end
 	end
