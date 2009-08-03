@@ -202,11 +202,13 @@ module packet_source_yarc
    integer 			 i;
    
    reg 				 new_packet;   
-   
+
+
+ 
    always @(posedge clk, posedge reset)
      begin
 	new_packet
-	  <= ($dist_uniform(seed, 0, 99) < packet_rate) && run && !reset;
+ 	  <= ($dist_uniform(seed, 0, 99) < packet_rate) && run && !reset;
      end
    
    wire waiting_packet_count_zero;

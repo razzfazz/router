@@ -1,14 +1,14 @@
 # Begin_DVE_Session_Save_Info
 # DVE restart session
-# Saved on Wed Jul 29 14:04:31 2009
+# Saved on Mon Aug 3 12:17:52 2009
 # Designs open: 1
 #   Sim: /home/qtedq/router/branches/tiles/verif/fbr_tile_nobackup/testbench
 # Toplevel windows open: 1
 # 	TopLevel.1
 #   Source.1: testbench
-#   Wave.1: 9 signals
+#   Wave.1: 48 signals
 #   Group count = 1
-#   Group Group1 signal count = 9
+#   Group Group1 signal count = 48
 # End_DVE_Session_Save_Info
 
 # DVE version: B-2008.12_Full64
@@ -18,7 +18,7 @@
 #<Session mode="Restart" path=".restartSimSession.tcl" type="Debug">
 
 gui_set_loading_session_type Restart
-gui_continuetime_set
+gui_continuetime_set -value 5000ns
 gui_clear_window -type Wave
 gui_clear_window -type List
 
@@ -48,10 +48,10 @@ set Wave.1 Wave.1
 gui_update_layout -id ${Wave.1} {{show_state maximized} {dock_state undocked} {dock_on_new_line false} {child_wave_left 565} {child_wave_right 1058} {child_wave_colname 347} {child_wave_colvalue 213} {child_wave_col1 0} {child_wave_col2 1}}
 set Source.1 Source.1
 gui_update_layout -id ${Source.1} {{show_state maximized} {dock_state undocked} {dock_on_new_line false}}
-gui_set_active_window -window ${DLPane.1}
+gui_set_active_window -window ${Wave.1}
 
 # End MDI window settings
-gui_set_active_window -window ${DLPane.1}
+gui_set_active_window -window ${Wave.1}
 
 # Restore toplevel window zorder
 gui_set_active_window -window ${TopLevel.1}
@@ -76,17 +76,16 @@ gui_set_active_window -window ${TopLevel.1}
 # Global: Signal Compare
 
 # Global: Signal Groups
-gui_load_child_values {testbench.ips[0].eps}
 set {Group1} {Group1}
 gui_sg_create ${Group1}
-gui_sg_addsignal -group ${Group1} { {testbench.ips[0].eps.clk} {testbench.ips[0].eps.reset} {testbench.ips[0].eps.flit_ctrl} {testbench.ips[0].eps.flit_data} {testbench.flow_ctrl_out_ip} {testbench.flit_ctrl_out_op} {testbench.flit_data_out_op} {testbench.ips[0].eps.flit_data[0]} {testbench.ips[0].eps.flow_ctrl} }
+gui_sg_addsignal -group ${Group1} { {testbench.ps_error_ip} {testbench.rtl_error_ip} {testbench.fifo_error_ip_ivc} {testbench.rtr_error} {testbench.x_error_op} {testbench.check_error_op} {testbench.tb_errors} {testbench.tb_error} {testbench.ips[0].ps_error} {testbench.ips[1].ps_error} {testbench.ips[2].ps_error} {testbench.ips[3].ps_error} {testbench.ips[4].ps_error} {testbench.ips[5].ps_error} {testbench.ips[6].ps_error} {testbench.ips[6].rtl_error_ivc} {testbench.ips[6].itcs[0].ircs[0].rtl_error_unmasked} {testbench.ips[6].itcs[0].ircs[0].rtl_error} {testbench.ips[6].itcs[0].ircs[1].rtl_error_unmasked} {testbench.ips[6].itcs[0].ircs[1].rtl_error} {testbench.ips[6].ivcs[0].fifo_error} {testbench.ips[6].ivcs[1].fifo_error} {testbench.ips[7].ps_error} {testbench.ips[7].rtl_error_ivc} {testbench.ips[7].itcs[0].ircs[0].rtl_error_unmasked} {testbench.ips[7].itcs[0].ircs[0].rtl_error} {testbench.ips[7].itcs[0].ircs[1].rtl_error_unmasked} {testbench.ips[7].itcs[0].ircs[1].rtl_error} {testbench.ips[7].ivcs[0].fifo_error} {testbench.ips[7].ivcs[1].fifo_error} {testbench.ips[8].ps_error} {testbench.ips[8].rtl_error_ivc} {testbench.ips[8].itcs[0].ircs[0].rtl_error_unmasked} {testbench.ips[8].itcs[0].ircs[0].rtl_error} {testbench.ips[8].itcs[0].ircs[1].rtl_error_unmasked} {testbench.ips[8].itcs[0].ircs[1].rtl_error} {testbench.ips[8].ivcs[0].fifo_error} {testbench.ips[8].ivcs[1].fifo_error} {testbench.ips[9].ps_error} {testbench.ips[9].rtl_error_ivc} {testbench.ips[9].itcs[0].ircs[0].rtl_error_unmasked} {testbench.ips[9].itcs[0].ircs[0].rtl_error} {testbench.ips[9].itcs[0].ircs[1].rtl_error_unmasked} {testbench.ips[9].itcs[0].ircs[1].rtl_error} {testbench.ips[9].ivcs[0].fifo_error} {testbench.ips[9].ivcs[1].fifo_error} {testbench.reset} {testbench.clk} }
 
 # Global: Highlighting
 
 # Post database loading setting...
 
 # Restore C1 time
-gui_set_time -C1_only 48
+gui_set_time -C1_only 2360308
 
 
 
@@ -118,7 +117,7 @@ gui_list_set_filter -id ${Data.1} -list { {Buffer 1} {Input 1} {Others 1} {Linka
 gui_list_set_filter -id ${Data.1} -text {*}
 gui_list_show_data -id ${Data.1} {testbench}
 gui_show_window -window ${Data.1}
-catch { gui_list_select -id ${Data.1} {testbench.flow_ctrl_out_ip testbench.flit_ctrl_out_op testbench.flit_data_out_op }}
+catch { gui_list_select -id ${Data.1} {testbench.reset testbench.clk }}
 gui_view_scroll -id ${Data.1} -vertical -set 0
 gui_view_scroll -id ${Data.1} -horizontal -set 0
 gui_view_scroll -id ${Hier.1} -vertical -set 0
@@ -132,15 +131,11 @@ set origWaveHeight [gui_get_pref_value -category Wave -key waveRowHeight]
 gui_list_set_height -id Wave -height 25
 set origGroupCreationState [gui_list_create_group_when_add -wave]
 gui_list_create_group_when_add -wave -disable
-gui_wv_zoom_timerange -id ${Wave.1} 0 264
+gui_wv_zoom_timerange -id ${Wave.1} 0 5000000
 gui_list_set_filter -id ${Wave.1} -list { {Buffer 1} {Input 1} {Others 1} {Linkage 1} {Output 1} {Parameter 1} {All 1} {Aggregate 1} {Event 1} {Assertion 1} {Constant 1} {Signal 1} {$unit 1} {Inout 1} {Variable 1} }
 gui_list_set_filter -id ${Wave.1} -text {*}
 gui_list_add_group -id ${Wave.1} -after {New Group} {{Group1}}
-gui_list_expand -id ${Wave.1} {testbench.ips[0].eps.flit_ctrl}
-gui_list_expand -id ${Wave.1} {testbench.ips[0].eps.flit_data}
-gui_list_expand -id ${Wave.1} {testbench.ips[0].eps.flow_ctrl}
-gui_list_select -id ${Wave.1} {{testbench.ips[0].eps.flit_data[11]} {testbench.ips[0].eps.flit_data[12]} {testbench.ips[0].eps.flit_data[13]} {testbench.ips[0].eps.flit_data[14]} {testbench.ips[0].eps.flit_data[15]} {testbench.ips[0].eps.flit_data[16]} {testbench.ips[0].eps.flit_data[17]} {testbench.ips[0].eps.flit_data[18]} }
-gui_list_set_insertion_bar  -id ${Wave.1} -group {Group1} -item {testbench.ips[0].eps.flit_data[0]} -position below
+gui_list_set_insertion_bar  -id ${Wave.1} -group {Group1}  -position in
 gui_seek_criteria -id ${Wave.1} {Any Edge}
 
 
@@ -154,8 +149,8 @@ if {$origGroupCreationState} {
 if { $groupExD } {
  gui_msg_report -code DVWW028 
 }
-gui_marker_move -id ${Wave.1} {C1} 48
-gui_view_scroll -id ${Wave.1} -vertical -set 35
+gui_marker_move -id ${Wave.1} {C1} 2360308
+gui_view_scroll -id ${Wave.1} -vertical -set 0
 
 # Source 'Source.1'
 gui_src_value_annotate -id ${Source.1} -switch false

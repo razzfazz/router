@@ -498,7 +498,7 @@ module extern_packet_source
      begin
 	if(reset | flit_sent)
 	  for(i = 0; i < flit_data_width; i = i + 1)
-	    data_q[i] <=1'b1;//<= $dist_uniform(seed, 0, 1);
+	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
    
    wire [0:route_info_width-1] route_info;

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps 
 module testbench
   ();
    
@@ -173,8 +174,8 @@ module testbench
 
    //packet source params
    parameter max_packet_count 	 = -1;
-   parameter packet_rate 	 = 24;
-   parameter side_packet_rate 	 = 3;
+   parameter packet_rate 	 = 0;
+   parameter extern_packet_rate  = 3;
    
    parameter initial_seed 	 = 0;
    parameter packet_count_width  = 32;
@@ -184,7 +185,7 @@ module testbench
    //end packet source params
    
    parameter end_time 		 = 10000;
-   parameter Tclk 		 = 5;
+   parameter Tclk 		 = 5.0;
    
 
 
@@ -263,13 +264,17 @@ module testbench
 	.run				(run));
 
    wire packets_in;
-   wire self_out;
-   wire [0:num_ports-1-1] col_out;
-   wire [0:1] row_out;
+   wire self_packets_out;
+   wire [0:num_ports-1-1] col_packets_out;
+   wire [0:1] row_packets_out;
+
+   wire [0:num_ports-1-1] col_packets_in;
+   wire [0:(num_ports-1)*num_vcs-1] row_packets_in;
+
    
-   assign packets_in  =flit_ctrl[0];
-   assign self_out    = flit_ctrl_out_tile[0];
-   assign col_out[0:num_ports-1-1] = {flit_ctrl_out_col_bus[0*flit_ctrl_width],
+   assign packets_in 	    =flit_ctrl[0];
+   assign self_packets_out  = flit_ctrl_out_tile[0];
+   assign col_packets_out[0:num_ports-1-1] = {flit_ctrl_out_col_bus[0*flit_ctrl_width],
 				      flit_ctrl_out_col_bus[1*flit_ctrl_width],
 				      flit_ctrl_out_col_bus[2*flit_ctrl_width],
 				      flit_ctrl_out_col_bus[3*flit_ctrl_width],
@@ -277,11 +282,34 @@ module testbench
 				      flit_ctrl_out_col_bus[5*flit_ctrl_width],
 				      flit_ctrl_out_col_bus[6*flit_ctrl_width]
 				      };
-   assign row_out[0:1] = {flit_ctrl_out_row_bus[0],
+
+   assign col_packets_in[0:num_ports-1-1] = {flit_ctrl_in_col_bus[0*flit_ctrl_width],
+					      flit_ctrl_in_col_bus[1*flit_ctrl_width],
+					      flit_ctrl_in_col_bus[2*flit_ctrl_width],
+					      flit_ctrl_in_col_bus[3*flit_ctrl_width],
+					      flit_ctrl_in_col_bus[4*flit_ctrl_width],
+					      flit_ctrl_in_col_bus[5*flit_ctrl_width],
+					      flit_ctrl_in_col_bus[6*flit_ctrl_width]
+					     };
+   assign row_packets_out[0:1] = {flit_ctrl_out_row_bus[0],
 			  flit_ctrl_out_row_bus[flit_ctrl_width]};
+   assign row_packets_in [0:(num_ports-1)*num_vcs-1]= {flit_ctrl_in_row_bus[0*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[1*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[2*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[3*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[4*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[5*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[6*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[7*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[8*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[9*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[10*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[11*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[12*flit_ctrl_width],
+						       flit_ctrl_in_row_bus[13*flit_ctrl_width]
+						       };
    
-   
-   
+						       
 /*
 
    yarc_tile  #(
@@ -378,7 +406,7 @@ dut (
    assign flit_data_in_tile 	= flit_data;
    assign flow_ctrl 		= flow_ctrl_out_tile;
 
-/*
+   
    generate
       genvar ecols;
       for(ecols =0; ecols <7; ecols=ecols+1)
@@ -387,7 +415,7 @@ dut (
 		 #(
 		   // Parameters
 		   .max_packet_count	(max_packet_count),
-		   .packet_rate		(20),
+		   .packet_rate		(extern_packet_rate),
 		   .initial_seed	(initial_seed+ecols+10),
 		   .packet_count_width	(packet_count_width),
 		   .num_flit_buffers	(num_col_buffers),
@@ -409,7 +437,7 @@ dut (
 		   .dimension_order	(dimension_order),
 		   .port_id		(port_id),
 		   .packet_length_mode	(packet_length_mode))
-	   psecol
+	   eps_col
 		 (
 		  // Outputs
 		  .flit_ctrl		(flit_ctrl_in_col_bus[ecols*flit_ctrl_width:(ecols+1)*flit_ctrl_width-1]),
@@ -434,22 +462,32 @@ dut (
 	begin:erowss
 	   for(vcs = 0; vcs<2; vcs= vcs+1)
 	     begin: vcss
-		packet_source_yarc 
+		wire[0:flow_ctrl_width-1] row_flow_ctrl;
+		if(vcs == 0)
+		  begin assign row_flow_ctrl[0]  = flow_ctrl_out_row_bus[(erows)*(flow_ctrl_width)] && flow_ctrl_out_row_bus[(erows)*(flow_ctrl_width)+1]; 
+		     assign row_flow_ctrl[1:flow_ctrl_width-1]  = flow_ctrl_out_row_bus[(erows)*(flow_ctrl_width)+1:(erows+1)*(flow_ctrl_width)-1]; 
+		  end
+		else 
+		  begin
+		     assign row_flow_ctrl[0]  = flow_ctrl_out_row_bus[(erows)*(flow_ctrl_width)] && flow_ctrl_out_row_bus[(erows)*(flow_ctrl_width)+2]; 
+		     assign row_flow_ctrl[1:flow_ctrl_width-1]  = flow_ctrl_out_row_bus[(erows)*(flow_ctrl_width)+1:(erows+1)*(flow_ctrl_width)-1]; 
+		  end
+		extern_packet_source_yarc 
 		 #(
 		   // Parameters
 		   .max_packet_count	(max_packet_count),
-		   .packet_rate		(2),
-		   .initial_seed	(initial_seed),
+		   .packet_rate		(extern_packet_rate),
+		   .initial_seed	(initial_seed+erows*2+vcs+20),
 		   .packet_count_width	(packet_count_width),
-		   .num_flit_buffers	(num_flit_buffers),
-		   .num_header_buffers	(num_flit_buffers),
+		   .num_flit_buffers	(num_row_buffers),
+		   .num_header_buffers	(num_row_buffers),
 		   .num_traffic_classes	(num_traffic_classes),
 		   .num_routing_classes	(num_routing_classes),
 		   .num_vcs_per_class	(num_vcs_per_class),
 		   .num_ports		(num_ports),
 		   .num_dimensions	(num_dimensions),
 		   .num_routers_per_dim	(num_routers_per_dim),
-		   .router_address	(0),
+		   .router_address	(4'b0),
 		   .num_neighbors_per_dim(num_neighbors_per_dim),
 		   .packet_format	(packet_format),
 		   .max_payload_length	(max_payload_length),
@@ -459,33 +497,34 @@ dut (
 		   .routing_function_type(routing_function_type),
 		   .dimension_order	(dimension_order),
 		   .port_id		(port_id),
-		   .packet_length_mode	(packet_length_mode))
-		ps (
-		    // Outputs
-		    .flit_ctrl			(flit_ctrl_in_row_bus[(erows*num_vcs+vcs)*flit_ctrl_width:(erows*num_vcs+vcs+1)*flit_ctrl_width-1]),
-		    .flit_data			(flit_data_in_row_bus[(erows*num_vcs+vcs)*flit_data_width:(erows*num_vcs+vcs+1)*flit_data_width-1]),
-		    .out_flits			(out_flits[0:packet_count_width-1]),
-		    .error				(error),
-		    // Inputs
-		    .clk				(clk),
-		    .reset				(reset),
-		    .flow_ctrl			(flow_ctrl[0:flow_ctrl_width-1]),
-		    .run				(run));
-		end
+		   .packet_length_mode	(packet_length_mode),
+		   .vc_id(vcs))
+		eps_row (
+			 // Outputs
+			 .flit_ctrl			(flit_ctrl_in_row_bus[(erows*num_vcs+vcs)*flit_ctrl_width:(erows*num_vcs+vcs+1)*flit_ctrl_width-1]),
+			 .flit_data			(flit_data_in_row_bus[(erows*num_vcs+vcs)*flit_data_width:(erows*num_vcs+vcs+1)*flit_data_width-1]),
+			 .out_flits			(out_flits[0:packet_count_width-1]),
+			 .error				(error),
+			 // Inputs
+			 .clk				(clk),
+			 .reset				(reset),
+			 .flow_ctrl			(row_flow_ctrl),
+			 .run				(run));
+	     end
 	   
 	end
    endgenerate
-   */
+   
    //////////////////////////////////////////////////////////
    //test bench hacks
    //////////////////////////////////////////////////////////
 
 
-   assign flit_ctrl_in_row_bus 	= {((num_ports-1)*flit_ctrl_width){1'b0}};
-   assign flit_data_in_row_bus 	= {((num_ports-1)*flit_data_width){1'b0}};
+   //assign flit_ctrl_in_row_bus 	= {((num_ports-1)*flit_ctrl_width){1'b0}};
+   //assign flit_data_in_row_bus 	= {((num_ports-1)*flit_data_width){1'b0}};
    //assign flow_ctrl_in_row_bus 	={(num_ports-1)*flow_ctrl_width{1'b0}};
-   assign flit_ctrl_in_col_bus 	= {((num_ports-1)*flit_ctrl_width){1'b0}};
-   assign flit_data_in_col_bus 	= {((num_ports-1)*flit_data_width){1'b0}};
+   //assign flit_ctrl_in_col_bus 	= {((num_ports-1)*flit_ctrl_width){1'b0}};
+   //assign flit_data_in_col_bus 	= {((num_ports-1)*flit_data_width){1'b0}};
    //assign flow_ctrl_in_col_bus 	={(num_ports-1)*(flow_ctrl_width-1){1'b0}};
    //assign flow_ctrl_in_tile 	={flow_ctrl_width{1'b0}};
    
@@ -537,7 +576,7 @@ dut (
    
 
    /*stats*/
-
+   //injection ports
    wire [0:31] count_in_flits_s, count_in_flits_q;
    assign count_in_flits_s
      = 
@@ -555,57 +594,96 @@ dut (
    wire [0:31] count_in_flits;
    assign count_in_flits = count_in_flits_s;
 
-   wire [0:31] count_self_out_s, count_self_out_q;
-   assign count_self_out_s
+   //output port
+   wire [0:31] count_self_packets_out_s, count_self_packets_out_q;
+   assign count_self_packets_out_s
      = 
-       count_self_out_q + pop_count(self_out);
+       count_self_packets_out_q + pop_count(self_packets_out);
    
    c_dff
      #(.width(32),
        .reset_type(reset_type))
-   count_self_outq
+   count_self_packets_outq
      (.clk(clk),
       .reset(reset),
-      .d(count_self_out_s),
-      .q(count_self_out_q));
+      .d(count_self_packets_out_s),
+      .q(count_self_packets_out_q));
 
-   wire [0:31] count_self_out;
-   assign count_self_out = count_self_out_s;
+   wire [0:31] count_self_packets_out;
+   assign count_self_packets_out = count_self_packets_out_s;
 
-
-    wire [0:31] count_col_out_s, count_col_out_q;
-   assign count_col_out_s
+   //column bus output
+    wire [0:31] count_col_packets_out_s, count_col_packets_out_q;
+   assign count_col_packets_out_s
      = 
-       count_col_out_q + pop_count(col_out);
+       count_col_packets_out_q + pop_count(col_packets_out);
    
    c_dff
      #(.width(32),
        .reset_type(reset_type))
-   count_col_outq
+   count_col_packets_outq
      (.clk(clk),
       .reset(reset),
-      .d(count_col_out_s),
-      .q(count_col_out_q));
+      .d(count_col_packets_out_s),
+      .q(count_col_packets_out_q));
 
-   wire [0:31] count_col_out;
-   assign count_col_out = count_col_out_s;
+   wire [0:31] count_col_packets_out;
+   assign count_col_packets_out = count_col_packets_out_s;
 
-    wire [0:31] count_row_out_s, count_row_out_q;
-   assign count_row_out_s
+   //column bus input
+       wire [0:31] count_col_packets_in_s, count_col_packets_in_q;
+   assign count_col_packets_in_s
      = 
-       count_row_out_q + pop_count(row_out);
+       count_col_packets_in_q + pop_count(col_packets_in);
+
+   c_dff
+     #(.width(32),
+       .reset_type(reset_type))
+   count_col_packets_inq
+     (.clk(clk),
+      .reset(reset),
+      .d(count_col_packets_in_s),
+      .q(count_col_packets_in_q));
+
+   wire [0:31] count_col_packets_in;
+   assign count_col_packets_in = count_col_packets_in_s;
+
+   //row bus out
+   wire [0:31] count_row_packets_out_s, count_row_packets_out_q;
+   assign count_row_packets_out_s
+     = 
+       count_row_packets_out_q + pop_count(row_packets_out);
    
    c_dff
      #(.width(32),
        .reset_type(reset_type))
-   count_row_outq
+   count_row_packets_outq
      (.clk(clk),
       .reset(reset),
-      .d(count_row_out_s),
-      .q(count_row_out_q));
+      .d(count_row_packets_out_s),
+      .q(count_row_packets_out_q));
 
-   wire [0:31] count_row_out;
-   assign count_row_out = count_row_out_s;
+   wire [0:31] count_row_packets_out;
+   assign count_row_packets_out  = count_row_packets_out_s;
+
+   
+   //row bus in
+   wire [0:31] count_row_packets_in_s, count_row_packets_in_q;
+   assign count_row_packets_in_s
+     = 
+       count_row_packets_in_q + pop_count(row_packets_in);
+   
+   c_dff
+     #(.width(32),
+       .reset_type(reset_type))
+   count_row_packets_inq
+     (.clk(clk),
+      .reset(reset),
+      .d(count_row_packets_in_s),
+      .q(count_row_packets_in_q));
+
+   wire [0:31] count_row_packets_in;
+   assign count_row_packets_in = count_row_packets_in_s;
    /*end stats*/
    
    reg [0:flit_ctrl_width+flit_data_width-1] vectors[0:100], currentvec;
@@ -614,10 +692,8 @@ dut (
 
    
    initial begin
-      $readmemb("test_vector", vectors);
       vectornum     = 0;
       run_time 	    = 0;
-      
    end 
 
    
@@ -647,7 +723,7 @@ dut (
 	//$display("%d %b %b",run_time,flit_ctrl,flit_data);
       
       if(run_time == end_time) begin
-	 $display("Total %d flits in, %d flits out, %d flits column out, %d flits row out",count_in_flits,count_self_out,count_col_out, count_row_out);
+	 $display("%d port in, %d port outout, %d column bus out, %d row bus out %d column bus in, %d row bus in",count_in_flits,count_self_packets_out,count_col_packets_out, count_row_packets_out,count_col_packets_in, count_row_packets_in );
 	 
 	 $finish;
 	 end
@@ -664,8 +740,8 @@ dut (
      end
    
    initial begin : main
-      $dumpfile("yarc.vcd");
-      $dumpvars(0, dut);
+      //$dumpfile("yarc.vcd");
+      //$dumpvars(0, testbench.dut);
       $sdf_annotate("yarc_tile.sdf",testbench.dut);
       
    end   
