@@ -580,8 +580,7 @@ module vcr_vc_alloc_sep_of
 				      assign gnt_raw_icvc = req_out_icvc;
 
 				    c_padder
-				      #(.width(num_resource_classes*
-					       num_vcs_per_class),
+				      #(.width(num_vcs_per_class),
 					.pad_left(0),
 					.pad_right((num_resource_classes - 1)*
 						   num_vcs_per_class))
