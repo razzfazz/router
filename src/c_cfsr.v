@@ -64,7 +64,9 @@ module c_cfsr
    
    // data output
    output [offset:(offset+width)-1] q;
-   reg [offset:(offset+width)-1] q;
+   wire [offset:(offset+width)-1] q;
+   
+   wire [offset:(offset+width)-1] cfsr_q;
    
    wire 			 fb_seed;
    
@@ -86,8 +88,6 @@ module c_cfsr
    
    wire [offset:(offset+width)-1] base_val;
    assign base_val[offset] = 1'b0;
-   
-   wire [offset:(offset+width)-1] cfsr_q;
    
    generate
       
