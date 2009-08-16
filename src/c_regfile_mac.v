@@ -81,30 +81,40 @@ module c_regfile_mac
    
    reg [0:addr_width-1] read_address_q;
    
+   always @(posedge clk)
+     if(read_enable)
+       read_address_q <= read_address;
+   
    genvar 		level;
    
    generate
       
-      always @(posedge clk)
-	if(read_enable)
-	  read_address_q <= read_address;
-      
       case(regfile_type)
 	
-	`REGFILE_TYPE_FF_2D:
+	`REGFILE_TYPE_FF_2D, `REGFILE_TYPE_LAT_2D:
 	  begin
 	     
-	     reg [0:width-1] 	storage [0:depth-1];
+	     reg [0:width-1] storage [0:depth-1];
 	     
-	     always @(posedge clk)
-	       if(write_enable)
-		 storage[write_address] <= write_data;
+	     case(regfile_type)
+	       
+	       `REGFILE_TYPE_FF_2D:
+		 always @(posedge clk)
+		   if(write_enable)
+		     storage[write_address] <= write_data;
+	       
+	       `REGFILE_TYPE_LAT_2D:
+		 always @(clk, write_enable, write_address, write_data)
+		   if(~clk & write_enable)
+		     storage[write_address] <= write_data;
+	       
+	     endcase
 	     
 	     assign read_data = storage[read_address_q];
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_MUX:
+	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX:
 	  begin
 	     
 	     wire [0:depth*width-1] read_data_lvl;
@@ -117,9 +127,19 @@ module c_regfile_mac
 		  
 		  reg [0:width-1] storage;
 		  
-		  always @(posedge clk)
-		    if(write)
-		      storage <= write_data;
+		  case(regfile_type)
+		    
+		    `REGFILE_TYPE_FF_1D_MUX:
+		      always @(posedge clk)
+			if(write)
+			  storage <= write_data;
+		    
+		    `REGFILE_TYPE_LAT_1D_MUX:
+		      always @(clk, write, write_data)
+			if(~clk & write)
+			  storage <= write_data;
+		    
+		  endcase
 		  
 		  assign read_data_lvl[level*width:(level+1)*width-1] = storage;
 		  
@@ -129,10 +149,10 @@ module c_regfile_mac
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_TRISTATE:
+	`REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
 	  begin
 	     
-	     reg 		    read_enable_q;
+	     reg read_enable_q;
 	     
 	     always @(posedge clk)
 	       read_enable_q <= read_enable;
@@ -144,9 +164,20 @@ module c_regfile_mac
 		  assign write = write_enable && (write_address == level);
 		  
 		  reg [0:width-1] storage;
-		  always @(posedge clk)
-		    if(write)
-		      storage <= write_data;
+		  
+		  case(regfile_type)
+		    
+		    `REGFILE_TYPE_FF_1D_TRISTATE:
+		      always @(posedge clk)
+			if(write)
+			  storage <= write_data;
+		    
+		    `REGFILE_TYPE_LAT_1D_TRISTATE:
+		      always @(clk, write, write_data)
+			if(~clk & write)
+			  storage <= write_data;
+		    
+		  endcase
 		  
 		  wire 		  read;
 		  assign read = read_enable_q && (read_address_q == level);
@@ -154,6 +185,50 @@ module c_regfile_mac
 		  assign read_data = read ? storage : {width{1'bz}};
 		  
 	       end
+	     
+	  end
+	
+	`REGFILE_TYPE_FF_DW, `REGFILE_TYPE_LAT_DW:
+	  begin
+	     
+	     wire write_enable_b;
+	     assign write_enable_b = ~write_enable;
+	     
+	     case(regfile_type)
+	       
+	       `REGFILE_TYPE_FF_DW:
+		 begin
+		    DW_ram_r_w_s_dff
+		      #(.data_width(width),
+			.depth(depth),
+			.rst_mode(1))
+		    DW_rf_dff
+		      (.clk(clk),
+		       .rst_n(1'b1),
+		       .cs_n(write_enable_b),
+		       .wr_n(write_enable_b),
+		       .rd_addr(read_address_q),
+		       .wr_addr(write_address),
+		       .data_in(write_data),
+		       .data_out(read_data));
+		 end
+	
+	       `REGFILE_TYPE_LAT_DW:
+		 begin
+		    DW_ram_r_w_s_lat
+		      #(.data_width(width),
+			.depth(depth))
+		    DW_rf_lat
+		      (.clk(clk),
+		       .cs_n(write_enable_b),
+		       .wr_n(write_enable_b),
+		       .rd_addr(read_address_q),
+		       .wr_addr(write_address),
+		       .data_in(write_data),
+		       .data_out(read_data));
+		 end
+	       
+	     endcase
 	     
 	  end
 	

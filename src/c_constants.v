@@ -148,13 +148,28 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // 2D array implemented using flipflops
-`define REGFILE_TYPE_FF_2D          0
+`define REGFILE_TYPE_FF_2D           0
 
 // 1D array of flipflops, read using a combinational mux
-`define REGFILE_TYPE_FF_1D_MUX      1
+`define REGFILE_TYPE_FF_1D_MUX       1
 
 // 1D array of flipflops, read using a tristate mux
-`define REGFILE_TYPE_FF_1D_TRISTATE 2
+`define REGFILE_TYPE_FF_1D_TRISTATE  2
+
+// Synopsys DesignWare implementation using flipflips
+`define REGFILE_TYPE_FF_DW           3
+
+// 2D array implemented using flipflops
+`define REGFILE_TYPE_LAT_2D          4
+
+// 1D array of flipflops, read using a combinational mux
+`define REGFILE_TYPE_LAT_1D_MUX      5
+
+// 1D array of flipflops, read using a tristate mux
+`define REGFILE_TYPE_LAT_1D_TRISTATE 6
+
+// Synopsys DesignWare implementation using flipflips
+`define REGFILE_TYPE_LAT_DW          7
 
 
 //------------------------------------------------------------------------------
