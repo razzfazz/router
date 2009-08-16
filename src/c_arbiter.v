@@ -39,6 +39,19 @@ module c_arbiter
    // number of input ports
    parameter num_ports = 32;
    
+   // compute ceiling of binary logarithm
+   function integer clogb(input integer argument);
+      integer 		     i;
+      begin
+	 clogb = 0;
+	 for(i = argument - 1; i > 0; i = i >> 1)
+	   clogb = clogb + 1;
+      end
+   endfunction
+   
+   // number fo bits required to select a port
+   localparam port_idx_width = clogb(num_ports);
+   
    // select type of arbiter to use
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -68,7 +81,7 @@ module c_arbiter
 		  c_rr_arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type))
-		  arb
+		  rr_arb
 		    (.clk(clk),
 		     .reset(reset),
 		     .update(update),
@@ -80,12 +93,46 @@ module c_arbiter
 		  c_matrix_arbiter
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type))
-		  arb
+		  m_arb
 		    (.clk(clk),
 		     .reset(reset),
 		     .update(update),
 		     .req(req),
 		     .gnt(gnt));
+	       end
+	     `ARBITER_TYPE_DW_FCFS:
+	       begin
+		  wire rst_n;
+		  if(reset_type == `RESET_TYPE_ASYNC)
+		    assign rst_n = ~reset;
+		  else
+		    assign rst_n = 1'b1;
+		  
+		  wire init_n;
+		  if(reset_type == `RESET_TYPE_SYNC)
+		    assign init_n = ~reset;
+		  else
+		    assign init_n = 1'b1;
+		  
+		  wire parked;
+		  wire locked;
+		  wire [0:port_idx_width-1] grant_index;
+		  DW_arb_fcfs
+		    #(.n(num_ports),
+		      .park_mode(0),
+		      .output_mode(0))
+		  dw_fcfs_arb
+		    (.clk(clk),
+		     .rst_n(rst_n),
+		     .init_n(init_n),
+		     .enable(update),
+		     .request(req),
+		     .lock({num_ports{1'b0}}),
+		     .mask({num_ports{1'b0}}),
+		     .parked(parked),
+		     .locked(locked),
+		     .grant(gnt),
+		     .grant_index(grant_index));
 	       end
 	   endcase
 	   

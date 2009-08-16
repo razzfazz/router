@@ -114,6 +114,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // matrix arbiter
 `define ARBITER_TYPE_MATRIX      1
 
+// DesignWare first-come, first-serve arbiter
+`define ARBITER_TYPE_DW_FCFS     2
+
 
 //------------------------------------------------------------------------------
 // error checker capture more
