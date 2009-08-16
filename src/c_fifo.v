@@ -246,6 +246,43 @@ module c_fifo
 	     assign data_out = storage[read_ptr];
 	     
 	  end
+	`FIFO_TYPE_DW:
+	  begin
+	     wire rst_n;
+	     if(reset_type != `RESET_TYPE_NONE)
+	       assign rst_n = ~reset;
+	     else
+	       assign rst_n = 1'b1;
+	     
+	     wire push_req_n;
+	     assign push_req_n = ~push;
+	     
+	     wire pop_req_n;
+	     assign pop_req_n = ~pop;
+
+	     wire almost_empty;
+	     wire half_full;
+	     wire almost_full;
+	     DW_fifo_s1_sf
+	       #(.width(width),
+		 .depth(depth),
+		 .err_mode(2),
+		 .rst_mode((reset_type == `RESET_TYPE_ASYNC) ? 2 : 3))
+	     dw_fifo
+	       (.clk(clk),
+		.rst_n(rst_n),
+		.push_req_n(push_req_n),
+		.pop_req_n(pop_req_n),
+		.diag_n(1'b1),
+		.data_in(data_in),
+		.empty(empty),
+		.almost_empty(almost_empty),
+		.half_full(half_full),
+		.almost_full(almost_full),
+		.full(full),
+		.error(error),
+		.data_out(data_out));
+	  end
       endcase
       
    endgenerate
