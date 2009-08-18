@@ -36,16 +36,6 @@ module c_fifo_ctrl
    
 `include "c_constants.v"
    
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
-   
    // address width
    parameter addr_width = 3;
    
@@ -187,7 +177,7 @@ module c_fifo_ctrl
    // synopsys translate_off
    generate
       
-      if(addr_width < clogb(depth))
+      if(depth > (1 << addr_width))
 	begin
 	   initial
 	   begin
