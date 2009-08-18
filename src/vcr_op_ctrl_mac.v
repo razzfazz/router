@@ -100,8 +100,17 @@ module vcr_op_ctrl_mac
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
+   // connectivity within each dimension
+   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   localparam num_neighbors_per_dim
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+       2 :
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports

@@ -40,8 +40,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // mesh
 `define NETWORK_TOPOLOGY_MESH  0
 
+// torus
+`define NETWORK_TOPOLOGY_TORUS 1
+
 // flattened butterfly
-`define NETWORK_TOPOLOGY_FBFLY 1
+`define NETWORK_TOPOLOGY_FBFLY 2
+
+
+//------------------------------------------------------------------------------
+// what does connectivity look like within a dimension?
+//------------------------------------------------------------------------------
+
+// nodes are connected to their neighbors with no wraparound (e.g. mesh)
+`define DIMENSION_CONNECTIVITY_LINE 0
+
+// nodes are connected to their neighbors with wraparound (e.g. torus)
+`define DIMENSION_CONNECTIVITY_RING 1
+
+// nodes are fully connected (e.g. flattened butterfly)
+`define DIMENSION_CONNECTIVITY_FULL 2
 
 
 //------------------------------------------------------------------------------
@@ -59,13 +76,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // routing function types
 //------------------------------------------------------------------------------
 
-// within a dimension, route based on relation between current and destination 
-// address (one port each for greater and smaller addresses)
-`define ROUTING_FUNCTION_TYPE_MESH  0
-
-// within a dimension, route based on difference between current and destinatio
-// address (one port for each address other than current one)  
-`define ROUTING_FUNCTION_TYPE_FBFLY 1
+// dimension-order routing (using multiple phases if num_resource_classes > 1)
+`define ROUTING_FUNCTION_TYPE_DOR 0
 
 
 //------------------------------------------------------------------------------

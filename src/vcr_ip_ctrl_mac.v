@@ -100,8 +100,17 @@ module vcr_ip_ctrl_mac
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
+   // connectivity within each dimension
+   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   localparam num_neighbors_per_dim
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+       2 :
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports
@@ -160,7 +169,7 @@ module vcr_ip_ctrl_mac
    parameter track_vcs_at_output = 0;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
@@ -428,7 +437,7 @@ module vcr_ip_ctrl_mac
 			 .num_routers_per_dim(num_routers_per_dim),
 			 .num_dimensions(num_dimensions),
 			 .num_nodes_per_router(num_nodes_per_router),
-			 .num_neighbors_per_dim(num_neighbors_per_dim),
+			 .dimension_connectivity(dimension_connectivity),
 			 .packet_format(packet_format),
 			 .max_payload_length(max_payload_length),
 			 .min_payload_length(min_payload_length),

@@ -134,11 +134,22 @@ module testbench
    localparam [0:router_addr_width-1] router_address
      = {router_addr_width{1'b0}}/*{num_dimensions{default_dim_addr}}*/;
    
+   // connectivity within each dimension
+   localparam dimension_connectivity
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       `DIMENSION_CONNECTIVITY_LINE :
+       (network_topology == `NETWORK_TOPOLOGY_TORUS) ?
+       `DIMENSION_CONNECTIVITY_RING :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       `DIMENSION_CONNECTIVITY_FULL :
+       -1;
+   
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
        2 :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -190,12 +201,7 @@ module testbench
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select routing function type
-   localparam routing_function_type
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_MESH :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `ROUTING_FUNCTION_TYPE_FBFLY :
-       -1;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // enable speculative switch allocation
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
@@ -475,12 +481,15 @@ module testbench
 			      .num_routers_per_dim(num_routers_per_dim),
 			      .num_dimensions(num_dimensions),
 			      .num_nodes_per_router(num_nodes_per_router),
-			      .num_neighbors_per_dim(num_neighbors_per_dim),
+			      .dimension_connectivity(dimension_connectivity),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
-			      .resource_class(irc))
+			      .resource_class(irc),
+			      .reset_type(reset_type))
 			  rtl
-			    (.router_address(router_address),
+			    (.clk(clk),
+			     .reset(reset),
+			     .router_address(router_address),
 			     .hop_route_info(hop_route_info),
 			     .route_port(route_port),
 			     .inc_rc(inc_rc));
@@ -554,12 +563,15 @@ module testbench
 			      .num_routers_per_dim(num_routers_per_dim),
 			      .num_dimensions(num_dimensions),
 			      .num_nodes_per_router(num_nodes_per_router),
-			      .num_neighbors_per_dim(num_neighbors_per_dim),
+			      .dimension_connectivity(dimension_connectivity),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
-			      .resource_class(irc))
+			      .resource_class(irc),
+			      .reset_type(reset_type))
 			  lar
-			    (.router_address(router_address),
+			    (.clk(clk),
+			     .reset(reset),
+			     .router_address(router_address),
 			     .route_port(la_route_port),
 			     .inc_rc(la_inc_rc),
 			     .hop_route_info(hop_route_info_la),

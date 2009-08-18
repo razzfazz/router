@@ -77,8 +77,17 @@ module whr_ip_ctrl_mac
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
+   // connectivity within each dimension
+   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   localparam num_neighbors_per_dim
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+       2 :
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports
@@ -137,7 +146,7 @@ module whr_ip_ctrl_mac
    localparam flow_ctrl_width = 1;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
@@ -668,11 +677,14 @@ module whr_ip_ctrl_mac
      #(.num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .dimension_connectivity(dimension_connectivity),
        .routing_function_type(routing_function_type),
-       .dimension_order(dimension_order))
+       .dimension_order(dimension_order),
+       .reset_type(reset_type))
    lar
-     (.router_address(router_address),
+     (.clk(clk),
+      .reset(reset),
+      .router_address(router_address),
       .route_op(route_op),
       .route_info(hdff_route_info),
       .la_route_info(la_route_info_out));

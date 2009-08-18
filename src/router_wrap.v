@@ -93,11 +93,22 @@ module router_wrap
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
+   // connectivity within each dimension
+   localparam dimension_connectivity
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       `DIMENSION_CONNECTIVITY_LINE :
+       (network_topology == `NETWORK_TOPOLOGY_TORUS) ?
+       `DIMENSION_CONNECTIVITY_RING :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       `DIMENSION_CONNECTIVITY_FULL :
+       -1;
+   
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
        2 :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -117,12 +128,7 @@ module router_wrap
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select routing function type
-   localparam routing_function_type
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_MESH :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `ROUTING_FUNCTION_TYPE_FBFLY :
-       -1;
+   localparam routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // enable speculative switch allocation
    localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
@@ -172,7 +178,7 @@ module router_wrap
 		 .num_routers_per_dim(num_routers_per_dim),
 		 .num_dimensions(num_dimensions),
 		 .num_nodes_per_router(num_nodes_per_router),
-		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .dimension_connectivity(dimension_connectivity),
 		 .packet_format(packet_format),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
@@ -214,7 +220,7 @@ module router_wrap
 		 .num_routers_per_dim(num_routers_per_dim),
 		 .num_dimensions(num_dimensions),
 		 .num_nodes_per_router(num_nodes_per_router),
-		 .num_neighbors_per_dim(num_neighbors_per_dim),
+		 .dimension_connectivity(dimension_connectivity),
 		 .packet_format(packet_format),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),

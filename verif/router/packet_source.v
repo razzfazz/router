@@ -127,11 +127,22 @@ module packet_source
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
+   // connectivity within each dimension
+   localparam dimension_connectivity
+     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+       `DIMENSION_CONNECTIVITY_LINE :
+       (network_topology == `NETWORK_TOPOLOGY_TORUS) ?
+       `DIMENSION_CONNECTIVITY_RING :
+       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       `DIMENSION_CONNECTIVITY_FULL :
+       -1;
+   
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
        2 :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -184,7 +195,7 @@ module packet_source
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
@@ -561,12 +572,14 @@ module packet_source
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_dimensions(num_dimensions),
 		    .num_nodes_per_router(num_nodes_per_router),
-		    .num_neighbors_per_dim(num_neighbors_per_dim),
+		    .dimension_connectivity(dimension_connectivity),
 		    .routing_function_type(routing_function_type),
 		    .dimension_order(dimension_order),
 		    .resource_class(irc))
 		rtl
-		  (.router_address(router_address),
+		  (.clk(clk),
+		   .reset(reset),
+		   .router_address(router_address),
 		   .hop_route_info(hop_route_info),
 		   .route_port(route_port),
 		   .inc_rc(inc_rc));

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for wormhole router
 module whr_routing_logic
-  (router_address, route_info, route_op);
+  (clk, reset, router_address, route_info, route_op);
    
 `include "c_constants.v"
    
@@ -67,21 +67,36 @@ module whr_routing_logic
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
+   // connectivity within each dimension
+   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   localparam num_neighbors_per_dim
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+       2 :
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
    
    // total number of bits required for storing routing information
    localparam route_info_width = addr_width;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   input clk;
+   input reset;
    
    // current router's address
    input [0:router_addr_width-1] router_address;
@@ -103,85 +118,116 @@ module whr_routing_logic
    wire [0:num_dimensions-1] 	dim_addr_match;
    
    generate
-   
-      genvar 			dim;
       
-      for(dim = 0; dim < num_dimensions; dim = dim + 1)
-	begin:dims
-	   
-	   wire [0:dim_addr_width-1] dim_addr;
-	   assign dim_addr
-	     = dest_router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
-	   
-	   wire [0:dim_addr_width-1] local_dim_addr;
-	   assign local_dim_addr
-	     = router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
-	   
-	   assign dim_addr_match[dim] = (dim_addr == local_dim_addr);
-	   
-	   wire 		     dim_sel;
-	   
-	   case(dimension_order)
+      case(routing_function_type)
+	
+	`ROUTING_FUNCTION_TYPE_DOR:
+	  begin
 	     
-	     `DIMENSION_ORDER_ASCENDING:
-	       begin
-		  if(dim == 0)
-		    assign dim_sel = ~dim_addr_match[dim];
-		  else
-		    assign dim_sel = &dim_addr_match[0:dim-1] &
-				     ~dim_addr_match[dim];
+	     genvar dim;
+	     
+	     for(dim = 0; dim < num_dimensions; dim = dim + 1)
+	       begin:dims
+		  
+		  wire [0:dim_addr_width-1] dim_addr;
+		  assign dim_addr
+		    = dest_router_address[dim*dim_addr_width:
+					  (dim+1)*dim_addr_width-1];
+		  
+		  wire [0:dim_addr_width-1] local_dim_addr;
+		  assign local_dim_addr
+		    = router_address[dim*dim_addr_width:
+				     (dim+1)*dim_addr_width-1];
+		  
+		  assign dim_addr_match[dim] = (dim_addr == local_dim_addr);
+		  
+		  wire 			    dim_sel;
+		  
+		  case(dimension_order)
+		    
+		    `DIMENSION_ORDER_ASCENDING:
+		      begin
+			 if(dim == 0)
+			   assign dim_sel = ~dim_addr_match[dim];
+			 else
+			   assign dim_sel = &dim_addr_match[0:dim-1] &
+					    ~dim_addr_match[dim];
+		      end
+		    
+		    `DIMENSION_ORDER_DESCENDING:
+		      begin
+			 if(dim == (num_dimensions - 1))
+			   assign dim_sel = ~dim_addr_match[dim];
+			 else
+			   assign dim_sel = ~dim_addr_match[dim] &
+					    dim_addr_match[(dim+1):
+							   (num_dimensions-1)];
+		      end
+		    
+		  endcase
+		  
+		  wire [0:num_neighbors_per_dim-1] port_dec;
+		  
+		  case(dimension_connectivity)
+		    
+		    `DIMENSION_CONNECTIVITY_LINE:
+		      begin
+			 
+			 assign port_dec
+			   = {dim_addr < local_dim_addr, 
+			      dim_addr > local_dim_addr};
+			 
+		      end
+		    
+		    `DIMENSION_CONNECTIVITY_RING:
+		      begin
+			 
+			 // FIXME: add implementation here!
+			 
+			 // synopsys translate_off
+			 initial
+			 begin
+			    $display("ERROR: The routing logic module does not \
+				     yet support ring connectivity within each \
+				     dimension.");
+			    $stop;
+			 end
+			 // synopsys translate_on
+			 
+		      end
+		    
+		    `DIMENSION_CONNECTIVITY_FULL:
+		      begin
+			 
+			 wire [0:num_routers_per_dim-1] dim_addr_dec;
+			 c_decoder
+			   #(.num_ports(num_routers_per_dim))
+			 dim_addr_dec_dec
+			   (.data_in(dim_addr),
+			    .data_out(dim_addr_dec));
+			 
+			 wire [0:(2*num_routers_per_dim-1)-1] dim_addr_dec_repl;
+			 assign dim_addr_dec_repl
+			   = {dim_addr_dec, 
+			      dim_addr_dec[0:(num_routers_per_dim-1)-1]};
+			 
+			 assign port_dec
+			   = dim_addr_dec_repl[(local_dim_addr+1) +: 
+					       num_neighbors_per_dim];
+			 
+		      end
+		    
+		  endcase
+		  
+		  assign route_op[dim*num_neighbors_per_dim:
+				  (dim+1)*num_neighbors_per_dim-1]
+			   = port_dec & {num_neighbors_per_dim{dim_sel}};
+		  
 	       end
 	     
-	     `DIMENSION_ORDER_DESCENDING:
-	       begin
-		  if(dim == (num_dimensions - 1))
-		    assign dim_sel = ~dim_addr_match[dim];
-		  else
-		    assign dim_sel = ~dim_addr_match[dim] &
-				     dim_addr_match[(dim+1):(num_dimensions-1)];
-	       end
-	     
-	   endcase
-	   
-	   wire [0:num_neighbors_per_dim-1] port_dec;
-	   
-	   case(routing_function_type)
-	     
-	     `ROUTING_FUNCTION_TYPE_MESH:
-	       begin
-		  
-		  assign port_dec
-		    = {dim_addr < local_dim_addr, dim_addr > local_dim_addr};
-		  
-	       end
-	     
-	     `ROUTING_FUNCTION_TYPE_FBFLY:
-	       begin
-		  
-		  wire [0:num_routers_per_dim-1] dim_addr_dec;
-		  c_decoder
-		    #(.num_ports(num_routers_per_dim))
-		  dim_addr_dec_dec
-		    (.data_in(dim_addr),
-		     .data_out(dim_addr_dec));
-		  
-		  wire [0:(2*num_routers_per_dim-1)-1] dim_addr_dec_repl;
-		  assign dim_addr_dec_repl
-		    = {dim_addr_dec, dim_addr_dec[0:(num_routers_per_dim-1)-1]};
-		  
-		  assign port_dec
-		    = dim_addr_dec_repl[(local_dim_addr+1) +: 
-					num_neighbors_per_dim];
-		  
-	       end
-	     
-	   endcase
-	   
-	   assign route_op[dim*num_neighbors_per_dim:
-			   (dim+1)*num_neighbors_per_dim-1]
-		    = port_dec & {num_neighbors_per_dim{dim_sel}};
-	   
-	end
+	  end
+	
+      endcase
       
       if(num_nodes_per_router > 1)
 	begin

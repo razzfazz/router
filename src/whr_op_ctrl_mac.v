@@ -81,8 +81,17 @@ module whr_op_ctrl_mac
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
+   // connectivity within each dimension
+   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   localparam num_neighbors_per_dim
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+       2 :
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports

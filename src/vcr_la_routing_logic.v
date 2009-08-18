@@ -32,7 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic for VC router
 module vcr_la_routing_logic
-  (router_address, route_port, inc_rc, hop_route_info, la_route_info);
+  (clk, reset, router_address, route_port, inc_rc, hop_route_info, 
+   la_route_info);
    
 `include "c_constants.v"
    
@@ -70,8 +71,17 @@ module vcr_la_routing_logic
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
+   // connectivity within each dimension
+   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   
    // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
+   localparam num_neighbors_per_dim
+     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
+	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+       2 :
+       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
    
    // number of input and output ports on router
    localparam num_ports
@@ -85,7 +95,7 @@ module vcr_la_routing_logic
      = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;
+   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
    
    // select order of dimension traversal
    parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
@@ -100,6 +110,12 @@ module vcr_la_routing_logic
        (resource_class == (num_resource_classes - 2)) ?
        (router_addr_width + addr_width) :
        (2 * router_addr_width);
+   
+
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   input clk;
+   input reset;
    
    // current router's address
    input [0:router_addr_width-1] router_address;
@@ -127,10 +143,6 @@ module vcr_la_routing_logic
    
    wire [0:num_ports-1] 	  next_route_op;
    
-   wire 			  eject;
-   
-   genvar 			  dim;
-   
    generate
       
       if(num_resource_classes > 1)
@@ -153,115 +165,161 @@ module vcr_la_routing_logic
       else
 	assign dest_router_address = hop_route_info[0:router_addr_width-1];
       
-      for(dim = 0; dim < num_dimensions; dim = dim + 1)
-	begin:dims
-	   
-	   wire [0:dim_addr_width-1] dest_dim_addr;
-	   assign dest_dim_addr
-	     = dest_router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
-	   
-	   wire [0:dim_addr_width-1] curr_dim_addr;
-	   assign curr_dim_addr
-	     = router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
-	   
-	   wire [0:dim_addr_width-1] next_dim_addr;
-	   
-	   assign dim_addr_match[dim] = (next_dim_addr == dest_dim_addr);
-	   
-	   wire 			    dim_sel;
-	   
-	   case(dimension_order)
+      case(routing_function_type)
+	
+	`ROUTING_FUNCTION_TYPE_DOR:
+	  begin
 	     
-	     `DIMENSION_ORDER_ASCENDING:
-	       begin
-		  if(dim == 0)
-		    assign dim_sel = ~dim_addr_match[dim];
-		  else
-		    assign dim_sel = &dim_addr_match[0:dim-1] &
-				     ~dim_addr_match[dim];
+	     genvar dim;
+	     
+	     for(dim = 0; dim < num_dimensions; dim = dim + 1)
+	       begin:dims
+		  
+		  wire [0:dim_addr_width-1] dest_dim_addr;
+		  assign dest_dim_addr
+		    = dest_router_address[dim*dim_addr_width:
+					  (dim+1)*dim_addr_width-1];
+		  
+		  wire [0:dim_addr_width-1] curr_dim_addr;
+		  assign curr_dim_addr
+		    = router_address[dim*dim_addr_width:
+				     (dim+1)*dim_addr_width-1];
+		  
+		  wire [0:dim_addr_width-1] next_dim_addr;
+		  
+		  assign dim_addr_match[dim] = (next_dim_addr == dest_dim_addr);
+		  
+		  wire 			    dim_sel;
+		  
+		  case(dimension_order)
+		    
+		    `DIMENSION_ORDER_ASCENDING:
+		      begin
+			 if(dim == 0)
+			   assign dim_sel = ~dim_addr_match[dim];
+			 else
+			   assign dim_sel = &dim_addr_match[0:dim-1] &
+					    ~dim_addr_match[dim];
+		      end
+		    
+		    `DIMENSION_ORDER_DESCENDING:
+		      begin
+			 if(dim == (num_dimensions - 1))
+			   assign dim_sel = ~dim_addr_match[dim];
+			 else
+			   assign dim_sel = ~dim_addr_match[dim] &
+					    dim_addr_match[(dim+1):
+							   (num_dimensions-1)];
+		      end
+		    
+		  endcase
+		  
+		  wire [0:num_neighbors_per_dim-1] port_dec;
+		  
+		  assign next_router_address[dim*dim_addr_width:
+					     (dim+1)*dim_addr_width-1]
+			   = next_dim_addr;
+		  
+		  case(dimension_connectivity)
+		    
+		    `DIMENSION_CONNECTIVITY_LINE, `DIMENSION_CONNECTIVITY_RING:
+		      begin
+			 
+			 wire route_down;
+			 assign route_down
+			   = (route_port == dim*num_neighbors_per_dim);
+			 
+			 wire route_up;
+			 assign route_up
+			   = (route_port == dim*num_neighbors_per_dim+1);
+			 
+			 // Assemble a delta value for the address segment 
+			 // corresponding to the current dimension; the delta 
+			 // can have the values -1 (i.e., all ones in two's 
+			 // complement), 0 or 1
+			 wire [0:dim_addr_width-1] addr_delta;
+			 if(dim_addr_width > 1)
+			   assign addr_delta[0:dim_addr_width-2]
+				    = {(dim_addr_width-1){route_down}};
+			 assign addr_delta[dim_addr_width-1]
+				  = route_down | route_up;
+			 
+			 assign next_dim_addr = curr_dim_addr + addr_delta;
+			 
+			 case(dimension_connectivity)
+			   
+			   `DIMENSION_CONNECTIVITY_LINE:
+			     begin
+				assign port_dec
+				  = {next_dim_addr < dest_dim_addr,
+				     next_dim_addr > dest_dim_addr};
+			     end
+			   
+			   `DIMENSION_CONNECTIVITY_RING:
+			     begin
+				
+				// FIXME: add implementation here!
+				
+				// synopsys translate_off
+				initial
+				begin
+				   $display("ERROR: The lookahead routing \
+					    logic module does not yet support \
+					    ring connectivity within each \
+					    dimension.");
+				   $stop;
+				end
+				// synopsys translate_on
+				
+			     end
+			   
+			 endcase
+			 
+		      end
+		    
+		    `DIMENSION_CONNECTIVITY_FULL:
+		      begin
+			 
+			 wire route_dest;
+			 assign route_dest
+			   = (route_port >= (dim*num_neighbors_per_dim)) &&
+			     (route_port <= ((dim+1)*num_neighbors_per_dim-1));
+			 
+			 assign next_dim_addr
+			   = route_dest ? dest_dim_addr : curr_dim_addr;
+			 
+			 wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
+			 c_decoder
+			   #(.num_ports(num_routers_per_dim))
+			 dest_dim_addr_dec_dec
+			   (.data_in(dest_dim_addr),
+			    .data_out(dest_dim_addr_dec));
+			 
+			 wire [0:(2*num_routers_per_dim-1)-1] 
+			   dest_dim_addr_dec_repl;
+			 assign dest_dim_addr_dec_repl
+			   = {dest_dim_addr_dec,
+			      dest_dim_addr_dec[0:(num_routers_per_dim-1)-1]};
+			 
+			 assign port_dec
+			   = dest_dim_addr_dec_repl[(next_dim_addr+1) +:
+						    num_neighbors_per_dim];
+			 
+		      end
+		    
+		  endcase
+		  
+		  assign next_route_op[dim*num_neighbors_per_dim:
+				       (dim+1)*num_neighbors_per_dim-1]
+			   = port_dec & {num_neighbors_per_dim{dim_sel}};
+		  
 	       end
 	     
-	     `DIMENSION_ORDER_DESCENDING:
-	       begin
-		  if(dim == (num_dimensions - 1))
-		    assign dim_sel = ~dim_addr_match[dim];
-		  else
-		    assign dim_sel = ~dim_addr_match[dim] &
-				     dim_addr_match[(dim+1):(num_dimensions-1)];
-	       end
-	     
-	   endcase
-	   
-	   wire [0:num_neighbors_per_dim-1] port_dec;
-	   
-	   assign next_router_address[dim*dim_addr_width:
-				      (dim+1)*dim_addr_width-1]
-		    = next_dim_addr;
-	   
-	   case(routing_function_type)
-	     
-	     `ROUTING_FUNCTION_TYPE_MESH:
-	       begin
-		  
-		  wire 			    route_down;
-		  assign route_down = (route_port == dim*num_neighbors_per_dim);
-		  
-		  wire 			    route_up;
-		  assign route_up = (route_port == dim*num_neighbors_per_dim+1);
-		  
-		  // Assemble a delta value for the address segment 
-		  // corresponding to the current dimension; the delta can have
-		  // the values -1 (i.e., all ones in two's complement), 0 or 1
-		  wire [0:dim_addr_width-1] addr_delta;
-		  if(dim_addr_width > 1)
-		    assign addr_delta[0:dim_addr_width-2]
-			     = {(dim_addr_width-1){route_down}};
-		  assign addr_delta[dim_addr_width-1] = route_down | route_up;
-		  
-		  assign next_dim_addr = curr_dim_addr + addr_delta;
-		  
-		  assign port_dec
-		    = {next_dim_addr < dest_dim_addr,
-		       next_dim_addr > dest_dim_addr};
-		  
-	       end
-	     
-	     `ROUTING_FUNCTION_TYPE_FBFLY:
-	       begin
-		  
-		  wire route_dest;
-		  assign route_dest
-		    = (route_port >= (dim*num_neighbors_per_dim)) &&
-		      (route_port <= ((dim+1)*num_neighbors_per_dim-1));
-		  
-		  assign next_dim_addr
-		    = route_dest ? dest_dim_addr : curr_dim_addr;
-		  
-		  wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
-		  c_decoder
-		    #(.num_ports(num_routers_per_dim))
-		  dest_dim_addr_dec_dec
-		    (.data_in(dest_dim_addr),
-		     .data_out(dest_dim_addr_dec));
-		  
-		  wire [0:(2*num_routers_per_dim-1)-1] dest_dim_addr_dec_repl;
-		  assign dest_dim_addr_dec_repl
-		    = {dest_dim_addr_dec,
-		       dest_dim_addr_dec[0:(num_routers_per_dim-1)-1]};
-		  
-		  assign port_dec
-		    = dest_dim_addr_dec_repl[(next_dim_addr+1) +:
-					     num_neighbors_per_dim];
-		  
-	       end
-	     
-	   endcase
-	   
-	   assign next_route_op[dim*num_neighbors_per_dim:
-				(dim+1)*num_neighbors_per_dim-1]
-		    = port_dec & {num_neighbors_per_dim{dim_sel}};
-	   
-	end
+	  end
+	
+      endcase
+      
+      wire 						      eject;
       
       if(resource_class == (num_resource_classes - 1))
 	assign eject = &dim_addr_match;
@@ -273,7 +331,7 @@ module vcr_la_routing_logic
       if(num_nodes_per_router > 1)
 	begin
 	   
-	   wire [0:node_addr_width-1] 	dest_node_address;
+	   wire [0:node_addr_width-1] dest_node_address;
 	   assign dest_node_address
 	     = hop_route_info[hop_route_info_width-node_addr_width:
 			      hop_route_info_width-1];

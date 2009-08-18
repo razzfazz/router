@@ -117,7 +117,7 @@ module vc_alloc_wrap
    // select routing function type
    localparam routing_function_type
      = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_MESH :
+       `ROUTING_FUNCTION_TYPE_DOR :
        (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
        `ROUTING_FUNCTION_TYPE_FBFLY :
        -1;
