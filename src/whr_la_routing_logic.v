@@ -46,39 +46,39 @@ module whr_la_routing_logic
       end
    endfunction
    
-   // number of input and output ports on router
-   parameter num_ports = 5;
-   
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
-   // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width;
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
    
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
    // width required to select individual router in network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
-   // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
-   
    // number of nodes per router (a.k.a. consentration factor)
-   localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
+   parameter num_nodes_per_router = 1;
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
+   
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width = port_idx_width;
    
    // select routing function type
    parameter routing_function_type = `ROUTING_FUNCTION_TYPE_MESH;

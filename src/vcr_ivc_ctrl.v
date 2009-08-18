@@ -78,8 +78,21 @@ module vcr_ivc_ctrl
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of nodes per router (a.k.a. consentration factor)
+   parameter num_nodes_per_router = 1;
+   
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
    // number of input and output ports on router
-   parameter num_ports = 5;
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
@@ -87,19 +100,6 @@ module vcr_ivc_ctrl
    // width required for lookahead routing information
    localparam la_route_info_width
      = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
-   // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
-   
-   // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
-   
-   // number of nodes per router (a.k.a. consentration factor)
-   localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -781,9 +781,9 @@ module vcr_ivc_ctrl
    
    vcr_la_routing_logic
      #(.num_resource_classes(num_resource_classes),
-       .num_ports(num_ports),
-       .num_dimensions(num_dimensions),
        .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .routing_function_type(routing_function_type),
        .dimension_order(dimension_order),

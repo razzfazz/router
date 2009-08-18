@@ -472,9 +472,9 @@ module testbench
 			  
 			  vcr_routing_logic
 			    #(.num_resource_classes(num_resource_classes),
-			      .num_ports(num_ports),
-			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
+			      .num_dimensions(num_dimensions),
+			      .num_nodes_per_router(num_nodes_per_router),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),
@@ -551,9 +551,9 @@ module testbench
 			  wire [0:la_route_info_width-1]     la_route_info;
 			  vcr_la_routing_logic
 			    #(.num_resource_classes(num_resource_classes),
-			      .num_ports(num_ports),
-			      .num_dimensions(num_dimensions),
 			      .num_routers_per_dim(num_routers_per_dim),
+			      .num_dimensions(num_dimensions),
+			      .num_nodes_per_router(num_nodes_per_router),
 			      .num_neighbors_per_dim(num_neighbors_per_dim),
 			      .routing_function_type(routing_function_type),
 			      .dimension_order(dimension_order),

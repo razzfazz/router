@@ -82,30 +82,30 @@ module vcr_op_ctrl_mac
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
-   // number of input and output ports on router
-   parameter num_ports = 5;
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
    
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // number of nodes per router (a.k.a. consentration factor)
+   parameter num_nodes_per_router = 1;
+   
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
    
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim = 2;
    
-   // number of nodes per router (a.k.a. consentration factor)
-   localparam num_nodes_per_router
-     = num_ports - num_dimensions * num_neighbors_per_dim;
-   
-   // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;

@@ -55,23 +55,30 @@ module whr_top
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
-   // number of input and output ports on router
-   parameter num_ports = 5;
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
-   
-   // number of adjacent routers in each dimension
-   parameter num_neighbors_per_dim = 2;
    
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
    
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // number of nodes per router (a.k.a. concentration factor)
+   parameter num_nodes_per_router = 1;
+   
+   // number of adjacent routers in each dimension
+   parameter num_neighbors_per_dim = 2;
+   
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -217,9 +224,9 @@ module whr_top
 	   whr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_ports(num_ports),
-	       .num_dimensions(num_dimensions),
 	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
 	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
@@ -355,10 +362,10 @@ module whr_top
 	   whr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
-	       .num_ports(num_ports),
 	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .num_neighbors_per_dim(num_neighbors_per_dim),
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
