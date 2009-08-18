@@ -8,7 +8,7 @@ SRCS = $(TOP_SRC) $(DEP_SRCS)
 SRC_DIR = ../../src
 DW_DIR = $(SYN_HOME)/dw/sim_ver
 
-VCS_FLAGS = +lint=noVCDE +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
+VCS_FLAGS = +lint=all,noVCDE +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
 
 # DUMP_CTRL may be overidden by script calling this
 DUMP_CTRL=
