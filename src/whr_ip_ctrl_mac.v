@@ -118,7 +118,7 @@ module whr_ip_ctrl_mac
      = clogb(max_payload_length-min_payload_length+1);
 
    // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length-1);
+   localparam flit_ctr_width = clogb(max_payload_length);
    
    // total number of bits required for storing routing information
    localparam route_info_width = addr_width;

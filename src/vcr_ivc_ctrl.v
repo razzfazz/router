@@ -126,7 +126,7 @@ module vcr_ivc_ctrl
      = clogb(max_payload_length-min_payload_length+1);
 
    // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length-1);
+   localparam flit_ctr_width = clogb(max_payload_length);
    
    // width required to select individual router in a dimension
    localparam dim_addr_width = clogb(num_routers_per_dim);
