@@ -158,6 +158,18 @@ module c_credit_tracker
 	   
 	end
       
+      // synopsys translate_off
+      if(num_credits == 0)
+	begin
+	   initial
+	   begin
+	      $display("ERROR: The credit checker module requires at least one \
+		       credit.");
+	      $stop;
+	   end
+	end
+      // synopsys translate_on
+      
    endgenerate
    
    wire [0:1] errors_out;

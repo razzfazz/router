@@ -184,4 +184,20 @@ module c_fifo_ctrl
    
    assign error = |errors_out;
    
+   // synopsys translate_off
+   generate
+      
+      if(addr_width < clogb(depth))
+	begin
+	   initial
+	   begin
+	      $display("ERROR: The FIFO controller requires that addr_width be \
+		       at least wide enough to cover the entire depth.");
+	      $stop;
+	   end
+	end
+      
+   endgenerate
+   // synopsys translate_on
+   
 endmodule

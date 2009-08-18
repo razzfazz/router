@@ -285,6 +285,18 @@ module c_fifo
 	  end
       endcase
       
+      // synopsys translate_off
+      if(depth < 2)
+	begin
+	   initial
+	   begin
+	      $display("ERROR: The FIFO module must have a depth of at least \
+		       two entries.");
+	      $stop;
+	   end
+	end
+      // synopsys translate_on
+      
    endgenerate
    
 endmodule
