@@ -75,10 +75,6 @@ module vcr_vc_alloc_mac
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select implementation variant for wavefront allocator
-   // (note: only valid for VC_ALLOCATOR_TYPE_WF_BASE+x
-   localparam wf_allocator_type = allocator_type-`VC_ALLOCATOR_TYPE_WF_BASE;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -118,75 +114,72 @@ module vcr_vc_alloc_mac
    
    generate
       
-      case(allocator_type)
-	`VC_ALLOCATOR_TYPE_SEP_IF:
-	  begin
-	     vcr_vc_alloc_sep_if
-	       #(.num_message_classes(num_message_classes),
-		 .num_resource_classes(num_resource_classes),
-		 .num_vcs_per_class(num_vcs_per_class),
-		 .num_ports(num_ports),
-		 .arbiter_type(arbiter_type),
-		 .reset_type(reset_type))
-	     core_sep_if
-	       (.clk(clk),
-		.reset(reset),
-		.route_port_ip_ivc(route_port_ip_ivc),
-		.inc_rc_ip_ivc(inc_rc_ip_ivc),
-		.elig_op_ovc(elig_op_ovc),
-		.req_ip_ivc(req_ip_ivc),
+      if(allocator_type == `VC_ALLOCATOR_TYPE_SEP_IF)
+	begin
+	   vcr_vc_alloc_sep_if
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_ports(num_ports),
+	       .arbiter_type(arbiter_type),
+	       .reset_type(reset_type))
+	   core_sep_if
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+	      .elig_op_ovc(elig_op_ovc),
+	      .req_ip_ivc(req_ip_ivc),
+	      .gnt_ip_ivc(gnt_ip_ivc),
+	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .gnt_op_ovc(gnt_op_ovc),
+	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
+	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
+	end
+      else if(allocator_type == `VC_ALLOCATOR_TYPE_SEP_OF)
+	begin
+	   vcr_vc_alloc_sep_of
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_ports(num_ports),
+	       .arbiter_type(arbiter_type),
+	       .reset_type(reset_type))
+	   core_sep_of
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+	      .elig_op_ovc(elig_op_ovc),
+	      .req_ip_ivc(req_ip_ivc),
 		.gnt_ip_ivc(gnt_ip_ivc),
-		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-		.gnt_op_ovc(gnt_op_ovc),
-		.gnt_op_ovc_ip(gnt_op_ovc_ip),
-		.gnt_op_ovc_ivc(gnt_op_ovc_ivc));
-	  end
-	`VC_ALLOCATOR_TYPE_SEP_OF:
-	  begin
-	     vcr_vc_alloc_sep_of
-	       #(.num_message_classes(num_message_classes),
-		 .num_resource_classes(num_resource_classes),
-		 .num_vcs_per_class(num_vcs_per_class),
-		 .num_ports(num_ports),
-		 .arbiter_type(arbiter_type),
-		 .reset_type(reset_type))
-	     core_sep_of
-	       (.clk(clk),
-		.reset(reset),
-		.route_port_ip_ivc(route_port_ip_ivc),
-		.inc_rc_ip_ivc(inc_rc_ip_ivc),
-		.elig_op_ovc(elig_op_ovc),
-		.req_ip_ivc(req_ip_ivc),
-		.gnt_ip_ivc(gnt_ip_ivc),
-		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-		.gnt_op_ovc(gnt_op_ovc),
-		.gnt_op_ovc_ip(gnt_op_ovc_ip),
-		.gnt_op_ovc_ivc(gnt_op_ovc_ivc));
-	  end
-      endcase
-      
-      if((allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE) &&
-	 (allocator_type <= `VC_ALLOCATOR_TYPE_WF_LIMIT))
+	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .gnt_op_ovc(gnt_op_ovc),
+	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
+	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
+	end
+      else if((allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE) &&
+	      (allocator_type <= `VC_ALLOCATOR_TYPE_WF_LIMIT))
 	begin
 	   vcr_vc_alloc_wf
-	       #(.num_message_classes(num_message_classes),
-		 .num_resource_classes(num_resource_classes),
-		 .num_vcs_per_class(num_vcs_per_class),
-		 .num_ports(num_ports),
-		 .wf_allocator_type(wf_allocator_type),
-		 .reset_type(reset_type))
-	     core_wf
-	       (.clk(clk),
-		.reset(reset),
-		.route_port_ip_ivc(route_port_ip_ivc),
-		.inc_rc_ip_ivc(inc_rc_ip_ivc),
-		.elig_op_ovc(elig_op_ovc),
-		.req_ip_ivc(req_ip_ivc),
-		.gnt_ip_ivc(gnt_ip_ivc),
-		.gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
-		.gnt_op_ovc(gnt_op_ovc),
-		.gnt_op_ovc_ip(gnt_op_ovc_ip),
-		.gnt_op_ovc_ivc(gnt_op_ovc_ivc));
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_ports(num_ports),
+	       .wf_allocator_type(allocator_type - `VC_ALLOCATOR_TYPE_WF_BASE),
+	       .reset_type(reset_type))
+	   core_wf
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+	      .elig_op_ovc(elig_op_ovc),
+	      .req_ip_ivc(req_ip_ivc),
+	      .gnt_ip_ivc(gnt_ip_ivc),
+	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .gnt_op_ovc(gnt_op_ovc),
+	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
+	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
 	end
       
    endgenerate

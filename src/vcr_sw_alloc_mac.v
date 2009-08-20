@@ -60,10 +60,6 @@ module vcr_sw_alloc_mac
    // select implementation variant for switch allocator
    parameter allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
    
-   // select implementation variant for wavefront allocator
-   // (note: only valid for SW_ALLOCATOR_TYPE_WF_BASE+x
-   localparam wf_allocator_type = allocator_type-`SW_ALLOCATOR_TYPE_WF_BASE;
-   
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -99,52 +95,49 @@ module vcr_sw_alloc_mac
    
    generate
       
-      case(allocator_type)
-	`SW_ALLOCATOR_TYPE_SEP_IF:
-	  begin
-	     vcr_sw_alloc_sep_if
-	       #(.num_vcs(num_vcs),
-		 .num_ports(num_ports),
-		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level),
-		 .reset_type(reset_type))
-	     core_sep_if
-	       (.clk(clk),
-		.reset(reset),
-		.route_port_ip_ivc(route_port_ip_ivc),
-		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
-		.req_spec_ip_ivc(req_spec_ip_ivc),
-		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
-		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-		.gnt_op_ip(gnt_op_ip));
-	  end
-	`SW_ALLOCATOR_TYPE_SEP_OF:
-	  begin
-	     vcr_sw_alloc_sep_of
-	       #(.num_vcs(num_vcs),
-		 .num_ports(num_ports),
-		 .arbiter_type(arbiter_type),
-		 .spec_level(spec_level),
-		 .reset_type(reset_type))
-	     core_sep_of
-	       (.clk(clk),
-		.reset(reset),
-		.route_port_ip_ivc(route_port_ip_ivc),
-		.req_nonspec_ip_ivc(req_nonspec_ip_ivc),
-		.req_spec_ip_ivc(req_spec_ip_ivc),
-		.gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
-		.gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-		.gnt_op_ip(gnt_op_ip));
-	  end
-      endcase
-      
-      if((allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE) &&
-	 (allocator_type <= `SW_ALLOCATOR_TYPE_WF_LIMIT))
+      if(allocator_type == `SW_ALLOCATOR_TYPE_SEP_IF)
+	begin
+	   vcr_sw_alloc_sep_if
+	     #(.num_vcs(num_vcs),
+	       .num_ports(num_ports),
+	       .arbiter_type(arbiter_type),
+	       .spec_level(spec_level),
+	       .reset_type(reset_type))
+	   core_sep_if
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
+	      .req_spec_ip_ivc(req_spec_ip_ivc),
+	      .gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
+	      .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
+	      .gnt_op_ip(gnt_op_ip));
+	end
+      else if(allocator_type == `SW_ALLOCATOR_TYPE_SEP_OF)
+	begin
+	   vcr_sw_alloc_sep_of
+	     #(.num_vcs(num_vcs),
+	       .num_ports(num_ports),
+	       .arbiter_type(arbiter_type),
+	       .spec_level(spec_level),
+	       .reset_type(reset_type))
+	   core_sep_of
+	     (.clk(clk),
+	      .reset(reset),
+	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
+	      .req_spec_ip_ivc(req_spec_ip_ivc),
+	      .gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
+	      .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
+	      .gnt_op_ip(gnt_op_ip));
+	end
+      else if((allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE) &&
+	      (allocator_type <= `SW_ALLOCATOR_TYPE_WF_LIMIT))
 	begin
 	   vcr_sw_alloc_wf
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
-	       .wf_allocator_type(wf_allocator_type),
+	       .wf_allocator_type(allocator_type - `SW_ALLOCATOR_TYPE_WF_BASE),
 	       .arbiter_type(arbiter_type),
 	       .spec_level(spec_level),
 	       .reset_type(reset_type))
