@@ -46,6 +46,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // flattened butterfly
 `define NETWORK_TOPOLOGY_FBFLY 2
 
+`define NETWORK_TOPOLOGY_LAST  `NETWORK_TOPOLOGY_FBFLY
+
 
 //------------------------------------------------------------------------------
 // what does connectivity look like within a dimension?
@@ -60,6 +62,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // nodes are fully connected (e.g. flattened butterfly)
 `define DIMENSION_CONNECTIVITY_FULL 2
 
+`define DIMENSION_CONNECTIVITY_LAST `DIMENSION_CONNECTIVITY_FULL
+
 
 //------------------------------------------------------------------------------
 // router implementations
@@ -71,6 +75,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // virtual channel router
 `define ROUTER_TYPE_VC       1
 
+`define ROUTER_TYPE_LAST `ROUTER_TYPE_VC
+
 
 //------------------------------------------------------------------------------
 // routing function types
@@ -78,6 +84,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // dimension-order routing (using multiple phases if num_resource_classes > 1)
 `define ROUTING_FUNCTION_TYPE_DOR 0
+
+`define ROUTING_FUNCTION_TYPE_LAST `ROUTING_FUNCTION_TYPE_DOR
 
 
 //------------------------------------------------------------------------------
@@ -101,6 +109,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // head flits are identified by header bit, and contain encoded packet length
 `define PACKET_FORMAT_EXPLICIT_LENGTH 1
 
+`define PACKET_FORMAT_LAST `PACKET_FORMAT_EXPLICIT_LENGTH
+
 
 //------------------------------------------------------------------------------
 // reset handling
@@ -114,6 +124,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // synchronous reset
 `define RESET_TYPE_SYNC  2
+
+`define RESET_TYPE_LAST `RESET_TYPE_SYNC
 
 
 //------------------------------------------------------------------------------
@@ -129,6 +141,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // DesignWare first-come, first-serve arbiter
 `define ARBITER_TYPE_DW_FCFS     2
 
+`define ARBITER_TYPE_LAST `ARBITER_TYPE_DW_FCFS
+
 
 //------------------------------------------------------------------------------
 // error checker capture more
@@ -143,6 +157,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // capture all errors
 `define CHECKER_CAPTURE_MODE_HOLD_ALL   2
 
+`define CHECKER_CAPTURE_MODE_LAST `CHECKER_CAPTURE_MODE_HOLD_ALL
+
 
 //------------------------------------------------------------------------------
 // crossbar implementation variants
@@ -156,6 +172,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // distributed multiplexers
 `define CROSSBAR_TYPE_DIST_MUX 2
+
+`define CROSSBAR_TYPE_LAST `CROSSBAR_TYPE_DIST_MUX
 
 
 //------------------------------------------------------------------------------
@@ -186,6 +204,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Synopsys DesignWare implementation using flipflips
 `define REGFILE_TYPE_LAT_DW          7
 
+`define REGFILE_TYPE_LAST `REGFILE_TYPE_LAT_DW
+
 
 //------------------------------------------------------------------------------
 // FIFO implementation variants
@@ -199,6 +219,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // DesignWare FIFO implementation
 `define FIFO_TYPE_DW       2
+
+`define FIFO_TYPE_LAST `FIFO_TYPE_DW
 
 
 //------------------------------------------------------------------------------
@@ -231,6 +253,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // described in Dally et al, "Principles and Practices of Interconnection 
 // Networks"
 `define WF_ALLOCATOR_TYPE_LOOP 4
+
+`define WF_ALLOCATOR_TYPE_LAST `WF_ALLOCATOR_TYPE_LOOP
 
 
 `endif

@@ -138,7 +138,8 @@ module vcr_sw_alloc_mac
 	  end
       endcase
       
-      if(allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE)
+      if((allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE) &&
+	 (allocator_type <= `SW_ALLOCATOR_TYPE_WF_LIMIT))
 	begin
 	   vcr_sw_alloc_wf
 	     #(.num_vcs(num_vcs),

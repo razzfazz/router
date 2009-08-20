@@ -33,6 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `ifndef _VCR_CONSTANTS_V_
 `define _VCR_CONSTANTS_V_
 
+`include "c_constants.v"
+
 //------------------------------------------------------------------------------
 // credit handling implementation variants
 //------------------------------------------------------------------------------
@@ -43,35 +45,45 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // push credits to input side one by one
 `define CREDIT_HANDLING_TYPE_PUSH  1
 
+`define CREDIT_HANDLING_TYPE_LAST `CREDIT_HANDLING_TYPE_PUSH
+
 
 //------------------------------------------------------------------------------
 // VC allocator implementation variants
 //------------------------------------------------------------------------------
 
 // separable, input-first
-`define VC_ALLOCATOR_TYPE_SEP_IF  0
+`define VC_ALLOCATOR_TYPE_SEP_IF   0
 
 // separable, output-first
-`define VC_ALLOCATOR_TYPE_SEP_OF  1
+`define VC_ALLOCATOR_TYPE_SEP_OF   1
 
 // wavefront-based
 // (note: add WF_ALLOCATOR_TYPE_* constant to select wavefront variant)
-`define VC_ALLOCATOR_TYPE_WF_BASE 2
+`define VC_ALLOCATOR_TYPE_WF_BASE  2
+`define VC_ALLOCATOR_TYPE_WF_LIMIT (`VC_ALLOCATOR_TYPE_WF_BASE + \
+				    `WF_ALLOCATOR_TYPE_LAST)
 
+`define VC_ALLOCATOR_TYPE_LAST `VC_ALLOCATOR_TYPE_WF_LIMIT
+  
 
 //------------------------------------------------------------------------------
 // switch allocator implementation variants
 //------------------------------------------------------------------------------
 
 // separable, input-first
-`define SW_ALLOCATOR_TYPE_SEP_IF  0
+`define SW_ALLOCATOR_TYPE_SEP_IF   0
 
 // separable, output-first
-`define SW_ALLOCATOR_TYPE_SEP_OF  1
+`define SW_ALLOCATOR_TYPE_SEP_OF   1
 
 // wavefront-based
 // (note: add WF_ALLOCATOR_TYPE_* constant to select wavefront variant)
-`define SW_ALLOCATOR_TYPE_WF_BASE 2
+`define SW_ALLOCATOR_TYPE_WF_BASE  2
+`define SW_ALLOCATOR_TYPE_WF_LIMIT (`SW_ALLOCATOR_TYPE_WF_BASE + \
+				    `WF_ALLOCATOR_TYPE_LAST)
+
+`define SW_ALLOCATOR_TYPE_LAST `SW_ALLOCATOR_TYPE_WF_LIMIT
 
 
 //------------------------------------------------------------------------------
@@ -92,6 +104,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // use speculative grants when not conflicting with intermediate non-spec grants
 `define SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS 4
+
+`define SW_SPEC_LEVEL_LAST `SW_SPEC_LEVEL_NONSPEC_INT_MASKS
 
 
 `endif

@@ -165,7 +165,8 @@ module vcr_vc_alloc_mac
 	  end
       endcase
       
-      if(allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE)
+      if((allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE) &&
+	 (allocator_type <= `VC_ALLOCATOR_TYPE_WF_LIMIT))
 	begin
 	   vcr_vc_alloc_wf
 	       #(.num_message_classes(num_message_classes),
