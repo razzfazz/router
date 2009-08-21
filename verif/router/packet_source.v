@@ -31,8 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `default_nettype none
 
 module packet_source
-  (clk, reset, router_address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, 
-   error);
+  (clk, reset, address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, error);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -220,7 +219,7 @@ module packet_source
    input clk;
    input reset;
    
-   input [0:router_addr_width-1] router_address;
+   input [0:addr_width-1] address;
    
    output [0:flit_ctrl_width-1] flit_ctrl;
    wire [0:flit_ctrl_width-1] flit_ctrl;
@@ -532,7 +531,10 @@ module packet_source
 	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
    
-   wire [0:route_info_width-1] route_info;
+   wire [0:router_addr_width-1] router_address;
+   assign router_address = address[0:router_addr_width-1];
+   
+   reg [0:route_info_width-1] 	route_info;
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    
    generate
@@ -624,55 +626,110 @@ module packet_source
       else
 	assign la_route_info = la_route_info_ivc;
       
-      genvar 					       irc;
+      integer 			   offset;
+      integer 			   d;
       
-      for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-	begin:ircs
-
-	   if(irc == (num_resource_classes - 1))
+      reg [0:router_addr_width-1]  random_router_address;
+      reg [0:router_addr_width-1]  last_router_address;
+      
+      if(num_nodes_per_router > 1)
+	begin
+	   
+	   wire [0:node_addr_width-1] node_address;
+	   assign node_address = address[router_addr_width:addr_width-1];
+	   
+	   reg [0:node_addr_width-1]   random_node_address;
+	   
+	   always @(posedge clk, posedge reset)
 	     begin
-
-		reg [0:addr_width-1] addr_q;
-		always @(posedge clk, posedge reset)
+		if(reset | packet_sent)
 		  begin
-		     if(reset | packet_sent)
-		       addr_q <= $dist_uniform(seed, 0, num_nodes-1);
-		  end
-		
-		assign route_info[irc*router_addr_width:route_info_width-1]
-			 = addr_q;
-		
-	     end
-	   else
-	     begin
-		
-		wire [0:router_addr_width-1] next_addr;
-		assign next_addr
-		  = route_info[(irc+1)*router_addr_width:(irc+2)*router_addr_width-1];
-		
-		reg [0:router_addr_width-1] router_addr_q;
-		always @(posedge clk, posedge reset)
-		  begin
-		     if(reset | packet_sent)
-		       router_addr_q
-			 <= (next_addr + $dist_uniform(seed, 1, num_routers-1)) %
-			    num_routers;
-		  end
-		
-		assign route_info[irc*router_addr_width:(irc+1)*router_addr_width-1]
-			 = router_addr_q;
-		
+		     for(d = 0; d < num_dimensions; d = d + 1)
+		       random_router_address[d*dim_addr_width +: dim_addr_width]
+			 = (router_address[d*dim_addr_width +: dim_addr_width] +
+			    $dist_uniform(seed, 0, num_routers_per_dim-1)) %
+			   num_routers_per_dim;
+		     random_node_address
+		       = (node_address +
+			  $dist_uniform(seed, 
+					(random_router_address == 
+					 router_address) ? 1 : 0, 
+					num_nodes_per_router - 1)) % 
+			 num_nodes_per_router;
+		     route_info[route_info_width-addr_width:route_info_width-1]
+		       = {random_router_address, random_node_address};
+		  end		
 	     end
 	   
 	end
+      else
+	begin
+	   always @(posedge clk, posedge reset)
+	     begin
+		if(reset | packet_sent)
+		  begin
+		     for(d = 0; d < num_dimensions - 1; d = d + 1)
+		       random_router_address[d*dim_addr_width +: dim_addr_width]
+			 = (router_address[d*dim_addr_width +: dim_addr_width] +
+			    $dist_uniform(seed, 0, num_routers_per_dim-1)) %
+			   num_routers_per_dim;
+		     random_router_address[router_addr_width-dim_addr_width:
+					   router_addr_width-1]
+		       = router_address[router_addr_width-dim_addr_width:
+					router_addr_width-1];
+		     random_router_address[router_addr_width-dim_addr_width:
+					   router_addr_width-1]
+		       = (router_address[router_addr_width-dim_addr_width:
+					 router_addr_width-1] +
+			  $dist_uniform(seed,
+					(random_router_address == 
+					 router_address) ? 1 : 0,
+					num_routers_per_dim - 1)) %
+			 num_routers_per_dim;
+		     route_info[route_info_width-addr_width:route_info_width-1]
+		       = random_router_address;
+		  end
+	     end
+	end
       
-   endgenerate
-   
-   assign header_info[la_route_info_width:
-		      la_route_info_width+route_info_width-1]
-	    = route_info;
-   
-   generate
+      if(num_resource_classes > 1)
+	begin
+	   
+	   reg [0:router_addr_width-1] random_intm_address;
+	   
+	   always @(random_router_address)
+	     begin
+		last_router_address = random_router_address;
+		for(i = num_resource_classes - 2; i >= 0; i = i - 1)
+		  begin
+		     for(d = 0; d < num_dimensions - 1; d = d + 1)
+		       random_intm_address[d*dim_addr_width +: dim_addr_width]
+			 = (last_router_address[d*dim_addr_width +: 
+						dim_addr_width] +
+			    $dist_uniform(seed, 0, num_routers_per_dim-1)) %
+			   num_routers_per_dim;
+		     random_intm_address[router_addr_width-dim_addr_width:
+					 router_addr_width-1]
+		       = last_router_address[router_addr_width-dim_addr_width:
+					     router_addr_width-1];
+		     random_intm_address[router_addr_width-dim_addr_width:
+					 router_addr_width-1]
+		       = (last_router_address[router_addr_width-dim_addr_width:
+					      router_addr_width-1] +
+			  $dist_uniform(seed, (random_router_address ==
+					       last_router_address) ? 1 : 0, 
+					num_routers_per_dim - 1)) % 
+			 num_routers_per_dim;
+		     route_info[i*router_addr_width +: router_addr_width]
+		       = random_intm_address;
+		     last_router_address = random_intm_address;
+		  end
+	     end
+	end
+      
+      assign header_info[la_route_info_width:
+			 la_route_info_width+route_info_width-1]
+	       = route_info;
       
       if(max_payload_length > 0)
 	begin
