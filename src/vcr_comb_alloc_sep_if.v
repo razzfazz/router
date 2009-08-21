@@ -242,7 +242,7 @@ module vcr_comb_alloc_sep_if
 				   .pad_right((num_packet_classes - 
 					       (mc*num_resource_classes+irc+1))*
 					      num_vcs_per_class))
-			       gnt_ovc_padder
+			       gnt_ovc_pad
 				 (.data_in(next_vc_ocvc),
 				  .data_out(gnt_ovc));
 			       
@@ -302,9 +302,9 @@ module vcr_comb_alloc_sep_if
 				   .pad_left((mc*num_resource_classes+irc)*
 					     num_vcs_per_class),
 				   .pad_right((num_packet_classes -
-					       (mc*num_resource_classes+irc))*
+					       (mc*num_resource_classes+irc+2))*
 					      num_vcs_per_class))
-			       gnt_ovc_padder
+			       gnt_ovc_pad
 				 (.data_in({next_vc_low_ocvc, 
 					    next_vc_high_ocvc}),
 				  .data_out(gnt_ovc));
