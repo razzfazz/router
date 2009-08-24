@@ -1,4 +1,4 @@
-# $Id: Makefile 1274 2009-05-20 23:52:12Z dub $
+# $Id: Makefile 1437 2009-08-18 01:45:25Z dub $
 
 TOP_SRC = testbench.v
 DEP_SRCS = 
@@ -6,8 +6,9 @@ DEP_SRCS =
 SRCS = $(TOP_SRC) $(DEP_SRCS)
 
 SRC_DIR = ../../src
+DW_DIR = $(SYN_HOME)/dw/sim_ver
 
-VCS_FLAGS = +lint=all +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
+VCS_FLAGS = +lint=all,noVCDE +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
 
 # DUMP_CTRL may be overidden by script calling this
 DUMP_CTRL=
@@ -17,10 +18,10 @@ INT_CTRL=
 all: simv
 
 simv: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
-	vcs -o simv $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
+	vcs -o simv $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
 
 simvfast: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
-	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
+	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
 
 clean:
 	rm -rf work simv simvfast simv.daidir simvfast.daidir transcript *.vcd *.vpd ucli.key vcs.key run.args csrc DVEfiles .vcsmx_rebuild *~
