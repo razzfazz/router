@@ -49,13 +49,13 @@ module vcr_sw_alloc_mac
    localparam port_idx_width = clogb(num_ports);
    
    // select implementation variant for switch allocator
-   parameter allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter allocator_type = `SW_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -86,7 +86,7 @@ module vcr_sw_alloc_mac
    
    generate
       
-      if(allocator_type == `SW_ALLOCATOR_TYPE_SEP_IF)
+      if(allocator_type == `SW_ALLOC_TYPE_SEP_IF)
 	begin
 	   vcr_sw_alloc_sep_if
 	     #(.num_vcs(num_vcs),
@@ -104,7 +104,7 @@ module vcr_sw_alloc_mac
 	      .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
 	      .gnt_op_ip(gnt_op_ip));
 	end
-      else if(allocator_type == `SW_ALLOCATOR_TYPE_SEP_OF)
+      else if(allocator_type == `SW_ALLOC_TYPE_SEP_OF)
 	begin
 	   vcr_sw_alloc_sep_of
 	     #(.num_vcs(num_vcs),
@@ -122,13 +122,13 @@ module vcr_sw_alloc_mac
 	      .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
 	      .gnt_op_ip(gnt_op_ip));
 	end
-      else if((allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE) &&
-	      (allocator_type <= `SW_ALLOCATOR_TYPE_WF_LIMIT))
+      else if((allocator_type >= `SW_ALLOC_TYPE_WF_BASE) &&
+	      (allocator_type <= `SW_ALLOC_TYPE_WF_LIMIT))
 	begin
 	   vcr_sw_alloc_wf
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
-	       .wf_allocator_type(allocator_type - `SW_ALLOCATOR_TYPE_WF_BASE),
+	       .wf_alloc_type(allocator_type - `SW_ALLOC_TYPE_WF_BASE),
 	       .arbiter_type(arbiter_type),
 	       .spec_level(spec_level),
 	       .reset_type(reset_type))

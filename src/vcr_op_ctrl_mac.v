@@ -92,14 +92,14 @@ module vcr_op_ctrl_mac
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // connectivity within each dimension
-   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
-	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
-       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    

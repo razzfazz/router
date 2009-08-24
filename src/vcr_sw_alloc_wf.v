@@ -49,13 +49,13 @@ module vcr_sw_alloc_wf
    localparam port_idx_width = clogb(num_ports);
    
    // select which wavefront allocator variant to use
-   parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
+   parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -244,7 +244,7 @@ module vcr_sw_alloc_wf
 	   
 	   wire [0:num_vcs-1] 		gnt_spec_ivc;
 	   
-	   if(spec_level != `SW_SPEC_LEVEL_NONE)
+	   if(spec_level != `SW_ALLOC_SPEC_LEVEL_NONE)
 	     begin
 		
 		//--------------------------------------------------------------
@@ -376,7 +376,7 @@ module vcr_sw_alloc_wf
       
       case(spec_level)
 	
-	`SW_SPEC_LEVEL_NONE:
+	`SW_ALLOC_SPEC_LEVEL_NONE:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
@@ -384,7 +384,7 @@ module vcr_sw_alloc_wf
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_ANY_NONSPEC_MASKS:
+	`SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{~|req_nonspec_ip_ivc}};
@@ -392,8 +392,8 @@ module vcr_sw_alloc_wf
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS,
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
+	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS,
+	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
@@ -420,7 +420,7 @@ module vcr_sw_alloc_wf
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
+	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] gnt_wf_nonspec_op_ip;
@@ -472,7 +472,7 @@ module vcr_sw_alloc_wf
    
    c_wf_alloc
      #(.num_ports(num_ports),
-       .wf_allocator_type(wf_allocator_type),
+       .wf_alloc_type(wf_alloc_type),
        .reset_type(reset_type))
    gnt_wf_nonspec_ip_op_alloc
      (.clk(clk),
@@ -483,7 +483,7 @@ module vcr_sw_alloc_wf
    
    generate
       
-      if(spec_level != `SW_SPEC_LEVEL_NONE)
+      if(spec_level != `SW_ALLOC_SPEC_LEVEL_NONE)
 	begin
 	   
 	   // only update priorities if there is no conflicting non-
@@ -492,7 +492,7 @@ module vcr_sw_alloc_wf
 	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
 	   wire [0:num_ports*num_ports-1] req_wf_spec_int_ip_op;
-	   if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
+	   if(spec_level == `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
 	     assign req_wf_spec_int_ip_op
 	       = req_wf_spec_ip_op & spec_mask_ip_op;
 	   else
@@ -501,7 +501,7 @@ module vcr_sw_alloc_wf
 	   wire [0:num_ports*num_ports-1] gnt_wf_spec_int_ip_op;
 	   c_wf_alloc
 	     #(.num_ports(num_ports),
-	       .wf_allocator_type(wf_allocator_type),
+	       .wf_alloc_type(wf_alloc_type),
 	       .reset_type(reset_type))
 	   gnt_wf_spec_int_ip_op_alloc
 	     (.clk(clk),
@@ -510,7 +510,7 @@ module vcr_sw_alloc_wf
 	      .req(req_wf_spec_int_ip_op),
 	      .gnt(gnt_wf_spec_int_ip_op));
 	   
-	   if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
+	   if(spec_level == `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
 	     assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op;
 	   else
 	     assign gnt_wf_spec_ip_op

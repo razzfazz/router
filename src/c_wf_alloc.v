@@ -41,7 +41,7 @@ module c_wf_alloc
    parameter num_ports = 8;
    
    // select implementation variant
-   parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
+   parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
    // try to recover from errors
    parameter error_recovery = 0;
@@ -63,8 +63,8 @@ module c_wf_alloc
    
    generate
       
-      case(wf_allocator_type)
-	`WF_ALLOCATOR_TYPE_MUX:
+      case(wf_alloc_type)
+	`WF_ALLOC_TYPE_MUX:
 	  begin
 	     c_wf_alloc_mux
 	       #(.num_ports(num_ports),
@@ -77,7 +77,7 @@ module c_wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end
-	`WF_ALLOCATOR_TYPE_REP:
+	`WF_ALLOC_TYPE_REP:
 	  begin
 	     c_wf_alloc_rep
 	       #(.num_ports(num_ports),
@@ -90,7 +90,7 @@ module c_wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end
-	`WF_ALLOCATOR_TYPE_DPA:
+	`WF_ALLOC_TYPE_DPA:
 	  begin
 	     c_wf_alloc_dpa
 	       #(.num_ports(num_ports),
@@ -103,7 +103,7 @@ module c_wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end      
-	`WF_ALLOCATOR_TYPE_ROT:
+	`WF_ALLOC_TYPE_ROT:
 	  begin
 	     c_wf_alloc_rot
 	       #(.num_ports(num_ports),
@@ -116,7 +116,7 @@ module c_wf_alloc
 		.req(req),
 		.gnt(gnt));
 	  end
-	`WF_ALLOCATOR_TYPE_LOOP:
+	`WF_ALLOC_TYPE_LOOP:
 	  begin
 	     c_wf_alloc_loop
 	       #(.num_ports(num_ports),

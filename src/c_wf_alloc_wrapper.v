@@ -41,7 +41,7 @@ module c_wf_alloc_wrapper
    parameter num_ports = 8;
    
    // select implementation variant
-   parameter wf_allocator_type = `WF_ALLOCATOR_TYPE_REP;
+   parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
    // try to recover from errors
    parameter error_recovery = 0;
@@ -83,7 +83,7 @@ module c_wf_alloc_wrapper
    
    c_wf_alloc
      #(.num_ports(num_ports),
-       .wf_allocator_type(wf_allocator_type),
+       .wf_alloc_type(wf_alloc_type),
        .error_recovery(error_recovery),
        .reset_type(reset_type))
    alloc

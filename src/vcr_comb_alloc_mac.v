@@ -62,11 +62,11 @@ module vcr_comb_alloc_mac
    localparam port_idx_width = clogb(num_ports);
    
    // select implementation variant for switch allocator
-   parameter allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter allocator_type = `SW_ALLOC_TYPE_SEP_IF;
    
    // select implementation variant for wavefront allocator
-   // (note: only valid for SW_ALLOCATOR_TYPE_WF_BASE+x
-   localparam wf_allocator_type = allocator_type-`SW_ALLOCATOR_TYPE_WF_BASE;
+   // (note: only valid for SW_ALLOC_TYPE_WF_BASE+x
+   localparam wf_alloc_type = allocator_type-`SW_ALLOC_TYPE_WF_BASE;
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -123,7 +123,7 @@ module vcr_comb_alloc_mac
    generate
       
       case(allocator_type)
-	`SW_ALLOCATOR_TYPE_SEP_IF:
+	`SW_ALLOC_TYPE_SEP_IF:
 	  begin
 	     vcr_comb_alloc_sep_if
 	       #(.num_message_classes(num_message_classes),
@@ -148,7 +148,7 @@ module vcr_comb_alloc_mac
 		.sw_gnt_ip_ivc(sw_gnt_ip_ivc),
 		.sw_gnt_op_ip(sw_gnt_op_ip));
 	  end
-	/*`SW_ALLOCATOR_TYPE_SEP_OF:
+	/*`SW_ALLOC_TYPE_SEP_OF:
 	  begin
 	     vcr_comb_alloc_sep_of
 	       #(.num_message_classes(num_message_classes),
@@ -175,14 +175,14 @@ module vcr_comb_alloc_mac
 	  end*/
       endcase
       
-      /*if(allocator_type >= `SW_ALLOCATOR_TYPE_WF_BASE)
+      /*if(allocator_type >= `SW_ALLOC_TYPE_WF_BASE)
 	begin
 	   vcr_comb_alloc_wf
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
-	       .wf_allocator_type(wf_allocator_type),
+	       .wf_alloc_type(wf_alloc_type),
 	       .arbiter_type(arbiter_type),
 	       .reset_type(reset_type))
 	   core_wf

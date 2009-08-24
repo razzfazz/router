@@ -79,14 +79,14 @@ module vcr_ivc_ctrl
    parameter num_nodes_per_router = 1;
    
    // connectivity within each dimension
-   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
-	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
-       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -156,10 +156,10 @@ module vcr_ivc_ctrl
    parameter track_vcs_at_output = 0;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_DOR;
    
    // select order of dimension traversal
-   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   parameter dim_order = `DIM_ORDER_ASCENDING;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
@@ -181,7 +181,7 @@ module vcr_ivc_ctrl
    
    // enable speculative (i.e., while VC is being allocated as well) switch
    // allocation
-   parameter sw_spec_enable = 1;
+   parameter sw_alloc_spec_enable = 1;
    
    // use combined VC and switch allocator
    parameter comb_alloc_enable = 1;
@@ -485,7 +485,7 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(!comb_alloc_enable && sw_spec_enable)
+      if(!comb_alloc_enable && sw_alloc_spec_enable)
 	begin
 	   assign vc_allocated = vc_gnt | vc_allocated_q;
 	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
@@ -784,9 +784,9 @@ module vcr_ivc_ctrl
        .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
-       .dimension_connectivity(dimension_connectivity),
-       .routing_function_type(routing_function_type),
-       .dimension_order(dimension_order),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .dim_order(dim_order),
        .resource_class(resource_class),
        .reset_type(reset_type))
    lar
@@ -1005,7 +1005,7 @@ module vcr_ivc_ctrl
 	assign sw_req_nonspec
 	  = header_valid & flit_valid & vc_allocated_q & free_allocated;
       
-      if(!comb_alloc_enable && sw_spec_enable)
+      if(!comb_alloc_enable && sw_alloc_spec_enable)
 	assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
       else
 	assign sw_req_spec = 1'b0;
@@ -1037,7 +1037,7 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs_per_class-1] flit_ocvc;
 		
-		if(comb_alloc_enable || sw_spec_enable)
+		if(comb_alloc_enable || sw_alloc_spec_enable)
 		  assign flit_ocvc = vc_allocated_hold_ocvc;
 		else
 		  assign flit_ocvc = vc_allocated_ocvc_q;

@@ -80,14 +80,14 @@ module vcr_top
    parameter num_nodes_per_router = 1;
    
    // connectivity within each dimension
-   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
-	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
-       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -138,10 +138,10 @@ module vcr_top
    parameter track_vcs_at_output = 0;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_DOR;
    
    // select order of dimension traversal
-   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   parameter dim_order = `DIM_ORDER_ASCENDING;
    
    // select method for credit signaling from output to input controller
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
@@ -171,21 +171,21 @@ module vcr_top
    localparam fbf_addr_width = clogb(fbf_depth);
    
    // select implementation variant for VC allocator
-   parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
-   parameter sw_spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter sw_alloc_spec_level = `SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   localparam sw_alloc_spec_enable = (sw_alloc_spec_level != `SW_ALLOC_SPEC_LEVEL_NONE);
    
    // use combined VC and switch allocator
    parameter comb_alloc_enable = 1;
@@ -313,17 +313,17 @@ module vcr_top
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
-	       .dimension_connectivity(dimension_connectivity),
+	       .connectivity(connectivity),
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
 	       .track_vcs_at_output(track_vcs_at_output),
-	       .routing_function_type(routing_function_type),
-	       .dimension_order(dimension_order),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order),
 	       .credit_handling_type(credit_handling_type),
 	       .header_fifo_type(header_fifo_type),
-	       .sw_spec_enable(sw_spec_enable),
+	       .sw_alloc_spec_enable(sw_alloc_spec_enable),
 	       .comb_alloc_enable(comb_alloc_enable),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
@@ -411,8 +411,8 @@ module vcr_top
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
-	       .allocator_type(vc_allocator_type),
-	       .arbiter_type(vc_arbiter_type),
+	       .allocator_type(vc_alloc_type),
+	       .arbiter_type(vc_alloc_arbiter_type),
 	       .reset_type(reset_type))
 	   vca
 	     (.clk(clk),
@@ -444,9 +444,9 @@ module vcr_top
 	   vcr_sw_alloc_mac
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
-	       .allocator_type(sw_allocator_type),
-	       .arbiter_type(sw_arbiter_type),
-	       .spec_level(sw_spec_level),
+	       .allocator_type(sw_alloc_type),
+	       .arbiter_type(sw_alloc_arbiter_type),
+	       .spec_level(sw_alloc_spec_level),
 	       .reset_type(reset_type))
 	   swa
 	     (.clk(clk),
@@ -475,8 +475,8 @@ module vcr_top
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
-	       .allocator_type(sw_allocator_type),
-	       .arbiter_type(sw_arbiter_type),
+	       .allocator_type(sw_alloc_type),
+	       .arbiter_type(sw_alloc_arbiter_type),
 	       .reset_type(reset_type))
 	   cba
 	     (.clk(clk),
@@ -596,7 +596,7 @@ module vcr_top
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
-	       .dimension_connectivity(dimension_connectivity),
+	       .connectivity(connectivity),
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),

@@ -53,18 +53,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // separable, input-first
-`define VC_ALLOCATOR_TYPE_SEP_IF   0
+`define VC_ALLOC_TYPE_SEP_IF   0
 
 // separable, output-first
-`define VC_ALLOCATOR_TYPE_SEP_OF   1
+`define VC_ALLOC_TYPE_SEP_OF   1
 
 // wavefront-based
-// (note: add WF_ALLOCATOR_TYPE_* constant to select wavefront variant)
-`define VC_ALLOCATOR_TYPE_WF_BASE  2
-`define VC_ALLOCATOR_TYPE_WF_LIMIT (`VC_ALLOCATOR_TYPE_WF_BASE + \
-				    `WF_ALLOCATOR_TYPE_LAST)
+// (note: add WF_ALLOC_TYPE_* constant to select wavefront variant)
+`define VC_ALLOC_TYPE_WF_BASE  2
+`define VC_ALLOC_TYPE_WF_LIMIT (`VC_ALLOC_TYPE_WF_BASE + \
+				    `WF_ALLOC_TYPE_LAST)
 
-`define VC_ALLOCATOR_TYPE_LAST `VC_ALLOCATOR_TYPE_WF_LIMIT
+`define VC_ALLOC_TYPE_LAST `VC_ALLOC_TYPE_WF_LIMIT
   
 
 //------------------------------------------------------------------------------
@@ -72,18 +72,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // separable, input-first
-`define SW_ALLOCATOR_TYPE_SEP_IF   0
+`define SW_ALLOC_TYPE_SEP_IF   0
 
 // separable, output-first
-`define SW_ALLOCATOR_TYPE_SEP_OF   1
+`define SW_ALLOC_TYPE_SEP_OF   1
 
 // wavefront-based
-// (note: add WF_ALLOCATOR_TYPE_* constant to select wavefront variant)
-`define SW_ALLOCATOR_TYPE_WF_BASE  2
-`define SW_ALLOCATOR_TYPE_WF_LIMIT (`SW_ALLOCATOR_TYPE_WF_BASE + \
-				    `WF_ALLOCATOR_TYPE_LAST)
+// (note: add WF_ALLOC_TYPE_* constant to select wavefront variant)
+`define SW_ALLOC_TYPE_WF_BASE  2
+`define SW_ALLOC_TYPE_WF_LIMIT (`SW_ALLOC_TYPE_WF_BASE + \
+				    `WF_ALLOC_TYPE_LAST)
 
-`define SW_ALLOCATOR_TYPE_LAST `SW_ALLOCATOR_TYPE_WF_LIMIT
+`define SW_ALLOC_TYPE_LAST `SW_ALLOC_TYPE_WF_LIMIT
 
 
 //------------------------------------------------------------------------------
@@ -91,21 +91,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // disable speculative switch allocation
-`define SW_SPEC_LEVEL_NONE                    0
+`define SW_ALLOC_SPEC_LEVEL_NONE                    0
 
 // only use speculative grants if no non-speculative requests/grants present
-`define SW_SPEC_LEVEL_ANY_NONSPEC_MASKS       1
+`define SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS       1
 
 // use speculative grants when not conflicting with non-spec requests
-`define SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS 2
+`define SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS 2
 
 // use speculative grants when not conflicting with non-spec grants
-`define SW_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS 3
+`define SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS 3
 
 // use speculative grants when not conflicting with intermediate non-spec grants
-`define SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS 4
+`define SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS 4
 
-`define SW_SPEC_LEVEL_LAST `SW_SPEC_LEVEL_NONSPEC_INT_MASKS
+`define SW_ALLOC_SPEC_LEVEL_LAST `SW_ALLOC_SPEC_LEVEL_NONSPEC_INT_MASKS
 
 
 `endif

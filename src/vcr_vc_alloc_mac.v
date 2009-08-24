@@ -61,7 +61,7 @@ module vcr_vc_alloc_mac
    localparam port_idx_width = clogb(num_ports);
    
    // select implementation variant for VC allocator
-   parameter allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter allocator_type = `VC_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -105,7 +105,7 @@ module vcr_vc_alloc_mac
    
    generate
       
-      if(allocator_type == `VC_ALLOCATOR_TYPE_SEP_IF)
+      if(allocator_type == `VC_ALLOC_TYPE_SEP_IF)
 	begin
 	   vcr_vc_alloc_sep_if
 	     #(.num_message_classes(num_message_classes),
@@ -127,7 +127,7 @@ module vcr_vc_alloc_mac
 	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
 	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
 	end
-      else if(allocator_type == `VC_ALLOCATOR_TYPE_SEP_OF)
+      else if(allocator_type == `VC_ALLOC_TYPE_SEP_OF)
 	begin
 	   vcr_vc_alloc_sep_of
 	     #(.num_message_classes(num_message_classes),
@@ -149,15 +149,15 @@ module vcr_vc_alloc_mac
 	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
 	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
 	end
-      else if((allocator_type >= `VC_ALLOCATOR_TYPE_WF_BASE) &&
-	      (allocator_type <= `VC_ALLOCATOR_TYPE_WF_LIMIT))
+      else if((allocator_type >= `VC_ALLOC_TYPE_WF_BASE) &&
+	      (allocator_type <= `VC_ALLOC_TYPE_WF_LIMIT))
 	begin
 	   vcr_vc_alloc_wf
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
-	       .wf_allocator_type(allocator_type - `VC_ALLOCATOR_TYPE_WF_BASE),
+	       .wf_alloc_type(allocator_type - `VC_ALLOC_TYPE_WF_BASE),
 	       .reset_type(reset_type))
 	   core_wf
 	     (.clk(clk),

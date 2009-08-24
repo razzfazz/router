@@ -66,21 +66,21 @@ module router_wrap
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // connectivity within each dimension
-   localparam dimension_connectivity
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `DIMENSION_CONNECTIVITY_LINE :
-       (network_topology == `NETWORK_TOPOLOGY_TORUS) ?
-       `DIMENSION_CONNECTIVITY_RING :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `DIMENSION_CONNECTIVITY_FULL :
+   localparam connectivity
+     = (topology == `TOPOLOGY_MESH) ?
+       `CONNECTIVITY_LINE :
+       (topology == `TOPOLOGY_TORUS) ?
+       `CONNECTIVITY_RING :
+       (topology == `TOPOLOGY_FBFLY) ?
+       `CONNECTIVITY_FULL :
        -1;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
-	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
-       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -100,10 +100,10 @@ module router_wrap
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select routing function type
-   localparam routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
+   localparam routing_type = `ROUTING_TYPE_DOR;
    
    // enable speculative switch allocation
-   localparam sw_spec_enable = (sw_spec_level != `SW_SPEC_LEVEL_NONE);
+   localparam sw_alloc_spec_enable = (sw_alloc_spec_level != `SW_ALLOC_SPEC_LEVEL_NONE);
    
    
    input clk;
@@ -150,7 +150,7 @@ module router_wrap
 		 .num_routers_per_dim(num_routers_per_dim),
 		 .num_dimensions(num_dimensions),
 		 .num_nodes_per_router(num_nodes_per_router),
-		 .dimension_connectivity(dimension_connectivity),
+		 .connectivity(connectivity),
 		 .packet_format(packet_format),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
@@ -159,11 +159,11 @@ module router_wrap
 		 .perf_ctr_width(perf_ctr_width),
 		 .checker_enable(checker_enable),
 		 .checker_capture_mode(checker_capture_mode),
-		 .routing_function_type(routing_function_type),
-		 .dimension_order(dimension_order),
+		 .routing_type(routing_type),
+		 .dim_order(dim_order),
 		 .header_fifo_type(header_fifo_type),
 		 .fbf_regfile_type(fbf_regfile_type),
-		 .arbiter_type(sw_arbiter_type),
+		 .arbiter_type(sw_alloc_arbiter_type),
 		 .crossbar_type(data_crossbar_type),
 		 .reset_type(reset_type))
 	     whr
@@ -192,7 +192,7 @@ module router_wrap
 		 .num_routers_per_dim(num_routers_per_dim),
 		 .num_dimensions(num_dimensions),
 		 .num_nodes_per_router(num_nodes_per_router),
-		 .dimension_connectivity(dimension_connectivity),
+		 .connectivity(connectivity),
 		 .packet_format(packet_format),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
@@ -202,16 +202,16 @@ module router_wrap
 		 .checker_enable(checker_enable),
 		 .checker_capture_mode(checker_capture_mode),
 		 .track_vcs_at_output(track_vcs_at_output),
-		 .routing_function_type(routing_function_type),
-		 .dimension_order(dimension_order),
+		 .routing_type(routing_type),
+		 .dim_order(dim_order),
 		 .credit_handling_type(credit_handling_type),
 		 .header_fifo_type(header_fifo_type),
 		 .fbf_regfile_type(fbf_regfile_type),
-		 .vc_allocator_type(vc_allocator_type),
-		 .vc_arbiter_type(vc_arbiter_type),
-		 .sw_allocator_type(sw_allocator_type),
-		 .sw_arbiter_type(sw_arbiter_type),
-		 .sw_spec_level(sw_spec_level),
+		 .vc_alloc_type(vc_alloc_type),
+		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+		 .sw_alloc_type(sw_alloc_type),
+		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
+		 .sw_alloc_spec_level(sw_alloc_spec_level),
 		 .comb_alloc_enable(comb_alloc_enable),
 		 .ctrl_crossbar_type(ctrl_crossbar_type),
 		 .data_crossbar_type(data_crossbar_type),

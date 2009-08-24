@@ -47,7 +47,7 @@ module testbench
 `include "vcr_constants.v"
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
+   parameter topology = `TOPOLOGY_FBFLY;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -82,9 +82,9 @@ module testbench
    
    // number of adjacent routers in each dimension
    parameter num_neighbors_per_dim
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+     = (topology == `TOPOLOGY_MESH) ?
        2 :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (topology == `TOPOLOGY_FBFLY) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -96,14 +96,14 @@ module testbench
    localparam port_idx_width = clogb(num_ports);
    
    // select implementation variant for switch allocator
-   parameter allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+   parameter allocator_type = `SW_ALLOC_TYPE_SEP_IF;
    
    // select implementation variant for wavefront allocator
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
+   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    

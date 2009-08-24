@@ -40,7 +40,7 @@ module vc_alloc_wrap
 `include "vcr_constants.v"
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
+   parameter topology = `TOPOLOGY_FBFLY;
    
    // number of traffic classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -75,9 +75,9 @@ module vc_alloc_wrap
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
+     = (topology == `TOPOLOGY_MESH) ?
        2 :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
+       (topology == `TOPOLOGY_FBFLY) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -89,15 +89,15 @@ module vc_alloc_wrap
    localparam port_idx_width = clogb(num_ports);
    
    // select routing function type
-   localparam routing_function_type
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_DOR :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `ROUTING_FUNCTION_TYPE_FBFLY :
+   localparam routing_type
+     = (topology == `TOPOLOGY_MESH) ?
+       `ROUTING_TYPE_DOR :
+       (topology == `TOPOLOGY_FBFLY) ?
+       `ROUTING_TYPE_FBFLY :
        -1;
    
    // select implementation variant for VC allocator
-   parameter allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+   parameter allocator_type = `VC_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;

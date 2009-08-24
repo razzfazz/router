@@ -57,7 +57,7 @@ module c_port_filter
    parameter restrict_turns = 1;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_DOR;
    
    // ID of current port
    parameter port_id = 0;
@@ -100,9 +100,9 @@ module c_port_filter
 	   // flattened butterfly, this applies to all links in the same
 	   // dimension
 	   if((op < (num_ports - num_nodes_per_router)) &&
-	      (((routing_function_type == `ROUTING_FUNCTION_TYPE_DOR) &&
+	      (((routing_type == `ROUTING_TYPE_DOR) &&
 		(op == port_id)) ||
-	       ((routing_function_type == `ROUTING_FUNCTION_TYPE_FBFLY) &&
+	       ((routing_type == `ROUTING_TYPE_FBFLY) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
 	     begin

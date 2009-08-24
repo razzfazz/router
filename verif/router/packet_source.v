@@ -52,7 +52,7 @@ module packet_source
    parameter packet_length_mode = 0;
    
    // select network topology
-   parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
+   parameter topology = `TOPOLOGY_FBFLY;
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
@@ -101,21 +101,21 @@ module packet_source
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // connectivity within each dimension
-   localparam dimension_connectivity
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `DIMENSION_CONNECTIVITY_LINE :
-       (network_topology == `NETWORK_TOPOLOGY_TORUS) ?
-       `DIMENSION_CONNECTIVITY_RING :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `DIMENSION_CONNECTIVITY_FULL :
+   localparam connectivity
+     = (topology == `TOPOLOGY_MESH) ?
+       `CONNECTIVITY_LINE :
+       (topology == `TOPOLOGY_TORUS) ?
+       `CONNECTIVITY_RING :
+       (topology == `TOPOLOGY_FBFLY) ?
+       `CONNECTIVITY_FULL :
        -1;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
-	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
-       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -168,10 +168,10 @@ module packet_source
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_DOR;
    
    // select order of dimension traversal
-   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   parameter dim_order = `DIM_ORDER_ASCENDING;
    
    // maximum packet length (in flits)
    localparam max_packet_length = 1 + max_payload_length;
@@ -548,9 +548,9 @@ module packet_source
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_dimensions(num_dimensions),
 		    .num_nodes_per_router(num_nodes_per_router),
-		    .dimension_connectivity(dimension_connectivity),
-		    .routing_function_type(routing_function_type),
-		    .dimension_order(dimension_order),
+		    .connectivity(connectivity),
+		    .routing_type(routing_type),
+		    .dim_order(dim_order),
 		    .resource_class(irc))
 		rtl
 		  (.clk(clk),

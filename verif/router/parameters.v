@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // router configuration options
 
 // select network topology
-parameter network_topology = `NETWORK_TOPOLOGY_MESH;
+parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
 parameter num_flit_buffers = 5;
@@ -87,7 +87,7 @@ parameter track_vcs_at_output = 1;
 parameter router_type = `ROUTER_TYPE_VC;
 
 // select order of dimension traversal
-parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+parameter dim_order = `DIM_ORDER_ASCENDING;
 
 // select method for credit signaling from output to input controller
 parameter credit_handling_type = `CREDIT_HANDLING_TYPE_LEVEL;
@@ -99,19 +99,19 @@ parameter header_fifo_type = `FIFO_TYPE_SHIFTING;
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
 
 // select implementation variant for VC allocator
-parameter vc_allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
+parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 
 // select which arbiter type to use for VC allocator
-parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select implementation variant for switch allocator
-parameter sw_allocator_type = `SW_ALLOCATOR_TYPE_SEP_IF;
+parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 
 // select which arbiter type to use for switch allocator
-parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select speculation level for switch allocator
-parameter sw_spec_level = `SW_SPEC_LEVEL_NONE;
+parameter sw_alloc_spec_level = `SW_ALLOC_SPEC_LEVEL_NONE;
 
 // use combined VC and switch allocator
 parameter comb_alloc_enable = 1;

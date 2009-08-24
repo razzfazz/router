@@ -59,14 +59,14 @@ module whr_la_routing_logic
    localparam addr_width = router_addr_width + node_addr_width;
    
    // connectivity within each dimension
-   parameter dimension_connectivity = `DIMENSION_CONNECTIVITY_LINE;
+   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((dimension_connectivity == `DIMENSION_CONNECTIVITY_LINE) ||
-	(dimension_connectivity == `DIMENSION_CONNECTIVITY_RING)) ?
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
-       (dimension_connectivity == `DIMENSION_CONNECTIVITY_FULL) ?
+       (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
        -1;
    
@@ -81,10 +81,10 @@ module whr_la_routing_logic
    localparam la_route_info_width = port_idx_width;
    
    // select routing function type
-   parameter routing_function_type = `ROUTING_FUNCTION_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_DOR;
    
    // select order of dimension traversal
-   parameter dimension_order = `DIMENSION_ORDER_ASCENDING;
+   parameter dim_order = `DIM_ORDER_ASCENDING;
    
    // total number of bits required for storing routing information
    localparam route_info_width = addr_width;
@@ -121,9 +121,9 @@ module whr_la_routing_logic
    
    generate
       
-      case(routing_function_type)
+      case(routing_type)
 	
-	`ROUTING_FUNCTION_TYPE_DOR:
+	`ROUTING_TYPE_DOR:
 	  begin
 	     
 	     genvar dim;
@@ -147,9 +147,9 @@ module whr_la_routing_logic
 		  
 		  wire 			    dim_sel;
 		  
-		  case(dimension_order)
+		  case(dim_order)
 		    
-		    `DIMENSION_ORDER_ASCENDING:
+		    `DIM_ORDER_ASCENDING:
 		      begin
 			 if(dim == 0)
 			   assign dim_sel = ~dim_addr_match[dim];
@@ -158,7 +158,7 @@ module whr_la_routing_logic
 					    ~dim_addr_match[dim];
 		      end
 		    
-		    `DIMENSION_ORDER_DESCENDING:
+		    `DIM_ORDER_DESCENDING:
 		      begin
 			 if(dim == (num_dimensions - 1))
 			   assign dim_sel = ~dim_addr_match[dim];
@@ -176,9 +176,9 @@ module whr_la_routing_logic
 					     (dim+1)*dim_addr_width-1]
 		    = next_dim_addr;
 		  
-		  case(dimension_connectivity)
+		  case(connectivity)
 		    
-		    `DIMENSION_CONNECTIVITY_LINE, `DIMENSION_CONNECTIVITY_RING:
+		    `CONNECTIVITY_LINE, `CONNECTIVITY_RING:
 		      begin
 			 
 			 wire route_down;
@@ -202,16 +202,16 @@ module whr_la_routing_logic
 			 
 			 assign next_dim_addr = curr_dim_addr + addr_delta;
 			 
-			 case(dimension_connectivity)
+			 case(connectivity)
 			   
-			   `DIMENSION_CONNECTIVITY_LINE:
+			   `CONNECTIVITY_LINE:
 			     begin
 				assign port_dec
 				  = {next_dim_addr < dest_dim_addr,
 				     next_dim_addr > dest_dim_addr};
 			     end
 			   
-			   `DIMENSION_CONNECTIVITY_RING:
+			   `CONNECTIVITY_RING:
 			     begin
 				
 				// FIXME: add implementation here!
@@ -233,7 +233,7 @@ module whr_la_routing_logic
 			 
 		      end
 		    
-		    `DIMENSION_CONNECTIVITY_FULL:
+		    `CONNECTIVITY_FULL:
 		      begin
 			 
 			 wire route_dest;

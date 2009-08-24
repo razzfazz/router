@@ -52,7 +52,7 @@ module vcr_sw_alloc_sep_of
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -240,7 +240,7 @@ module vcr_sw_alloc_sep_of
 	   wire [0:num_vcs-1] 		gnt_spec_ivc;
 	   wire [0:num_ports-1] 	gnt_spec_op;
 	   
-	   if(spec_level != `SW_SPEC_LEVEL_NONE)
+	   if(spec_level != `SW_ALLOC_SPEC_LEVEL_NONE)
 	     begin
 		
 		wire unused_by_nonspec;
@@ -312,7 +312,7 @@ module vcr_sw_alloc_sep_of
 		wire [0:num_vcs-1] 	     req_in_spec_int_ivc;
 		wire [0:num_vcs-1] 	     gnt_in_spec_int_ivc;
 		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
-		if(spec_level == `SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
+		if(spec_level == `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
 		  begin
 
 		     assign req_in_spec_int_ivc
@@ -458,7 +458,7 @@ module vcr_sw_alloc_sep_of
       
       case(spec_level)
 	
-	`SW_SPEC_LEVEL_NONE:
+	`SW_ALLOC_SPEC_LEVEL_NONE:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
@@ -466,7 +466,7 @@ module vcr_sw_alloc_sep_of
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_ANY_NONSPEC_MASKS:
+	`SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{~|req_nonspec_ip_ivc}};
@@ -474,8 +474,8 @@ module vcr_sw_alloc_sep_of
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS,
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
+	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS,
+	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
 	  begin
 	     
 	     c_nor_nto1
@@ -494,7 +494,7 @@ module vcr_sw_alloc_sep_of
 	     
 	  end
 	
-	`SW_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
+	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
 	  begin
 	     
 	     // An input is granted if and only if there are any input-stage 
@@ -574,7 +574,7 @@ module vcr_sw_alloc_sep_of
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
-	   if(spec_level != `SW_SPEC_LEVEL_NONE)
+	   if(spec_level != `SW_ALLOC_SPEC_LEVEL_NONE)
 	     begin
 		
 		//--------------------------------------------------------------

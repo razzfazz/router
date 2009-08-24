@@ -38,15 +38,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // mesh
-`define NETWORK_TOPOLOGY_MESH  0
+`define TOPOLOGY_MESH  0
 
 // torus
-`define NETWORK_TOPOLOGY_TORUS 1
+`define TOPOLOGY_TORUS 1
 
 // flattened butterfly
-`define NETWORK_TOPOLOGY_FBFLY 2
+`define TOPOLOGY_FBFLY 2
 
-`define NETWORK_TOPOLOGY_LAST  `NETWORK_TOPOLOGY_FBFLY
+`define TOPOLOGY_LAST  `TOPOLOGY_FBFLY
 
 
 //------------------------------------------------------------------------------
@@ -54,15 +54,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // nodes are connected to their neighbors with no wraparound (e.g. mesh)
-`define DIMENSION_CONNECTIVITY_LINE 0
+`define CONNECTIVITY_LINE 0
 
 // nodes are connected to their neighbors with wraparound (e.g. torus)
-`define DIMENSION_CONNECTIVITY_RING 1
+`define CONNECTIVITY_RING 1
 
 // nodes are fully connected (e.g. flattened butterfly)
-`define DIMENSION_CONNECTIVITY_FULL 2
+`define CONNECTIVITY_FULL 2
 
-`define DIMENSION_CONNECTIVITY_LAST `DIMENSION_CONNECTIVITY_FULL
+`define CONNECTIVITY_LAST `CONNECTIVITY_FULL
 
 
 //------------------------------------------------------------------------------
@@ -83,9 +83,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // dimension-order routing (using multiple phases if num_resource_classes > 1)
-`define ROUTING_FUNCTION_TYPE_DOR 0
+`define ROUTING_TYPE_DOR 0
 
-`define ROUTING_FUNCTION_TYPE_LAST `ROUTING_FUNCTION_TYPE_DOR
+`define ROUTING_TYPE_LAST `ROUTING_TYPE_DOR
 
 
 //------------------------------------------------------------------------------
@@ -93,10 +93,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // traverse dimensions in ascending order
-`define DIMENSION_ORDER_ASCENDING  0
+`define DIM_ORDER_ASCENDING  0
 
 // traverse dimensions in descending order
-`define DIMENSION_ORDER_DESCENDING 1
+`define DIM_ORDER_DESCENDING 1
 
 
 //------------------------------------------------------------------------------
@@ -236,25 +236,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // variant which uses multiplexers to permute inputs and outputs based on 
 // priority
-`define WF_ALLOCATOR_TYPE_MUX  0
+`define WF_ALLOC_TYPE_MUX  0
 
 // variant which replicates the entire allocation logic for the different 
 // priorities and selects the result from the appropriate one
-`define WF_ALLOCATOR_TYPE_REP  1
+`define WF_ALLOC_TYPE_REP  1
 
 // variant implementing a Diagonal Propagation Arbiter as described in Hurt et 
 // al, "Design and Implementation of High-Speed Symmetric Crossbar Schedulers"
-`define WF_ALLOCATOR_TYPE_DPA  2
+`define WF_ALLOC_TYPE_DPA  2
 
 // variant which rotates inputs and outputs based on priority
-`define WF_ALLOCATOR_TYPE_ROT  3
+`define WF_ALLOC_TYPE_ROT  3
 
 // variant which uses wraparound (forming a false combinational loop) as 
 // described in Dally et al, "Principles and Practices of Interconnection 
 // Networks"
-`define WF_ALLOCATOR_TYPE_LOOP 4
+`define WF_ALLOC_TYPE_LOOP 4
 
-`define WF_ALLOCATOR_TYPE_LAST `WF_ALLOCATOR_TYPE_LOOP
+`define WF_ALLOC_TYPE_LAST `WF_ALLOC_TYPE_LOOP
 
 
 `endif
