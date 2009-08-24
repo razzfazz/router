@@ -1,10 +1,15 @@
 all: 
+	for dir in $(wildcard *); do \
+          if [ -d $$dir ] ; then \
+	    $(MAKE) -C $$dir $@ ; \
+	  fi ; \
+        done
 
 runall:
 	for dir in $(wildcard *); do \
           if [ -d $$dir ] ; then \
 	    cd $$dir ; \
-	    ./run ; \
+	    ./simv ; \
 	    cd ..  ; \
 	  fi \
         done
