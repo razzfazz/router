@@ -1,16 +1,17 @@
 module testbench
-  #(parameter num_buffers = 8,
-    parameter data_width = 16,
-    parameter reset_type = 1,
-    parameter Tclk = 2,
-    parameter runtime = 1000,
-    parameter rate_in = 50,
-    parameter rate_out = 50, 
-    parameter initial_seed = 0)
-   ();
+  ();
    
-`include "functions.v"
-`include "sim_functions.v"
+`include "c_functions.v"
+`include "c_constants.v"
+   
+   parameter num_buffers = 8;
+   parameter data_width = 16;
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter Tclk = 2;
+   parameter runtime = 1000;
+   parameter rate_in = 50;
+   parameter rate_out = 50; 
+   parameter initial_seed = 0;
    
    localparam addr_width = clogb(num_buffers);
    
@@ -22,8 +23,10 @@ module testbench
    wire [0:addr_width-1] write_addr;
    wire [0:addr_width-1] read_addr;
    wire 		 empty;
+   wire 		 full;
+   wire 		 ffc_error;
    
-   fifo_ctrl
+   c_fifo_ctrl
      #(.depth(num_buffers),
        .reset_type(reset_type))
    ffc
@@ -33,12 +36,15 @@ module testbench
       .pop(pop),
       .write_addr(write_addr),
       .read_addr(read_addr),
-      .empty(empty));
+      .empty(empty),
+      .full(full),
+      .error(ffc_error));
    
    wire free;
    wire free_early;
+   wire ct_error;
    
-   credit_tracker
+   c_credit_tracker
      #(.num_credits(num_buffers),
        .reset_type(reset_type))
    ct
@@ -46,14 +52,14 @@ module testbench
       .reset(reset),
       .debit(push),
       .credit(pop),
-      .clear(1'b0),
       .free(free),
-      .free_early(free_early));
+      .free_early(free_early),
+      .error(ct_error));
 
    reg [0:data_width-1] write_data;
    wire [0:data_width-1] read_data;
 
-   regfile
+   c_regfile_mac
      #(.width(data_width),
        .depth(num_buffers))
    rf
@@ -61,6 +67,7 @@ module testbench
       .write_enable(push),
       .write_address(write_addr),
       .write_data(write_data),
+      .read_enable(pop),
       .read_address(read_addr),
       .read_data(read_data));
    
@@ -83,7 +90,7 @@ module testbench
    assign pop = ~reset & flag_out & ~empty;
 
    wire pop_q;
-   dff
+   c_dff
      #(.width(1),
        .reset_type(reset_type))
    popq
@@ -93,7 +100,7 @@ module testbench
       .q(pop_q));
 
    wire [0:addr_width-1] read_addr_q;
-   dff
+   c_dff
      #(.width(addr_width),
        .reset_type(reset_type))
    read_addrq
@@ -117,7 +124,7 @@ module testbench
 	  $display($time, " WRITE: %x=%x.", write_addr, write_data);
 	if(pop_q)
 	  $display($time, " READ:  %x=%x.", read_addr_q, read_data);
-	if(pop_q & is_x(read_data))
+	if(pop_q & (^read_data === 1'bx))
 	  $display($time, " ERROR: read X value");
      end
    

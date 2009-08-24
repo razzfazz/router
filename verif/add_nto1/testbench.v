@@ -6,7 +6,7 @@ module testbench
     parameter initial_seed = 0)
    ();
 
-`include "functions.v"
+`include "c_functions.v"
 
    localparam out_width = clogb(num_ports) + width;
 
@@ -28,10 +28,10 @@ module testbench
 	  end
      end
 
-   add_nto1
+   c_add_nto1
      #(.width(width),
        .num_ports(num_ports))
-   adder
+   dut
      (.data_in(data_in),
       .data_out(data_out));
    

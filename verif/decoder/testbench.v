@@ -4,14 +4,14 @@ module testbench
     parameter initial_seed = 0)
    ();
 
-`include "functions.v"
+`include "c_functions.v"
 
    localparam width = clogb(num_ports);
    
    reg [0:width-1] data_in;
    wire [0:num_ports-1] data_out;
    
-   decoder
+   c_decoder
      #(.num_ports(num_ports))
    dut
      (.data_in(data_in),

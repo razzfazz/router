@@ -1,16 +1,17 @@
 module testbench
-  #(parameter num_credits = 8,
-    parameter min_credits = 2,
-    parameter reset_type = 1,
-    parameter Tclk = 2,
-    parameter runtime = 1000,
-    parameter rate_in = 50,
-    parameter rate_out = 50, 
-    parameter initial_seed = 0)
-   ();
-
-`include "functions.v"
-
+  ();
+   
+`include "c_functions.v"
+`include "c_constants.v"
+   
+   parameter num_credits = 8;
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter Tclk = 2;
+   parameter runtime = 1000;
+   parameter rate_in = 50;
+   parameter rate_out = 50;
+   parameter initial_seed = 0;
+   
    reg clk;
    reg reset;
    
@@ -18,11 +19,10 @@ module testbench
    wire credit;
    wire free;
    wire free_early;
-   wire free_plus1;
+   wire error;
    
-   credit_tracker
+   c_credit_tracker
      #(.num_credits(num_credits),
-       .min_credits(min_credits),
        .reset_type(reset_type))
    dut
      (.clk(clk),
@@ -31,7 +31,7 @@ module testbench
       .credit(credit),
       .free(free),
       .free_early(free_early),
-      .free_plus1(free_plus1));
+      .error(error));
    
    always
    begin
