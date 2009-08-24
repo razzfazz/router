@@ -91,21 +91,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // disable speculative switch allocation
-`define SW_ALLOC_SPEC_LEVEL_NONE                    0
+`define SW_ALLOC_SPEC_TYPE_NONE                    0
 
 // only use speculative grants if no non-speculative requests/grants present
-`define SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS       1
+`define SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS       1
 
 // use speculative grants when not conflicting with non-spec requests
-`define SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS 2
+`define SW_ALLOC_SPEC_TYPE_REQ 2
 
 // use speculative grants when not conflicting with non-spec grants
-`define SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS 3
+`define SW_ALLOC_SPEC_TYPE_GNT 3
 
 // use speculative grants when not conflicting with intermediate non-spec grants
-`define SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS 4
+`define SW_ALLOC_SPEC_TYPE_INT 4
 
-`define SW_ALLOC_SPEC_LEVEL_LAST `SW_ALLOC_SPEC_LEVEL_NONSPEC_INT_MASKS
+`define SW_ALLOC_SPEC_TYPE_LAST `SW_ALLOC_SPEC_TYPE_NONSPEC_INT_MASKS
 
 
 `endif

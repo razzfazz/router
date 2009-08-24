@@ -103,7 +103,7 @@ module testbench
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
+   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -284,7 +284,7 @@ module testbench
        .num_ports(num_ports),
        .allocator_type(allocator_type),
        .arbiter_type(arbiter_type),
-       .spec_level(spec_level),
+       .spec_type(spec_type),
        .reset_type(reset_type))
    swa
      (.clk(clk),
@@ -544,9 +544,9 @@ module testbench
       
       if(output_as_csv)
 	begin
-	   $display("SIM: num_ports,num_vcs,spec_level,rate, spec_rate,req_flow,gnt_flow,max_flow,gnt_prob,max_prob,efficiency");
+	   $display("SIM: num_ports,num_vcs,spec_type,rate, spec_rate,req_flow,gnt_flow,max_flow,gnt_prob,max_prob,efficiency");
 	   $display("SIM: %0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%f,%f,%f", 
-		    num_ports, num_vcs, spec_level, rate, spec_rate, 
+		    num_ports, num_vcs, spec_type, rate, spec_rate, 
 		    req_count, gnt_count, max_count, 
 		    ($itor(gnt_count)/$itor(req_count)), ($itor(max_count)/$itor(req_count)),
 		    ($itor(gnt_count)/$itor(max_count)));
@@ -556,8 +556,8 @@ module testbench
 	   $display("SIM: simulation completed");
       
 	   $display("SIM: flow analysis:");
-	   $display("SIM: num_ports=%0d, num_vcs=%0d, spec_level=%0d, rate=%0d, spec_rate=%0d",
-		    num_ports, num_vcs, spec_level, rate, spec_rate);
+	   $display("SIM: num_ports=%0d, num_vcs=%0d, spec_type=%0d, rate=%0d, spec_rate=%0d",
+		    num_ports, num_vcs, spec_type, rate, spec_rate);
 	   $display("SIM: req_count=%0d, gnt_count=%0d, max_count=%0d",
 		    req_count, gnt_count, max_count);
 	   $display("SIM: gnt_prob=%f, max_prob=%f",

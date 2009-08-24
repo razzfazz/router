@@ -104,7 +104,7 @@ module sw_alloc_wrap
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS;
+   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -137,7 +137,7 @@ module sw_alloc_wrap
        .num_ports(num_ports),
        .allocator_type(allocator_type),
        .arbiter_type(arbiter_type),
-       .spec_level(spec_level),
+       .spec_type(spec_type),
        .reset_type(reset_type))
    swa
      (.clk(clk),

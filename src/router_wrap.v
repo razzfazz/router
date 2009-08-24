@@ -99,12 +99,6 @@ module router_wrap
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
-   // select routing function type
-   localparam routing_type = `ROUTING_TYPE_DOR;
-   
-   // enable speculative switch allocation
-   localparam sw_alloc_spec_enable = (sw_alloc_spec_level != `SW_ALLOC_SPEC_LEVEL_NONE);
-   
    
    input clk;
    input reset;
@@ -211,7 +205,7 @@ module router_wrap
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
 		 .sw_alloc_type(sw_alloc_type),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
-		 .sw_alloc_spec_level(sw_alloc_spec_level),
+		 .sw_alloc_spec_type(sw_alloc_spec_type),
 		 .comb_alloc_enable(comb_alloc_enable),
 		 .ctrl_crossbar_type(ctrl_crossbar_type),
 		 .data_crossbar_type(data_crossbar_type),

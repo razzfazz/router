@@ -52,7 +52,7 @@ module vcr_sw_alloc_sep_if
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level
-   parameter spec_level = `SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter spec_type = `SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -210,7 +210,7 @@ module vcr_sw_alloc_sep_if
 	   
 	   wire [0:num_vcs-1] 	gnt_spec_ivc;
 	   
-	   if(spec_level != `SW_ALLOC_SPEC_LEVEL_NONE)
+	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
 		
 		//--------------------------------------------------------------
@@ -350,9 +350,9 @@ module vcr_sw_alloc_sep_if
    
    generate
       
-      case(spec_level)
+      case(spec_type)
 	
-	`SW_ALLOC_SPEC_LEVEL_NONE:
+	`SW_ALLOC_SPEC_TYPE_NONE:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
@@ -360,7 +360,7 @@ module vcr_sw_alloc_sep_if
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS:
+	`SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{~|req_nonspec_ip_ivc}};
@@ -368,7 +368,7 @@ module vcr_sw_alloc_sep_if
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_REQ_MASKS:
+	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
 	     // We can potentially improve matching by using the grants of the
@@ -398,7 +398,7 @@ module vcr_sw_alloc_sep_if
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_GNT_MASKS:
+	`SW_ALLOC_SPEC_TYPE_GNT:
 	  begin
 	     
 	     // An output is granted if and only if there were any output-stage 
@@ -424,7 +424,7 @@ module vcr_sw_alloc_sep_if
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS:
+	`SW_ALLOC_SPEC_TYPE_INT:
 	  begin
 	     
 	     c_nor_nto1
@@ -498,7 +498,7 @@ module vcr_sw_alloc_sep_if
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
-	   if(spec_level != `SW_ALLOC_SPEC_LEVEL_NONE)
+	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
 		
 		//--------------------------------------------------------------
@@ -517,7 +517,7 @@ module vcr_sw_alloc_sep_if
 		wire [0:num_ports-1] gnt_out_spec_int_ip;
 		wire [0:num_ports-1] gnt_out_spec_ip;
 		
-		if(spec_level == `SW_ALLOC_SPEC_LEVEL_CONFL_NONSPEC_INT_MASKS)
+		if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
 		  begin
 		     
 		     assign req_out_spec_int_ip

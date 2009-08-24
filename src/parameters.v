@@ -88,6 +88,9 @@ parameter router_type = `ROUTER_TYPE_VC;
 // width of flit payload data
 parameter flit_data_width = 32;
 
+// select routing function type
+parameter routing_type = `ROUTING_TYPE_DOR;
+
 // select order of dimension traversal
 parameter dim_order = `DIM_ORDER_ASCENDING;
 
@@ -113,7 +116,7 @@ parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select speculation level for switch allocator
-parameter sw_alloc_spec_level = `SW_ALLOC_SPEC_LEVEL_NONE;
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_NONE;
 
 // use combined VC and switch allocator
 parameter comb_alloc_enable = 1;

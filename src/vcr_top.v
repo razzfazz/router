@@ -183,9 +183,10 @@ module vcr_top
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation level for switch allocator
-   parameter sw_alloc_spec_level = `SW_ALLOC_SPEC_LEVEL_ANY_NONSPEC_MASKS;
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS;
    
-   localparam sw_alloc_spec_enable = (sw_alloc_spec_level != `SW_ALLOC_SPEC_LEVEL_NONE);
+   localparam sw_alloc_spec_enable
+     = (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE);
    
    // use combined VC and switch allocator
    parameter comb_alloc_enable = 1;
@@ -446,7 +447,7 @@ module vcr_top
 	       .num_ports(num_ports),
 	       .allocator_type(sw_alloc_type),
 	       .arbiter_type(sw_alloc_arbiter_type),
-	       .spec_level(sw_alloc_spec_level),
+	       .spec_type(sw_alloc_spec_type),
 	       .reset_type(reset_type))
 	   swa
 	     (.clk(clk),
