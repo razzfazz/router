@@ -103,7 +103,7 @@ module sw_alloc_wrap
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select speculation level
+   // select speculation type
    parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
