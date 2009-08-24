@@ -42,35 +42,9 @@ module testbench
    parameter warmup_cycles = 10;
    parameter sim_cycles = 10000;
    
+`include "c_functions.v"
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
-   
-   // compute ceiling of base-th root of argument
-   function integer croot(input integer argument, input integer base);
-      integer 		     i;
-      integer 		     j;
-      begin
-	 croot = 0;
-	 i = 0;
-	 while(i < argument)
-	   begin
-	      croot = croot + 1;
-	      i = 1;
-	      for(j = 0; j < base; j = j + 1)
-		i = i * croot;
-	   end
-      end
-   endfunction
    
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;
@@ -120,14 +94,6 @@ module testbench
    
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
-   
-   // select routing function type
-   localparam routing_function_type
-     = (network_topology == `NETWORK_TOPOLOGY_MESH) ?
-       `ROUTING_FUNCTION_TYPE_MESH :
-       (network_topology == `NETWORK_TOPOLOGY_FBFLY) ?
-       `ROUTING_FUNCTION_TYPE_FBFLY :
-       -1;
    
    // select implementation variant for switch allocator
    parameter allocator_type = `VC_ALLOCATOR_TYPE_SEP_IF;
@@ -746,20 +712,11 @@ module testbench
       end
    endfunction
    
-   function integer pop_count(input [0:num_ports*num_vcs-1] argument);
-      integer i;
-      begin
-	 pop_count = 0;
-	 for(i = 0; i < num_ports*num_vcs; i = i + 1)
-	   pop_count = pop_count + argument[i];
-      end
-   endfunction
-   
    wire [0:31] req_flow;
    assign req_flow = get_flow(req_ip_ivc_op_ovc);
    
    wire [0:31] gnt_flow;
-   assign gnt_flow = get_flow(gnt_ip_ivc_op_ovc);//pop_count(gnt_ip_ivc);
+   assign gnt_flow = get_flow(gnt_ip_ivc_op_ovc);
    
    wire [0:31] max_flow;
    assign max_flow = get_flow(max_ip_ivc_op_ovc);

@@ -34,14 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_decoder
   (data_in, data_out);
    
-   function integer clogb(input integer argument);
-      integer i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
+`include "c_functions.v"
    
    // number of output ports (i.e., width of decoded word)
    parameter num_ports = 8;

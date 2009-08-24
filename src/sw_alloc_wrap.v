@@ -35,35 +35,9 @@ module sw_alloc_wrap
   (clk, reset, route_port_ip_ivc, req_nonspec_ip_ivc, req_spec_ip_ivc, 
    gnt_nonspec_ip_ivc, gnt_spec_ip_ivc, gnt_op_ip);
    
+`include "c_functions.v"
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
-   
-   // compute ceiling of base-th root of argument
-   function integer croot(input integer argument, input integer base);
-      integer 		     i;
-      integer 		     j;
-      begin
-	 croot = 0;
-	 i = 0;
-	 while(i < argument)
-	   begin
-	      croot = croot + 1;
-	      i = 1;
-	      for(j = 0; j < base; j = j + 1)
-		i = i * croot;
-	   end
-      end
-   endfunction
    
    // select network topology
    parameter network_topology = `NETWORK_TOPOLOGY_FBFLY;

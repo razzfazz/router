@@ -36,18 +36,9 @@ module vcr_op_ctrl_mac
    xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in, flit_ctrl_out, flit_data_out, 
    elig_ovc, int_flow_ctrl_ovc, error);
    
+`include "c_functions.v"
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;

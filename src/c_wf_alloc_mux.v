@@ -35,17 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_wf_alloc_mux
   (clk, reset, update, req, gnt);
    
+`include "c_functions.v"
 `include "c_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // number of input/output ports
    // each input can bid for any combination of outputs

@@ -39,18 +39,9 @@ module vcr_ip_ctrl_mac
    fbf_write_addr, fbf_write_enable, fbf_write_data, fbf_read_addr, 
    fbf_read_enable, fbf_read_data, error);
    
+`include "c_functions.v"
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;

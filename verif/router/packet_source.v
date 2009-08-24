@@ -33,35 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module packet_source
   (clk, reset, address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, error);
    
+`include "c_functions.v"
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
-   
-   // compute ceiling of base-th root of argument
-   function integer croot(input integer argument, input integer base);
-      integer 		     i;
-      integer 		     j;
-      begin
-	 croot = 0;
-	 i = 0;
-	 while(i < argument)
-	   begin
-	      croot = croot + 1;
-	      i = 1;
-	      for(j = 0; j < base; j = j + 1)
-		i = i * croot;
-	   end
-      end
-   endfunction
    
    parameter initial_seed = 0;
    

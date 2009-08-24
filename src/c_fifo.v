@@ -34,16 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_fifo
   (clk, reset, full, data_in, push, empty, data_out, pop, error);
    
+`include "c_functions.v"
 `include "c_constants.v"
-   
-   function integer clogb(input integer argument);
-      integer i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // number of entries
    parameter depth = 4;

@@ -37,35 +37,7 @@ module router_wrap
    flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
    error);
    
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
-   
-   // compute ceiling of base-th root of argument
-   function integer croot(input integer argument, input integer base);
-      integer 		     i;
-      integer 		     j;
-      begin
-	 croot = 0;
-	 i = 0;
-	 while(i < argument)
-	   begin
-	      croot = croot + 1;
-	      i = 1;
-	      for(j = 0; j < base; j = j + 1)
-		i = i * croot;
-	   end
-      end
-   endfunction
-   
-   
+`include "c_functions.v"   
 `include "c_constants.v"
 `include "vcr_constants.v"
 `include "parameters.v"

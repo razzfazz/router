@@ -34,20 +34,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_arbiter
   (clk, reset, update, req, gnt);
    
+`include "c_functions.v"
 `include "c_constants.v"
    
    // number of input ports
    parameter num_ports = 32;
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // number fo bits required to select a port
    localparam port_idx_width = clogb(num_ports);

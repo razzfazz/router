@@ -36,18 +36,9 @@ module vcr_comb_alloc_mac
    vc_gnt_ip_ivc, vc_gnt_ip_ivc_ovc, vc_gnt_op_ovc, vc_gnt_op_ovc_ip, 
    vc_gnt_op_ovc_ivc, sw_req_ip_ivc, sw_gnt_ip_ivc, sw_gnt_op_ip);
    
+`include "c_functions.v"
 `include "c_constants.v"
 `include "vcr_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;

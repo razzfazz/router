@@ -34,17 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module vcr_routing_logic
   (clk, reset, router_address, hop_route_info, route_port, inc_rc);
    
+`include "c_functions.v"
 `include "c_constants.v"
-   
-   // compute ceiling of binary logarithm
-   function integer clogb(input integer argument);
-      integer 		     i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
