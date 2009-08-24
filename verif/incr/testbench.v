@@ -7,7 +7,7 @@ module testbench
    wire [0:width-1] data_out;
    reg [0:width-1]  data_in;
    
-   incr
+   c_incr
      #(.width(width),
        .min_value(min_value),
        .max_value(max_value))
