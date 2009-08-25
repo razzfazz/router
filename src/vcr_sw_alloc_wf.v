@@ -54,8 +54,8 @@ module vcr_sw_alloc_wf
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select speculation level
-   parameter spec_type = `SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS;
+   // select speculation type
+   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -381,14 +381,6 @@ module vcr_sw_alloc_wf
 	     
 	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
 	     assign unused_by_nonspec_op = {num_ports{1'b0}};
-	     
-	  end
-	
-	`SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS:
-	  begin
-	     
-	     assign unused_by_nonspec_ip = {num_ports{~|req_nonspec_ip_ivc}};
-	     assign unused_by_nonspec_op = {num_ports{1'b1}};
 	     
 	  end
 	

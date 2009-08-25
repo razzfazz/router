@@ -182,8 +182,8 @@ module vcr_top
    // select which arbiter type to use for switch allocator
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select speculation level for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_ANY_NONSPEC_MASKS;
+   // select speculation type for switch allocator
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    localparam sw_alloc_spec_enable
      = (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE);
