@@ -35,16 +35,8 @@ module c_regfile_mac
   (clk, write_enable, write_address, write_data, read_enable, read_address,
    read_data);
    
+`include "c_functions.v"
 `include "c_constants.v"
-   
-   function integer clogb(input integer argument);
-      integer i;
-      begin
-	 clogb = 0;
-	 for(i = argument - 1; i > 0; i = i >> 1)
-	   clogb = clogb + 1;
-      end
-   endfunction
    
    // number of entries
    parameter depth = 8;
@@ -79,36 +71,11 @@ module c_regfile_mac
    output [0:width-1] read_data;
    wire [0:width-1] read_data;
    
-   
-   //---------------------------------------------------------------------------
-   // WRITE TIMING
-   // ============
-   // The values of 'write_enable', 'write_address' and 'write_data' at the end 
-   // of cycle N determine a register file write to perform in cycle N+1; the
-   // write will complete -- i.e., the value specified in 'write_data' will be 
-   // available in the register file entry selected by 'write_address' -- in 
-   // cycle N+2.
-   //---------------------------------------------------------------------------
-   // READ TIMING
-   // ===========
-   // The valuees of 'read_enable' and 'read_address' at the end of cycle N 
-   // determine which register file entry to read out in cycle N+1; i.e., in 
-   // cycle N+1, the cell selected by the value of 'read_address' at the end of 
-   // cycle N will be connected to 'read_data'.
-   //---------------------------------------------------------------------------
-   
-   
-   reg 		    write_enable_q;
-   reg [0:data_width-1] write_data_q;
    reg [0:addr_width-1] read_address_q;
    
    always @(posedge clk)
-     begin
-	write_enable_q <= write_enable;
-	write_data_q <= write_data;
-	if(read_enable)
-	  read_address_q <= read_address;
-     end
+     if(read_enable)
+       read_address_q <= read_address;
    
    genvar 		level;
    
@@ -116,20 +83,30 @@ module c_regfile_mac
       
       case(regfile_type)
 	
-	`REGFILE_TYPE_FF_2D:
+	`REGFILE_TYPE_FF_2D, `REGFILE_TYPE_LAT_2D:
 	  begin
 	     
-	     reg [0:width-1] 	storage [0:depth-1];
+	     reg [0:width-1] storage [0:depth-1];
 	     
-	     always @(posedge clk)
-	       if(write_enable_q)
-		 storage[write_address] <= write_data_q;
+	     case(regfile_type)
+	       
+	       `REGFILE_TYPE_FF_2D:
+		 always @(posedge clk)
+		   if(write_enable)
+		     storage[write_address] <= write_data;
+	       
+	       `REGFILE_TYPE_LAT_2D:
+		 always @(clk, write_enable, write_address, write_data)
+		   if(~clk & write_enable)
+		     storage[write_address] <= write_data;
+	       
+	     endcase
 	     
 	     assign read_data = storage[read_address_q];
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_MUX:
+	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX:
 	  begin
 	     
 	     wire [0:depth*width-1] read_data_lvl;
@@ -138,13 +115,23 @@ module c_regfile_mac
 	       begin:mux_levels
 		  
 		  wire write;
-		  assign write = write_enable_q && (write_address == level);
+		  assign write = write_enable && (write_address == level);
 		  
 		  reg [0:width-1] storage;
 		  
-		  always @(posedge clk)
-		    if(write)
-		      storage <= write_data_q;
+		  case(regfile_type)
+		    
+		    `REGFILE_TYPE_FF_1D_MUX:
+		      always @(posedge clk)
+			if(write)
+			  storage <= write_data;
+		    
+		    `REGFILE_TYPE_LAT_1D_MUX:
+		      always @(clk, write, write_data)
+			if(~clk & write)
+			  storage <= write_data;
+		    
+		  endcase
 		  
 		  assign read_data_lvl[level*width:(level+1)*width-1] = storage;
 		  
@@ -154,10 +141,10 @@ module c_regfile_mac
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_TRISTATE:
+	`REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
 	  begin
 	     
-	     reg 		    read_enable_q;
+	     reg read_enable_q;
 	     
 	     always @(posedge clk)
 	       read_enable_q <= read_enable;
@@ -166,12 +153,23 @@ module c_regfile_mac
 	       begin:tristate_levels
 		  
 		  wire write;
-		  assign write = write_enable_q && (write_address == level);
+		  assign write = write_enable && (write_address == level);
 		  
 		  reg [0:width-1] storage;
-		  always @(posedge clk)
-		    if(write)
-		      storage <= write_data_q;
+		  
+		  case(regfile_type)
+		    
+		    `REGFILE_TYPE_FF_1D_TRISTATE:
+		      always @(posedge clk)
+			if(write)
+			  storage <= write_data;
+		    
+		    `REGFILE_TYPE_LAT_1D_TRISTATE:
+		      always @(clk, write, write_data)
+			if(~clk & write)
+			  storage <= write_data;
+		    
+		  endcase
 		  
 		  wire 		  read;
 		  assign read = read_enable_q && (read_address_q == level);
@@ -182,7 +180,68 @@ module c_regfile_mac
 	     
 	  end
 	
+	`REGFILE_TYPE_FF_DW, `REGFILE_TYPE_LAT_DW:
+	  begin
+	     
+	     wire write_enable_b;
+	     assign write_enable_b = ~write_enable;
+	     
+	     case(regfile_type)
+	       
+	       `REGFILE_TYPE_FF_DW:
+		 begin
+		    DW_ram_r_w_s_dff
+		      #(.data_width(width),
+			.depth(depth),
+			.rst_mode(1))
+		    DW_rf_dff
+		      (.clk(clk),
+		       .rst_n(1'b1),
+		       .cs_n(write_enable_b),
+		       .wr_n(write_enable_b),
+		       .rd_addr(read_address_q),
+		       .wr_addr(write_address),
+		       .data_in(write_data),
+		       .data_out(read_data));
+		 end
+	
+	       `REGFILE_TYPE_LAT_DW:
+		 begin
+		    DW_ram_r_w_s_lat
+		      #(.data_width(width),
+			.depth(depth))
+		    DW_rf_lat
+		      (.clk(clk),
+		       .cs_n(write_enable_b),
+		       .wr_n(write_enable_b),
+		       .rd_addr(read_address_q),
+		       .wr_addr(write_address),
+		       .data_in(write_data),
+		       .data_out(read_data));
+		 end
+	       
+	     endcase
+	     
+	  end
+	
       endcase
+      
+      
+      //----------------------------------------------------------------------
+      // check parameter validity
+      //----------------------------------------------------------------------
+      
+      // synopsys translate_off
+      if(depth < 2)
+      begin
+	 initial
+	 begin
+	    $display("ERROR: The register file module requires a depth of \
+		     two or more entries.");
+	    $stop;
+	     end
+      end
+      // synopsys translate_on
       
    endgenerate
    
