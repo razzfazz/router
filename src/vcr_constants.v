@@ -53,19 +53,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // separable, input-first
-`define VC_ALLOC_TYPE_SEP_IF   0
+`define VC_ALLOC_TYPE_SEP_IF    0
 
 // separable, output-first
-`define VC_ALLOC_TYPE_SEP_OF   1
+`define VC_ALLOC_TYPE_SEP_OF    1
 
 // wavefront-based
 // (note: add WF_ALLOC_TYPE_* constant to select wavefront variant)
-`define VC_ALLOC_TYPE_WF_BASE  2
-`define VC_ALLOC_TYPE_WF_LIMIT (`VC_ALLOC_TYPE_WF_BASE + \
-				    `WF_ALLOC_TYPE_LAST)
+`define VC_ALLOC_TYPE_WF_BASE   2
+`define VC_ALLOC_TYPE_WF_LIMIT  (`VC_ALLOC_TYPE_WF_BASE + `WF_ALLOC_TYPE_LAST)
 
-`define VC_ALLOC_TYPE_LAST `VC_ALLOC_TYPE_WF_LIMIT
-  
+// VC allocation is piggy-backed onto switch allocation
+`define VC_ALLOC_TYPE_PIGGYBACK (`VC_ALLOC_TYPE_WF_LIMIT + 1)
+
+`define VC_ALLOC_TYPE_LAST `VC_ALLOC_TYPE_PIGGYBACK
+
 
 //------------------------------------------------------------------------------
 // switch allocator implementation variants
@@ -80,8 +82,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wavefront-based
 // (note: add WF_ALLOC_TYPE_* constant to select wavefront variant)
 `define SW_ALLOC_TYPE_WF_BASE  2
-`define SW_ALLOC_TYPE_WF_LIMIT (`SW_ALLOC_TYPE_WF_BASE + \
-				    `WF_ALLOC_TYPE_LAST)
+`define SW_ALLOC_TYPE_WF_LIMIT (`SW_ALLOC_TYPE_WF_BASE + `WF_ALLOC_TYPE_LAST)
 
 `define SW_ALLOC_TYPE_LAST `SW_ALLOC_TYPE_WF_LIMIT
 
