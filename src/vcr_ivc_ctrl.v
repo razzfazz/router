@@ -998,7 +998,7 @@ module vcr_ivc_ctrl
    
    generate
       
-      if((vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK))
+      if(vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK)
 	assign sw_req_nonspec
 	  = header_valid & flit_valid & (free_allocated | ~vc_allocated_q);
       else
