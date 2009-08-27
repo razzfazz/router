@@ -206,7 +206,6 @@ module router_wrap
 		 .sw_alloc_type(sw_alloc_type),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .sw_alloc_spec_type(sw_alloc_spec_type),
-		 .comb_alloc_enable(comb_alloc_enable),
 		 .ctrl_crossbar_type(ctrl_crossbar_type),
 		 .data_crossbar_type(data_crossbar_type),
 		 .reset_type(reset_type))

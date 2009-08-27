@@ -189,12 +189,11 @@ module vcr_ip_ctrl_mac
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
-   // enable speculative (i.e., while VC is being allocated as well) switch
-   // allocation
-   parameter sw_alloc_spec_enable = 1;
+   // select implementation variant for VC allocator
+   parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
-   // use combined VC and switch allocator
-   parameter comb_alloc_enable = 1;
+   // select speculation type for switch allocator
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -437,8 +436,8 @@ module vcr_ip_ctrl_mac
 			 .dim_order(dim_order),
 			 .credit_handling_type(credit_handling_type),
 			 .header_fifo_type(header_fifo_type),
-			 .sw_alloc_spec_enable(sw_alloc_spec_enable),
-			 .comb_alloc_enable(comb_alloc_enable),
+			 .vc_alloc_type(vc_alloc_type),
+			 .sw_alloc_spec_type(sw_alloc_spec_type),
 			 .perf_ctr_enable(perf_ctr_enable),
 			 .checker_enable(checker_enable),
 			 .checker_capture_mode(checker_capture_mode),

@@ -116,9 +116,6 @@ parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 // select speculation type for switch allocator
 parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_NONE;
 
-// use combined VC and switch allocator
-parameter comb_alloc_enable = 1;
-
 // select implementation variant for control crossbar
 parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
