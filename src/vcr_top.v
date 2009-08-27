@@ -185,12 +185,6 @@ module vcr_top
    // select speculation type for switch allocator
    parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
-   localparam sw_alloc_spec_enable
-     = (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE);
-   
-   // use combined VC and switch allocator
-   parameter comb_alloc_enable = 1;
-   
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
    
@@ -324,8 +318,8 @@ module vcr_top
 	       .dim_order(dim_order),
 	       .credit_handling_type(credit_handling_type),
 	       .header_fifo_type(header_fifo_type),
-	       .sw_alloc_spec_enable(sw_alloc_spec_enable),
-	       .comb_alloc_enable(comb_alloc_enable),
+	       .vc_alloc_type(vc_alloc_type),
+	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .checker_enable(checker_enable),
@@ -405,7 +399,7 @@ module vcr_top
    
    generate
       
-      if(!comb_alloc_enable)
+      if(vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK)
 	begin
 	   vcr_vc_alloc_mac
 	     #(.num_message_classes(num_message_classes),
@@ -440,7 +434,7 @@ module vcr_top
    
    generate
       
-      if(!comb_alloc_enable)
+      if(vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK)
 	begin
 	   vcr_sw_alloc_mac
 	     #(.num_vcs(num_vcs),
@@ -469,7 +463,7 @@ module vcr_top
    
    generate
       
-      if(comb_alloc_enable)
+      if(vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK)
 	begin
 	   vcr_comb_alloc_mac
 	     #(.num_message_classes(num_message_classes),
