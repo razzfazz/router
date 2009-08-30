@@ -502,7 +502,7 @@ module vcr_top
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
    wire [0:num_ports*num_ports-1] 	    xbc_ctrl_op_ip_q;
-   c_crossbar_mac
+   vcr_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(int_flit_ctrl_width),
@@ -521,7 +521,7 @@ module vcr_top
    
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
    wire [0:num_ports*num_ports-1] 	    xbd_ctrl_op_ip_q;
-   c_crossbar_mac
+   whr_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(flit_data_width),
