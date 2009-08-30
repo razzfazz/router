@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// configurable crossbar module
-module c_crossbar_mac
+// configurable crossbar module for wormhole router
+module whr_crossbar_mac
   (clk, reset, ctrl_op_ip_s, ctrl_op_ip_q, data_in_ip, data_out_op);
    
 `include "c_constants.v"
@@ -74,89 +74,22 @@ module c_crossbar_mac
       .d(ctrl_op_ip_s),
       .q(ctrl_op_ip_q));
    
-   generate
-      
-      genvar 				 op;
-      for(op = 0; op < num_out_ports; op = op + 1)
-	begin:ops
-	   
-	   wire [0:width-1] data_out;
-	   
-	   genvar 	    ip;
-	   
-	   case(crossbar_type)
-	     
-	     `CROSSBAR_TYPE_TRISTATE:
-	       begin
-		  
-		  for(ip = 0; ip < num_in_ports; ip = ip + 1)
-		    begin:tristate_ips
-		       
-		       wire [0:width-1] in;
-		       assign in = data_in_ip[ip*width:(ip+1)*width-1];
-		       
-		       wire 		ctrl_q;
-		       assign ctrl_q = ctrl_op_ip_q[op*num_in_ports+ip];
-		       
-		       assign data_out = ctrl_q ? in : {width{1'bz}};
-		       
-		    end
-		  
-	       end
-	     
-	     `CROSSBAR_TYPE_MUX:
-	       begin
-		  
-		  wire [0:num_in_ports-1] ctrl_ip_q;
-		  assign ctrl_ip_q
-		    = ctrl_op_ip_q[op*num_in_ports:(op+1)*num_in_ports-1];
-		  
-		  c_select_1ofn
-		    #(.width(width),
-		      .num_ports(num_in_ports))
-		  out_mux
-		    (.select(ctrl_ip_q),
-		     .data_in(data_in_ip),
-		     .data_out(data_out));
-		  
-	       end
-	     
-	     `CROSSBAR_TYPE_DIST_MUX:
-	       begin
-		  
-		  wire [0:num_in_ports*width-1] data;
-		  assign data[0:width-1] = data_in_ip[0:width-1];
-		  
-		  for(ip = 1; ip < num_in_ports; ip = ip + 1)
-		    begin:dist_mux_ips
-		       
-		       wire [0:width-1] in;
-		       assign in = data_in_ip[ip*width:(ip+1)*width-1];
-		       
-		       wire [0:width-1] thru;
-		       assign thru = data[(ip-1)*width:ip*width-1];
-		       
-		       wire 		ctrl_q;
-		       assign ctrl_q = ctrl_op_ip_q[op*num_in_ports+ip];
-		       
-		       wire [0:width-1] out;
-		       assign out = ctrl_q ? in : thru;
-		       
-		       assign data[ip*width:(ip+1)*width-1] = out;
-		       
-		    end
-		  
-		  assign data_out
-		    = data[(num_in_ports-1)*width:num_in_ports*width-1];
-		  
-	       end
-	     
-	   endcase
-	   
-	   assign data_out_op[op*width:(op+1)*width-1] = data_out;
-	   
-	end
-      
-   endgenerate
+   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
+   c_interleaver
+     #(.width(num_out_ports*num_in_ports),
+       .num_blocks(num_out_ports))
+   ctrl_ip_op_q_intl
+     (.data_in(ctrl_op_ip_q),
+      .data_out(ctrl_ip_op_q));
+   
+   c_crossbar
+     #(.num_in_ports(num_in_ports),
+       .num_out_ports(num_out_ports),
+       .width(width),
+       .crossbar_type(crossbar_type))
+   xbr
+     (.ctrl_ip_op(ctrl_ip_op_q),
+      .data_in_ip(data_in_ip),
+      .data_out_op(data_out_op));
    
 endmodule
