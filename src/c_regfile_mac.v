@@ -71,11 +71,36 @@ module c_regfile_mac
    output [0:width-1] read_data;
    wire [0:width-1] read_data;
    
+   
+   //---------------------------------------------------------------------------
+   // WRITE TIMING
+   // ============
+   // The values of 'write_enable', 'write_address' and 'write_data' at the end 
+   // of cycle N determine a register file write to perform in cycle N+1; the
+   // write will complete -- i.e., the value specified in 'write_data' will be 
+   // available in the register file entry selected by 'write_address' -- in 
+   // cycle N+2.
+   //---------------------------------------------------------------------------
+   // READ TIMING
+   // ===========
+   // The valuees of 'read_enable' and 'read_address' at the end of cycle N 
+   // determine which register file entry to read out in cycle N+1; i.e., in 
+   // cycle N+1, the cell selected by the value of 'read_address' at the end of 
+   // cycle N will be connected to 'read_data'.
+   //---------------------------------------------------------------------------
+   
+   
+   reg 		    write_enable_q;
+   reg [0:data_width-1] write_data_q;
    reg [0:addr_width-1] read_address_q;
    
    always @(posedge clk)
-     if(read_enable)
-       read_address_q <= read_address;
+     begin
+	write_enable_q <= write_enable;
+	write_data_q <= write_data;
+	if(read_enable)
+	  read_address_q <= read_address;
+     end
    
    genvar 		level;
    
@@ -92,13 +117,13 @@ module c_regfile_mac
 	       
 	       `REGFILE_TYPE_FF_2D:
 		 always @(posedge clk)
-		   if(write_enable)
-		     storage[write_address] <= write_data;
+		   if(write_enable_q)
+		     storage[write_address] <= write_data_q;
 	       
 	       `REGFILE_TYPE_LAT_2D:
-		 always @(clk, write_enable, write_address, write_data)
-		   if(~clk & write_enable)
-		     storage[write_address] <= write_data;
+		 always @(clk, write_enable_q, write_address, write_data_q)
+		   if(~clk & write_enable_q)
+		     storage[write_address] <= write_data_q;
 	       
 	     endcase
 	     
@@ -115,7 +140,7 @@ module c_regfile_mac
 	       begin:mux_levels
 		  
 		  wire write;
-		  assign write = write_enable && (write_address == level);
+		  assign write = write_enable_q && (write_address == level);
 		  
 		  reg [0:width-1] storage;
 		  
@@ -124,12 +149,12 @@ module c_regfile_mac
 		    `REGFILE_TYPE_FF_1D_MUX:
 		      always @(posedge clk)
 			if(write)
-			  storage <= write_data;
+			  storage <= write_data_q;
 		    
 		    `REGFILE_TYPE_LAT_1D_MUX:
-		      always @(clk, write, write_data)
+		      always @(clk, write, write_data_q)
 			if(~clk & write)
-			  storage <= write_data;
+			  storage <= write_data_q;
 		    
 		  endcase
 		  
@@ -153,7 +178,7 @@ module c_regfile_mac
 	       begin:tristate_levels
 		  
 		  wire write;
-		  assign write = write_enable && (write_address == level);
+		  assign write = write_enable_q && (write_address == level);
 		  
 		  reg [0:width-1] storage;
 		  
@@ -162,12 +187,12 @@ module c_regfile_mac
 		    `REGFILE_TYPE_FF_1D_TRISTATE:
 		      always @(posedge clk)
 			if(write)
-			  storage <= write_data;
+			  storage <= write_data_q;
 		    
 		    `REGFILE_TYPE_LAT_1D_TRISTATE:
-		      always @(clk, write, write_data)
+		      always @(clk, write, write_data_q)
 			if(~clk & write)
-			  storage <= write_data;
+			  storage <= write_data_q;
 		    
 		  endcase
 		  
