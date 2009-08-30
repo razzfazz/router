@@ -179,12 +179,11 @@ module vcr_ivc_ctrl
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
-   // enable speculative (i.e., while VC is being allocated as well) switch
-   // allocation
-   parameter sw_alloc_spec_enable = 1;
+   // select implementation variant for VC allocator
+   parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
-   // use combined VC and switch allocator
-   parameter comb_alloc_enable = 1;
+   // select speculation type for switch allocator
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
@@ -485,7 +484,8 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(!comb_alloc_enable && sw_alloc_spec_enable)
+      if((vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK) && 
+	 (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
 	begin
 	   assign vc_allocated = vc_gnt | vc_allocated_q;
 	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
@@ -998,14 +998,15 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(comb_alloc_enable)
+      if(vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK)
 	assign sw_req_nonspec
 	  = header_valid & flit_valid & (free_allocated | ~vc_allocated_q);
       else
 	assign sw_req_nonspec
 	  = header_valid & flit_valid & vc_allocated_q & free_allocated;
       
-      if(!comb_alloc_enable && sw_alloc_spec_enable)
+      if((vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK) && 
+	 (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
 	assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
       else
 	assign sw_req_spec = 1'b0;
@@ -1037,7 +1038,8 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs_per_class-1] flit_ocvc;
 		
-		if(comb_alloc_enable || sw_alloc_spec_enable)
+		if((vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK) || 
+		   (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
 		  assign flit_ocvc = vc_allocated_hold_ocvc;
 		else
 		  assign flit_ocvc = vc_allocated_ocvc_q;

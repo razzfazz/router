@@ -33,8 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // output port controller (tracks state of buffers in downstream router)
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip, vc_gnt_ovc_ivc, 
-   xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in, flit_ctrl_out, flit_data_out, 
-   elig_ovc, int_flow_ctrl_ovc, error);
+   sw_oreq_nonspec_ip, sw_oreq_spec_ip, sw_ognt_nonspec_ip, sw_ognt_spec_ip, 
+   sw_gnt_nonspec_ip, sw_gnt_spec_ip, int_flit_ctrl_in, flit_data_in, 
+   flit_ctrl_out, flit_data_out, elig_ovc, int_flow_ctrl_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -178,11 +179,20 @@ module vcr_op_ctrl_mac
    localparam [0:cred_level_width-1] free_reset_value
      = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
    
+   // select implementation variant for switch allocator
+   parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
+   
+   // select which arbiter type to use for switch allocator
+   parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select speculation type for switch allocator
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
-
+   
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
@@ -194,9 +204,26 @@ module vcr_op_ctrl_mac
    
    // input VC that each output VC was granted to
    input [0:num_vcs*num_vcs-1] vc_gnt_ovc_ivc;
-
-   // port to which this output is currently connected
-   input [0:num_ports-1] xbr_ctrl_ip;
+   
+   // non-speculative switch allocation requests from input stage
+   input [0:num_ports-1] sw_oreq_nonspec_ip;
+   
+   // speculative switch allocation requests from input stage
+   input [0:num_ports-1] sw_oreq_spec_ip;
+   
+   // non-speculative switch allocation grants to input stage
+   output [0:num_ports-1] sw_ognt_nonspec_ip;
+   wire [0:num_ports-1] sw_ognt_nonspec_ip;
+   
+   // speculative switch allocation grants to input stage
+   output [0:num_ports-1] sw_ognt_spec_ip;
+   wire [0:num_ports-1] sw_ognt_spec_ip;
+   
+   // non-speculative global switch allocation grants
+   input [0:num_ports-1] sw_gnt_nonspec_ip;
+   
+   // speculative global switch allocation grants
+   input [0:num_ports-1] sw_gnt_spec_ip;
    
    // incoming flit control signals
    input [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
@@ -266,14 +293,303 @@ module vcr_op_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // output VC control logic
+   // switch allocation
    //---------------------------------------------------------------------------
    
-   wire 				  xbr_ctrl;
-   assign xbr_ctrl = |xbr_ctrl_ip;
+   wire [0:num_ports-1] sw_gnt_ip;
    
+   generate
+      
+      if((sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ||
+	 (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF))
+	begin
+	   
+	   // any non-speculative requests for this port?
+	   wire sw_oreq_nonspec;
+	   assign sw_oreq_nonspec = |sw_oreq_nonspec_ip;
+	   
+	   //any non-speculative grants for this port?
+	   wire sw_gnt_nonspec;
+	   assign sw_gnt_nonspec = |sw_gnt_nonspec_ip;
+	   
+	   // update arbiter priorities
+	   wire update_arb_nonspec;
+	   
+	   case(sw_alloc_type)
+	     
+	     `SW_ALLOC_TYPE_SEP_IF:
+	       begin
+		  
+		  //------------------------------------------------------------
+		  // For the input-first separable allocator, if any requests 
+		  // reach the output stage, they must already have won input-
+		  // side arbitration; consequently, one of them will result in 
+		  // an global grant, and we can thus update arbiter priorities
+		  // whenever we see a request.
+		  //------------------------------------------------------------
+		  
+		  assign update_arb_nonspec = sw_oreq_nonspec;
+		  
+	       end
+	     
+	     `SW_ALLOC_TYPE_SEP_OF:
+	       begin
+		  
+		  //------------------------------------------------------------
+		  // For separable output-first allocation, any grants generated
+		  // by the output stage may subsequently be dropped at the 
+		  // input stage; consequently, we must only update priorities 
+		  // once we know that our grant also won input-side 
+		  // arbitration.
+		  //------------------------------------------------------------
+		  
+		  assign update_arb_nonspec = sw_gnt_nonspec;
+		  
+	       end
+	     
+	   endcase
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // The actual arbitration is identical for the input- and output-
+	   // first cases.
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:num_ports-1] req_nonspec_ip;
+	   assign req_nonspec_ip = sw_oreq_nonspec_ip;
+	   
+	   wire [0:num_ports-1] gnt_nonspec_ip;
+	   c_arbiter
+	     #(.num_ports(num_ports),
+	       .arbiter_type(sw_alloc_arbiter_type),
+	       .reset_type(reset_type))
+	   gnt_nonspec_ip_arb
+	     (.clk(clk),
+	      .reset(reset),
+	      .update(update_arb_nonspec),
+	      .req(req_nonspec_ip),
+	      .gnt(gnt_nonspec_ip));
+	   
+	   assign sw_ognt_nonspec_ip = gnt_nonspec_ip;
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // speculative switch allocation support
+	   //-------------------------------------------------------------------
+	   
+	   if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+	     begin
+		
+		// arbitrate between speculative requests
+		wire [0:num_ports-1] req_spec_ip;
+		wire [0:num_ports-1] gnt_spec_ip;
+		wire 		     update_arb_spec;
+
+		case(sw_alloc_type)
+		  
+		  `SW_ALLOC_TYPE_SEP_IF:
+		    begin
+		       
+		       //-------------------------------------------------------
+		       // For input-first allocation, any non-speculative 
+		       // requests arriving at the output stage must already 
+		       // have won input-side arbitration, and thus one of them 
+		       // will always be granted; therefore, we can suppress 
+		       // speculative grants and the arbiter state update in 
+		       // this case whenever any non-speculative requests are 
+		       // present. 
+		       // Likewise, the global grants can be formed by 
+		       // combining the non-speculative and speculative output-
+		       // side grants.
+		       //-------------------------------------------------------
+		       
+		       assign update_arb_spec
+			 = ~sw_oreq_nonspec & |sw_oreq_spec_ip;
+		       
+		       assign req_spec_ip = sw_oreq_spec_ip;
+		       
+		       assign sw_ognt_spec_ip
+			 = {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
+		       
+		       assign sw_gnt_ip = sw_ognt_nonspec_ip | sw_ognt_spec_ip;
+		       
+		    end
+		  
+		  `SW_ALLOC_TYPE_SEP_OF:
+		    begin
+		       case(sw_alloc_spec_type)
+			 
+			 `SW_ALLOC_SPEC_TYPE_REQ, `SW_ALLOC_SPEC_TYPE_INT:
+			   begin
+			      
+			      //------------------------------------------------
+			      // For output-first allocation, on the other hand,
+			      // any given output-side non-speculative grant may
+			      // still fail to win input-side arbitration; 
+			      // however, if we suppress speculative requests 
+			      // based on non-speculative grants, we can still 
+			      // use the same approach as in the input-first 
+			      // case. 
+			      //------------------------------------------------
+			      
+			      assign update_arb_spec
+				= ~sw_oreq_nonspec & |sw_oreq_spec_ip;
+			      
+			      assign req_spec_ip = sw_oreq_spec_ip;
+			      
+			      assign sw_ognt_spec_ip
+				= {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
+			      
+			   end
+			 
+			 `SW_ALLOC_SPEC_TYPE_GNT:
+			   begin
+			      
+			      //------------------------------------------------
+			      // For output-first allocation with conflict 
+			      // detection based on non-speculative grants, 
+			      // however, we must check if non-speculative 
+			      // grants also won input-side arbitration before 
+			      // suppressing speculative grants and inhibiting 
+			      // arbiter state updates.
+			      //------------------------------------------------
+			      
+			      assign update_arb_spec
+				= ~sw_gnt_nonspec & |sw_gnt_spec_ip;
+			      
+			      assign req_spec_ip
+				= {num_ports{~sw_gnt_nonspec}} & 
+				  sw_oreq_spec_ip;
+			      
+			      assign sw_ognt_spec_ip = gnt_spec_ip;
+			      
+			   end
+			 
+		       endcase
+		       
+		       //-------------------------------------------------------
+		       // The global grants in this case come from the input-
+		       // side arbitration stage; speculation-related masking is
+		       // performed at the input side.
+		       //-------------------------------------------------------
+		       
+		       assign sw_gnt_ip = sw_gnt_nonspec_ip | sw_gnt_spec_ip;
+		       
+		    end
+		  
+		endcase
+		
+		c_arbiter
+		  #(.num_ports(num_ports),
+		    .arbiter_type(sw_alloc_arbiter_type),
+		    .reset_type(reset_type))
+		gnt_spec_ip_arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .update(update_arb_spec),
+		   .req(req_spec_ip),
+		   .gnt(gnt_spec_ip));
+		
+	     end
+	   else
+	     begin
+		
+		//--------------------------------------------------------------
+		// If speculation is disable, all speculation-related control
+		// signals are just tied to zero.
+		//--------------------------------------------------------------
+		
+		assign sw_ognt_spec_ip = {num_ports{1'b0}};
+		
+		case(sw_alloc_type)
+		  
+		  `SW_ALLOC_TYPE_SEP_IF:
+		    begin
+		       
+		       //-------------------------------------------------------
+		       // In the separable input-first case, every output-side
+		       // request already succeeded in input-side arbitration, 
+		       // and thus the global grants are just the output-side 
+		       // grants; i.e., we do not need to consider the incoming 
+		       // sw_gnt_*_ip signals.
+		       //-------------------------------------------------------
+		       
+		       assign sw_gnt_ip = sw_ognt_nonspec_ip;
+		       
+		    end
+		  
+		  `SW_ALLOC_TYPE_SEP_OF:
+		    begin
+		       
+		       //-------------------------------------------------------
+		       // In the output-first case, on the other hand, the 
+		       // global grants are generated by the input-side
+		       // arbitration stage.
+		       //-------------------------------------------------------
+		       
+		       assign sw_gnt_ip = sw_gnt_nonspec_ip;
+		       
+		    end
+		  
+		endcase
+		
+	     end
+	   
+	end
+      else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	      (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
+	begin
+	   
+	   //-------------------------------------------------------------------
+	   // The wavefront allocator does not require any output-side logic. 
+	   // Global grants are generated externally in the wavefront block.
+	   //-------------------------------------------------------------------
+	   
+	   assign sw_ognt_nonspec_ip = {num_ports{1'b0}};
+	   assign sw_ognt_spec_ip = {num_ports{1'b0}};
+	   
+	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
+	     assign sw_gnt_ip = sw_gnt_nonspec_ip;
+	   else
+	     assign sw_gnt_ip = sw_gnt_nonspec_ip | sw_gnt_spec_ip;
+	   
+	end
+      
+   endgenerate
+   
+   wire sw_gnt_s;
+   assign sw_gnt_s = |sw_gnt_ip;
+   
+   wire sw_gnt_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   sw_gntq
+     (.clk(clk),
+      .reset(reset),
+      .d(sw_gnt_s),
+      .q(sw_gnt_q));
+   
+   wire [0:num_ports-1] 		  sw_gnt_ip_s;
+   assign sw_gnt_ip_s = sw_gnt_ip;
+   
+   wire [0:num_ports-1] 		  sw_gnt_ip_q;
+   c_dff
+     #(.width(num_ports),
+       .reset_type(reset_type))
+   sw_gnt_ipq
+     (.clk(clk),
+      .reset(reset),
+      .d(sw_gnt_ip_s),
+      .q(sw_gnt_ip_q));
+   
+   
+   //---------------------------------------------------------------------------
+   // output VC control logic
+   //---------------------------------------------------------------------------
+
    wire 				  flit_valid_in;
-   assign flit_valid_in = int_flit_ctrl_in[0] & xbr_ctrl;
+   assign flit_valid_in = int_flit_ctrl_in[0] & sw_gnt_q;
    
    wire 				  flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
@@ -388,7 +704,7 @@ module vcr_op_ctrl_mac
 			.q(allocated_ivc_q));
 		     
 		     assign match_ovc[ovc] = allocated_q &
-					     |(allocated_ip_q & xbr_ctrl_ip) &
+					     |(allocated_ip_q & sw_gnt_ip_q) &
 					     allocated_ivc_q[flit_vc_in];
 		     
 		  end
@@ -701,7 +1017,7 @@ module vcr_op_ctrl_mac
    // output staging
    //---------------------------------------------------------------------------
    
-   wire [0:flit_ctrl_width-1] 		      flit_ctrl_s, flit_ctrl_q;
+   wire [0:flit_ctrl_width-1] flit_ctrl_s, flit_ctrl_q;
    
    assign flit_ctrl_s[0] = flit_valid_in;
    
@@ -721,21 +1037,21 @@ module vcr_op_ctrl_mac
 		   .data_out(match_ovc_enc));
 		
 		assign flit_ctrl_s[1:1+vc_idx_width-1]
-			 = xbr_ctrl ? 
+			 = sw_gnt_q ? 
 			   match_ovc_enc : 
 			   flit_ctrl_q[1:1+vc_idx_width-1];
 		
 	     end
 	   else
 	     assign flit_ctrl_s[1:1+vc_idx_width-1]
-		      = xbr_ctrl ? 
+		      = sw_gnt_q ? 
 			int_flit_ctrl_in[1:1+vc_idx_width-1] :
 			flit_ctrl_q[1:1+vc_idx_width-1];
 	   
 	end
       
       assign flit_ctrl_s[1+vc_idx_width:flit_ctrl_width-1]
-	       = xbr_ctrl ?
+	       = sw_gnt_q ?
 		 int_flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1] :
 		 flit_ctrl_q[1+vc_idx_width:flit_ctrl_width-1];
       
@@ -777,7 +1093,7 @@ module vcr_op_ctrl_mac
    assign flit_ctrl_out = flit_ctrl_q;
    
    wire [0:flit_data_width-1] 		  flit_data_s, flit_data_q;
-   assign flit_data_s = xbr_ctrl ? flit_data_in : flit_data_q;
+   assign flit_data_s = sw_gnt_q ? flit_data_in : flit_data_q;
    c_dff
      #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
