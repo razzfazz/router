@@ -30,78 +30,133 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// linear feedback shift register
+// generic multi-input linear feedback shift register register
 module c_lfsr
   (clk, reset, load, run, feedback, d, q);
    
 `include "c_constants.v"
    
-   // width of register
+   // width of register (must be greater than one)
    parameter width = 32;
    
    // offset (left index) of register
    parameter offset = 0;
    
+   // initial state
+   parameter [offset:(offset+width)-1] reset_value = {{(width-1){1'b0}}, 1'b1};
+   
+   // include all-zeros state in state sequence
+   parameter complete = 0;
+   
+   // allow any-to-any feedback between bit positions
+   parameter generalized = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
-   parameter [offset:(offset+width)-1] reset_value = {width{1'b1}};
+   // compute total feedback width
+   localparam feedback_width = (generalized > 0) ? (width * width) : width;
    
    input clk;
    input reset;
    
-   // load data input into shift register
+   // load data input into signature register
    input load;
    
-   // enable shift register operation
+   // activate signature updates
    input run;
    
-   // feedback polynomial
-   input [offset:(offset+width)-1] feedback;
+   // feedback polynomial(s)
+   input [0:feedback_width-1] feedback;
    
    // data input
-   // (only used to load value into register)
    input [offset:(offset+width)-1] d;
    
    // data output
    output [offset:(offset+width)-1] q;
    wire [offset:(offset+width)-1] q;
-
    
-   wire [offset:(offset+width)-1] lfsr_q;
+   wire [offset:(offset+width)-1] state_q;
    
-   wire 			 fb_seed;
-   assign fb_seed = lfsr_q[offset+width-1];
-   
-   wire [offset:(offset+width)-1] fb_val;
-   assign fb_val = {width{fb_seed}} & feedback;
-   
-   wire [offset:(offset+width)-1] toggle_val;
-   assign toggle_val = load ? d : fb_val;
-   
-   wire [offset:(offset+width)-1] base_val;
-   assign base_val[offset] = 1'b0;
+   wire [offset:(offset+width)-1] feedback_value;
    
    generate
       
-      if(width > 1)
-	assign base_val[(offset+1):(offset+width)-1]
-		 = {(width-1){~load}} & lfsr_q[offset:(offset+width-1)-1];
+      if(generalized > 0)
+	begin
+	   
+	   wire [0:width-1] feedback_seeds;
+	   
+	   if(complete > 0)
+	     begin
+		assign feedback_seeds[0:(width-1)-1]
+			 = state_q[offset:(offset+width-1)-1];
+		assign feedback_seeds[width-1]
+			 = ~|state_q[offset:(offset+width-1)-1] ^ 
+			   state_q[offset+width-1];
+	     end
+	   else
+	     assign feedback_seeds = state_q;
+	   
+	   wire [0:width*width-1] feedback_mask;
+	   c_replicator
+	     #(.width(width),
+	       .count(width))
+	   feedback_mask_repl
+	     (.data_in(feedback_seeds),
+	      .data_out(feedback_mask));
+	   
+	   wire [0:width*width-1] feedback_vectors;
+	   assign feedback_vectors = feedback & feedback_mask;
+	   
+	   wire [0:width-1] 	  feedback_sum;
+	   c_xor_nto1
+	     #(.num_ports(width),
+	       .width(width))
+	   feedback_sum_xor
+	     (.data_in(feedback_vectors),
+	      .data_out(feedback_sum));
+	   
+	   assign feedback_value = {width{~load}} & feedback_sum;
+	   
+	end
+      else
+	begin
+	   
+	   wire feedback_seed;
+	   
+	   if(complete > 0)
+	     assign feedback_seed
+	       =  ~|state_q[offset:(offset+width-1)-1] ^ 
+		  state_q[offset+width-1];
+	   else
+	     assign feedback_seed = state_q[offset+width-1];
+	   
+	   assign feedback_value = {width{~load & feedback_seed}} & feedback;
+	   
+	end
       
    endgenerate
    
-   wire [offset:(offset+width)-1] lfsr_s;
-   assign lfsr_s = (load | run) ? (base_val ^ toggle_val) : lfsr_q;
+   wire [offset:(offset+width)-1] toggle_value;
+   assign toggle_value = feedback_value ^ d;
+   
+   wire [offset:(offset+width)-1] base_value;
+   assign base_value
+     = {1'b0, {(width-1){~load}} & state_q[offset:(offset+width-1)-1]};
+   
+   wire [offset:(offset+width)-1] state_s;
+   assign state_s = (load | run) ? (base_value ^ toggle_value) : state_q;
    c_dff
      #(.width(width),
        .offset(offset),
        .reset_type(reset_type),
        .reset_value(reset_value))
-   lfsrq
+   stateq
      (.clk(clk),
       .reset(reset),
-      .d(lfsr_s),
-      .q(lfsr_q));
+      .d(state_s),
+      .q(state_q));
    
-   assign q = lfsr_q;
+   assign q = state_q;
    
 endmodule
