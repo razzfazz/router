@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input-side switch allocator logic
 module vcr_sw_alloc_ip
   (clk, reset, route_ivc_op, req_in_ivc, req_out_op, gnt_in_op, gnt_out_op, 
-   gnt_out_ivc, sel_ivc);
+   gnt_out_ivc, sel_ivc, allow_update);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -79,6 +79,9 @@ module vcr_sw_alloc_ip
    // VC selector for flit buffer read address generation
    output [0:num_vcs-1] sel_ivc;
    wire [0:num_vcs-1] 	sel_ivc;
+
+   // allow arbiter state updates
+   input allow_update;
    
    generate
       
@@ -100,7 +103,7 @@ module vcr_sw_alloc_ip
 	   // from input stage grants, it is sufficient to check for output
 	   // stage grants here
 	   wire update_arb;
-	   assign update_arb = gnt_in;
+	   assign update_arb = gnt_in & allow_update;
 	   
 	   wire [0:num_vcs-1] req_ivc;
 	   assign req_ivc = req_in_ivc;
@@ -137,11 +140,9 @@ module vcr_sw_alloc_ip
 	   // buffer read address early
 	   assign sel_ivc = gnt_ivc;
 	   
-	   /*
 	   // the output-side port grants, so just pass these through (this 
 	   // signal will be ignored at the router level anyway)
 	   assign gnt_out_op = gnt_in_op;
-	   */
 	   
 	end
       else if((allocator_type == `SW_ALLOC_TYPE_SEP_OF) ||
@@ -193,7 +194,7 @@ module vcr_sw_alloc_ip
 		// VCs actually requested the granted output, it is sufficient 
 		// to just check for output grants here
 		wire update_arb;
-		assign update_arb = |gnt_in_op;
+		assign update_arb = |gnt_in_op & allow_update;
 		
 		// determine which of the requesting VCs can use each output
 		wire [0:num_ports*num_vcs-1] usable_op_ivc;
@@ -263,7 +264,7 @@ module vcr_sw_alloc_ip
 		     
 		     // only update arbiter if output port was actually granted
 		     wire update_arb;
-		     assign update_arb = gnt_in_op[op];
+		     assign update_arb = gnt_in_op[op] & allow_update;
 		     
 		     wire [0:num_vcs-1] route_ivc;
 		     assign route_ivc
@@ -329,12 +330,10 @@ module vcr_sw_alloc_ip
 		// the flit buffer read address is determined by the winning VC
 		assign sel_ivc = gnt_ivc;
 		
-		/*
 		// in the wavefront case, the final input-side port grants are 
 		// just the output-side port grants, so just pass these through
 		// (this signal will be ignored at the router level anyway)
 		assign gnt_out_op = gnt_in_op;
-		*/
 		
 	     end
 	   

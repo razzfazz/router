@@ -47,7 +47,7 @@ module vcr_crossbar_mac
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
    // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       

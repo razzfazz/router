@@ -183,7 +183,7 @@ module vcr_top
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
@@ -439,42 +439,13 @@ module vcr_top
    
    
    //---------------------------------------------------------------------------
-   // switch allocator
+   // switch allocation
    //---------------------------------------------------------------------------
-   
-   generate
-      
-      if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
-	 (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
-	begin
-	   // FIXME: add code here
-	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // select crossbar control signals
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] sw_ognt_nonspec_op_ip;
-   c_interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   sw_ognt_nonspec_ip_op_intl
-     (.data_in(sw_ognt_nonspec_op_ip),
-      .data_out(sw_ognt_nonspec_ip_op));
-   
-   wire [0:num_ports*num_ports-1] sw_ognt_spec_op_ip;
-   c_interleaver
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   sw_ognt_spec_ip_op_intl
-     (.data_in(sw_ognt_spec_op_ip),
-      .data_out(sw_ognt_spec_ip_op));
    
    wire [0:num_ports*num_ports-1] sw_oreq_nonspec_op_ip;
    wire [0:num_ports*num_ports-1] sw_oreq_spec_op_ip;
+   wire [0:num_ports*num_ports-1] sw_ognt_nonspec_op_ip;
+   wire [0:num_ports*num_ports-1] sw_ognt_spec_op_ip;
    wire [0:num_ports*num_ports-1] sw_ignt_nonspec_op_ip;
    wire [0:num_ports*num_ports-1] sw_ignt_spec_op_ip;
    wire [0:num_ports*num_ports-1] sw_gnt_nonspec_op_ip;
@@ -499,6 +470,20 @@ module vcr_top
 	   sw_oreq_spec_op_ip_intl
 	     (.data_in(sw_oreq_spec_ip_op),
 	      .data_out(sw_oreq_spec_op_ip));
+	   
+	   c_interleaver
+	     #(.width(num_ports*num_ports),
+	       .num_blocks(num_ports))
+	   sw_ognt_nonspec_ip_op_intl
+	     (.data_in(sw_ognt_nonspec_op_ip),
+	      .data_out(sw_ognt_nonspec_ip_op));
+	   
+	   c_interleaver
+	     #(.width(num_ports*num_ports),
+	       .num_blocks(num_ports))
+	   sw_ognt_spec_ip_op_intl
+	     (.data_in(sw_ognt_spec_op_ip),
+	      .data_out(sw_ognt_spec_ip_op));
 	   
 	   case(sw_alloc_type)
 	     
@@ -543,7 +528,52 @@ module vcr_top
       else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
 	      (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
 	begin
-	   // FIXME: add logic here
+	   
+	   wire [0:num_ports*num_ports-1] req_wf_nonspec_ip_op;
+	   assign req_wf_nonspec_ip_op = sw_oreq_nonspec_ip_op;
+	   
+	   wire [0:num_ports*num_ports-1] req_wf_spec_ip_op;
+	   assign req_wf_spec_ip_op = sw_oreq_spec_ip_op;
+	   
+	   wire [0:num_ports*num_ports-1] gnt_wf_nonspec_ip_op;
+	   wire [0:num_ports*num_ports-1] gnt_wf_spec_ip_op;
+	   vcr_sw_alloc_wf_mac
+	     #(.num_ports(num_ports),
+	       .wf_alloc_type(sw_alloc_type - `SW_ALLOC_TYPE_WF_BASE),
+	       .spec_type(sw_alloc_spec_type),
+	       .reset_type(reset_type))
+	   swa_wf
+	     (.clk(clk),
+	      .reset(reset),
+	      .req_nonspec_ip_op(req_wf_nonspec_ip_op),
+	      .req_spec_ip_op(req_wf_spec_ip_op),
+	      .gnt_nonspec_ip_op(gnt_wf_nonspec_ip_op),
+	      .gnt_spec_ip_op(gnt_wf_spec_ip_op));
+	   
+	   assign sw_ognt_nonspec_ip_op = gnt_wf_nonspec_ip_op;
+	   
+	   wire [0:num_ports*num_ports-1] sw_gnt_nonspec_ip_op;
+	   assign sw_gnt_nonspec_ip_op = gnt_wf_nonspec_ip_op;
+	   
+	   c_interleaver
+	     #(.width(num_ports*num_ports),
+	       .num_blocks(num_ports))
+	   sw_gnt_nonspec_op_ip_intl
+	     (.data_in(sw_gnt_nonspec_ip_op),
+	      .data_out(sw_gnt_nonspec_op_ip));
+	   
+	   assign sw_ognt_spec_ip_op = gnt_wf_spec_ip_op;
+	   
+	   wire [0:num_ports*num_ports-1] sw_gnt_spec_ip_op;
+	   assign sw_gnt_spec_ip_op = gnt_wf_spec_ip_op;
+	   
+	   c_interleaver
+	     #(.width(num_ports*num_ports),
+	       .num_blocks(num_ports))
+	   sw_gnt_spec_op_ip_intl
+	     (.data_in(sw_gnt_spec_ip_op),
+	      .data_out(sw_gnt_spec_op_ip));
+	   
 	end
       
    endgenerate

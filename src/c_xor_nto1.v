@@ -30,74 +30,41 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// multiple-input signature register
-module c_misr
-  (clk, reset, load, run, feedback, d, q);
+// n-input bitwise XOR
+module c_xor_nto1
+  (data_in, data_out);
    
-`include "c_constants.v"
+   // number of inputs
+   parameter num_ports = 2;
    
-   // width of register
-   parameter width = 32;
+   // width of each input
+   parameter width = 1;
    
-   // offset (left index) of register
-   parameter offset = 0;
+   // vector of inputs
+   input [0:width*num_ports-1] data_in;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
-   
-   parameter [offset:(offset+width)-1] reset_value = {width{1'b0}};
-   
-   input clk;
-   input reset;
-   
-   // load data input into signature register
-   input load;
-   
-   // activate signature updates
-   input run;
-   
-   // feedback polynomial
-   input [offset:(offset+width)-1] feedback;
-   
-   // data input
-   input [offset:(offset+width)-1] d;
-   
-   // data output
-   output [offset:(offset+width)-1] q;
-   reg [offset:(offset+width)-1] q;
-
-   
-   wire [offset:(offset+width)-1] fb_val;
-   assign fb_val = {width{~load & misr_q[offset+width-1]}} & feedback;
-   
-   wire [offset:(offset+width)-1] toggle_val;
-   assign toggle_val = fb_val ^ d;
-   
-   wire [offset:(offset+width)-1] base_val;
-   assign base_val[offset] = 1'b0;
-   
-   wire [offset:(offset+width)-1] misr_q;
+   // result
+   output [0:width-1] data_out;
+   wire [0:width-1] data_out;
    
    generate
       
-      if(width > 1)
-	assign base_val[(offset+1):(offset+width)-1]
-		 = {(width-1){~load}} & misr_q[offset:(offset+width-1)-1];
+      genvar 	    i;
+      for(i = 0; i < width; i = i + 1)
+	begin:bit_positions
+	   
+	   wire [0:num_ports-1] data;
+	   
+	   genvar 		j;
+	   for(j = 0; j < num_ports; j = j + 1)
+	     begin:input_ports
+		assign data[j] = data_in[j*width+i];
+	     end
+	   
+	   assign data_out[i] = ^data;
+	   
+	end
       
    endgenerate
-   
-   wire [offset:(offset+width)-1] misr_s;
-   assign misr_s = (load | run) ? (base_val ^ toggle_val) : misr_q;
-   c_dff
-     #(.width(width),
-       .offset(offset),
-       .reset_type(reset_type),
-       .reset_value(reset_value))
-   misrq
-     (.clk(clk),
-      .reset(reset),
-      .d(misr_s),
-      .q(misr_q));
-   
-   assign q = misr_q;
    
 endmodule

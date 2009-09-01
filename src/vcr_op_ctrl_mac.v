@@ -186,7 +186,7 @@ module vcr_op_ctrl_mac
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -406,8 +406,6 @@ module vcr_op_ctrl_mac
 		       assign update_arb_spec
 			 = ~sw_oreq_nonspec & |sw_oreq_spec_ip;
 		       
-		       assign req_spec_ip = sw_oreq_spec_ip;
-		       
 		       assign sw_ognt_spec_ip
 			 = {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
 		       
@@ -419,7 +417,8 @@ module vcr_op_ctrl_mac
 		    begin
 		       case(sw_alloc_spec_type)
 			 
-			 `SW_ALLOC_SPEC_TYPE_REQ, `SW_ALLOC_SPEC_TYPE_INT:
+			 `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS,
+			 `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
 			   begin
 			      
 			      //------------------------------------------------
@@ -435,14 +434,13 @@ module vcr_op_ctrl_mac
 			      assign update_arb_spec
 				= ~sw_oreq_nonspec & |sw_oreq_spec_ip;
 			      
-			      assign req_spec_ip = sw_oreq_spec_ip;
-			      
 			      assign sw_ognt_spec_ip
 				= {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
 			      
 			   end
 			 
-			 `SW_ALLOC_SPEC_TYPE_GNT:
+			 `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS,
+			 `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
 			   begin
 			      
 			      //------------------------------------------------
@@ -457,11 +455,8 @@ module vcr_op_ctrl_mac
 			      assign update_arb_spec
 				= ~sw_gnt_nonspec & |sw_gnt_spec_ip;
 			      
-			      assign req_spec_ip
-				= {num_ports{~sw_gnt_nonspec}} & 
-				  sw_oreq_spec_ip;
-			      
-			      assign sw_ognt_spec_ip = gnt_spec_ip;
+			      assign sw_ognt_spec_ip
+				= {num_ports{~sw_gnt_nonspec}} & gnt_spec_ip;
 			      
 			   end
 			 
@@ -479,6 +474,8 @@ module vcr_op_ctrl_mac
 		  
 		endcase
 		
+		assign req_spec_ip = sw_oreq_spec_ip;
+		       
 		c_arbiter
 		  #(.num_ports(num_ports),
 		    .arbiter_type(sw_alloc_arbiter_type),

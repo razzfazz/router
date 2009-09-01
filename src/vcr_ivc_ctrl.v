@@ -183,7 +183,7 @@ module vcr_ivc_ctrl
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
    // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
    // enable performance counter
    parameter perf_ctr_enable = 1;
