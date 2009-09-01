@@ -104,7 +104,7 @@ module sw_alloc_wrap
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation type
-   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ_MASKS_GNT;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
