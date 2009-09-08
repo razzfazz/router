@@ -344,17 +344,48 @@ module vcr_ivc_ctrl
 	  begin
 	     
 	     if(max_payload_length == 0)
-	       assign flit_tail_in = flit_head_in;
+	       begin
+		  
+		  if(max_payload_length == min_payload_length)
+		    assign flit_tail_in = flit_head_in;
+		  
+		  // synopsys translate_off
+		  else
+		    begin
+		       initial
+		       begin
+			  $display("ERROR: The value of the max_payload_length \
+                                    parameter cannot be smaller than that of \
+                                    the min_payload_length parameter.");
+			  $stop;
+		       end
+		    end
+		  // synopsys translate_on
+		  
+	       end
 	     else if(max_payload_length == 1)
 	       begin
 		  
 		  wire has_payload;
 		  
-		  if(min_payload_length == 0)
+		  if(max_payload_length > min_payload_length)
 		    assign has_payload
 		      = header_info_in[la_route_info_width+route_info_width];
-		  else
+		  else if(max_payload_length == min_payload_length)
 		    assign has_payload = 1'b1;
+		  
+		  // synopsys translate_off
+		  else
+		    begin
+		       initial
+		       begin
+			  $display("ERROR: The value of the max_payload_length \
+                                    parameter cannot be smaller than that of \
+                                    the min_payload_length parameter.");
+			  $stop;
+		       end
+		    end
+		  // synopsys translate_on
 		  
 		  assign flit_tail_in = ~flit_head_in | ~has_payload;
 		  
@@ -365,7 +396,7 @@ module vcr_ivc_ctrl
 		  wire [0:flit_ctr_width-1] flit_ctr_q;
 		  wire [0:flit_ctr_width-1] flit_ctr_next;
 		  
-		  if(payload_length_width > 0)
+		  if(max_payload_length > min_payload_length)
 		    begin
 		       
 		       wire [0:payload_length_width-1] payload_length;
@@ -386,11 +417,24 @@ module vcr_ivc_ctrl
 			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
 		       
 		    end
-		  else
+		  else if(max_payload_length == min_payload_length)
 		    begin
 		       assign flit_ctr_next = max_payload_length - 1;
 		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
 		    end
+		  
+		  // synopsys translate_off
+		  else
+		    begin
+		       initial
+		       begin
+			  $display("ERROR: The value of the max_payload_length \
+                                    parameter cannot be smaller than that of \
+                                    the min_payload_length parameter.");
+			  $stop;
+		       end
+		    end
+		  // synopsys translate_on
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s;
 		  assign flit_ctr_s = flit_valid_in ? 
