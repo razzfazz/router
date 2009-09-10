@@ -622,97 +622,216 @@ module vcr_ip_ctrl_mac
 	      .sel_ivc(vc_sel_spec_ivc),
 	      .allow_update(allow_update_spec));
 	   
-	   case(sw_alloc_spec_type)
-	     
-	     `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
-	       begin
+	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
+	     begin
+		
+		case(sw_alloc_spec_type)
 		  
-		  // propagate all speculative requests
-		  assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
+		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS,
+		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
+		    begin
+		       
+		       // do not propagate speculative requests if any 
+		       // non-speculative requests were issued by this input's 
+		       // VCs
+		       assign sw_oreq_spec_op = {num_ports{~sw_req_nonspec}} & 
+						sw_oreq_spec_unqual_op;
+		       
+		       // no additional masking is required for speculative 
+		       // grants
+		       assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
+		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		       
+		       // flit buffer read address can be determined early
+		       assign vc_sel_ivc = sw_req_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // updates are masked indirectly via output-side grants
+		       assign allow_update_spec = 1'b1;
+		       
+		    end
 		  
-		  // suppress speculative grants if any non-speculative requests
-		  // were issued by this input's VCs
-		  assign sw_gnt_spec_ivc
-		    = {num_vcs{~sw_req_nonspec}} & sw_gnt_spec_unqual_ivc;
-		  assign sw_ignt_spec_op
-		    = {num_ports{~sw_req_nonspec}} & sw_ignt_spec_unqual_op;
+		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS,
+		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
+		    begin
+		       
+		       // do not propagate requests if a non-speculative grant 
+		       // was generated for this input
+		       assign sw_oreq_spec_op = {num_ports{~sw_ognt_nonspec}} & 
+						sw_oreq_spec_unqual_op;
+		       
+		       // no additional masking required for grants
+		       assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
+		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		       
+		       // we only know whether to use non-speculative or 
+		       // speculative flits once the output-side grants are 
+		       // known
+		       assign vc_sel_ivc = sw_ognt_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // updates are masked indirectly via output-side grants
+		       assign allow_update_spec = 1'b1;
+		       
+		    end
 		  
-		  // flit buffer read address can be determined early
-		  assign vc_sel_ivc
-		    = sw_req_nonspec ? vc_sel_nonspec_ivc : vc_sel_spec_ivc;
+		endcase
+		
+	     end
+	   else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
+	     begin
+		
+		case(sw_alloc_spec_type)
 		  
-		  // inhibit updates if non-speculative requests are present
-		  assign allow_update_spec = ~sw_req_nonspec;
+		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
+		    begin
+		       
+		       // propagate all speculative requests
+		       assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
+		       
+		       // suppress speculative grants if any non-speculative 
+		       // requests were issued by this input's VCs
+		       assign sw_gnt_spec_ivc = {num_vcs{~sw_req_nonspec}} & 
+						sw_gnt_spec_unqual_ivc;
+		       assign sw_ignt_spec_op = {num_ports{~sw_req_nonspec}} & 
+						sw_ignt_spec_unqual_op;
+		       
+		       // flit buffer read address can be determined early
+		       assign vc_sel_ivc = sw_req_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // inhibit updates if non-speculative requests are 
+		       // present
+		       assign allow_update_spec = ~sw_req_nonspec;
+		       
+		    end
 		  
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
-	       begin
+		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
+		    begin
+		       
+		       // do not propagate speculative requests if any 
+		       // non-speculative requests were issued by this input's 
+		       // VCs
+		       assign sw_oreq_spec_op = {num_ports{~sw_req_nonspec}} & 
+						sw_oreq_spec_unqual_op;
+		       
+		       // no additional masking is required for speculative 
+		       // grants
+		       assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
+		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		       
+		       // flit buffer read address can be determined early
+		       assign vc_sel_ivc = sw_req_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // updates are masked indirectly via output-side grants
+		       assign allow_update_spec = 1'b1;
+		       
+		    end
 		  
-		  // do not propagate speculative requests if any 
-		  // non-speculative requests were issued by this input's VCs
-		  assign sw_oreq_spec_op
-		    = {num_ports{~sw_req_nonspec}} & sw_oreq_spec_unqual_op;
+		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
+		    begin
+		       
+		       // propagate all speculative requests
+		       assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
+		       
+		       // suppress speculative grants if any non-speculative 
+		       // grants were generated for this input
+		       assign sw_gnt_spec_ivc = {num_vcs{~sw_ognt_nonspec}} & 
+						sw_gnt_spec_unqual_ivc;
+		       assign sw_ignt_spec_op = {num_ports{~sw_ognt_nonspec}} & 
+						sw_ignt_spec_unqual_op;
+		       
+		       // we only know whether to use non-speculative or 
+		       // speculative flits once the output-side grants are 
+		       // known
+		       assign vc_sel_ivc = sw_ognt_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // inhibit updates if non-speculative grants are present
+		       assign allow_update_spec = ~sw_ognt_nonspec;
+		       
+		    end
 		  
-		  // no additional masking is required for speculative grants
-		  assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
-		  assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
+		    begin
+		       
+		       // do not propagate requests if a non-speculative grant 
+		       // was generated for this input
+		       assign sw_oreq_spec_op = {num_ports{~sw_ognt_nonspec}} & 
+						sw_oreq_spec_unqual_op;
+		       
+		       // no additional masking requiured for grants
+		       assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
+		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		       
+		       // we only know whether to use non-speculative or 
+		       // speculative flits once the output-side grants are 
+		       // known
+		       assign vc_sel_ivc = sw_ognt_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // updates are masked indirectly via output-side grants
+		       assign allow_update_spec = 1'b1;
+		       
+		    end
 		  
-		  // flit buffer read address can be determined early
-		  assign vc_sel_ivc
-		    = sw_req_nonspec ? vc_sel_nonspec_ivc : vc_sel_spec_ivc;
+		endcase
+		
+	     end
+	   else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
+		   (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
+	     begin
+		
+		// propagate all speculative requests
+		assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
+		
+		// all masking is done inside the wavefront block, so we can 
+		// just propagate grants
+		assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
+		assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		
+		case(sw_alloc_spec_type)
 		  
-		  // updates are masked indirectly via output-side grants
-		  assign allow_update_spec = 1'b1;
+		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS,
+		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
+		    begin
+		       
+		       // flit buffer read address can be determined early
+		       assign vc_sel_ivc = sw_req_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // inhibit updates if non-speculative requests are 
+		       // present
+		       assign allow_update_spec = ~sw_req_nonspec;
+		       
+		    end
 		  
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
-	       begin
+		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS,
+		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
+		    begin
+		       
+		       // flit buffer read address depends on whether a 
+		       // non-speculative grant was generated
+		       assign vc_sel_ivc = sw_ognt_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
+		       
+		       // inhibit updates if non-speculative grant was generated
+		       assign allow_update_spec = ~sw_ognt_nonspec;
+		       
+		    end
 		  
-		  // propagate all speculative requests
-		  assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
-		  
-		  // suppress speculative grants if any non-speculative grants 
-		  // were generated for this input
-		  assign sw_gnt_spec_ivc
-		    = {num_vcs{~sw_ognt_nonspec}} & sw_gnt_spec_unqual_ivc;
-		  assign sw_ignt_spec_op
-		    = {num_ports{~sw_ognt_nonspec}} & sw_ignt_spec_unqual_op;
-		  
-		  // we only know whether to use non-speculative or speculative
-		  // flits once the output-side grants are known
-		  assign vc_sel_ivc
-		    = sw_ognt_nonspec ? vc_sel_nonspec_ivc : vc_sel_spec_ivc;
-		  
-		  // inhibit updates if non-speculative grants are present
-		  assign allow_update_spec = ~sw_ognt_nonspec;
-		  
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
-	       begin
-		  
-		  // do not propagate requests if a non-speculative grant was
-		  // generated for this input
-		  assign sw_oreq_spec_op
-		    = {num_ports{~sw_ognt_nonspec}} & sw_oreq_spec_unqual_op;
-		  
-		  // no additional masking requiured for grants
-		  assign sw_gnt_spec_ivc = sw_gnt_spec_unqual_ivc;
-		  assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
-		  
-		  // we only know whether to use non-speculative or speculative
-		  // flits once the output-side grants are known
-		  assign vc_sel_ivc
-		    = sw_ognt_nonspec ? vc_sel_nonspec_ivc : vc_sel_spec_ivc;
-		  
-		  // updates are masked indirectly via output-side grants
-		  assign allow_update_spec = 1'b1;
-		  
-	       end
-	     
-	   endcase
+		endcase
+		
+	     end
 	   
 	   // if any output port was granted to this input port 
 	   // non-speculatively, we know that a flit will be sent out

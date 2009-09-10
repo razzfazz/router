@@ -101,80 +101,79 @@ module vcr_sw_alloc_wf_mac
       if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
 	   
-	   wire [0:num_ports-1] req_spec_op;
-	   c_or_nto1
-	     #(.width(num_ports),
-	       .num_ports(num_ports))
-	   req_spec_op_or
-	     (.data_in(req_spec_ip_op),
-	      .data_out(req_spec_op));
-	   
 	   wire 			  update_alloc_spec;
 	   wire [0:num_ports*num_ports-1] req_wf_spec_ip_op;
 	   wire [0:num_ports*num_ports-1] gnt_wf_spec_ip_op;
 	   
 	   case(spec_type)
 	     
- 	     `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
+	     `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS,
+	     `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
 	       begin
 		  
 		  wire [0:num_ports-1] noreq_nonspec_op;
 		  c_nor_nto1
 		    #(.width(num_ports),
 		      .num_ports(num_ports))
-		  noreq_nonspec_op_or
+		  noreq_nonspec_op_nor
 		    (.data_in(req_nonspec_ip_op),
 		     .data_out(noreq_nonspec_op));
 		  
-		  assign update_alloc_spec = |(req_spec_op & noreq_nonspec_op);
-		  
-		  assign req_wf_spec_ip_op = req_spec_ip_op;
-		  
-		  assign gnt_spec_ip_op 
-		    = {num_ports{noreq_nonspec_op}} & gnt_wf_spec_ip_op;
-		  
-	       end
-	     
- 	     `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
-	       begin
-		  
-		  wire [0:num_ports-1] noreq_nonspec_op;
-		  c_nor_nto1
-		    #(.width(num_ports),
-		      .num_ports(num_ports))
-		  noreq_nonspec_op_or
+		  wire [0:num_ports*num_ports-1] req_nonspec_op_ip;
+		  c_interleaver
+		    #(.width(num_ports*num_ports),
+		      .num_blocks(num_ports))
+		  req_nonspec_op_ip_intl
 		    (.data_in(req_nonspec_ip_op),
-		     .data_out(noreq_nonspec_op));
+		     .data_out(req_nonspec_op_ip));
 		  
-		  assign update_alloc_spec = |(req_spec_op & noreq_nonspec_op);
-		  
-		  assign req_wf_spec_ip_op
-		    = {num_ports{noreq_nonspec_op}} & req_spec_ip_op;
-		  
-		  assign gnt_spec_ip_op = gnt_wf_spec_ip_op;
-		  
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
-	       begin
-		  
-		  wire [0:num_ports-1] nognt_nonspec_op;
+		  wire [0:num_ports-1] 		 noreq_nonspec_ip;
 		  c_nor_nto1
 		    #(.width(num_ports),
 		      .num_ports(num_ports))
-		  nognt_nonspec_op_or
-		    (.data_in(gnt_nonspec_ip_op),
-		     .data_out(nognt_nonspec_op));
+		  noreq_nonspec_ip_nor
+		    (.data_in(req_nonspec_op_ip),
+		     .data_out(noreq_nonspec_ip));
 		  
-		  assign update_alloc_spec = |(req_spec_op & nognt_nonspec_op);
+		  wire [0:num_ports*num_ports-1] noreq_nonspec_ip_op;
+		  c_vec_prod
+		    #(.num_rows(num_ports),
+		      .num_cols(num_ports))
+		  noreq_nonspec_ip_op_vprod
+		    (.col_vec(noreq_nonspec_ip),
+		     .row_vec(noreq_nonspec_op),
+		     .result(noreq_nonspec_ip_op));
 		  
-		  assign req_wf_spec_ip_op = req_spec_ip_op;
+		  assign update_alloc_spec
+		    = |(req_spec_ip_op & noreq_nonspec_ip_op);
 		  
-		  assign gnt_spec_ip_op
-		    = {num_ports{nognt_nonspec_op}} & gnt_wf_spec_ip_op;
+		  case(spec_type)
+		    
+ 		    `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
+		      begin
+			 
+			 assign req_wf_spec_ip_op = req_spec_ip_op;
+			 
+			 assign gnt_spec_ip_op 
+			   = noreq_nonspec_ip_op & gnt_wf_spec_ip_op;
+			 
+		      end
+		    
+ 		    `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
+		      begin
+			 
+			 assign req_wf_spec_ip_op
+			   = noreq_nonspec_ip_op & req_spec_ip_op;
+			 
+			 assign gnt_spec_ip_op = gnt_wf_spec_ip_op;
+			 
+		      end
+		    
+		  endcase
 		  
 	       end
 	     
+	     `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS,
 	     `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
 	       begin
 		  
@@ -182,16 +181,61 @@ module vcr_sw_alloc_wf_mac
 		  c_nor_nto1
 		    #(.width(num_ports),
 		      .num_ports(num_ports))
-		  nognt_nonspec_op_or
+		  nognt_nonspec_op_nor
 		    (.data_in(gnt_nonspec_ip_op),
 		     .data_out(nognt_nonspec_op));
 		  
-		  assign update_alloc_spec = |(req_spec_op & nognt_nonspec_op);
+		  wire [0:num_ports*num_ports-1] gnt_nonspec_op_ip;
+		  c_interleaver
+		    #(.width(num_ports*num_ports),
+		      .num_blocks(num_ports))
+		  gnt_nonspec_op_ip_intl
+		    (.data_in(gnt_nonspec_ip_op),
+		     .data_out(gnt_nonspec_op_ip));
 		  
-		  assign req_wf_spec_ip_op
-		    = {num_ports{nognt_nonspec_op}} & req_spec_ip_op;
+		  wire [0:num_ports-1] 		 nognt_nonspec_ip;
+		  c_nor_nto1
+		    #(.width(num_ports),
+		      .num_ports(num_ports))
+		  nognt_nonspec_ip_nor
+		    (.data_in(gnt_nonspec_op_ip),
+		     .data_out(nognt_nonspec_ip));
 		  
-		  assign gnt_spec_ip_op = gnt_wf_spec_ip_op;
+		  wire [0:num_ports*num_ports-1] nognt_nonspec_ip_op;
+		  c_vec_prod
+		    #(.num_rows(num_ports),
+		      .num_cols(num_ports))
+		  nognt_nonspec_ip_op_vprod
+		    (.col_vec(nognt_nonspec_ip),
+		     .row_vec(nognt_nonspec_op),
+		     .result(nognt_nonspec_ip_op));
+		  
+		  assign update_alloc_spec
+		    = |(req_spec_ip_op & nognt_nonspec_ip_op);
+		  
+		  case(spec_type)
+		    
+		    `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
+		      begin
+			 
+			 assign req_wf_spec_ip_op = req_spec_ip_op;
+			 
+			 assign gnt_spec_ip_op
+			   = nognt_nonspec_ip_op & gnt_wf_spec_ip_op;
+			 
+		      end
+		    
+		    `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
+		      begin
+			 
+			 assign req_wf_spec_ip_op
+			   = nognt_nonspec_ip_op & req_spec_ip_op;
+			 
+			 assign gnt_spec_ip_op = gnt_wf_spec_ip_op;
+			 
+		      end
+		    
+		  endcase
 		  
 	       end
 	     
