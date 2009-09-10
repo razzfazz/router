@@ -174,7 +174,7 @@ module packet_source
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
 
-   // 
+   // which router port is this packet source attached to?
    parameter port_id = 0;
    
    // maximum packet length (in flits)
