@@ -31,7 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `default_nettype none
 
 module packet_source
-  (clk, reset, address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, error);
+  (clk, reset, router_address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, 
+   error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -172,6 +173,9 @@ module packet_source
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
+
+   // 
+   parameter port_id = 0;
    
    // maximum packet length (in flits)
    localparam max_packet_length = 1 + max_payload_length;
@@ -193,7 +197,7 @@ module packet_source
    input clk;
    input reset;
    
-   input [0:addr_width-1] address;
+   input [0:router_addr_width-1] router_address;
    
    output [0:flit_ctrl_width-1] flit_ctrl;
    wire [0:flit_ctrl_width-1] flit_ctrl;
@@ -505,9 +509,6 @@ module packet_source
 	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
    
-   wire [0:router_addr_width-1] router_address;
-   assign router_address = address[0:router_addr_width-1];
-   
    reg [0:route_info_width-1] 	route_info;
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    
@@ -604,13 +605,16 @@ module packet_source
       integer 			   d;
       
       reg [0:router_addr_width-1]  random_router_address;
-      reg [0:router_addr_width-1]  last_router_address;
       
       if(num_nodes_per_router > 1)
 	begin
 	   
 	   wire [0:node_addr_width-1] node_address;
-	   assign node_address = address[router_addr_width:addr_width-1];
+	   
+	   if(port_id >= (num_ports - num_nodes_per_router))
+	     assign node_address = port_id - (num_ports - num_nodes_per_router);
+	   else
+	     assign node_address = {node_addr_width{1'b0}};
 	   
 	   reg [0:node_addr_width-1]   random_node_address;
 	   
@@ -626,8 +630,10 @@ module packet_source
 		     random_node_address
 		       = (node_address +
 			  $dist_uniform(seed, 
-					(random_router_address == 
-					 router_address) ? 1 : 0, 
+					((port_id >= 
+					  (num_ports - num_nodes_per_router)) &&
+					 (random_router_address == 
+					  router_address)) ? 1 : 0, 
 					num_nodes_per_router - 1)) % 
 			 num_nodes_per_router;
 		     route_info[route_info_width-addr_width:route_info_width-1]
@@ -656,8 +662,10 @@ module packet_source
 		       = (router_address[router_addr_width-dim_addr_width:
 					 router_addr_width-1] +
 			  $dist_uniform(seed,
-					(random_router_address == 
-					 router_address) ? 1 : 0,
+					((port_id >= 
+					  (num_ports - num_nodes_per_router)) &&
+					 (random_router_address == 
+					  router_address)) ? 1 : 0,
 					num_routers_per_dim - 1)) %
 			 num_routers_per_dim;
 		     route_info[route_info_width-addr_width:route_info_width-1]
@@ -669,6 +677,7 @@ module packet_source
       if(num_resource_classes > 1)
 	begin
 	   
+	   reg [0:router_addr_width-1]  last_router_address;
 	   reg [0:router_addr_width-1] random_intm_address;
 	   
 	   always @(random_router_address)

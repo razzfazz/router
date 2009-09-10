@@ -198,7 +198,7 @@ module testbench
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   if(inject_node_ports_only && (ip < num_ports - num_nodes_per_router))
+	   if(inject_node_ports_only && (ip < (num_ports-num_nodes_per_router)))
 	     begin
 		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
@@ -237,21 +237,6 @@ module testbench
 		
 		assign cred_valid_out_ip[ip] = flow_ctrl[0];
 		
-		wire [0:addr_width-1] 	   address;
-		
-		if(num_nodes_per_router > 1)
-		  begin
-		     
-		     wire [0:node_addr_width-1] node_address;
-		     assign node_address
-		       = (ip - (num_ports - num_nodes_per_router));
-		     
-		     assign address = {router_address, node_address};
-		     
-		  end
-		else
-		  assign address = router_address;
-		
 		wire [0:flit_ctrl_width-1] flit_ctrl;
 		wire [0:flit_data_width-1] flit_data;
 		
@@ -278,11 +263,12 @@ module testbench
 		    .min_payload_length(min_payload_length),
 		    .flit_data_width(flit_data_width),
 		    .routing_type(routing_type),
-		    .dim_order(dim_order))
+		    .dim_order(dim_order),
+		    .port_id(ip))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
-		   .address(address),
+		   .router_address(router_address),
 		   .flit_ctrl(flit_ctrl),
 		   .flit_data(flit_data),
 		   .flow_ctrl(flow_ctrl),
