@@ -492,7 +492,7 @@ module vcr_op_ctrl_mac
 	     begin
 		
 		//--------------------------------------------------------------
-		// If speculation is disable, all speculation-related control
+		// If speculation is disabled, all speculation-related control
 		// signals are just tied to zero.
 		//--------------------------------------------------------------
 		
