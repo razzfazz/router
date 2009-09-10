@@ -31,10 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // router configuration options
 
 // select network topology
-parameter topology = `TOPOLOGY_MESH;
+parameter topology = `TOPOLOGY_FBFLY;
 
 // flit buffer entries per VC
-parameter num_flit_buffers = 5;
+parameter num_flit_buffers = 8;
 
 // maximum number of packets that can be in a given VC buffer simultaneously
 parameter num_header_buffers = 4;
@@ -43,7 +43,7 @@ parameter num_header_buffers = 4;
 parameter num_message_classes = 2;
 
 // number of resource classes (e.g. minimal, adaptive)
-parameter num_resource_classes = 1;
+parameter num_resource_classes = 2;
 
 // number of VCs per class
 parameter num_vcs_per_class = 1;
@@ -52,16 +52,16 @@ parameter num_vcs_per_class = 1;
 parameter num_nodes = 64;
 
 // number of dimensions in network
-parameter num_dimensions = 1;
+parameter num_dimensions = 2;
 
 // number of nodes per router (a.k.a. concentration factor)
-parameter num_nodes_per_router = 1;
+parameter num_nodes_per_router = 4;
 
 // select packet format
 parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
 
 // maximum payload length (in flits)
-parameter max_payload_length = 0;
+parameter max_payload_length = 4;
 
 // minimum payload length (in flits)
 parameter min_payload_length = 0;
