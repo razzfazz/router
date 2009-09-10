@@ -40,8 +40,14 @@ module c_padder
    // number of bits to pad on the left
    parameter pad_left = 0;
    
+   // bit value to pad with on the left
+   parameter [0:0] pad_left_value = 1'b0;
+   
    // number of bits to pad on the right
    parameter pad_right = 0;
+   
+   // bit value to pad with on the right
+   parameter [0:0] pad_right_value = 1'b0;
    
    // width of input vector
    localparam new_width = pad_left + width + pad_right;
@@ -56,12 +62,13 @@ module c_padder
    generate
       
       if(pad_left > 0)
-	assign data_out[0:pad_left-1] = {pad_left{1'b0}};
+	assign data_out[0:pad_left-1] = {pad_left{pad_left_value}};
       
       assign data_out[pad_left:pad_left+width-1] = data_in;
       
       if(pad_right > 0)
-	assign data_out[pad_left+width:new_width-1] = {pad_right{1'b0}};
+	assign data_out[pad_left+width:new_width-1]
+		 = {pad_right{pad_right_value}};
       
    endgenerate
    
