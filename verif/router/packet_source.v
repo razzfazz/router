@@ -177,6 +177,9 @@ module packet_source
    // which router port is this packet source attached to?
    parameter port_id = 0;
    
+   // allow nodes to send packets to themselves
+   parameter allow_loopback = 1;
+   
    // maximum packet length (in flits)
    localparam max_packet_length = 1 + max_payload_length;
    
@@ -630,7 +633,8 @@ module packet_source
 		     random_node_address
 		       = (node_address +
 			  $dist_uniform(seed, 
-					((port_id >= 
+					((allow_loopback == 0) &&
+					 (port_id >= 
 					  (num_ports - num_nodes_per_router)) &&
 					 (random_router_address == 
 					  router_address)) ? 1 : 0, 
@@ -662,7 +666,8 @@ module packet_source
 		       = (router_address[router_addr_width-dim_addr_width:
 					 router_addr_width-1] +
 			  $dist_uniform(seed,
-					((port_id >= 
+					((allow_loopback == 0) &&
+					 (port_id >= 
 					  (num_ports - num_nodes_per_router)) &&
 					 (random_router_address == 
 					  router_address)) ? 1 : 0,

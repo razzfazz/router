@@ -65,6 +65,9 @@ module testbench
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
    
+   // allow nodes to send packets to themselves
+   parameter allow_loopback = 1;
+   
    
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
@@ -264,7 +267,8 @@ module testbench
 		    .flit_data_width(flit_data_width),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
-		    .port_id(ip))
+		    .port_id(ip),
+		    .allow_loopback(allow_loopback))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
