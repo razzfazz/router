@@ -268,7 +268,8 @@ module testbench
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
 		    .port_id(ip),
-		    .allow_loopback(allow_loopback))
+		    .allow_loopback(allow_loopback),
+		    .reset_type(reset_type))
 		ps
 		  (.clk(clk),
 		   .reset(reset),
@@ -570,7 +571,8 @@ module testbench
 				      dest_port_q) :
 				     dest_port_q;
 		c_dff
-		  #(.width(port_idx_width))
+		  #(.width(port_idx_width),
+		    .reset_type(reset_type))
 		dest_portq
 		  (.clk(clk),
 		   .reset(reset),
@@ -604,7 +606,8 @@ module testbench
 				     dest_ovc_q) :
 				    dest_ovc_q;
 		c_dff
-		  #(.width(num_vcs))
+		  #(.width(num_vcs),
+		    .reset_type(reset_type))
 		dest_ovcq
 		  (.clk(clk),
 		   .reset(reset),
@@ -749,7 +752,8 @@ module testbench
 		     c_fifo
 		       #(.depth(num_flit_buffers),
 			 .width(flit_ctrl_width+flit_data_width+port_idx_width+
-				num_vcs))
+				num_vcs),
+			 .reset_type(reset_type))
 		     ref_fifo
 		       (.clk(clk),
 			.reset(reset),

@@ -197,6 +197,8 @@ module packet_source
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam cred_count_width = clogb(num_flit_buffers+1);
    
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
    input clk;
    input reset;
    
@@ -246,7 +248,8 @@ module packet_source
 	     = waiting_packet_count_q - packet_ready;
 	   c_dff
 	     #(.width(packet_count_width),
-	       .reset_value(max_packet_count))
+	       .reset_value(max_packet_count),
+	       .reset_type(reset_type))
 	   waiting_packet_countq
 	     (.clk(clk),
 	      .reset(reset),
@@ -272,7 +275,8 @@ module packet_source
        packet_ready :
        {packet_count_width{1'b0}};
    c_dff
-     #(.width(packet_count_width))
+     #(.width(packet_count_width),
+       .reset_type(reset_type))
    ready_packet_countq
      (.clk(clk),
       .reset(reset),
@@ -353,7 +357,8 @@ module packet_source
 		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
 		    ({num_flit_buffers{debit & flit_tail}} & push_mask);
 		c_dff
-		  #(.width(num_flit_buffers))
+		  #(.width(num_flit_buffers),
+		    .reset_type(reset_type))
 		tail_queueq
 		  (.clk(clk),
 		   .reset(reset),
@@ -372,7 +377,8 @@ module packet_source
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
 		assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
 		c_dff
-		  #(.width(flit_buffer_idx_width))
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
 		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
@@ -397,7 +403,8 @@ module packet_source
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
 		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
 		c_dff
-		  #(.width(flit_buffer_idx_width))
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
 		pop_ptrq
 		  (.clk(clk),
 		   .reset(reset),
@@ -433,7 +440,8 @@ module packet_source
 	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
 	       .checker_enable(1),
-	       .checker_capture_mode(0))
+	       .checker_capture_mode(0),
+	       .reset_type(reset_type))
 	   hct
 	     (.clk(clk),
 	      .reset(reset),
@@ -450,7 +458,8 @@ module packet_source
 	   assign cred_count_s = cred_count_q + credit - debit;
 	   c_dff
 	     #(.width(cred_count_width),
-	       .reset_value(num_flit_buffers))
+	       .reset_value(num_flit_buffers),
+	       .reset_type(reset_type))
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
@@ -497,7 +506,8 @@ module packet_source
 			 ~(flit_sent & flit_tail) :
 			 ~ready_packet_count_zero;
    c_dff
-     #(.width(1))
+     #(.width(1),
+       .reset_type(reset_type))
    flit_validq
      (.clk(clk),
       .reset(reset),
@@ -555,7 +565,8 @@ module packet_source
 		    .connectivity(connectivity),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
-		    .resource_class(irc))
+		    .resource_class(irc),
+		    .reset_type(reset_type))
 		rtl
 		  (.clk(clk),
 		   .reset(reset),
@@ -757,7 +768,8 @@ module packet_source
 	   assign head_s = (head_q & ~flit_sent) | packet_sent;
 	   c_dff
 	     #(.width(1),
-	       .reset_value(1'b1))
+	       .reset_value(1'b1),
+	       .reset_type(reset_type))
 	   headq
 	     (.clk(clk),
 	      .reset(reset),
@@ -814,7 +826,8 @@ module packet_source
    wire [0:packet_count_width-1] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + flit_sent;
    c_dff
-     #(.width(packet_count_width))
+     #(.width(packet_count_width),
+       .reset_type(reset_type))
    out_flitsq
      (.clk(clk),
       .reset(reset),
