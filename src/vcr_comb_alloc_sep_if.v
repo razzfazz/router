@@ -226,15 +226,14 @@ module vcr_comb_alloc_sep_if
 					       (mc*num_resource_classes+irc+1)*
 					       num_vcs_per_class-1];
 			       
-			       c_padder
-				 #(.width(num_vcs_per_class),
-				   .pad_left((mc*num_resource_classes+irc)*
-					     num_vcs_per_class),
-				   .pad_right((num_packet_classes - 
-					       (mc*num_resource_classes+irc+1))*
-					      num_vcs_per_class))
-			       gnt_ovc_pad
+			       c_align
+				 #(.data_width(num_vcs_per_class),
+				   .dest_width(num_vcs),
+				   .offset((mc*num_resource_classes+irc)*
+					   num_vcs_per_class))
+			       gnt_ovc_alg
 				 (.data_in(next_vc_ocvc),
+				  .dest_in({num_vcs{1'b0}}),
 				  .data_out(gnt_ovc));
 			       
 			       assign elig = |elig_ocvc;
@@ -288,16 +287,15 @@ module vcr_comb_alloc_sep_if
 					       num_vcs_per_class-1] &
 				   {num_vcs_per_class{inc_rc}};
 			       
-			       c_padder
-				 #(.width(2*num_vcs_per_class),
-				   .pad_left((mc*num_resource_classes+irc)*
-					     num_vcs_per_class),
-				   .pad_right((num_packet_classes -
-					       (mc*num_resource_classes+irc+2))*
-					      num_vcs_per_class))
-			       gnt_ovc_pad
+			       c_align
+				 #(.data_width(2*num_vcs_per_class),
+				   .dest_width(num_vcs),
+				   .offset((mc*num_resource_classes+irc)*
+					   num_vcs_per_class))
+			       gnt_ovc_alg
 				 (.data_in({next_vc_low_ocvc, 
 					    next_vc_high_ocvc}),
+				  .dest_in({num_vcs{1'b0}}),
 				  .data_out(gnt_ovc));
 			       
 			    end
