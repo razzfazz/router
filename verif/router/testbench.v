@@ -96,7 +96,7 @@ module testbench
    
    // current router's address
    localparam [0:router_addr_width-1] router_address
-     = {router_addr_width{1'b0}}/*{num_dimensions{default_dim_addr}}*/;
+     = {num_dimensions{default_dim_addr}};
    
    // connectivity within each dimension
    localparam connectivity
