@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// add zero padding to given vector
+// add padding to given vector
 module c_padder
   (data_in, data_out);
    
