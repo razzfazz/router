@@ -1093,27 +1093,27 @@ module vcr_ivc_ctrl
 		if(resource_class == (num_resource_classes - 1))
 		  begin
 		     
-		     c_padder
-		       #(.width(num_vcs_per_class),
-			 .pad_left(packet_class*num_vcs_per_class),
-			 .pad_right((num_packet_classes - 1 - packet_class)*
-				    num_vcs_per_class))
-		     flit_ovc_pad
+		     c_align
+		       #(.data_width(num_vcs_per_class),
+			 .dest_width(num_vcs),
+			 .offset(packet_class*num_vcs_per_class))
+		     flit_ovc_alg
 		       (.data_in(flit_ocvc),
+			.dest_in({num_vcs{1'b0}}),
 			.data_out(flit_ovc));
 		     
 		  end
 		else
 		  begin
 		     
-		     c_padder
-		       #(.width(2*num_vcs_per_class),
-			 .pad_left(packet_class*num_vcs_per_class),
-			 .pad_right((num_packet_classes - 1 - packet_class - 1)*
-				    num_vcs_per_class))
-		     flit_ovc_pad
+		     c_align
+		       #(.data_width(2*num_vcs_per_class),
+			 .dest_width(num_vcs),
+			 .offset(packet_class*num_vcs_per_class))
+		     flit_ovc_alg
 		       (.data_in({flit_ocvc & {num_vcs_per_class{~inc_rc}},
 				  flit_ocvc & {num_vcs_per_class{inc_rc}}}),
+			.dest_in({num_vcs{1'b0}}),
 			.data_out(flit_ovc));
 		     
 		  end
