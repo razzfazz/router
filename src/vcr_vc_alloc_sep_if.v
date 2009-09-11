@@ -339,15 +339,15 @@ module vcr_vc_alloc_sep_if
 			     .data_out(gnt_orc_ocvc));
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
-			  c_padder
-			    #(.width(num_resource_classes*num_vcs_per_class),
-			      .pad_left(mc*num_resource_classes*
-					num_vcs_per_class),
-			      .pad_right((num_message_classes - 1 - mc)*
-					 num_resource_classes*
-					 num_vcs_per_class))
-			  gnt_ovc_pad
+			  c_align
+			    #(.data_width(num_resource_classes*
+					  num_vcs_per_class),
+			      .dest_width(num_vcs),
+			      .offset(mc*num_resource_classes*
+				      num_vcs_per_class))
+			  gnt_ovc_alg
 			    (.data_in(gnt_orc_ocvc),
+			     .dest_in({num_vcs{1'b0}}),
 			     .data_out(gnt_ovc));
 			  
 			  assign gnt_ip_ivc_ovc[(((ip*num_message_classes+mc)*
@@ -531,13 +531,15 @@ module vcr_vc_alloc_sep_if
 				    else
 				      assign gnt_out_icvc = req_out_icvc;
 				    
-				    c_padder
-				      #(.width(num_vcs_per_class),
-					.pad_left(0),
-					.pad_right((num_resource_classes-1)*
-						   num_vcs_per_class))
-				    gnt_out_irc_icvc_pad
+				    c_align
+				      #(.data_width(num_vcs_per_class),
+					.dest_width(num_resource_classes*
+						    num_vcs_per_class),
+					.offset(0))
+				    gnt_out_irc_icvc_alg
 				      (.data_in(gnt_out_icvc),
+				       .dest_in({(num_resource_classes*
+						  num_vcs_per_class){1'b0}}),
 				       .data_out(gnt_out_irc_icvc));
 				    
 				 end
@@ -585,14 +587,16 @@ module vcr_vc_alloc_sep_if
 				       .gnt({gnt_out_low_icvc,
 					     gnt_out_high_icvc}));
 				    
-				    c_padder
-				      #(.width(2*num_vcs_per_class),
-					.pad_left((orc-1)*num_vcs_per_class),
-					.pad_right(((num_resource_classes-1)-
-						    orc)*num_vcs_per_class))
-				    gng_out_irc_icvc_pad
+				    c_align
+				      #(.data_width(2*num_vcs_per_class),
+					.dest_width(num_resource_classes*
+						    num_vcs_per_class),
+					.offset((orc-1)*num_vcs_per_class))
+				    gng_out_irc_icvc_alg
 				      (.data_in({gnt_out_low_icvc,
 						 gnt_out_high_icvc}),
+				       .dest_in({(num_resource_classes*
+						  num_vcs_per_class){1'b0}}),
 				       .data_out(gnt_out_irc_icvc));
 				    
 				 end
@@ -608,16 +612,15 @@ module vcr_vc_alloc_sep_if
 					    num_vcs_per_class){gnt_out_ip[ip]}};
 			       
 			       wire [0:num_vcs-1] 		 gnt_out_ivc;
-			       c_padder
-				 #(.width(num_resource_classes*
-					  num_vcs_per_class),
-				   .pad_left(mc*num_resource_classes*
-					     num_vcs_per_class),
-				   .pad_right((num_message_classes - 1 - mc)*
-					      num_resource_classes*
-					      num_vcs_per_class))
-			       gnt_out_ivc_pad
+			       c_align
+				 #(.data_width(num_resource_classes*
+					       num_vcs_per_class),
+				   .dest_width(num_vcs),
+				   .offset(mc*num_resource_classes*
+					   num_vcs_per_class))
+			       gnt_out_ivc_alg
 				 (.data_in(gnt_out_irc_icvc),
+				  .dest_in({num_vcs{1'b0}}),
 				  .data_out(gnt_out_ivc));
 			       
 			       assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]

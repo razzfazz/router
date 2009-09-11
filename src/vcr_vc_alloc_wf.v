@@ -330,15 +330,15 @@ module vcr_vc_alloc_wf
 			     .data_out(gnt_orc_ocvc));
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
-			  c_padder
-			    #(.width(num_resource_classes*num_vcs_per_class),
-			      .pad_left(mc*num_resource_classes*
-					num_vcs_per_class),
-			      .pad_right((num_message_classes - 1 - mc)*
-					 num_resource_classes*
-					 num_vcs_per_class))
-			  gnt_ovc_pad
+			  c_align
+			    #(.data_width(num_resource_classes*
+					  num_vcs_per_class),
+			      .dest_width(num_vcs),
+			      .offset(mc*num_resource_classes*
+				      num_vcs_per_class))
+			  gnt_ovc_alg
 			    (.data_in(gnt_orc_ocvc),
+			     .dest_in({num_vcs{1'b0}}),
 			     .data_out(gnt_ovc));
 			  
 			  assign gnt_ip_ivc_ovc[(ip*num_vcs+
@@ -546,15 +546,15 @@ module vcr_vc_alloc_wf
 				   = |gnt_wf_irc_icvc;
 			  
 			  wire [0:num_vcs-1] gnt_wf_ivc;
-			  c_padder
-			    #(.width(num_resource_classes*num_vcs_per_class),
-			      .pad_left(mc*num_resource_classes*
-					num_vcs_per_class),
-			      .pad_right((num_message_classes - 1 - mc)*
-					 num_resource_classes*
-					 num_vcs_per_class))
-			  gnt_wf_ivc_pad
+			  c_align
+			    #(.data_width(num_resource_classes*
+					  num_vcs_per_class),
+			      .dest_width(num_vcs),
+			      .offset(mc*num_resource_classes*
+				      num_vcs_per_class))
+			  gnt_wf_ivc_alg
 			    (.data_in(gnt_wf_irc_icvc),
+			     .dest_in({num_vcs{1'b0}}),
 			     .data_out(gnt_wf_ivc));
 			  
 			  assign gnt_op_ovc_ivc[(op*num_vcs+
