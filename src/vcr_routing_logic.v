@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for VC router
 module vcr_routing_logic
-  (clk, reset, router_address, hop_route_info, route_port, inc_rc);
+  (clk, reset, router_address, sel_rc, route_info, route_port, inc_rc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -86,14 +86,9 @@ module vcr_routing_logic
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // current resource class
-   parameter resource_class = 0;
-   
    // total number of bits required for storing routing information
-   localparam hop_route_info_width
-     = (resource_class == (num_resource_classes - 1)) ?
-       addr_width :
-       router_addr_width;
+   localparam route_info_width
+     = num_resource_classes * router_addr_width + node_addr_width;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -104,8 +99,11 @@ module vcr_routing_logic
    // current router's address
    input [0:router_addr_width-1] router_address;
    
+   // select current resource class
+   input [0:num_resource_classes-1] sel_rc;
+   
    // routing data
-   input [0:hop_route_info_width-1] hop_route_info;
+   input [0:route_info_width-1] route_info;
    
    // output port to forward to
    output [0:port_idx_width-1] route_port;
@@ -116,24 +114,33 @@ module vcr_routing_logic
    output inc_rc;
    wire 		inc_rc;
    
-   // address of destination router for current resource class
-   wire [0:router_addr_width-1] dest_router_address;
-   assign dest_router_address
-     = hop_route_info[0:router_addr_width-1];
+   // all router addresses (intermediate + final)
+   wire [0:num_resource_classes*router_addr_width-1] route_info_addresses;
+   assign route_info_addresses
+     = route_info[0:num_resource_classes*router_addr_width-1];
    
-   wire 			reached_dest;
+   // address of destination router for current resource class
+   wire [0:router_addr_width-1] 		     dest_router_address;
+   c_select_1ofn
+     #(.width(router_addr_width),
+       .num_ports(num_resource_classes))
+   dest_router_address_sel
+     (.select(sel_rc),
+      .data_in(route_info_addresses),
+      .data_out(dest_router_address));
+   
+   wire 					     reached_dest;
    assign reached_dest = (router_address == dest_router_address);
    
-   wire [0:num_dimensions-1] 	dim_addr_match;
+   wire 					     final_rc;
+   assign final_rc = sel_rc[num_resource_classes-1];
    
-   wire [0:num_ports-1] 	route_op;
+   assign inc_rc = reached_dest & ~final_rc;
+   
+   wire [0:num_dimensions-1] 			     dim_addr_match;
+   wire [0:num_ports-1] 			     route_op;
    
    generate
-      
-      if(resource_class == (num_resource_classes - 1))
-	assign inc_rc = 1'b0;
-      else
-	assign inc_rc = reached_dest;
       
       case(routing_type)
 	
@@ -245,34 +252,27 @@ module vcr_routing_logic
 	
       endcase
       
-      if(resource_class == (num_resource_classes - 1))
+      if(num_nodes_per_router > 1)
 	begin
 	   
-	   if(num_nodes_per_router > 1)
-	     begin
-		
-		wire [0:node_addr_width-1] dest_node_address;
-		assign dest_node_address
-		  = hop_route_info[router_addr_width:hop_route_info_width-1];
-		
-		wire [0:num_nodes_per_router-1] node_sel;
-		c_decoder
-		  #(.num_ports(num_nodes_per_router))
-		node_sel_dec
-		  (.data_in(dest_node_address),
-		   .data_out(node_sel));
-		
-		assign route_op[num_ports-num_nodes_per_router:num_ports-1]
-			 = node_sel & {num_nodes_per_router{&dim_addr_match}};
-		
-	     end
-	   else
-	     assign route_op[num_ports-1] = &dim_addr_match;
+	   wire [0:node_addr_width-1] dest_node_address;
+	   assign dest_node_address
+	     = route_info[route_info_width-node_addr_width:route_info_width-1];
+	   
+	   wire [0:num_nodes_per_router-1] node_sel;
+	   c_decoder
+	     #(.num_ports(num_nodes_per_router))
+	   node_sel_dec
+	     (.data_in(dest_node_address),
+	      .data_out(node_sel));
+	   
+	   assign route_op[num_ports-num_nodes_per_router:num_ports-1]
+		    = node_sel & 
+		      {num_nodes_per_router{&dim_addr_match & final_rc}};
 	   
 	end
       else
-	assign route_op[num_ports-num_nodes_per_router:num_ports-1]
-		 = {num_nodes_per_router{1'b0}};
+	assign route_op[num_ports-1] = &dim_addr_match & final_rc;
       
    endgenerate
    

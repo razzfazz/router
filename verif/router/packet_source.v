@@ -538,22 +538,8 @@ module packet_source
 	     begin:ircs
 		
 		localparam ipc = mc * num_resource_classes + irc;
-		
-		wire [0:((irc == (num_resource_classes - 1)) ?
-			 addr_width :
-			 router_addr_width)-1] hop_route_info;
-		
-		assign hop_route_info[0:router_addr_width-1]
-			 = route_info[irc*router_addr_width:
-				      (irc+1)*router_addr_width-1];
-		
-		if((irc == (num_resource_classes - 1)) &&
-		   (num_nodes_per_router > 1))
-		  assign hop_route_info[router_addr_width:addr_width-1]
-			   = route_info[num_resource_classes*
-					router_addr_width:
-					num_resource_classes*
-					router_addr_width+node_addr_width-1];
+		localparam [0:num_resource_classes-1] sel_irc
+		  = (1 << (num_resource_classes - 1 - irc));
 		
 		wire [0:port_idx_width-1]      route_port;
 		wire 			       inc_rc;
@@ -565,13 +551,13 @@ module packet_source
 		    .connectivity(connectivity),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
-		    .resource_class(irc),
 		    .reset_type(reset_type))
 		rtl
 		  (.clk(clk),
 		   .reset(reset),
 		   .router_address(router_address),
-		   .hop_route_info(hop_route_info),
+		   .sel_rc(sel_irc),
+		   .route_info(route_info),
 		   .route_port(route_port),
 		   .inc_rc(inc_rc));
 		
