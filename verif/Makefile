@@ -1,3 +1,5 @@
+# $Id$
+
 all: 
 	for dir in $(wildcard *); do \
           if [ -d $$dir ] ; then \
