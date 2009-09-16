@@ -1,7 +1,7 @@
 // $Id: vcr_op_ctrl_mac.v 1438 2009-08-18 02:19:29Z dub $
 
 /*
-Copyright (c) 2007, Trustees of Leland Stanford Junior University
+Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
