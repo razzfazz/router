@@ -132,7 +132,6 @@ module vcr_vc_alloc_sep_of
 	   for(ip = 0; ip < num_ports; ip = ip + 1)
 	     begin:ips
 		
-		wire [0:num_vcs*num_vcs-1] gnt_ivc_ovc;
 		wire [0:num_vcs-1] 	   gnt_ivc;
 		
 		genvar 			   irc;
