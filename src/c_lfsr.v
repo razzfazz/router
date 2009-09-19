@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic multi-input linear feedback shift register register
 module c_lfsr
-  (clk, reset, load, run, feedback, d, q);
+  (clk, reset, load, run, feedback, complete, d, q);
    
 `include "c_constants.v"
    
@@ -45,16 +45,10 @@ module c_lfsr
    // initial state
    parameter [offset:(offset+width)-1] reset_value = {{(width-1){1'b0}}, 1'b1};
    
-   // include all-zeros state in state sequence
-   parameter complete = 0;
-   
-   // allow any-to-any feedback between bit positions
-   parameter generalized = 0;
+   // how many iterations to perform at once
+   parameter iterations = 1;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
-   
-   // compute total feedback width
-   localparam feedback_width = (generalized > 0) ? (width * width) : width;
    
    input clk;
    input reset;
@@ -66,7 +60,10 @@ module c_lfsr
    input run;
    
    // feedback polynomial(s)
-   input [0:feedback_width-1] feedback;
+   input [0:width-1] feedback;
+   
+   // include all-zeros state in state sequence
+   input complete;
    
    // data input
    input [offset:(offset+width)-1] d;
@@ -77,65 +74,104 @@ module c_lfsr
    
    wire [offset:(offset+width)-1] state_q;
    
-   wire [offset:(offset+width)-1] feedback_value;
+   wire [0:width-1] 		  feedback_seeds;
+   assign feedback_seeds[0:(width-1)-1] = state_q[offset:(offset+width-1)-1];
+   assign feedback_seeds[width-1]
+	    = (~|state_q[offset:(offset+width-1)-1] & complete) ^ 
+	      state_q[offset+width-1];
+   
+   wire [0:width*width-1] 	  iter_matrix_noshift_transposed;
+   assign iter_matrix_noshift_transposed
+     = {{((width-1)*width){1'b0}}, feedback};
+   
+   wire [0:width*width-1] 	  iter_matrix_noshift;
+   c_interleaver
+     #(.width(width*width),
+       .num_blocks(width))
+   iter_matrix_noshift_intl
+     (.data_in(iter_matrix_noshift_transposed),
+      .data_out(iter_matrix_noshift));
+   
+   wire [0:width*width-1] 	  initial_matrix;
+   
+   wire [0:(iterations+1)*width*width-1] matrices;
+   assign matrices[0:width*width-1] = initial_matrix;
+   
+   wire [0:width*width-1] 		 feedback_matrix;
+   assign feedback_matrix
+     = matrices[iterations*width*width:(iterations+1)*width*width-1];
+   
+   wire [0:width*width-1] 		 iter_matrix;
+   wire [0:width*width-1] 		 feedback_matrix_noshift;
    
    generate
       
-      if(generalized > 0)
-	begin
+      genvar 				 row;
+      
+      for(row = 0; row < width; row = row + 1)
+	begin:rows
 	   
-	   wire [0:width-1] feedback_seeds;
+	   genvar col;
 	   
-	   if(complete > 0)
-	     begin
-		assign feedback_seeds[0:(width-1)-1]
-			 = state_q[offset:(offset+width-1)-1];
-		assign feedback_seeds[width-1]
-			 = ~|state_q[offset:(offset+width-1)-1] ^ 
-			   state_q[offset+width-1];
+	   for(col = 0; col < width; col = col + 1)
+	     begin:cols
+		
+		wire invert;
+		assign invert = (row == (col + 1));
+		
+		assign iter_matrix[row*width+col]
+			 = iter_matrix_noshift[row*width+col] ^ invert;
+		
+		assign feedback_matrix_noshift[row*width+col]
+			 = feedback_matrix[row*width+col] ^ invert;
+		
+		wire sethi;
+		assign sethi = (row == col);
+		
+		assign initial_matrix[row*width+col] = sethi;
+		
 	     end
-	   else
-	     assign feedback_seeds = state_q;
-	   
-	   wire [0:width*width-1] feedback_mask;
-	   c_replicator
-	     #(.width(width),
-	       .count(width))
-	   feedback_mask_repl
-	     (.data_in(feedback_seeds),
-	      .data_out(feedback_mask));
-	   
-	   wire [0:width*width-1] feedback_vectors;
-	   assign feedback_vectors = feedback & feedback_mask;
-	   
-	   wire [0:width-1] 	  feedback_sum;
-	   c_xor_nto1
-	     #(.num_ports(width),
-	       .width(width))
-	   feedback_sum_xor
-	     (.data_in(feedback_vectors),
-	      .data_out(feedback_sum));
-	   
-	   assign feedback_value = {width{~load}} & feedback_sum;
 	   
 	end
-      else
-	begin
+      
+      genvar 	     iter;
+      
+      for(iter = 0; iter < iterations; iter = iter+1)
+	begin:iters
 	   
-	   wire feedback_seed;
+	   wire [0:width*width-1] in_matrix;
+	   assign in_matrix
+	     = matrices[iter*width*width:(iter+1)*width*width-1];
 	   
-	   if(complete > 0)
-	     assign feedback_seed
-	       =  ~|state_q[offset:(offset+width-1)-1] ^ 
-		  state_q[offset+width-1];
-	   else
-	     assign feedback_seed = state_q[offset+width-1];
+	   wire [0:width*width-1] out_matrix;
+	   c_mat_mult
+	     #(.dim1_width(width),
+	       .dim2_width(width),
+	       .dim3_width(width))
+	   out_matrix_mmult
+	     (.input_a(iter_matrix),
+	      .input_b(in_matrix),
+	      .result(out_matrix));
 	   
-	   assign feedback_value = {width{~load & feedback_seed}} & feedback;
+	   assign matrices[(iter+1)*width*width:(iter+2)*width*width-1]
+		    = out_matrix;
 	   
 	end
       
    endgenerate
+   
+   wire [0:width-1] 		  feedback_sum;
+   c_mat_mult
+     #(.dim1_width(width),
+       .dim2_width(width),
+       .dim3_width(1))
+   feedback_sum_mmult
+     (.input_a(feedback_matrix_noshift),
+      .input_b(feedback_seeds),
+      .result(feedback_sum));
+   
+   wire [offset:(offset+width)-1] feedback_value;
+   assign feedback_value = {width{~load}} & feedback_sum;
    
    wire [offset:(offset+width)-1] toggle_value;
    assign toggle_value = feedback_value ^ d;

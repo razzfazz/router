@@ -216,7 +216,7 @@ module vcr_term_mac
    input reset;
    
    // feedback matrix for LFSRs
-   input [0:lfsr_width*lfsr_width-1] lfsr_feedback;
+   input [0:lfsr_width-1] lfsr_feedback;
    
    // current router's address
    input [0:addr_width-1] address;
@@ -540,8 +540,7 @@ module vcr_term_mac
      = {lfsr_width{write_arrival_rv}} & reg_data_q[0:lfsr_width-1];
    c_lfsr
      #(.width(lfsr_width),
-       .complete(1),
-       .generalized(1),
+       .iterations(lfsr_width),
        .reset_type(reset_type))
    arrival_rv_lfsr
      (.clk(clk),
@@ -549,6 +548,7 @@ module vcr_term_mac
       .load(write_arrival_rv),
       .run(gen_packets),
       .feedback(lfsr_feedback),
+      .complete(1'b1),
       .d(arrival_rv_s),
       .q(arrival_rv_q));
    
@@ -604,8 +604,7 @@ module vcr_term_mac
      = {lfsr_width{write_packet_rvs}} & reg_data_q[0:lfsr_width-1];
    c_lfsr
      #(.width(lfsr_width),
-       .complete(1),
-       .generalized(1),
+       .iterations(lfsr_width),
        .reset_type(reset_type))
    packet_rvs_lfsr
      (.clk(clk),
@@ -613,6 +612,7 @@ module vcr_term_mac
       .load(write_packet_rvs),
       .run(packet_sent),
       .feedback(lfsr_feedback),
+      .complete(1'b1),
       .d(packet_rvs_s),
       .q(packet_rvs_q));
    
@@ -1294,8 +1294,7 @@ module vcr_term_mac
 	       flit_data_new[blk*lfsr_width:(blk+1)*lfsr_width-1];
 	   c_lfsr
 	     #(.width(lfsr_width),
-	       .complete(1),
-	       .generalized(1),
+	       .iterations(lfsr_width),
 	       .reset_type(reset_type))
 	   flit_data_rv_lfsr
 	     (.clk(clk),
@@ -1303,6 +1302,7 @@ module vcr_term_mac
 	      .load(write_flit_data_rv),
 	      .run(flit_sent),
 	      .feedback(lfsr_feedback),
+	      .complete(1'b1),
 	      .d(flit_data_rv_s),
 	      .q(flit_data_rv_q));
 	   
@@ -1315,8 +1315,7 @@ module vcr_term_mac
 	       flit_data_in[blk*lfsr_width:(blk+1)*lfsr_width-1];
 	   c_lfsr
 	     #(.width(lfsr_width),
-	       .complete(1),
-	       .generalized(1),
+	       .iterations(lfsr_width),
 	       .reset_type(reset_type))
 	   flit_sig_lfsr
 	     (.clk(clk),
@@ -1324,6 +1323,7 @@ module vcr_term_mac
 	      .load(start),
 	      .run(flit_received),
 	      .feedback(lfsr_feedback),
+	      .complete(1'b1),
 	      .d(flit_sig_s),
 	      .q(flit_sig_q));
 	   
@@ -1344,8 +1344,7 @@ module vcr_term_mac
 		    = {(lfsr_width - (flit_data_width % lfsr_width)){1'b0}};
 	   c_lfsr
 	     #(.width(lfsr_width),
-	       .complete(1),
-	       .generalized(1),
+	       .iterations(lfsr_width),
 	       .reset_type(reset_type))
 	   flit_data_rv_lfsr
 	     (.clk(clk),
@@ -1353,6 +1352,7 @@ module vcr_term_mac
 	      .load(write_flit_data_rv),
 	      .run(flit_sent),
 	      .feedback(lfsr_feedback),
+	      .complete(1'b1),
 	      .d(flit_data_rv_s),
 	      .q(flit_data_rv_q));
 	   
@@ -1368,8 +1368,7 @@ module vcr_term_mac
 		    = {(lfsr_width - (flit_data_width % lfsr_width)){1'b0}};
 	   c_lfsr
 	     #(.width(lfsr_width),
-	       .complete(1),
-	       .generalized(1),
+	       .iterations(lfsr_width),
 	       .reset_type(reset_type))
 	   flit_sig_lfsr
 	     (.clk(clk),
@@ -1377,6 +1376,7 @@ module vcr_term_mac
 	      .load(start),
 	      .run(flit_received),
 	      .feedback(lfsr_feedback),
+	      .complete(1'b1),
 	      .d(flit_sig_s),
 	      .q(flit_sig_q));
 	   
