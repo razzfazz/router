@@ -1,4 +1,4 @@
-// $Id$
+// $Id: c_vec_prod.v 1534 2009-09-16 16:10:23Z dub $
 
 /*
 Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
@@ -30,37 +30,48 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// vector product (column vector times row vector, result is matrix)
-module c_vec_prod
-  (col_vec, row_vec, result);
+// matrix multiplication in GF(2)
+module c_mat_mult
+  (input_a, input_b, result);
    
-   // length of column vector
-   parameter num_rows = 1;
+   // matrix dimensions
+   parameter dim1_width = 1;
+   parameter dim2_width = 1;
+   parameter dim3_width = 1;
    
-   // length of row vector
-   parameter num_cols = 1;
+   // first input matrix
+   input [0:dim1_width*dim2_width-1] input_a;
    
-   // column vector
-   input [0:num_rows-1] col_vec;
+   // second input matrix
+   input [0:dim2_width*dim3_width-1] input_b;
    
-   // row vector
-   input [0:num_cols-1] row_vec;
-   
-   // result
-   output [0:num_rows*num_cols-1] result;
-   wire [0:num_rows*num_cols-1] result;
+   output [0:dim1_width*dim3_width-1] result;
+   wire [0:dim1_width*dim3_width-1] result;
    
    generate
       
-      genvar 			row;
-      for(row = 0; row < num_rows; row = row + 1)
+      genvar 			    row;
+      
+      for(row = 0; row < dim1_width; row = row + 1)
 	begin:rows
 	   
 	   genvar col;
-	   for(col = 0; col < num_cols; col = col + 1)
+	   
+	   for(col = 0; col < dim3_width; col = col + 1)
 	     begin:cols
 		
-		assign result[row*num_cols+col] = col_vec[row] & row_vec[col];
+		wire [0:dim2_width-1] products;
+		
+		genvar 		      idx;
+		
+		for(idx = 0; idx < dim2_width; idx = idx + 1)
+		  begin:idxs
+		     assign products[idx]
+			      = input_a[row*dim2_width+idx] & 
+				input_b[idx*dim3_width+col];
+		  end
+		
+		assign result[row*dim3_width+col] = ^products;
 		
 	     end
 	   

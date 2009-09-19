@@ -585,24 +585,26 @@ module vcr_comb_alloc_sep_if
 		    = gnt_ovc & {num_vcs{vc_req}};
 	   
 	   wire [0:num_vcs*num_ports-1] 	  vc_gnt_ovc_ip;
-	   c_vec_prod
-	     #(.num_rows(num_vcs),
-	       .num_cols(num_ports))
-	   vc_gnt_ovc_ip_vprod
-	     (.col_vec(gnt_ovc),
-	      .row_vec(gnt_out_ip),
+	   c_mat_mult
+	     #(.dim1_width(num_vcs),
+	       .dim2_width(1),
+	       .dim3_width(num_ports))
+	   vc_gnt_ovc_ip_mmult
+	     (.input_a(gnt_ovc),
+	      .input_b(gnt_out_ip),
 	      .result(vc_gnt_ovc_ip));
 
 	   assign vc_gnt_op_ovc_ip[op*num_vcs*num_ports:
 				   (op+1)*num_vcs*num_ports-1] = vc_gnt_ovc_ip;
 	   
 	   wire [0:num_vcs*num_vcs-1] 		  vc_gnt_ovc_ivc;
-	   c_vec_prod
-	     #(.num_rows(num_vcs),
-	       .num_cols(num_vcs))
-	   vc_gnt_ovc_ivc_vprod
-	     (.col_vec(gnt_ovc),
-	      .row_vec(gnt_in_ivc),
+	   c_mat_mult
+	     #(.dim1_width(num_vcs),
+	       .dim2_width(1),
+	       .dim3_width(num_vcs))
+	   vc_gnt_ovc_ivc_mmult
+	     (.input_a(gnt_ovc),
+	      .input_b(gnt_in_ivc),
 	      .result(vc_gnt_ovc_ivc));
 	   
 	   assign vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:

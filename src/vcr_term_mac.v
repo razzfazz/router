@@ -634,12 +634,13 @@ module vcr_term_mac
    wire [0:num_resource_classes-1]    sel_rc_rv;
    
    wire [0:num_packet_classes-1]      sel_pc_rv;
-   c_vec_prod
-     #(.num_rows(num_message_classes),
-       .num_cols(num_resource_classes))
-   sel_pc_rv_vprod
-     (.col_vec(sel_mc_rv),
-      .row_vec(sel_rc_rv),
+   c_mat_mult
+     #(.dim1_width(num_message_classes),
+       .dim2_width(1),
+       .dim3_width(num_resource_classes))
+   sel_pc_rv_mmult
+     (.input_a(sel_mc_rv),
+      .input_b(sel_rc_rv),
       .result(sel_pc_rv));
    
    wire [0:num_vcs_per_class-1]       vc_alloc_cvc;
@@ -656,12 +657,13 @@ module vcr_term_mac
    assign sel_cvc = vc_alloc ? vc_alloc_cvc : next_free_cvc;
    
    wire [0:num_vcs-1] 		      sel_vc;
-   c_vec_prod
-     #(.num_rows(num_packet_classes),
-       .num_cols(num_vcs_per_class))
-   sel_vc_vprod
-     (.col_vec(sel_pc_rv),
-      .row_vec(sel_cvc),
+   c_mat_mult
+     #(.dim1_width(num_packet_classes),
+       .dim2_width(1),
+       .dim3_width(num_vcs_per_class))
+   sel_vc_mmult
+     (.input_a(sel_pc_rv),
+      .input_b(sel_cvc),
       .result(sel_vc));
    
    wire [0:num_vcs-1] 		      next_free_vc;

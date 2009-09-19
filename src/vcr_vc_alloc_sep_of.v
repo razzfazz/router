@@ -333,12 +333,14 @@ module vcr_vc_alloc_sep_of
 			  
 			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] gnt_in_op_orc_ocvc;
-			  c_vec_prod
-			    #(.num_rows(num_ports),
-			      .num_cols(num_resource_classes*num_vcs_per_class))
-			  gnt_in_op_orc_ocvc_vprod
-			    (.col_vec(route_op),
-			     .row_vec(gnt_in_orc_ocvc),
+			  c_mat_mult
+			    #(.dim1_width(num_ports),
+			      .dim2_width(1),
+			      .dim3_width(num_resource_classes*
+					  num_vcs_per_class))
+			  gnt_in_op_orc_ocvc_mmult
+			    (.input_a(route_op),
+			     .input_b(gnt_in_orc_ocvc),
 			     .result(gnt_in_op_orc_ocvc));
 			  
 			  assign gnt_in_ip_irc_icvc_op_orc_ocvc[

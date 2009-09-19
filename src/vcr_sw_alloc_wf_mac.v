@@ -136,12 +136,13 @@ module vcr_sw_alloc_wf_mac
 		     .data_out(noreq_nonspec_ip));
 		  
 		  wire [0:num_ports*num_ports-1] noreq_nonspec_ip_op;
-		  c_vec_prod
-		    #(.num_rows(num_ports),
-		      .num_cols(num_ports))
-		  noreq_nonspec_ip_op_vprod
-		    (.col_vec(noreq_nonspec_ip),
-		     .row_vec(noreq_nonspec_op),
+		  c_mat_mult
+		    #(.dim1_width(num_ports),
+		      .dim2_width(1),
+		      .dim3_width(num_ports))
+		  noreq_nonspec_ip_op_mmult
+		    (.input_a(noreq_nonspec_ip),
+		     .input_b(noreq_nonspec_op),
 		     .result(noreq_nonspec_ip_op));
 		  
 		  assign update_alloc_spec
@@ -202,12 +203,13 @@ module vcr_sw_alloc_wf_mac
 		     .data_out(nognt_nonspec_ip));
 		  
 		  wire [0:num_ports*num_ports-1] nognt_nonspec_ip_op;
-		  c_vec_prod
-		    #(.num_rows(num_ports),
-		      .num_cols(num_ports))
-		  nognt_nonspec_ip_op_vprod
-		    (.col_vec(nognt_nonspec_ip),
-		     .row_vec(nognt_nonspec_op),
+		  c_mat_mult
+		    #(.dim1_width(num_ports),
+		      .dim2_width(1),
+		      .dim3_width(num_ports))
+		  nognt_nonspec_ip_op_mmult
+		    (.input_a(nognt_nonspec_ip),
+		     .input_b(nognt_nonspec_op),
 		     .result(nognt_nonspec_ip_op));
 		  
 		  assign update_alloc_spec
