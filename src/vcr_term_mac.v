@@ -30,9 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // network terminal (combined packet source / sink) for VC router
 module vcr_term_mac
-  (clk, reset, lfsr_feedback, address, flit_ctrl_out, flit_data_out, 
-   flow_ctrl_in, flit_ctrl_in, flit_data_in, flow_ctrl_out, reg_write, reg_read,
-   reg_addr, reg_write_data, reg_read_data, reg_done, error);
+  (clk, reset, address, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
+   flit_ctrl_in, flit_data_in, flow_ctrl_out, reg_write, reg_read, reg_addr, 
+   reg_write_data, reg_read_data, reg_done, error);
    
 // register address declarations
 `define REG_ADDR_CTRL               0
@@ -214,9 +214,6 @@ module vcr_term_mac
    
    input clk;
    input reset;
-   
-   // feedback matrix for LFSRs
-   input [0:lfsr_width-1] lfsr_feedback;
    
    // current router's address
    input [0:addr_width-1] address;
@@ -534,6 +531,13 @@ module vcr_term_mac
    
    wire 			      write_arrival_rv;
    assign write_arrival_rv = reg_write_q & reg_sel_arrival_rv;
+
+   wire [0:lfsr_width-1] 	      arrival_rv_feedback;
+   c_fbgen
+     #(.width(lfsr_width),
+       .index(0))
+   arrival_rv_feedback_fbgen
+     (.feedback(arrival_rv_feedback));
    
    wire [0:lfsr_width-1] 	      arrival_rv_s, arrival_rv_q;
    assign arrival_rv_s
@@ -547,7 +551,7 @@ module vcr_term_mac
       .reset(reset),
       .load(write_arrival_rv),
       .run(gen_packets),
-      .feedback(lfsr_feedback),
+      .feedback(arrival_rv_feedback),
       .complete(1'b1),
       .d(arrival_rv_s),
       .q(arrival_rv_q));
@@ -599,6 +603,13 @@ module vcr_term_mac
    wire 			      write_packet_rvs;
    assign write_packet_rvs = reg_write_q & reg_sel_packet_rvs;
    
+   wire [0:lfsr_width-1] 	      packet_rvs_feedback;
+   c_fbgen
+     #(.width(lfsr_width),
+       .index(1))
+   packet_rvs_feedback_fbgen
+     (.feedback(packet_rvs_feedback));
+   
    wire [0:lfsr_width-1] 	      packet_rvs_s, packet_rvs_q;
    assign packet_rvs_s
      = {lfsr_width{write_packet_rvs}} & reg_data_q[0:lfsr_width-1];
@@ -611,7 +622,7 @@ module vcr_term_mac
       .reset(reset),
       .load(write_packet_rvs),
       .run(packet_sent),
-      .feedback(lfsr_feedback),
+      .feedback(packet_rvs_feedback),
       .complete(1'b1),
       .d(packet_rvs_s),
       .q(packet_rvs_q));
@@ -1288,6 +1299,13 @@ module vcr_term_mac
       for(blk = 0; blk < (flit_data_width / lfsr_width); blk = blk + 1)
 	begin:blks
 
+	   wire [0:lfsr_width-1] flit_data_rv_feedback;
+	   c_fbgen
+	     #(.width(lfsr_width),
+	       .index(2+blk))
+	   flit_data_rv_feedback_fbgen
+	     (.feedback(flit_data_rv_feedback));
+	   
 	   wire [0:lfsr_width-1] flit_data_rv_s, flit_data_rv_q;
 	   assign flit_data_rv_s
 	     = {lfsr_width{write_flit_data_rv}} & 
@@ -1301,7 +1319,7 @@ module vcr_term_mac
 	      .reset(reset),
 	      .load(write_flit_data_rv),
 	      .run(flit_sent),
-	      .feedback(lfsr_feedback),
+	      .feedback(flit_data_rv_feedback),
 	      .complete(1'b1),
 	      .d(flit_data_rv_s),
 	      .q(flit_data_rv_q));
@@ -1322,7 +1340,7 @@ module vcr_term_mac
 	      .reset(reset),
 	      .load(start),
 	      .run(flit_received),
-	      .feedback(lfsr_feedback),
+	      .feedback(flit_data_rv_feedback),
 	      .complete(1'b1),
 	      .d(flit_sig_s),
 	      .q(flit_sig_q));
@@ -1334,6 +1352,13 @@ module vcr_term_mac
       
       if((flit_data_width % lfsr_width) > 0)
 	begin
+	   
+	   wire [0:lfsr_width-1] flit_data_rv_feedback;
+	   c_fbgen
+	     #(.width(lfsr_width),
+	       .index(2+(flit_data_width / lfsr_width)))
+	   flit_data_rv_feedback_fbgen
+	     (.feedback(flit_data_rv_feedback));
 	   
 	   wire [0:lfsr_width-1] flit_data_rv_s, flit_data_rv_q;
 	   assign flit_data_rv_s[0:(flit_data_width % lfsr_width)-1]
@@ -1351,7 +1376,7 @@ module vcr_term_mac
 	      .reset(reset),
 	      .load(write_flit_data_rv),
 	      .run(flit_sent),
-	      .feedback(lfsr_feedback),
+	      .feedback(flit_data_rv_feedback),
 	      .complete(1'b1),
 	      .d(flit_data_rv_s),
 	      .q(flit_data_rv_q));
@@ -1375,7 +1400,7 @@ module vcr_term_mac
 	      .reset(reset),
 	      .load(start),
 	      .run(flit_received),
-	      .feedback(lfsr_feedback),
+	      .feedback(flit_data_rv_feedback),
 	      .complete(1'b1),
 	      .d(flit_sig_s),
 	      .q(flit_sig_q));
