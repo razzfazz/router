@@ -77,20 +77,11 @@ module vcr_op_ctrl_mac
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
-   // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 1;
-   
-   // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
    
    // connectivity within each dimension
    parameter connectivity = `CONNECTIVITY_LINE;
@@ -110,25 +101,6 @@ module vcr_op_ctrl_mac
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
-   
-   // maximum payload length (in flits)
-   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter max_payload_length = 4;
-   
-   // minimum payload length (in flits)
-   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-   parameter min_payload_length = 1;
-   
-   // number of bits required to represent all possible payload sizes
-   localparam payload_length_width
-     = clogb(max_payload_length-min_payload_length+1);
-
-   // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length);
-   
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
    
    // width of flit control signals
    localparam flit_ctrl_width
