@@ -407,151 +407,125 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*6-1] 		    events_ivc;
    wire [0:num_vcs*num_ports-1] 	    route_ivc_op;
    
+   genvar 				    ivc;
+   
    generate
       
-      genvar 				    mc;
-      
-      for(mc = 0; mc < num_message_classes; mc = mc + 1)
-	begin:mcs
+      for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	begin:ivcs
 	   
-	   genvar irc;
+	   wire vc_gnt;
+	   assign vc_gnt = vc_gnt_ivc[ivc];
 	   
-	   for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-	     begin:ircs
-		
-		genvar ivc;
-		
-		for(ivc = (mc*num_resource_classes+irc)*num_vcs_per_class;
-		    ivc < (mc*num_resource_classes+irc+1)*num_vcs_per_class;
-		    ivc = ivc + 1)
-		  begin:ivcs
-		     
-		     wire vc_gnt;
-		     assign vc_gnt = vc_gnt_ivc[ivc];
-		     
-		     wire [0:num_vcs-1] vc_gnt_ovc;
-		     assign vc_gnt_ovc
-		       = vc_gnt_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
-		     
-		     wire 		sw_gnt_nonspec;
-		     assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[ivc];
-		     
-		     wire               sw_gnt_spec;
-		     assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
-		     
-		     wire [0:port_idx_width-1] route_port;
-		     wire 		       inc_rc;
-		     wire 		       vc_req;
-		     wire 		       sw_req_nonspec;
-		     wire 		       sw_req_spec;
-		     wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
-		     wire [0:la_route_info_width-1] la_route_info;
-		     wire [0:fbf_addr_width-1] 	    fbf_write_addr;
-		     wire [0:fbf_addr_width-1] 	    fbf_read_addr;
-		     wire 			    ivcc_error;
-		     wire [0:5] 		    events;
-		     vcr_ivc_ctrl
-		       #(.num_flit_buffers(num_flit_buffers),
-			 .num_header_buffers(num_header_buffers),
-			 .num_message_classes(num_message_classes),
-			 .num_resource_classes(num_resource_classes),
-			 .num_vcs_per_class(num_vcs_per_class),
-			 .num_routers_per_dim(num_routers_per_dim),
-			 .num_dimensions(num_dimensions),
-			 .num_nodes_per_router(num_nodes_per_router),
-			 .connectivity(connectivity),
-			 .packet_format(packet_format),
-			 .max_payload_length(max_payload_length),
-			 .min_payload_length(min_payload_length),
-			 .track_vcs_at_output(track_vcs_at_output),
-			 .routing_type(routing_type),
-			 .dim_order(dim_order),
-			 .credit_handling_type(credit_handling_type),
-			 .header_fifo_type(header_fifo_type),
-			 .vc_alloc_type(vc_alloc_type),
-			 .sw_alloc_spec_type(sw_alloc_spec_type),
-			 .perf_ctr_enable(perf_ctr_enable),
-			 .checker_enable(checker_enable),
-			 .checker_capture_mode(checker_capture_mode),
-			 .vc_id(ivc),
-			 .message_class(mc),
-			 .resource_class(irc),
-			 .reset_type(reset_type))
-		     ivcc
-		       (.clk(clk),
-			.reset(reset),
-			.router_address(router_address),
-			.flit_ctrl_in(flit_ctrl_in_q),
-			.header_info_in(header_info_in_q),
-			.int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-			.route_port(route_port),
-			.inc_rc(inc_rc),
-			.vc_req(vc_req),
-			.vc_gnt(vc_gnt),
-			.vc_gnt_ovc(vc_gnt_ovc),
-			.sw_req_nonspec(sw_req_nonspec),
-			.sw_req_spec(sw_req_spec),
-			.sw_gnt_nonspec(sw_gnt_nonspec),
-			.sw_gnt_spec(sw_gnt_spec),
-			.int_flit_ctrl_out(int_flit_ctrl_out),
-			.la_route_info_out(la_route_info),
-			.fbf_write_addr(fbf_write_addr),
-			.fbf_read_addr(fbf_read_addr),
-			.error(ivcc_error),
-			.events(events));
-		     
-		     wire [0:num_ports-1] 	    route_op;
-		     c_decoder
-		       #(.num_ports(num_ports))
-		     route_op_dec
-		       (.data_in(route_port),
-			.data_out(route_op));
-		     
-		     assign route_port_ivc[ivc*port_idx_width:
-					   (ivc+1)*port_idx_width-1]
-			      = route_port;
-		     assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
-			      = route_op;
-		     assign inc_rc_ivc[ivc] = inc_rc;
-		     assign vc_req_ivc[ivc] = vc_req;
-		     assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
-		     assign sw_req_spec_ivc[ivc] = sw_req_spec;
-		     assign int_flit_ctrl_out_ivc[ivc*int_flit_ctrl_width:
-						  (ivc+1)*int_flit_ctrl_width-1]
-			      = int_flit_ctrl_out;
-		     assign la_route_info_ivc[ivc*la_route_info_width:
-					      (ivc+1)*la_route_info_width-1]
-			      = la_route_info;
-		     assign fbf_write_addr_ivc[ivc*fbf_addr_width:
-					       (ivc+1)*fbf_addr_width-1]
-			      = fbf_write_addr;
-		     assign fbf_read_addr_ivc[ivc*fbf_addr_width:
-					      (ivc+1)*fbf_addr_width-1]
-			      = fbf_read_addr;
-		     assign fbf_write_offset_ivc[ivc*
-						 flit_buffer_idx_width:
-						 (ivc+1)*
-						 flit_buffer_idx_width-1]
-			      = fbf_write_addr[fbf_addr_width-
-					       flit_buffer_idx_width:
-					       fbf_addr_width-1];
-		     assign fbf_read_offset_ivc[ivc*flit_buffer_idx_width:
-						(ivc+1)*flit_buffer_idx_width-1]
-			      = fbf_read_addr[fbf_addr_width-
-					      flit_buffer_idx_width:
-					      fbf_addr_width-1];
-		     assign ivcc_error_ivc[ivc] = ivcc_error;
-		     assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
-		     
-		  end
-		
-	     end
+	   wire [0:num_vcs-1] vc_gnt_ovc;
+	   assign vc_gnt_ovc = vc_gnt_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
+	   
+	   wire 	      sw_gnt_nonspec;
+	   assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[ivc];
+	   
+	   wire               sw_gnt_spec;
+	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
+	   
+	   wire [0:port_idx_width-1] route_port;
+	   wire 		     inc_rc;
+	   wire 		     vc_req;
+	   wire 		     sw_req_nonspec;
+	   wire 		     sw_req_spec;
+	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
+	   wire [0:la_route_info_width-1] la_route_info;
+	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+	   wire 			  ivcc_error;
+	   wire [0:5] 			  events;
+	   vcr_ivc_ctrl
+	     #(.num_flit_buffers(num_flit_buffers),
+	       .num_header_buffers(num_header_buffers),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .packet_format(packet_format),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
+	       .track_vcs_at_output(track_vcs_at_output),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order),
+	       .credit_handling_type(credit_handling_type),
+	       .header_fifo_type(header_fifo_type),
+	       .vc_alloc_type(vc_alloc_type),
+	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .perf_ctr_enable(perf_ctr_enable),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
+	       .vc_id(ivc),
+	       .reset_type(reset_type))
+	   ivcc
+	     (.clk(clk),
+	      .reset(reset),
+	      .router_address(router_address),
+	      .flit_ctrl_in(flit_ctrl_in_q),
+	      .header_info_in(header_info_in_q),
+	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+	      .route_port(route_port),
+	      .inc_rc(inc_rc),
+	      .vc_req(vc_req),
+	      .vc_gnt(vc_gnt),
+	      .vc_gnt_ovc(vc_gnt_ovc),
+	      .sw_req_nonspec(sw_req_nonspec),
+	      .sw_req_spec(sw_req_spec),
+	      .sw_gnt_nonspec(sw_gnt_nonspec),
+	      .sw_gnt_spec(sw_gnt_spec),
+	      .int_flit_ctrl_out(int_flit_ctrl_out),
+	      .la_route_info_out(la_route_info),
+	      .fbf_write_addr(fbf_write_addr),
+	      .fbf_read_addr(fbf_read_addr),
+	      .error(ivcc_error),
+	      .events(events));
+	   
+	   wire [0:num_ports-1] 	  route_op;
+	   c_decoder
+	     #(.num_ports(num_ports))
+	   route_op_dec
+	     (.data_in(route_port),
+	      .data_out(route_op));
+	   
+	   assign route_port_ivc[ivc*port_idx_width:(ivc+1)*port_idx_width-1]
+		    = route_port;
+	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
+		    = route_op;
+	   assign inc_rc_ivc[ivc] = inc_rc;
+	   assign vc_req_ivc[ivc] = vc_req;
+	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
+	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
+	   assign int_flit_ctrl_out_ivc[ivc*int_flit_ctrl_width:
+					(ivc+1)*int_flit_ctrl_width-1]
+		    = int_flit_ctrl_out;
+	   assign la_route_info_ivc[ivc*la_route_info_width:
+				    (ivc+1)*la_route_info_width-1]
+		    = la_route_info;
+	   assign fbf_write_addr_ivc[ivc*fbf_addr_width:
+				     (ivc+1)*fbf_addr_width-1]
+		    = fbf_write_addr;
+	   assign fbf_read_addr_ivc[ivc*fbf_addr_width:
+				    (ivc+1)*fbf_addr_width-1]
+		    = fbf_read_addr;
+	   assign fbf_write_offset_ivc[ivc*flit_buffer_idx_width:
+				       (ivc+1)*flit_buffer_idx_width-1]
+		    = fbf_write_addr[fbf_addr_width-flit_buffer_idx_width:
+				     fbf_addr_width-1];
+	   assign fbf_read_offset_ivc[ivc*flit_buffer_idx_width:
+				      (ivc+1)*flit_buffer_idx_width-1]
+		    = fbf_read_addr[fbf_addr_width-flit_buffer_idx_width:
+				    fbf_addr_width-1];
+	   assign ivcc_error_ivc[ivc] = ivcc_error;
+	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
 	   
 	end
       
    endgenerate
-   
-   assign error = |ivcc_error_ivc;
    
    
    //---------------------------------------------------------------------------
@@ -1111,5 +1085,12 @@ module vcr_ip_ctrl_mac
 	     end
 	end
    endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // error checking
+   //---------------------------------------------------------------------------
+   
+   assign error = |ivcc_error_ivc;
    
 endmodule

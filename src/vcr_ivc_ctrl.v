@@ -196,14 +196,15 @@ module vcr_ivc_ctrl
    parameter vc_id = 0;
    
    // message class to which this VC belongs
-   parameter message_class = 0;
+   localparam message_class
+     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
    
    // resource class to which this VC belongs
-   parameter resource_class = 0;
+   localparam resource_class
+     = (vc_id / num_vcs_per_class) % num_resource_classes;
    
    // packet class to which this VC belongs
-   localparam packet_class
-     = message_class * num_resource_classes + resource_class;
+   localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
    
    // width of routing information required for each VC
    localparam hop_route_info_width
