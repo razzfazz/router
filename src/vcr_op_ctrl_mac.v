@@ -44,15 +44,6 @@ module vcr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
-   // width required to select a buffer
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   
-   // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_flit_buffers+1);
-   
-   // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width = clogb(num_flit_buffers);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
@@ -143,13 +134,6 @@ module vcr_op_ctrl_mac
        (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
        1 :
        -1;
-   
-   // maximum value for credit level
-   localparam [0:cred_level_width-1] max_cred_level = {cred_level_width{1'b1}};
-   
-   // capped reset value for credit level
-   localparam [0:cred_level_width-1] free_reset_value
-     = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
    
    // select implementation variant for switch allocator
    parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
@@ -572,8 +556,7 @@ module vcr_op_ctrl_mac
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
    wire [0:num_vcs-1] 			  next_cred_ovc;
-   wire [0:num_vcs-1] 			  error_hct_ovc;
-   wire [0:num_vcs*2-1] 		  error_cred_ovc;
+   wire [0:num_vcs-1] 			  ovcc_error_ovc;
    
    generate
       
@@ -582,400 +565,58 @@ module vcr_op_ctrl_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire credit;
-	   
-	   if(num_vcs > 1)
-	     begin
-		
-		wire [0:vc_idx_width-1] cred_vc;
-		assign cred_vc = flow_ctrl_q[1:1+vc_idx_width-1];
-		
-		assign credit = cred_valid && (cred_vc == ovc);
-		
-	     end
-	   else
-	     assign credit = cred_valid;
-	   
-	   wire 			flit_valid_in_qual;
-	   assign flit_valid_in_qual = flit_valid_in & match_ovc[ovc];
-	   
-	   wire 			debit;
-	   assign debit = flit_valid_in_qual;
-	   
-	   wire 			vc_gnt;
+	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc];
 	   
+	   wire [0:num_ports-1] vc_gnt_ip;
+	   assign vc_gnt_ip = vc_gnt_ovc_ip[ovc*num_ports:(ovc+1)*num_ports-1];
 	   
-	   //-------------------------------------------------------------------
-	   // track whether this output VC is currently assigend to an input VC
-	   //-------------------------------------------------------------------
-	   
-	   wire set_allocated;
-	   assign set_allocated = vc_gnt;
-	   
-	   wire reset_allocated;   
-	   assign reset_allocated = flit_valid_in_qual & flit_tail_in;
-	   
-	   wire allocated_s, allocated_q;
-	   assign allocated_s
-	     = (set_allocated | allocated_q) & ~reset_allocated;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   allocatedq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(allocated_s),
-	      .q(allocated_q));
-	   
-	   if(num_vcs > 1)
-	     begin
-		
-		wire [0:vc_idx_width-1] flit_vc_in;
-		assign flit_vc_in = int_flit_ctrl_in[1:1+vc_idx_width-1];
-		
-		// if VC assignment is tracked at the output, each output VC 
-		// needs to check if it is currently assigned to the incoming VC
-		// ID at the selected input port
-		if(track_vcs_at_output)
-		  begin
-		     
-		     wire [0:num_ports-1] vc_gnt_ip;
-		     assign vc_gnt_ip
-		       = vc_gnt_ovc_ip[ovc*num_ports:(ovc+1)*num_ports-1];
-		     
-		     wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
-		     assign allocated_ip_s
-		       = vc_gnt ? vc_gnt_ip : allocated_ip_q;
-		     c_dff
-		       #(.width(num_ports),
-			 .reset_type(reset_type))
-		     allocated_ipq
-		       (.clk(clk),
-			.reset(reset),
-			.d(allocated_ip_s),
-			.q(allocated_ip_q));
-		     
-		     wire [0:num_vcs-1]   vc_gnt_ivc;
-		     assign vc_gnt_ivc
-		       = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
-		     
-		     wire [0:num_vcs-1]   allocated_ivc_s, allocated_ivc_q;
-		     assign allocated_ivc_s
-		       = vc_gnt ? vc_gnt_ivc : allocated_ivc_q;
-		     c_dff
-		       #(.width(num_vcs),
-			 .reset_type(reset_type))
-		     allocated_ivcq
-		       (.clk(clk),
-			.reset(reset),
-			.d(allocated_ivc_s),
-			.q(allocated_ivc_q));
-		     
-		     assign match_ovc[ovc] = allocated_q &
-					     |(allocated_ip_q & sw_gnt_ip_q) &
-					     allocated_ivc_q[flit_vc_in];
-		     
-		  end
-		
-		// if VC assignments are tracked at the input side, we can just 
-		// check for our own VC ID
-		else
-		  assign match_ovc[ovc] = (flit_vc_in == ovc);
-		
-	     end
-	   
-	   // if we only have a single VC to begin with, it is always selected
-	   else
-	     assign match_ovc[ovc] = 1'b1;
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // track number of packets that downstream buffer can still accept
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:cred_count_width-1] cred_count_s;
-	   wire 		       head_free_early;
-	   
-	   if(num_header_buffers == num_flit_buffers)
-	     begin
-		
-		// if every flit buffer entry can be a head flit, we don't need 
-		// dedicated credit tracking for headers, and can instead just
-		// rely on the normal credit tracking mechanism
-		assign head_free_early = 1'b1;
-		
-		assign error_hct_ovc[ovc] = 1'b0;
-		
-	     end
-	   else
-	     begin
+	   wire [0:num_vcs-1] 	vc_gnt_ivc;
+	   assign vc_gnt_ivc = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
 
-		// if only a subset of the flit buffer entries can be headers, 
-		// we need to keep track of how many such slots are left
-		
-		if(num_header_buffers == 1)
-		  begin
-		     
-		     // if we can only have one packet per buffer, we can accept
-		     // the next one once the buffer has been completely drained
-		     // after the tail has been sent
-		     
-		     wire buffer_drained;
-		     assign buffer_drained = (cred_count_s == num_flit_buffers);
-		     
-		     wire tail_sent_s, tail_sent_q;
-		     assign tail_sent_s
-		       = (tail_sent_q | (flit_valid_in_qual & flit_tail_in)) &
-			 ~buffer_drained;
-		     c_dff
-		       #(.width(1),
-			 .reset_type(reset_type))
-		     tail_sentq
-		       (.clk(clk),
-			.reset(reset),
-			.d(tail_sent_s),
-			.q(tail_sent_q));
-		     
-		     wire head_free_s, head_free_q;
-		     assign head_free_s
-		       = (head_free_q & ~vc_gnt) |
-			 (credit & tail_sent_q & buffer_drained);
-		     c_dff
-		       #(.width(1),
-			 .reset_type(reset_type),
-			 .reset_value(1'b1))
-		     head_freeq
-		       (.clk(clk),
-			.reset(reset),
-			.d(head_free_s),
-			.q(head_free_q));
-		     
-		     assign head_free_early = head_free_s;
-		     
-		     assign error_hct_ovc[ovc] = 1'b0;
-		     
-		  end
-		else
-		  begin
-		     
-		     wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
-		     c_incr
-		       #(.width(flit_buffer_idx_width),
-			 .min_value(0),
-			 .max_value(num_flit_buffers-1))
-		     push_ptr_incr
-		       (.data_in(push_ptr_q),
-			.data_out(push_ptr_next));
-		     
-		     wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		     assign push_ptr_s
-		       = flit_valid_in_qual ? push_ptr_next : push_ptr_q;
-		     c_dff
-		       #(.width(flit_buffer_idx_width),
-			 .reset_type(reset_type))
-		     push_ptrq
-		       (.clk(clk),
-			.reset(reset),
-			.d(push_ptr_s),
-			.q(push_ptr_q));
-		     
-		     wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
-		     c_incr
-		       #(.width(flit_buffer_idx_width),
-			 .min_value(0),
-			 .max_value(num_flit_buffers-1))
-		     pop_ptr_incr
-		       (.data_in(pop_ptr_q),
-			.data_out(pop_ptr_next));
-		     
-		     wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		     assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
-		     c_dff
-		       #(.width(flit_buffer_idx_width),
-			 .reset_type(reset_type))
-		     pop_ptrq
-		       (.clk(clk),
-			.reset(reset),
-			.d(pop_ptr_s),
-			.q(pop_ptr_q));
-		     
-		     reg [0:num_flit_buffers-1]       tail_queue;
-		     
-		     always @(posedge clk)
-		       if(flit_valid_in_qual)
-			 tail_queue[push_ptr_q] <= flit_tail_in;
-		     
-		     wire 			      tail;
-		     assign tail = tail_queue[pop_ptr_q];
-		     
-		     wire 			      head_credit;
-		     assign head_credit = credit & tail;
-		     
-		     wire 			      head_debit;
-		     assign head_debit = vc_gnt;
-		     
-		     // track header credits using stock credit tracker module
-		     wire 			      head_free;
-		     wire 			      error_hct;
-		     c_credit_tracker
-		       #(.num_credits(num_header_buffers),
-			 .checker_enable(checker_enable),
-			 .checker_capture_mode(checker_capture_mode),
-			 .reset_type(reset_type))
-		     hct
-		       (.clk(clk),
-			.reset(reset),
-			.credit(head_credit),
-			.debit(head_debit),
-			.free(head_free),
-			.free_early(head_free_early),
-			.error(error_hct));
-		     
-		     assign error_hct_ovc[ovc] = error_hct;
-		     
-		  end
-		
-	     end
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // track number of flits that downstream buffer can still accept
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:cred_count_width-1] cred_count_q;
-	   assign cred_count_s = (cred_count_q + credit - debit);
-	   c_dff
-	     #(.width(cred_count_width),
-	       .reset_type(reset_type),
-	       .reset_value(num_flit_buffers))
-	   cred_countq
+	   wire 		match;
+	   wire 		elig;
+	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
+	   wire 			  ovcc_error;
+	   vcr_ovc_ctrl
+	     #(.num_flit_buffers(num_flit_buffers),
+	       .num_header_buffers(num_header_buffers),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .packet_format(packet_format),
+	       .checker_enable(checker_enable),
+	       .checker_capture_mode(checker_capture_mode),
+	       .vc_id(ovc),
+	       .track_vcs_at_output(track_vcs_at_output),
+	       .credit_handling_type(credit_handling_type),
+	       .cred_level_width(cred_level_width),
+	       .reset_type(reset_type))
+	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      .d(cred_count_s),
-	      .q(cred_count_q));
-	   
-	   assign next_cred_ovc[ovc] = |cred_count_s;
-	   
-	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
-				(cred_count_q == 0) && debit};
-	   
-	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // generate flow control signals to input controller
-	   //-------------------------------------------------------------------
-	   
-	   case(credit_handling_type)
-	     
-	     `CREDIT_HANDLING_TYPE_LEVEL:
-	       begin
-		  
-		  // Having an additional register here is likely overkill, and
-		  // increases the credit round-trip delay by a cycle, so we 
-		  // just send out the value directly for now.
-		  
-		  /*
-		  wire [0:cred_level_width-1] free_s, free_q;
-		  assign free_s = (cred_count_s > max_cred_level) ?
-				  max_cred_level :
-				  cred_count_s[cred_count_width-
-					       cred_level_width:
-					       cred_count_width-1];
-		  c_dff
-		    #(.width(cred_level_width),
-		      .reset_type(reset_type),
-		      .reset_value(free_reset_value))
-		  freeq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(free_s),
-		     .q(free_q));
-		  
-		  assign int_flow_ctrl_ovc[ovc*cred_level_width:
-					   (ovc+1)*cred_level_width-1]
-			   = free_q;
-		  */
-		  
-		  assign int_flow_ctrl_ovc[ovc*cred_level_width:
-					   (ovc+1)*cred_level_width-1]
-			   = (cred_count_s > max_cred_level) ?
-			     max_cred_level :
-			     cred_count_s[cred_count_width-cred_level_width:
-					  cred_count_width-1];
-		  
-	       end
-	     
-	     `CREDIT_HANDLING_TYPE_PUSH:
-	       begin
-		  
-		  wire [0:cred_hold_width-1]  cred_hold_copy;
-		  assign cred_hold_copy
-		    = cred_count_s[(cred_count_width-cred_hold_width):
-				   cred_count_width-1] - |cred_count_s/*1'b1*/;
-		  
-		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
-		  assign cred_hold_s
-		    = allocated_s ?
-		      (cred_hold_q - (|cred_hold_q & ~credit)) :
-		      cred_hold_copy;
-		  c_dff
-		    #(.width(cred_hold_width),
-		      .reset_type(reset_type),
-		      .reset_value(num_flit_buffers-1))
-		  cred_holdq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(cred_hold_s),
-		     .q(cred_hold_q));
-		  
-		  // Having an additional register here is likely overkill, and
-		  // increases the credit round-trip delay by a cycle, so we 
-		  // just send out the value directly for now.
-		  
-		  /*
-		  wire 			      cred_s, cred_q;
-		  assign cred_s = |cred_hold_s | (credit & allocated_s);
-		  c_dff
-		    #(.width(1),
-		      .reset_type(reset_type),
-		      .reset_value(1))
-		  credq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(cred_s),
-		     .q(cred_q));
-		  
-		  assign int_flow_ctrl_ovc[ovc] = cred_q;
-		  */
-		  
-		  assign int_flow_ctrl_ovc[ovc]
-			   = |cred_hold_s | (credit & allocated_s);
-		  
-	       end
-	     
-	   endcase
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // keep track of whether current VC is available for allocation
-	   //-------------------------------------------------------------------
-	   
-	   wire 			      elig_s, elig_q;
-	   assign elig_s = ~allocated_s & head_free_early & next_cred_ovc[ovc];
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type),
-	       .reset_value(1'b1))
-	   eligq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(elig_s),
-	      .q(elig_q));
-	   
-	   assign elig_ovc[ovc] = elig_q;
+	      .flow_ctrl(flow_ctrl_q),
+	      .vc_gnt(vc_gnt),
+	      .vc_gnt_ip(vc_gnt_ip),
+	      .vc_gnt_ivc(vc_gnt_ivc),
+	      .sw_gnt(sw_gnt_q),
+	      .sw_gnt_ip(sw_gnt_ip_q),
+	      .int_flit_ctrl(int_flit_ctrl_in),
+	      .match(match),
+	      .elig(elig),
+	      .int_flow_ctrl(int_flow_ctrl),
+	      .error(ovcc_error));
+
+	   assign match_ovc[ovc] = match;
+	   assign elig_ovc[ovc] = elig;
+	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
+				    (ovc+1)*int_flow_ctrl_width-1]
+		    = int_flow_ctrl;
+	   assign ovcc_error_ovc[ovc] = ovcc_error;
 	   
 	end
       
@@ -1076,21 +717,9 @@ module vcr_op_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // error checker logic
+   // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs*2-1] 		  errors_out_ovc;
-   c_checker
-     #(.num_errors(num_vcs*2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(error_cred_ovc),
-      .errors_out(errors_out_ovc));
-   
-   assign error = error_unmatched | (|error_hct_ovc) | (|errors_out_ovc);
+   assign error = |ovcc_error_ovc | error_unmatched;
    
 endmodule

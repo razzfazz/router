@@ -1,0 +1,621 @@
+// $Id$
+
+/*
+Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this 
+list of conditions and the following disclaimer in the documentation and/or 
+other materials provided with the distribution.
+Neither the name of the Stanford University nor the names of its contributors 
+may be used to endorse or promote products derived from this software without 
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+
+
+// output port controller (tracks state of buffers in downstream router)
+module vcr_ovc_ctrl
+  (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt, sw_gnt_ip, 
+   int_flit_ctrl, match, elig, int_flow_ctrl, error);
+   
+`include "c_functions.v"
+`include "c_constants.v"
+`include "vcr_constants.v"
+   
+   // flit buffer entries per VC
+   parameter num_flit_buffers = 8;
+   
+   // width required to select a buffer
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
+   // width for full range of credit count ([0:num_credits])
+   localparam cred_count_width = clogb(num_flit_buffers+1);
+   
+   // width of counter for credits waiting to be sent to input controller
+   localparam cred_hold_width = clogb(num_flit_buffers);
+   
+   // maximum number of packets that can be in a given VC buffer simultaneously
+   parameter num_header_buffers = 4;
+   
+   // number of traffic classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // number of VCs available for each class
+   parameter num_vcs_per_class = 1;
+   
+   // number of VCs
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of nodes per router (a.k.a. consentration factor)
+   parameter num_nodes_per_router = 1;
+   
+   // connectivity within each dimension
+   parameter connectivity = `CONNECTIVITY_LINE;
+   
+   // number of adjacent routers in each dimension
+   localparam num_neighbors_per_dim
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
+       2 :
+       (connectivity == `CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
+   
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // width of flit control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width = 1 + vc_idx_width;
+   
+   // include error checking logic
+   parameter checker_enable = 1;
+   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   
+   // ID of current input VC
+   parameter vc_id = 0;
+   
+   // select whether to set a packet's outgoing VC ID at the input or output 
+   // controller
+   parameter track_vcs_at_output = 0;
+   
+   // select method for credit signaling from output to input controller
+   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   
+   // number of bits to be used for credit level reporting
+   // (note: must be less than or equal to cred_count_width as given below)
+   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
+   parameter cred_level_width = 2;
+   
+   // width required for internal flit control signalling
+   localparam int_flit_ctrl_width
+     = 1 + vc_idx_width + 1 + 1;
+   
+   // width required for internal flow control signalling
+   localparam int_flow_ctrl_width
+     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+       cred_level_width :
+       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       1 :
+       -1;
+   
+   // maximum value for credit level
+   localparam [0:cred_level_width-1] max_cred_level = {cred_level_width{1'b1}};
+   
+   // capped reset value for credit level
+   localparam [0:cred_level_width-1] free_reset_value
+     = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   input clk;
+   input reset;
+   
+   // incoming flow control signals
+   input [0:flow_ctrl_width-1] flow_ctrl;
+   
+   // output VC was granted to an input VC
+   input vc_gnt;
+   
+   // input port that the output VC was granted to
+   input [0:num_ports-1] vc_gnt_ip;
+   
+   // input VC that the output VC was granted to
+   input [0:num_vcs-1] vc_gnt_ivc;
+   
+   // switch allocation produced a grant for this output port
+   input sw_gnt;
+   
+   // input port that this output port was granted to during switch allocation
+   input [0:num_ports-1] sw_gnt_ip;
+   
+   // incoming flit control signals
+   input [0:int_flit_ctrl_width-1] int_flit_ctrl;
+   
+   // output VC owns the current flit
+   // (NOTE: only valid if track_vcs_at_output=1)
+   output match;
+   wire match;
+   
+   // output VC is eligible for allocation (i.e., not currently allocated)
+   output elig;
+   wire elig;
+   
+   // internal flow control signalling from output controller to input 
+   // controllers
+   output [0:int_flow_ctrl_width-1] int_flow_ctrl;
+   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
+   
+   // internal error condition detected
+   output error;
+   wire 			  error;
+   
+   
+   //---------------------------------------------------------------------------
+   // decode control signals
+   //---------------------------------------------------------------------------
+   
+   wire 			  flit_valid;
+   assign flit_valid = int_flit_ctrl[0] & sw_gnt;
+   
+   wire 			  flit_tail;
+   assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
+   
+   wire 			  cred_valid;
+   assign cred_valid = flow_ctrl[0];
+   
+   wire 			  credit;
+   
+   generate
+      
+      if(num_vcs > 1)
+	begin
+	   
+	   wire [0:vc_idx_width-1] cred_vc;
+	   assign cred_vc = flow_ctrl[1:1+vc_idx_width-1];
+	   
+	   assign credit = cred_valid && (cred_vc == vc_id);
+	   
+	end
+      else
+	assign credit = cred_valid;
+      
+   endgenerate
+   
+   wire 			   flit_valid_qual;
+   assign flit_valid_qual = flit_valid & match;
+   
+   wire 			   debit;
+   assign debit = flit_valid_qual;
+   
+   
+   //---------------------------------------------------------------------------
+   // track whether this output VC is currently assigend to an input VC
+   //---------------------------------------------------------------------------
+   
+   wire 			   set_allocated;
+   assign set_allocated = vc_gnt;
+   
+   wire 			   reset_allocated;   
+   assign reset_allocated = flit_valid_qual & flit_tail;
+   
+   wire 			   allocated_s, allocated_q;
+   assign allocated_s = (set_allocated | allocated_q) & ~reset_allocated;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   allocatedq
+     (.clk(clk),
+      .reset(reset),
+      .d(allocated_s),
+      .q(allocated_q));
+   
+   generate
+      
+      if(num_vcs > 1)
+	begin
+	   
+	   wire [0:vc_idx_width-1] flit_vc;
+	   assign flit_vc = int_flit_ctrl[1:1+vc_idx_width-1];
+	   
+	   // if VC assignment is tracked at the output, each output VC needs to
+	   // check if it is currently assigned to the incoming VC ID at the 
+	   // selected input port
+	   if(track_vcs_at_output)
+	     begin
+		
+		wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
+		assign allocated_ip_s = vc_gnt ? vc_gnt_ip : allocated_ip_q;
+		c_dff
+		  #(.width(num_ports),
+		    .reset_type(reset_type))
+		allocated_ipq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(allocated_ip_s),
+		   .q(allocated_ip_q));
+		
+		wire [0:num_vcs-1]   allocated_ivc_s, allocated_ivc_q;
+		assign allocated_ivc_s = vc_gnt ? vc_gnt_ivc : allocated_ivc_q;
+		c_dff
+		  #(.width(num_vcs),
+		    .reset_type(reset_type))
+		allocated_ivcq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(allocated_ivc_s),
+		   .q(allocated_ivc_q));
+		
+		assign match = allocated_q &
+			       |(allocated_ip_q & sw_gnt_ip) &
+			       allocated_ivc_q[flit_vc];
+		
+	     end
+	   
+	   // if VC assignments are tracked at the input side, we can just check
+	   // for our own VC ID
+	   else
+	     assign match = (flit_vc == vc_id);
+	   
+	end
+      
+      // if we only have a single VC to begin with, it is always selected
+      else
+	assign match = 1'b1;
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // track number of packets that downstream buffer can still accept
+   //---------------------------------------------------------------------------
+   
+   wire [0:cred_count_width-1] cred_count_s;
+   wire 		       head_free_early;
+   wire 		       hct_error;
+   
+   generate
+      
+      if(num_header_buffers == num_flit_buffers)
+	begin
+	   
+	   // if every flit buffer entry can be a head flit, we don't need 
+	   // dedicated credit tracking for headers, and can instead just rely 
+	   // on the normal credit tracking mechanism
+	   assign head_free_early = 1'b1;
+	   
+	   assign hct_error = 1'b0;
+	   
+	end
+      else
+	begin
+	   
+	   // if only a subset of the flit buffer entries can be headers, we 
+	   // need to keep track of how many such slots are left
+	   
+	   if(num_header_buffers == 1)
+	     begin
+		
+		// if we can only have one packet per buffer, we can accept the 
+		// next one once the buffer has been completely drained after 
+		// the tail has been sent
+		
+		wire buffer_drained;
+		assign buffer_drained = (cred_count_s == num_flit_buffers);
+		
+		wire tail_sent_s, tail_sent_q;
+		assign tail_sent_s
+		  = (tail_sent_q | (flit_valid_qual & flit_tail)) &
+		    ~buffer_drained;
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		tail_sentq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(tail_sent_s),
+		   .q(tail_sent_q));
+		
+		wire head_free_s, head_free_q;
+		assign head_free_s = (head_free_q & ~vc_gnt) |
+				     (credit & tail_sent_q & buffer_drained);
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type),
+		    .reset_value(1'b1))
+		head_freeq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(head_free_s),
+		   .q(head_free_q));
+		
+		assign head_free_early = head_free_s;
+		
+		assign hct_error = 1'b0;
+		
+	     end
+	   else
+	     begin
+		
+		wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
+		c_incr
+		  #(.width(flit_buffer_idx_width),
+		    .min_value(0),
+		    .max_value(num_flit_buffers-1))
+		push_ptr_incr
+		  (.data_in(push_ptr_q),
+		   .data_out(push_ptr_next));
+		
+		wire [0:flit_buffer_idx_width-1] push_ptr_s;
+		assign push_ptr_s
+		  = flit_valid_qual ? push_ptr_next : push_ptr_q;
+		c_dff
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
+		push_ptrq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(push_ptr_s),
+		   .q(push_ptr_q));
+		
+		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
+		c_incr
+		  #(.width(flit_buffer_idx_width),
+		    .min_value(0),
+		    .max_value(num_flit_buffers-1))
+		pop_ptr_incr
+		  (.data_in(pop_ptr_q),
+		   .data_out(pop_ptr_next));
+		
+		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
+		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
+		c_dff
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
+		pop_ptrq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(pop_ptr_s),
+		   .q(pop_ptr_q));
+		
+		reg [0:num_flit_buffers-1] 	 tail_queue;
+		
+		always @(posedge clk)
+		  if(flit_valid_qual)
+		    tail_queue[push_ptr_q] <= flit_tail;
+		
+		wire 				 tail;
+		assign tail = tail_queue[pop_ptr_q];
+		
+		wire 				 head_credit;
+		assign head_credit = credit & tail;
+		
+		wire 				 head_debit;
+		assign head_debit = vc_gnt;
+		
+		// track header credits using stock credit tracker module
+		wire 				 head_free;
+		c_credit_tracker
+		  #(.num_credits(num_header_buffers),
+		    .checker_enable(checker_enable),
+		    .checker_capture_mode(checker_capture_mode),
+		    .reset_type(reset_type))
+		hct
+		  (.clk(clk),
+		   .reset(reset),
+		   .credit(head_credit),
+		   .debit(head_debit),
+		   .free(head_free),
+		   .free_early(head_free_early),
+		   .error(hct_error));
+		
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // track number of flits that downstream buffer can still accept
+   //---------------------------------------------------------------------------
+   
+   wire [0:cred_count_width-1] 			 cred_count_q;
+   assign cred_count_s = (cred_count_q + credit - debit);
+   c_dff
+     #(.width(cred_count_width),
+       .reset_type(reset_type),
+       .reset_value(num_flit_buffers))
+   cred_countq
+     (.clk(clk),
+      .reset(reset),
+      .d(cred_count_s),
+      .q(cred_count_q));
+   
+   wire 					 next_cred;
+   assign next_cred = |cred_count_s;
+   
+   wire [0:1] 					 error_cred;
+   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
+			(cred_count_q == 0) && debit};
+   
+   
+   //-------------------------------------------------------------------
+   // generate flow control signals to input controller
+   //-------------------------------------------------------------------
+   
+   generate
+      
+      case(credit_handling_type)
+	
+	`CREDIT_HANDLING_TYPE_LEVEL:
+	  begin
+	     
+	     // Having an additional register here is likely overkill, and
+	     // increases the credit round-trip delay by a cycle, so we just 
+	     // send out the value directly for now.
+	     
+	     /*
+	     wire [0:cred_level_width-1] free_s, free_q;
+	     assign free_s = (cred_count_s > max_cred_level) ?
+			     max_cred_level :
+			     cred_count_s[cred_count_width-
+					  cred_level_width:
+					  cred_count_width-1];
+	     c_dff
+	       #(.width(cred_level_width),
+		 .reset_type(reset_type),
+		 .reset_value(free_reset_value))
+	     freeq
+	       (.clk(clk),
+		.reset(reset),
+		.d(free_s),
+		.q(free_q));
+	     
+	     assign int_flow_ctrl = free_q;
+	     */
+	     
+	     assign int_flow_ctrl
+	       = (cred_count_s > max_cred_level) ?
+		 max_cred_level :
+		 cred_count_s[cred_count_width-cred_level_width:
+			      cred_count_width-1];
+	     
+	  end
+	
+	`CREDIT_HANDLING_TYPE_PUSH:
+	  begin
+	     
+	     wire [0:cred_hold_width-1]  cred_hold_copy;
+	     assign cred_hold_copy
+	       = cred_count_s[(cred_count_width-cred_hold_width):
+			      cred_count_width-1] - 
+		 |cred_count_s /*1'b1*/;
+	     
+	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
+	     assign cred_hold_s = allocated_s ?
+				  (cred_hold_q - (|cred_hold_q & ~credit)) :
+				  cred_hold_copy;
+	     c_dff
+	       #(.width(cred_hold_width),
+		 .reset_type(reset_type),
+		 .reset_value(num_flit_buffers-1))
+	     cred_holdq
+	       (.clk(clk),
+		.reset(reset),
+		.d(cred_hold_s),
+		.q(cred_hold_q));
+	     
+	     // Having an additional register here is likely overkill, and
+	     // increases the credit round-trip delay by a cycle, so we just 
+	     // send out the value directly for now.
+	     
+	     /*
+	     wire 			 cred_s, cred_q;
+	     assign cred_s = |cred_hold_s | (credit & allocated_s);
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type),
+		 .reset_value(1))
+	     credq
+	       (.clk(clk),
+		.reset(reset),
+		.d(cred_s),
+		.q(cred_q));
+	     
+	     assign int_flow_ctrl = cred_q;
+	     */
+	     
+	     assign int_flow_ctrl = |cred_hold_s | (credit & allocated_s);
+	     
+	  end
+	
+      endcase
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // keep track of whether current VC is available for allocation
+   //---------------------------------------------------------------------------
+   
+   wire 				 elig_s, elig_q;
+   assign elig_s = ~allocated_s & head_free_early & next_cred;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type),
+       .reset_value(1'b1))
+   eligq
+     (.clk(clk),
+      .reset(reset),
+      .d(elig_s),
+      .q(elig_q));
+   
+   assign elig = elig_q;
+   
+
+   //---------------------------------------------------------------------------
+   // error checking
+   //---------------------------------------------------------------------------
+   
+   wire [0:1] 				 errors_in;
+   assign errors_in = error_cred;
+   
+   wire [0:1] 				 errors_out;
+   c_checker
+     #(.num_errors(2),
+       .enable(checker_enable),
+       .capture_mode(checker_capture_mode),
+       .reset_type(reset_type))
+   chk
+     (.clk(clk),
+      .reset(reset),
+      .errors_in(errors_in),
+      .errors_out(errors_out));
+   
+   assign error = |errors_out | |hct_error;
+   
+endmodule
