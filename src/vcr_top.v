@@ -147,8 +147,7 @@ module vcr_top
    parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
    
    // width required for internal flit control signalling
-   localparam int_flit_ctrl_width
-     = 1 + vc_idx_width + 1 + 1;
+   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width

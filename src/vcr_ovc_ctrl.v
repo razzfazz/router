@@ -131,8 +131,7 @@ module vcr_ovc_ctrl
    parameter cred_level_width = 2;
    
    // width required for internal flit control signalling
-   localparam int_flit_ctrl_width
-     = 1 + vc_idx_width + 1 + 1;
+   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
