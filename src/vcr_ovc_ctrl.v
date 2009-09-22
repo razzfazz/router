@@ -312,7 +312,7 @@ module vcr_ovc_ctrl
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire [0:cred_count_width-1] cred_count_s;
+   wire [0:cred_count_width-1] cred_count_q;
    wire 		       head_free_early;
    wire 		       hct_error;
    
@@ -342,13 +342,14 @@ module vcr_ovc_ctrl
 		// next one once the buffer has been completely drained after 
 		// the tail has been sent
 		
-		wire buffer_drained;
-		assign buffer_drained = (cred_count_s == num_flit_buffers);
+		wire last_credit_received;
+		assign last_credit_received
+		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
 		  = (tail_sent_q | (flit_valid_qual & flit_tail)) &
-		    ~buffer_drained;
+		    ~last_credit_received;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -359,8 +360,9 @@ module vcr_ovc_ctrl
 		   .q(tail_sent_q));
 		
 		wire head_free_s, head_free_q;
-		assign head_free_s = (head_free_q & ~vc_gnt) |
-				     (credit & tail_sent_q & buffer_drained);
+		assign head_free_s
+		  = (head_free_q & ~vc_gnt) |
+		    (credit & tail_sent_q & last_credit_received);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -462,7 +464,7 @@ module vcr_ovc_ctrl
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire [0:cred_count_width-1] 			 cred_count_q;
+   wire [0:cred_count_width-1] 			 cred_count_s;
    assign cred_count_s = (cred_count_q + credit - debit);
    c_dff
      #(.width(cred_count_width),
