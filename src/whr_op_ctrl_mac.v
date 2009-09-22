@@ -470,30 +470,6 @@ module whr_op_ctrl_mac
 		   .free_early(head_free_early),
 		   .error(error_hct));
 
-		// synopsys_translate off
-		integer dbg_total_head_debits;
-		integer dbg_total_head_credits;
-		integer dbg_head_credits_left;
-		always @(posedge reset, posedge clk)
-		  begin
-		     if(reset)
-		       begin
-			  dbg_total_head_debits <= 0;
-			  dbg_total_head_credits <= 0;
-			  dbg_head_credits_left <= num_header_buffers;
-		       end
-		     else
-		       begin
-			  dbg_total_head_debits
-			    <= dbg_total_head_debits + head_debit;
-			  dbg_total_head_credits
-			    <= dbg_total_head_credits + head_credit;
-			  dbg_head_credits_left
-			    <= dbg_head_credits_left - head_debit + head_credit;
-		       end
-		  end
-		// synopsys_translate on
-		
 	     end
 	   
 	end
