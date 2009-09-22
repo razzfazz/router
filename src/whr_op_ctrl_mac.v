@@ -552,27 +552,6 @@ module whr_op_ctrl_mac
 		 |cred_count_q[0:cred_count_width-2] | 
 		 (cred_count_q[cred_count_width-1] & ~gnt_unqual/*debit*/);
    
-   // synopsys_translate off
-   integer dbg_total_debits;
-   integer dbg_total_credits;
-   integer dbg_credits_left;
-   always @(posedge reset, posedge clk)
-     begin
-	if(reset)
-	  begin
-	     dbg_total_debits <= 0;
-	     dbg_total_credits <= 0;
-	     dbg_credits_left <= num_flit_buffers;
-	  end
-	else
-	  begin
-	     dbg_total_debits <= dbg_total_debits + debit;
-	     dbg_total_credits <= dbg_total_credits + credit;
-	     dbg_credits_left <= dbg_credits_left - debit + credit;
-	  end
-     end
-   // synopsys_translate on
-   
    
    //---------------------------------------------------------------------------
    // output staging
