@@ -328,8 +328,11 @@ module whr_op_ctrl_mac
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire [0:cred_count_width-1] 		  cred_count_s;
-   wire 				  error_hct;
+   wire 		credit;
+   assign credit = cred_valid;
+   
+   wire [0:cred_count_width-1] cred_count_q;
+   wire 		       error_hct;
    
    generate
       
@@ -357,13 +360,14 @@ module whr_op_ctrl_mac
 		// next one once the buffer has been completely drained after 
 		// the tail has been sent
 		
-		wire buffer_drained;
-		assign buffer_drained = (cred_count_s == num_flit_buffers);
+		wire last_credit_received;
+		assign last_credit_received
+		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
 		  = (tail_sent_q | (flit_valid_in & flit_tail_in)) &
-		    ~buffer_drained;
+		    ~last_credit_received;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -376,7 +380,7 @@ module whr_op_ctrl_mac
 		wire head_free_s, head_free_q;
 		assign head_free_s
 		  = (head_free_q & ~gnt) |
-		    (cred_valid & tail_sent_q & buffer_drained);
+		    (cred_valid & tail_sent_q & last_credit_received);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -445,7 +449,7 @@ module whr_op_ctrl_mac
 		assign tail = tail_queue[pop_ptr_q];
 		
 		wire 				 head_credit;
-		assign head_credit = cred_valid & tail;
+		assign head_credit = credit & tail;
 		
 		wire 				 head_debit;
 		assign head_debit = ~allocated_q & new_gnt & free;
@@ -501,16 +505,13 @@ module whr_op_ctrl_mac
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 					 credit;
-   assign credit = cred_valid;
-   
    wire 					 credit_b;
    assign credit_b = ~credit;
    
    wire 					 debit;
    assign debit = gnt;
    
-   wire [0:cred_count_width-1] 			 cred_count_q;
+   wire [0:cred_count_width-1] 			 cred_count_s;
    
    wire [0:cred_count_width-1] 			 cred_count_debit;
    assign cred_count_debit = cred_count_q - credit_b;
