@@ -294,11 +294,7 @@ module whr_top
    
    wire [0:num_ports*num_ports-1]           xbr_ctrl_op_ip;
    
-   wire [0:num_ports*num_ports-1] 	    xbr_ctrl_op_ip_s;
-   assign xbr_ctrl_op_ip_s = xbr_ctrl_op_ip;
-   
    wire [0:num_ports*flit_data_width-1]     xbr_data_out_op;
-   wire [0:num_ports*num_ports-1] 	    xbr_ctrl_op_ip_q;
    whr_crossbar_mac
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
@@ -308,8 +304,7 @@ module whr_top
    xbr
      (.clk(clk),
       .reset(reset),
-      .ctrl_op_ip_s(xbr_ctrl_op_ip_s),
-      .ctrl_op_ip_q(xbr_ctrl_op_ip_q),
+      .ctrl_op_ip(xbr_ctrl_op_ip),
       .data_in_ip(xbr_data_in_ip),
       .data_out_op(xbr_data_out_op));
    
