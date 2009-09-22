@@ -509,11 +509,6 @@ module whr_op_ctrl_mac
    assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
 			(cred_count_q == 0) && debit};
    
-   // We should be able to reduce the credit roundtrip latency by a cycle by 
-   // generating 'free' without the additional register stage, since it is used 
-   // to gate the arbiter outputs, which happens late in the cycle. As a result,
-   // it seems somewhat wasteful to have it come straight out of a register.
-   
    // Instead of just computing this as the reduction of of the updated credit
    // count sum, we can optimize a bit. In particular, we have one or more 
    // credits available iff...
