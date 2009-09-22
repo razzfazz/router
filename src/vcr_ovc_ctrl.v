@@ -492,7 +492,7 @@ module vcr_ovc_ctrl
       .q(cred_count_q));
    
    wire 					 next_cred;
-   assign next_cred = |cred_count_s;
+   assign next_cred = credit || (cred_count_q > 1) || (|cred_count_q && !debit);
    
    wire [0:1] 					 error_cred;
    assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
