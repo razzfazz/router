@@ -45,7 +45,7 @@ module vcr_ivc_ctrl
    parameter num_flit_buffers = 8;
    
    // width of credit hold register
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_PUSH)
+   // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_PUSH)
    localparam cred_hold_width = clogb(num_flit_buffers);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
@@ -162,16 +162,21 @@ module vcr_ivc_ctrl
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
    // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
+   
+   // number of bits to be used for credit level reporting
+   // (note: must be less than or equal to cred_count_width as given below)
+   // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_LEVEL)
+   parameter cred_level_width = 2;
    
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
-       2 :
-       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ?
+       cred_level_width :
+       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ?
        1 :
        -1;
    
@@ -857,12 +862,12 @@ module vcr_ivc_ctrl
    
    generate
       
-      case(credit_handling_type)
+      case(int_flow_ctrl_type)
 	
 	// the current number of credits available are transmitted from the 
 	// output controllers as a multi-level signal (0, 1, 2 or 3+ credits
 	// currently available)
-	`CREDIT_HANDLING_TYPE_LEVEL:
+	`INT_FLOW_CTRL_TYPE_LEVEL:
 	  begin
 	     
 	     // credit status for the case where we do not change resource class
@@ -946,7 +951,7 @@ module vcr_ivc_ctrl
 	// credits are forwarded from the output controllers individually as 
 	// pulses, accumulated at the input controllers, and used whenever a
 	// flit is sent to the crossbar
-	`CREDIT_HANDLING_TYPE_PUSH:
+	`INT_FLOW_CTRL_TYPE_PUSH:
 	  begin
 	     
 	     // credit indicator for the case where we do not change the 

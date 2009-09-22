@@ -40,12 +40,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // indicate credit level to input side
-`define CREDIT_HANDLING_TYPE_LEVEL 0
+`define INT_FLOW_CTRL_TYPE_LEVEL 0
 
 // push credits to input side one by one
-`define CREDIT_HANDLING_TYPE_PUSH  1
+`define INT_FLOW_CTRL_TYPE_PUSH  1
 
-`define CREDIT_HANDLING_TYPE_LAST `CREDIT_HANDLING_TYPE_PUSH
+`define INT_FLOW_CTRL_TYPE_LAST `INT_FLOW_CTRL_TYPE_PUSH
 
 
 //------------------------------------------------------------------------------

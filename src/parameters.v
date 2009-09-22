@@ -95,7 +95,7 @@ parameter routing_type = `ROUTING_TYPE_DOR;
 parameter dim_order = `DIM_ORDER_ASCENDING;
 
 // select method for credit signaling from output to input controller
-parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
 
 // select implementation variant for header FIFO
 parameter header_fifo_type = `FIFO_TYPE_INDEXED;

@@ -116,11 +116,11 @@ module vcr_op_ctrl_mac
    parameter track_vcs_at_output = 0;
    
    // select method for credit signaling from output to input controller
-   parameter credit_handling_type = `CREDIT_HANDLING_TYPE_PUSH;
+   parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
    // number of bits to be used for credit level reporting
    // (note: must be less than or equal to cred_count_width as given below)
-   // (note: this parameter is only used for CREDIT_HANDLING_TYPE_LEVEL)
+   // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_LEVEL)
    parameter cred_level_width = 2;
    
    // width required for internal flit control signalling
@@ -128,9 +128,9 @@ module vcr_op_ctrl_mac
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (credit_handling_type == `CREDIT_HANDLING_TYPE_LEVEL) ?
+     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ?
        cred_level_width :
-       (credit_handling_type == `CREDIT_HANDLING_TYPE_PUSH) ?
+       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ?
        1 :
        -1;
    
@@ -592,7 +592,7 @@ module vcr_op_ctrl_mac
 	       .checker_capture_mode(checker_capture_mode),
 	       .vc_id(ovc),
 	       .track_vcs_at_output(track_vcs_at_output),
-	       .credit_handling_type(credit_handling_type),
+	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),
 	       .reset_type(reset_type))
 	   ovcc

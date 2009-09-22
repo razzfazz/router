@@ -800,7 +800,7 @@ module testbench
 	  .router_type(router_type),
 	  .flit_data_width(flit_data_width),
 	  .dim_order(dim_order),
-	  .credit_handling_type(credit_handling_type),
+	  .int_flow_ctrl_type(int_flow_ctrl_type),
 	  .header_fifo_type(header_fifo_type),
 	  .fbf_regfile_type(fbf_regfile_type),
 	  .vc_alloc_type(vc_alloc_type),
