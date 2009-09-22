@@ -442,11 +442,10 @@ module vcr_ivc_ctrl
 		  // synopsys translate_on
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s;
-		  assign flit_ctr_s = flit_valid_in ? 
-				      flit_head_in ? 
-				      flit_ctr_next : 
-				      (flit_ctr_q - 1'b1) : 
-				      flit_ctr_q;
+		  assign flit_ctr_s
+		    = flit_valid_in ? 
+		      (flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1)) : 
+		      flit_ctr_q;
 		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
