@@ -371,11 +371,10 @@ module whr_ip_ctrl_mac
 		    end
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s;
-		  assign flit_ctr_s = flit_valid_in ? 
-				      flit_head_in ? 
-				      flit_ctr_next : 
-				      (flit_ctr_q - 1'b1) : 
-				      flit_ctr_q;
+		  assign flit_ctr_s
+		    = flit_valid_in ? 
+		      (flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1)) : 
+		      flit_ctr_q;
 		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
@@ -403,6 +402,9 @@ module whr_ip_ctrl_mac
    
    wire 				    flit_valid_out;
    assign flit_valid_out = gnt;
+
+   wire 				    flit_present;
+   assign flit_present = flit_valid_in | ~fbc_empty;
    
    wire 				    fbc_empty;
    
@@ -434,11 +436,12 @@ module whr_ip_ctrl_mac
 		
 		reg  head_q, tail_q;
 		always @(posedge clk)
-		  if(capture)
-		    begin
-		       head_q <= flit_head_in;
-		       tail_q <= flit_tail_in;
-		    end
+		  if(flit_valid_in)
+		    if(capture)
+		      begin
+			 head_q <= flit_head_in;
+			 tail_q <= flit_tail_in;
+		      end
 		
 		assign head_queue[idx] = head_q;
 		assign tail_queue[idx] = tail_q;
@@ -475,7 +478,9 @@ module whr_ip_ctrl_mac
 	   assign head_in = flit_valid_in & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
-	   assign head_valid_s = (head_valid_q | head_in) & ~flit_valid_out;
+	   assign head_valid_s = flit_present ? 
+				 ((head_valid_q | head_in) & ~flit_valid_out) : 
+				 head_valid_q;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -491,7 +496,10 @@ module whr_ip_ctrl_mac
 	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
-	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
+	   assign tail_idx_s
+	     = flit_valid_in ? 
+	       (tail_in ? fbf_write_addr : tail_idx_q) : 
+	       tail_idx_q;
 	   c_dff
 	     #(.width(fbf_addr_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -502,8 +510,10 @@ module whr_ip_ctrl_mac
 	      .q(tail_idx_q));
 	   
 	   wire 		     tail_valid_s, tail_valid_q;
-	   assign tail_valid_s
-	     = (tail_valid_q | tail_in) & ~(flit_valid_out & flit_tail_out);
+	   assign tail_valid_s = flit_present ? 
+				 ((tail_valid_q | tail_in) & 
+				  ~(flit_valid_out & flit_tail_out)) : 
+				 tail_valid_q;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -596,7 +606,9 @@ module whr_ip_ctrl_mac
 	   wire [0:la_route_info_width-1] hdff_la_route_info_s,
 					  hdff_la_route_info_q;
 	   assign hdff_la_route_info_s
-	     = hdff_push ? la_route_info_in : hdff_la_route_info_q;
+	     = flit_valid_in ? 
+	       (hdff_push ? la_route_info_in : hdff_la_route_info_q) : 
+	       hdff_la_route_info_q;
 	   c_dff
 	     #(.width(la_route_info_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
@@ -611,7 +623,9 @@ module whr_ip_ctrl_mac
 	   
 	   wire [0:route_info_width-1] hdff_route_info_s, hdff_route_info_q;
 	   assign hdff_route_info_s
-	     = hdff_push ? route_info_in : hdff_route_info_q;
+	     = flit_valid_in ? 
+	       (hdff_push ? route_info_in : hdff_route_info_q) : 
+	       hdff_route_info_q;
 	   c_dff
 	     #(.width(route_info_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
@@ -625,8 +639,10 @@ module whr_ip_ctrl_mac
 	     = hdff_empty ? route_info_in : hdff_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
-	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) &
-				 ~(hdff_push & ~hdff_pop);
+	   assign hdff_empty_s = flit_present ? 
+				 ((hdff_empty_q | (hdff_pop & ~hdff_push)) & 
+				  ~(hdff_push & ~hdff_pop)) : 
+				 hdff_empty_q;
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -741,7 +757,7 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire                      flit_head_out_s, flit_head_out_q;
-   assign flit_head_out_s = flit_head_out;
+   assign flit_head_out_s = flit_present ? flit_head_out : flit_head_out_q;
    c_dff
      #(.width(1),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -752,7 +768,7 @@ module whr_ip_ctrl_mac
       .q(flit_head_out_q));
    
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
-   assign la_route_info_s = la_route_info_out;
+   assign la_route_info_s = flit_present ? la_route_info_out : la_route_info_q;
    c_dff
      #(.width(la_route_info_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
