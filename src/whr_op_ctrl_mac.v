@@ -328,6 +328,9 @@ module whr_op_ctrl_mac
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
+   wire 		update_credits;
+   assign update_credits = flit_valid_in | cred_valid;
+   
    wire 		credit;
    assign credit = cred_valid;
    
@@ -366,8 +369,10 @@ module whr_op_ctrl_mac
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
-		  = (tail_sent_q | (flit_valid_in & flit_tail_in)) &
-		    ~last_credit_received;
+		  = update_credits ? 
+		    ((tail_sent_q | (flit_valid_in & flit_tail_in)) &
+		     ~last_credit_received) : 
+		    tail_sent_q;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -409,7 +414,10 @@ module whr_op_ctrl_mac
 		   .data_out(push_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s = flit_valid_in ? push_ptr_next : push_ptr_q;
+		assign push_ptr_s
+		  = update_credits ? 
+		    (flit_valid_in ? push_ptr_next : push_ptr_q) : 
+		    push_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
@@ -429,7 +437,10 @@ module whr_op_ctrl_mac
 		   .data_out(pop_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = cred_valid ? pop_ptr_next : pop_ptr_q;
+		assign pop_ptr_s
+		  = update_credits ? 
+		    (cred_valid ? pop_ptr_next : pop_ptr_q) : 
+		    pop_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
@@ -442,8 +453,9 @@ module whr_op_ctrl_mac
 		reg [0:num_flit_buffers-1] 	 tail_queue;
 		
 		always @(posedge clk)
-		  if(flit_valid_in)
-		    tail_queue[push_ptr_q] <= flit_tail_in;
+		  if(update_credits)
+		    if(flit_valid_in)
+		      tail_queue[push_ptr_q] <= flit_tail_in;
 		
 		wire 				 tail;
 		assign tail = tail_queue[pop_ptr_q];
