@@ -747,8 +747,10 @@ module whr_ip_ctrl_mac
    // flit buffer control signals
    //---------------------------------------------------------------------------
    
+   // read enable doesn't need to be exact, so we read whenever we have a flit
+   assign fbf_read_enable = flit_present /*flit_valid_out*/;
+   
    assign fbf_write_enable = flit_valid_in;
-   assign fbf_read_enable = flit_valid_out;
    assign fbf_write_data = flit_data_in_q;
    
    
