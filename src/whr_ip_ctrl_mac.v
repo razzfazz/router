@@ -403,10 +403,10 @@ module whr_ip_ctrl_mac
    wire 				    flit_valid_out;
    assign flit_valid_out = gnt;
 
+   wire 				    fbc_empty;
+   
    wire 				    flit_present;
    assign flit_present = flit_valid_in | ~fbc_empty;
-   
-   wire 				    fbc_empty;
    
    wire 				    flit_head_out;
    wire 				    flit_tail_out;
