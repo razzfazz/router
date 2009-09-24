@@ -954,15 +954,17 @@ module vcr_ip_ctrl_mac
       .d(flit_valid_out_s),
       .q(flit_valid_out_q));
    
-   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
+   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_muxed;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(int_flit_ctrl_width))
-   int_flit_ctrl_out_s_sel
+   int_flit_ctrl_out_muxed_sel
      (.select(vc_sel_ivc),
       .data_in(int_flit_ctrl_out_ivc),
-      .data_out(int_flit_ctrl_out_s));
+      .data_out(int_flit_ctrl_out_muxed));
    
+   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
+   assign int_flit_ctrl_out_s = int_flit_ctrl_out_muxed;
    c_dff
      #(.width(int_flit_ctrl_width-1),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -979,14 +981,17 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl_out = int_flit_ctrl_out_q;
    
-   wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
+   wire [0:la_route_info_width-1] la_route_info_muxed;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(la_route_info_width))
-   la_route_info_sel
+   la_route_info_muxed_sel
      (.select(vc_sel_ivc),
       .data_in(la_route_info_ivc),
-      .data_out(la_route_info_s));
+      .data_out(la_route_info_muxed));
+   
+   wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
+   assign la_route_info_s = la_route_info_muxed;
    c_dff
      #(.width(la_route_info_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -1026,12 +1031,15 @@ module vcr_ip_ctrl_mac
       if(num_vcs > 1)
 	begin
 	   
-	   wire [0:vc_idx_width-1] cred_vc_s, cred_vc_q;
+	   wire [0:vc_idx_width-1] cred_vc;
 	   c_encoder
 	     #(.num_ports(num_vcs))
-	   cred_vc_out_enc
+	   cred_vc_enc
 	     (.data_in(vc_sel_ivc),
-	      .data_out(cred_vc_s));
+	      .data_out(cred_vc));
+	   
+	   wire [0:vc_idx_width-1] cred_vc_s, cred_vc_q;
+	   assign cred_vc_s = cred_vc;
 	   c_dff
 	     #(.width(vc_idx_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -1052,32 +1060,37 @@ module vcr_ip_ctrl_mac
    // performance counters
    //---------------------------------------------------------------------------
    
-   wire [0:6*num_vcs-1] 	     events;
-   c_interleaver
-     #(.width(num_vcs*6),
-       .num_blocks(num_vcs))
-   events_intl
-     (.data_in(events_ivc),
-      .data_out(events));
-   
-   genvar 			     ctr;
-   
    generate
+      
       if(perf_ctr_enable > 0)
 	begin
+	   
+	   wire [0:6*num_vcs-1] events;
+	   c_interleaver
+	     #(.width(num_vcs*6),
+	       .num_blocks(num_vcs))
+	   events_intl
+	     (.data_in(events_ivc),
+	      .data_out(events));
+	   
+	   genvar ctr;
+	   
 	   for(ctr = 0; ctr < 6; ctr = ctr + 1)
 	     begin:ctrs
 		
-		wire [0:event_width-1] event_sum;
+		wire [0:num_vcs-1] ctr_events;
+		assign ctr_events = events[ctr*num_vcs:(ctr+1)*num_vcs-1];
+		
+		wire [0:event_width-1] ctr_sum;
 		c_add_nto1
 		  #(.num_ports(num_vcs),
 		    .width(1))
-		event_sum_add
-		  (.data_in(events[ctr*num_vcs:(ctr+1)*num_vcs-1]),
-		   .data_out(event_sum));
+		ctr_sum_add
+		  (.data_in(ctr_events),
+		   .data_out(ctr_sum));
 		
 		wire [0:perf_ctr_width-1] ctr_s, ctr_q;
-		assign ctr_s = ctr_q + event_sum;
+		assign ctr_s = ctr_q + ctr_sum;
 		c_dff
 		  #(.width(perf_ctr_width),
 		    .reset_type(reset_type))
@@ -1089,6 +1102,7 @@ module vcr_ip_ctrl_mac
 		
 	     end
 	end
+      
    endgenerate
    
    
