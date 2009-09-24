@@ -129,9 +129,8 @@ module vcr_top
    // width of each counter
    parameter perf_ctr_width = 32;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   // configure error checking logic
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
@@ -333,8 +332,7 @@ module vcr_top
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
+	       .error_capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),
@@ -693,8 +691,7 @@ module vcr_top
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
 	       .flit_data_width(flit_data_width),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
+	       .error_capture_mode(error_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),
@@ -748,21 +745,31 @@ module vcr_top
    // error reporting
    //---------------------------------------------------------------------------
    
-   wire [0:2*num_ports-1] 			  errors_in;
-   assign errors_in = {ipc_error_ip, opc_error_op};
-   
-   wire [0:2*num_ports-1] 			  errors_out;
-   c_checker
-     #(.num_errors(2*num_ports),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(errors_in),
-      .errors_out(errors_out));
-   
-   assign error = |errors_out;
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:num_ports+num_ports-1] errors_in;
+	   assign errors_in = {ipc_error_ip, opc_error_op};
+	   
+	   wire [0:num_ports+num_ports-1] errors_out;
+	   c_err_rpt
+	     #(.num_errors(num_ports+num_ports),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .errors_in(errors_in),
+	      .errors_out(errors_out));
+	   
+	   assign error = |errors_out;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
    
 endmodule

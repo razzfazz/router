@@ -182,7 +182,7 @@ module testbench
    
    wire [0:num_ports-1] 		ps_error_ip;
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
-   wire [0:num_ports*num_vcs-1] 	  fifo_error_ip_ivc;
+   wire [0:num_ports*num_vcs*2-1] 	  fifo_errors_ip_ivc;
    
    wire 				  rtr_error;
    wire [0:num_ports-1] 		  x_error_op;
@@ -226,8 +226,8 @@ module testbench
 		assign match_ip_ivc_op[ip*num_vcs*num_ports:
 				       (ip+1)*num_vcs*num_ports-1]
 			 = {num_vcs*num_ports{1'b0}};
-		assign fifo_error_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			 = {num_vcs{1'b0}};
+		assign fifo_errors_ip_ivc[ip*num_vcs*2:(ip+1)*num_vcs*2-1]
+			 = {num_vcs*2{1'b0}};
 		
 	     end
 	   else
@@ -727,7 +727,7 @@ module testbench
 		     assign pop = match;
 		     
 		     wire 			  fifo_full;
-		     wire 			  fifo_error;
+		     wire [0:1] 		  fifo_errors;
 		     
 		     c_fifo
 		       #(.depth(num_flit_buffers),
@@ -743,9 +743,11 @@ module testbench
 			.empty(fifo_empty),
 			.data_out(data_out),
 			.pop(pop),
-			.error(fifo_error));
+			.errors(fifo_errors));
 		     
-		     assign fifo_error_ip_ivc[ip*num_vcs+ivc] = fifo_error;
+		     assign fifo_errors_ip_ivc[(ip*num_vcs+ivc)*2:
+					       (ip*num_vcs+ivc+1)*2-1]
+			      = fifo_errors;
 		     
 		     wire [0:num_ports-1] 	  port_mask;
 		     c_decoder
@@ -794,8 +796,7 @@ module testbench
 	  .min_payload_length(min_payload_length),
 	  .perf_ctr_enable(perf_ctr_enable),
 	  .perf_ctr_width(perf_ctr_width),
-	  .checker_enable(checker_enable),
-	  .checker_capture_mode(checker_capture_mode),
+	  .error_capture_mode(error_capture_mode),
 	  .track_vcs_at_output(track_vcs_at_output),
 	  .router_type(router_type),
 	  .flit_data_width(flit_data_width),
@@ -990,7 +991,7 @@ module testbench
    assign tb_errors = {|ps_error_ip,
 		       |check_error_op,
 		       |x_error_op,
-		       |fifo_error_ip_ivc};
+		       |fifo_errors_ip_ivc};
    
    wire       tb_error;
    assign tb_error = |tb_errors;

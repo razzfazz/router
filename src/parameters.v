@@ -74,9 +74,8 @@ parameter perf_ctr_enable = 0;
 // width of each counter
 parameter perf_ctr_width = 32;
 
-// include error checking logic
-parameter checker_enable = 0;
-parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+// configure error checking logic
+parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 
 // select whether to set a packet's outgoing VC ID at the input or output 
 // controller

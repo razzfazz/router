@@ -148,16 +148,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // error checker capture more
 //------------------------------------------------------------------------------
 
+// disable error reporting
+`define ERROR_CAPTURE_MODE_NONE       0
 // don't hold errors
-`define CHECKER_CAPTURE_MODE_NO_HOLD    0
+`define ERROR_CAPTURE_MODE_NO_HOLD    1
 
 // capture first error only (subsequent errors are blocked)
-`define CHECKER_CAPTURE_MODE_HOLD_FIRST 1
+`define ERROR_CAPTURE_MODE_HOLD_FIRST 2
 
 // capture all errors
-`define CHECKER_CAPTURE_MODE_HOLD_ALL   2
+`define ERROR_CAPTURE_MODE_HOLD_ALL   3
 
-`define CHECKER_CAPTURE_MODE_LAST `CHECKER_CAPTURE_MODE_HOLD_ALL
+`define ERROR_CAPTURE_MODE_LAST `ERROR_CAPTURE_MODE_HOLD_ALL
 
 
 //------------------------------------------------------------------------------

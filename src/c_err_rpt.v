@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// error checker module
-module c_checker
+// error reporting module
+module c_err_rpt
   (clk, reset, errors_in, errors_out);
    
 `include "c_constants.v"
@@ -39,11 +39,8 @@ module c_checker
    // number of error inputs
    parameter num_errors = 1;
    
-   // enable error checking
-   parameter enable = 1;
-   
    // select mode of operation
-   parameter capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   parameter capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -60,25 +57,30 @@ module c_checker
    
    generate
       
-      if(enable > 0)
+      if(capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
+	   
 	   wire [0:num_errors-1] errors_s, errors_q;
+	   
 	   case(capture_mode)
-	     `CHECKER_CAPTURE_MODE_NO_HOLD:
+	     
+	     `ERROR_CAPTURE_MODE_NO_HOLD:
 	       begin
 		  assign errors_s = errors_in;
 	       end
-	     `CHECKER_CAPTURE_MODE_HOLD_FIRST:
+	     
+	     `ERROR_CAPTURE_MODE_HOLD_FIRST:
 	       begin
-		  wire [0:num_errors-1] mask;
-		  assign mask = ~{num_errors{|errors_q}};
-		  assign errors_s = errors_q | (mask & errors_in);
+		  assign errors_s = ~|errors_q ? errors_in : errors_q;
 	       end
-	     `CHECKER_CAPTURE_MODE_HOLD_ALL:
+	     
+	     `ERROR_CAPTURE_MODE_HOLD_ALL:
 	       begin
 		  assign errors_s = errors_q | errors_in;
 	       end
+	     
 	   endcase
+	   
 	   c_dff
 	     #(.width(num_errors),
 	       .reset_type(reset_type))
@@ -89,11 +91,10 @@ module c_checker
 	      .q(errors_q));
 	   
 	   assign errors_out = errors_q;
+	   
 	end
       else
-	begin
-	   assign errors_out = {num_errors{1'b0}};
-	end
+	assign errors_out = {num_errors{1'b0}};
       
    endgenerate
    

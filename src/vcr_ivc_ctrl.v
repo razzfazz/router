@@ -35,7 +35,7 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
    int_flow_ctrl_op_ovc, route_port, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
-   la_route_info_out, fbf_write_addr, fbf_read_addr, error, events);
+   la_route_info_out, fbf_write_addr, fbf_read_addr, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -192,10 +192,6 @@ module vcr_ivc_ctrl
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
    // ID of current input VC
    parameter vc_id = 0;
    
@@ -294,8 +290,8 @@ module vcr_ivc_ctrl
    wire [0:fbf_addr_width-1] 	  fbf_read_addr;
    
    // internal error condition detected
-   output error;
-   wire 			  error;
+   output [0:5] errors;
+   wire [0:5] 			  errors;
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
@@ -688,7 +684,6 @@ module vcr_ivc_ctrl
    wire [0:hop_route_info_width-1] hop_route_info_in;
    
    wire 			   hdff_empty;
-   wire 			   hdff_error;
    
    wire 			   hdff_push;
    assign hdff_push = flit_valid_in & flit_head_in;
@@ -698,6 +693,8 @@ module vcr_ivc_ctrl
    
    wire [0:la_route_info_width-1]  hdff_la_route_info;
    wire [0:hop_route_info_width-1] hdff_hop_route_info;
+   wire 			   error_hdff_underflow;
+   wire 			   error_hdff_overflow;
    
    generate
       
@@ -722,13 +719,11 @@ module vcr_ivc_ctrl
 	   
 	   wire hdff_full;
 	   wire [0:hdff_width-1] hdff_data_out;
-	   
+	   wire [0:1] 		 hdff_errors;
 	   c_fifo
 	     #(.depth(num_header_buffers),
 	       .width(hdff_width),
 	       .fifo_type(header_fifo_type),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
 	   hdff
 	     (.clk(clk),
@@ -739,7 +734,7 @@ module vcr_ivc_ctrl
 	      .empty(hdff_empty),
 	      .data_out(hdff_data_out),
 	      .pop(hdff_pop),
-	      .error(hdff_error));
+	      .errors(hdff_errors));
 	   
 	   assign hdff_la_route_info
 	     = hdff_empty ?
@@ -750,7 +745,10 @@ module vcr_ivc_ctrl
 	       hop_route_info_in :
 	       hdff_data_out[la_route_info_width:
 			     la_route_info_width+hop_route_info_width-1];
-   
+	   
+	   assign error_hdff_underflow = hdff_errors[0];
+	   assign error_hdff_overflow = hdff_errors[1];
+	   
 	end
       else
 	begin
@@ -802,7 +800,8 @@ module vcr_ivc_ctrl
 	   
 	   assign hdff_empty = hdff_empty_q;
 	   
-	   assign hdff_error = ~hdff_empty_q & hdff_push;
+	   assign error_hdff_underflow = hdff_empty_q & hdff_pop;
+	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push;
 	   
 	end
       
@@ -810,6 +809,11 @@ module vcr_ivc_ctrl
    
    wire 	header_valid;
    assign header_valid = ~hdff_empty | hdff_push;
+   
+   wire 	flit_valid;
+   
+   wire 	error_no_header;
+   assign error_no_header = flit_valid & ~header_valid;
    
    
    //---------------------------------------------------------------------------
@@ -857,7 +861,7 @@ module vcr_ivc_ctrl
 			    num_vcs*int_flow_ctrl_width];
    
    wire 				  free_allocated;
-   wire 				  cred_tracker_error;
+   wire 				  error_ct_overflow;
    
    generate
       
@@ -943,7 +947,7 @@ module vcr_ivc_ctrl
 	     
 	     assign free_allocated = free_allocated_q;
 	     
-	     assign cred_tracker_error = 1'b0;
+	     assign error_ct_overflow = 1'b0;
 	     
 	  end
 	
@@ -1027,7 +1031,7 @@ module vcr_ivc_ctrl
 		.d(cred_hold_s),
 		.q(cred_hold_q));
 	     
-	     assign cred_tracker_error
+	     assign error_ct_overflow
 	       = vc_allocated_q && (cred_hold_q == num_flit_buffers-1) &&
 		 incr_cred_hold;
 	     
@@ -1041,8 +1045,6 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    // generate allocator control signals
    //---------------------------------------------------------------------------
-   
-   wire 				       flit_valid;
    
    generate
       
@@ -1147,14 +1149,12 @@ module vcr_ivc_ctrl
    wire 		       fbc_pop;
    assign fbc_pop = flit_valid_out;
    
-   wire 		       fbc_error;
+   wire [0:1] 		       fbc_errors;
    wire 		       fbc_full;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .offset(fbf_min_addr),
        .depth(num_flit_buffers),
-       .checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
@@ -1165,7 +1165,13 @@ module vcr_ivc_ctrl
       .read_addr(fbf_read_addr),
       .empty(fbc_empty),
       .full(fbc_full),
-      .error(fbc_error));
+      .errors(fbc_errors));
+   
+   wire 		       error_fbc_underflow;
+   assign error_fbc_underflow = fbc_errors[0];
+   
+   wire 		       error_fbc_overflow;
+   assign error_fbc_overflow = fbc_errors[1];
    
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
@@ -1174,22 +1180,12 @@ module vcr_ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:1] 		       errors_in;
-   assign errors_in = {flit_valid & ~header_valid, cred_tracker_error};
-   
-   wire [0:1] 		       errors_out;
-   c_checker
-     #(.num_errors(2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(errors_in),
-      .errors_out(errors_out));
-   
-   assign error = |errors_out | hdff_error | fbc_error;
+   assign errors = {error_fbc_underflow,
+		    error_fbc_overflow,
+		    error_hdff_underflow,
+		    error_hdff_overflow,
+		    error_no_header,
+		    error_ct_overflow};
    
    
    //---------------------------------------------------------------------------

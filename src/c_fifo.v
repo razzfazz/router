@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic FIFO buffer built from registers
 module c_fifo
-  (clk, reset, full, data_in, push, empty, data_out, pop, error);
+  (clk, reset, full, data_in, push, empty, data_out, pop, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -45,10 +45,6 @@ module c_fifo
    
    // select implementation variant
    parameter fifo_type = `FIFO_TYPE_INDEXED;
-   
-   // include checker logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -86,14 +82,15 @@ module c_fifo
    input pop;
    
    // internal error condition detected
-   output error;
-   wire 	    error;
+   output [0:1] errors;
+   wire [0:1] 	    errors;
    
    genvar 	    level;
    
    generate
       
       case(fifo_type)
+	
 	`FIFO_TYPE_SHIFTING:
 	  begin
 	     
@@ -190,23 +187,10 @@ module c_fifo
 	     wire 		   error_overflow;
 	     assign error_overflow = full & push & ~pop;
 	     
-	     wire [0:1] 	   errors_in, errors_out;
-	     assign errors_in = {error_underflow,
-				 error_overflow};
-	     c_checker
-	       #(.num_errors(2),
-		 .enable(checker_enable),
-		 .capture_mode(checker_capture_mode),
-		 .reset_type(reset_type))
-	     chk
-	       (.clk(clk),
-		.reset(reset),
-		.errors_in(errors_in),
-		.errors_out(errors_out));
-	     
-	     assign error = |errors_out;
+	     assign errors = {error_underflow, error_overflow};
 	     
 	  end
+	
 	`FIFO_TYPE_INDEXED:
 	  begin
 
@@ -215,8 +199,6 @@ module c_fifo
 	       #(.addr_width(rw_ptr_width),
 		 .offset(0),
 		 .depth(depth),
-		 .checker_enable(checker_enable),
-		 .checker_capture_mode(checker_capture_mode),
 		 .reset_type(reset_type))
 	     ctrl
 	       (.clk(clk),
@@ -227,7 +209,7 @@ module c_fifo
 		.read_addr(read_ptr),
 		.empty(empty),
 		.full(full),
-		.error(error));
+		.errors(errors));
 	     
 	     reg [0:width-1] 	     storage [0:depth-1];
 	     
@@ -238,8 +220,10 @@ module c_fifo
 	     assign data_out = storage[read_ptr];
 	     
 	  end
+	
 	`FIFO_TYPE_DW:
 	  begin
+	     
 	     wire rst_n;
 	     if(reset_type != `RESET_TYPE_NONE)
 	       assign rst_n = ~reset;
@@ -251,10 +235,11 @@ module c_fifo
 	     
 	     wire pop_req_n;
 	     assign pop_req_n = ~pop;
-
+	     
 	     wire almost_empty;
 	     wire half_full;
 	     wire almost_full;
+	     wire error;
 	     DW_fifo_s1_sf
 	       #(.width(width),
 		 .depth(depth),
@@ -274,7 +259,11 @@ module c_fifo
 		.full(full),
 		.error(error),
 		.data_out(data_out));
+	     
+	     assign errors = {error, 1'b0};
+	     
 	  end
+	
       endcase
       
       // synopsys translate_off

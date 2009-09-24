@@ -107,9 +107,8 @@ module vcr_op_ctrl_mac
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   // configure error checking logic
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
@@ -555,7 +554,7 @@ module vcr_op_ctrl_mac
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
    wire [0:num_vcs-1] 			  next_cred_ovc;
-   wire [0:num_vcs-1] 			  ovcc_error_ovc;
+   wire [0:num_vcs*4-1] 		  ovcc_errors_ovc;
    
    generate
       
@@ -576,7 +575,7 @@ module vcr_op_ctrl_mac
 	   wire 		match;
 	   wire 		elig;
 	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
-	   wire 			  ovcc_error;
+	   wire [0:3] 			  ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -588,8 +587,6 @@ module vcr_op_ctrl_mac
 	       .num_nodes_per_router(num_nodes_per_router),
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
 	       .vc_id(ovc),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
@@ -608,14 +605,14 @@ module vcr_op_ctrl_mac
 	      .match(match),
 	      .elig(elig),
 	      .int_flow_ctrl(int_flow_ctrl),
-	      .error(ovcc_error));
+	      .errors(ovcc_errors));
 
 	   assign match_ovc[ovc] = match;
 	   assign elig_ovc[ovc] = elig;
 	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
 				    (ovc+1)*int_flow_ctrl_width-1]
 		    = int_flow_ctrl;
-	   assign ovcc_error_ovc[ovc] = ovcc_error;
+	   assign ovcc_errors_ovc[ovc*4:(ovc+1)*4-1] = ovcc_errors;
 	   
 	end
       
@@ -719,6 +716,29 @@ module vcr_op_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   assign error = |ovcc_error_ovc | error_unmatched;
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:1+num_vcs*4-1] errors_s, errors_q;
+	   assign errors_s = {error_unmatched, ovcc_errors_ovc};
+	   c_err_rpt
+	     #(.num_errors(1+num_vcs*4),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
+	   
+	   assign error = |errors_q;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
    
 endmodule

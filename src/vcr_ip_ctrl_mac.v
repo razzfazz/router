@@ -211,9 +211,8 @@ module vcr_ip_ctrl_mac
    // width of each counter
    parameter perf_ctr_width = 32;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   // configure error checking logic
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // width of sum of event signals from all VCs
    localparam event_width = clogb(num_vcs + 1);
@@ -407,7 +406,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbf_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbf_read_offset_ivc;
-   wire [0:num_vcs-1] 			    ivcc_error_ivc;
+   wire [0:num_vcs*6-1] 		    ivcc_errors_ivc;
    wire [0:num_vcs*6-1] 		    events_ivc;
    wire [0:num_vcs*num_ports-1] 	    route_ivc_op;
    
@@ -439,7 +438,7 @@ module vcr_ip_ctrl_mac
 	   wire [0:la_route_info_width-1] la_route_info;
 	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
 	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-	   wire 			  ivcc_error;
+	   wire [0:5] 			  ivcc_errors;
 	   wire [0:5] 			  events;
 	   vcr_ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -463,8 +462,6 @@ module vcr_ip_ctrl_mac
 	       .vc_alloc_type(vc_alloc_type),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .perf_ctr_enable(perf_ctr_enable),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
 	       .vc_id(ivc),
 	       .reset_type(reset_type))
 	   ivcc
@@ -487,7 +484,7 @@ module vcr_ip_ctrl_mac
 	      .la_route_info_out(la_route_info),
 	      .fbf_write_addr(fbf_write_addr),
 	      .fbf_read_addr(fbf_read_addr),
-	      .error(ivcc_error),
+	      .errors(ivcc_errors),
 	      .events(events));
 	   
 	   wire [0:num_ports-1] 	  route_op;
@@ -525,7 +522,7 @@ module vcr_ip_ctrl_mac
 				      (ivc+1)*flit_buffer_idx_width-1]
 		    = fbf_read_addr[fbf_addr_width-flit_buffer_idx_width:
 				    fbf_addr_width-1];
-	   assign ivcc_error_ivc[ivc] = ivcc_error;
+	   assign ivcc_errors_ivc[ivc*6:(ivc+1)*6-1] = ivcc_errors;
 	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
 	   
 	end
@@ -1110,6 +1107,29 @@ module vcr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   assign error = |ivcc_error_ivc;
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:num_vcs*6-1] errors_s, errors_q;
+	   assign errors_s = ivcc_errors_ivc;
+	   c_err_rpt
+	     #(.num_errors(num_vcs*6),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
+	   
+	   assign error = |errors_q;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
    
 endmodule

@@ -32,17 +32,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module for tracking available credit in a buffer
 module c_credit_tracker
-  (clk, reset, debit, credit, free, free_early, error);
+  (clk, reset, debit, credit, free, free_early, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
    
    // total number of credits available
    parameter num_credits = 8;
-   
-   // include error checker
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -69,8 +65,8 @@ module c_credit_tracker
    wire free_early;
    
    // internal error condition encountered
-   output error;
-   wire error;
+   output [0:1] errors;
+   wire [0:1] errors;
    
    wire set_cred, reset_cred;
    wire cred_s, cred_q;
@@ -94,7 +90,8 @@ module c_credit_tracker
    wire decr;
    assign decr = debit & ~credit;
 
-   wire [0:1] errors;
+   wire error_underflow;
+   wire error_overflow;
    wire [0:true_idx_width-1] true_count;
    
    generate
@@ -105,9 +102,9 @@ module c_credit_tracker
 	   
 	   assign set_cred = incr;
 	   assign reset_cred = decr;
-	   
-	   assign errors = {cred_q & credit,
-			    ~cred_q & debit};
+
+	   assign error_underflow = ~cred_q & debit;
+	   assign error_overflow = cred_q & credit;
 	   assign true_count = cred_q;
 	   
 	end
@@ -144,8 +141,10 @@ module c_credit_tracker
 	   assign set_cred = incr & ~cred_q & cred_count_zero;
 	   assign reset_cred = decr & cred_q & cred_count_zero;
 	   
-	   assign errors = {cred_q && (cred_count_q == num_credits-1) && credit,
-			    !cred_q && (cred_count_q == 0) && debit};
+	   assign error_underflow
+	     = !cred_q && (cred_count_q == 0) && debit;
+	   assign error_overflow
+	     = cred_q && (cred_count_q == (num_credits - 1)) && credit;
 	   assign true_count = cred_count_q + cred_q;
 	   
 	end
@@ -155,7 +154,7 @@ module c_credit_tracker
 	begin
 	   initial
 	   begin
-	      $display("ERROR: The credit checker module requires at least one \
+	      $display("ERROR: The credit tracker module requires at least one \
 		       credit.");
 	      $stop;
 	   end
@@ -164,18 +163,6 @@ module c_credit_tracker
       
    endgenerate
    
-   wire [0:1] errors_out;
-   c_checker
-     #(.num_errors(2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(errors),
-      .errors_out(errors_out));
-   
-   assign error = |errors_out;
+   assign errors = {error_underflow, error_overflow};
    
 endmodule

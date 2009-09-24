@@ -175,7 +175,7 @@ module vcr_term_mac
    
    // include error checking logic
    parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;

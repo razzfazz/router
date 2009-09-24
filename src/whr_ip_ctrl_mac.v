@@ -160,9 +160,8 @@ module whr_ip_ctrl_mac
    // width of each counter
    parameter perf_ctr_width = 32;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   // configure error checking logic
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
@@ -546,7 +545,6 @@ module whr_ip_ctrl_mac
 			la_route_info_width+route_info_width-1];
    
    wire 			     hdff_empty;
-   wire 			     hdff_error;
    
    wire 			     hdff_push;
    assign hdff_push = flit_valid_in & flit_head_in;
@@ -556,6 +554,8 @@ module whr_ip_ctrl_mac
    
    wire [0:la_route_info_width-1]    hdff_la_route_info;
    wire [0:route_info_width-1] 	     hdff_route_info;
+   wire 			     error_hdff_underflow;
+   wire 			     error_hdff_overflow;
    
    generate
       
@@ -570,13 +570,11 @@ module whr_ip_ctrl_mac
 	   
 	   wire 		 hdff_full;
 	   wire [0:hdff_width-1] hdff_data_out;
-	   
+	   wire [0:1] 		 hdff_errors;
 	   c_fifo
 	     #(.depth(num_header_buffers),
 	       .width(hdff_width),
 	       .fifo_type(header_fifo_type),
-	       .checker_enable(checker_enable),
-	       .checker_capture_mode(checker_capture_mode),
 	       .reset_type(reset_type))
 	   hdff
 	     (.clk(clk),
@@ -587,7 +585,7 @@ module whr_ip_ctrl_mac
 	      .empty(hdff_empty),
 	      .data_out(hdff_data_out),
 	      .pop(hdff_pop),
-	      .error(hdff_error));
+	      .errors(hdff_errors));
 	   
 	   assign hdff_la_route_info
 	     = hdff_empty ?
@@ -598,7 +596,10 @@ module whr_ip_ctrl_mac
 	       route_info_in :
 	       hdff_data_out[la_route_info_width:
 			     la_route_info_width+route_info_width-1];
-   
+	   
+	   assign error_hdff_underflow = hdff_errors[0];
+	   assign error_hdff_overflow = hdff_errors[1];
+	   
 	end
       else
 	begin
@@ -655,7 +656,8 @@ module whr_ip_ctrl_mac
 	   
 	   assign hdff_empty = hdff_empty_q;
 	   
-	   assign hdff_error = ~hdff_empty_q & hdff_push;
+	   assign error_hdff_underflow = hdff_empty_q & hdff_pop;
+	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push;
 	   
 	end
       
@@ -663,6 +665,11 @@ module whr_ip_ctrl_mac
    
    wire 	header_valid;
    assign header_valid = ~hdff_empty | hdff_push;
+   
+   wire 	flit_valid;
+   
+   wire 	error_no_header;
+   assign error_no_header = flit_valid & ~header_valid;
    
    
    //---------------------------------------------------------------------------
@@ -707,13 +714,11 @@ module whr_ip_ctrl_mac
    wire 		     fbc_pop;
    assign fbc_pop = flit_valid_out;
    
-   wire 		     fbc_error;
+   wire [0:1]		     fbc_errors;
    wire 		     fbc_full;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .depth(num_flit_buffers),
-       .checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
@@ -724,9 +729,14 @@ module whr_ip_ctrl_mac
       .read_addr(fbf_read_addr),
       .empty(fbc_empty),
       .full(fbc_full),
-      .error(fbc_error));
+      .errors(fbc_errors));
    
-   wire 		     flit_valid;
+   wire 		       error_fbc_underflow;
+   assign error_fbc_underflow = fbc_errors[0];
+   
+   wire 		       error_fbc_overflow;
+   assign error_fbc_overflow = fbc_errors[1];
+   
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
    
@@ -810,22 +820,34 @@ module whr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:0] 		          errors_in;
-   assign errors_in = {flit_valid & ~header_valid};
-   
-   wire [0:0] 		          errors_out;
-   c_checker
-     #(.num_errors(1),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(errors_in),
-      .errors_out(errors_out));
-   
-   assign error = |errors_out | hdff_error | fbc_error;
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:4] errors_s, errors_q;
+	   assign errors_s = {error_fbc_underflow,
+			      error_fbc_overflow,
+			      error_hdff_underflow,
+			      error_hdff_overflow,
+			      error_no_header};
+	   c_err_rpt
+	     #(.num_errors(5),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
+	   
+	   assign error = |errors_q;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------

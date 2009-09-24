@@ -126,9 +126,8 @@ module whr_op_ctrl_mac
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+   // configure error checking logic
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -335,7 +334,8 @@ module whr_op_ctrl_mac
    assign credit = cred_valid;
    
    wire [0:cred_count_width-1] cred_count_q;
-   wire 		       error_hct;
+   wire 		       error_hct_underflow;
+   wire 		       error_hct_overflow;
    
    generate
       
@@ -347,7 +347,8 @@ module whr_op_ctrl_mac
 	   // on the normal credit tracking mechanism
 	   assign head_free = 1'b1;
 	   
-	   assign error_hct = 1'b0;
+	   assign error_hct_underflow = 1'b0;
+	   assign error_hct_overflow = 1'b0;
 	   
 	end
       else
@@ -355,6 +356,9 @@ module whr_op_ctrl_mac
 	   
 	   // if only a subset of the flit buffer entries can be headers, we 
 	   // need to keep track of how many such slots are left
+	   
+	   wire head_credit;
+	   wire head_debit;
 	   
 	   if(num_header_buffers == 1)
 	     begin
@@ -367,7 +371,13 @@ module whr_op_ctrl_mac
 		assign last_credit_received
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
-		wire tail_sent_s, tail_sent_q;
+		wire tail_sent_q;
+		wire head_free_q;
+		
+		assign head_credit =  tail_sent_q & last_credit_received;
+		assign head_debit = head_free_q & gnt;
+		
+		wire tail_sent_s;
 		assign tail_sent_s
 		  = update_credits ? 
 		    ((tail_sent_q | (flit_valid_in & flit_tail_in)) &
@@ -382,10 +392,8 @@ module whr_op_ctrl_mac
 		   .d(tail_sent_s),
 		   .q(tail_sent_q));
 		
-		wire head_free_s, head_free_q;
-		assign head_free_s
-		  = (head_free_q & ~gnt) |
-		    (cred_valid & tail_sent_q & last_credit_received);
+		wire head_free_s;
+		assign head_free_s = (head_free_q & ~head_debit) | head_credit;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -398,7 +406,8 @@ module whr_op_ctrl_mac
 		
 		assign head_free = head_free_q;
 		
-		assign error_hct = 1'b0;
+		assign error_hct_underflow = head_debit & ~head_free_q;
+		assign error_hct_overflow = head_credit & head_free_q;
 		
 	     end
 	   else
@@ -460,18 +469,14 @@ module whr_op_ctrl_mac
 		wire 				 tail;
 		assign tail = tail_queue[pop_ptr_q];
 		
-		wire 				 head_credit;
 		assign head_credit = credit & tail;
-		
-		wire 				 head_debit;
 		assign head_debit = ~allocated_q & new_gnt & free;
 		
 		// track header credits using stock credit tracker module
 		wire 				 head_free_early;
+		wire [0:1] 			 hct_errors;
 		c_credit_tracker
 		  #(.num_credits(num_header_buffers),
-		    .checker_enable(checker_enable),
-		    .checker_capture_mode(checker_capture_mode),
 		    .reset_type(reset_type))
 		hct
 		  (.clk(clk),
@@ -480,8 +485,11 @@ module whr_op_ctrl_mac
 		   .debit(head_debit),
 		   .free(head_free),
 		   .free_early(head_free_early),
-		   .error(error_hct));
-
+		   .errors(hct_errors));
+		
+		assign error_hct_underflow = hct_errors[0];
+		assign error_hct_overflow = hct_errors[1];
+		
 	     end
 	   
 	end
@@ -517,9 +525,11 @@ module whr_op_ctrl_mac
       .d(cred_count_s),
       .q(cred_count_q));
    
-   wire [0:1] 					 error_cred;
-   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
-			(cred_count_q == 0) && debit};
+   wire 					 error_ct_underflow;
+   assign error_ct_underflow = (cred_count_q == 0) && debit;
+   
+   wire 					 error_ct_overflow;
+   assign error_ct_overflow = (cred_count_q == num_flit_buffers) && credit;
    
    // Instead of just computing this as the reduction of of the updated credit
    // count sum, we can optimize a bit. In particular, we have one or more 
@@ -633,18 +643,32 @@ module whr_op_ctrl_mac
    // error checker logic
    //---------------------------------------------------------------------------
    
-   wire [0:1] 				  errors_out;
-   c_checker
-     #(.num_errors(2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(error_cred),
-      .errors_out(errors_out));
-   
-   assign error = error_hct | (|errors_out);
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:3] errors_s, errors_q;
+	   assign errors_s = {error_ct_underflow,
+			      error_ct_overflow,
+			      error_hct_underflow,
+			      error_hct_overflow};
+	   c_err_rpt
+	     #(.num_errors(4),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
+	   
+	   assign error = |errors_q;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
    
 endmodule

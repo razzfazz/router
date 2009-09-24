@@ -304,8 +304,8 @@ module packet_source
    wire [0:num_vcs-1] 		  free_ovc;
    wire [0:num_vcs-1] 		  head_free_ovc;
    
-   wire [0:num_vcs-1] 		  error_hct_ovc;
-   wire [0:num_vcs*2-1] 	  error_cred_ovc;
+   wire [0:num_vcs*2-1] 	  errors_hct_ovc;
+   wire [0:num_vcs*2-1] 	  errors_cred_ovc;
    
    wire 			  free;
    wire 			  head_free;
@@ -436,11 +436,9 @@ module packet_source
 	   // track header credits using stock credit tracker module
 	   wire 			    head_free;
 	   wire 			    head_free_early;
-	   wire 			    error_hct;
+	   wire [0:1] 			    errors_hct;
 	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
-	       .checker_enable(1),
-	       .checker_capture_mode(0),
 	       .reset_type(reset_type))
 	   hct
 	     (.clk(clk),
@@ -449,10 +447,10 @@ module packet_source
 	      .debit(head_debit),
 	      .free(head_free),
 	      .free_early(head_free_early),
-	      .error(error_hct));
+	      .errors(errors_hct));
 
 	   assign head_free_ovc[ovc] = head_free;
-	   assign error_hct_ovc[ovc] = error_hct;
+	   assign errors_hct_ovc[ovc*2:(ovc+1)*2-1] = errors_hct;
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
 	   assign cred_count_s = cred_count_q + credit - debit;
@@ -468,11 +466,11 @@ module packet_source
 	   
 	   assign free_ovc[ovc] = |cred_count_q;
 	   
-	   wire [0:1] 		       error_cred;
-	   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
-				(cred_count_q == 0) && debit};
+	   wire [0:1] 		       errors_cred;
+	   assign errors_cred = {(cred_count_q == num_flit_buffers) && credit,
+				 (cred_count_q == 0) && debit};
 	   
-	   assign error_cred_ovc[ovc*2:(ovc+1)*2-1] = error_cred;
+	   assign errors_cred_ovc[ovc*2:(ovc+1)*2-1] = errors_cred;
 	   
 	end
       
@@ -807,7 +805,7 @@ module packet_source
    assign flit_data[header_info_width:flit_data_width-1]
 	    = data_q[header_info_width:flit_data_width-1];
    
-   assign error = |error_hct_ovc | |error_cred_ovc;
+   assign error = |errors_hct_ovc | |errors_cred_ovc;
    
    wire [0:packet_count_width-1] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + flit_sent;

@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // output port controller (tracks state of buffers in downstream router)
 module vcr_ovc_ctrl
   (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt, sw_gnt_ip, 
-   int_flit_ctrl, match, elig, int_flow_ctrl, error);
+   int_flit_ctrl, match, elig, int_flow_ctrl, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -111,10 +111,6 @@ module vcr_ovc_ctrl
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
-   // include error checking logic
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
-   
    // ID of current input VC
    parameter vc_id = 0;
    
@@ -189,8 +185,8 @@ module vcr_ovc_ctrl
    wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
    
    // internal error condition detected
-   output error;
-   wire 			  error;
+   output [0:3] errors;
+   wire [0:3] 			  errors;
    
    
    //---------------------------------------------------------------------------
@@ -319,7 +315,8 @@ module vcr_ovc_ctrl
    
    wire [0:cred_count_width-1] cred_count_q;
    wire 		       head_free_early;
-   wire 		       hct_error;
+   wire 		       error_hct_underflow;
+   wire 		       error_hct_overflow;
    
    generate
       
@@ -331,7 +328,8 @@ module vcr_ovc_ctrl
 	   // on the normal credit tracking mechanism
 	   assign head_free_early = 1'b1;
 	   
-	   assign hct_error = 1'b0;
+	   assign error_hct_underflow = 1'b0;
+	   assign error_hct_overflow = 1'b0;
 	   
 	end
       else
@@ -388,7 +386,8 @@ module vcr_ovc_ctrl
 		
 		assign head_free_early = head_free_s;
 		
-		assign hct_error = 1'b0;
+		assign error_hct_underflow = head_debit & ~head_free_q;
+		assign error_hct_overflow = head_credit & head_free_q;
 		
 	     end
 	   else
@@ -455,10 +454,9 @@ module vcr_ovc_ctrl
 		
 		// track header credits using stock credit tracker module
 		wire 				 head_free;
+		wire [0:1] 			 hct_errors;
 		c_credit_tracker
 		  #(.num_credits(num_header_buffers),
-		    .checker_enable(checker_enable),
-		    .checker_capture_mode(checker_capture_mode),
 		    .reset_type(reset_type))
 		hct
 		  (.clk(clk),
@@ -467,7 +465,10 @@ module vcr_ovc_ctrl
 		   .debit(head_debit),
 		   .free(head_free),
 		   .free_early(head_free_early),
-		   .error(hct_error));
+		   .errors(hct_errors));
+		
+		assign error_hct_underflow = hct_errors[0];
+		assign error_hct_overflow = hct_errors[1];
 		
 	     end
 	   
@@ -494,6 +495,12 @@ module vcr_ovc_ctrl
       .d(cred_count_s),
       .q(cred_count_q));
    
+   wire 					 error_ct_underflow;
+   assign error_ct_underflow = (cred_count_q == 0) && debit;
+   
+   wire 					 error_ct_overflow;
+   assign error_ct_overflow = (cred_count_q == num_flit_buffers) && credit;
+   
    // Instead of just computing this as the reduction of of the updated credit
    // count sum, we can optimize a bit. In particular, we have one or more 
    // credits available iff...
@@ -513,10 +520,6 @@ module vcr_ovc_ctrl
    assign next_cred = credit | 
 		      |cred_count_q[0:cred_count_width-2] | 
 		      (cred_count_q[cred_count_width-1] & ~debit);
-   
-   wire [0:1] 					 error_cred;
-   assign error_cred = {(cred_count_q == num_flit_buffers) && credit,
-			(cred_count_q == 0) && debit};
    
    
    //-------------------------------------------------------------------
@@ -637,21 +640,9 @@ module vcr_ovc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   wire [0:1] 				 errors_in;
-   assign errors_in = error_cred;
-   
-   wire [0:1] 				 errors_out;
-   c_checker
-     #(.num_errors(2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(errors_in),
-      .errors_out(errors_out));
-   
-   assign error = |errors_out | |hct_error;
+   assign errors = {error_ct_underflow, 
+		    error_ct_overflow,
+		    error_hct_underflow, 
+		    error_hct_overflow};
    
 endmodule

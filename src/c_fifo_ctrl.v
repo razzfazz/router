@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // simple FIFO controller
 module c_fifo_ctrl
-  (clk, reset, push, pop, write_addr, read_addr, empty, full, error);
+  (clk, reset, push, pop, write_addr, read_addr, empty, full, errors);
    
 `include "c_constants.v"
    
@@ -50,10 +50,6 @@ module c_fifo_ctrl
    
    // maximum (rightmost) address
    localparam [0:addr_width-1] max_value = offset + depth - 1;
-   
-   // include error checker
-   parameter checker_enable = 1;
-   parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -83,8 +79,8 @@ module c_fifo_ctrl
    wire 		 full;
    
    // internal error condition detected
-   output error;
-   wire 		 error;
+   output [0:1] errors;
+   wire [0:1] 		 errors;
    
    wire [0:addr_width-1] read_ptr_next, read_ptr_q;
    c_incr
@@ -156,23 +152,7 @@ module c_fifo_ctrl
    wire 		 error_overflow;
    assign error_overflow = full & push & ~pop;
    
-   wire [0:1] 		 errors_in;
-   assign errors_in = {error_underflow,
-		       error_overflow};
-   
-   wire [0:1] 		 errors_out;
-   c_checker
-     #(.num_errors(2),
-       .enable(checker_enable),
-       .capture_mode(checker_capture_mode),
-       .reset_type(reset_type))
-   chk
-     (.clk(clk),
-      .reset(reset),
-      .errors_in(errors_in),
-      .errors_out(errors_out));
-   
-   assign error = |errors_out;
+   assign errors = {error_underflow, error_overflow};
    
    // synopsys translate_off
    generate
