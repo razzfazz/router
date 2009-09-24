@@ -340,6 +340,9 @@ module vcr_ovc_ctrl
 	   // if only a subset of the flit buffer entries can be headers, we 
 	   // need to keep track of how many such slots are left
 	   
+	   wire head_credit;
+	   wire head_debit;
+	   
 	   if(num_header_buffers == 1)
 	     begin
 		
@@ -351,7 +354,12 @@ module vcr_ovc_ctrl
 		assign last_credit_received
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
-		wire tail_sent_s, tail_sent_q;
+		wire tail_sent_q;
+		
+		assign head_credit = tail_sent_q & last_credit_received;
+		assign head_debit = vc_gnt;
+		
+		wire tail_sent_s;
 		assign tail_sent_s
 		  = update_credits ? 
 		    ((tail_sent_q | (flit_valid_qual & flit_tail)) &
@@ -367,9 +375,7 @@ module vcr_ovc_ctrl
 		   .q(tail_sent_q));
 		
 		wire head_free_s, head_free_q;
-		assign head_free_s
-		  = (head_free_q & ~vc_gnt) |
-		    (credit & tail_sent_q & last_credit_received);
+		assign head_free_s = (head_free_q & ~head_debit) | head_credit;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -444,10 +450,7 @@ module vcr_ovc_ctrl
 		wire 				 tail;
 		assign tail = tail_queue[pop_ptr_q];
 		
-		wire 				 head_credit;
-		assign head_credit = credit & tail;
-		
-		wire 				 head_debit;
+		assign head_credit = credit & tail;		
 		assign head_debit = vc_gnt;
 		
 		// track header credits using stock credit tracker module
