@@ -141,9 +141,6 @@ module vcr_vc_alloc_sep_of
 	   for(ip = 0; ip < num_ports; ip = ip + 1)
 	     begin:ips
 		
-		wire [0:num_vcs*num_vcs-1] gnt_ivc_ovc;
-		wire [0:num_vcs-1] 	   gnt_ivc;
-		
 		genvar 			   irc;
 		
 		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
@@ -289,6 +286,8 @@ module vcr_vc_alloc_sep_of
 			      orc = orc + 1)
 			    begin:orcs
 			       
+			       wire [0:num_vcs_per_class-1] gnt_in_ocvc;
+			       
 			       if((orc == irc) || (orc == (irc + 1)))
 				 begin
 				    
@@ -298,8 +297,6 @@ module vcr_vc_alloc_sep_of
 							num_vcs_per_class:
 							(orc+1)*
 							num_vcs_per_class-1];
-				    
-				    wire [0:num_vcs_per_class-1] gnt_in_ocvc;
 				    
 				    if(num_vcs_per_class > 1)
 				      begin
@@ -331,12 +328,15 @@ module vcr_vc_alloc_sep_of
 				    else
 				      assign gnt_in_ocvc = req_in_ocvc;
 				    
-				    assign gnt_in_orc_ocvc[
-						  orc*num_vcs_per_class:
-						  (orc+1)*num_vcs_per_class-1]
-					     = gnt_in_ocvc;
-				    
 				 end
+			       else
+				 assign gnt_in_ocvc = {num_vcs_per_class{1'b0}};
+			       
+			       assign gnt_in_orc_ocvc[orc*
+						      num_vcs_per_class:
+						      (orc+1)*
+						      num_vcs_per_class-1]
+					= gnt_in_ocvc;
 			       
 			    end
 			  
