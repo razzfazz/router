@@ -880,6 +880,7 @@ module vcr_term_mac
 	   
 	   wire match;
 	   wire elig;
+	   wire empty;
 	   wire [0:1] int_flow_ctrl;
 	   wire [0:3] ovcc_errors;
 	   
@@ -911,6 +912,7 @@ module vcr_term_mac
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .match(match),
 	      .elig(elig),
+	      .empty(empty),
 	      .int_flow_ctrl(int_flow_ctrl),
 	      .errors(ovcc_errors));
 	   

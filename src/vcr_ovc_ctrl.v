@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // output port controller (tracks state of buffers in downstream router)
 module vcr_ovc_ctrl
   (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt, sw_gnt_ip, 
-   int_flit_ctrl, match, elig, int_flow_ctrl, errors);
+   int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -178,6 +178,10 @@ module vcr_ovc_ctrl
    // output VC is eligible for allocation (i.e., not currently allocated)
    output elig;
    wire elig;
+   
+   // no buffer slots in output VC are in use (i.e., all credits are present)
+   output empty;
+   wire empty;
    
    // internal flow control signalling from output controller to input 
    // controllers
@@ -506,6 +510,8 @@ module vcr_ovc_ctrl
    
    wire 					 error_ct_overflow;
    assign error_ct_overflow = cred_count_all & credit;
+   
+   assign empty = cred_count_all;
    
    // Instead of just computing this as the reduction of of the updated credit
    // count sum, we can optimize a bit. In particular, we have one or more 
