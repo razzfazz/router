@@ -429,20 +429,23 @@ module vcr_term_mac
    // are more packets and/or flits to send
    //---------------------------------------------------------------------------
    
-   wire 		     packet_sent;
    wire 		     packet_count_zero;
    wire 		     gen_packets;
+   wire 		     packet_valid_q;
+   wire [0:num_vcs-1] 	     empty_ovc;
    
-   wire 		     last_packet_sent;
-   assign last_packet_sent = (packet_sent & packet_count_zero & ~gen_packets);
+   wire 		     last_credit_received;
+   assign last_credit_received
+     = (~gen_packets & packet_count_zero & ~packet_valid_q & &empty_ovc);
    
    wire 		     num_packets_zero_b;
    
    wire 		     active_s, active_q;
    assign active_s
      = (reg_active_q | active_q) ? 
-       (next_start ? num_packets_zero_b : (active_q & ~last_packet_sent)) : 
-       active_q;
+//       (next_start ? num_packets_zero_b : (active_q & ~last_credit_received)) : 
+     ((active_q & ~last_credit_received) | next_start | start) :
+     active_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -627,6 +630,8 @@ module vcr_term_mac
      (.data_in(reg_data_q),
       .dest_in({packet_rvs_width{1'b0}}),
       .data_out(packet_rvs_loadval));
+   
+   wire 			      packet_sent;
    
    wire [0:packet_rvs_width-1] 	      packet_rvs_s, packet_rvs_q;
    assign packet_rvs_s
@@ -858,11 +863,10 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    
    wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
-   wire packet_valid_q;
    
-   wire [0:num_vcs*4-1] ovcc_errors_ovc;
+   wire [0:num_vcs*4-1] 	  ovcc_errors_ovc;
    
-   genvar 		ovc;
+   genvar 			  ovc;
    
    generate
       
@@ -920,6 +924,7 @@ module vcr_term_mac
 	   assign free = int_flit_ctrl[0] ? int_flow_ctrl[0] : int_flow_ctrl[1];
 	   
 	   assign elig_ovc[ovc] = elig;
+	   assign empty_ovc[ovc] = empty;
 	   assign free_ovc[ovc] = free;
 	   assign ovcc_errors_ovc[ovc*4:(ovc+1)*4-1] = ovcc_errors;
 	   
