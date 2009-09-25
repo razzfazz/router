@@ -70,7 +70,7 @@ parameter min_payload_length = 0;
 parameter router_type = `ROUTER_TYPE_VC;
 
 // width of flit payload data
-parameter flit_data_width = 64;
+parameter flit_data_width = 32;
 
 // enable performance counter
 parameter perf_ctr_enable = 1;
@@ -79,8 +79,7 @@ parameter perf_ctr_enable = 1;
 parameter perf_ctr_width = 32;
 
 // include error checking logic
-parameter checker_enable = 1;
-parameter checker_capture_mode = `CHECKER_CAPTURE_MODE_NO_HOLD;
+parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 
 // select whether to set a packet's outgoing VC ID at the input or output 
 // controller
@@ -93,7 +92,7 @@ parameter routing_type = `ROUTING_TYPE_DOR;
 parameter dim_order = `DIM_ORDER_ASCENDING;
 
 // select method for credit signaling from output to input controller
-parameter credit_handling_type = `CREDIT_HANDLING_TYPE_LEVEL;
+parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 
 // select implementation variant for header FIFO
 parameter header_fifo_type = `FIFO_TYPE_SHIFTING;

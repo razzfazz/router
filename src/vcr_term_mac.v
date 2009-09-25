@@ -36,14 +36,13 @@ module vcr_term_mac
    
 // register address declarations
 `define REG_ADDR_CTRL               0
-`define REG_ADDR_NUM_PACKETS        1
-`define REG_ADDR_ARRIVAL_RV         2
-`define REG_ADDR_ARRIVAL_THRESH     3
-`define REG_ADDR_PACKET_RVS         4
-`define REG_ADDR_PLENGTH_SEL_THRESH 5
-`define REG_ADDR_PLENGTH_VALS       6
-`define REG_ADDR_FLIT_DATA_RV       7
-`define REG_ADDR_LAST `REG_ADDR_FLIT_DATA_RV   
+`define REG_ADDR_STATUS             1
+`define REG_ADDR_FLIT_SIG           2
+`define REG_ADDR_LFSR_SEED          3
+`define REG_ADDR_NUM_PACKETS        4
+`define REG_ADDR_ARRIVAL_THRESH     5
+`define REG_ADDR_PLENGTH_SEL_THRESH 6
+`define REG_ADDR_PLENGTH_VALS       7
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -174,8 +173,10 @@ module vcr_term_mac
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // include error checking logic
-   parameter checker_enable = 1;
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
+   
+   // width required for internal flit control signalling
+   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
@@ -183,34 +184,36 @@ module vcr_term_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
-   
-   // select width (and thus period) for LFSRs
-   parameter lfsr_width = 20;
-   
-   // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length);
-   
-   // number of internal registers
-   localparam num_regs = `REG_ADDR_LAST + 1;
-   
-   // number of bits required to select an individual register
-   localparam reg_addr_width = clogb(num_regs);
+   // select set of feedback polynomials used for LFSRs
+   parameter lfsr_index = 0;
    
    // width of control register data
    parameter reg_data_width = 32;
    
+   // smallest multiple of reg_data_width that is >= flit_data_width
+   localparam flit_sig_exp_width
+     = ((flit_data_width+reg_data_width-1)/reg_data_width)*reg_data_width;
+   
+   // number of bits required to select an individual register
+   parameter reg_addr_width = 6;
+   
    // width of run cycle counter
-   parameter num_packets_width = 16;
+   parameter num_packets_width = 20;
    
    // width of arrival rate LFSR
-   parameter arrival_rv_width = 16;
+   parameter arrival_rv_width = 20;
    
    // width of payload length selection LFSR
    parameter plength_sel_rv_width = 1;
    
+   // select width (and thus period) for LFSRs
+   localparam packet_rvs_width
+     = mc_idx_width + rc_idx_width + route_info_width + plength_sel_rv_width;
+   
    // width of register that holds the number of outstanding packets
    parameter packet_count_width = 8;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
@@ -308,7 +311,7 @@ module vcr_term_mac
    assign reg_addr_s = reg_active_q ? reg_addr : reg_addr_q;
    c_dff
      #(.width(reg_addr_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    reg_addrq
      (.clk(clk),
       .reset(reset),
@@ -319,6 +322,18 @@ module vcr_term_mac
    assign reg_sel_ctrl
      = (reg_addr_q == `REG_ADDR_CTRL);
    
+   wire 		     reg_sel_status;
+   assign reg_sel_status
+     = (reg_addr_q == `REG_ADDR_STATUS);
+   
+   wire 		     reg_sel_flit_sig;
+   assign reg_sel_flit_sig
+     = (reg_addr_q == `REG_ADDR_FLIT_SIG);
+   
+   wire 		     reg_sel_lfsr_seed;
+   assign reg_sel_lfsr_seed
+     = (reg_addr_q == `REG_ADDR_LFSR_SEED);
+   
    wire 		     reg_sel_num_packets;
    assign reg_sel_num_packets
      = (reg_addr_q == `REG_ADDR_NUM_PACKETS);
@@ -326,14 +341,6 @@ module vcr_term_mac
    wire 		     reg_sel_arrival_thresh;
    assign reg_sel_arrival_thresh
      = (reg_addr_q == `REG_ADDR_ARRIVAL_THRESH);
-   
-   wire 		     reg_sel_arrival_rv;
-   assign reg_sel_arrival_rv
-     = (reg_addr_q == `REG_ADDR_ARRIVAL_RV);
-   
-   wire 		     reg_sel_packet_rvs;
-   assign reg_sel_packet_rvs
-     = (reg_addr_q == `REG_ADDR_PACKET_RVS);
    
    wire 		     reg_sel_plength_sel_thresh;
    assign reg_sel_plength_sel_thresh
@@ -343,40 +350,27 @@ module vcr_term_mac
    assign reg_sel_plength_vals
      = (reg_addr_q == `REG_ADDR_PLENGTH_VALS);
    
-   wire 		     reg_sel_flit_data_rv;
-   assign reg_sel_flit_data_rv
-     = (reg_addr_q == `REG_ADDR_FLIT_DATA_RV);
+   wire [0:reg_data_width-1] reg_read_data_status;
+   wire [0:reg_data_width-1] reg_read_data_flit_sig;
    
-   wire [0:reg_data_width-1] reg_read_data_ctrl;
-   wire [0:reg_data_width-1] reg_read_data_num_packets;
-   wire [0:reg_data_width-1] reg_read_data_arrival_thresh;
-   wire [0:reg_data_width-1] reg_read_data_arrival_rv;
-   wire [0:reg_data_width-1] reg_read_data_packet_rvs;
-   wire [0:reg_data_width-1] reg_read_data_plength_sel_thresh;
-   wire [0:reg_data_width-1] reg_read_data_plength_vals;
-   wire [0:reg_data_width-1] reg_read_data_flit_data_rv;
+   wire [0:reg_data_width-1] reg_read_data_muxed;
+   c_select_1ofn
+     #(.num_ports(2),
+       .width(reg_data_width))
+   reg_read_data_muxed_sel
+     (.select({reg_sel_status,
+	       reg_sel_flit_sig}),
+      .data_in({reg_read_data_status,
+		reg_read_data_flit_sig}),
+      .data_out(reg_read_data_muxed));
    
-   wire [0:num_regs*reg_data_width-1] reg_read_data_vec;
-   assign reg_read_data_vec = {reg_read_data_ctrl,
-			       reg_read_data_num_packets,
-			       reg_read_data_arrival_thresh,
-			       reg_read_data_arrival_rv,
-			       reg_read_data_packet_rvs,
-			       reg_read_data_plength_sel_thresh,
-			       reg_read_data_plength_vals,
-			       reg_read_data_flit_data_rv};
-   
-   wire [0:reg_data_width-1] 	      reg_read_data_muxed;
-   assign reg_read_data_muxed
-     = reg_read_data_vec[reg_addr_q*reg_data_width +: reg_data_width];
-   
-   wire [0:reg_data_width-1] 	      reg_data_s, reg_data_q;
+   wire [0:reg_data_width-1] reg_data_s, reg_data_q;
    assign reg_data_s = reg_active_q ? 
 		       (reg_read_q ? reg_read_data_muxed : reg_write_data) : 
 		       reg_data_q;
    c_dff
      #(.width(reg_data_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    reg_dataq
      (.clk(clk),
       .reset(reset),
@@ -385,7 +379,7 @@ module vcr_term_mac
    
    assign reg_read_data = reg_data_q;
    
-   wire 			      reg_done_s, reg_done_q;
+   wire 		     reg_done_s, reg_done_q;
    assign reg_done_s
      = reg_active_q ? ((reg_write_q | reg_read_q) & ~reg_done_q) : reg_done_q;
    c_dff
@@ -402,16 +396,20 @@ module vcr_term_mac
    
    //---------------------------------------------------------------------------
    // run control register
-   // (writing to this register starts the experiment; 
-   // reading from this register returns a non-zero value for as long as there 
-   // are more packets and/or flits to send)
+   // ====================
+   // writing to this register starts the experiment
    //---------------------------------------------------------------------------
    
-   wire 			      write_ctrl;
+   wire 		     write_ctrl;
    assign write_ctrl = reg_write_q & reg_sel_ctrl;
    
-   wire 			      ctrl_s, ctrl_q;
-   assign ctrl_s = reg_active_q ? (write_ctrl & ~ctrl_q) : ctrl_q;
+   wire 		     start;
+   
+   wire 		     next_start;
+   assign next_start = write_ctrl & ~start;
+   
+   wire 		     ctrl_s, ctrl_q;
+   assign ctrl_s = reg_active_q ? next_start : ctrl_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -421,21 +419,30 @@ module vcr_term_mac
       .d(ctrl_s),
       .q(ctrl_q));
    
-   wire 			      start;
    assign start = ctrl_q;
    
-   wire 			      packet_sent;
-   wire 			      packet_count_zero;
-   wire 			      gen_packets;
    
-   wire 			      last_packet_sent;
+   //---------------------------------------------------------------------------
+   // status register
+   // ===============
+   // reading from this register returns a non-zero value for as long as there 
+   // are more packets and/or flits to send
+   //---------------------------------------------------------------------------
+   
+   wire 		     packet_sent;
+   wire 		     packet_count_zero;
+   wire 		     gen_packets;
+   
+   wire 		     last_packet_sent;
    assign last_packet_sent = (packet_sent & packet_count_zero & ~gen_packets);
    
-   wire 			      num_packets_zero_b;
+   wire 		     num_packets_zero_b;
    
-   wire 			      active_s, active_q;
+   wire 		     active_s, active_q;
    assign active_s
-     = start ? num_packets_zero_b : (active_q & ~last_packet_sent);
+     = (reg_active_q | active_q) ? 
+       (next_start ? num_packets_zero_b : (active_q & ~last_packet_sent)) : 
+       active_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -449,13 +456,15 @@ module vcr_term_mac
      #(.data_width(1),
        .dest_width(reg_data_width),
        .offset(0))
-   reg_read_data_ctrl_alg
+   reg_read_data_status_alg
      (.data_in(active_q),
       .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_ctrl));
+      .data_out(reg_read_data_status));
    
    
    //---------------------------------------------------------------------------
+   // packet count register
+   // =====================
    // specify how many packets to generate during the experiment
    // (special value of -1 corresponds to an infinite number of packets)
    //---------------------------------------------------------------------------
@@ -463,12 +472,22 @@ module vcr_term_mac
    wire 			      write_num_packets;
    assign write_num_packets = reg_write_q & reg_sel_num_packets;
    
+   wire [0:num_packets_width-1]       num_packets_loadval;
+   c_align
+     #(.data_width(reg_data_width),
+       .dest_width(num_packets_width),
+       .offset(num_packets_width-reg_data_width))
+   num_packets_loadval_alg
+     (.data_in(reg_data_q),
+      .dest_in({num_packets_width{1'b0}}),
+      .data_out(num_packets_loadval));
+   
    wire [0:num_packets_width-1]       num_packets_s, num_packets_q;
    assign num_packets_s
-     = write_num_packets ? reg_data_q[0:num_packets_width-1] : num_packets_q;
+     = write_num_packets ? num_packets_loadval : num_packets_q;
    c_dff
      #(.width(num_packets_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    num_packetsq
      (.clk(clk),
       .reset(reset),
@@ -477,26 +496,20 @@ module vcr_term_mac
    
    assign num_packets_zero_b = |num_packets_q;
    
+   wire 			      inf_packets_loadval;
+   assign inf_packets_loadval = &num_packets_loadval;
+   
    wire 			      inf_packets_s, inf_packets_q;
    assign inf_packets_s
-     = write_num_packets ? &reg_data_q[0:num_packets_width-1] : inf_packets_q;
+     = write_num_packets ? inf_packets_loadval : inf_packets_q;
    c_dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    inf_packetsq
      (.clk(clk),
       .reset(reset),
-      .d(inf_packets_q),
+      .d(inf_packets_s),
       .q(inf_packets_q));
-   
-   c_align
-     #(.data_width(num_packets_width),
-       .dest_width(reg_data_width),
-       .offset(0))
-   reg_read_data_num_packets_alg
-     (.data_in(num_packets_q),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_num_packets));
    
    
    //---------------------------------------------------------------------------
@@ -529,112 +542,108 @@ module vcr_term_mac
    // generate packet arrival times
    //---------------------------------------------------------------------------
    
-   wire 			      write_arrival_rv;
-   assign write_arrival_rv = reg_write_q & reg_sel_arrival_rv;
-
-   wire [0:lfsr_width-1] 	      arrival_rv_feedback;
+   wire [0:arrival_rv_width-1] 		      arrival_rv_feedback;
    c_fbgen
-     #(.width(lfsr_width),
-       .index(0))
+     #(.width(arrival_rv_width),
+       .index(lfsr_index+0))
    arrival_rv_feedback_fbgen
      (.feedback(arrival_rv_feedback));
    
-   wire [0:lfsr_width-1] 	      arrival_rv_s, arrival_rv_q;
+   wire 			      write_lfsr_seed;
+   assign write_lfsr_seed = reg_write_q & reg_sel_lfsr_seed;
+   
+   wire [0:arrival_rv_width-1] 	      arrival_rv_loadval;
+   c_align
+     #(.data_width(reg_data_width),
+       .dest_width(arrival_rv_width),
+       .offset(arrival_rv_width-reg_data_width))
+   arrival_rv_loadval_alg
+     (.data_in(reg_data_q),
+      .dest_in({arrival_rv_width{1'b0}}),
+      .data_out(arrival_rv_loadval));
+   
+   wire [0:arrival_rv_width-1] 	      arrival_rv_s, arrival_rv_q;
    assign arrival_rv_s
-     = {lfsr_width{write_arrival_rv}} & reg_data_q[0:lfsr_width-1];
+     = {arrival_rv_width{write_lfsr_seed}} & arrival_rv_loadval;
    c_lfsr
-     #(.width(lfsr_width),
-       .iterations(lfsr_width),
-       .reset_type(reset_type))
+     #(.width(arrival_rv_width),
+       .iterations(arrival_rv_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    arrival_rv_lfsr
      (.clk(clk),
       .reset(reset),
-      .load(write_arrival_rv),
+      .load(write_lfsr_seed),
       .run(gen_packets),
       .feedback(arrival_rv_feedback),
       .complete(1'b1),
       .d(arrival_rv_s),
       .q(arrival_rv_q));
    
-   wire [0:arrival_rv_width-1] 	      arrival_rv;
-   assign arrival_rv = arrival_rv_q[0:arrival_rv_width-1];
-   
-   c_align
-     #(.data_width(arrival_rv_width),
-       .dest_width(reg_data_width),
-       .offset(0))
-   reg_read_data_arrival_rv_alg
-     (.data_in(arrival_rv),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_arrival_rv));
-   
    wire 			      write_arrival_thresh;
    assign write_arrival_thresh = reg_write_q & reg_sel_arrival_thresh;
    
+   wire [0:arrival_rv_width-1] 	      arrival_thresh_loadval;
+   c_align
+     #(.data_width(reg_data_width),
+       .dest_width(arrival_rv_width),
+       .offset(arrival_rv_width-reg_data_width))
+   arrival_thresh_loadval_alg
+     (.data_in(reg_data_q),
+      .dest_in({arrival_rv_width{1'b0}}),
+      .data_out(arrival_thresh_loadval));
+   
    wire [0:arrival_rv_width-1] 	      arrival_thresh_s, arrival_thresh_q;
-   assign arrival_thresh_s = write_arrival_thresh ? 
-			     reg_data_q[0:arrival_rv_width-1] : 
-			     arrival_thresh_q;
+   assign arrival_thresh_s
+     = write_arrival_thresh ? arrival_thresh_loadval : arrival_thresh_q;
    c_dff
      #(.width(arrival_rv_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    arrival_threshq
      (.clk(clk),
       .reset(reset),
       .d(arrival_thresh_s),
       .q(arrival_thresh_q));
    
-   assign new_packet_rv = (arrival_rv <= arrival_thresh_q);
-   
-   c_align
-     #(.data_width(arrival_rv_width),
-       .dest_width(reg_data_width),
-       .offset(0))
-   reg_read_data_arrival_thresh_alg
-     (.data_in(arrival_thresh_q),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_arrival_thresh));
+   assign new_packet_rv = (arrival_rv_q <= arrival_thresh_q);
    
    
    //---------------------------------------------------------------------------
    // shared LFSR for per-packet random values
    //---------------------------------------------------------------------------
    
-   wire 			      write_packet_rvs;
-   assign write_packet_rvs = reg_write_q & reg_sel_packet_rvs;
-   
-   wire [0:lfsr_width-1] 	      packet_rvs_feedback;
+   wire [0:packet_rvs_width-1] 	      packet_rvs_feedback;
    c_fbgen
-     #(.width(lfsr_width),
-       .index(1))
+     #(.width(packet_rvs_width),
+       .index(lfsr_index+1))
    packet_rvs_feedback_fbgen
      (.feedback(packet_rvs_feedback));
    
-   wire [0:lfsr_width-1] 	      packet_rvs_s, packet_rvs_q;
+   wire [0:packet_rvs_width-1] 	      packet_rvs_loadval;
+   c_align
+     #(.data_width(reg_data_width),
+       .dest_width(packet_rvs_width),
+       .offset(packet_rvs_width-reg_data_width))
+   packet_rvs_loadval_alg
+     (.data_in(reg_data_q),
+      .dest_in({packet_rvs_width{1'b0}}),
+      .data_out(packet_rvs_loadval));
+   
+   wire [0:packet_rvs_width-1] 	      packet_rvs_s, packet_rvs_q;
    assign packet_rvs_s
-     = {lfsr_width{write_packet_rvs}} & reg_data_q[0:lfsr_width-1];
+     = {packet_rvs_width{write_lfsr_seed}} & packet_rvs_loadval;
    c_lfsr
-     #(.width(lfsr_width),
-       .iterations(lfsr_width),
-       .reset_type(reset_type))
+     #(.width(packet_rvs_width),
+       .iterations(packet_rvs_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    packet_rvs_lfsr
      (.clk(clk),
       .reset(reset),
-      .load(write_packet_rvs),
+      .load(write_lfsr_seed),
       .run(packet_sent),
       .feedback(packet_rvs_feedback),
       .complete(1'b1),
       .d(packet_rvs_s),
       .q(packet_rvs_q));
-   
-   c_align
-     #(.data_width(lfsr_width),
-       .dest_width(reg_data_width),
-       .offset(0))
-   reg_read_data_packet_rvs_alg
-     (.data_in(packet_rvs_q),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_packet_rvs));
    
    
    //---------------------------------------------------------------------------
@@ -642,47 +651,46 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_message_classes-1]     sel_mc_rv;
-   wire [0:num_resource_classes-1]    sel_rc_rv;
+   wire [0:num_resource_classes-1]    sel_orc_rv;
    
-   wire [0:num_packet_classes-1]      sel_pc_rv;
+   wire [0:num_packet_classes-1]      sel_opc_rv;
    c_mat_mult
      #(.dim1_width(num_message_classes),
        .dim2_width(1),
        .dim3_width(num_resource_classes))
-   sel_pc_rv_mmult
+   sel_opc_rv_mmult
      (.input_a(sel_mc_rv),
-      .input_b(sel_rc_rv),
-      .result(sel_pc_rv));
+      .input_b(sel_orc_rv),
+      .result(sel_opc_rv));
    
-   wire [0:num_vcs_per_class-1]       vc_alloc_cvc;
+   wire 			      vc_alloc_q;
+   wire [0:num_vcs_per_class-1]       vc_alloc_ocvc_q;
+   wire [0:num_vcs_per_class-1]       next_elig_ocvc;
    
-   wire 			      vc_alloc;
-   assign vc_alloc = |vc_alloc_cvc;
+   wire [0:num_vcs_per_class-1]       sel_ocvc;
+   assign sel_ocvc = vc_alloc_q ? vc_alloc_ocvc_q : next_elig_ocvc;
    
-   wire [0:num_vcs_per_class-1]       next_free_cvc;
-   
-   wire 			      any_free;
-   assign any_free = |next_free_cvc;
-   
-   wire [0:num_vcs_per_class-1]       sel_cvc;
-   assign sel_cvc = vc_alloc ? vc_alloc_cvc : next_free_cvc;
-   
-   wire [0:num_vcs-1] 		      sel_vc;
+   wire [0:num_vcs-1] 		      sel_ovc;
    c_mat_mult
      #(.dim1_width(num_packet_classes),
        .dim2_width(1),
        .dim3_width(num_vcs_per_class))
-   sel_vc_mmult
-     (.input_a(sel_pc_rv),
-      .input_b(sel_cvc),
-      .result(sel_vc));
+   sel_ovc_mmult
+     (.input_a(sel_opc_rv),
+      .input_b(sel_ocvc),
+      .result(sel_ovc));
    
-   wire [0:num_vcs-1] 		      next_free_vc;
-   wire [0:num_resource_classes*num_vcs_per_class-1] next_free_rc_cvc;
+   wire [0:num_vcs-1] 		      elig_ovc;
+   wire [0:num_packet_classes-1]      elig_opc;
+   wire [0:num_resource_classes-1]    elig_orc;
+   wire 			      elig;
    
-   wire [0:num_vcs-1] 				     free_vc;
-   wire [0:num_resource_classes*num_vcs_per_class-1] free_rc_cvc;
-   wire [0:num_vcs_per_class-1] 		     free_cvc;
+   wire [0:num_vcs-1] 		      next_elig_ovc;
+   wire [0:num_resource_classes*num_vcs_per_class-1] next_elig_orc_ocvc;
+   
+   wire [0:num_vcs-1] 				     free_ovc;
+   wire [0:num_resource_classes*num_vcs_per_class-1] free_orc_ocvc;
+   wire [0:num_vcs_per_class-1] 		     free_ocvc;
    wire 					     free;
    
    generate
@@ -695,13 +703,16 @@ module vcr_term_mac
 	     = packet_rvs_q[0:mc_idx_width-1] % 
 	       num_message_classes;
 	   
-	   assign next_free_rc_cvc
-	     = next_free_vc[mc_idx_rv*num_resource_classes*num_vcs_per_class +: 
-			    num_resource_classes*num_vcs_per_class];
+	   assign elig_orc = elig_opc[mc_idx_rv*num_resource_classes +:
+				      num_resource_classes];
 	   
-	   assign free_rc_cvc
-	     = free_vc[mc_idx_rv*num_resource_classes*num_vcs_per_class +: 
-		       num_resource_classes*num_vcs_per_class];
+	   assign next_elig_orc_ocvc
+	     = next_elig_ovc[mc_idx_rv*num_resource_classes*num_vcs_per_class +:
+			     num_resource_classes*num_vcs_per_class];
+	   
+	   assign free_orc_ocvc
+	     = free_ovc[mc_idx_rv*num_resource_classes*num_vcs_per_class +: 
+			num_resource_classes*num_vcs_per_class];
 	   
 	   c_decoder
 	     #(.num_ports(num_message_classes))
@@ -713,52 +724,131 @@ module vcr_term_mac
       else
 	begin
 	   assign sel_mc_rv = 1'b1;
-	   assign next_free_rc_cvc = next_free_vc;
-	   assign free_rc_cvc = free_vc;
+	   assign elig_orc = elig_opc;
+	   assign next_elig_orc_ocvc = next_elig_ovc;
+	   assign free_orc_ocvc = free_ovc;
 	end
       
       if(num_resource_classes > 1)
 	begin
 	   
-	   wire [0:rc_idx_width-1] rc_idx_rv;
-	   assign rc_idx_rv
+	   wire [0:rc_idx_width-1] orc_idx_rv;
+	   assign orc_idx_rv
 	     = packet_rvs_q[mc_idx_width:(mc_idx_width+rc_idx_width)-1] % 
 	       num_resource_classes;
 	   
-	   assign next_free_cvc
-	     = next_free_rc_cvc[rc_idx_rv*num_vcs_per_class +: 
-				num_vcs_per_class];
+	   assign elig = elig_orc[orc_idx_rv];
 	   
-	   assign free_cvc
-	     = free_rc_cvc[rc_idx_rv*num_vcs_per_class +: 
-			   num_vcs_per_class];
+	   assign next_elig_ocvc
+	     = next_elig_orc_ocvc[orc_idx_rv*num_vcs_per_class +: 
+				  num_vcs_per_class];
+	   
+	   assign free_ocvc
+	     = free_orc_ocvc[orc_idx_rv*num_vcs_per_class +: 
+			     num_vcs_per_class];
 	   
 	   c_decoder
 	     #(.num_ports(num_resource_classes))
-	   sel_rc_rv_dec
-	     (.data_in(rc_idx_rv),
-	      .data_out(sel_rc_rv));
+	   sel_orc_rv_dec
+	     (.data_in(orc_idx_rv),
+	      .data_out(sel_orc_rv));
 	   
 	end
       else
 	begin
-	   assign sel_rc_rv = 1'b1;
-	   assign next_free_cvc = next_free_rc_cvc;
-	   assign free_cvc = free_rc_cvc;
+	   assign sel_orc_rv = 1'b1;
+	   assign elig = elig_orc;
+	   assign next_elig_ocvc = next_elig_orc_ocvc;
+	   assign free_ocvc = free_orc_ocvc;
 	end
       
       if(num_vcs_per_class > 1)
 	begin
+	   
 	   c_select_1ofn
 	     #(.width(1),
 	       .num_ports(num_vcs_per_class))
 	   free_sel
-	     (.select(sel_cvc),
-	      .data_in(free_cvc),
+	     (.select(sel_ocvc),
+	      .data_in(free_ocvc),
 	      .data_out(free));
+	   
+	   genvar opc;
+	   
+	   for(opc = 0; opc < num_packet_classes; opc = opc + 1)
+	     begin:opcs
+		
+		wire [0:num_vcs_per_class-1] elig_ocvc;
+		assign elig_ocvc = elig_ovc[opc*num_vcs_per_class:
+					    (opc+1)*num_vcs_per_class-1];
+		
+		assign elig_opc[opc] = |elig_ocvc;
+		
+		wire [0:num_vcs_per_class-1] req_ocvc;
+		assign req_ocvc = elig_ocvc;
+		
+		wire [0:num_vcs_per_class-1] gnt_ocvc;
+		c_fp_arbiter
+		  #(.num_ports(num_vcs_per_class))
+		gnt_ocvc_arb
+		  (.req(req_ocvc),
+		   .gnt(gnt_ocvc));
+		
+		wire [0:num_vcs_per_class-1] next_elig_ocvc;
+		assign next_elig_ocvc = gnt_ocvc;
+		
+		assign next_elig_ovc[opc*num_vcs_per_class:
+				     (opc+1)*num_vcs_per_class-1]
+			 = next_elig_ocvc;
+		
+	     end
+	   
 	end
       else
-	assign free = free_cvc;
+	begin
+	   assign elig_opc = elig_ovc;
+	   assign next_elig_ovc = elig_ovc;
+	   assign free = free_ocvc;
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // input staging for flow control signals
+   //---------------------------------------------------------------------------
+   
+   wire [0:flow_ctrl_width-1] flow_ctrl_in_s, flow_ctrl_in_q;
+   assign flow_ctrl_in_s = flow_ctrl_in;
+   
+   wire 		      cred_valid_in_s, cred_valid_in_q;
+   assign cred_valid_in_s = flow_ctrl_in_s[0];
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   cred_valid_inq
+     (.clk(clk),
+      .reset(reset),
+      .d(cred_valid_in_s),
+      .q(cred_valid_in_q));
+   
+   assign flow_ctrl_in_q[0] = cred_valid_in_q;
+   
+   generate
+      
+      if(flow_ctrl_width > 1)
+	begin
+	   
+	   c_dff
+	     #(.width(flow_ctrl_width-1),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   flow_ctrl_inq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flow_ctrl_in_s[1:flow_ctrl_width-1]),
+	      .q(flow_ctrl_in_q[1:flow_ctrl_width-1]));
+	   
+	end
       
    endgenerate
    
@@ -767,91 +857,69 @@ module vcr_term_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
-   wire active;
+   wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
+   wire packet_valid_q;
    
-   wire flit_sent;
-   wire flit_tail;
+   wire [0:num_vcs*4-1] ovcc_errors_ovc;
+   
+   genvar 		ovc;
    
    generate
       
-      genvar 					       mc;
-      
-      for(mc = 0; mc < num_message_classes; mc = mc + 1)
-	begin:mcs
+      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+	begin:ovcs
 	   
-	   genvar rc;
+	   wire next_elig;
+	   assign next_elig = next_elig_ovc[ovc];
 	   
-	   for(rc = 0; rc < num_resource_classes; rc = rc + 1)
-	     begin:rcs
-		
-		wire sel;
-		assign sel = sel_mc_rv[mc] & sel_rc_rv[rc];
-		
-		genvar cvc;
-		
-		for(cvc = 0; cvc < num_vcs_per_class; cvc = cvc + 1)
-		  begin:cvcs
-		     // FIXME
-		  end
-		
-		wire [0:num_vcs_per_class-1] free_cvc_s, free_cvc_q;
-		assign free_cvc_s = free_cvc_q; // FIXME
-		c_dff
-		  #(.width(num_vcs_per_class),
-		    .reset_value({num_vcs_per_class{1'b1}}),
-		    .reset_type(reset_type))
-		free_cvcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(free_cvc_s),
-		   .q(free_cvc_q));
-		
-		assign free_vc[(mc*num_resource_classes+rc)*
-			       num_vcs_per_class:
-			       (mc*num_resource_classes+rc+1)*
-			       num_vcs_per_class-1]
-			 = free_cvc_q;
-		
-		wire [0:num_vcs_per_class-1] head_free_cvc_s, head_free_cvc_q;
-		assign head_free_cvc_s = head_free_cvc_q; // FIXME
-		c_dff
-		  #(.width(num_vcs_per_class),
-		    .reset_value({num_vcs_per_class{1'b1}}),
-		    .reset_type(reset_type))
-		head_free_cvcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(head_free_cvc_s),
-		   .q(head_free_cvc_q));
-		
-		wire [0:num_vcs_per_class-1] req_cvc;
-		assign req_cvc = free_cvc_s & head_free_cvc_s;
-		
-		wire [0:num_vcs_per_class-1] gnt_cvc;
-		c_fp_arbiter
-		  #(.num_ports(num_vcs_per_class))
-		gnt_cvc_arb
-		  (.req(req_cvc),
-		   .gnt(gnt_cvc));
-		
-		wire [0:num_vcs_per_class-1] next_free_cvc_s, next_free_cvc_q;
-		assign next_free_cvc_s = active ? gnt_cvc : next_free_cvc_q;
-		c_dff
-		  #(.width(num_vcs_per_class),
-		    .reset_type(reset_type))
-		next_free_cvcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(next_free_cvc_s),
-		   .q(next_free_cvc_q));
-		
-		assign next_free_vc[(mc*num_resource_classes+rc)*
-				    num_vcs_per_class:
-				    (mc*num_resource_classes+rc+1)*
-				    num_vcs_per_class-1]
-			 = next_free_cvc_q;
-		
-	     end
+	   wire sel;
+	   assign sel = sel_opc_rv[ovc / num_vcs_per_class];
+	   
+	   wire vc_gnt;
+	   assign vc_gnt = packet_valid_q & ~vc_alloc_q & sel & next_elig;
+	   
+	   wire match;
+	   wire elig;
+	   wire [0:1] int_flow_ctrl;
+	   wire [0:3] ovcc_errors;
+	   
+	   vcr_ovc_ctrl
+	     #(.num_flit_buffers(num_flit_buffers),
+	       .num_header_buffers(num_header_buffers),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .packet_format(packet_format),
+	       .vc_id(ovc),
+	       .track_vcs_at_output(0),
+	       .int_flow_ctrl_type(`INT_FLOW_CTRL_TYPE_LEVEL),
+	       .cred_level_width(2),
+	       .reset_type(reset_type))
+	   ovcc
+	     (.clk(clk),
+	      .reset(reset),
+	      .flow_ctrl(flow_ctrl_in_q),
+	      .vc_gnt(vc_gnt),
+	      .vc_gnt_ip({num_ports{1'b0}}),
+	      .vc_gnt_ivc({num_vcs{1'b0}}),
+	      .sw_gnt(1'b1),
+	      .sw_gnt_ip({num_ports{1'b0}}),
+	      .int_flit_ctrl(int_flit_ctrl),
+	      .match(match),
+	      .elig(elig),
+	      .int_flow_ctrl(int_flow_ctrl),
+	      .errors(ovcc_errors));
+	   
+	   wire free;
+	   assign free = int_flit_ctrl[0] ? int_flow_ctrl[0] : int_flow_ctrl[1];
+	   
+	   assign elig_ovc[ovc] = elig;
+	   assign free_ovc[ovc] = free;
+	   assign ovcc_errors_ovc[ovc*4:(ovc+1)*4-1] = ovcc_errors;
 	   
 	end
       
@@ -1013,7 +1081,7 @@ module vcr_term_mac
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .sel_rc(sel_rc_rv),
+      .sel_rc(sel_orc_rv),
       .route_info(route_info_rv),
       .route_port(route_port_rv),
       .inc_rc(inc_rc_rv));
@@ -1047,28 +1115,29 @@ module vcr_term_mac
 	   assign write_plength_sel_thresh
 	     = reg_write_q & reg_sel_plength_sel_thresh;
 	   
+	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_loadval;
+	   c_align
+	     #(.data_width(reg_data_width),
+	       .dest_width(plength_sel_rv_width),
+	       .offset(plength_sel_rv_width-reg_data_width))
+	   plength_sel_thresh_loadval_alg
+	     (.data_in(reg_data_q),
+	      .dest_in({plength_sel_rv_width{1'b0}}),
+	      .data_out(plength_sel_thresh_loadval));
+	   
 	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_s, 
 					   plength_sel_thresh_q;
 	   assign plength_sel_thresh_s = write_plength_sel_thresh ? 
-					 reg_data_q[0:plength_sel_rv_width-1] :
+					 plength_sel_thresh_loadval :
 					 plength_sel_thresh_q;
 	   c_dff
 	     #(.width(plength_sel_rv_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   plength_sel_threshq
 	     (.clk(clk),
 	      .reset(reset),
 	      .d(plength_sel_thresh_s),
 	      .q(plength_sel_thresh_q));
-	   
-	   c_align
-	     #(.data_width(plength_sel_rv_width),
-	       .dest_width(reg_data_width),
-	       .offset(0))
-	   reg_read_data_plength_sel_thresh_alg
-	     (.data_in(plength_sel_thresh_q),
-	      .dest_in({reg_data_width{1'b0}}),
-	      .data_out(reg_read_data_plength_sel_thresh));
 	   
 	   wire [0:plength_sel_rv_width-1] plength_sel_rv;
 	   assign plength_sel_rv
@@ -1079,28 +1148,27 @@ module vcr_term_mac
 	   wire 			   write_plength_vals;
 	   assign write_plength_vals = reg_write_q & reg_sel_plength_vals;
 	   
+	   wire [0:2*payload_length_width-1] plength_vals_loadval;
+	   c_align
+	     #(.data_width(reg_data_width),
+	       .dest_width(2*payload_length_width),
+	       .offset(2*payload_length_width-reg_data_width))
+	   plength_vals_loadval_alg
+	     (.data_in(reg_data_q),
+	      .dest_in({(2*payload_length_width){1'b0}}),
+	      .data_out(plength_vals_loadval));
+	   
 	   wire [0:2*payload_length_width-1] plength_vals_s, plength_vals_q;
 	   assign plength_vals_s
-	     = write_plength_vals ? 
-	       reg_data_q[0:2*payload_length_width-1] : 
-	       plength_vals_q;
+	     = write_plength_vals ? plength_vals_loadval : plength_vals_q;
 	   c_dff
 	     #(.width(2*payload_length_width),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   plength_valsq
 	     (.clk(clk),
 	      .reset(reset),
 	      .d(plength_vals_s),
 	      .q(plength_vals_q));
-	   
-	   c_align
-	     #(.data_width(2*payload_length_width),
-	       .dest_width(reg_data_width),
-	       .offset(0))
-	   reg_read_data_plength_vals_alg
-	     (.data_in(plength_vals_q),
-	      .dest_in({reg_data_width{1'b0}}),
-	      .data_out(reg_read_data_plength_vals));
 	   
 	   wire [0:payload_length_width-1] plength_rv;
 	   assign plength_rv
@@ -1128,9 +1196,6 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    
    wire 				   packet_count_zero_b;
-   wire 				   packet_valid_q;
-   
-   assign active = start | gen_packets | packet_count_zero_b | packet_valid_q;
    
    wire 				   packet_count_decr;
    assign packet_count_decr
@@ -1144,13 +1209,13 @@ module vcr_term_mac
    
    wire [0:packet_count_width-1] 	   packet_count_s, packet_count_q;
    assign packet_count_s
-     = active ?
+     = active_q ?
        ({packet_count_width{~start}} &
 	(packet_count_q + packet_count_incr - packet_count_decr)) : 
        packet_count_q;
    c_dff
      #(.width(packet_count_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    packet_countq
      (.clk(clk),
       .reset(reset),
@@ -1163,9 +1228,9 @@ module vcr_term_mac
    
    wire 				   packet_valid_s;
    assign packet_valid_s
-     = active ? 
-       (((packet_valid_q  & ~packet_sent) | 
-	 packet_count_zero_b | new_packet_rv) & 
+     = active_q ? 
+       (((packet_valid_q  & ~packet_sent) | packet_count_zero_b | 
+	 new_packet_rv) & 
 	~start) : 
        packet_valid_q;
    c_dff
@@ -1177,18 +1242,31 @@ module vcr_term_mac
       .d(packet_valid_s),
       .q(packet_valid_q));
    
-   assign flit_sent = packet_valid_q & (vc_alloc ? free : any_free);
+   wire 				   flit_sent;
+   assign flit_sent = packet_valid_q & (vc_alloc_q ? free : elig);
    
-   assign flit_ctrl_out[0] = flit_sent;
+   wire 				   flit_sent_s, flit_sent_q;
+   assign flit_sent_s = active_q ? flit_sent : flit_sent_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_sentq
+     (.clk(clk),
+      .reset(reset),
+      .d(flit_sent_s),
+      .q(flit_sent_q));
+   
+   assign flit_ctrl_out[0] = flit_sent_q;
+   assign int_flit_ctrl[0] = flit_sent_q;
    
    wire [0:packet_length_width-1] 	   flit_count_s, flit_count_q;
    assign flit_count_s
-     = active ? 
+     = active_q ? 
        ((start | packet_sent) ? flit_count_rv : (flit_count_q - flit_sent)) : 
        flit_count_q;
    c_dff
      #(.width(packet_length_width),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    flit_countq
      (.clk(clk),
       .reset(reset),
@@ -1199,52 +1277,89 @@ module vcr_term_mac
    assign flit_count_zero = ~|flit_count_q;
    
    assign packet_sent = flit_sent & flit_count_zero;
+   
+   wire 				   flit_tail;
    assign flit_tail = flit_count_zero;
    
-   wire [0:num_vcs_per_class-1] 	   vc_alloc_cvc_s, vc_alloc_cvc_q;
-   assign vc_alloc_cvc_s
-     = active ? 
-       ((vc_alloc_cvc_q & {num_vcs_per_class{~start & ~packet_sent}}) | 
-	({num_vcs_per_class{~vc_alloc}} & next_free_cvc)) : 
-       vc_alloc_cvc_q;
+   wire 				   flit_tail_s, flit_tail_q;
+   assign flit_tail_s = active_q ? flit_tail : flit_tail_q;
    c_dff
-     #(.width(num_vcs_per_class),
-       .reset_type(reset_type))
-   vc_alloc_cvcq
+     #(.width(1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_tailq
      (.clk(clk),
       .reset(reset),
-      .d(vc_alloc_cvc_s),
-      .q(vc_alloc_cvc_q));
-
-   assign vc_alloc_cvc = vc_alloc_cvc_q;
-   assign vc_alloc = |vc_alloc_cvc_q;
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+      
+   wire 				   vc_alloc_s;
+   assign vc_alloc_s
+     = active_q ? 
+       (vc_alloc_q ? (~start & ~packet_sent) : (packet_valid_q & elig)) : 
+       vc_alloc_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   vc_allocq
+     (.clk(clk),
+      .reset(reset),
+      .d(vc_alloc_s),
+      .q(vc_alloc_q));
+   
+   wire [0:num_vcs_per_class-1] 	   vc_alloc_ocvc_s;
+   assign vc_alloc_ocvc_s = active_q ? 
+			    (vc_alloc_q ? vc_alloc_ocvc_q : next_elig_ocvc) : 
+			    vc_alloc_ocvc_q;
+   c_dff
+     #(.width(num_vcs_per_class),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   vc_alloc_ocvcq
+     (.clk(clk),
+      .reset(reset),
+      .d(vc_alloc_ocvc_s),
+      .q(vc_alloc_ocvc_q));
    
    wire 				   flit_head;
+   wire 				   flit_head_q;
    
    generate
       
       if(max_payload_length > 0)
 	begin
 	   
-	   wire flit_head_s, flit_head_q;
-	   assign flit_head_s
-	     = active ? 
-	       ((flit_head_q & ~flit_sent) | start | packet_sent) : 
-	       flit_head_q;
+	   wire flit_head_gen_s, flit_head_gen_q;
+	   assign flit_head_gen_s
+	     = active_q ? 
+	       ((flit_head_gen_q & ~flit_sent) | start | packet_sent) : 
+	       flit_head_gen_q;
 	   c_dff
 	     #(.width(1),
-	       .reset_type(reset_type))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   flit_head_genq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_head_gen_s),
+	      .q(flit_head_gen_q));
+	   
+	   assign flit_head = flit_head_gen_q;
+	   
+	   wire flit_head_s;
+	   assign flit_head_s = active_q ? flit_head : flit_head_q;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   flit_headq
 	     (.clk(clk),
 	      .reset(reset),
 	      .d(flit_head_s),
 	      .q(flit_head_q));
 	   
-	   assign flit_head = flit_head_q;
-	   
 	end
       else
-	assign flit_head = 1'b1;
+	begin
+	   assign flit_head = 1'b1;
+	   assign flit_head_q = 1'b1;
+	end
       
       if(num_vcs > 1)
 	begin
@@ -1253,10 +1368,22 @@ module vcr_term_mac
 	   c_encoder
 	     #(.num_ports(num_vcs))
 	   flit_vc_enc
-	     (.data_in(sel_vc),
+	     (.data_in(sel_ovc),
 	      .data_out(flit_vc));
 	   
-	   assign flit_ctrl_out[1:1+vc_idx_width-1] = flit_vc;
+	   wire [0:vc_idx_width-1] flit_vc_s, flit_vc_q;
+	   assign flit_vc_s = active_q ? flit_vc : flit_vc_q;
+	   c_dff
+	     #(.width(vc_idx_width),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   flit_vcq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_vc_s),
+	      .q(flit_vc_q));
+	   	   
+	   assign flit_ctrl_out[1:1+vc_idx_width-1] = flit_vc_q;
+	   assign int_flit_ctrl[1:1+vc_idx_width-1] = flit_vc_q;
 	   
 	end
       
@@ -1265,167 +1392,181 @@ module vcr_term_mac
       
    endgenerate
    
-   assign flit_ctrl_out[1+vc_idx_width+0] = flit_head;
+   assign flit_ctrl_out[1+vc_idx_width+0] = flit_head_q;
+   assign int_flit_ctrl[1+vc_idx_width+0] = flit_head_q;
+   assign int_flit_ctrl[1+vc_idx_width+1] = flit_tail_q;
    
    
    //---------------------------------------------------------------------------
-   // generate random payload data and signature
+   // generate pseudo-random payload data
    //---------------------------------------------------------------------------
    
-   wire 				   write_flit_data_rv;
-   assign write_flit_data_rv = reg_write_q & reg_sel_flit_data_rv;
-
-   // zero-extend (or truncate) load value to full flit width
-   wire [0:flit_data_width-1] 		   flit_data_new;
+   wire [0:flit_data_width-1] 	   flit_data_rv_feedback;
+   c_fbgen
+     #(.width(flit_data_width),
+       .index(lfsr_index+2))
+   flit_data_rv_feedback_fbgen
+     (.feedback(flit_data_rv_feedback));
+   
+   wire [0:flit_data_width-1] 	   flit_data_rv_loadval;
    c_align
      #(.data_width(reg_data_width),
        .dest_width(flit_data_width),
-       .offset(0))
-   flit_data_new_alg
+       .offset(flit_data_width-reg_data_width))
+   flit_data_rv_loadval_alg
      (.data_in(reg_data_q),
       .dest_in({flit_data_width{1'b0}}),
-      .data_out(flit_data_new));
+      .data_out(flit_data_rv_loadval));
    
-   wire 				   flit_received;
-   assign flit_received = flit_ctrl_in[0];
+   wire [0:flit_data_width-1] 	   flit_data_rv_s, flit_data_rv_q;
+   assign flit_data_rv_s
+     = {flit_data_width{write_lfsr_seed}} & flit_data_rv_loadval;
+   c_lfsr
+     #(.width(flit_data_width),
+       .iterations(flit_data_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_data_rv_lfsr
+     (.clk(clk),
+      .reset(reset),
+      .load(write_lfsr_seed),
+      .run(flit_sent_q),
+      .feedback(flit_data_rv_feedback),
+      .complete(1'b1),
+      .d(flit_data_rv_s),
+      .q(flit_data_rv_q));
    
-   wire [0:flit_data_width-1] 		   flit_data_rv;
-   wire [0:flit_data_width-1] 		   flit_sig;
+   assign flit_data_out[0:header_info_width-1]
+	    = flit_head ? 
+	      header_info_rv : 
+	      flit_data_rv_q[0:header_info_width-1];
+   assign flit_data_out[header_info_width:flit_data_width-1]
+	    = flit_data_rv_q[header_info_width:flit_data_width-1];
    
-   genvar 				   blk;
+   
+   //---------------------------------------------------------------------------
+   // flit signature register
+   // =======================
+   // This is a MISR that computes a signature over all flit data received
+   // during the experiment.
+   //---------------------------------------------------------------------------
+   
+   wire [0:flit_data_width-1] 	   flit_sig_feedback;
+   c_fbgen
+     #(.width(flit_data_width),
+       .index(lfsr_index+3))
+   flit_sig_feedback_fbgen
+     (.feedback(flit_sig_feedback));
+   
+   wire [0:flit_data_width-1] 	   flit_sig_loadval;
+   assign flit_sig_loadval = {{(flit_data_width-1){1'b0}}, 1'b1};
+   
+   wire 			   update_flit_sig;
+   assign update_flit_sig = flit_ctrl_in[0] & active_q;
+   
+   wire [0:flit_data_width-1] 	   flit_sig_s, flit_sig_q;
+   assign flit_sig_s = start ? flit_sig_loadval : flit_data_in;
+   c_lfsr
+     #(.width(flit_data_width),
+       .iterations(1),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   flit_sig_lfsr
+     (.clk(clk),
+      .reset(reset),
+      .load(start),
+      .run(update_flit_sig),
+      .feedback(flit_sig_feedback),
+      .complete(1'b0),
+      .d(flit_sig_s),
+      .q(flit_sig_q));
+
+   // expand the signature to a multiple of reg_data_width, ...
+   wire [0:flit_sig_exp_width-1]   flit_sig_expanded;
+   c_align
+     #(.data_width(flit_data_width),
+       .dest_width(flit_sig_exp_width),
+       .offset(0))
+   flit_sig_reg_alg
+     (.data_in(flit_sig_q),
+      .dest_in({flit_sig_exp_width{1'b0}}),
+      .data_out(flit_sig_expanded));
+   
+   // ... and reduce it down to a single signature of width reg_data_width
+   c_xor_nto1
+     #(.num_ports(flit_sig_exp_width / reg_data_width),
+       .width(reg_data_width))
+   reg_read_data_flit_sig_xor
+     (.data_in(flit_sig_expanded),
+      .data_out(reg_read_data_flit_sig));
+   
+   
+   //---------------------------------------------------------------------------
+   // credit return path
+   //---------------------------------------------------------------------------
+   
+   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out_s, flow_ctrl_out_q;
+   assign flow_ctrl_out_s = flit_ctrl_in[0:flow_ctrl_width-1];
+   
+   wire 			     cred_valid_out_s, cred_valid_out_q;
+   assign cred_valid_out_s = flow_ctrl_out_s[0];
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   cred_valid_outq
+     (.clk(clk),
+      .reset(reset),
+      .d(cred_valid_out_s),
+      .q(cred_valid_out_q));
+   
+   assign flow_ctrl_out_q[0] = cred_valid_out_q;
    
    generate
       
-      for(blk = 0; blk < (flit_data_width / lfsr_width); blk = blk + 1)
-	begin:blks
-
-	   wire [0:lfsr_width-1] flit_data_rv_feedback;
-	   c_fbgen
-	     #(.width(lfsr_width),
-	       .index(2+blk))
-	   flit_data_rv_feedback_fbgen
-	     (.feedback(flit_data_rv_feedback));
-	   
-	   wire [0:lfsr_width-1] flit_data_rv_s, flit_data_rv_q;
-	   assign flit_data_rv_s
-	     = {lfsr_width{write_flit_data_rv}} & 
-	       flit_data_new[blk*lfsr_width:(blk+1)*lfsr_width-1];
-	   c_lfsr
-	     #(.width(lfsr_width),
-	       .iterations(lfsr_width),
-	       .reset_type(reset_type))
-	   flit_data_rv_lfsr
-	     (.clk(clk),
-	      .reset(reset),
-	      .load(write_flit_data_rv),
-	      .run(flit_sent),
-	      .feedback(flit_data_rv_feedback),
-	      .complete(1'b1),
-	      .d(flit_data_rv_s),
-	      .q(flit_data_rv_q));
-	   
-	   assign flit_data_rv[blk*lfsr_width:(blk+1)*lfsr_width-1]
-		    = flit_data_rv_q;
-	   
-	   wire [0:lfsr_width-1] flit_sig_s, flit_sig_q;
-	   assign flit_sig_s
-	     = {lfsr_width{flit_received & ~start}} & 
-	       flit_data_in[blk*lfsr_width:(blk+1)*lfsr_width-1];
-	   c_lfsr
-	     #(.width(lfsr_width),
-	       .iterations(lfsr_width),
-	       .reset_type(reset_type))
-	   flit_sig_lfsr
-	     (.clk(clk),
-	      .reset(reset),
-	      .load(start),
-	      .run(flit_received),
-	      .feedback(flit_data_rv_feedback),
-	      .complete(1'b1),
-	      .d(flit_sig_s),
-	      .q(flit_sig_q));
-	   
-	   assign flit_sig[blk*lfsr_width:(blk+1)*lfsr_width-1]
-		    = flit_sig_q;
-	   
-	end
-      
-      if((flit_data_width % lfsr_width) > 0)
+      if(flow_ctrl_width > 1)
 	begin
 	   
-	   wire [0:lfsr_width-1] flit_data_rv_feedback;
-	   c_fbgen
-	     #(.width(lfsr_width),
-	       .index(2+(flit_data_width / lfsr_width)))
-	   flit_data_rv_feedback_fbgen
-	     (.feedback(flit_data_rv_feedback));
-	   
-	   wire [0:lfsr_width-1] flit_data_rv_s, flit_data_rv_q;
-	   assign flit_data_rv_s[0:(flit_data_width % lfsr_width)-1]
-		    = {(flit_data_width % lfsr_width){write_flit_data_rv}} & 
-		      flit_data_new[(flit_data_width / lfsr_width)*lfsr_width:
-				    flit_data_width-1];
-	   assign flit_data_rv_s[(flit_data_width % lfsr_width):lfsr_width-1]
-		    = {(lfsr_width - (flit_data_width % lfsr_width)){1'b0}};
-	   c_lfsr
-	     #(.width(lfsr_width),
-	       .iterations(lfsr_width),
-	       .reset_type(reset_type))
-	   flit_data_rv_lfsr
+	   c_dff
+	     #(.width(flow_ctrl_width-1),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   flow_ctrl_outq
 	     (.clk(clk),
 	      .reset(reset),
-	      .load(write_flit_data_rv),
-	      .run(flit_sent),
-	      .feedback(flit_data_rv_feedback),
-	      .complete(1'b1),
-	      .d(flit_data_rv_s),
-	      .q(flit_data_rv_q));
+	      .d(flow_ctrl_out_s[1:flow_ctrl_width-1]),
+	      .q(flow_ctrl_out_q[1:flow_ctrl_width-1]));
 	   
-	   assign flit_data_rv[(flit_data_width / lfsr_width)*lfsr_width:
-			       flit_data_width-1]
-		    = flit_data_rv_q;
-
-	   wire [0:lfsr_width-1] flit_sig_s, flit_sig_q;
-	   assign flit_sig_s[0:(flit_data_width % lfsr_width)-1]
-		    = flit_data_in[(flit_data_width / lfsr_width)*lfsr_width:
-				   flit_data_width-1];
-	   assign flit_sig_s[(flit_data_width % lfsr_width):lfsr_width-1]
-		    = {(lfsr_width - (flit_data_width % lfsr_width)){1'b0}};
-	   c_lfsr
-	     #(.width(lfsr_width),
-	       .iterations(lfsr_width),
-	       .reset_type(reset_type))
-	   flit_sig_lfsr
-	     (.clk(clk),
-	      .reset(reset),
-	      .load(start),
-	      .run(flit_received),
-	      .feedback(flit_data_rv_feedback),
-	      .complete(1'b1),
-	      .d(flit_sig_s),
-	      .q(flit_sig_q));
-	   
-	   assign flit_sig[(flit_data_width / lfsr_width)*lfsr_width:
-			   flit_data_width-1]
-		    = flit_sig_q;
-
 	end
       
    endgenerate
    
-   assign flit_data_out[0:header_info_width-1]
-	    = flit_head ? header_info_rv : flit_data_rv[0:header_info_width-1];
-   assign flit_data_out[header_info_width:flit_data_width-1]
-	    = flit_data_rv[header_info_width:flit_data_width-1];
+   assign flow_ctrl_out = flow_ctrl_out_q;
    
-   c_align
-     #(.data_width(flit_data_width),
-       .dest_width(reg_data_width),
-       .offset(0))
-   reg_read_data_flit_data_rv_alg
-     (.data_in(flit_sig),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_flit_data_rv));
    
+   //---------------------------------------------------------------------------
+   // error checking
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:num_vcs*4-1] errors_s, errors_q;
+	   assign errors_s = ovcc_errors_ovc;
+	   c_err_rpt
+	     #(.num_errors(num_vcs*4),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
+	   
+	   assign error = |errors_q;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
    
 endmodule

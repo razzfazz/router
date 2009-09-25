@@ -68,7 +68,7 @@ module testbench
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // address within each dimensions
+   // current node's address
    localparam [0:addr_width-1] address = {addr_width{1'b0}};
    
    // connectivity within each dimension
@@ -131,17 +131,17 @@ module testbench
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
-   // number of internal registers
-   localparam num_regs = 8;
-   
-   // number of bits required to select an individual register
-   localparam reg_addr_width = clogb(num_regs);
+   // select set of feedback polynomials used for LFSRs
+   parameter lfsr_index = 0;
    
    // width of control register data
    parameter reg_data_width = 32;
    
+   // number of bits required to select an individual register
+   parameter reg_addr_width = 6;
+   
    // width of run cycle counter
-   parameter run_ctr_width = 16;
+   parameter num_packets_width = 16;
    
    // width of arrival rate LFSR
    parameter arrival_rv_width = 16;
@@ -149,27 +149,14 @@ module testbench
    // width of payload length selection LFSR
    parameter plength_sel_rv_width = 4;
    
-   // select width (and thus period) for LFSRs
-   parameter lfsr_width = 16;
+   // width of register that holds the number of outstanding packets
+   parameter packet_count_width = 8;
    
-   // feedback matrix
-   localparam [0:lfsr_width*lfsr_width-1] lfsr_feedback
-     = {16'b1100000000010110,
-	16'b0110000000001011,
-	16'b1011000000010011,
-	16'b1101100000011111,
-	16'b1110110000011001,
-	16'b1111011000011010,
-	16'b0111101100001101,
-	16'b1011110110010000,
-	16'b0101111011001000,
-	16'b0010111101100100,
-	16'b0001011110110010,
-	16'b0000101111011001,
-	16'b1000010111111010,
-	16'b0100001011111101,
-	16'b1010000101101000,
-	16'b1101000010100010};
+   // RNG seed value
+   parameter initial_seed = 0;
+   
+   // channel latency in cycles
+   parameter channel_latency = 1;
    
    reg 		    reset;
    reg 		    clk;
@@ -180,7 +167,7 @@ module testbench
    
    wire [0:flit_ctrl_width-1] flit_ctrl_out;
    wire [0:flit_data_width-1] flit_data_out;
-   reg [0:flow_ctrl_width-1]  flow_ctrl_in;
+   wire [0:flow_ctrl_width-1] flow_ctrl_in;
    
    reg 			      reg_write;
    reg 			      reg_read;
@@ -205,16 +192,20 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
-       . checker_enable(checker_enable),
-       .checker_capture_mode(checker_capture_mode),
+       .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
        .dim_order(dim_order),
-       .lfsr_width(lfsr_width),
+       .lfsr_index(lfsr_index),
+       .reg_data_width(reg_data_width),
+       .reg_addr_width(reg_addr_width),
+       .num_packets_width(num_packets_width),
+       .arrival_rv_width(arrival_rv_width),
+       .plength_sel_rv_width(plength_sel_rv_width),
+       .packet_count_width(packet_count_width),
        .reset_type(reset_type))
    dut
      (.clk(clk),
       .reset(reset),
-      .lfsr_feedback(lfsr_feedback),
       .address(address),
       .flit_ctrl_out(flit_ctrl_out),
       .flit_data_out(flit_data_out),
@@ -229,6 +220,94 @@ module testbench
       .reg_read_data(reg_read_data),
       .reg_done(reg_done),
       .error(error));
+   
+   wire [0:flit_ctrl_width-1] flit_ctrl_dly;
+   
+   generate
+      
+      if(channel_latency == 0)
+	assign flit_ctrl_dly = flit_ctrl_out;
+      else
+	begin
+	   
+	   wire [0:channel_latency*flit_ctrl_width-1] flit_ctrl_dly_s,
+						      flit_ctrl_dly_q;
+	   c_dff
+	     #(.width(channel_latency*flit_ctrl_width),
+	       .reset_type(reset_type))
+	   flit_ctrl_dlyq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_ctrl_dly_s),
+	      .q(flit_ctrl_dly_q));
+	   
+	   if(channel_latency == 1)
+	     begin
+		assign flit_ctrl_dly_s = flit_ctrl_out;
+		assign flit_ctrl_dly = flit_ctrl_dly_q;
+	     end
+	   else
+	     begin
+		assign flit_ctrl_dly_s
+		  = {flit_ctrl_out, 
+		     flit_ctrl_dly_q[0:(channel_latency-1)*flit_ctrl_width-1]};
+		assign flit_ctrl_dly
+		  = flit_ctrl_dly_q[(channel_latency-1)*flit_ctrl_width:
+				    channel_latency*flit_ctrl_width-1];
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   wire [0:flow_ctrl_width-1] flow_ctrl_s, flow_ctrl_q;
+   assign flow_ctrl_s = flit_ctrl_dly[0:1+vc_idx_width-1];
+   c_dff
+     #(.width(flow_ctrl_width),
+       .reset_type(reset_type))
+   flow_ctrlq
+     (.clk(clk),
+      .reset(reset),
+      .d(flow_ctrl_s),
+      .q(flow_ctrl_q));
+   
+   generate
+      
+      if(channel_latency == 0)
+	assign flow_ctrl_in = flow_ctrl_q;
+      else
+	begin
+	   
+	   wire [0:channel_latency*flow_ctrl_width-1] flow_ctrl_dly_s,
+						      flow_ctrl_dly_q;
+	   c_dff
+	     #(.width(channel_latency*flow_ctrl_width),
+	       .reset_type(reset_type))
+	   flow_ctrl_dlyq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flow_ctrl_dly_s),
+	      .q(flow_ctrl_dly_q));
+	   
+	   if(channel_latency == 1)
+	     begin
+		assign flow_ctrl_dly_s = flow_ctrl_q;
+		assign flow_ctrl_in = flow_ctrl_dly_q;
+	     end
+	   else
+	     begin
+		assign flow_ctrl_dly_s
+		  = {flow_ctrl_q,
+		     flow_ctrl_dly_q[0:(channel_latency-1)*
+				     flow_ctrl_width-1]};
+		assign flow_ctrl_in
+		  = flow_ctrl_dly_q[(channel_latency-1)*flow_ctrl_width:
+				    channel_latency*flow_ctrl_width-1];
+	     end
+	   
+	end
+      
+   endgenerate
    
    reg 			      clk_en;
    
@@ -250,6 +329,8 @@ module testbench
      end
    
    reg done;
+   integer i;
+   integer seed = initial_seed;
    
    initial
    begin
@@ -269,7 +350,6 @@ module testbench
       done = 1'b0;
       flit_ctrl_in = 'd0;
       flit_data_in = 'd0;
-      flow_ctrl_in = 'd0;
       
       #(Tclk);
       
@@ -282,8 +362,9 @@ module testbench
       #(Tclk);
       
       reg_write = 1'b1;
-      reg_addr = 'd1;
-      reg_write_data[0:run_ctr_width-1] = 'd20;
+      reg_addr = 'd3;
+      for(i = 0; i < reg_data_width; i = i + 1)
+	reg_write_data[i] = $dist_uniform(seed, 0, 1);
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -291,8 +372,8 @@ module testbench
       #(Tclk);
       
       reg_write = 1'b1;
-      reg_addr = 'd3;
-      reg_write_data[0:arrival_rv_width-1] = 'd16384;
+      reg_addr = 'd4;
+      reg_write_data = 'd20;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -301,7 +382,7 @@ module testbench
       
       reg_write = 1'b1;
       reg_addr = 'd5;
-      reg_write_data[0:plength_sel_rv_width-1] = 'd8;
+      reg_write_data = 'd16384;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -310,8 +391,16 @@ module testbench
       
       reg_write = 1'b1;
       reg_addr = 'd6;
-      reg_write_data[0:payload_length_width-1] = 'd0;
-      reg_write_data[payload_length_width:2*payload_length_width-1] = 'd4;
+      reg_write_data = 'd1;
+      while(!reg_done)
+	#(Tclk);
+      reg_write = 1'b0;
+      
+      #(Tclk);
+      
+      reg_write = 1'b1;
+      reg_addr = 'd7;
+      reg_write_data = 'd4;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -331,11 +420,11 @@ module testbench
 	   #(10*Tclk);
 	   
 	   reg_read = 1'b1;
-	   reg_addr = 'd0;
+	   reg_addr = 'd1;
 	   while(!reg_done)
 	     #(Tclk);
 	   reg_read = 1'b0;
-	   done = ~|reg_read_data;
+	   done = ~reg_read_data[0];
 	   
 	end
       
