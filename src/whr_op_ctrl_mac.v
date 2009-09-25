@@ -525,11 +525,17 @@ module whr_op_ctrl_mac
       .d(cred_count_s),
       .q(cred_count_q));
    
+   wire 					 cred_count_zero;
+   assign cred_count_zero = ~|cred_count_q;
+   
    wire 					 error_ct_underflow;
-   assign error_ct_underflow = (cred_count_q == 0) && debit;
+   assign error_ct_underflow = cred_count_zero & debit;
+   
+   wire 					 cred_count_all;
+   assign cred_count_all = (cred_count_q == num_flit_buffers);
    
    wire 					 error_ct_overflow;
-   assign error_ct_overflow = (cred_count_q == num_flit_buffers) && credit;
+   assign error_ct_overflow = cred_count_all & credit;
    
    // Instead of just computing this as the reduction of of the updated credit
    // count sum, we can optimize a bit. In particular, we have one or more 
