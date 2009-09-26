@@ -352,16 +352,19 @@ module vcr_term_mac
    
    wire [0:reg_data_width-1] reg_read_data_status;
    wire [0:reg_data_width-1] reg_read_data_flit_sig;
+   wire [0:reg_data_width-1] reg_read_data_num_packets;
    
    wire [0:reg_data_width-1] reg_read_data_muxed;
    c_select_1ofn
-     #(.num_ports(2),
+     #(.num_ports(3),
        .width(reg_data_width))
    reg_read_data_muxed_sel
      (.select({reg_sel_status,
-	       reg_sel_flit_sig}),
+	       reg_sel_flit_sig,
+	       reg_sel_num_packets}),
       .data_in({reg_read_data_status,
-		reg_read_data_flit_sig}),
+		reg_read_data_flit_sig,
+		reg_read_data_num_packets}),
       .data_out(reg_read_data_muxed));
    
    wire [0:reg_data_width-1] reg_data_s, reg_data_q;
@@ -397,36 +400,45 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    // run control register
    // ====================
-   // writing to this register starts the experiment
+   // setting the MSB of this register to 1'b1 wakes up the terminal and starts 
+   // the experiment; setting it to 1'b0 stops it and puts the terminal into 
+   // idle mode
    //---------------------------------------------------------------------------
    
    wire 		     write_ctrl;
    assign write_ctrl = reg_write_q & reg_sel_ctrl;
    
-   wire 		     start;
-   
-   wire 		     next_start;
-   assign next_start = write_ctrl & ~start;
-   
-   wire 		     ctrl_s, ctrl_q;
-   assign ctrl_s = reg_active_q ? next_start : ctrl_q;
+   wire 		     active_s, active_q;
+   assign active_s = write_ctrl ? reg_data_q[0] : active_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   ctrlq
+   activeq
      (.clk(clk),
       .reset(reset),
-      .d(ctrl_s),
-      .q(ctrl_q));
+      .d(active_s),
+      .q(active_q));
    
-   assign start = ctrl_q;
+   wire 		     start_s, start_q;
+   assign start_s = write_ctrl ? (reg_data_q[0] & ~active_q) : start_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   startq
+     (.clk(clk),
+      .reset(reset),
+      .d(start_s),
+      .q(start_q));
+   
+   wire 		     start;
+   assign start = start_q;
    
    
    //---------------------------------------------------------------------------
    // status register
    // ===============
    // reading from this register returns a non-zero value for as long as there 
-   // are more packets and/or flits to send
+   // are packets and/or flits left to send
    //---------------------------------------------------------------------------
    
    wire 		     packet_count_zero;
@@ -438,29 +450,26 @@ module vcr_term_mac
    assign last_credit_received
      = (~gen_packets & packet_count_zero & ~packet_valid_q & &empty_ovc);
    
-   wire 		     num_packets_zero_b;
-   
-   wire 		     active_s, active_q;
-   assign active_s
-     = (reg_active_q | active_q) ? 
-//       (next_start ? num_packets_zero_b : (active_q & ~last_credit_received)) : 
-     ((active_q & ~last_credit_received) | next_start | start) :
-     active_q;
+   wire 		     running_s, running_q;
+   assign running_s
+     = (reg_active_q | running_q) ? 
+       ((running_q & ~last_credit_received) | start) : 
+       running_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   activeq
+   runningq
      (.clk(clk),
       .reset(reset),
-      .d(active_s),
-      .q(active_q));
+      .d(running_s),
+      .q(running_q));
    
    c_align
      #(.data_width(1),
        .dest_width(reg_data_width),
        .offset(0))
    reg_read_data_status_alg
-     (.data_in(active_q),
+     (.data_in(running_q),
       .dest_in({reg_data_width{1'b0}}),
       .data_out(reg_read_data_status));
    
@@ -485,9 +494,21 @@ module vcr_term_mac
       .dest_in({num_packets_width{1'b0}}),
       .data_out(num_packets_loadval));
    
-   wire [0:num_packets_width-1]       num_packets_s, num_packets_q;
+   wire 			      num_packets_zero;
+   wire [0:num_packets_width-1]       num_packets_q;
+   wire 			      inf_packets_q;
+   wire 			      new_packet_rv;
+   
+   wire [0:num_packets_width-1]       num_packets_next;
+   assign num_packets_next = (inf_packets_q | num_packets_zero) ? 
+			     num_packets_q : 
+			     (num_packets_q - new_packet_rv);
+   
+   wire [0:num_packets_width-1]       num_packets_s;
    assign num_packets_s
-     = write_num_packets ? num_packets_loadval : num_packets_q;
+     = (write_num_packets | active_q) ? 
+       (write_num_packets ? num_packets_loadval : num_packets_next) : 
+       num_packets_q;
    c_dff
      #(.width(num_packets_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -496,13 +517,22 @@ module vcr_term_mac
       .reset(reset),
       .d(num_packets_s),
       .q(num_packets_q));
+
+   assign num_packets_zero = ~|num_packets_q;
    
-   assign num_packets_zero_b = |num_packets_q;
+   c_align
+     #(.data_width(num_packets_width),
+       .dest_width(reg_data_width),
+       .offset(reg_data_width-num_packets_width))
+   reg_read_data_num_packets_alg
+     (.data_in(num_packets_q),
+      .dest_in({reg_data_width{1'b0}}),
+      .data_out(reg_read_data_num_packets));
    
    wire 			      inf_packets_loadval;
    assign inf_packets_loadval = &num_packets_loadval;
    
-   wire 			      inf_packets_s, inf_packets_q;
+   wire 			      inf_packets_s;
    assign inf_packets_s
      = write_num_packets ? inf_packets_loadval : inf_packets_q;
    c_dff
@@ -514,12 +544,12 @@ module vcr_term_mac
       .d(inf_packets_s),
       .q(inf_packets_q));
    
+   assign gen_packets = active_q & (~num_packets_zero | inf_packets_q);
+   
    
    //---------------------------------------------------------------------------
    // run counter
    //---------------------------------------------------------------------------
-   
-   wire 			      new_packet_rv;
    
    wire 			      update_run_ctr;
    assign update_run_ctr = start | (gen_packets & ~inf_packets_q);
@@ -537,8 +567,6 @@ module vcr_term_mac
       .reset(reset),
       .d(run_ctr_s),
       .q(run_ctr_q));
-   
-   assign gen_packets = |run_ctr_q;
    
    
    //---------------------------------------------------------------------------
