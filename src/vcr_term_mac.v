@@ -1330,7 +1330,7 @@ module vcr_term_mac
    wire 				   vc_alloc_s;
    assign vc_alloc_s
      = active_q ? 
-       (vc_alloc_q ? (~start & ~packet_sent) : (packet_valid_q & elig)) : 
+       ((vc_alloc_q | (packet_valid_q & elig)) & ~start & ~packet_sent) : 
        vc_alloc_q;
    c_dff
      #(.width(1),
