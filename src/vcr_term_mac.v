@@ -380,7 +380,7 @@ module vcr_term_mac
       .d(reg_data_s),
       .q(reg_data_q));
    
-   assign reg_read_data = reg_data_q;
+   assign reg_read_data = reg_data_q & {reg_data_width{reg_read_q}};
    
    wire 		     reg_done_s, reg_done_q;
    assign reg_done_s
@@ -400,9 +400,11 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    // run control register
    // ====================
-   // setting the MSB of this register to 1'b1 wakes up the terminal and starts 
+   // Setting bit 0 of this register to 1'b1 wakes up the terminal and starts 
    // the experiment; setting it to 1'b0 stops it and puts the terminal into 
-   // idle mode
+   // idle mode.
+   // If bit 1 of this register is set, the traffic generator is operated in
+   // loopback mode; i.e., its outputs are fed back into its inputs.
    //---------------------------------------------------------------------------
    
    wire 		     write_ctrl;
@@ -418,6 +420,26 @@ module vcr_term_mac
       .reset(reset),
       .d(active_s),
       .q(active_q));
+   
+   wire 		     loopback_s, loopback_q;
+   assign loopback_s = write_ctrl ? reg_data_q[1] : loopback_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   loopbackq
+     (.clk(clk),
+      .reset(reset),
+      .d(loopback_s),
+      .q(loopback_q));
+   
+   wire [0:flit_ctrl_width-1] 	   flit_ctrl_muxed;
+   assign flit_ctrl_muxed = loopback_q ? flit_ctrl_out : flit_ctrl_in;
+   
+   wire [0:flit_data_width-1] 	   flit_data_muxed;
+   assign flit_data_muxed = loopback_q ? flit_data_out : flit_data_in;
+
+   wire [0:flow_ctrl_width-1] 	   flow_ctrl_muxed;
+   assign flow_ctrl_muxed = loopback_q ? flow_ctrl_out : flow_ctrl_in;
    
    wire 		     start_s, start_q;
    assign start_s = write_ctrl ? (reg_data_q[0] & ~active_q) : start_q;
@@ -852,7 +874,7 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    
    wire [0:flow_ctrl_width-1] flow_ctrl_in_s, flow_ctrl_in_q;
-   assign flow_ctrl_in_s = flow_ctrl_in;
+   assign flow_ctrl_in_s = flow_ctrl_muxed;
    
    wire 		      cred_valid_in_s, cred_valid_in_q;
    assign cred_valid_in_s = flow_ctrl_in_s[0];
@@ -1496,10 +1518,10 @@ module vcr_term_mac
    assign flit_sig_loadval = {{(flit_data_width-1){1'b0}}, 1'b1};
    
    wire 			   update_flit_sig;
-   assign update_flit_sig = flit_ctrl_in[0] & active_q;
+   assign update_flit_sig = flit_ctrl_muxed[0] & active_q;
    
    wire [0:flit_data_width-1] 	   flit_sig_s, flit_sig_q;
-   assign flit_sig_s = start ? flit_sig_loadval : flit_data_in;
+   assign flit_sig_s = start ? flit_sig_loadval : flit_data_muxed;
    c_lfsr
      #(.width(flit_data_width),
        .iterations(1),
@@ -1538,10 +1560,10 @@ module vcr_term_mac
    // credit return path
    //---------------------------------------------------------------------------
    
-   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out_s, flow_ctrl_out_q;
-   assign flow_ctrl_out_s = flit_ctrl_in[0:flow_ctrl_width-1];
+   wire [0:flow_ctrl_width-1] 	   flow_ctrl_out_s, flow_ctrl_out_q;
+   assign flow_ctrl_out_s = flit_ctrl_muxed[0:flow_ctrl_width-1];
    
-   wire 			     cred_valid_out_s, cred_valid_out_q;
+   wire 			   cred_valid_out_s, cred_valid_out_q;
    assign cred_valid_out_s = flow_ctrl_out_s[0];
    c_dff
      #(.width(1),

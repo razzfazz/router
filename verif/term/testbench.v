@@ -410,6 +410,8 @@ module testbench
       reg_write = 1'b1;
       reg_addr = 'd0;
       reg_write_data[0] = 'd1;
+      reg_write_data[1] = 'd0;
+      reg_write_data[2:reg_data_width-1] = 'd0;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -427,12 +429,56 @@ module testbench
 	   done = ~reg_read_data[0];
 	   
 	end
+      done = 1'b0;
       
       #(Tclk);
       
       reg_write = 1'b1;
       reg_addr = 'd0;
-      reg_write_data[0] = 'd0;
+      reg_write_data = 'd0;
+      while(!reg_done)
+	#(Tclk);
+      reg_write = 1'b0;
+      
+      #(Tclk);
+      
+      reg_write = 1'b1;
+      reg_addr = 'd4;
+      reg_write_data = 'd20;
+      while(!reg_done)
+	#(Tclk);
+      reg_write = 1'b0;
+      
+      #(10*Tclk);
+      
+      reg_write = 1'b1;
+      reg_addr = 'd0;
+      reg_write_data[0] = 'd1;
+      reg_write_data[1] = 'd1;
+      while(!reg_done)
+	#(Tclk);
+      reg_write = 1'b0;
+      
+      while(!done)
+	begin
+	   
+	   #(10*Tclk);
+	   
+	   reg_read = 1'b1;
+	   reg_addr = 'd1;
+	   while(!reg_done)
+	     #(Tclk);
+	   reg_read = 1'b0;
+	   done = ~reg_read_data[0];
+	   
+	end
+      done = 1'b0;
+      
+      #(Tclk);
+      
+      reg_write = 1'b1;
+      reg_addr = 'd0;
+      reg_write_data = 'd0;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
