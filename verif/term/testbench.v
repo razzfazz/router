@@ -391,7 +391,7 @@ module testbench
       
       reg_write = 1'b1;
       reg_addr = 'd6;
-      reg_write_data = 'd1;
+      reg_write_data = 'd8;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -400,7 +400,7 @@ module testbench
       
       reg_write = 1'b1;
       reg_addr = 'd7;
-      reg_write_data = 'd4;
+      reg_write_data = 'd0 + 'd4;
       while(!reg_done)
 	#(Tclk);
       reg_write = 1'b0;
@@ -427,6 +427,15 @@ module testbench
 	   done = ~reg_read_data[0];
 	   
 	end
+      
+      #(Tclk);
+      
+      reg_write = 1'b1;
+      reg_addr = 'd0;
+      reg_write_data[0] = 'd0;
+      while(!reg_done)
+	#(Tclk);
+      reg_write = 1'b0;
       
       #(3*Tclk/4);
       
