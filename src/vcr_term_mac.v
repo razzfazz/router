@@ -411,7 +411,8 @@ module vcr_term_mac
    assign write_ctrl = reg_write_q & reg_sel_ctrl;
    
    wire 		     active_s, active_q;
-   assign active_s = write_ctrl ? reg_data_q[0] : active_q;
+   assign active_s
+     = reg_active_q ? (write_ctrl ? reg_data_q[0] : active_q) : active_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -422,7 +423,8 @@ module vcr_term_mac
       .q(active_q));
    
    wire 		     loopback_s, loopback_q;
-   assign loopback_s = write_ctrl ? reg_data_q[1] : loopback_q;
+   assign loopback_s
+     = reg_active_q ? (write_ctrl ? reg_data_q[1] : loopback_q) : loopback_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -442,7 +444,9 @@ module vcr_term_mac
    assign flow_ctrl_muxed = loopback_q ? flow_ctrl_out : flow_ctrl_in;
    
    wire 		     start_s, start_q;
-   assign start_s = write_ctrl ? (reg_data_q[0] & ~active_q) : start_q;
+   assign start_s = reg_active_q ? 
+		    (write_ctrl ? (reg_data_q[0] & ~active_q) : start_q) : 
+		    start_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -451,9 +455,6 @@ module vcr_term_mac
       .reset(reset),
       .d(start_s),
       .q(start_q));
-   
-   wire 		     start;
-   assign start = start_q;
    
    
    //---------------------------------------------------------------------------
@@ -473,10 +474,9 @@ module vcr_term_mac
      = (~gen_packets & packet_count_zero & ~packet_valid_q & &empty_ovc);
    
    wire 		     running_s, running_q;
-   assign running_s
-     = (reg_active_q | running_q) ? 
-       ((running_q & ~last_credit_received) | start) : 
-       running_q;
+   assign running_s = active_q ? 
+		      ((running_q & ~last_credit_received) | start_q) : 
+		      running_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -522,13 +522,13 @@ module vcr_term_mac
    wire 			      new_packet_rv;
    
    wire [0:num_packets_width-1]       num_packets_next;
-   assign num_packets_next = (inf_packets_q | num_packets_zero) ? 
+   assign num_packets_next = (~active_q | inf_packets_q | num_packets_zero) ? 
 			     num_packets_q : 
 			     (num_packets_q - new_packet_rv);
    
    wire [0:num_packets_width-1]       num_packets_s;
    assign num_packets_s
-     = (write_num_packets | active_q) ? 
+     = (reg_active_q | active_q) ? 
        (write_num_packets ? num_packets_loadval : num_packets_next) : 
        num_packets_q;
    c_dff
@@ -556,7 +556,9 @@ module vcr_term_mac
    
    wire 			      inf_packets_s;
    assign inf_packets_s
-     = write_num_packets ? inf_packets_loadval : inf_packets_q;
+     = reg_active_q ? 
+       (write_num_packets ? inf_packets_loadval : inf_packets_q) : 
+       inf_packets_q;
    c_dff
      #(.width(1),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -574,13 +576,12 @@ module vcr_term_mac
    //---------------------------------------------------------------------------
    
    wire 			      update_run_ctr;
-   assign update_run_ctr = start | (gen_packets & ~inf_packets_q);
+   assign update_run_ctr = gen_packets & ~inf_packets_q & new_packet_rv;
    
    wire [0:num_packets_width-1] 	      run_ctr_s, run_ctr_q;
-   assign run_ctr_s
-     = update_run_ctr ?
-       (start ? num_packets_q : (run_ctr_q - new_packet_rv)) :
-       run_ctr_q;
+   assign run_ctr_s = active_q ?
+		      (start_q ? num_packets_q : (run_ctr_q - update_run_ctr)) :
+		      run_ctr_q;
    c_dff
      #(.width(num_packets_width),
        .reset_type(reset_type))
@@ -647,7 +648,9 @@ module vcr_term_mac
    
    wire [0:arrival_rv_width-1] 	      arrival_thresh_s, arrival_thresh_q;
    assign arrival_thresh_s
-     = write_arrival_thresh ? arrival_thresh_loadval : arrival_thresh_q;
+     = reg_active_q ? 
+       (write_arrival_thresh ? arrival_thresh_loadval : arrival_thresh_q) : 
+       arrival_thresh_q;
    c_dff
      #(.width(arrival_rv_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -1184,8 +1187,10 @@ module vcr_term_mac
 	   
 	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_s, 
 					   plength_sel_thresh_q;
-	   assign plength_sel_thresh_s = write_plength_sel_thresh ? 
-					 plength_sel_thresh_loadval :
+	   assign plength_sel_thresh_s = reg_active_q ? 
+					 (write_plength_sel_thresh ? 
+					  plength_sel_thresh_loadval :
+					  plength_sel_thresh_q) : 
 					 plength_sel_thresh_q;
 	   c_dff
 	     #(.width(plength_sel_rv_width),
@@ -1217,7 +1222,9 @@ module vcr_term_mac
 	   
 	   wire [0:2*payload_length_width-1] plength_vals_s, plength_vals_q;
 	   assign plength_vals_s
-	     = write_plength_vals ? plength_vals_loadval : plength_vals_q;
+	     = reg_active_q ? 
+	       (write_plength_vals ? plength_vals_loadval : plength_vals_q) : 
+	       plength_vals_q;
 	   c_dff
 	     #(.width(2*payload_length_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -1267,7 +1274,7 @@ module vcr_term_mac
    wire [0:packet_count_width-1] 	   packet_count_s, packet_count_q;
    assign packet_count_s
      = active_q ?
-       ({packet_count_width{~start}} &
+       ({packet_count_width{~start_q}} &
 	(packet_count_q + packet_count_incr - packet_count_decr)) : 
        packet_count_q;
    c_dff
@@ -1288,7 +1295,7 @@ module vcr_term_mac
      = active_q ? 
        (((packet_valid_q  & ~packet_sent) | packet_count_zero_b | 
 	 new_packet_rv) & 
-	~start) : 
+	~start_q) : 
        packet_valid_q;
    c_dff
      #(.width(1),
@@ -1319,7 +1326,7 @@ module vcr_term_mac
    wire [0:packet_length_width-1] 	   flit_count_s, flit_count_q;
    assign flit_count_s
      = active_q ? 
-       ((start | packet_sent) ? flit_count_rv : (flit_count_q - flit_sent)) : 
+       ((start_q | packet_sent) ? flit_count_rv : (flit_count_q - flit_sent)) : 
        flit_count_q;
    c_dff
      #(.width(packet_length_width),
@@ -1352,7 +1359,7 @@ module vcr_term_mac
    wire 				   vc_alloc_s;
    assign vc_alloc_s
      = active_q ? 
-       ((vc_alloc_q | (packet_valid_q & elig)) & ~start & ~packet_sent) : 
+       ((vc_alloc_q | (packet_valid_q & elig)) & ~start_q & ~packet_sent) : 
        vc_alloc_q;
    c_dff
      #(.width(1),
@@ -1387,7 +1394,7 @@ module vcr_term_mac
 	   wire flit_head_gen_s, flit_head_gen_q;
 	   assign flit_head_gen_s
 	     = active_q ? 
-	       ((flit_head_gen_q & ~flit_sent) | start | packet_sent) : 
+	       ((flit_head_gen_q & ~flit_sent) | start_q | packet_sent) : 
 	       flit_head_gen_q;
 	   c_dff
 	     #(.width(1),
@@ -1521,7 +1528,7 @@ module vcr_term_mac
    assign update_flit_sig = flit_ctrl_muxed[0] & active_q;
    
    wire [0:flit_data_width-1] 	   flit_sig_s, flit_sig_q;
-   assign flit_sig_s = start ? flit_sig_loadval : flit_data_muxed;
+   assign flit_sig_s = start_q ? flit_sig_loadval : flit_data_muxed;
    c_lfsr
      #(.width(flit_data_width),
        .iterations(1),
@@ -1529,7 +1536,7 @@ module vcr_term_mac
    flit_sig_lfsr
      (.clk(clk),
       .reset(reset),
-      .load(start),
+      .load(start_q),
       .run(update_flit_sig),
       .feedback(flit_sig_feedback),
       .complete(1'b0),
