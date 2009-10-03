@@ -328,6 +328,7 @@ module vcr_top
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),
 	       .header_fifo_type(header_fifo_type),
+	       .fbf_register_output(fbf_register_output),
 	       .vc_alloc_type(vc_alloc_type),
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),

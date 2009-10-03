@@ -402,6 +402,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*int_flit_ctrl_width-1] int_flit_ctrl_out_ivc;
    wire [0:num_vcs*fbf_addr_width-1] 	  fbc_write_addr_ivc;
    wire [0:num_vcs*fbf_addr_width-1] 	  fbc_read_addr_ivc;
+   wire [0:num_vcs-1] 			  fbc_empty_ivc;
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_read_offset_ivc;
@@ -437,6 +438,7 @@ module vcr_ip_ctrl_mac
 	   wire [0:la_route_info_width-1] la_route_info;
 	   wire [0:fbf_addr_width-1] 	  fbc_write_addr;
 	   wire [0:fbf_addr_width-1] 	  fbc_read_addr;
+	   wire 			  fbc_empty;
 	   wire [0:5] 			  ivcc_errors;
 	   wire [0:5] 			  events;
 	   vcr_ivc_ctrl
@@ -483,6 +485,7 @@ module vcr_ip_ctrl_mac
 	      .la_route_info_out(la_route_info),
 	      .fbc_write_addr(fbc_write_addr),
 	      .fbc_read_addr(fbc_read_addr),
+	      .fbc_empty(fbc_empty),
 	      .errors(ivcc_errors),
 	      .events(events));
 	   
@@ -521,6 +524,7 @@ module vcr_ip_ctrl_mac
 				      (ivc+1)*flit_buffer_idx_width-1]
 		    = fbc_read_addr[fbf_addr_width-flit_buffer_idx_width:
 				    fbf_addr_width-1];
+	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign ivcc_errors_ivc[ivc*6:(ivc+1)*6-1] = ivcc_errors;
 	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
 	   
@@ -941,16 +945,21 @@ module vcr_ip_ctrl_mac
 	   
 	   assign fbf_read_addr = fbc_read_addr;
 	   
+	   wire 		      fbc_empty;
+	   assign fbc_empty = |(vc_sel_ivc & fbc_empty_ivc);
+	   
 	   wire [0:flit_data_width-1] flit_read_data_s, flit_read_data_q;
 	   assign flit_read_data_s
-	     = fbf_read_enable ? fbf_read_data : flit_read_data_q;
+	     = fbf_read_enable ? 
+	       (fbc_empty ? flit_data_in_q : fbf_read_data) : 
+	       flit_read_data_q;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
 	   flit_read_dataq
 	     (.clk(clk),
 	      .reset(reset),
-	      .s(flit_read_data_s),
+	      .d(flit_read_data_s),
 	      .q(flit_read_data_q));
 	   
 	   assign flit_read_data = flit_read_data_q;

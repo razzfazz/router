@@ -35,7 +35,7 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
    int_flow_ctrl_op_ovc, route_port, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
-   la_route_info_out, fbc_write_addr, fbc_read_addr, errors, events);
+   la_route_info_out, fbc_write_addr, fbc_read_addr, fbc_empty, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -288,6 +288,10 @@ module vcr_ivc_ctrl
    // read pointer for shared flit buffer
    output [0:fbf_addr_width-1] fbc_read_addr;
    wire [0:fbf_addr_width-1] 	  fbc_read_addr;
+   
+   // flit buffer does not have any valid entries
+   output fbc_empty;
+   wire 			  fbc_empty;
    
    // internal error condition detected
    output [0:5] errors;
@@ -548,8 +552,6 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
-   
-   wire fbc_empty;
    
    wire flit_head_out;
    

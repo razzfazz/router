@@ -753,7 +753,9 @@ module whr_ip_ctrl_mac
 	   
 	   wire [0:flit_data_width-1] flit_read_data_s, flit_read_data_q;
 	   assign flit_read_data_s
-	     = fbf_read_enable ? fbf_read_data : flit_read_data_q;
+	     = fbf_read_enable ? 
+	       (fbc_empty ? flit_data_in_q : fbf_read_data) : 
+	       flit_read_data_q;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
@@ -762,6 +764,8 @@ module whr_ip_ctrl_mac
 	      .reset(reset),
 	      .d(flit_read_data_s),
 	      .q(flit_read_data_q));
+	   
+	   assign flit_read_data = flit_read_data_q;
 	   
 	end
       
