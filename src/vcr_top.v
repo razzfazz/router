@@ -173,6 +173,9 @@ module vcr_top
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
+   // insert explicit pipeline register between flit buffer and crossbar
+   parameter fbf_register_output = 0;
+   
    // select implementation variant for VC allocator
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
@@ -303,7 +306,6 @@ module vcr_top
 	   wire 			     fbf_write_enable;
 	   wire [0:flit_data_width-1] 	     fbf_write_data;
 	   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
-	   wire 			     fbf_read_enable;
 	   wire [0:flit_data_width-1] 	     fbf_read_data;
 	   wire 			     ipc_error;
 	   vcr_ip_ctrl_mac
@@ -359,7 +361,6 @@ module vcr_top
 	      .fbf_write_enable(fbf_write_enable),
 	      .fbf_write_data(fbf_write_data),
 	      .fbf_read_addr(fbf_read_addr),
-	      .fbf_read_enable(fbf_read_enable),
 	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
 	   
@@ -372,7 +373,6 @@ module vcr_top
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbf_write_addr),
 	      .write_data(fbf_write_data),
-	      .read_enable(fbf_read_enable),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   

@@ -32,8 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic register file
 module c_regfile_mac
-  (clk, write_enable, write_address, write_data, read_enable, read_address,
-   read_data);
+  (clk, write_enable, write_address, write_data, read_address, read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -61,9 +60,6 @@ module c_regfile_mac
    // data to be written
    input [0:width-1] write_data;
    
-   // if high, enable read for next cycle
-   input read_enable;
-   
    // entry to read out
    input [0:addr_width-1] read_address;
    
@@ -71,13 +67,7 @@ module c_regfile_mac
    output [0:width-1] read_data;
    wire [0:width-1] read_data;
    
-   reg [0:addr_width-1] read_address_q;
-   
-   always @(posedge clk)
-     if(read_enable)
-       read_address_q <= read_address;
-   
-   genvar 		level;
+   genvar 	    level;
    
    generate
       
@@ -102,7 +92,7 @@ module c_regfile_mac
 	       
 	     endcase
 	     
-	     assign read_data = storage[read_address_q];
+	     assign read_data = storage[read_address];
 	     
 	  end
 	
@@ -137,17 +127,12 @@ module c_regfile_mac
 		  
 	       end
 	     
-	     assign read_data = read_data_lvl[read_address_q*width +: width];
+	     assign read_data = read_data_lvl[read_address*width +: width];
 	     
 	  end
 	
 	`REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
 	  begin
-	     
-	     reg read_enable_q;
-	     
-	     always @(posedge clk)
-	       read_enable_q <= read_enable;
 	     
 	     for(level = 0; level < depth; level = level + 1)
 	       begin:tristate_levels
@@ -172,7 +157,7 @@ module c_regfile_mac
 		  endcase
 		  
 		  wire 		  read;
-		  assign read = read_enable_q && (read_address_q == level);
+		  assign read = (read_address == level);
 		  
 		  assign read_data = read ? storage : {width{1'bz}};
 		  
@@ -199,7 +184,7 @@ module c_regfile_mac
 		       .rst_n(1'b1),
 		       .cs_n(write_enable_b),
 		       .wr_n(write_enable_b),
-		       .rd_addr(read_address_q),
+		       .rd_addr(read_address),
 		       .wr_addr(write_address),
 		       .data_in(write_data),
 		       .data_out(read_data));
@@ -214,7 +199,7 @@ module c_regfile_mac
 		      (.clk(clk),
 		       .cs_n(write_enable_b),
 		       .wr_n(write_enable_b),
-		       .rd_addr(read_address_q),
+		       .rd_addr(read_address),
 		       .wr_addr(write_address),
 		       .data_in(write_data),
 		       .data_out(read_data));

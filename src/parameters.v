@@ -102,6 +102,9 @@ parameter header_fifo_type = `FIFO_TYPE_INDEXED;
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
 
+// insert explicit pipeline register between flit buffer and crossbar
+parameter fbf_register_output = 0;
+
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 

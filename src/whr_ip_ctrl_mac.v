@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module whr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, req_op, req_head, 
    req_tail, gnt_op, flit_data_out, flow_ctrl_out, fbf_write_addr, 
-   fbf_write_enable, fbf_write_data, fbf_read_addr, fbf_read_enable, 
-   fbf_read_data, error);
+   fbf_write_enable, fbf_write_data, fbf_read_addr, fbf_read_data, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -154,6 +153,9 @@ module whr_ip_ctrl_mac
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
+   // insert explicit pipeline register between flit buffer and crossbar
+   parameter fbf_register_output = 0;
+   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -215,10 +217,6 @@ module whr_ip_ctrl_mac
    // flit buffer read address
    output [0:fbf_addr_width-1] fbf_read_addr;
    wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-   
-   // flit buffer read enable
-   output fbf_read_enable;
-   wire 			  fbf_read_enable;
    
    // flit buffer read data
    input [0:flit_data_width-1] fbf_read_data;
@@ -407,6 +405,9 @@ module whr_ip_ctrl_mac
    wire 				    flit_present;
    assign flit_present = flit_valid_in | ~fbc_empty;
    
+   wire [0:fbf_addr_width-1] 		    fbc_write_addr;
+   wire [0:fbf_addr_width-1] 		    fbc_read_addr;
+   
    wire 				    flit_head_out;
    wire 				    flit_tail_out;
    
@@ -427,8 +428,8 @@ module whr_ip_ctrl_mac
 	   for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
 	     begin:idxs
 		
-		assign write_sel[idx] = (fbf_write_addr == idx);
-		assign read_sel[idx] = (fbf_read_addr == idx);
+		assign write_sel[idx] = (fbc_write_addr == idx);
+		assign read_sel[idx] = (fbc_read_addr == idx);
 		
 		wire capture;
 		assign capture = flit_valid_in & write_sel[idx];
@@ -525,7 +526,7 @@ module whr_ip_ctrl_mac
 	   assign flit_tail_out
 	     = fbc_empty ?
 	       flit_tail_in :
-	       (tail_valid_q && (fbf_read_addr == tail_idx_q));
+	       (tail_valid_q && (fbc_read_addr == tail_idx_q));
 	   
 	end
       
@@ -714,8 +715,8 @@ module whr_ip_ctrl_mac
    wire 		     fbc_pop;
    assign fbc_pop = flit_valid_out;
    
-   wire [0:1]		     fbc_errors;
    wire 		     fbc_full;
+   wire [0:1]		     fbc_errors;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .depth(num_flit_buffers),
@@ -725,11 +726,68 @@ module whr_ip_ctrl_mac
       .reset(reset),
       .push(fbc_push),
       .pop(fbc_pop),
-      .write_addr(fbf_write_addr),
-      .read_addr(fbf_read_addr),
+      .write_addr(fbc_write_addr),
+      .read_addr(fbc_read_addr),
       .empty(fbc_empty),
       .full(fbc_full),
       .errors(fbc_errors));
+   
+   assign fbf_write_enable = flit_valid_in;
+   assign fbf_write_addr = fbc_write_addr;
+   assign fbf_write_data = flit_data_in_q;
+   
+   // read enable doesn't need to be exact, so we read whenever we have a flit
+   wire 		     fbf_read_enable;
+   assign fbf_read_enable = flit_present /*flit_valid_out*/;
+   
+   wire [0:flit_data_width-1] flit_read_data;
+   
+   generate
+      
+      // we can optionally insert an explicit pipeline register between the flit
+      // buffer and the crossbar in order to improve timing
+      if(fbf_register_output)
+	begin
+	   
+	   assign fbf_read_addr = fbc_read_addr;
+	   
+	   wire [0:flit_data_width-1] flit_read_data_s, flit_read_data_q;
+	   assign flit_read_data_s
+	     = fbf_read_enable ? fbf_read_data : flit_read_data_q;
+	   c_dff
+	     #(.width(flit_data_width),
+	       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+	   flit_read_dataq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(flit_read_data_s),
+	      .q(flit_read_data_q));
+	   
+	end
+      
+      // in the absence of an explicit pipeline register between the flit buffer
+      // and the crossbar, flits must stay in the buffer for an additional cycle
+      else
+	begin
+	   
+	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+	   assign fbf_read_addr_s
+	     = fbf_read_enable ? fbc_read_addr : fbf_read_addr_q;
+	   c_dff
+	     #(.width(fbf_addr_width),
+	       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+	   fbf_read_addrq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(fbf_read_addr_s),
+	      .q(fbf_read_addr_q));
+	   
+	   assign fbf_read_addr = fbf_read_addr_q;
+	   assign flit_read_data = fbf_read_data;
+	   
+	end
+      
+   endgenerate
    
    wire 		       error_fbc_underflow;
    assign error_fbc_underflow = fbc_errors[0];
@@ -751,17 +809,6 @@ module whr_ip_ctrl_mac
    
    assign req_head = flit_head_out;
    assign req_tail = flit_tail_out;
-   
-   
-   //---------------------------------------------------------------------------
-   // flit buffer control signals
-   //---------------------------------------------------------------------------
-   
-   // read enable doesn't need to be exact, so we read whenever we have a flit
-   assign fbf_read_enable = flit_present /*flit_valid_out*/;
-   
-   assign fbf_write_enable = flit_valid_in;
-   assign fbf_write_data = flit_data_in_q;
    
    
    //---------------------------------------------------------------------------
@@ -793,9 +840,9 @@ module whr_ip_ctrl_mac
    assign flit_data_out[0:la_route_info_width-1]
 	    = flit_head_out_q ? 
 	      la_route_info_q : 
-	      fbf_read_data[0:la_route_info_width-1];
+	      flit_read_data[0:la_route_info_width-1];
    assign flit_data_out[la_route_info_width:flit_data_width-1]
-	    = fbf_read_data[la_route_info_width:flit_data_width-1];
+	    = flit_read_data[la_route_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------

@@ -132,6 +132,9 @@ module whr_top
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
+   // insert explicit pipeline register between flit buffer and crossbar
+   parameter fbf_register_output = 0;
+   
    // select which arbiter type to use for switch allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -217,7 +220,6 @@ module whr_top
 	   wire 			  fbf_write_enable;
 	   wire [0:flit_data_width-1] 	  fbf_write_data;
 	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-	   wire 			  fbf_read_enable;
 	   wire [0:flit_data_width-1] 	  fbf_read_data;
 	   wire 			  ipc_error;
 	   whr_ip_ctrl_mac
@@ -234,6 +236,7 @@ module whr_top
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .header_fifo_type(header_fifo_type),
+	       .fbf_register_output(fbf_register_output),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .error_capture_mode(error_capture_mode),
@@ -254,7 +257,6 @@ module whr_top
 	      .fbf_write_enable(fbf_write_enable),
 	      .fbf_write_data(fbf_write_data),
 	      .fbf_read_addr(fbf_read_addr),
-	      .fbf_read_enable(fbf_read_enable),
 	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
 	   
@@ -267,7 +269,6 @@ module whr_top
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbf_write_addr),
 	      .write_data(fbf_write_data),
-	      .read_enable(fbf_read_enable),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   

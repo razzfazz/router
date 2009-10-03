@@ -35,7 +35,7 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
    int_flow_ctrl_op_ovc, route_port, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
    sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
-   la_route_info_out, fbf_write_addr, fbf_read_addr, errors, events);
+   la_route_info_out, fbc_write_addr, fbc_read_addr, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -221,7 +221,7 @@ module vcr_ivc_ctrl
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
    
    // index of leftmost entry in shared flit buffer
-   localparam fbf_min_addr = vc_id * num_flit_buffers;
+   localparam fbc_min_addr = vc_id * num_flit_buffers;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -282,12 +282,12 @@ module vcr_ivc_ctrl
    wire [0:la_route_info_width-1] la_route_info_out;
    
    // write pointer for shared flit buffer
-   output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+   output [0:fbf_addr_width-1] fbc_write_addr;
+   wire [0:fbf_addr_width-1] 	  fbc_write_addr;
    
    // read pointer for shared flit buffer
-   output [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+   output [0:fbf_addr_width-1] fbc_read_addr;
+   wire [0:fbf_addr_width-1] 	  fbc_read_addr;
    
    // internal error condition detected
    output [0:5] errors;
@@ -571,9 +571,9 @@ module vcr_ivc_ctrl
 	     begin:idxs
 		
 		assign write_sel[idx]
-			 = (fbf_write_addr == (fbf_min_addr + idx));
+			 = (fbc_write_addr == (fbc_min_addr + idx));
 		assign read_sel[idx]
-			 = (fbf_read_addr == (fbf_min_addr + idx));
+			 = (fbc_read_addr == (fbc_min_addr + idx));
 		
 		wire capture;
 		assign capture = flit_valid_in & write_sel[idx];
@@ -637,7 +637,7 @@ module vcr_ivc_ctrl
 	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
-	   assign tail_idx_s = tail_in ? fbf_write_addr : tail_idx_q;
+	   assign tail_idx_s = tail_in ? fbc_write_addr : tail_idx_q;
 	   c_dff
 	     #(.width(fbf_addr_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -662,7 +662,7 @@ module vcr_ivc_ctrl
 	   assign flit_tail_out
 	     = fbc_empty ?
 	       flit_tail_in :
-	       (tail_valid_q && (fbf_read_addr == tail_idx_q));
+	       (tail_valid_q && (fbc_read_addr == tail_idx_q));
 	   
 	end
       
@@ -1153,7 +1153,7 @@ module vcr_ivc_ctrl
    wire 		       fbc_full;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
-       .offset(fbf_min_addr),
+       .offset(fbc_min_addr),
        .depth(num_flit_buffers),
        .reset_type(reset_type))
    fbc
@@ -1161,8 +1161,8 @@ module vcr_ivc_ctrl
       .reset(reset),
       .push(fbc_push),
       .pop(fbc_pop),
-      .write_addr(fbf_write_addr),
-      .read_addr(fbf_read_addr),
+      .write_addr(fbc_write_addr),
+      .read_addr(fbc_read_addr),
       .empty(fbc_empty),
       .full(fbc_full),
       .errors(fbc_errors));
