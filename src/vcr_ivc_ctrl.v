@@ -485,47 +485,59 @@ module vcr_ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
-   wire [0:num_vcs_per_class-1] 	    vc_gnt_unchanged_ocvc;
-   assign vc_gnt_unchanged_ocvc
-     = vc_gnt_ovc[packet_class*num_vcs_per_class:
-		  (packet_class+1)*num_vcs_per_class-1];
-   
-   wire [0:num_vcs_per_class-1] 	    vc_gnt_ocvc;
+   wire [0:num_vcs_per_class-1] 	    vc_allocated_hold_ocvc;
+   wire [0:num_vcs_per_class-1] 	    vc_allocated_ocvc_q;
    
    generate
       
-      if(resource_class == (num_resource_classes - 1))
-	assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
-      else
+      if(num_vcs_per_class > 1)
 	begin
 	   
-	   wire [0:num_vcs_per_class-1] vc_gnt_changed_ocvc;
-	   assign vc_gnt_changed_ocvc
-	     = vc_gnt_ovc[(packet_class+1)*num_vcs_per_class:
-			  (packet_class+2)*num_vcs_per_class-1];
+	   wire [0:num_vcs_per_class-1] vc_gnt_unchanged_ocvc;
+	   assign vc_gnt_unchanged_ocvc
+	     = vc_gnt_ovc[packet_class*num_vcs_per_class:
+			  (packet_class+1)*num_vcs_per_class-1];
 	   
-	   // only one of the two will have a bit set, so we can just OR them
-	   assign vc_gnt_ocvc = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
+	   wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
 	   
+	   if(resource_class == (num_resource_classes - 1))
+	     assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
+	   else
+	     begin
+		
+		wire [0:num_vcs_per_class-1] vc_gnt_changed_ocvc;
+		assign vc_gnt_changed_ocvc
+		  = vc_gnt_ovc[(packet_class+1)*num_vcs_per_class:
+			       (packet_class+2)*num_vcs_per_class-1];
+		
+		// only one of the two will have a bit set, so we just OR them
+		assign vc_gnt_ocvc
+		  = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
+		
+	     end
+	   
+	   assign vc_allocated_hold_ocvc = vc_allocated_ocvc_q | vc_gnt_ocvc;
+	   
+	   wire [0:num_vcs_per_class-1]      vc_allocated_ocvc_s;
+	   assign vc_allocated_ocvc_s
+	     = vc_allocated_hold_ocvc & ~{num_vcs_per_class{packet_done}};
+	   c_dff
+	     #(.width(num_vcs_per_class),
+	       .reset_type(reset_type))
+	   vc_allocated_ocvcq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(vc_allocated_ocvc_s),
+	      .q(vc_allocated_ocvc_q));
+	   
+	end
+      else
+	begin
+	   assign vc_allocated_hold_ocvc = vc_allocated_q | vc_gnt;
+	   assign vc_allocated_ocvc_q = vc_allocated_q;
 	end
       
    endgenerate
-   
-   wire [0:num_vcs_per_class-1] 	vc_allocated_ocvc_q;
-   wire [0:num_vcs_per_class-1] 	vc_allocated_hold_ocvc;
-   assign vc_allocated_hold_ocvc = vc_allocated_ocvc_q | vc_gnt_ocvc;
-   
-   wire [0:num_vcs_per_class-1] 	vc_allocated_ocvc_s;
-   assign vc_allocated_ocvc_s
-     = vc_allocated_hold_ocvc & ~{num_vcs_per_class{packet_done}};
-   c_dff
-     #(.width(num_vcs_per_class),
-       .reset_type(reset_type))
-   vc_allocated_ocvcq
-     (.clk(clk),
-      .reset(reset),
-      .d(vc_allocated_ocvc_s),
-      .q(vc_allocated_ocvc_q));
    
    wire 				vc_allocated;
    wire 				sw_allocated;
