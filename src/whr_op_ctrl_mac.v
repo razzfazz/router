@@ -537,36 +537,11 @@ module whr_op_ctrl_mac
    wire 					 error_ct_overflow;
    assign error_ct_overflow = cred_count_all & credit;
    
-   // Instead of just computing this as the reduction of of the updated credit
-   // count sum, we can optimize a bit. In particular, we have one or more 
-   // credits available iff...
-   //  a) ... we just received a credit. In this case, we either had credits 
-   //     available to begin with, or there cannot be a debit at the same time.
-   //  b) ... we currently have at least two credits available. In this case,
-   //     even if there is a debit and no credit, we will still have at least
-   //     one credit left.
-   //  c) ... we currently have an off number of credits available, and did not
-   //     just receive a debit. For odd numbers greater than one, we will always
-   //     have credit left, and in case we have one credit left, we will still
-   //     have at least one left if no debit occurs.
-   // This only leaves out the case where we are not receiving a credit, do not
-   // currently have two or more credits and either have no credits left or have
-   // a single credit left and receive a debit.
-   wire 					 cred_s, cred_q;
-   assign cred_s = credit | 
-		   |cred_count_q[0:cred_count_width-2] | 
-		   (cred_count_q[cred_count_width-1] & ~debit);
-   c_dff
-     #(.width(1),
-       .reset_value(1'b1),
-       .reset_type(reset_type))
-   credq
-     (.clk(clk),
-      .reset(reset),
-      .d(cred_s),
-      .q(cred_q));
-   
-   assign free = cred_q;
+   // Note: For the wormhole router, the credit check can be performed at the 
+   // allocator (here, arbiter) output; thus, the follwoing computation can be
+   // performed in parallel with arbitration, so we don't need an additional
+   // register stage as in the general VC case.
+   assign free = |cred_count_q | credit;
    
    
    //---------------------------------------------------------------------------
