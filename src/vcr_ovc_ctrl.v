@@ -235,14 +235,13 @@ module vcr_ovc_ctrl
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
    
-   wire 			   set_allocated;
-   assign set_allocated = vc_gnt;
+   wire 			   allocated_q;
    
-   wire 			   reset_allocated;   
-   assign reset_allocated = flit_valid_qual & flit_tail;
+   wire 			   next_allocated;   
+   assign next_allocated = vc_gnt | allocated_q;
    
-   wire 			   allocated_s, allocated_q;
-   assign allocated_s = (set_allocated | allocated_q) & ~reset_allocated;
+   wire 			   allocated_s;
+   assign allocated_s = next_allocated & ~(flit_valid_qual & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -595,7 +594,7 @@ module vcr_ovc_ctrl
 		 |cred_count_next /*1'b1*/;
 	     
 	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
-	     assign cred_hold_s = allocated_s ?
+	     assign cred_hold_s = next_allocated ?
 				  (cred_hold_q - (|cred_hold_q & ~credit)) :
 				  cred_hold_copy;
 	     c_dff
@@ -614,7 +613,7 @@ module vcr_ovc_ctrl
 	     
 	     /*
 	     wire 			 cred_s, cred_q;
-	     assign cred_s = |cred_hold_s | (credit & allocated_s);
+	     assign cred_s = |cred_hold_s | (credit & next_allocated);
 	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type),
@@ -628,7 +627,7 @@ module vcr_ovc_ctrl
 	     assign int_flow_ctrl = cred_q;
 	     */
 	     
-	     assign int_flow_ctrl = |cred_hold_s | (credit & allocated_s);
+	     assign int_flow_ctrl = |cred_hold_s | (credit & next_allocated);
 	     
 	  end
 	
