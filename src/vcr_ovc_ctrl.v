@@ -277,20 +277,27 @@ module vcr_ovc_ctrl
 		   .d(allocated_ip_s),
 		   .q(allocated_ip_q));
 		
-		wire [0:num_vcs-1]   allocated_ivc_s, allocated_ivc_q;
-		assign allocated_ivc_s = vc_gnt ? vc_gnt_ivc : allocated_ivc_q;
+		wire [0:vc_idx_width-1] vc_gnt_vc;
+		c_encoder
+		  #(.num_ports(num_vcs))
+		vc_gnt_vc_enc
+		  (.data_in(vc_gnt_ivc),
+		   .data_out(vc_gnt_vc));
+		
+		wire [0:vc_idx_width-1]   allocated_vc_s, allocated_vc_q;
+		assign allocated_vc_s = vc_gnt ? vc_gnt_vc : allocated_vc_q;
 		c_dff
-		  #(.width(num_vcs),
+		  #(.width(vc_idx_width),
 		    .reset_type(reset_type))
-		allocated_ivcq
+		allocated_vcq
 		  (.clk(clk),
 		   .reset(reset),
-		   .d(allocated_ivc_s),
-		   .q(allocated_ivc_q));
+		   .d(allocated_vc_s),
+		   .q(allocated_vc_q));
 		
-		assign match = allocated_q &
-			       |(allocated_ip_q & sw_gnt_ip) &
-			       allocated_ivc_q[flit_vc];
+		assign match = allocated_q &&
+			       |(allocated_ip_q & sw_gnt_ip) &&
+			       (allocated_vc_q == flit_vc);
 		
 	     end
 	   
