@@ -492,10 +492,11 @@ module vcr_ovc_ctrl
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
+   wire [0:cred_count_width-1] 			 cred_count_next;
+   assign cred_count_next = cred_count_q + credit - debit;
+   
    wire [0:cred_count_width-1] 			 cred_count_s;
-   assign cred_count_s = update_credits ? 
-			 (cred_count_q + credit - debit) : 
-			 cred_count_q;
+   assign cred_count_s = update_credits ? cred_count_next : cred_count_q;
    c_dff
      #(.width(cred_count_width),
        .reset_type(reset_type),
@@ -558,11 +559,11 @@ module vcr_ovc_ctrl
 	     
 	     /*
 	     wire [0:cred_level_width-1] free_s, free_q;
-	     assign free_s = (cred_count_s > max_cred_level) ?
+	     assign free_s = (cred_count_next > max_cred_level) ?
 			     max_cred_level :
-			     cred_count_s[cred_count_width-
-					  cred_level_width:
-					  cred_count_width-1];
+			     cred_count_next[cred_count_width-
+					     cred_level_width:
+					     cred_count_width-1];
 	     c_dff
 	       #(.width(cred_level_width),
 		 .reset_type(reset_type),
@@ -577,10 +578,10 @@ module vcr_ovc_ctrl
 	     */
 	     
 	     assign int_flow_ctrl
-	       = (cred_count_s > max_cred_level) ?
+	       = (cred_count_next > max_cred_level) ?
 		 max_cred_level :
-		 cred_count_s[cred_count_width-cred_level_width:
-			      cred_count_width-1];
+		 cred_count_next[cred_count_width-cred_level_width:
+				 cred_count_width-1];
 	     
 	  end
 	
@@ -589,9 +590,9 @@ module vcr_ovc_ctrl
 	     
 	     wire [0:cred_hold_width-1]  cred_hold_copy;
 	     assign cred_hold_copy
-	       = cred_count_s[(cred_count_width-cred_hold_width):
-			      cred_count_width-1] - 
-		 |cred_count_s /*1'b1*/;
+	       = cred_count_next[(cred_count_width-cred_hold_width):
+				 cred_count_width-1] - 
+		 |cred_count_next /*1'b1*/;
 	     
 	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 	     assign cred_hold_s = allocated_s ?
