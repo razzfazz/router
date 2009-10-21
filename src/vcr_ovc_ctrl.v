@@ -137,12 +137,11 @@ module vcr_ovc_ctrl
        1 :
        -1;
    
-   // maximum value for credit level
-   localparam [0:cred_level_width-1] max_cred_level = {cred_level_width{1'b1}};
-   
    // capped reset value for credit level
    localparam [0:cred_level_width-1] free_reset_value
-     = (num_flit_buffers > max_cred_level) ? max_cred_level : num_flit_buffers;
+     = (flit_buffer_idx_width > cred_level_width) ? 
+       ((1 << cred_level_width) - 1) : 
+       num_flit_buffers;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
