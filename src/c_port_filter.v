@@ -105,7 +105,7 @@ module c_port_filter
 	   if((op < (num_ports - num_nodes_per_router)) &&
 	      ((routing_type == `ROUTING_TYPE_DOR) &&
 	       (((connectivity == `CONNECTIVITY_LINE) || 
-		 (conectivity == `CONNECTIVITY_RING)) && (op == port_id)) ||
+		 (connectivity == `CONNECTIVITY_RING)) && (op == port_id)) ||
 	       ((connectivity == `CONNECTIVITY_FULL) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
@@ -155,13 +155,17 @@ module c_port_filter
 	   
 	end
       
-      if(restrict_turns != 0)
-	assign route_out_op = route_restricted_op;
+      if(restrict_turns)
+	begin
+	   assign route_out_op = route_restricted_op;
+	   assign error = |error_op;
+	end
       else
-	assign route_out_op = route_in_op;
+	begin
+	   assign route_out_op = route_in_op;
+	   assign error = 1'b0;
+	end
       
    endgenerate
-   
-   assign error = |error_op;
    
 endmodule
