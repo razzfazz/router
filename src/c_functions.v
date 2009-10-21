@@ -1,4 +1,4 @@
-// $Id: c_constants.v 1443 2009-08-20 00:12:24Z dub $
+// $Id$
 
 /*
 Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
