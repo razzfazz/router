@@ -500,9 +500,8 @@ module packet_source
    assign packet_sent = flit_tail & flit_sent;
    
    wire 			       flit_valid_s;
-   assign flit_valid_s = flit_valid_q ?
-			 ~(flit_sent & flit_tail) :
-			 ~ready_packet_count_zero;
+   assign flit_valid_s
+     = (flit_valid_q & ~packet_sent) | ~ready_packet_count_zero;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
