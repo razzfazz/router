@@ -139,7 +139,7 @@ module vcr_ovc_ctrl
    
    // capped reset value for credit level
    localparam [0:cred_level_width-1] free_reset_value
-     = (flit_buffer_idx_width > cred_level_width) ? 
+     = (cred_count_width > cred_level_width) ? 
        ((1 << cred_level_width) - 1) : 
        num_flit_buffers;
    
@@ -575,11 +575,23 @@ module vcr_ovc_ctrl
 	     assign int_flow_ctrl = free_q;
 	     */
 	     
-	     assign int_flow_ctrl
-	       = (cred_count_next > max_cred_level) ?
-		 max_cred_level :
-		 cred_count_next[cred_count_width-cred_level_width:
-				 cred_count_width-1];
+	     if(cred_count_width > cred_level_width)
+	       begin
+		  
+		  wire limit_cred_level;
+		  assign limit_cred_level
+		    = |cred_count_next[0:cred_count_width-cred_level_width-1];
+		  
+		  assign int_flow_ctrl
+		    = {cred_level_width{limit_cred_level}} | 
+		      cred_count_next[cred_count_width-cred_level_width:
+				      cred_count_width-1];
+		  
+	       end
+	     else
+	       assign int_flow_ctrl
+		 = cred_count_next[cred_count_width-cred_level_width:
+				   cred_count_width-1];
 	     
 	  end
 	
