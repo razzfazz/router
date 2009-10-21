@@ -34,10 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
-parameter num_flit_buffers = 4;
+parameter num_flit_buffers = 8;
 
 // maximum number of packets that can be in a given VC buffer simultaneously
-parameter num_header_buffers = 2;
+parameter num_header_buffers = 4;
 
 // number of message classes (e.g. request, reply)
 parameter num_message_classes = 2;
@@ -66,7 +66,7 @@ parameter max_payload_length = 4;
 
 // minimum payload length (in flits)
 // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
-parameter min_payload_length = 1;
+parameter min_payload_length = 0;
 
 // enable performance counter
 parameter perf_ctr_enable = 0;
@@ -79,7 +79,7 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 
 // select whether to set a packet's outgoing VC ID at the input or output 
 // controller
-parameter track_vcs_at_output = 1;
+parameter track_vcs_at_output = 0;
 
 // select router implementation
 parameter router_type = `ROUTER_TYPE_VC;
@@ -99,13 +99,13 @@ parameter routing_type = `ROUTING_TYPE_DOR;
 parameter dim_order = `DIM_ORDER_ASCENDING;
 
 // select method for credit signaling from output to input controller
-parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
+parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 
 // select implementation variant for header FIFO
 parameter header_fifo_type = `FIFO_TYPE_INDEXED;
 
 // select implementation variant for flit buffer register file
-parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+parameter fbf_regfile_type = `REGFILE_TYPE_LAT_1D_MUXED;
 
 // insert explicit pipeline register between flit buffer and crossbar
 parameter fbf_register_output = 0;
@@ -123,7 +123,7 @@ parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select speculation type for switch allocator
-parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_NONE;
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS;
 
 // select implementation variant for control crossbar
 parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
