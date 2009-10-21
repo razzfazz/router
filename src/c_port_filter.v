@@ -56,6 +56,9 @@ module c_port_filter
    // with such turns)
    parameter restrict_turns = 1;
    
+   // connectivity within each dimension
+   parameter connectivity = `CONNECTIVITY_LINE;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
@@ -100,9 +103,10 @@ module c_port_filter
 	   // flattened butterfly, this applies to all links in the same
 	   // dimension
 	   if((op < (num_ports - num_nodes_per_router)) &&
-	      (((routing_type == `ROUTING_TYPE_DOR) &&
-		(op == port_id)) ||
-	       ((routing_type == `ROUTING_TYPE_FBFLY) &&
+	      ((routing_type == `ROUTING_TYPE_DOR) &&
+	       (((connectivity == `CONNECTIVITY_LINE) || 
+		 (conectivity == `CONNECTIVITY_RING)) && (op == port_id)) ||
+	       ((connectivity == `CONNECTIVITY_FULL) &&
 		((op / num_neighbors_per_dim) == 
 		 (port_id / num_neighbors_per_dim)))))
 	     begin
@@ -113,7 +117,7 @@ module c_port_filter
 		  end
 		else
 		  begin
-
+		     
 		     // we could mask this by inc_rc; however, the goal of port 
 		     // filtering is to allow synthesis to take advantage of
 		     // turn restrictions in optimizing the design, so from this
@@ -126,6 +130,7 @@ module c_port_filter
 			      = route_in_op[op] /* & inc_rc*/;
 		     
 		     assign error_op[op] = route_in_op[op] & ~inc_rc;
+		     
 		  end
 	     end
 	   
