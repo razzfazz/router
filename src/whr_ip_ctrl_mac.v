@@ -135,6 +135,11 @@ module whr_ip_ctrl_mac
    // width of flow control signals
    localparam flow_ctrl_width = 1;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
@@ -164,6 +169,9 @@ module whr_ip_ctrl_mac
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
+   
+   // ID of current input port
+   parameter port_id = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
@@ -680,12 +688,35 @@ module whr_ip_ctrl_mac
    wire [0:port_idx_width-1] route_port;
    assign route_port = hdff_la_route_info[0:port_idx_width-1];
    
-   wire [0:num_ports-1] route_op;
+   wire [0:num_ports-1] route_unmasked_op;
    c_decoder
      #(.num_ports(num_ports))
-   route_op_dec
+   route_unmasked_op_dec
      (.data_in(route_port),
-      .data_out(route_op));
+      .data_out(route_unmasked_op));
+   
+   wire [0:num_ports-1]      route_op;
+   wire 		     pf_error;
+   c_port_filter
+     #(.num_message_classes(1),
+       .num_resource_classes(1),
+       .num_ports(num_ports),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .num_nodes_per_router(num_nodes_per_router),
+       .restrict_turns(restrict_turns),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .port_id(port_id),
+       .message_class(0),
+       .resource_class(0))
+   route_op_pf
+     (.route_in_op(route_unmasked_op),
+      .inc_rc(1'b0),
+      .route_out_op(route_op),
+      .error(pf_error));
+   
+   wire 		     error_invalid_port;
+   assign error_invalid_port = header_valid & pf_error;
    
    wire [0:la_route_info_width-1] la_route_info_out;
    whr_la_routing_logic
@@ -876,14 +907,15 @@ module whr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:4] errors_s, errors_q;
+	   wire [0:5] errors_s, errors_q;
 	   assign errors_s = {error_fbc_underflow,
 			      error_fbc_overflow,
 			      error_hdff_underflow,
 			      error_hdff_overflow,
-			      error_no_header};
+			      error_no_header,
+			      error_invalid_port};
 	   c_err_rpt
-	     #(.num_errors(5),
+	     #(.num_errors(6),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

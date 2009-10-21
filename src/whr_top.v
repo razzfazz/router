@@ -114,6 +114,11 @@ module whr_top
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
@@ -233,6 +238,7 @@ module whr_top
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
+	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .header_fifo_type(header_fifo_type),
@@ -240,6 +246,7 @@ module whr_top
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .error_capture_mode(error_capture_mode),
+	       .port_id(ip),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),

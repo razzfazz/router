@@ -87,6 +87,11 @@ parameter router_type = `ROUTER_TYPE_VC;
 // width of flit payload data
 parameter flit_data_width = 32;
 
+// filter out illegal destination ports
+// (the intent is to allow synthesis to optimize away the logic associated with 
+// such turns)
+parameter restrict_turns = 0;
+
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_DOR;
 

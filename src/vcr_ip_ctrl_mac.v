@@ -159,6 +159,11 @@ module vcr_ip_ctrl_mac
    // controller
    parameter track_vcs_at_output = 0;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
@@ -219,6 +224,9 @@ module vcr_ip_ctrl_mac
    
    // width of sum of event signals from all VCs
    localparam event_width = clogb(num_vcs + 1);
+   
+   // ID of current input port
+   parameter port_id = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
       
@@ -406,7 +414,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_read_offset_ivc;
-   wire [0:num_vcs*6-1] 		    ivcc_errors_ivc;
+   wire [0:num_vcs*7-1] 		    ivcc_errors_ivc;
    wire [0:num_vcs*6-1] 		    events_ivc;
    wire [0:num_vcs*num_ports-1] 	    route_ivc_op;
    
@@ -429,6 +437,7 @@ module vcr_ip_ctrl_mac
 	   wire               sw_gnt_spec;
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
+	   wire [0:num_ports-1] route_op;
 	   wire [0:port_idx_width-1] route_port;
 	   wire 		     inc_rc;
 	   wire 		     vc_req;
@@ -439,7 +448,7 @@ module vcr_ip_ctrl_mac
 	   wire [0:fbf_addr_width-1] 	  fbc_write_addr;
 	   wire [0:fbf_addr_width-1] 	  fbc_read_addr;
 	   wire 			  fbc_empty;
-	   wire [0:5] 			  ivcc_errors;
+	   wire [0:6] 			  ivcc_errors;
 	   wire [0:5] 			  events;
 	   vcr_ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -455,6 +464,7 @@ module vcr_ip_ctrl_mac
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .track_vcs_at_output(track_vcs_at_output),
+	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
@@ -464,6 +474,7 @@ module vcr_ip_ctrl_mac
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .vc_id(ivc),
+	       .port_id(port_id),
 	       .reset_type(reset_type))
 	   ivcc
 	     (.clk(clk),
@@ -472,6 +483,7 @@ module vcr_ip_ctrl_mac
 	      .flit_ctrl_in(flit_ctrl_in_q),
 	      .header_info_in(header_info_in_q),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+	      .route_op(route_op),
 	      .route_port(route_port),
 	      .inc_rc(inc_rc),
 	      .vc_req(vc_req),
@@ -489,17 +501,10 @@ module vcr_ip_ctrl_mac
 	      .errors(ivcc_errors),
 	      .events(events));
 	   
-	   wire [0:num_ports-1] 	  route_op;
-	   c_decoder
-	     #(.num_ports(num_ports))
-	   route_op_dec
-	     (.data_in(route_port),
-	      .data_out(route_op));
-	   
-	   assign route_port_ivc[ivc*port_idx_width:(ivc+1)*port_idx_width-1]
-		    = route_port;
 	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 		    = route_op;
+	   assign route_port_ivc[ivc*port_idx_width:(ivc+1)*port_idx_width-1]
+		    = route_port;
 	   assign inc_rc_ivc[ivc] = inc_rc;
 	   assign vc_req_ivc[ivc] = vc_req;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
@@ -525,7 +530,7 @@ module vcr_ip_ctrl_mac
 		    = fbc_read_addr[fbf_addr_width-flit_buffer_idx_width:
 				    fbf_addr_width-1];
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
-	   assign ivcc_errors_ivc[ivc*6:(ivc+1)*6-1] = ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*7:(ivc+1)*7-1] = ivcc_errors;
 	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
 	   
 	end
@@ -1168,10 +1173,10 @@ module vcr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*6-1] errors_s, errors_q;
+	   wire [0:num_vcs*7-1] errors_s, errors_q;
 	   assign errors_s = ivcc_errors_ivc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*6),
+	     #(.num_errors(num_vcs*7),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

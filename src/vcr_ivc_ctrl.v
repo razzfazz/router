@@ -33,9 +33,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_ctrl_in, header_info_in, 
-   int_flow_ctrl_op_ovc, route_port, inc_rc, vc_req, vc_gnt, vc_gnt_ovc, 
-   sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, int_flit_ctrl_out, 
-   la_route_info_out, fbc_write_addr, fbc_read_addr, fbc_empty, errors, events);
+   int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, vc_gnt, 
+   vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
+   int_flit_ctrl_out, la_route_info_out, fbc_write_addr, fbc_read_addr, 
+   fbc_empty, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -155,6 +156,11 @@ module vcr_ivc_ctrl
    // controller
    parameter track_vcs_at_output = 0;
    
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
@@ -223,6 +229,9 @@ module vcr_ivc_ctrl
    // index of leftmost entry in shared flit buffer
    localparam fbc_min_addr = vc_id * num_flit_buffers;
    
+   // ID of current input port
+   parameter port_id = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -241,7 +250,11 @@ module vcr_ivc_ctrl
    // controllers
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
-   // destination port
+   // destination port (1-hot)
+   output [0:num_ports-1] route_op;
+   wire [0:num_ports-1] route_op;
+   
+   // destination port (encoded)
    output [0:port_idx_width-1] route_port;
    wire [0:port_idx_width-1] route_port;
    
@@ -294,8 +307,8 @@ module vcr_ivc_ctrl
    wire 			  fbc_empty;
    
    // internal error condition detected
-   output [0:5] errors;
-   wire [0:5] 			  errors;
+   output [0:6] errors;
+   wire [0:6] 			  errors;
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
@@ -308,8 +321,8 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			  flit_valid_in;
-   wire 			   flit_head_in;   
-   wire 			   flit_tail_in;
+   wire 			  flit_head_in;   
+   wire 			  flit_tail_in;
    
    generate
 
@@ -836,6 +849,35 @@ module vcr_ivc_ctrl
    
    assign route_port = hdff_la_route_info[0:port_idx_width-1];
    
+   wire [0:num_ports-1] route_unmasked_op;
+   c_decoder
+     #(.num_ports(num_ports))
+   route_unmasked_op_dec
+     (.data_in(route_port),
+      .data_out(route_unmasked_op));
+   
+   wire 		pf_error;
+   c_port_filter
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_ports(num_ports),
+       .num_neighbors_per_dim(num_neighbors_per_dim),
+       .num_nodes_per_router(num_nodes_per_router),
+       .restrict_turns(restrict_turns),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .port_id(port_id),
+       .message_class(message_class),
+       .resource_class(resource_class))
+   route_op_pf
+     (.route_in_op(route_unmasked_op),
+      .inc_rc(inc_rc),
+      .route_out_op(route_op),
+      .error(pf_error));
+   
+   wire 		error_invalid_port;
+   assign error_invalid_port = header_valid & pf_error;
+   
    generate
       
       if(resource_class < (num_resource_classes - 1))
@@ -1199,7 +1241,8 @@ module vcr_ivc_ctrl
 		    error_hdff_underflow,
 		    error_hdff_overflow,
 		    error_no_header,
-		    error_ct_overflow};
+		    error_ct_overflow,
+		    error_invalid_port};
    
    
    //---------------------------------------------------------------------------
