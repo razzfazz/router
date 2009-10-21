@@ -301,6 +301,8 @@ module packet_source
       
    endgenerate
    
+   wire 			  flit_kill;
+   
    wire [0:num_vcs-1] 		  free_ovc;
    wire [0:num_vcs-1] 		  head_free_ovc;
    
@@ -334,13 +336,13 @@ module packet_source
 		wire [0:vc_idx_width-1] flit_vc;
 		assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
 		
-		assign debit = flit_sent && (flit_vc == ovc);
+		assign debit = flit_sent && (flit_vc == ovc) && !flit_kill;
 		
 	     end
 	   else
 	     begin
 		assign credit = cred_valid;
-		assign debit = flit_sent;
+		assign debit = flit_sent & ~flit_kill;
 	     end
 	   
 	   wire head_credit;
@@ -495,7 +497,7 @@ module packet_source
    wire 			       flit_valid_q;
    assign flit_sent = flit_valid_q & free & (head_free | ~flit_head);
    
-   assign flit_ctrl[0] = flit_sent;
+   assign flit_ctrl[0] = flit_sent & ~flit_kill;
    
    assign packet_sent = flit_tail & flit_sent;
    
@@ -519,7 +521,7 @@ module packet_source
 	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
    
-   reg [0:route_info_width-1] 	route_info;
+   reg [0:route_info_width-1] route_info;
    wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
    
    generate
@@ -598,10 +600,22 @@ module packet_source
       else
 	assign la_route_info = la_route_info_ivc;
       
-      integer 			   offset;
-      integer 			   d;
-      
-      reg [0:router_addr_width-1]  random_router_address;
+   endgenerate
+   
+   wire [0:addr_width-1] 	   source_address;
+   assign source_address[0:router_addr_width-1] = router_address;
+   
+   assign flit_kill
+     = (port_id >= (num_ports - num_nodes_per_router)) &&
+       (route_info[route_info_width-addr_width:route_info_width-1] ==
+	source_address);
+   
+   reg [0:router_addr_width-1] 	   random_router_address;
+   
+   integer 			   offset;
+   integer 			   d;
+   
+   generate
       
       if(num_nodes_per_router > 1)
 	begin
@@ -612,6 +626,8 @@ module packet_source
 	     assign node_address = port_id - (num_ports - num_nodes_per_router);
 	   else
 	     assign node_address = {node_addr_width{1'b0}};
+	   
+	   assign source_address[router_addr_width:addr_width-1] = node_address;
 	   
 	   reg [0:node_addr_width-1]   random_node_address;
 	   
@@ -676,7 +692,7 @@ module packet_source
       if(num_resource_classes > 1)
 	begin
 	   
-	   reg [0:router_addr_width-1]  last_router_address;
+	   reg [0:router_addr_width-1] last_router_address;
 	   reg [0:router_addr_width-1] random_intm_address;
 	   
 	   always @(random_router_address)
