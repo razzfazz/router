@@ -54,23 +54,11 @@ module whr_op_ctrl_mac
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
-   // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 1;
-   
-   // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
-   
-   // width of global addresses
-   localparam addr_width = router_addr_width + node_addr_width;
    
    // connectivity within each dimension
    parameter connectivity = `CONNECTIVITY_LINE;
@@ -105,9 +93,6 @@ module whr_op_ctrl_mac
 
    // width of counter for remaining flits
    localparam flit_ctr_width = clogb(max_payload_length);
-   
-   // total number of bits required for storing routing information
-   localparam route_info_width = addr_width;
    
    // width of flit control signals
    localparam flit_ctrl_width
