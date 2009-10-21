@@ -97,13 +97,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // use non-speculative requests to mask non-speculative grants
 `define SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS 1
 
-// use non-speculative grants to mask speculative grants
+// use non-speculative requests to mask speculative requests
 `define SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS 2
 
-// use non-speculative requests to mask non-speculative grants
+// use non-speculative grants to mask non-speculative grants
 `define SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS 3
 
-// use non-speculative grants to mask speculative grants
+// use non-speculative grants to mask speculative requests
 `define SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS 4
 
 `define SW_ALLOC_SPEC_TYPE_LAST `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS
