@@ -105,7 +105,7 @@ parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 parameter header_fifo_type = `FIFO_TYPE_INDEXED;
 
 // select implementation variant for flit buffer register file
-parameter fbf_regfile_type = `REGFILE_TYPE_LAT_1D_MUXED;
+parameter fbf_regfile_type = `REGFILE_TYPE_LAT_1D_MUX;
 
 // insert explicit pipeline register between flit buffer and crossbar
 parameter fbf_register_output = 0;
