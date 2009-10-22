@@ -218,7 +218,7 @@ module vcr_term_mac
    input clk;
    input reset;
    
-   // current router's address
+   // current node's address
    input [0:addr_width-1] address;
    
    // control signals for outgoing flit
