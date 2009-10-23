@@ -28,8 +28,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// network terminal (combined packet source / sink) for VC router
-module vcr_term_mac
+// network pseudo-node (combined packet source / sink)
+module tc_node_mac
   (clk, reset, address, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
    flit_ctrl_in, flit_data_in, flow_ctrl_out, reg_write, reg_read, reg_addr, 
    reg_write_data, reg_read_data, reg_done, error);
