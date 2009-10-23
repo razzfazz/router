@@ -120,8 +120,8 @@ module whr_routing_logic
 	     for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	       begin:dims
 		  
-		  wire [0:dim_addr_width-1] dim_addr;
-		  assign dim_addr
+		  wire [0:dim_addr_width-1] dest_dim_addr;
+		  assign dest_dim_addr
 		    = dest_router_address[dim*dim_addr_width:
 					  (dim+1)*dim_addr_width-1];
 		  
@@ -130,7 +130,8 @@ module whr_routing_logic
 		    = router_address[dim*dim_addr_width:
 				     (dim+1)*dim_addr_width-1];
 		  
-		  assign dim_addr_match[dim] = (dim_addr == local_dim_addr);
+		  assign dim_addr_match[dim]
+			   = (dest_dim_addr == local_dim_addr);
 		  
 		  wire 			    dim_sel;
 		  
@@ -165,8 +166,8 @@ module whr_routing_logic
 		      begin
 			 
 			 assign port_dec
-			   = {dim_addr < local_dim_addr, 
-			      dim_addr > local_dim_addr};
+			   = {dest_dim_addr < local_dim_addr, 
+			      dest_dim_addr > local_dim_addr};
 			 
 		      end
 		    
@@ -190,21 +191,22 @@ module whr_routing_logic
 		    `CONNECTIVITY_FULL:
 		      begin
 			 
-			 wire [0:num_routers_per_dim-1] dim_addr_dec;
+			 wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
 			 c_decoder
 			   #(.num_ports(num_routers_per_dim))
-			 dim_addr_dec_dec
-			   (.data_in(dim_addr),
-			    .data_out(dim_addr_dec));
+			 dest_dim_addr_dec_dec
+			   (.data_in(dest_dim_addr),
+			    .data_out(dest_dim_addr_dec));
 			 
-			 wire [0:(2*num_routers_per_dim-1)-1] dim_addr_dec_repl;
-			 assign dim_addr_dec_repl
-			   = {dim_addr_dec, 
-			      dim_addr_dec[0:(num_routers_per_dim-1)-1]};
+			 wire [0:(2*num_routers_per_dim-1)-1] 
+			   dest_dim_addr_dec_repl;
+			 assign dest_dim_addr_dec_repl
+			   = {dest_dim_addr_dec, 
+			      dest_dim_addr_dec[0:(num_routers_per_dim-1)-1]};
 			 
 			 assign port_dec
-			   = dim_addr_dec_repl[(local_dim_addr+1) +: 
-					       num_neighbors_per_dim];
+			   = dest_dim_addr_dec_repl[(local_dim_addr+1) +: 
+						    num_neighbors_per_dim];
 			 
 		      end
 		    

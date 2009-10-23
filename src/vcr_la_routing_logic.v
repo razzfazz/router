@@ -242,8 +242,8 @@ module vcr_la_routing_logic
 			   `CONNECTIVITY_LINE:
 			     begin
 				assign port_dec
-				  = {next_dim_addr < dest_dim_addr,
-				     next_dim_addr > dest_dim_addr};
+				  = {dest_dim_addr < next_dim_addr,
+				     dest_dim_addr > next_dim_addr};
 			     end
 			   
 			   `CONNECTIVITY_RING:
