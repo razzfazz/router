@@ -135,10 +135,10 @@ module testbench
    parameter lfsr_index = 0;
    
    // width of control register data
-   parameter reg_data_width = 32;
+   parameter cfg_data_width = 32;
    
    // number of bits required to select an individual register
-   parameter reg_addr_width = 6;
+   parameter cfg_addr_width = 6;
    
    // width of run cycle counter
    parameter num_packets_width = 16;
@@ -169,16 +169,16 @@ module testbench
    wire [0:flit_data_width-1] flit_data_out;
    wire [0:flow_ctrl_width-1] flow_ctrl_in;
    
-   reg 			      reg_write;
-   reg 			      reg_read;
-   reg [0:reg_addr_width-1]   reg_addr;
-   reg [0:reg_data_width-1]   reg_write_data;
-   wire [0:reg_data_width-1]  reg_read_data;
-   wire 		      reg_done;
+   reg 			      cfg_req;
+   reg 			      cfg_write;
+   reg [0:cfg_addr_width-1]   cfg_addr;
+   reg [0:cfg_data_width-1]   cfg_write_data;
+   wire [0:cfg_data_width-1]  cfg_read_data;
+   wire 		      cfg_done;
    
    wire 		      error;
    
-   vcr_term_mac
+   tc_node_mac
      #(.num_flit_buffers(num_flit_buffers),
        .num_header_buffers(num_header_buffers),
        .num_message_classes(num_message_classes),
@@ -196,8 +196,8 @@ module testbench
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),
-       .reg_data_width(reg_data_width),
-       .reg_addr_width(reg_addr_width),
+       .cfg_data_width(cfg_data_width),
+       .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
        .plength_sel_rv_width(plength_sel_rv_width),
@@ -213,12 +213,12 @@ module testbench
       .flit_ctrl_in(flit_ctrl_in),
       .flit_data_in(flit_data_in),
       .flow_ctrl_out(flow_ctrl_out),
-      .reg_write(reg_write),
-      .reg_read(reg_read),
-      .reg_addr(reg_addr),
-      .reg_write_data(reg_write_data),
-      .reg_read_data(reg_read_data),
-      .reg_done(reg_done),
+      .cfg_req(cfg_req),
+      .cfg_write(cfg_write),
+      .cfg_addr(cfg_addr),
+      .cfg_write_data(cfg_write_data),
+      .cfg_read_data(cfg_read_data),
+      .cfg_done(cfg_done),
       .error(error));
    
    wire [0:flit_ctrl_width-1] flit_ctrl_dly;
@@ -343,10 +343,10 @@ module testbench
       #(Tclk/4);
       
       reset = 1'b1;
-      reg_write = 1'b0;
-      reg_read = 1'b0;
-      reg_addr = 'b0;
-      reg_write_data = 'b0;
+      cfg_req = 1'b0;
+      cfg_write = 1'b0;
+      cfg_addr = 'b0;
+      cfg_write_data = 'b0;
       done = 1'b0;
       flit_ctrl_in = 'd0;
       flit_data_in = 'd0;
@@ -361,127 +361,139 @@ module testbench
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd3;
-      for(i = 0; i < reg_data_width; i = i + 1)
-	reg_write_data[i] = $dist_uniform(seed, 0, 1);
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd3;
+      for(i = 0; i < cfg_data_width; i = i + 1)
+	cfg_write_data[i] = $dist_uniform(seed, 0, 1);
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd4;
-      reg_write_data = 'd20;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd4;
+      cfg_write_data = 'd1024;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd5;
-      reg_write_data = 'd16384;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd5;
+      cfg_write_data = 'd16384;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd6;
-      reg_write_data = 'd8;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd6;
+      cfg_write_data = 'd8;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd7;
-      reg_write_data = 'd0 + 'd4;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd7;
+      cfg_write_data = 'd0 + 'd4;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(10*Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd0;
-      reg_write_data[0] = 'd1;
-      reg_write_data[1] = 'd0;
-      reg_write_data[2:reg_data_width-1] = 'd0;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd0;
+      cfg_write_data[0] = 'd1;
+      cfg_write_data[1] = 'd0;
+      cfg_write_data[2:cfg_data_width-1] = 'd0;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       while(!done)
 	begin
 	   
 	   #(10*Tclk);
-	   
-	   reg_read = 1'b1;
-	   reg_addr = 'd1;
-	   while(!reg_done)
+
+	   cfg_req = 1'b1;
+	   cfg_write = 1'b0;
+	   cfg_addr = 'd1;
+	   while(!cfg_done)
 	     #(Tclk);
-	   reg_read = 1'b0;
-	   done = ~reg_read_data[0];
+	   cfg_req = 1'b0;
+	   done = ~cfg_read_data[0];
 	   
 	end
       done = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd0;
-      reg_write_data = 'd0;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd0;
+      cfg_write_data = 'd0;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd4;
-      reg_write_data = 'd20;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd4;
+      cfg_write_data = 'd20;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(10*Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd0;
-      reg_write_data[0] = 'd1;
-      reg_write_data[1] = 'd1;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd0;
+      cfg_write_data[0] = 'd1;
+      cfg_write_data[1] = 'd1;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       while(!done)
 	begin
 	   
 	   #(10*Tclk);
 	   
-	   reg_read = 1'b1;
-	   reg_addr = 'd1;
-	   while(!reg_done)
+	   cfg_req = 1'b1;
+	   cfg_write = 1'b0;
+	   cfg_addr = 'd1;
+	   while(!cfg_done)
 	     #(Tclk);
-	   reg_read = 1'b0;
-	   done = ~reg_read_data[0];
+	   cfg_req = 1'b0;
+	   done = ~cfg_read_data[0];
 	   
 	end
       done = 1'b0;
       
       #(Tclk);
       
-      reg_write = 1'b1;
-      reg_addr = 'd0;
-      reg_write_data = 'd0;
-      while(!reg_done)
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr = 'd0;
+      cfg_write_data = 'd0;
+      while(!cfg_done)
 	#(Tclk);
-      reg_write = 1'b0;
+      cfg_req = 1'b0;
       
       #(3*Tclk/4);
       

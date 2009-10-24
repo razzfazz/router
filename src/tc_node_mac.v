@@ -31,18 +31,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // network pseudo-node (combined packet source / sink)
 module tc_node_mac
   (clk, reset, address, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
-   flit_ctrl_in, flit_data_in, flow_ctrl_out, reg_write, reg_read, reg_addr, 
-   reg_write_data, reg_read_data, reg_done, error);
+   flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_req, cfg_write, cfg_addr, 
+   cfg_write_data, cfg_read_data, cfg_done, error);
    
 // register address declarations
-`define REG_ADDR_CTRL               0
-`define REG_ADDR_STATUS             1
-`define REG_ADDR_FLIT_SIG           2
-`define REG_ADDR_LFSR_SEED          3
-`define REG_ADDR_NUM_PACKETS        4
-`define REG_ADDR_ARRIVAL_THRESH     5
-`define REG_ADDR_PLENGTH_SEL_THRESH 6
-`define REG_ADDR_PLENGTH_VALS       7
+`define CFG_ADDR_CTRL               0
+`define CFG_ADDR_STATUS             1
+`define CFG_ADDR_FLIT_SIG           2
+`define CFG_ADDR_LFSR_SEED          3
+`define CFG_ADDR_NUM_PACKETS        4
+`define CFG_ADDR_ARRIVAL_THRESH     5
+`define CFG_ADDR_PLENGTH_SEL_THRESH 6
+`define CFG_ADDR_PLENGTH_VALS       7
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -188,14 +188,14 @@ module tc_node_mac
    parameter lfsr_index = 0;
    
    // width of control register data
-   parameter reg_data_width = 32;
+   parameter cfg_data_width = 32;
    
-   // smallest multiple of reg_data_width that is >= flit_data_width
+   // smallest multiple of cfg_data_width that is >= flit_data_width
    localparam flit_sig_exp_width
-     = ((flit_data_width+reg_data_width-1)/reg_data_width)*reg_data_width;
+     = ((flit_data_width+cfg_data_width-1)/cfg_data_width)*cfg_data_width;
    
    // number of bits required to select an individual register
-   parameter reg_addr_width = 6;
+   parameter cfg_addr_width = 6;
    
    // width of run cycle counter
    parameter num_packets_width = 20;
@@ -242,25 +242,25 @@ module tc_node_mac
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] flow_ctrl_out;
    
-   // config register write access pending
-   input reg_write;
+   // config register access pending
+   input cfg_req;
    
-   // config register read access pending
-   input reg_read;
+   // config register access is write access
+   input cfg_write;
    
    // select config register to access
-   input [0:reg_addr_width-1] reg_addr;
+   input [0:cfg_addr_width-1] cfg_addr;
    
    // data to be written to selected config register for write accesses
-   input [0:reg_data_width-1] reg_write_data;
+   input [0:cfg_data_width-1] cfg_write_data;
    
    // contents of selected config register for read accesses
-   output [0:reg_data_width-1] reg_read_data;
-   wire [0:reg_data_width-1] reg_read_data;
+   output [0:cfg_data_width-1] cfg_read_data;
+   wire [0:cfg_data_width-1] cfg_read_data;
    
    // config register access complete
-   output reg_done;
-   wire 		     reg_done;
+   output cfg_done;
+   wire 		     cfg_done;
    
    // internal error condition detected
    output error;
@@ -271,130 +271,128 @@ module tc_node_mac
    // configuration register interface
    //---------------------------------------------------------------------------
    
-   wire 		     reg_write_q;
-   wire 		     reg_read_q;
+   wire 		     cfg_req_q;
    
-   wire 		     reg_active_s, reg_active_q;
-   assign reg_active_s = (reg_read | reg_write | reg_read_q | reg_write_q);
+   wire 		     cfg_active_s, cfg_active_q;
+   assign cfg_active_s = cfg_req | cfg_req_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   reg_activeq
+   cfg_activeq
      (.clk(clk),
       .reset(reset),
-      .d(reg_active_s),
-      .q(reg_active_q));
+      .d(cfg_active_s),
+      .q(cfg_active_q));
    
-   wire 		     reg_write_s;
-   assign reg_write_s = reg_active_q ? reg_write : reg_write_q;
+   wire 		     cfg_req_s;
+   assign cfg_req_s = cfg_active_q ? cfg_req : cfg_req_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   reg_writeq
+   cfg_reqq
      (.clk(clk),
       .reset(reset),
-      .d(reg_write_s),
-      .q(reg_write_q));
+      .d(cfg_req_s),
+      .q(cfg_req_q));
    
-   wire 		     reg_read_s;
-   assign reg_read_s = reg_active_q ? reg_read : reg_read_q;
+   wire 		     cfg_write_s, cfg_write_q;
+   assign cfg_write_s = cfg_active_q ? cfg_write : cfg_write_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   reg_readq
+   cfg_writeq
      (.clk(clk),
       .reset(reset),
-      .d(reg_read_s),
-      .q(reg_read_q));
+      .d(cfg_write_s),
+      .q(cfg_write_q));
    
-   wire [0:reg_addr_width-1] reg_addr_s, reg_addr_q;
-   assign reg_addr_s = reg_active_q ? reg_addr : reg_addr_q;
+   wire [0:cfg_addr_width-1] cfg_addr_s, cfg_addr_q;
+   assign cfg_addr_s = cfg_active_q ? cfg_addr : cfg_addr_q;
    c_dff
-     #(.width(reg_addr_width),
+     #(.width(cfg_addr_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   reg_addrq
+   cfg_addrq
      (.clk(clk),
       .reset(reset),
-      .d(reg_addr_s),
-      .q(reg_addr_q));
+      .d(cfg_addr_s),
+      .q(cfg_addr_q));
    
-   wire 		     reg_sel_ctrl;
-   assign reg_sel_ctrl
-     = (reg_addr_q == `REG_ADDR_CTRL);
+   wire 		     cfg_sel_ctrl;
+   assign cfg_sel_ctrl
+     = (cfg_addr_q == `CFG_ADDR_CTRL);
    
-   wire 		     reg_sel_status;
-   assign reg_sel_status
-     = (reg_addr_q == `REG_ADDR_STATUS);
+   wire 		     cfg_sel_status;
+   assign cfg_sel_status
+     = (cfg_addr_q == `CFG_ADDR_STATUS);
    
-   wire 		     reg_sel_flit_sig;
-   assign reg_sel_flit_sig
-     = (reg_addr_q == `REG_ADDR_FLIT_SIG);
+   wire 		     cfg_sel_flit_sig;
+   assign cfg_sel_flit_sig
+     = (cfg_addr_q == `CFG_ADDR_FLIT_SIG);
    
-   wire 		     reg_sel_lfsr_seed;
-   assign reg_sel_lfsr_seed
-     = (reg_addr_q == `REG_ADDR_LFSR_SEED);
+   wire 		     cfg_sel_lfsr_seed;
+   assign cfg_sel_lfsr_seed
+     = (cfg_addr_q == `CFG_ADDR_LFSR_SEED);
    
-   wire 		     reg_sel_num_packets;
-   assign reg_sel_num_packets
-     = (reg_addr_q == `REG_ADDR_NUM_PACKETS);
+   wire 		     cfg_sel_num_packets;
+   assign cfg_sel_num_packets
+     = (cfg_addr_q == `CFG_ADDR_NUM_PACKETS);
    
-   wire 		     reg_sel_arrival_thresh;
-   assign reg_sel_arrival_thresh
-     = (reg_addr_q == `REG_ADDR_ARRIVAL_THRESH);
+   wire 		     cfg_sel_arrival_thresh;
+   assign cfg_sel_arrival_thresh
+     = (cfg_addr_q == `CFG_ADDR_ARRIVAL_THRESH);
    
-   wire 		     reg_sel_plength_sel_thresh;
-   assign reg_sel_plength_sel_thresh
-     = (reg_addr_q == `REG_ADDR_PLENGTH_SEL_THRESH);
+   wire 		     cfg_sel_plength_sel_thresh;
+   assign cfg_sel_plength_sel_thresh
+     = (cfg_addr_q == `CFG_ADDR_PLENGTH_SEL_THRESH);
    
-   wire 		     reg_sel_plength_vals;
-   assign reg_sel_plength_vals
-     = (reg_addr_q == `REG_ADDR_PLENGTH_VALS);
+   wire 		     cfg_sel_plength_vals;
+   assign cfg_sel_plength_vals
+     = (cfg_addr_q == `CFG_ADDR_PLENGTH_VALS);
    
-   wire [0:reg_data_width-1] reg_read_data_status;
-   wire [0:reg_data_width-1] reg_read_data_flit_sig;
-   wire [0:reg_data_width-1] reg_read_data_num_packets;
+   wire [0:cfg_data_width-1] cfg_read_data_status;
+   wire [0:cfg_data_width-1] cfg_read_data_flit_sig;
+   wire [0:cfg_data_width-1] cfg_read_data_num_packets;
    
-   wire [0:reg_data_width-1] reg_read_data_muxed;
+   wire [0:cfg_data_width-1] cfg_read_data_muxed;
    c_select_1ofn
      #(.num_ports(3),
-       .width(reg_data_width))
-   reg_read_data_muxed_sel
-     (.select({reg_sel_status,
-	       reg_sel_flit_sig,
-	       reg_sel_num_packets}),
-      .data_in({reg_read_data_status,
-		reg_read_data_flit_sig,
-		reg_read_data_num_packets}),
-      .data_out(reg_read_data_muxed));
+       .width(cfg_data_width))
+   cfg_read_data_muxed_sel
+     (.select({cfg_sel_status,
+	       cfg_sel_flit_sig,
+	       cfg_sel_num_packets}),
+      .data_in({cfg_read_data_status,
+		cfg_read_data_flit_sig,
+		cfg_read_data_num_packets}),
+      .data_out(cfg_read_data_muxed));
    
-   wire [0:reg_data_width-1] reg_data_s, reg_data_q;
-   assign reg_data_s = reg_active_q ? 
-		       (reg_read_q ? reg_read_data_muxed : reg_write_data) : 
-		       reg_data_q;
+   wire [0:cfg_data_width-1] cfg_data_s, cfg_data_q;
+   assign cfg_data_s = cfg_active_q ? 
+		       (cfg_write_q ? cfg_write_data : cfg_read_data_muxed) : 
+		       cfg_data_q;
    c_dff
-     #(.width(reg_data_width),
+     #(.width(cfg_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   reg_dataq
+   cfg_dataq
      (.clk(clk),
       .reset(reset),
-      .d(reg_data_s),
-      .q(reg_data_q));
+      .d(cfg_data_s),
+      .q(cfg_data_q));
    
-   assign reg_read_data = reg_data_q & {reg_data_width{reg_read_q}};
+   assign cfg_read_data = cfg_data_q & {cfg_data_width{~cfg_write_q}};
    
-   wire 		     reg_done_s, reg_done_q;
-   assign reg_done_s
-     = reg_active_q ? ((reg_write_q | reg_read_q) & ~reg_done_q) : reg_done_q;
+   wire 		     cfg_done_s, cfg_done_q;
+   assign cfg_done_s = cfg_active_q ? (cfg_req_q & ~cfg_done_q) : cfg_done_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   reg_doneq
+   cfg_doneq
      (.clk(clk),
       .reset(reset),
-      .d(reg_done_s),
-      .q(reg_done_q));
+      .d(cfg_done_s),
+      .q(cfg_done_q));
    
-   assign reg_done = reg_done_q;
+   assign cfg_done = cfg_done_q;
    
    
    //---------------------------------------------------------------------------
@@ -408,11 +406,11 @@ module tc_node_mac
    //---------------------------------------------------------------------------
    
    wire 		     write_ctrl;
-   assign write_ctrl = reg_write_q & reg_sel_ctrl;
+   assign write_ctrl = cfg_write_q & cfg_sel_ctrl;
    
    wire 		     active_s, active_q;
    assign active_s
-     = reg_active_q ? (write_ctrl ? reg_data_q[0] : active_q) : active_q;
+     = cfg_active_q ? (write_ctrl ? cfg_data_q[0] : active_q) : active_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -424,7 +422,7 @@ module tc_node_mac
    
    wire 		     loopback_s, loopback_q;
    assign loopback_s
-     = reg_active_q ? (write_ctrl ? reg_data_q[1] : loopback_q) : loopback_q;
+     = cfg_active_q ? (write_ctrl ? cfg_data_q[1] : loopback_q) : loopback_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -444,8 +442,8 @@ module tc_node_mac
    assign flow_ctrl_muxed = loopback_q ? flow_ctrl_out : flow_ctrl_in;
    
    wire 		     start_s, start_q;
-   assign start_s = reg_active_q ? 
-		    (write_ctrl ? (reg_data_q[0] & ~active_q) : start_q) : 
+   assign start_s = cfg_active_q ? 
+		    (write_ctrl ? (cfg_data_q[0] & ~active_q) : start_q) : 
 		    start_q;
    c_dff
      #(.width(1),
@@ -488,12 +486,12 @@ module tc_node_mac
    
    c_align
      #(.data_width(1),
-       .dest_width(reg_data_width),
+       .dest_width(cfg_data_width),
        .offset(0))
-   reg_read_data_status_alg
+   cfg_read_data_status_alg
      (.data_in(running_q),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_status));
+      .dest_in({cfg_data_width{1'b0}}),
+      .data_out(cfg_read_data_status));
    
    
    //---------------------------------------------------------------------------
@@ -504,15 +502,15 @@ module tc_node_mac
    //---------------------------------------------------------------------------
    
    wire 			      write_num_packets;
-   assign write_num_packets = reg_write_q & reg_sel_num_packets;
+   assign write_num_packets = cfg_write_q & cfg_sel_num_packets;
    
    wire [0:num_packets_width-1]       num_packets_loadval;
    c_align
-     #(.data_width(reg_data_width),
+     #(.data_width(cfg_data_width),
        .dest_width(num_packets_width),
-       .offset(num_packets_width-reg_data_width))
+       .offset(num_packets_width-cfg_data_width))
    num_packets_loadval_alg
-     (.data_in(reg_data_q),
+     (.data_in(cfg_data_q),
       .dest_in({num_packets_width{1'b0}}),
       .data_out(num_packets_loadval));
    
@@ -528,7 +526,7 @@ module tc_node_mac
    
    wire [0:num_packets_width-1]       num_packets_s;
    assign num_packets_s
-     = (reg_active_q | active_q) ? 
+     = (cfg_active_q | active_q) ? 
        (write_num_packets ? num_packets_loadval : num_packets_next) : 
        num_packets_q;
    c_dff
@@ -544,19 +542,19 @@ module tc_node_mac
    
    c_align
      #(.data_width(num_packets_width),
-       .dest_width(reg_data_width),
-       .offset(reg_data_width-num_packets_width))
-   reg_read_data_num_packets_alg
+       .dest_width(cfg_data_width),
+       .offset(cfg_data_width-num_packets_width))
+   cfg_read_data_num_packets_alg
      (.data_in(num_packets_q),
-      .dest_in({reg_data_width{1'b0}}),
-      .data_out(reg_read_data_num_packets));
+      .dest_in({cfg_data_width{1'b0}}),
+      .data_out(cfg_read_data_num_packets));
    
    wire 			      inf_packets_loadval;
    assign inf_packets_loadval = &num_packets_loadval;
    
    wire 			      inf_packets_s;
    assign inf_packets_s
-     = reg_active_q ? 
+     = cfg_active_q ? 
        (write_num_packets ? inf_packets_loadval : inf_packets_q) : 
        inf_packets_q;
    c_dff
@@ -568,28 +566,7 @@ module tc_node_mac
       .d(inf_packets_s),
       .q(inf_packets_q));
    
-   assign gen_packets = active_q & (~num_packets_zero | inf_packets_q);
-   
-   
-   //---------------------------------------------------------------------------
-   // run counter
-   //---------------------------------------------------------------------------
-   
-   wire 			      update_run_ctr;
-   assign update_run_ctr = gen_packets & ~inf_packets_q & new_packet_rv;
-   
-   wire [0:num_packets_width-1] 	      run_ctr_s, run_ctr_q;
-   assign run_ctr_s = active_q ?
-		      (start_q ? num_packets_q : (run_ctr_q - update_run_ctr)) :
-		      run_ctr_q;
-   c_dff
-     #(.width(num_packets_width),
-       .reset_type(reset_type))
-   run_ctrq
-     (.clk(clk),
-      .reset(reset),
-      .d(run_ctr_s),
-      .q(run_ctr_q));
+   assign gen_packets = ~num_packets_zero | inf_packets_q;
    
    
    //---------------------------------------------------------------------------
@@ -604,17 +581,20 @@ module tc_node_mac
      (.feedback(arrival_rv_feedback));
    
    wire 			      write_lfsr_seed;
-   assign write_lfsr_seed = reg_write_q & reg_sel_lfsr_seed;
+   assign write_lfsr_seed = cfg_write_q & cfg_sel_lfsr_seed;
    
    wire [0:arrival_rv_width-1] 	      arrival_rv_loadval;
    c_align
-     #(.data_width(reg_data_width),
+     #(.data_width(cfg_data_width),
        .dest_width(arrival_rv_width),
-       .offset(arrival_rv_width-reg_data_width))
+       .offset(arrival_rv_width-cfg_data_width))
    arrival_rv_loadval_alg
-     (.data_in(reg_data_q),
+     (.data_in(cfg_data_q),
       .dest_in({arrival_rv_width{1'b0}}),
       .data_out(arrival_rv_loadval));
+   
+   wire 			      update_arrival_rv;
+   assign update_arrival_rv = active_q & gen_packets;
    
    wire [0:arrival_rv_width-1] 	      arrival_rv_s, arrival_rv_q;
    assign arrival_rv_s
@@ -627,28 +607,28 @@ module tc_node_mac
      (.clk(clk),
       .reset(reset),
       .load(write_lfsr_seed),
-      .run(gen_packets),
+      .run(update_arrival_rv),
       .feedback(arrival_rv_feedback),
       .complete(1'b1),
       .d(arrival_rv_s),
       .q(arrival_rv_q));
    
    wire 			      write_arrival_thresh;
-   assign write_arrival_thresh = reg_write_q & reg_sel_arrival_thresh;
+   assign write_arrival_thresh = cfg_write_q & cfg_sel_arrival_thresh;
    
    wire [0:arrival_rv_width-1] 	      arrival_thresh_loadval;
    c_align
-     #(.data_width(reg_data_width),
+     #(.data_width(cfg_data_width),
        .dest_width(arrival_rv_width),
-       .offset(arrival_rv_width-reg_data_width))
+       .offset(arrival_rv_width-cfg_data_width))
    arrival_thresh_loadval_alg
-     (.data_in(reg_data_q),
+     (.data_in(cfg_data_q),
       .dest_in({arrival_rv_width{1'b0}}),
       .data_out(arrival_thresh_loadval));
    
    wire [0:arrival_rv_width-1] 	      arrival_thresh_s, arrival_thresh_q;
    assign arrival_thresh_s
-     = reg_active_q ? 
+     = cfg_active_q ? 
        (write_arrival_thresh ? arrival_thresh_loadval : arrival_thresh_q) : 
        arrival_thresh_q;
    c_dff
@@ -661,6 +641,16 @@ module tc_node_mac
       .q(arrival_thresh_q));
    
    assign new_packet_rv = (arrival_rv_q <= arrival_thresh_q);
+   
+   wire 			      packet_to_self;
+   
+   wire 			      inject_packet;
+   assign inject_packet = gen_packets & new_packet_rv & ~packet_to_self;
+   
+   // we assume packets that we send to ourselves are handled internally in the 
+   // node, so they're not actually injected into the network
+   wire 			      discard_packet;
+   assign discard_packet = gen_packets & new_packet_rv & packet_to_self;
    
    
    //---------------------------------------------------------------------------
@@ -676,15 +666,18 @@ module tc_node_mac
    
    wire [0:packet_rvs_width-1] 	      packet_rvs_loadval;
    c_align
-     #(.data_width(reg_data_width),
+     #(.data_width(cfg_data_width),
        .dest_width(packet_rvs_width),
-       .offset(packet_rvs_width-reg_data_width))
+       .offset(packet_rvs_width-cfg_data_width))
    packet_rvs_loadval_alg
-     (.data_in(reg_data_q),
+     (.data_in(cfg_data_q),
       .dest_in({packet_rvs_width{1'b0}}),
       .data_out(packet_rvs_loadval));
    
    wire 			      packet_sent;
+   
+   wire 			      update_packet_rvs;
+   assign update_packet_rvs = active_q & (packet_sent | discard_packet);
    
    wire [0:packet_rvs_width-1] 	      packet_rvs_s, packet_rvs_q;
    assign packet_rvs_s
@@ -697,7 +690,7 @@ module tc_node_mac
      (.clk(clk),
       .reset(reset),
       .load(write_lfsr_seed),
-      .run(packet_sent),
+      .run(update_packet_rvs),
       .feedback(packet_rvs_feedback),
       .complete(1'b1),
       .d(packet_rvs_s),
@@ -1004,6 +997,8 @@ module tc_node_mac
 			route_info_width-1]
 	    = dest_addr_rv;
    
+   assign packet_to_self = (dest_addr_rv == address);
+   
    genvar 			   dim;
    
    generate
@@ -1173,21 +1168,21 @@ module tc_node_mac
 	   
 	   wire write_plength_sel_thresh;
 	   assign write_plength_sel_thresh
-	     = reg_write_q & reg_sel_plength_sel_thresh;
+	     = cfg_write_q & cfg_sel_plength_sel_thresh;
 	   
 	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_loadval;
 	   c_align
-	     #(.data_width(reg_data_width),
+	     #(.data_width(cfg_data_width),
 	       .dest_width(plength_sel_rv_width),
-	       .offset(plength_sel_rv_width-reg_data_width))
+	       .offset(plength_sel_rv_width-cfg_data_width))
 	   plength_sel_thresh_loadval_alg
-	     (.data_in(reg_data_q),
+	     (.data_in(cfg_data_q),
 	      .dest_in({plength_sel_rv_width{1'b0}}),
 	      .data_out(plength_sel_thresh_loadval));
 	   
 	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_s, 
 					   plength_sel_thresh_q;
-	   assign plength_sel_thresh_s = reg_active_q ? 
+	   assign plength_sel_thresh_s = cfg_active_q ? 
 					 (write_plength_sel_thresh ? 
 					  plength_sel_thresh_loadval :
 					  plength_sel_thresh_q) : 
@@ -1208,21 +1203,21 @@ module tc_node_mac
 			    plength_sel_rv_width-1];
 	   
 	   wire 			   write_plength_vals;
-	   assign write_plength_vals = reg_write_q & reg_sel_plength_vals;
+	   assign write_plength_vals = cfg_write_q & cfg_sel_plength_vals;
 	   
 	   wire [0:2*payload_length_width-1] plength_vals_loadval;
 	   c_align
-	     #(.data_width(reg_data_width),
+	     #(.data_width(cfg_data_width),
 	       .dest_width(2*payload_length_width),
-	       .offset(2*payload_length_width-reg_data_width))
+	       .offset(2*payload_length_width-cfg_data_width))
 	   plength_vals_loadval_alg
-	     (.data_in(reg_data_q),
+	     (.data_in(cfg_data_q),
 	      .dest_in({(2*payload_length_width){1'b0}}),
 	      .data_out(plength_vals_loadval));
 	   
 	   wire [0:2*payload_length_width-1] plength_vals_s, plength_vals_q;
 	   assign plength_vals_s
-	     = reg_active_q ? 
+	     = cfg_active_q ? 
 	       (write_plength_vals ? plength_vals_loadval : plength_vals_q) : 
 	       plength_vals_q;
 	   c_dff
@@ -1263,13 +1258,14 @@ module tc_node_mac
    
    wire 				   packet_count_decr;
    assign packet_count_decr
-     = (~packet_valid_q | packet_sent) & (packet_count_zero_b | new_packet_rv);
+     = (~packet_valid_q | packet_sent) & (packet_count_zero_b | inject_packet);
    
    wire 				   packet_count_max_b;
    
    wire 				   packet_count_incr;
    assign packet_count_incr
-     = new_packet_rv & (packet_count_max_b | ~packet_valid_q | packet_sent);
+     = (packet_count_max_b | ~packet_valid_q | packet_sent) & 
+       inject_packet;
    
    wire [0:packet_count_width-1] 	   packet_count_s, packet_count_q;
    assign packet_count_s
@@ -1294,7 +1290,7 @@ module tc_node_mac
    assign packet_valid_s
      = active_q ? 
        (((packet_valid_q  & ~packet_sent) | packet_count_zero_b | 
-	 new_packet_rv) & 
+	 inject_packet) & 
 	~start_q) : 
        packet_valid_q;
    c_dff
@@ -1474,13 +1470,16 @@ module tc_node_mac
    
    wire [0:flit_data_width-1] 	   flit_data_rv_loadval;
    c_align
-     #(.data_width(reg_data_width),
+     #(.data_width(cfg_data_width),
        .dest_width(flit_data_width),
-       .offset(flit_data_width-reg_data_width))
+       .offset(flit_data_width-cfg_data_width))
    flit_data_rv_loadval_alg
-     (.data_in(reg_data_q),
+     (.data_in(cfg_data_q),
       .dest_in({flit_data_width{1'b0}}),
       .data_out(flit_data_rv_loadval));
+   
+   wire 			   update_flit_data_rv;
+   assign update_flit_data_rv = active_q & flit_sent_q;
    
    wire [0:flit_data_width-1] 	   flit_data_rv_s, flit_data_rv_q;
    assign flit_data_rv_s
@@ -1493,7 +1492,7 @@ module tc_node_mac
      (.clk(clk),
       .reset(reset),
       .load(write_lfsr_seed),
-      .run(flit_sent_q),
+      .run(update_flit_data_rv),
       .feedback(flit_data_rv_feedback),
       .complete(1'b1),
       .d(flit_data_rv_s),
@@ -1525,7 +1524,7 @@ module tc_node_mac
    assign flit_sig_loadval = {{(flit_data_width-1){1'b0}}, 1'b1};
    
    wire 			   update_flit_sig;
-   assign update_flit_sig = flit_ctrl_muxed[0] & active_q;
+   assign update_flit_sig = active_q & flit_ctrl_muxed[0];
    
    wire [0:flit_data_width-1] 	   flit_sig_s, flit_sig_q;
    assign flit_sig_s = start_q ? flit_sig_loadval : flit_data_muxed;
@@ -1543,24 +1542,24 @@ module tc_node_mac
       .d(flit_sig_s),
       .q(flit_sig_q));
 
-   // expand the signature to a multiple of reg_data_width, ...
+   // expand the signature to a multiple of cfg_data_width, ...
    wire [0:flit_sig_exp_width-1]   flit_sig_expanded;
    c_align
      #(.data_width(flit_data_width),
        .dest_width(flit_sig_exp_width),
        .offset(0))
-   flit_sig_reg_alg
+   flit_sig_cfg_alg
      (.data_in(flit_sig_q),
       .dest_in({flit_sig_exp_width{1'b0}}),
       .data_out(flit_sig_expanded));
    
-   // ... and reduce it down to a single signature of width reg_data_width
+   // ... and reduce it down to a single signature of width cfg_data_width
    c_xor_nto1
-     #(.num_ports(flit_sig_exp_width / reg_data_width),
-       .width(reg_data_width))
-   reg_read_data_flit_sig_xor
+     #(.num_ports(flit_sig_exp_width / cfg_data_width),
+       .width(cfg_data_width))
+   cfg_read_data_flit_sig_xor
      (.data_in(flit_sig_expanded),
-      .data_out(reg_read_data_flit_sig));
+      .data_out(cfg_read_data_flit_sig));
    
    
    //---------------------------------------------------------------------------
