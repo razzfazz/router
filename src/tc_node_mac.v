@@ -31,8 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // network pseudo-node (combined packet source / sink)
 module tc_node_mac
   (clk, reset, address, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
-   flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_req, cfg_write, cfg_addr, 
-   cfg_write_data, cfg_read_data, cfg_done, error);
+   flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_addr_prefixes, cfg_req, 
+   cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, error);
    
 // register address declarations
 `define CFG_ADDR_CTRL               0
@@ -187,6 +187,12 @@ module tc_node_mac
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
    
+   // number of bits in address that are considered base address
+   parameter cfg_addr_prefix_width = 10;
+   
+   // number of distinct base addresses to which this node replies
+   parameter num_cfg_addr_prefixes = 2;
+   
    // width of control register data
    parameter cfg_data_width = 32;
    
@@ -195,7 +201,10 @@ module tc_node_mac
      = ((flit_data_width+cfg_data_width-1)/cfg_data_width)*cfg_data_width;
    
    // number of bits required to select an individual register
-   parameter cfg_addr_width = 6;
+   parameter cfg_addr_width = 16;
+   
+   // width of register selector part of control register address
+   localparam cfg_addr_suffix_width = cfg_addr_width - cfg_addr_prefix_width;
    
    // width of run cycle counter
    parameter num_packets_width = 20;
@@ -241,6 +250,9 @@ module tc_node_mac
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] flow_ctrl_out;
+   
+   // address prefixes assigned to this node
+   input [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] cfg_addr_prefixes;
    
    // config register access pending
    input cfg_req;
@@ -306,54 +318,98 @@ module tc_node_mac
       .d(cfg_write_s),
       .q(cfg_write_q));
    
-   wire [0:cfg_addr_width-1] cfg_addr_s, cfg_addr_q;
-   assign cfg_addr_s = cfg_active_q ? cfg_addr : cfg_addr_q;
+   wire cfg_sel_node;
+   
+   wire 		     cfg_do_write;
+   assign cfg_do_write = cfg_req_q & cfg_write_q & cfg_sel_node;
+   
+   wire [0:cfg_addr_prefix_width-1] cfg_addr_prefix;
+   assign cfg_addr_prefix = cfg_addr[0:cfg_addr_prefix_width-1];
+   
+   wire [0:cfg_addr_prefix_width-1] cfg_addr_prefix_s, cfg_addr_prefix_q;
+   assign cfg_addr_prefix_s
+     = cfg_active_q ? cfg_addr_prefix : cfg_addr_prefix_q;
    c_dff
-     #(.width(cfg_addr_width),
+     #(.width(cfg_addr_prefix_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   cfg_addrq
+   cfg_addr_prefixq
      (.clk(clk),
       .reset(reset),
-      .d(cfg_addr_s),
-      .q(cfg_addr_q));
+      .d(cfg_addr_prefix_s),
+      .q(cfg_addr_prefix_q));
    
-   wire 		     cfg_sel_ctrl;
+   wire [0:num_cfg_addr_prefixes-1] cfg_prefix_match;
+   
+   genvar 			    prefix;
+   
+   generate
+      
+      for(prefix = 0; prefix < num_cfg_addr_prefixes; prefix = prefix + 1)
+	begin:prefixes
+	   
+	   assign cfg_prefix_match[prefix]
+		    = (cfg_addr_prefix_q == 
+		       cfg_addr_prefixes[prefix*cfg_addr_prefix_width:
+					 (prefix+1)*cfg_addr_prefix_width-1]);
+	   
+	end
+      
+   endgenerate
+   
+   assign cfg_sel_node = |cfg_prefix_match;
+   
+   wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix;
+   assign cfg_addr_suffix = cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1];
+   
+   wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix_s, cfg_addr_suffix_q;
+   assign cfg_addr_suffix_s
+     = cfg_active_q ? cfg_addr_suffix : cfg_addr_suffix_q;
+   c_dff
+     #(.width(cfg_addr_suffix_width),
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+   cfg_addr_suffixq
+     (.clk(clk),
+      .reset(reset),
+      .d(cfg_addr_suffix_s),
+      .q(cfg_addr_suffix_q));
+   
+   wire 			    cfg_sel_ctrl;
    assign cfg_sel_ctrl
-     = (cfg_addr_q == `CFG_ADDR_CTRL);
+     = (cfg_addr_suffix_q == `CFG_ADDR_CTRL);
    
-   wire 		     cfg_sel_status;
+   wire 			    cfg_sel_status;
    assign cfg_sel_status
-     = (cfg_addr_q == `CFG_ADDR_STATUS);
+     = (cfg_addr_suffix_q == `CFG_ADDR_STATUS);
    
-   wire 		     cfg_sel_flit_sig;
+   wire 			    cfg_sel_flit_sig;
    assign cfg_sel_flit_sig
-     = (cfg_addr_q == `CFG_ADDR_FLIT_SIG);
+     = (cfg_addr_suffix_q == `CFG_ADDR_FLIT_SIG);
    
-   wire 		     cfg_sel_lfsr_seed;
+   wire 			    cfg_sel_lfsr_seed;
    assign cfg_sel_lfsr_seed
-     = (cfg_addr_q == `CFG_ADDR_LFSR_SEED);
+     = (cfg_addr_suffix_q == `CFG_ADDR_LFSR_SEED);
    
-   wire 		     cfg_sel_num_packets;
+   wire 			    cfg_sel_num_packets;
    assign cfg_sel_num_packets
-     = (cfg_addr_q == `CFG_ADDR_NUM_PACKETS);
+     = (cfg_addr_suffix_q == `CFG_ADDR_NUM_PACKETS);
    
-   wire 		     cfg_sel_arrival_thresh;
+   wire 			    cfg_sel_arrival_thresh;
    assign cfg_sel_arrival_thresh
-     = (cfg_addr_q == `CFG_ADDR_ARRIVAL_THRESH);
+     = (cfg_addr_suffix_q == `CFG_ADDR_ARRIVAL_THRESH);
    
-   wire 		     cfg_sel_plength_sel_thresh;
+   wire 			    cfg_sel_plength_sel_thresh;
    assign cfg_sel_plength_sel_thresh
-     = (cfg_addr_q == `CFG_ADDR_PLENGTH_SEL_THRESH);
+     = (cfg_addr_suffix_q == `CFG_ADDR_PLENGTH_SEL_THRESH);
    
-   wire 		     cfg_sel_plength_vals;
+   wire 			    cfg_sel_plength_vals;
    assign cfg_sel_plength_vals
-     = (cfg_addr_q == `CFG_ADDR_PLENGTH_VALS);
+     = (cfg_addr_suffix_q == `CFG_ADDR_PLENGTH_VALS);
    
-   wire [0:cfg_data_width-1] cfg_read_data_status;
-   wire [0:cfg_data_width-1] cfg_read_data_flit_sig;
-   wire [0:cfg_data_width-1] cfg_read_data_num_packets;
+   wire [0:cfg_data_width-1] 	    cfg_read_data_status;
+   wire [0:cfg_data_width-1] 	    cfg_read_data_flit_sig;
+   wire [0:cfg_data_width-1] 	    cfg_read_data_num_packets;
    
-   wire [0:cfg_data_width-1] cfg_read_data_muxed;
+   wire [0:cfg_data_width-1] 	    cfg_read_data_muxed;
    c_select_1ofn
      #(.num_ports(3),
        .width(cfg_data_width))
@@ -366,7 +422,7 @@ module tc_node_mac
 		cfg_read_data_num_packets}),
       .data_out(cfg_read_data_muxed));
    
-   wire [0:cfg_data_width-1] cfg_data_s, cfg_data_q;
+   wire [0:cfg_data_width-1] 	    cfg_data_s, cfg_data_q;
    assign cfg_data_s = cfg_active_q ? 
 		       (cfg_write_q ? cfg_write_data : cfg_read_data_muxed) : 
 		       cfg_data_q;
@@ -379,10 +435,12 @@ module tc_node_mac
       .d(cfg_data_s),
       .q(cfg_data_q));
    
-   assign cfg_read_data = cfg_data_q & {cfg_data_width{~cfg_write_q}};
+   assign cfg_read_data
+     = cfg_data_q & {cfg_data_width{cfg_sel_node & ~cfg_write_q}};
    
-   wire 		     cfg_done_s, cfg_done_q;
-   assign cfg_done_s = cfg_active_q ? (cfg_req_q & ~cfg_done_q) : cfg_done_q;
+   wire 			    cfg_done_s, cfg_done_q;
+   assign cfg_done_s
+     = cfg_active_q ? (cfg_req_q & cfg_sel_node & ~cfg_done_q) : cfg_done_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -405,10 +463,10 @@ module tc_node_mac
    // loopback mode; i.e., its outputs are fed back into its inputs.
    //---------------------------------------------------------------------------
    
-   wire 		     write_ctrl;
-   assign write_ctrl = cfg_write_q & cfg_sel_ctrl;
+   wire 			    write_ctrl;
+   assign write_ctrl = cfg_do_write & cfg_sel_ctrl;
    
-   wire 		     active_s, active_q;
+   wire 			    active_s, active_q;
    assign active_s
      = cfg_active_q ? (write_ctrl ? cfg_data_q[0] : active_q) : active_q;
    c_dff
@@ -420,7 +478,7 @@ module tc_node_mac
       .d(active_s),
       .q(active_q));
    
-   wire 		     loopback_s, loopback_q;
+   wire 			    loopback_s, loopback_q;
    assign loopback_s
      = cfg_active_q ? (write_ctrl ? cfg_data_q[1] : loopback_q) : loopback_q;
    c_dff
@@ -432,16 +490,16 @@ module tc_node_mac
       .d(loopback_s),
       .q(loopback_q));
    
-   wire [0:flit_ctrl_width-1] 	   flit_ctrl_muxed;
+   wire [0:flit_ctrl_width-1] 	    flit_ctrl_muxed;
    assign flit_ctrl_muxed = loopback_q ? flit_ctrl_out : flit_ctrl_in;
    
-   wire [0:flit_data_width-1] 	   flit_data_muxed;
+   wire [0:flit_data_width-1] 	    flit_data_muxed;
    assign flit_data_muxed = loopback_q ? flit_data_out : flit_data_in;
 
-   wire [0:flow_ctrl_width-1] 	   flow_ctrl_muxed;
+   wire [0:flow_ctrl_width-1] 	    flow_ctrl_muxed;
    assign flow_ctrl_muxed = loopback_q ? flow_ctrl_out : flow_ctrl_in;
    
-   wire 		     start_s, start_q;
+   wire 			    start_s, start_q;
    assign start_s = cfg_active_q ? 
 		    (write_ctrl ? (cfg_data_q[0] & ~active_q) : start_q) : 
 		    start_q;
@@ -462,16 +520,16 @@ module tc_node_mac
    // are packets and/or flits left to send
    //---------------------------------------------------------------------------
    
-   wire 		     packet_count_zero;
-   wire 		     gen_packets;
-   wire 		     packet_valid_q;
-   wire [0:num_vcs-1] 	     empty_ovc;
+   wire 			    packet_count_zero;
+   wire 			    gen_packets;
+   wire 			    packet_valid_q;
+   wire [0:num_vcs-1] 		    empty_ovc;
    
-   wire 		     last_credit_received;
+   wire 			    last_credit_received;
    assign last_credit_received
      = (~gen_packets & packet_count_zero & ~packet_valid_q & &empty_ovc);
    
-   wire 		     running_s, running_q;
+   wire 			    running_s, running_q;
    assign running_s = active_q ? 
 		      ((running_q & ~last_credit_received) | start_q) : 
 		      running_q;
@@ -501,10 +559,10 @@ module tc_node_mac
    // (special value of -1 corresponds to an infinite number of packets)
    //---------------------------------------------------------------------------
    
-   wire 			      write_num_packets;
-   assign write_num_packets = cfg_write_q & cfg_sel_num_packets;
+   wire 			    write_num_packets;
+   assign write_num_packets = cfg_do_write & cfg_sel_num_packets;
    
-   wire [0:num_packets_width-1]       num_packets_loadval;
+   wire [0:num_packets_width-1]     num_packets_loadval;
    c_align
      #(.data_width(cfg_data_width),
        .dest_width(num_packets_width),
@@ -514,17 +572,17 @@ module tc_node_mac
       .dest_in({num_packets_width{1'b0}}),
       .data_out(num_packets_loadval));
    
-   wire 			      num_packets_zero;
-   wire [0:num_packets_width-1]       num_packets_q;
-   wire 			      inf_packets_q;
-   wire 			      new_packet_rv;
+   wire 			    num_packets_zero;
+   wire [0:num_packets_width-1]     num_packets_q;
+   wire 			    inf_packets_q;
+   wire 			    new_packet_rv;
    
-   wire [0:num_packets_width-1]       num_packets_next;
+   wire [0:num_packets_width-1]     num_packets_next;
    assign num_packets_next = (~active_q | inf_packets_q | num_packets_zero) ? 
 			     num_packets_q : 
 			     (num_packets_q - new_packet_rv);
    
-   wire [0:num_packets_width-1]       num_packets_s;
+   wire [0:num_packets_width-1]     num_packets_s;
    assign num_packets_s
      = (cfg_active_q | active_q) ? 
        (write_num_packets ? num_packets_loadval : num_packets_next) : 
@@ -549,10 +607,10 @@ module tc_node_mac
       .dest_in({cfg_data_width{1'b0}}),
       .data_out(cfg_read_data_num_packets));
    
-   wire 			      inf_packets_loadval;
+   wire 			    inf_packets_loadval;
    assign inf_packets_loadval = &num_packets_loadval;
    
-   wire 			      inf_packets_s;
+   wire 			    inf_packets_s;
    assign inf_packets_s
      = cfg_active_q ? 
        (write_num_packets ? inf_packets_loadval : inf_packets_q) : 
@@ -573,17 +631,17 @@ module tc_node_mac
    // generate packet arrival times
    //---------------------------------------------------------------------------
    
-   wire [0:arrival_rv_width-1] 		      arrival_rv_feedback;
+   wire [0:arrival_rv_width-1] 	    arrival_rv_feedback;
    c_fbgen
      #(.width(arrival_rv_width),
        .index(lfsr_index+0))
    arrival_rv_feedback_fbgen
      (.feedback(arrival_rv_feedback));
    
-   wire 			      write_lfsr_seed;
-   assign write_lfsr_seed = cfg_write_q & cfg_sel_lfsr_seed;
+   wire 			    write_lfsr_seed;
+   assign write_lfsr_seed = cfg_do_write & cfg_sel_lfsr_seed;
    
-   wire [0:arrival_rv_width-1] 	      arrival_rv_loadval;
+   wire [0:arrival_rv_width-1] 	    arrival_rv_loadval;
    c_align
      #(.data_width(cfg_data_width),
        .dest_width(arrival_rv_width),
@@ -593,10 +651,10 @@ module tc_node_mac
       .dest_in({arrival_rv_width{1'b0}}),
       .data_out(arrival_rv_loadval));
    
-   wire 			      update_arrival_rv;
+   wire 			    update_arrival_rv;
    assign update_arrival_rv = active_q & gen_packets;
    
-   wire [0:arrival_rv_width-1] 	      arrival_rv_s, arrival_rv_q;
+   wire [0:arrival_rv_width-1] 	    arrival_rv_s, arrival_rv_q;
    assign arrival_rv_s
      = {arrival_rv_width{write_lfsr_seed}} & arrival_rv_loadval;
    c_lfsr
@@ -613,10 +671,10 @@ module tc_node_mac
       .d(arrival_rv_s),
       .q(arrival_rv_q));
    
-   wire 			      write_arrival_thresh;
-   assign write_arrival_thresh = cfg_write_q & cfg_sel_arrival_thresh;
+   wire 			    write_arrival_thresh;
+   assign write_arrival_thresh = cfg_do_write & cfg_sel_arrival_thresh;
    
-   wire [0:arrival_rv_width-1] 	      arrival_thresh_loadval;
+   wire [0:arrival_rv_width-1] 	    arrival_thresh_loadval;
    c_align
      #(.data_width(cfg_data_width),
        .dest_width(arrival_rv_width),
@@ -626,7 +684,7 @@ module tc_node_mac
       .dest_in({arrival_rv_width{1'b0}}),
       .data_out(arrival_thresh_loadval));
    
-   wire [0:arrival_rv_width-1] 	      arrival_thresh_s, arrival_thresh_q;
+   wire [0:arrival_rv_width-1] 	    arrival_thresh_s, arrival_thresh_q;
    assign arrival_thresh_s
      = cfg_active_q ? 
        (write_arrival_thresh ? arrival_thresh_loadval : arrival_thresh_q) : 
@@ -642,14 +700,14 @@ module tc_node_mac
    
    assign new_packet_rv = (arrival_rv_q <= arrival_thresh_q);
    
-   wire 			      packet_to_self;
+   wire 			    packet_to_self;
    
-   wire 			      inject_packet;
+   wire 			    inject_packet;
    assign inject_packet = gen_packets & new_packet_rv & ~packet_to_self;
    
    // we assume packets that we send to ourselves are handled internally in the 
    // node, so they're not actually injected into the network
-   wire 			      discard_packet;
+   wire 			    discard_packet;
    assign discard_packet = gen_packets & new_packet_rv & packet_to_self;
    
    
@@ -657,14 +715,14 @@ module tc_node_mac
    // shared LFSR for per-packet random values
    //---------------------------------------------------------------------------
    
-   wire [0:packet_rvs_width-1] 	      packet_rvs_feedback;
+   wire [0:packet_rvs_width-1] 	    packet_rvs_feedback;
    c_fbgen
      #(.width(packet_rvs_width),
        .index(lfsr_index+1))
    packet_rvs_feedback_fbgen
      (.feedback(packet_rvs_feedback));
    
-   wire [0:packet_rvs_width-1] 	      packet_rvs_loadval;
+   wire [0:packet_rvs_width-1] 	    packet_rvs_loadval;
    c_align
      #(.data_width(cfg_data_width),
        .dest_width(packet_rvs_width),
@@ -674,12 +732,12 @@ module tc_node_mac
       .dest_in({packet_rvs_width{1'b0}}),
       .data_out(packet_rvs_loadval));
    
-   wire 			      packet_sent;
+   wire 			    packet_sent;
    
-   wire 			      update_packet_rvs;
+   wire 			    update_packet_rvs;
    assign update_packet_rvs = active_q & (packet_sent | discard_packet);
    
-   wire [0:packet_rvs_width-1] 	      packet_rvs_s, packet_rvs_q;
+   wire [0:packet_rvs_width-1] 	    packet_rvs_s, packet_rvs_q;
    assign packet_rvs_s
      = {packet_rvs_width{write_lfsr_seed}} & packet_rvs_loadval;
    c_lfsr
@@ -701,10 +759,10 @@ module tc_node_mac
    // determine random message and resource class
    //---------------------------------------------------------------------------
    
-   wire [0:num_message_classes-1]     sel_mc_rv;
-   wire [0:num_resource_classes-1]    sel_orc_rv;
+   wire [0:num_message_classes-1]   sel_mc_rv;
+   wire [0:num_resource_classes-1]  sel_orc_rv;
    
-   wire [0:num_packet_classes-1]      sel_opc_rv;
+   wire [0:num_packet_classes-1]    sel_opc_rv;
    c_mat_mult
      #(.dim1_width(num_message_classes),
        .dim2_width(1),
@@ -714,14 +772,14 @@ module tc_node_mac
       .input_b(sel_orc_rv),
       .result(sel_opc_rv));
    
-   wire 			      vc_alloc_q;
-   wire [0:num_vcs_per_class-1]       vc_alloc_ocvc_q;
-   wire [0:num_vcs_per_class-1]       next_elig_ocvc;
+   wire 			    vc_alloc_q;
+   wire [0:num_vcs_per_class-1]     vc_alloc_ocvc_q;
+   wire [0:num_vcs_per_class-1]     next_elig_ocvc;
    
-   wire [0:num_vcs_per_class-1]       sel_ocvc;
+   wire [0:num_vcs_per_class-1]     sel_ocvc;
    assign sel_ocvc = vc_alloc_q ? vc_alloc_ocvc_q : next_elig_ocvc;
    
-   wire [0:num_vcs-1] 		      sel_ovc;
+   wire [0:num_vcs-1] 		    sel_ovc;
    c_mat_mult
      #(.dim1_width(num_packet_classes),
        .dim2_width(1),
@@ -731,12 +789,12 @@ module tc_node_mac
       .input_b(sel_ocvc),
       .result(sel_ovc));
    
-   wire [0:num_vcs-1] 		      elig_ovc;
-   wire [0:num_packet_classes-1]      elig_opc;
-   wire [0:num_resource_classes-1]    elig_orc;
-   wire 			      elig;
+   wire [0:num_vcs-1] 		    elig_ovc;
+   wire [0:num_packet_classes-1]    elig_opc;
+   wire [0:num_resource_classes-1]  elig_orc;
+   wire 			    elig;
    
-   wire [0:num_vcs-1] 		      next_elig_ovc;
+   wire [0:num_vcs-1] 		    next_elig_ovc;
    wire [0:num_resource_classes*num_vcs_per_class-1] next_elig_orc_ocvc;
    
    wire [0:num_vcs-1] 				     free_ovc;
@@ -1168,7 +1226,7 @@ module tc_node_mac
 	   
 	   wire write_plength_sel_thresh;
 	   assign write_plength_sel_thresh
-	     = cfg_write_q & cfg_sel_plength_sel_thresh;
+	     = cfg_do_write & cfg_sel_plength_sel_thresh;
 	   
 	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_loadval;
 	   c_align
@@ -1203,7 +1261,7 @@ module tc_node_mac
 			    plength_sel_rv_width-1];
 	   
 	   wire 			   write_plength_vals;
-	   assign write_plength_vals = cfg_write_q & cfg_sel_plength_vals;
+	   assign write_plength_vals = cfg_do_write & cfg_sel_plength_vals;
 	   
 	   wire [0:2*payload_length_width-1] plength_vals_loadval;
 	   c_align

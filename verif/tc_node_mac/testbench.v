@@ -134,11 +134,20 @@ module testbench
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
    
+   // number of bits in address that are considered base address
+   parameter cfg_addr_prefix_width = 10;
+   
+   // number of distinct base addresses to which this node replies
+   parameter num_cfg_addr_prefixes = 2;
+   
    // width of control register data
    parameter cfg_data_width = 32;
    
    // number of bits required to select an individual register
-   parameter cfg_addr_width = 6;
+   parameter cfg_addr_width = 16;
+   
+   // width of register selector part of control register address
+   localparam cfg_addr_suffix_width = cfg_addr_width - cfg_addr_prefix_width;
    
    // width of run cycle counter
    parameter num_packets_width = 16;
@@ -169,14 +178,15 @@ module testbench
    wire [0:flit_data_width-1] flit_data_out;
    wire [0:flow_ctrl_width-1] flow_ctrl_in;
    
-   reg 			      cfg_req;
-   reg 			      cfg_write;
-   reg [0:cfg_addr_width-1]   cfg_addr;
-   reg [0:cfg_data_width-1]   cfg_write_data;
-   wire [0:cfg_data_width-1]  cfg_read_data;
-   wire 		      cfg_done;
+   reg [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] cfg_addr_prefixes;
+   reg 							 cfg_req;
+   reg 							 cfg_write;
+   reg [0:cfg_addr_width-1] 				 cfg_addr;
+   reg [0:cfg_data_width-1] 				 cfg_write_data;
+   wire [0:cfg_data_width-1] 				 cfg_read_data;
+   wire 						 cfg_done;
    
-   wire 		      error;
+   wire 						 error;
    
    tc_node_mac
      #(.num_flit_buffers(num_flit_buffers),
@@ -213,6 +223,7 @@ module testbench
       .flit_ctrl_in(flit_ctrl_in),
       .flit_data_in(flit_data_in),
       .flow_ctrl_out(flow_ctrl_out),
+      .cfg_addr_prefixes(cfg_addr_prefixes),
       .cfg_req(cfg_req),
       .cfg_write(cfg_write),
       .cfg_addr(cfg_addr),
@@ -343,6 +354,7 @@ module testbench
       #(Tclk/4);
       
       reset = 1'b1;
+      cfg_addr_prefixes = 1'b0;
       cfg_req = 1'b0;
       cfg_write = 1'b0;
       cfg_addr = 'b0;
