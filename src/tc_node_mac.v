@@ -1424,18 +1424,30 @@ module tc_node_mac
       .d(vc_alloc_s),
       .q(vc_alloc_q));
    
-   wire [0:num_vcs_per_class-1] 	   vc_alloc_ocvc_s;
-   assign vc_alloc_ocvc_s = active_q ? 
-			    (vc_alloc_q ? vc_alloc_ocvc_q : next_elig_ocvc) : 
-			    vc_alloc_ocvc_q;
-   c_dff
-     #(.width(num_vcs_per_class),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   vc_alloc_ocvcq
-     (.clk(clk),
-      .reset(reset),
-      .d(vc_alloc_ocvc_s),
-      .q(vc_alloc_ocvc_q));
+   generate
+      
+      if(num_vcs_per_class > 1)
+	begin
+	   
+	   wire [0:num_vcs_per_class-1] 	   vc_alloc_ocvc_s;
+	   assign vc_alloc_ocvc_s
+	     = active_q ? 
+	       (vc_alloc_q ? vc_alloc_ocvc_q : next_elig_ocvc) : 
+	       vc_alloc_ocvc_q;
+	   c_dff
+	     #(.width(num_vcs_per_class),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   vc_alloc_ocvcq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(vc_alloc_ocvc_s),
+	      .q(vc_alloc_ocvc_q));
+	   
+	end
+      else
+	assign vc_alloc_ocvc_q = 1'b1;
+      
+   endgenerate
    
    wire 				   flit_head;
    wire 				   flit_head_q;
