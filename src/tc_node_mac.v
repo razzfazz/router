@@ -700,16 +700,6 @@ module tc_node_mac
    
    assign new_packet_rv = (arrival_rv_q <= arrival_thresh_q);
    
-   wire 			    packet_to_self;
-   
-   wire 			    inject_packet;
-   assign inject_packet = gen_packets & new_packet_rv & ~packet_to_self;
-   
-   // we assume packets that we send to ourselves are handled internally in the 
-   // node, so they're not actually injected into the network
-   wire 			    discard_packet;
-   assign discard_packet = gen_packets & new_packet_rv & packet_to_self;
-   
    
    //---------------------------------------------------------------------------
    // shared LFSR for per-packet random values
@@ -735,7 +725,7 @@ module tc_node_mac
    wire 			    packet_sent;
    
    wire 			    update_packet_rvs;
-   assign update_packet_rvs = active_q & (packet_sent | discard_packet);
+   assign update_packet_rvs = active_q & packet_sent;
    
    wire [0:packet_rvs_width-1] 	    packet_rvs_s, packet_rvs_q;
    assign packet_rvs_s
@@ -966,6 +956,7 @@ module tc_node_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
+   wire packet_to_self;
    wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
    
    wire [0:num_vcs*4-1] 	  ovcc_errors_ovc;
@@ -984,7 +975,8 @@ module tc_node_mac
 	   assign sel = sel_opc_rv[ovc / num_vcs_per_class];
 	   
 	   wire vc_gnt;
-	   assign vc_gnt = packet_valid_q & ~vc_alloc_q & sel & next_elig;
+	   assign vc_gnt
+	     = packet_valid_q & ~packet_to_self & ~vc_alloc_q & sel & next_elig;
 	   
 	   wire match;
 	   wire elig;
@@ -1312,18 +1304,20 @@ module tc_node_mac
    // keep track of packets being processed
    //---------------------------------------------------------------------------
    
+   wire 				   add_packet;
+   assign add_packet = gen_packets & new_packet_rv;
+   
    wire 				   packet_count_zero_b;
    
    wire 				   packet_count_decr;
    assign packet_count_decr
-     = (~packet_valid_q | packet_sent) & (packet_count_zero_b | inject_packet);
+     = (~packet_valid_q | packet_sent) & (packet_count_zero_b | add_packet);
    
    wire 				   packet_count_max_b;
    
    wire 				   packet_count_incr;
    assign packet_count_incr
-     = (packet_count_max_b | ~packet_valid_q | packet_sent) & 
-       inject_packet;
+     = (packet_count_max_b | ~packet_valid_q | packet_sent) & add_packet;
    
    wire [0:packet_count_width-1] 	   packet_count_s, packet_count_q;
    assign packet_count_s
@@ -1347,8 +1341,7 @@ module tc_node_mac
    wire 				   packet_valid_s;
    assign packet_valid_s
      = active_q ? 
-       (((packet_valid_q  & ~packet_sent) | packet_count_zero_b | 
-	 inject_packet) & 
+       (((packet_valid_q  & ~packet_sent) | packet_count_zero_b | add_packet) & 
 	~start_q) : 
        packet_valid_q;
    c_dff
@@ -1361,7 +1354,8 @@ module tc_node_mac
       .q(packet_valid_q));
    
    wire 				   flit_sent;
-   assign flit_sent = packet_valid_q & (vc_alloc_q ? free : elig);
+   assign flit_sent
+     = packet_valid_q & (vc_alloc_q ? free : elig) & ~packet_to_self;
    
    wire 				   flit_sent_s, flit_sent_q;
    assign flit_sent_s = active_q ? flit_sent : flit_sent_q;
@@ -1394,7 +1388,8 @@ module tc_node_mac
    wire 				   flit_count_zero;
    assign flit_count_zero = ~|flit_count_q;
    
-   assign packet_sent = flit_sent & flit_count_zero;
+   assign packet_sent
+     = (flit_sent & flit_count_zero) | (packet_valid_q & packet_to_self);
    
    wire 				   flit_tail;
    assign flit_tail = flit_count_zero;
