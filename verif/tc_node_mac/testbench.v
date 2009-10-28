@@ -165,28 +165,28 @@ module testbench
    parameter initial_seed = 0;
    
    // channel latency in cycles
-   parameter channel_latency = 1;
+   parameter channel_latency = 0;
    
    reg 		    reset;
    reg 		    clk;
    
-   reg [0:flit_ctrl_width-1] flit_ctrl_in;
-   reg [0:flit_data_width-1] flit_data_in;
-   wire [0:flow_ctrl_width-1] flow_ctrl_out;
+   wire [0:flit_ctrl_width-1] dut0_flit_ctrl;
+   wire [0:flit_data_width-1] dut0_flit_data;
+   wire [0:flow_ctrl_width-1] dut0_flow_ctrl;
    
-   wire [0:flit_ctrl_width-1] flit_ctrl_out;
-   wire [0:flit_data_width-1] flit_data_out;
-   wire [0:flow_ctrl_width-1] flow_ctrl_in;
+   wire [0:flit_ctrl_width-1] dut1_flit_ctrl_dly;
+   wire [0:flit_data_width-1] dut1_flit_data_dly;
+   wire [0:flow_ctrl_width-1] dut1_flow_ctrl_dly;
    
-   reg [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] cfg_addr_prefixes;
+   reg [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] dut0_cfg_addr_prefixes;
    reg 							 cfg_req;
    reg 							 cfg_write;
    reg [0:cfg_addr_width-1] 				 cfg_addr;
    reg [0:cfg_data_width-1] 				 cfg_write_data;
-   wire [0:cfg_data_width-1] 				 cfg_read_data;
-   wire 						 cfg_done;
+   wire [0:cfg_data_width-1] 				 dut0_cfg_read_data;
+   wire 						 dut0_cfg_done;
    
-   wire 						 error;
+   wire 						 dut0_error;
    
    tc_node_mac
      #(.num_flit_buffers(num_flit_buffers),
@@ -213,112 +213,155 @@ module testbench
        .plength_sel_rv_width(plength_sel_rv_width),
        .packet_count_width(packet_count_width),
        .reset_type(reset_type))
-   dut
+   dut0
      (.clk(clk),
       .reset(reset),
       .address(address),
-      .flit_ctrl_out(flit_ctrl_out),
-      .flit_data_out(flit_data_out),
-      .flow_ctrl_in(flow_ctrl_in),
-      .flit_ctrl_in(flit_ctrl_in),
-      .flit_data_in(flit_data_in),
-      .flow_ctrl_out(flow_ctrl_out),
-      .cfg_addr_prefixes(cfg_addr_prefixes),
+      .flit_ctrl_out(dut0_flit_ctrl),
+      .flit_data_out(dut0_flit_data),
+      .flow_ctrl_in(dut1_flow_ctrl_dly),
+      .flit_ctrl_in(dut1_flit_ctrl_dly),
+      .flit_data_in(dut1_flit_data_dly),
+      .flow_ctrl_out(dut0_flow_ctrl),
+      .cfg_addr_prefixes(dut0_cfg_addr_prefixes),
       .cfg_req(cfg_req),
       .cfg_write(cfg_write),
       .cfg_addr(cfg_addr),
       .cfg_write_data(cfg_write_data),
-      .cfg_read_data(cfg_read_data),
-      .cfg_done(cfg_done),
-      .error(error));
+      .cfg_read_data(dut0_cfg_read_data),
+      .cfg_done(dut0_cfg_done),
+      .error(dut0_error));
    
-   wire [0:flit_ctrl_width-1] flit_ctrl_dly;
-   
-   generate
-      
-      if(channel_latency == 0)
-	assign flit_ctrl_dly = flit_ctrl_out;
-      else
-	begin
-	   
-	   wire [0:channel_latency*flit_ctrl_width-1] flit_ctrl_dly_s,
-						      flit_ctrl_dly_q;
-	   c_dff
-	     #(.width(channel_latency*flit_ctrl_width),
-	       .reset_type(reset_type))
-	   flit_ctrl_dlyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flit_ctrl_dly_s),
-	      .q(flit_ctrl_dly_q));
-	   
-	   if(channel_latency == 1)
-	     begin
-		assign flit_ctrl_dly_s = flit_ctrl_out;
-		assign flit_ctrl_dly = flit_ctrl_dly_q;
-	     end
-	   else
-	     begin
-		assign flit_ctrl_dly_s
-		  = {flit_ctrl_out, 
-		     flit_ctrl_dly_q[0:(channel_latency-1)*flit_ctrl_width-1]};
-		assign flit_ctrl_dly
-		  = flit_ctrl_dly_q[(channel_latency-1)*flit_ctrl_width:
-				    channel_latency*flit_ctrl_width-1];
-	     end
-	   
-	end
-      
-   endgenerate
-   
-   wire [0:flow_ctrl_width-1] flow_ctrl_s, flow_ctrl_q;
-   assign flow_ctrl_s = flit_ctrl_dly[0:1+vc_idx_width-1];
-   c_dff
-     #(.width(flow_ctrl_width),
+   wire [0:flit_ctrl_width-1] dut1_flit_ctrl;
+   c_shift_reg
+     #(.width(flit_ctrl_width),
+       .depth(channel_latency),
        .reset_type(reset_type))
-   flow_ctrlq
+   dut1_flit_ctrl_dly_sr
      (.clk(clk),
       .reset(reset),
-      .d(flow_ctrl_s),
-      .q(flow_ctrl_q));
+      .enable(1'b1),
+      .data_in(dut1_flit_ctrl),
+      .data_out(dut1_flit_ctrl_dly));
    
-   generate
-      
-      if(channel_latency == 0)
-	assign flow_ctrl_in = flow_ctrl_q;
-      else
-	begin
-	   
-	   wire [0:channel_latency*flow_ctrl_width-1] flow_ctrl_dly_s,
-						      flow_ctrl_dly_q;
-	   c_dff
-	     #(.width(channel_latency*flow_ctrl_width),
-	       .reset_type(reset_type))
-	   flow_ctrl_dlyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flow_ctrl_dly_s),
-	      .q(flow_ctrl_dly_q));
-	   
-	   if(channel_latency == 1)
-	     begin
-		assign flow_ctrl_dly_s = flow_ctrl_q;
-		assign flow_ctrl_in = flow_ctrl_dly_q;
-	     end
-	   else
-	     begin
-		assign flow_ctrl_dly_s
-		  = {flow_ctrl_q,
-		     flow_ctrl_dly_q[0:(channel_latency-1)*
-				     flow_ctrl_width-1]};
-		assign flow_ctrl_in
-		  = flow_ctrl_dly_q[(channel_latency-1)*flow_ctrl_width:
-				    channel_latency*flow_ctrl_width-1];
-	     end
-	   
-	end
-      
-   endgenerate
+   wire [0:flit_data_width-1] dut1_flit_data;
+   c_shift_reg
+     #(.width(flit_data_width),
+       .depth(channel_latency),
+       .reset_type(reset_type))
+   dut1_flit_data_dly_sr
+     (.clk(clk),
+      .reset(reset),
+      .enable(1'b1),
+      .data_in(dut1_flit_data),
+      .data_out(dut1_flit_data_dly));
+   
+   wire [0:flow_ctrl_width-1] dut1_flow_ctrl;
+   c_shift_reg
+     #(.width(flow_ctrl_width),
+       .depth(channel_latency),
+       .reset_type(reset_type))
+   dut1_flow_ctrl_dly_sr
+     (.clk(clk),
+      .reset(reset),
+      .enable(1'b1),
+      .data_in(dut1_flow_ctrl),
+      .data_out(dut1_flow_ctrl_dly));
+   
+   wire [0:flit_ctrl_width-1] dut0_flit_ctrl_dly;
+   c_shift_reg
+     #(.width(flit_ctrl_width),
+       .depth(channel_latency),
+       .reset_type(reset_type))
+   dut0_flit_ctrl_dly_sr
+     (.clk(clk),
+      .reset(reset),
+      .enable(1'b1),
+      .data_in(dut0_flit_ctrl),
+      .data_out(dut0_flit_ctrl_dly));
+   
+   wire [0:flit_data_width-1] dut0_flit_data_dly;
+   c_shift_reg
+     #(.width(flit_data_width),
+       .depth(channel_latency),
+       .reset_type(reset_type))
+   dut0_flit_data_dly_sr
+     (.clk(clk),
+      .reset(reset),
+      .enable(1'b1),
+      .data_in(dut0_flit_data),
+      .data_out(dut0_flit_data_dly));
+   
+   wire [0:flow_ctrl_width-1] dut0_flow_ctrl_dly;
+   c_shift_reg
+     #(.width(flow_ctrl_width),
+       .depth(channel_latency),
+       .reset_type(reset_type))
+   dut0_flow_ctrl_dly_sr
+     (.clk(clk),
+      .reset(reset),
+      .enable(1'b1),
+      .data_in(dut0_flow_ctrl),
+      .data_out(dut0_flow_ctrl_dly));
+   
+   reg [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] dut1_cfg_addr_prefixes;
+   wire [0:cfg_data_width-1] 				 dut1_cfg_read_data;
+   wire 						 dut1_cfg_done;
+   
+   wire 						 dut1_error;
+   
+   tc_node_mac
+     #(.num_flit_buffers(num_flit_buffers),
+       .num_header_buffers(num_header_buffers),
+       .num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .flit_data_width(flit_data_width),
+       .error_capture_mode(error_capture_mode),
+       .routing_type(routing_type),
+       .dim_order(dim_order),
+       .lfsr_index(lfsr_index),
+       .cfg_data_width(cfg_data_width),
+       .cfg_addr_width(cfg_addr_width),
+       .num_packets_width(num_packets_width),
+       .arrival_rv_width(arrival_rv_width),
+       .plength_sel_rv_width(plength_sel_rv_width),
+       .packet_count_width(packet_count_width),
+       .reset_type(reset_type))
+   dut1
+     (.clk(clk),
+      .reset(reset),
+      .address(address),
+      .flit_ctrl_out(dut1_flit_ctrl),
+      .flit_data_out(dut1_flit_data),
+      .flow_ctrl_in(dut0_flow_ctrl_dly),
+      .flit_ctrl_in(dut0_flit_ctrl_dly),
+      .flit_data_in(dut0_flit_data_dly),
+      .flow_ctrl_out(dut1_flow_ctrl),
+      .cfg_addr_prefixes(dut1_cfg_addr_prefixes),
+      .cfg_req(cfg_req),
+      .cfg_write(cfg_write),
+      .cfg_addr(cfg_addr),
+      .cfg_write_data(cfg_write_data),
+      .cfg_read_data(dut1_cfg_read_data),
+      .cfg_done(dut1_cfg_done),
+      .error(dut1_error));
+   
+   wire [0:cfg_data_width-1] 				 cfg_read_data;
+   assign cfg_read_data = dut0_cfg_read_data | dut1_cfg_read_data;
+   
+   wire 						 cfg_done;
+   assign cfg_done = dut0_cfg_done | dut1_cfg_done;
+   
+   wire 						 error;
+   assign error = dut0_error | dut1_error;
    
    reg 			      clk_en;
    
@@ -354,14 +397,19 @@ module testbench
       #(Tclk/4);
       
       reset = 1'b1;
-      cfg_addr_prefixes = 1'b0;
+      dut0_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
+	= 'd0;
+      dut0_cfg_addr_prefixes[cfg_addr_prefix_width:2*cfg_addr_prefix_width-1]
+	= 'd3;
+      dut1_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
+	= 'd1;
+      dut1_cfg_addr_prefixes[cfg_addr_prefix_width:2*cfg_addr_prefix_width-1]
+	= 'd3;
       cfg_req = 1'b0;
       cfg_write = 1'b0;
       cfg_addr = 'b0;
       cfg_write_data = 'b0;
       done = 1'b0;
-      flit_ctrl_in = 'd0;
-      flit_data_in = 'd0;
       
       #(Tclk);
       
@@ -373,9 +421,13 @@ module testbench
       
       #(Tclk);
       
+      
+      // set LFSR seeds
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd3;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd0;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd3;
       for(i = 0; i < cfg_data_width; i = i + 1)
 	cfg_write_data[i] = $dist_uniform(seed, 0, 1);
       while(!cfg_done)
@@ -386,7 +438,23 @@ module testbench
       
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd4;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd1;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd3;
+      for(i = 0; i < cfg_data_width; i = i + 1)
+	cfg_write_data[i] = $dist_uniform(seed, 0, 1);
+      while(!cfg_done)
+	#(Tclk);
+      cfg_req = 1'b0;
+      
+      #(Tclk);
+      
+      
+      // set number of packets
+      
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd4;
       cfg_write_data = 'd1024;
       while(!cfg_done)
 	#(Tclk);
@@ -394,9 +462,13 @@ module testbench
       
       #(Tclk);
       
+      
+      // set arrival rate threshold
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd5;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd5;
       cfg_write_data = 'd16384;
       while(!cfg_done)
 	#(Tclk);
@@ -404,9 +476,13 @@ module testbench
       
       #(Tclk);
       
+      
+      // set packet length selection threshold
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd6;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd6;
       cfg_write_data = 'd8;
       while(!cfg_done)
 	#(Tclk);
@@ -414,25 +490,36 @@ module testbench
       
       #(Tclk);
       
+      
+      // set packet length values
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd7;
-      cfg_write_data = 'd0 + 'd4;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd7;
+      cfg_write_data = 'd4;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
       
       #(10*Tclk);
       
+      
+      // start experiment
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd0;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
       cfg_write_data[0] = 'd1;
       cfg_write_data[1] = 'd0;
       cfg_write_data[2:cfg_data_width-1] = 'd0;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
+      
+      
+      // wait for experiment to finish
       
       while(!done)
 	begin
@@ -441,7 +528,8 @@ module testbench
 
 	   cfg_req = 1'b1;
 	   cfg_write = 1'b0;
-	   cfg_addr = 'd1;
+	   cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+	   cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd1;
 	   while(!cfg_done)
 	     #(Tclk);
 	   cfg_req = 1'b0;
@@ -452,9 +540,13 @@ module testbench
       
       #(Tclk);
       
+      
+      // disable nodes
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd0;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
       cfg_write_data = 'd0;
       while(!cfg_done)
 	#(Tclk);
@@ -462,24 +554,34 @@ module testbench
       
       #(Tclk);
       
+      
+      // reset number of packets
+      
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd4;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd4;
       cfg_write_data = 'd20;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
       
       #(10*Tclk);
-      
+
+
+      // restart experiment in loopback mode
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd0;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
       cfg_write_data[0] = 'd1;
       cfg_write_data[1] = 'd1;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
+      
+      
+      // wait for experiment to finish
       
       while(!done)
 	begin
@@ -488,7 +590,8 @@ module testbench
 	   
 	   cfg_req = 1'b1;
 	   cfg_write = 1'b0;
-	   cfg_addr = 'd1;
+	   cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+	   cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd1;
 	   while(!cfg_done)
 	     #(Tclk);
 	   cfg_req = 1'b0;
@@ -501,7 +604,8 @@ module testbench
       
       cfg_req = 1'b1;
       cfg_write = 1'b1;
-      cfg_addr = 'd0;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
       cfg_write_data = 'd0;
       while(!cfg_done)
 	#(Tclk);

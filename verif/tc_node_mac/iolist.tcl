@@ -1,25 +1,22 @@
 # Begin_DVE_Session_Save_Info
 # DVE full session
-# Saved on Mon Sep 21 07:59:41 2009
+# Saved on Wed Oct 28 14:06:33 2009
 # Designs open: 1
-#   Sim: /home/dub/work/router/trunk/verif/term/simv
+#   Sim: simv
 # Toplevel windows open: 2
 # 	TopLevel.1
 # 	TopLevel.2
 #   Source.1: testbench
-#   Wave.1: 161 signals
-#   Group count = 4
-#   Group Group1 signal count = 18
-#   Group dut signal count = 69
-#   Group Group3 signal count = 37
-#   Group Group2 signal count = 37
+#   Wave.1: 15 signals
+#   Group count = 1
+#   Group Group1 signal count = 15
 # End_DVE_Session_Save_Info
 
 # DVE version: C-2009.06_Full64
 # DVE build date: May 19 2009 21:20:39
 
 
-#<Session mode="Full" path="/home/dub/work/router/trunk/verif/term/iolist.tcl" type="Debug">
+#<Session mode="Full" path="/home/dub/work/router/trunk/verif/tc_node_mac/iolist.tcl" type="Debug">
 
 gui_set_loading_session_type Post
 gui_continuetime_set
@@ -72,7 +69,7 @@ if {![gui_exist_window -window TopLevel.1]} {
 } else { 
     set TopLevel.1 TopLevel.1
 }
-gui_show_window -window ${TopLevel.1} -show_state normal -rect {{543 402} {1659 1059}}
+gui_show_window -window ${TopLevel.1} -show_state normal -rect {{457 449} {1570 1103}}
 
 # ToolBar settings
 gui_set_toolbar_attributes -toolbar {TimeOperations} -dock_state top
@@ -112,17 +109,17 @@ gui_show_toolbar -toolbar {Zoom And Pan History}
 # End ToolBar settings
 
 # Docked window settings
-set HSPane.1 [gui_create_window -type HSPane -parent ${TopLevel.1} -dock_state left -dock_on_new_line true -dock_extent 555]
+set HSPane.1 [gui_create_window -type HSPane -parent ${TopLevel.1} -dock_state left -dock_on_new_line true -dock_extent 551]
 set Hier.1 [gui_share_window -id ${HSPane.1} -type Hier]
-gui_set_window_pref_key -window ${HSPane.1} -key dock_width -value_type integer -value 555
-gui_set_window_pref_key -window ${HSPane.1} -key dock_height -value_type integer -value 289
+gui_set_window_pref_key -window ${HSPane.1} -key dock_width -value_type integer -value 551
+gui_set_window_pref_key -window ${HSPane.1} -key dock_height -value_type integer -value 556
 gui_set_window_pref_key -window ${HSPane.1} -key dock_offset -value_type integer -value 0
-gui_update_layout -id ${HSPane.1} {{left 0} {top 0} {width 554} {height 289} {show_state normal} {dock_state left} {dock_on_new_line true} {child_hier_colhier 416} {child_hier_coltype 149} {child_hier_col1 0} {child_hier_col2 1}}
-set Console.1 [gui_create_window -type Console -parent ${TopLevel.1} -dock_state bottom -dock_on_new_line true -dock_extent 270]
-gui_set_window_pref_key -window ${Console.1} -key dock_width -value_type integer -value 1121
-gui_set_window_pref_key -window ${Console.1} -key dock_height -value_type integer -value 270
+gui_update_layout -id ${HSPane.1} {{left 0} {top 0} {width 550} {height 290} {show_state normal} {dock_state left} {dock_on_new_line true} {child_hier_colhier 416} {child_hier_coltype 149} {child_hier_col1 0} {child_hier_col2 1}}
+set Console.1 [gui_create_window -type Console -parent ${TopLevel.1} -dock_state bottom -dock_on_new_line true -dock_extent 266]
+gui_set_window_pref_key -window ${Console.1} -key dock_width -value_type integer -value 1114
+gui_set_window_pref_key -window ${Console.1} -key dock_height -value_type integer -value 266
 gui_set_window_pref_key -window ${Console.1} -key dock_offset -value_type integer -value 0
-gui_update_layout -id ${Console.1} {{left 0} {top 0} {width 1116} {height 269} {show_state normal} {dock_state bottom} {dock_on_new_line true}}
+gui_update_layout -id ${Console.1} {{left 0} {top 0} {width 1113} {height 265} {show_state normal} {dock_state bottom} {dock_on_new_line true}}
 #### Start - Readjusting docked view's offset / size
 set dockAreaList { top left right bottom }
 foreach dockArea $dockAreaList {
@@ -168,7 +165,7 @@ if {![gui_exist_window -window TopLevel.2]} {
 } else { 
     set TopLevel.2 TopLevel.2
 }
-gui_show_window -window ${TopLevel.2} -show_state normal -rect {{126 93} {1840 1131}}
+gui_show_window -window ${TopLevel.2} -show_state normal -rect {{61 150} {1598 1185}}
 
 # ToolBar settings
 gui_set_toolbar_attributes -toolbar {TimeOperations} -dock_state top
@@ -213,7 +210,7 @@ gui_sync_global -id ${TopLevel.2} -option true
 # MDI window settings
 set Wave.1 [gui_create_window -type {Wave}  -parent ${TopLevel.2}]
 gui_show_window -window ${Wave.1} -show_state maximized
-gui_update_layout -id ${Wave.1} {{show_state maximized} {dock_state undocked} {dock_on_new_line false} {child_wave_left 498} {child_wave_right 1211} {child_wave_colname 267} {child_wave_colvalue 227} {child_wave_col1 0} {child_wave_col2 1}}
+gui_update_layout -id ${Wave.1} {{show_state maximized} {dock_state undocked} {dock_on_new_line false} {child_wave_left 446} {child_wave_right 1086} {child_wave_colname 221} {child_wave_colvalue 221} {child_wave_col1 0} {child_wave_col2 1}}
 
 # End MDI window settings
 
@@ -235,10 +232,10 @@ gui_update_statusbar_target_frame ${TopLevel.2}
 
 if { [llength [lindex [gui_get_db -design Sim] 0]] == 0 } {
 gui_set_env SIMSETUP::SIMARGS {{-ucligui }}
-gui_set_env SIMSETUP::SIMEXE {/home/dub/work/router/trunk/verif/term/simv}
+gui_set_env SIMSETUP::SIMEXE {simv}
 gui_set_env SIMSETUP::ALLOW_POLL {0}
-if { ![gui_is_db_opened -db {/home/dub/work/router/trunk/verif/term/simv}] } {
-gui_sim_run Ucli -exe simv -args {-ucligui } -dir /home/dub/work/router/trunk/verif/term -nosource
+if { ![gui_is_db_opened -db {simv}] } {
+gui_sim_run Ucli -exe simv -args {-ucligui } -dir ../tc_node_mac -nosource
 }
 }
 if { ![gui_sim_state -check active] } {error "Simulator did not start correctly" error}
@@ -262,27 +259,14 @@ gui_set_time_units 1ns
 # Global: Signal Groups
 set {Group1} {Group1}
 gui_sg_create ${Group1}
-gui_sg_addsignal -group ${Group1} { {testbench.reset} {testbench.clk} {testbench.flit_ctrl_in} {testbench.flit_data_in} {testbench.flow_ctrl_out} {testbench.flit_ctrl_out} {testbench.flit_data_out} {testbench.flow_ctrl_in} {testbench.reg_write} {testbench.reg_read} {testbench.reg_addr} {testbench.reg_write_data} {testbench.reg_read_data} {testbench.reg_done} {testbench.error} {testbench.clk_en} {testbench.done} {testbench.reg_read_data} }
-set {dut} {dut}
-gui_sg_create ${dut}
-gui_sg_addsignal -group ${dut} { {testbench.dut.address} {testbench.dut.arrival_rv} {testbench.dut.arrival_rv_q} {testbench.dut.arrival_rv_s} {testbench.dut.arrival_thresh_q} {testbench.dut.arrival_thresh_s} {testbench.dut.clk} {testbench.dut.dest_addr_rv} {testbench.dut.error} {testbench.dut.flit_count_rv} {testbench.dut.flit_ctrl_in} {testbench.dut.flit_ctrl_out} {testbench.dut.flit_data_in} {testbench.dut.flit_data_out} {testbench.dut.flow_ctrl_in} {testbench.dut.flow_ctrl_out} {testbench.dut.free} {testbench.dut.header_info_rv} {testbench.dut.inc_rc_rv} {testbench.dut.intm_addr_rvs} {testbench.dut.la_route_info_rv} {testbench.dut.mc_idx_rv} {testbench.dut.new_packet_rv} {testbench.dut.packet_rvs_q} {testbench.dut.packet_rvs_s} {testbench.dut.plength_rv} {testbench.dut.plength_sel_rv} {testbench.dut.plength_vals_q} {testbench.dut.plength_vals_s} {testbench.dut.rcs[0].flip_bits} {testbench.dut.rcs[0].intm_addr_rv} {testbench.dut.rcs[0].next_addr_rv} {testbench.dut.reg_addr} {testbench.dut.reg_addr_q} {testbench.dut.reg_addr_s} {testbench.dut.reg_data_q} {testbench.dut.reg_data_s} {testbench.dut.reg_done} {testbench.dut.reg_done_q} {testbench.dut.reg_done_s} {testbench.dut.reg_read} {testbench.dut.reg_read_data} {testbench.dut.reg_read_data_muxed} {testbench.dut.reg_read_q} {testbench.dut.reg_read_s} {testbench.dut.reg_sel_arrival_rv} {testbench.dut.reg_sel_arrival_thresh} {testbench.dut.reg_sel_packet_rvs} {testbench.dut.reg_sel_plength_sel_thresh} {testbench.dut.reg_sel_plength_vals} {testbench.dut.reg_write} {testbench.dut.reg_write_data} {testbench.dut.reg_write_q} {testbench.dut.reg_write_s} {testbench.dut.reset} {testbench.dut.route_info_rv} {testbench.dut.route_port_rv} {testbench.dut.router_address} {testbench.dut.run_ctr_q} {testbench.dut.run_ctr_s} {testbench.dut.sel_mc_rv} {testbench.dut.write_arrival_rv} {testbench.dut.write_arrival_thresh} {testbench.dut.write_ctrl} {testbench.dut.write_flit_data_rv} {testbench.dut.write_num_packets} {testbench.dut.write_packet_rvs} {testbench.dut.write_plength_sel_thresh} {testbench.dut.write_plength_vals} }
-set {Group3} {Group3}
-gui_sg_create ${Group3}
-gui_sg_addsignal -group ${Group3} { {testbench.dut.active_q} {testbench.dut.arrival_rv_q} {testbench.dut.arrival_thresh_q} {testbench.dut.blks[0].flit_data_rv_q} {testbench.dut.blks[0].flit_sig_q} {testbench.dut.blks[1].flit_data_rv_q} {testbench.dut.blks[1].flit_sig_q} {testbench.dut.blks[2].flit_data_rv_q} {testbench.dut.blks[2].flit_sig_q} {testbench.dut.blks[3].flit_data_rv_q} {testbench.dut.blks[3].flit_sig_q} {testbench.dut.cred_valid_in_q} {testbench.dut.ctrl_q} {testbench.dut.flit_count_q} {testbench.dut.flit_head_q} {testbench.dut.flow_ctrl_in_q} {testbench.dut.reg_data_q} {testbench.dut.inf_packets_s} {testbench.dut.inf_packets_q} {testbench.dut.num_packets_q} {testbench.dut.packet_count_q} {testbench.dut.packet_rvs_q} {testbench.dut.packet_valid_q} {testbench.dut.plength_sel_thresh_q} {testbench.dut.plength_vals_q} {testbench.dut.reg_active_q} {testbench.dut.reg_addr_q} {testbench.dut.reg_data_q} {testbench.dut.reg_done_q} {testbench.dut.reg_read_q} {testbench.dut.reg_write_q} {testbench.dut.run_ctr_q} {testbench.dut.vc_alloc_ocvc_q} {testbench.dut.vc_alloc_q} {testbench.dut.active_s} {testbench.dut.active_q} {testbench.dut.reg_read_data_ctrl} }
-set {Group2} {Group2}
-gui_sg_create ${Group2}
-gui_sg_addsignal -group ${Group2} { {testbench.dut.reg_write} {testbench.dut.reg_read} {testbench.dut.reg_addr} {testbench.dut.reg_write_data} {testbench.dut.reg_read_data} {testbench.dut.reg_done} {testbench.dut.reg_write_q} {testbench.dut.reg_read_q} {testbench.dut.reg_active_s} {testbench.dut.reg_active_q} {testbench.dut.reg_write_s} {testbench.dut.reg_read_s} {testbench.dut.reg_addr_s} {testbench.dut.reg_addr_q} {testbench.dut.reg_sel_ctrl} {testbench.dut.reg_sel_num_packets} {testbench.dut.reg_sel_arrival_thresh} {testbench.dut.reg_sel_arrival_rv} {testbench.dut.reg_sel_packet_rvs} {testbench.dut.reg_sel_plength_sel_thresh} {testbench.dut.reg_sel_plength_vals} {testbench.dut.reg_sel_flit_data_rv} {testbench.dut.reg_read_data_ctrl} {testbench.dut.reg_read_data_num_packets} {testbench.dut.reg_read_data_arrival_thresh} {testbench.dut.reg_read_data_arrival_rv} {testbench.dut.reg_read_data_packet_rvs} {testbench.dut.reg_read_data_plength_sel_thresh} {testbench.dut.reg_read_data_plength_vals} {testbench.dut.reg_read_data_vec} {testbench.dut.reg_read_data_muxed} {testbench.dut.reg_data_s} {testbench.dut.reg_data_q} {testbench.dut.reg_done_s} {testbench.dut.reg_done_q} {testbench.dut.reg_addr_width} {testbench.dut.reg_data_width} }
-gui_set_radix -radix {decimal} -signals {testbench.dut.reg_addr_width}
-gui_set_radix -radix {twosComplement} -signals {testbench.dut.reg_addr_width}
-gui_set_radix -radix {decimal} -signals {testbench.dut.reg_data_width}
-gui_set_radix -radix {twosComplement} -signals {testbench.dut.reg_data_width}
+gui_sg_addsignal -group ${Group1} { {testbench.clk} {testbench.reset} {testbench.dut0_flit_ctrl} {testbench.dut0_flit_data} {testbench.dut0_flow_ctrl} {testbench.dut1_flit_ctrl} {testbench.dut1_flit_data} {testbench.dut1_flow_ctrl} {testbench.cfg_req} {testbench.cfg_write} {testbench.cfg_addr} {testbench.cfg_write_data} {testbench.cfg_read_data} {testbench.cfg_done} {testbench.error} }
 
 # Global: Highlighting
 
 # Post database loading setting...
 
 # Restore C1 time
-gui_set_time -C1_only 272
+gui_set_time -C1_only 11802
 
 
 
@@ -307,25 +291,23 @@ gui_list_set_filter -id ${Hier.1} -text {*}
 gui_hier_list_init -id ${Hier.1}
 gui_change_design -id ${Hier.1} -design Sim
 catch {gui_list_expand -id ${Hier.1} testbench}
-catch {gui_list_select -id ${Hier.1} {testbench.dut}}
-gui_view_scroll -id ${Hier.1} -vertical -set 0
+catch {gui_list_select -id ${Hier.1} {testbench.dut1}}
+gui_view_scroll -id ${Hier.1} -vertical -set 21
 gui_view_scroll -id ${Hier.1} -horizontal -set 0
 
 # Data 'Data.1'
 gui_list_set_filter -id ${Data.1} -list { {Buffer 1} {Input 1} {Others 1} {Linkage 1} {Output 1} {Parameter 1} {All 1} {Aggregate 1} {Event 1} {Assertion 1} {Constant 1} {Interface 1} {Signal 1} {$unit 1} {Inout 1} {Variable 1} }
-gui_list_set_filter -id ${Data.1} -text {reg*}
-gui_list_show_data -id ${Data.1} {testbench.dut}
-gui_show_window -window ${Data.1}
-catch { gui_list_select -id ${Data.1} {testbench.dut.reg_write testbench.dut.reg_read testbench.dut.reg_addr testbench.dut.reg_write_data testbench.dut.reg_read_data testbench.dut.reg_done testbench.dut.reg_write_q testbench.dut.reg_read_q testbench.dut.reg_active_s testbench.dut.reg_active_q testbench.dut.reg_write_s testbench.dut.reg_read_s testbench.dut.reg_addr_s testbench.dut.reg_addr_q testbench.dut.reg_sel_ctrl testbench.dut.reg_sel_num_packets testbench.dut.reg_sel_arrival_thresh testbench.dut.reg_sel_arrival_rv testbench.dut.reg_sel_packet_rvs testbench.dut.reg_sel_plength_sel_thresh testbench.dut.reg_sel_plength_vals testbench.dut.reg_sel_flit_data_rv testbench.dut.reg_read_data_ctrl testbench.dut.reg_read_data_num_packets testbench.dut.reg_read_data_arrival_thresh testbench.dut.reg_read_data_arrival_rv testbench.dut.reg_read_data_packet_rvs testbench.dut.reg_read_data_plength_sel_thresh testbench.dut.reg_read_data_plength_vals testbench.dut.reg_read_data_vec testbench.dut.reg_read_data_muxed testbench.dut.reg_data_s testbench.dut.reg_data_q testbench.dut.reg_done_s testbench.dut.reg_done_q testbench.dut.reg_addr_width testbench.dut.reg_data_width }}
-gui_view_scroll -id ${Data.1} -vertical -set 488
+gui_list_set_filter -id ${Data.1} -text {discard_packet}
+gui_list_show_data -id ${Data.1} {testbench.dut1}
+gui_view_scroll -id ${Data.1} -vertical -set 0
 gui_view_scroll -id ${Data.1} -horizontal -set 0
-gui_view_scroll -id ${Hier.1} -vertical -set 0
+gui_view_scroll -id ${Hier.1} -vertical -set 21
 gui_view_scroll -id ${Hier.1} -horizontal -set 0
 
 # Source 'Source.1'
 gui_src_value_annotate -id ${Source.1} -switch false
 gui_set_env TOGGLE::VALUEANNOTATE 0
-gui_open_source -id ${Source.1}  -replace -active testbench /home/dub/work/router/trunk/verif/term/testbench.v
+gui_open_source -id ${Source.1}  -replace -active testbench testbench.v
 gui_view_scroll -id ${Source.1} -vertical -set 384
 gui_src_set_reusable -id ${Source.1}
 
@@ -338,16 +320,12 @@ gui_list_set_height -id Wave -height 25
 set origGroupCreationState [gui_list_create_group_when_add -wave]
 gui_list_create_group_when_add -wave -disable
 gui_marker_set_ref -id ${Wave.1}  C1
-gui_wv_zoom_timerange -id ${Wave.1} 136 408
+gui_wv_zoom_timerange -id ${Wave.1} 11771 11873
 gui_list_set_filter -id ${Wave.1} -list { {Buffer 1} {Input 1} {Others 1} {Linkage 1} {Output 1} {Parameter 1} {All 1} {Aggregate 1} {Event 1} {Assertion 1} {Constant 1} {Interface 1} {Signal 1} {$unit 1} {Inout 1} {Variable 1} }
 gui_list_set_filter -id ${Wave.1} -text {*}
 gui_list_add_group -id ${Wave.1} -after {New Group} {{Group1}}
-gui_list_add_group -id ${Wave.1} -after {New Group} {{dut}}
-gui_list_add_group -id ${Wave.1} -after {New Group} {{Group3}}
-gui_list_add_group -id ${Wave.1} -after {New Group} {{Group2}}
-gui_list_expand -id ${Wave.1} testbench.dut.run_ctr_q
-gui_list_select -id ${Wave.1} {testbench.dut.reg_read_data_muxed }
-gui_list_set_insertion_bar  -id ${Wave.1} -group {Group2} -item {testbench.dut.reg_data_width[31:0]} -position below
+gui_list_expand -id ${Wave.1} testbench.dut0_flit_ctrl
+gui_list_set_insertion_bar  -id ${Wave.1} -group {New Group} -position in
 gui_seek_criteria -id ${Wave.1} {Any Edge}
 
 
@@ -361,13 +339,13 @@ if {$origGroupCreationState} {
 if { $groupExD } {
  gui_msg_report -code DVWW028
 }
-gui_marker_move -id ${Wave.1} {C1} 272
+gui_marker_move -id ${Wave.1} {C1} 11802
 gui_view_scroll -id ${Wave.1} -vertical -set 0
 
 # DVE Active view and window setting: 
 
 gui_set_active_window -window ${DLPane.1}
-gui_set_active_window -window ${DLPane.1}
+gui_set_active_window -window ${Console.1}
 gui_set_active_window -window ${Wave.1}
 gui_set_active_window -window ${Wave.1}
 # Restore toplevel window zorder
