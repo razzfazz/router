@@ -155,6 +155,12 @@ module testbench
    // width of arrival rate LFSR
    parameter arrival_rv_width = 16;
    
+   // width of message class selection LFSR
+   parameter mc_idx_rv_width = 4;
+   
+   // width of resource class selection LFSR
+   parameter rc_idx_rv_width = 4;
+   
    // width of payload length selection LFSR
    parameter plength_idx_rv_width = 4;
    
@@ -213,6 +219,8 @@ module testbench
        .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
+       .mc_idx_rv_width(mc_idx_rv_width),
+       .rc_idx_rv_width(rc_idx_rv_width),
        .plength_idx_rv_width(plength_idx_rv_width),
        .num_plength_vals(num_plength_vals),
        .packet_count_width(packet_count_width),
@@ -336,7 +344,10 @@ module testbench
        .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
+       .mc_idx_rv_width(mc_idx_rv_width),
+       .rc_idx_rv_width(rc_idx_rv_width),
        .plength_idx_rv_width(plength_idx_rv_width),
+       .num_plength_vals(num_plength_vals),
        .packet_count_width(packet_count_width),
        .reset_type(reset_type))
    dut1
@@ -507,6 +518,36 @@ module testbench
       cfg_write_data = 'd0;
       cfg_write_data[0:payload_length_width-1] = 'd0;
       cfg_write_data[payload_length_width:2*payload_length_width-1] = 'd4;
+      while(!cfg_done)
+	#(Tclk);
+      cfg_req = 1'b0;
+      
+      #(Tclk);
+      
+      
+      // set message class selection thresholds
+      
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd8;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:mc_idx_rv_width-1] = 'd10;
+      while(!cfg_done)
+	#(Tclk);
+      cfg_req = 1'b0;
+      
+      #(Tclk);
+      
+      
+      // set resource class selection thresholds
+      
+      cfg_req = 1'b1;
+      cfg_write = 1'b1;
+      cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
+      cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd9;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:rc_idx_rv_width-1] = 'd12;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;

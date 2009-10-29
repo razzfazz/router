@@ -43,6 +43,8 @@ module tc_node_mac
 `define CFG_ADDR_ARRIVAL_THRESH  5
 `define CFG_ADDR_PLENGTH_THRESHS 6
 `define CFG_ADDR_PLENGTH_VALS    7
+`define CFG_ADDR_MC_THRESHS      8
+`define CFG_ADDR_RC_THRESHS      9
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -57,14 +59,8 @@ module tc_node_mac
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
-   // width required to select individual message class
-   localparam mc_idx_width = clogb(num_message_classes);
-   
    // number of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
-   
-   // width required to select individual resource class
-   localparam rc_idx_width = clogb(num_resource_classes);
    
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
@@ -212,6 +208,18 @@ module tc_node_mac
    // width of arrival rate LFSR
    parameter arrival_rv_width = 20;
    
+   // width of message class selection LFSR
+   parameter mc_idx_rv_width = 1;
+   
+   // width of message class threshold register
+   localparam mc_threshs_width = (num_message_classes - 1) * mc_idx_rv_width;
+   
+   // width of resource class selection LFSR
+   parameter rc_idx_rv_width = 1;
+   
+   // width of resource class threshold register
+   localparam rc_threshs_width = (num_resource_classes - 1) * rc_idx_rv_width;
+   
    // width of payload length selection LFSR
    parameter plength_idx_rv_width = 1;
    
@@ -227,7 +235,8 @@ module tc_node_mac
    
    // select width (and thus period) for LFSRs
    localparam packet_rvs_width
-     = mc_idx_width + rc_idx_width + route_info_width + plength_idx_rv_width;
+     = mc_idx_rv_width + rc_idx_rv_width + route_info_width + 
+       plength_idx_rv_width;
    
    // width of register that holds the number of outstanding packets
    parameter packet_count_width = 8;
@@ -414,6 +423,14 @@ module tc_node_mac
    wire 			    cfg_sel_plength_vals;
    assign cfg_sel_plength_vals
      = (cfg_addr_suffix_q == `CFG_ADDR_PLENGTH_VALS);
+   
+   wire 			    cfg_sel_mc_threshs;
+   assign cfg_sel_mc_threshs
+     = (cfg_addr_suffix_q == `CFG_ADDR_MC_THRESHS);
+   
+   wire 			    cfg_sel_rc_threshs;
+   assign cfg_sel_rc_threshs
+     = (cfg_addr_suffix_q == `CFG_ADDR_RC_THRESHS);
    
    wire [0:cfg_data_width-1] 	    cfg_read_data_status;
    wire [0:cfg_data_width-1] 	    cfg_read_data_flit_sig;
@@ -754,7 +771,7 @@ module tc_node_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_message_classes-1]   sel_mc_rv;
-   wire [0:num_resource_classes-1]  sel_orc_rv;
+   wire [0:num_resource_classes-1]  sel_rc_rv;
    
    wire [0:num_packet_classes-1]    sel_opc_rv;
    c_mat_mult
@@ -763,7 +780,7 @@ module tc_node_mac
        .dim3_width(num_resource_classes))
    sel_opc_rv_mmult
      (.input_a(sel_mc_rv),
-      .input_b(sel_orc_rv),
+      .input_b(sel_rc_rv),
       .result(sel_opc_rv));
    
    wire 			    vc_alloc_q;
@@ -801,27 +818,95 @@ module tc_node_mac
       if(num_message_classes > 1)
 	begin
 	   
-	   wire [0:mc_idx_width-1] mc_idx_rv;
-	   assign mc_idx_rv
-	     = packet_rvs_q[0:mc_idx_width-1] % 
-	       num_message_classes;
+	   // synopsys translate_off
+	   if(mc_threshs_width > cfg_data_width)
+	     begin
+		initial
+		begin
+		   $display("ERROR: The value of the cfg_data_width " +
+			    "parameter is too small to accomodate the " +
+			    "specified number of message class selection " +
+			    "thresholds.");
+		   $stop;
+		end
+	     end
+	   // synopsys translate_on
 	   
-	   assign elig_orc = elig_opc[mc_idx_rv*num_resource_classes +:
-				      num_resource_classes];
+	   wire write_mc_threshs;
+	   assign write_mc_threshs = cfg_do_write & cfg_sel_mc_threshs;
 	   
-	   assign next_elig_orc_ocvc
-	     = next_elig_ovc[mc_idx_rv*num_resource_classes*num_vcs_per_class +:
-			     num_resource_classes*num_vcs_per_class];
+	   wire [0:mc_threshs_width-1] mc_threshs_loadval;
+	   c_align
+	     #(.data_width(cfg_data_width),
+	       .dest_width(mc_threshs_width))
+	   mc_threshs_loadval_alg
+	     (.data_in(cfg_data_q),
+	      .dest_in({mc_threshs_width{1'b0}}),
+	      .data_out(mc_threshs_loadval));
 	   
-	   assign free_orc_ocvc
-	     = free_ovc[mc_idx_rv*num_resource_classes*num_vcs_per_class +: 
-			num_resource_classes*num_vcs_per_class];
+	   wire [0:mc_threshs_width-1] mc_threshs_s, mc_threshs_q;
+	   assign mc_threshs_s = cfg_active_q ? 
+				 (write_mc_threshs ? 
+				  mc_threshs_loadval :
+				  mc_threshs_q) : 
+				 mc_threshs_q;
+	   c_dff
+	     #(.width(mc_threshs_width),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   mc_threshsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(mc_threshs_s),
+	      .q(mc_threshs_q));
 	   
-	   c_decoder
+	   wire [0:mc_idx_rv_width-1] mc_idx_rv;
+	   assign mc_idx_rv = packet_rvs_q[0:mc_idx_rv_width-1];
+	   
+	   wire [0:num_message_classes-1] sel_mc_rv_unmasked;
+	   
+	   genvar 			  mc;
+	   
+	   for(mc = 0; mc < (num_message_classes - 1); mc = mc + 1)
+	     begin:mcs
+		
+		assign sel_mc_rv_unmasked[mc]
+			 = (mc_idx_rv <
+			    mc_threshs_q[mc*mc_idx_rv_width:
+					 (mc+1)*mc_idx_rv_width-1]);
+		
+	     end
+	   
+	   assign sel_mc_rv_unmasked[num_message_classes-1] = 1'b1;
+	   
+	   c_fp_arbiter
 	     #(.num_ports(num_message_classes))
-	   sel_mc_rv_dec
-	     (.data_in(mc_idx_rv),
-	      .data_out(sel_mc_rv));
+	   sel_mc_rv_arb
+	     (.req(sel_mc_rv_unmasked),
+	      .gnt(sel_mc_rv));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_message_classes),
+	       .width(num_resource_classes))
+	   elig_orc_sel
+	     (.select(sel_mc_rv),
+	      .data_in(elig_opc),
+	      .data_out(elig_orc));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_message_classes),
+	       .width(num_resource_classes*num_vcs_per_class))
+	   next_elig_orc_ocvc_sel
+	     (.select(sel_mc_rv),
+	      .data_in(next_elig_ovc),
+	      .data_out(next_elig_orc_ocvc));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_message_classes),
+	       .width(num_resource_classes*num_vcs_per_class))
+	   free_orc_ocvc_sel
+	     (.select(sel_mc_rv),
+	      .data_in(free_ovc),
+	      .data_out(free_orc_ocvc));
 	   
 	end
       else
@@ -835,31 +920,102 @@ module tc_node_mac
       if(num_resource_classes > 1)
 	begin
 	   
-	   wire [0:rc_idx_width-1] orc_idx_rv;
-	   assign orc_idx_rv
-	     = packet_rvs_q[mc_idx_width:(mc_idx_width+rc_idx_width)-1] % 
-	       num_resource_classes;
+	   // synopsys translate_off
+	   if(rc_threshs_width > cfg_data_width)
+	     begin
+		initial
+		begin
+		   $display("ERROR: The value of the cfg_data_width " +
+			    "parameter is too small to accomodate the " +
+			    "specified number of resource class selection " +
+			    "thresholds.");
+		   $stop;
+		end
+	     end
+	   // synopsys translate_on
 	   
-	   assign elig = elig_orc[orc_idx_rv];
+	   wire write_rc_threshs;
+	   assign write_rc_threshs = cfg_do_write & cfg_sel_rc_threshs;
 	   
-	   assign next_elig_ocvc
-	     = next_elig_orc_ocvc[orc_idx_rv*num_vcs_per_class +: 
-				  num_vcs_per_class];
+	   wire [0:rc_threshs_width-1] rc_threshs_loadval;
+	   c_align
+	     #(.data_width(cfg_data_width),
+	       .dest_width(rc_threshs_width))
+	   rc_threshs_loadval_alg
+	     (.data_in(cfg_data_q),
+	      .dest_in({rc_threshs_width{1'b0}}),
+	      .data_out(rc_threshs_loadval));
 	   
-	   assign free_ocvc
-	     = free_orc_ocvc[orc_idx_rv*num_vcs_per_class +: 
-			     num_vcs_per_class];
+	   wire [0:rc_threshs_width-1] rc_threshs_s, rc_threshs_q;
+	   assign rc_threshs_s = cfg_active_q ? 
+				 (write_rc_threshs ? 
+				  rc_threshs_loadval :
+				  rc_threshs_q) : 
+				 rc_threshs_q;
+	   c_dff
+	     #(.width(rc_threshs_width),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   rc_threshsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(rc_threshs_s),
+	      .q(rc_threshs_q));
 	   
-	   c_decoder
+	   wire [0:rc_idx_rv_width-1] rc_idx_rv;
+	   assign rc_idx_rv
+	     = packet_rvs_q[mc_idx_rv_width:
+			    (mc_idx_rv_width+rc_idx_rv_width)-1];
+	   
+	   wire [0:num_resource_classes-1] sel_rc_rv_unmasked;
+	   
+	   genvar 			   rc;
+	   
+	   for(rc = 0; rc < (num_resource_classes - 1); rc = rc + 1)
+	     begin:rcs
+		
+		assign sel_rc_rv_unmasked[rc]
+			 = (rc_idx_rv <
+			    rc_threshs_q[rc*rc_idx_rv_width:
+					 (rc+1)*rc_idx_rv_width-1]);
+		
+	     end
+	   
+	   assign sel_rc_rv_unmasked[num_resource_classes-1] = 1'b1;
+	   
+	   c_fp_arbiter
 	     #(.num_ports(num_resource_classes))
-	   sel_orc_rv_dec
-	     (.data_in(orc_idx_rv),
-	      .data_out(sel_orc_rv));
+	   sel_rc_rv_arb
+	     (.req(sel_rc_rv_unmasked),
+	      .gnt(sel_rc_rv));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_resource_classes),
+	       .width(1))
+	   elig_sel
+	     (.select(sel_rc_rv),
+	      .data_in(elig_orc),
+	      .data_out(elig));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_resource_classes),
+	       .width(num_vcs_per_class))
+	   next_elig_ocvc_sel
+	     (.select(sel_rc_rv),
+	      .data_in(next_elig_orc_ocvc),
+	      .data_out(next_elig_ocvc));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_resource_classes),
+	       .width(num_vcs_per_class))
+	   free_ocvc_sel
+	     (.select(sel_rc_rv),
+	      .data_in(free_orc_ocvc),
+	      .data_out(free_ocvc));
 	   
 	end
       else
 	begin
-	   assign sel_orc_rv = 1'b1;
+	   assign sel_rc_rv = 1'b1;
 	   assign elig = elig_orc;
 	   assign next_elig_ocvc = next_elig_orc_ocvc;
 	   assign free_ocvc = free_orc_ocvc;
@@ -1066,10 +1222,10 @@ module tc_node_mac
 	begin:dims
 	   
 	   assign dest_addr_rv[dim*dim_addr_width:(dim+1)*dim_addr_width-1]
-		    = packet_rvs_q[mc_idx_width+rc_idx_width+
+		    = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
 				   (num_resource_classes-1)*router_addr_width+
 				   dim*dim_addr_width:
-				   mc_idx_width+rc_idx_width+
+				   mc_idx_rv_width+rc_idx_rv_width+
 				   (num_resource_classes-1)*router_addr_width+
 				   (dim+1)*dim_addr_width-1] % 
 		      num_routers_per_dim;
@@ -1078,9 +1234,9 @@ module tc_node_mac
       
       if(num_nodes_per_router > 1)
 	   assign dest_addr_rv[router_addr_width:addr_width-1]
-		    = packet_rvs_q[mc_idx_width+rc_idx_width+
+		    = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
 				   num_resource_classes*router_addr_width:
-				   mc_idx_width+rc_idx_width+
+				   mc_idx_rv_width+rc_idx_rv_width+
 				   num_resource_classes*router_addr_width+
 				   node_addr_width-1] % 
 		      num_nodes_per_router;
@@ -1091,7 +1247,7 @@ module tc_node_mac
       //------------------------------------------------------------------------
       
       if(num_resource_classes > 1)
-	begin
+	begin:intm_addr_gen
 	   
 	   wire [0:num_resource_classes*router_addr_width-1] intm_addr_rvs;
 	   assign intm_addr_rvs[(num_resource_classes-1)*router_addr_width:
@@ -1110,10 +1266,10 @@ module tc_node_mac
 		     
 		     assign intm_addr_rv[dim*dim_addr_width:
 					 (dim+1)*dim_addr_width-1]
-			      = packet_rvs_q[mc_idx_width+rc_idx_width+
+			      = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
 					     rc*router_addr_width+
 					     dim*dim_addr_width:
-					     mc_idx_width+rc_idx_width+
+					     mc_idx_rv_width+rc_idx_rv_width+
 					     rc*router_addr_width+
 					     (dim+1)*dim_addr_width-1] %
 				num_routers_per_dim;
@@ -1190,7 +1346,7 @@ module tc_node_mac
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .sel_rc(sel_orc_rv),
+      .sel_rc(sel_rc_rv),
       .route_info(route_info_rv),
       .route_port(route_port_rv),
       .inc_rc(inc_rc_rv));
@@ -1244,7 +1400,33 @@ module tc_node_mac
 	     end
 	   // synopsys translate_on
 
-	   wire [0:num_plength_vals-1] 	 plength_select_unmasked;
+	   wire 			   write_plength_vals;
+	   assign write_plength_vals = cfg_do_write & cfg_sel_plength_vals;
+	   
+	   wire [0:plength_vals_width-1] plength_vals_loadval;
+	   c_align
+	     #(.data_width(cfg_data_width),
+	       .dest_width(plength_vals_width))
+	   plength_vals_loadval_alg
+	     (.data_in(cfg_data_q),
+	      .dest_in({(plength_vals_width){1'b0}}),
+	      .data_out(plength_vals_loadval));
+	   
+	   wire [0:plength_vals_width-1] plength_vals_s, plength_vals_q;
+	   assign plength_vals_s
+	     = cfg_active_q ? 
+	       (write_plength_vals ? plength_vals_loadval : plength_vals_q) : 
+	       plength_vals_q;
+	   c_dff
+	     #(.width(plength_vals_width),
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	   plength_valsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(plength_vals_s),
+	      .q(plength_vals_q));
+	   
+	   wire [0:payload_length_width-1] plength_rv;
 	   
 	   if(num_plength_vals > 1)
 	     begin
@@ -1280,9 +1462,12 @@ module tc_node_mac
 		
 		wire [0:plength_idx_rv_width-1]  plength_idx_rv;
 		assign plength_idx_rv
-		  = packet_rvs_q[mc_idx_width+rc_idx_width+route_info_width:
-				 mc_idx_width+rc_idx_width+route_info_width+
-				 plength_idx_rv_width-1];
+		  = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
+				 route_info_width:
+				 mc_idx_rv_width+rc_idx_rv_width+
+				 route_info_width+plength_idx_rv_width-1];
+		
+		wire [0:num_plength_vals-1] plength_select_unmasked;
 		
 		genvar 				 val;
 		
@@ -1298,51 +1483,26 @@ module tc_node_mac
 		     
 		  end
 		
+		assign plength_select_unmasked[num_plength_vals-1] = 1'b1;
+		
+		wire [0:num_plength_vals-1] 	 plength_select;
+		c_fp_arbiter
+		  #(.num_ports(num_plength_vals))
+		plength_select_arb
+		  (.req(plength_select_unmasked),
+		   .gnt(plength_select));
+		
+		c_select_1ofn
+		  #(.num_ports(num_plength_vals),
+		    .width(payload_length_width))
+		plength_rv_sel
+		  (.select(plength_select),
+		   .data_in(plength_vals_q),
+		   .data_out(plength_rv));
+		
 	     end
-	   
-	   assign plength_select_unmasked[num_plength_vals-1] = 1'b1;
-	   
-	   wire [0:num_plength_vals-1] plength_select;
-	   c_fp_arbiter
-	     #(.num_ports(num_plength_vals))
-	   plength_select_arb
-	     (.req(plength_select_unmasked),
-	      .gnt(plength_select));
-	   
-	   wire 			   write_plength_vals;
-	   assign write_plength_vals = cfg_do_write & cfg_sel_plength_vals;
-	   
-	   wire [0:plength_vals_width-1] plength_vals_loadval;
-	   c_align
-	     #(.data_width(cfg_data_width),
-	       .dest_width(plength_vals_width))
-	   plength_vals_loadval_alg
-	     (.data_in(cfg_data_q),
-	      .dest_in({(plength_vals_width){1'b0}}),
-	      .data_out(plength_vals_loadval));
-	   
-	   wire [0:plength_vals_width-1] plength_vals_s, plength_vals_q;
-	   assign plength_vals_s
-	     = cfg_active_q ? 
-	       (write_plength_vals ? plength_vals_loadval : plength_vals_q) : 
-	       plength_vals_q;
-	   c_dff
-	     #(.width(plength_vals_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   plength_valsq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(plength_vals_s),
-	      .q(plength_vals_q));
-	   
-	   wire [0:payload_length_width-1] plength_rv;
-	   c_select_1ofn
-	     #(.num_ports(num_plength_vals),
-	       .width(payload_length_width))
-	   plength_rv_sel
-	     (.select(plength_select),
-	      .data_in(plength_vals_q),
-	      .data_out(plength_rv));
+	   else
+	     assign plength_rv = plength_vals_q;
 	   
 	   if(packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH)
 	     assign header_info_rv[la_route_info_width+route_info_width:
