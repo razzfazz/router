@@ -213,21 +213,21 @@ module tc_node_mac
    parameter arrival_rv_width = 20;
    
    // width of payload length selection LFSR
-   parameter plength_sel_rv_width = 1;
+   parameter plength_idx_rv_width = 1;
    
    // number of selectable payload lengths
    parameter num_plength_vals = 2;
    
    // width of packet length threshold register
    localparam plength_threshs_width
-     = (num_plength_vals - 1) * plength_sel_rv_width;
+     = (num_plength_vals - 1) * plength_idx_rv_width;
    
    // width of packet length value register
    localparam plength_vals_width = num_plength_vals * payload_length_width;
    
    // select width (and thus period) for LFSRs
    localparam packet_rvs_width
-     = mc_idx_width + rc_idx_width + route_info_width + plength_sel_rv_width;
+     = mc_idx_width + rc_idx_width + route_info_width + plength_idx_rv_width;
    
    // width of register that holds the number of outstanding packets
    parameter packet_count_width = 8;
@@ -1278,11 +1278,11 @@ module tc_node_mac
 		   .d(plength_threshs_s),
 		   .q(plength_threshs_q));
 		
-		wire [0:plength_sel_rv_width-1]  plength_sel_rv;
-		assign plength_sel_rv
+		wire [0:plength_idx_rv_width-1]  plength_idx_rv;
+		assign plength_idx_rv
 		  = packet_rvs_q[mc_idx_width+rc_idx_width+route_info_width:
 				 mc_idx_width+rc_idx_width+route_info_width+
-				 plength_sel_rv_width-1];
+				 plength_idx_rv_width-1];
 		
 		genvar 				 val;
 		
@@ -1290,11 +1290,11 @@ module tc_node_mac
 		  begin:vals
 		     
 		     assign plength_select_unmasked[val]
-			      = (plength_sel_rv <
+			      = (plength_idx_rv <
 				 plength_threshs_q[val*
-						   plength_sel_rv_width:
+						   plength_idx_rv_width:
 						   (val+1)*
-						   plength_sel_rv_width-1]);
+						   plength_idx_rv_width-1]);
 		     
 		  end
 		
