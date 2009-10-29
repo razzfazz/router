@@ -156,7 +156,7 @@ module testbench
    parameter arrival_rv_width = 16;
    
    // width of payload length selection LFSR
-   parameter plength_sel_rv_width = 4;
+   parameter plength_idx_rv_width = 4;
    
    // number of selectable payload lengths
    parameter num_plength_vals = 2;
@@ -213,7 +213,7 @@ module testbench
        .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
-       .plength_sel_rv_width(plength_sel_rv_width),
+       .plength_idx_rv_width(plength_idx_rv_width),
        .num_plength_vals(num_plength_vals),
        .packet_count_width(packet_count_width),
        .reset_type(reset_type))
@@ -336,7 +336,7 @@ module testbench
        .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
-       .plength_sel_rv_width(plength_sel_rv_width),
+       .plength_idx_rv_width(plength_idx_rv_width),
        .packet_count_width(packet_count_width),
        .reset_type(reset_type))
    dut1
@@ -490,7 +490,7 @@ module testbench
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd6;
       cfg_write_data = 'd0;
-      cfg_write_data[0:plength_sel_rv_width-1] = 'd8;
+      cfg_write_data[0:plength_idx_rv_width-1] = 'd8;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
