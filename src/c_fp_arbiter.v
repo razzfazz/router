@@ -46,23 +46,34 @@ module c_fp_arbiter
    output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
    
-   // reversed request vector
-   wire [0:num_ports-1] req_rev;
-   c_reversor
-     #(.width(num_ports))
-   req_rev_revr
-     (.data_in(req),
-      .data_out(req_rev));
-   
-   // This finds the first non-zero bit from the right (which is why we reverse
-   // the request vector in the first place).
-   wire [0:num_ports-1] gnt_rev;
-   assign gnt_rev = req_rev & -req_rev;
-   
-   c_reversor
-     #(.width(num_ports))
-   gnt_revr
-     (.data_in(gnt_rev),
-      .data_out(gnt));
+   generate
+      
+      if(num_ports > 1)
+	begin
+	   
+	   // reversed request vector
+	   wire [0:num_ports-1] req_rev;
+	   c_reversor
+	     #(.width(num_ports))
+	   req_rev_revr
+	     (.data_in(req),
+	      .data_out(req_rev));
+	   
+	   // This finds the first non-zero bit from the right (which is why we 
+	   // reverse the request vector in the first place).
+	   wire [0:num_ports-1] gnt_rev;
+	   assign gnt_rev = req_rev & -req_rev;
+	   
+	   c_reversor
+	     #(.width(num_ports))
+	   gnt_revr
+	     (.data_in(gnt_rev),
+	      .data_out(gnt));
+	   
+	end
+      else
+	assign gnt = req;
+      
+   endgenerate
    
 endmodule
