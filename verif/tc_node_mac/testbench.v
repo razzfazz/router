@@ -158,6 +158,9 @@ module testbench
    // width of payload length selection LFSR
    parameter plength_sel_rv_width = 4;
    
+   // number of selectable payload lengths
+   parameter num_plength_vals = 2;
+   
    // width of register that holds the number of outstanding packets
    parameter packet_count_width = 8;
    
@@ -165,7 +168,7 @@ module testbench
    parameter initial_seed = 0;
    
    // channel latency in cycles
-   parameter channel_latency = 0;
+   parameter channel_latency = 1;
    
    reg 		    reset;
    reg 		    clk;
@@ -211,6 +214,7 @@ module testbench
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
        .plength_sel_rv_width(plength_sel_rv_width),
+       .num_plength_vals(num_plength_vals),
        .packet_count_width(packet_count_width),
        .reset_type(reset_type))
    dut0
@@ -455,7 +459,8 @@ module testbench
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd4;
-      cfg_write_data = 'd1024;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:num_packets_width-1] = 'd1024;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
@@ -469,7 +474,8 @@ module testbench
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd5;
-      cfg_write_data = 'd16384;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:arrival_rv_width-1] = 'd16384;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
@@ -483,7 +489,8 @@ module testbench
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd6;
-      cfg_write_data = 'd8;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:plength_sel_rv_width-1] = 'd8;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
@@ -497,7 +504,9 @@ module testbench
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd7;
-      cfg_write_data = 'd4;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:payload_length_width-1] = 'd0;
+      cfg_write_data[payload_length_width:2*payload_length_width-1] = 'd4;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
@@ -511,9 +520,9 @@ module testbench
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
+      cfg_write_data = 'd0;
       cfg_write_data[0] = 'd1;
       cfg_write_data[1] = 'd0;
-      cfg_write_data[2:cfg_data_width-1] = 'd0;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
@@ -525,11 +534,12 @@ module testbench
 	begin
 	   
 	   #(10*Tclk);
-
+	   
 	   cfg_req = 1'b1;
 	   cfg_write = 1'b0;
 	   cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
 	   cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd1;
+	   cfg_write_data = 'd0;
 	   while(!cfg_done)
 	     #(Tclk);
 	   cfg_req = 1'b0;
@@ -561,19 +571,21 @@ module testbench
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd4;
-      cfg_write_data = 'd20;
+      cfg_write_data = 'd0;
+      cfg_write_data[0:num_packets_width-1] = 'd1024;
       while(!cfg_done)
 	#(Tclk);
       cfg_req = 1'b0;
       
       #(10*Tclk);
-
-
+      
+      
       // restart experiment in loopback mode
       cfg_req = 1'b1;
       cfg_write = 1'b1;
       cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
       cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
+      cfg_write_data = 'd0;
       cfg_write_data[0] = 'd1;
       cfg_write_data[1] = 'd1;
       while(!cfg_done)
@@ -592,6 +604,7 @@ module testbench
 	   cfg_write = 1'b0;
 	   cfg_addr[0:cfg_addr_prefix_width-1] = 'd3;
 	   cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd1;
+	   cfg_write_data = 'd0;
 	   while(!cfg_done)
 	     #(Tclk);
 	   cfg_req = 1'b0;
@@ -601,6 +614,9 @@ module testbench
       done = 1'b0;
       
       #(Tclk);
+      
+      
+      // disable nodes
       
       cfg_req = 1'b1;
       cfg_write = 1'b1;

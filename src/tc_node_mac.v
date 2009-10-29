@@ -35,14 +35,14 @@ module tc_node_mac
    cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, error);
    
 // register address declarations
-`define CFG_ADDR_CTRL               0
-`define CFG_ADDR_STATUS             1
-`define CFG_ADDR_FLIT_SIG           2
-`define CFG_ADDR_LFSR_SEED          3
-`define CFG_ADDR_NUM_PACKETS        4
-`define CFG_ADDR_ARRIVAL_THRESH     5
-`define CFG_ADDR_PLENGTH_SEL_THRESH 6
-`define CFG_ADDR_PLENGTH_VALS       7
+`define CFG_ADDR_CTRL            0
+`define CFG_ADDR_STATUS          1
+`define CFG_ADDR_FLIT_SIG        2
+`define CFG_ADDR_LFSR_SEED       3
+`define CFG_ADDR_NUM_PACKETS     4
+`define CFG_ADDR_ARRIVAL_THRESH  5
+`define CFG_ADDR_PLENGTH_THRESHS 6
+`define CFG_ADDR_PLENGTH_VALS    7
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -214,6 +214,16 @@ module tc_node_mac
    
    // width of payload length selection LFSR
    parameter plength_sel_rv_width = 1;
+   
+   // number of selectable payload lengths
+   parameter num_plength_vals = 2;
+   
+   // width of packet length threshold register
+   localparam plength_threshs_width
+     = (num_plength_vals - 1) * plength_sel_rv_width;
+   
+   // width of packet length value register
+   localparam plength_vals_width = num_plength_vals * payload_length_width;
    
    // select width (and thus period) for LFSRs
    localparam packet_rvs_width
@@ -397,9 +407,9 @@ module tc_node_mac
    assign cfg_sel_arrival_thresh
      = (cfg_addr_suffix_q == `CFG_ADDR_ARRIVAL_THRESH);
    
-   wire 			    cfg_sel_plength_sel_thresh;
-   assign cfg_sel_plength_sel_thresh
-     = (cfg_addr_suffix_q == `CFG_ADDR_PLENGTH_SEL_THRESH);
+   wire 			    cfg_sel_plength_threshs;
+   assign cfg_sel_plength_threshs
+     = (cfg_addr_suffix_q == `CFG_ADDR_PLENGTH_THRESHS);
    
    wire 			    cfg_sel_plength_vals;
    assign cfg_sel_plength_vals
@@ -544,8 +554,7 @@ module tc_node_mac
    
    c_align
      #(.data_width(1),
-       .dest_width(cfg_data_width),
-       .offset(0))
+       .dest_width(cfg_data_width))
    cfg_read_data_status_alg
      (.data_in(running_q),
       .dest_in({cfg_data_width{1'b0}}),
@@ -565,8 +574,7 @@ module tc_node_mac
    wire [0:num_packets_width-1]     num_packets_loadval;
    c_align
      #(.data_width(cfg_data_width),
-       .dest_width(num_packets_width),
-       .offset(num_packets_width-cfg_data_width))
+       .dest_width(num_packets_width))
    num_packets_loadval_alg
      (.data_in(cfg_data_q),
       .dest_in({num_packets_width{1'b0}}),
@@ -600,8 +608,7 @@ module tc_node_mac
    
    c_align
      #(.data_width(num_packets_width),
-       .dest_width(cfg_data_width),
-       .offset(cfg_data_width-num_packets_width))
+       .dest_width(cfg_data_width))
    cfg_read_data_num_packets_alg
      (.data_in(num_packets_q),
       .dest_in({cfg_data_width{1'b0}}),
@@ -644,8 +651,7 @@ module tc_node_mac
    wire [0:arrival_rv_width-1] 	    arrival_rv_loadval;
    c_align
      #(.data_width(cfg_data_width),
-       .dest_width(arrival_rv_width),
-       .offset(arrival_rv_width-cfg_data_width))
+       .dest_width(arrival_rv_width))
    arrival_rv_loadval_alg
      (.data_in(cfg_data_q),
       .dest_in({arrival_rv_width{1'b0}}),
@@ -677,8 +683,7 @@ module tc_node_mac
    wire [0:arrival_rv_width-1] 	    arrival_thresh_loadval;
    c_align
      #(.data_width(cfg_data_width),
-       .dest_width(arrival_rv_width),
-       .offset(arrival_rv_width-cfg_data_width))
+       .dest_width(arrival_rv_width))
    arrival_thresh_loadval_alg
      (.data_in(cfg_data_q),
       .dest_in({arrival_rv_width{1'b0}}),
@@ -715,8 +720,7 @@ module tc_node_mac
    wire [0:packet_rvs_width-1] 	    packet_rvs_loadval;
    c_align
      #(.data_width(cfg_data_width),
-       .dest_width(packet_rvs_width),
-       .offset(packet_rvs_width-cfg_data_width))
+       .dest_width(packet_rvs_width))
    packet_rvs_loadval_alg
      (.data_in(cfg_data_q),
       .dest_in({packet_rvs_width{1'b0}}),
@@ -1216,62 +1220,114 @@ module tc_node_mac
       if(max_payload_length > min_payload_length)
 	begin
 	   
-	   wire write_plength_sel_thresh;
-	   assign write_plength_sel_thresh
-	     = cfg_do_write & cfg_sel_plength_sel_thresh;
+	   // synopsys translate_off
+	   if(plength_threshs_width > cfg_data_width)
+	     begin
+		initial
+		begin
+		   $display("ERROR: The value of the cfg_data_width " +
+			    "parameter is too small to accomodate the " +
+			    "specified number of packet length selection " +
+			    "thresholds.");
+		   $stop;
+		end
+	     end
+	   if(plength_vals_width > cfg_data_width)
+	     begin
+		initial
+		begin
+		   $display("ERROR: The value of the cfg_data_width " +
+			    "parameter is too small to accomodate the " +
+			    "specified number of packet length values.");
+		   $stop;
+		end
+	     end
+	   // synopsys translate_on
+
+	   wire [0:num_plength_vals-1] 	 plength_select_unmasked;
 	   
-	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_loadval;
-	   c_align
-	     #(.data_width(cfg_data_width),
-	       .dest_width(plength_sel_rv_width),
-	       .offset(plength_sel_rv_width-cfg_data_width))
-	   plength_sel_thresh_loadval_alg
-	     (.data_in(cfg_data_q),
-	      .dest_in({plength_sel_rv_width{1'b0}}),
-	      .data_out(plength_sel_thresh_loadval));
+	   if(num_plength_vals > 1)
+	     begin
+		
+		wire write_plength_threshs;
+		assign write_plength_threshs
+		  = cfg_do_write & cfg_sel_plength_threshs;
+		
+		wire [0:plength_threshs_width-1] plength_threshs_loadval;
+		c_align
+		  #(.data_width(cfg_data_width),
+		    .dest_width(plength_threshs_width))
+		plength_threshs_loadval_alg
+		  (.data_in(cfg_data_q),
+		   .dest_in({plength_threshs_width{1'b0}}),
+		   .data_out(plength_threshs_loadval));
+		
+		wire [0:plength_threshs_width-1] plength_threshs_s, 
+						 plength_threshs_q;
+		assign plength_threshs_s = cfg_active_q ? 
+					   (write_plength_threshs ? 
+					    plength_threshs_loadval :
+					    plength_threshs_q) : 
+					   plength_threshs_q;
+		c_dff
+		  #(.width(plength_threshs_width),
+		    .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+		plength_threshsq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(plength_threshs_s),
+		   .q(plength_threshs_q));
+		
+		wire [0:plength_sel_rv_width-1]  plength_sel_rv;
+		assign plength_sel_rv
+		  = packet_rvs_q[mc_idx_width+rc_idx_width+route_info_width:
+				 mc_idx_width+rc_idx_width+route_info_width+
+				 plength_sel_rv_width-1];
+		
+		genvar 				 val;
+		
+		for(val = 0; val < (num_plength_vals - 1); val = val + 1)
+		  begin:vals
+		     
+		     assign plength_select_unmasked[val]
+			      = (plength_sel_rv <
+				 plength_threshs_q[val*
+						   plength_sel_rv_width:
+						   (val+1)*
+						   plength_sel_rv_width-1]);
+		     
+		  end
+		
+	     end
 	   
-	   wire [0:plength_sel_rv_width-1] plength_sel_thresh_s, 
-					   plength_sel_thresh_q;
-	   assign plength_sel_thresh_s = cfg_active_q ? 
-					 (write_plength_sel_thresh ? 
-					  plength_sel_thresh_loadval :
-					  plength_sel_thresh_q) : 
-					 plength_sel_thresh_q;
-	   c_dff
-	     #(.width(plength_sel_rv_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-	   plength_sel_threshq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(plength_sel_thresh_s),
-	      .q(plength_sel_thresh_q));
+	   assign plength_select_unmasked[num_plength_vals-1] = 1'b1;
 	   
-	   wire [0:plength_sel_rv_width-1] plength_sel_rv;
-	   assign plength_sel_rv
-	     = packet_rvs_q[mc_idx_width+rc_idx_width+route_info_width:
-			    mc_idx_width+rc_idx_width+route_info_width+
-			    plength_sel_rv_width-1];
+	   wire [0:num_plength_vals-1] plength_select;
+	   c_fp_arbiter
+	     #(.num_ports(num_plength_vals))
+	   plength_select_arb
+	     (.req(plength_select_unmasked),
+	      .gnt(plength_select));
 	   
 	   wire 			   write_plength_vals;
 	   assign write_plength_vals = cfg_do_write & cfg_sel_plength_vals;
 	   
-	   wire [0:2*payload_length_width-1] plength_vals_loadval;
+	   wire [0:plength_vals_width-1] plength_vals_loadval;
 	   c_align
 	     #(.data_width(cfg_data_width),
-	       .dest_width(2*payload_length_width),
-	       .offset(2*payload_length_width-cfg_data_width))
+	       .dest_width(plength_vals_width))
 	   plength_vals_loadval_alg
 	     (.data_in(cfg_data_q),
-	      .dest_in({(2*payload_length_width){1'b0}}),
+	      .dest_in({(plength_vals_width){1'b0}}),
 	      .data_out(plength_vals_loadval));
 	   
-	   wire [0:2*payload_length_width-1] plength_vals_s, plength_vals_q;
+	   wire [0:plength_vals_width-1] plength_vals_s, plength_vals_q;
 	   assign plength_vals_s
 	     = cfg_active_q ? 
 	       (write_plength_vals ? plength_vals_loadval : plength_vals_q) : 
 	       plength_vals_q;
 	   c_dff
-	     #(.width(2*payload_length_width),
+	     #(.width(plength_vals_width),
 	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   plength_valsq
 	     (.clk(clk),
@@ -1280,10 +1336,13 @@ module tc_node_mac
 	      .q(plength_vals_q));
 	   
 	   wire [0:payload_length_width-1] plength_rv;
-	   assign plength_rv
-	     = (plength_sel_rv >= plength_sel_thresh_q) ? 
-	       plength_vals_q[payload_length_width:2*payload_length_width-1] : 
-	       plength_vals_q[0:payload_length_width-1];
+	   c_select_1ofn
+	     #(.num_ports(num_plength_vals),
+	       .width(payload_length_width))
+	   plength_rv_sel
+	     (.select(plength_select),
+	      .data_in(plength_vals_q),
+	      .data_out(plength_rv));
 	   
 	   if(packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH)
 	     assign header_info_rv[la_route_info_width+route_info_width:
@@ -1536,8 +1595,7 @@ module tc_node_mac
    wire [0:flit_data_width-1] 	   flit_data_rv_loadval;
    c_align
      #(.data_width(cfg_data_width),
-       .dest_width(flit_data_width),
-       .offset(flit_data_width-cfg_data_width))
+       .dest_width(flit_data_width))
    flit_data_rv_loadval_alg
      (.data_in(cfg_data_q),
       .dest_in({flit_data_width{1'b0}}),
@@ -1611,8 +1669,7 @@ module tc_node_mac
    wire [0:flit_sig_exp_width-1]   flit_sig_expanded;
    c_align
      #(.data_width(flit_data_width),
-       .dest_width(flit_sig_exp_width),
-       .offset(0))
+       .dest_width(flit_sig_exp_width))
    flit_sig_cfg_alg
      (.data_in(flit_sig_q),
       .dest_in({flit_sig_exp_width{1'b0}}),
