@@ -221,8 +221,8 @@ module c_regfile_mac
       begin
 	 initial
 	 begin
-	    $display("ERROR: The register file module requires a depth of \
-		     two or more entries.");
+	    $display("ERROR: The register file module requires a depth of " +
+		     "two or more entries.");
 	    $stop;
 	     end
       end

@@ -254,10 +254,10 @@ module vcr_la_routing_logic
 				// synopsys translate_off
 				initial
 				begin
-				   $display("ERROR: The lookahead routing \
-					    logic module does not yet support \
-					    ring connectivity within each \
-					    dimension.");
+				   $display("ERROR: The lookahead routing " +
+					    "logic module does not yet " +
+					    "support ring connectivity " +
+					    "within each dimension.");
 				   $stop;
 				end
 				// synopsys translate_on

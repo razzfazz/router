@@ -154,8 +154,8 @@ module c_credit_tracker
 	begin
 	   initial
 	   begin
-	      $display("ERROR: The credit tracker module requires at least one \
-		       credit.");
+	      $display("ERROR: The credit tracker module requires at least " +
+		       "one credit.");
 	      $stop;
 	   end
 	end
