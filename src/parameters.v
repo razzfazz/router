@@ -61,12 +61,16 @@ parameter num_nodes_per_router = 1;
 parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
 
 // maximum payload length (in flits)
-// (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
 parameter max_payload_length = 4;
 
 // minimum payload length (in flits)
-// (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
 parameter min_payload_length = 0;
+
+// select router implementation
+parameter router_type = `ROUTER_TYPE_VC;
+
+// width of flit payload data
+parameter flit_data_width = 32;
 
 // enable performance counter
 parameter perf_ctr_enable = 0;
@@ -80,12 +84,6 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // select whether to set a packet's outgoing VC ID at the input or output 
 // controller
 parameter track_vcs_at_output = 0;
-
-// select router implementation
-parameter router_type = `ROUTER_TYPE_VC;
-
-// width of flit payload data
-parameter flit_data_width = 32;
 
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
@@ -106,9 +104,6 @@ parameter header_fifo_type = `FIFO_TYPE_INDEXED;
 
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_LAT_1D_MUX;
-
-// insert explicit pipeline register between flit buffer and crossbar
-parameter fbf_register_output = 0;
 
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;

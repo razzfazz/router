@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // generic register file
-module c_regfile_mac
+module c_regfile
   (clk, write_enable, write_address, write_data, read_address, read_data);
    
 `include "c_functions.v"

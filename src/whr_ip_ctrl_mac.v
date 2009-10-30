@@ -34,7 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module whr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, req_op, req_head, 
    req_tail, gnt_op, flit_data_out, flow_ctrl_out, fbf_write_addr, 
-   fbf_write_enable, fbf_write_data, fbf_read_addr, fbf_read_data, error);
+   fbf_write_enable, fbf_write_data, fbf_read_enable, fbf_read_addr, 
+   fbf_read_data, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -158,9 +159,6 @@ module whr_ip_ctrl_mac
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
-   // insert explicit pipeline register between flit buffer and crossbar
-   parameter fbf_register_output = 0;
-   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -221,6 +219,10 @@ module whr_ip_ctrl_mac
    // flit buffer write data
    output [0:flit_data_width-1] fbf_write_data;
    wire [0:flit_data_width-1] 	  fbf_write_data;
+   
+   // flit buffer read enable
+   output fbf_read_enable;
+   wire 			  fbf_read_enable;
    
    // flit buffer read address
    output [0:fbf_addr_width-1] fbf_read_addr;
@@ -763,72 +765,19 @@ module whr_ip_ctrl_mac
       .full(fbc_full),
       .errors(fbc_errors));
    
+   wire 		     error_fbc_underflow;
+   assign error_fbc_underflow = fbc_errors[0];
+   
+   wire 		     error_fbc_overflow;
+   assign error_fbc_overflow = fbc_errors[1];
+   
+   // read enable doesn't need to be exact, so we read whenever we have a flit
+   assign fbf_read_enable = flit_present /*flit_valid_out*/;
+   
+   assign fbf_read_addr = fbc_read_addr;
    assign fbf_write_enable = flit_valid_in;
    assign fbf_write_addr = fbc_write_addr;
    assign fbf_write_data = flit_data_in_q;
-   
-   // read enable doesn't need to be exact, so we read whenever we have a flit
-   wire 		     fbf_read_enable;
-   assign fbf_read_enable = flit_present /*flit_valid_out*/;
-   
-   wire [0:flit_data_width-1] flit_read_data;
-   
-   generate
-      
-      // we can optionally insert an explicit pipeline register between the flit
-      // buffer and the crossbar in order to improve timing
-      if(fbf_register_output)
-	begin
-	   
-	   assign fbf_read_addr = fbc_read_addr;
-	   
-	   wire [0:flit_data_width-1] flit_read_data_s, flit_read_data_q;
-	   assign flit_read_data_s
-	     = fbf_read_enable ? 
-	       (fbc_empty ? flit_data_in_q : fbf_read_data) : 
-	       flit_read_data_q;
-	   c_dff
-	     #(.width(flit_data_width),
-	       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
-	   flit_read_dataq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(flit_read_data_s),
-	      .q(flit_read_data_q));
-	   
-	   assign flit_read_data = flit_read_data_q;
-	   
-	end
-      
-      // in the absence of an explicit pipeline register between the flit buffer
-      // and the crossbar, flits must stay in the buffer for an additional cycle
-      else
-	begin
-	   
-	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s
-	     = fbf_read_enable ? fbc_read_addr : fbf_read_addr_q;
-	   c_dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
-	   fbf_read_addrq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(fbf_read_addr_s),
-	      .q(fbf_read_addr_q));
-	   
-	   assign fbf_read_addr = fbf_read_addr_q;
-	   assign flit_read_data = fbf_read_data;
-	   
-	end
-      
-   endgenerate
-   
-   wire 		       error_fbc_underflow;
-   assign error_fbc_underflow = fbc_errors[0];
-   
-   wire 		       error_fbc_overflow;
-   assign error_fbc_overflow = fbc_errors[1];
    
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
@@ -875,9 +824,9 @@ module whr_ip_ctrl_mac
    assign flit_data_out[0:la_route_info_width-1]
 	    = flit_head_out_q ? 
 	      la_route_info_q : 
-	      flit_read_data[0:la_route_info_width-1];
+	      fbf_read_data[0:la_route_info_width-1];
    assign flit_data_out[la_route_info_width:flit_data_width-1]
-	    = flit_read_data[la_route_info_width:flit_data_width-1];
+	    = fbf_read_data[la_route_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------

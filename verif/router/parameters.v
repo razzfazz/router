@@ -85,6 +85,11 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // controller
 parameter track_vcs_at_output = 1;
 
+// filter out illegal destination ports
+// (the intent is to allow synthesis to optimize away the logic associated with 
+// such turns)
+parameter restrict_turns = 0;
+
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_DOR;
 
@@ -99,9 +104,6 @@ parameter header_fifo_type = `FIFO_TYPE_SHIFTING;
 
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
-
-// insert explicit pipeline register between flit buffer and crossbar
-parameter fbf_register_output = 1;
 
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
