@@ -137,17 +137,14 @@ module testbench
    // number of bits in address that are considered base address
    parameter cfg_addr_prefix_width = 10;
    
-   // number of distinct base addresses to which this node replies
-   parameter num_cfg_addr_prefixes = 2;
+   // width of register selector part of control register address
+   parameter cfg_addr_suffix_width = 6;
+   
+   // width of configuration bus addresses
+   localparam cfg_addr_width = cfg_addr_prefix_width + cfg_addr_suffix_width;
    
    // width of control register data
    parameter cfg_data_width = 32;
-   
-   // number of bits required to select an individual register
-   parameter cfg_addr_width = 16;
-   
-   // width of register selector part of control register address
-   localparam cfg_addr_suffix_width = cfg_addr_width - cfg_addr_prefix_width;
    
    // width of run cycle counter
    parameter num_packets_width = 16;
@@ -198,7 +195,9 @@ module testbench
    wire 		     cfg_done;
    
    tc_node_ctrl_mac
-     #(.cfg_addr_width(cfg_addr_width),
+     #(.cfg_addr_prefix_width(cfg_addr_prefix_width),
+       .cfg_addr_suffix_width(cfg_addr_suffix_width),
+       .num_cfg_addr_prefixes(1),
        .cfg_data_width(cfg_data_width),
        .done_delay_width(done_delay_width),
        .reset_type(reset_type))
@@ -226,11 +225,11 @@ module testbench
    wire [0:flit_data_width-1] dut1_flit_data_dly;
    wire [0:flow_ctrl_width-1] dut1_flow_ctrl_dly;
    
-   reg [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] dut0_cfg_addr_prefixes;
-   wire [0:cfg_data_width-1] 				 dut0_cfg_read_data;
-   wire 						 dut0_cfg_done;
+   reg [0:2*cfg_addr_prefix_width-1] dut0_cfg_addr_prefixes;
+   wire [0:cfg_data_width-1] 	     dut0_cfg_read_data;
+   wire 			     dut0_cfg_done;
    
-   wire 						 dut0_error;
+   wire 			     dut0_error;
    
    tc_node_mac
      #(.num_flit_buffers(num_flit_buffers),
@@ -250,8 +249,10 @@ module testbench
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),
+       .cfg_addr_prefix_width(cfg_addr_prefix_width),
+       .cfg_addr_suffix_width(cfg_addr_suffix_width),
+       .num_cfg_addr_prefixes(2),
        .cfg_data_width(cfg_data_width),
-       .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
        .mc_idx_rv_width(mc_idx_rv_width),
@@ -351,11 +352,11 @@ module testbench
       .data_in(dut0_flow_ctrl),
       .data_out(dut0_flow_ctrl_dly));
    
-   reg [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] dut1_cfg_addr_prefixes;
-   wire [0:cfg_data_width-1] 				 dut1_cfg_read_data;
-   wire 						 dut1_cfg_done;
+   reg [0:2*cfg_addr_prefix_width-1] dut1_cfg_addr_prefixes;
+   wire [0:cfg_data_width-1] 	     dut1_cfg_read_data;
+   wire 			     dut1_cfg_done;
    
-   wire 						 dut1_error;
+   wire 			     dut1_error;
    
    tc_node_mac
      #(.num_flit_buffers(num_flit_buffers),
@@ -375,8 +376,10 @@ module testbench
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),
+       .cfg_addr_prefix_width(cfg_addr_prefix_width),
+       .cfg_addr_suffix_width(cfg_addr_suffix_width),
+       .num_cfg_addr_prefixes(2),
        .cfg_data_width(cfg_data_width),
-       .cfg_addr_width(cfg_addr_width),
        .num_packets_width(num_packets_width),
        .arrival_rv_width(arrival_rv_width),
        .mc_idx_rv_width(mc_idx_rv_width),

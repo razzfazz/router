@@ -31,15 +31,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // network pseudo-node controller 
 module tc_node_ctrl_mac
   (clk, reset, io_write, io_read, io_addr, io_write_data, io_read_data, io_done,
-   cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done);
+   cfg_addr_prefixes, cfg_req, cfg_write, cfg_addr, cfg_write_data, 
+   cfg_read_data, cfg_done);
    
 `include "c_constants.v"
    
+   // number of bits in address that are considered base address
+   parameter cfg_addr_prefix_width = 10;
+   
+   // width of register selector part of control register address
+   parameter cfg_addr_suffix_width = 6;
+   
    // width of configuration bus addresses
-   parameter cfg_addr_width = 16;
+   localparam cfg_addr_width = cfg_addr_prefix_width + cfg_addr_suffix_width;
+   
+   // number of distinct base addresses to which this node replies
+   parameter num_cfg_addr_prefixes = 2;
    
    // width of configuration bus datapath
    parameter cfg_data_width = 32;
+   
+   // width of interface bus addresses
+   localparam io_addr_width = cfg_addr_width;
+   
+   // width of interface bus datapath
+   localparam io_data_width = cfg_data_width;
    
    // number of bits in delay counter for acknowledgement (i.e., log2 of 
    // interval before acknowledgement is sent)
@@ -60,23 +76,26 @@ module tc_node_ctrl_mac
    input [0:cfg_addr_width-1] io_addr;
    
    // input data
-   input [0:cfg_data_width-1] io_write_data;
+   input [0:io_data_width-1] io_write_data;
    
    // result data to chip controller
-   output [0:cfg_data_width-1] io_read_data;
-   wire [0:cfg_data_width-1] io_read_data;
+   output [0:io_data_width-1] io_read_data;
+   wire [0:io_data_width-1] io_read_data;
    
    // completion indicator to chip controller
    output io_done;
-   wire io_done;
+   wire 		    io_done;
+   
+   // address prefixes assigned to this node
+   input [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] cfg_addr_prefixes;
    
    // config register access pending
    output cfg_req;
-   wire cfg_req;
+   wire 		    cfg_req;
    
    // config register access is write access
    output cfg_write;
-   wire cfg_write;
+   wire 		    cfg_write;
    
    // select config register to access
    output [0:cfg_addr_width-1] cfg_addr;

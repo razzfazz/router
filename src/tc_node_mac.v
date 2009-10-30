@@ -45,6 +45,7 @@ module tc_node_mac
 `define CFG_ADDR_PLENGTH_VALS    7
 `define CFG_ADDR_MC_THRESHS      8
 `define CFG_ADDR_RC_THRESHS      9
+`define CFG_ADDR_ERROR           10
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -186,6 +187,12 @@ module tc_node_mac
    // number of bits in address that are considered base address
    parameter cfg_addr_prefix_width = 10;
    
+   // width of register selector part of control register address
+   parameter cfg_addr_suffix_width = 6;
+   
+   // width of configuration bus addresses
+   localparam cfg_addr_width = cfg_addr_prefix_width + cfg_addr_suffix_width;
+   
    // number of distinct base addresses to which this node replies
    parameter num_cfg_addr_prefixes = 2;
    
@@ -195,12 +202,6 @@ module tc_node_mac
    // smallest multiple of cfg_data_width that is >= flit_data_width
    localparam flit_sig_exp_width
      = ((flit_data_width+cfg_data_width-1)/cfg_data_width)*cfg_data_width;
-   
-   // number of bits required to select an individual register
-   parameter cfg_addr_width = 16;
-   
-   // width of register selector part of control register address
-   localparam cfg_addr_suffix_width = cfg_addr_width - cfg_addr_prefix_width;
    
    // width of run cycle counter
    parameter num_packets_width = 20;
@@ -538,8 +539,10 @@ module tc_node_mac
    //---------------------------------------------------------------------------
    // status register
    // ===============
-   // reading from this register returns a non-zero value for as long as there 
-   // are packets and/or flits left to send
+   // Bit 0 of this register is non-zero for as long as there are packets 
+   // and/or flits left to send.
+   // Bit 1 of this register is the summary error bit, i.e., the output of the 
+   // error reporting logic.
    //---------------------------------------------------------------------------
    
    wire 			    packet_count_zero;
@@ -565,10 +568,10 @@ module tc_node_mac
       .q(running_q));
    
    c_align
-     #(.data_width(1),
+     #(.data_width(2),
        .dest_width(cfg_data_width))
    cfg_read_data_status_alg
-     (.data_in(running_q),
+     (.data_in({running_q, error}),
       .dest_in({cfg_data_width{1'b0}}),
       .data_out(cfg_read_data_status));
    
