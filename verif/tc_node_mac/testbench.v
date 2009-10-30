@@ -171,6 +171,12 @@ module testbench
    // interval before acknowledgement is sent)
    parameter done_delay_width = 4;
    
+   // number of node control signals to generate
+   parameter node_ctrl_width = 2;
+   
+   // number of node status signals to accept
+   parameter node_status_width = 1;
+   
    // RNG seed value
    parameter initial_seed = 0;
    
@@ -187,12 +193,16 @@ module testbench
    wire [0:cfg_data_width-1] io_read_data;
    wire 		     io_done;
    
-   wire 		     cfg_req;
-   wire 		     cfg_write;
-   wire [0:cfg_addr_width-1] cfg_addr;
-   wire [0:cfg_data_width-1] cfg_write_data;
-   wire [0:cfg_data_width-1] cfg_read_data;
-   wire 		     cfg_done;
+   reg [0:1*cfg_addr_prefix_width-1] ctrl_cfg_addr_prefixes;
+   wire 			     cfg_req;
+   wire 			     cfg_write;
+   wire [0:cfg_addr_width-1] 	     cfg_addr;
+   wire [0:cfg_data_width-1] 	     cfg_write_data;
+   wire [0:cfg_data_width-1] 	     cfg_read_data;
+   wire  			     cfg_done;
+   
+   wire [0:node_ctrl_width-1] 	     node_ctrl;
+   reg [0:node_status_width-1] 	     node_status;
    
    tc_node_ctrl_mac
      #(.cfg_addr_prefix_width(cfg_addr_prefix_width),
@@ -200,6 +210,8 @@ module testbench
        .num_cfg_addr_prefixes(1),
        .cfg_data_width(cfg_data_width),
        .done_delay_width(done_delay_width),
+       .node_ctrl_width(node_ctrl_width),
+       .node_status_width(node_status_width),
        .reset_type(reset_type))
    ctrl
      (.clk(clk),
@@ -210,12 +222,15 @@ module testbench
       .io_write_data(io_write_data),
       .io_read_data(io_read_data),
       .io_done(io_done),
+      .cfg_addr_prefixes(ctrl_cfg_addr_prefixes),
       .cfg_req(cfg_req),
       .cfg_write(cfg_write),
       .cfg_addr(cfg_addr),
       .cfg_write_data(cfg_write_data),
       .cfg_read_data(cfg_read_data),
-      .cfg_done(cfg_done));
+      .cfg_done(cfg_done),
+      .node_ctrl(node_ctrl),
+      .node_status(node_status));
    
    wire [0:flit_ctrl_width-1] dut0_flit_ctrl;
    wire [0:flit_data_width-1] dut0_flit_data;
@@ -447,18 +462,21 @@ module testbench
       #(Tclk/4);
       
       reset = 1'b1;
-      dut0_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
+      ctrl_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
 	= 'd0;
+      dut0_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
+	= 'd1;
       dut0_cfg_addr_prefixes[cfg_addr_prefix_width:2*cfg_addr_prefix_width-1]
 	= 'd3;
       dut1_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
-	= 'd1;
+	= 'd2;
       dut1_cfg_addr_prefixes[cfg_addr_prefix_width:2*cfg_addr_prefix_width-1]
 	= 'd3;
       io_write = 1'b0;
       io_read = 1'b0;
       io_addr = 'b0;
       io_write_data = 'b0;
+      node_status = 'b0;
       done = 1'b0;
       
       #(Tclk);
@@ -472,10 +490,28 @@ module testbench
       #(Tclk);
       
       
-      // set LFSR seeds
+      // disable reset (i.e., enable reset_b) and enable clocks
       
       io_write = 1'b1;
       io_addr[0:cfg_addr_prefix_width-1] = 'd0;
+      io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
+      io_write_data = 'd0;
+      io_write_data[0] = 1'b1;
+      io_write_data[1] = 1'b1;
+      while(!io_done)
+	#(Tclk);
+      #(Tclk);
+      io_write = 1'b0;
+      while(io_done)
+	#(Tclk);
+      
+      #(Tclk);
+      
+      
+      // set LFSR seeds
+      
+      io_write = 1'b1;
+      io_addr[0:cfg_addr_prefix_width-1] = 'd1;
       io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd3;
       for(i = 0; i < cfg_data_width; i = i + 1)
 	io_write_data[i] = $dist_uniform(seed, 0, 1);
@@ -489,7 +525,7 @@ module testbench
       #(Tclk);
       
       io_write = 1'b1;
-      io_addr[0:cfg_addr_prefix_width-1] = 'd1;
+      io_addr[0:cfg_addr_prefix_width-1] = 'd2;
       io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd3;
       for(i = 0; i < cfg_data_width; i = i + 1)
 	io_write_data[i] = $dist_uniform(seed, 0, 1);
