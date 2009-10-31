@@ -768,14 +768,14 @@ module vcr_top
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
 		     if(ipc_error_ip[i])
-		       $display("ERROR: Router error detected in input " +
+		       $display("ERROR: Router error detected at input " +
 				"port %d.", i);
 		  end
 		
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
 		     if(opc_error_op[i])
-		       $display("ERROR: Router error detected in output " +
+		       $display("ERROR: Router error detected at output " +
 				"port %d.", i);
 		  end
 		
