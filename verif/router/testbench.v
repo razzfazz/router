@@ -91,13 +91,6 @@ module testbench
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
-   // address within each dimensions
-   localparam [0:dim_addr_width-1] default_dim_addr = num_routers_per_dim / 2;
-   
-   // current router's address
-   localparam [0:router_addr_width-1] router_address
-     = {num_dimensions{default_dim_addr}};
-   
    // connectivity within each dimension
    localparam connectivity
      = (topology == `TOPOLOGY_MESH) ?
@@ -120,38 +113,6 @@ module testbench
    // number of input and output ports on router
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
-   
-   // width required to select individual port
-   localparam port_idx_width = clogb(num_ports);
-   
-   // width required for lookahead routing information
-   localparam la_route_info_width
-     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
-   
-   // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
-   
-   // width of global addresses
-   localparam addr_width = router_addr_width + node_addr_width;
-   
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
-   
-   // number of bits required to represent all possible payload sizes
-   localparam payload_length_width
-     = clogb(max_payload_length-min_payload_length+1);
-
-   // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length);
-   
-   // total number of bits required for storing header information
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
-       -1;
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -181,23 +142,17 @@ module testbench
    wire [0:num_ports-1] 		cred_valid_in_op;
    
    wire [0:num_ports-1] 		ps_error_ip;
-   wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
-   wire [0:num_ports*num_vcs*2-1] 	  fifo_errors_ip_ivc;
    
-   wire 				  rtr_error;
-   wire [0:num_ports-1] 		  x_error_op;
+   wire 				rtr_error;
    
-   reg 					  run;
+   reg [0:router_addr_width-1] 		router_address;
    
-   wire [0:num_ports*num_vcs-1] 	  ref_valid_ip_ivc;
-   wire [0:num_ports*num_vcs*flit_ctrl_width-1] ref_ctrl_ip_ivc;
-   wire [0:num_ports*num_vcs*flit_data_width-1] ref_data_ip_ivc;
-   wire [0:num_ports*num_vcs*port_idx_width-1] 	ref_port_ip_ivc;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	ref_vcs_ip_ivc;
+   reg 					run;
    
    generate
       
-      genvar 				  ip;
+      genvar 				ip;
+      
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
@@ -220,14 +175,6 @@ module testbench
 		assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
 		
 		assign ps_error_ip[ip] = 1'b0;
-		assign ref_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-			 = {num_vcs{1'b0}};
-		
-		assign match_ip_ivc_op[ip*num_vcs*num_ports:
-				       (ip+1)*num_vcs*num_ports-1]
-			 = {num_vcs*num_ports{1'b0}};
-		assign fifo_errors_ip_ivc[ip*num_vcs*2:(ip+1)*num_vcs*2-1]
-			 = {num_vcs*2{1'b0}};
 		
 	     end
 	   else
@@ -290,541 +237,87 @@ module testbench
 			 =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
 		
-		wire [0:header_info_width-1]  header_info;
-		assign header_info = flit_data[0:header_info_width-1];
-		
-		wire [0:la_route_info_width-1] la_route_info_in;
-		assign la_route_info_in
-		  = header_info[0:la_route_info_width-1];
-		
-		wire [0:port_idx_width-1]      la_route_port;
-		assign la_route_port = la_route_info_in[0:port_idx_width-1];
-		
-		wire 			       la_inc_rc;
-		
-		if(num_resource_classes > 1)
-		  assign la_inc_rc = la_route_info_in[port_idx_width];
-		else
-		  assign la_inc_rc = 1'b0;
-		
-		wire [0:route_info_width-1]    route_info;
-		assign route_info
-		  = header_info[la_route_info_width:
-				la_route_info_width+route_info_width-1];
-		
-		wire 			      flit_valid;
-		assign flit_valid = flit_ctrl[0];
-		
-		wire 			      flit_head;
-		assign flit_head = flit_ctrl[1+vc_idx_width+0];
-		
-		wire 			      flit_tail;
-		
-		case(packet_format)
-		  `PACKET_FORMAT_HEAD_TAIL:
-		    assign flit_tail = flit_ctrl[1+vc_idx_width+1];
-		  `PACKET_FORMAT_EXPLICIT_LENGTH:
-		    begin
-		       
-		       if(max_payload_length == 0)
-			 assign flit_tail = flit_head;
-		       else if(max_payload_length == 1)
-			 begin
-			    
-			    wire has_payload;
-			    
-			    if(payload_length_width > 0)
-			      assign has_payload
-				= header_info[la_route_info_width+
-					      route_info_width];
-			    else
-			      assign has_payload = 1'b1;
-			    
-			    assign flit_tail = ~flit_head | ~has_payload;
-			    
-			 end
-		       else
-			 begin
-			    
-			    wire [0:flit_ctr_width-1] flit_ctr_q;
-			    wire [0:flit_ctr_width-1] flit_ctr_next;
-			    
-			    if(payload_length_width > 0)
-			      begin
-				 
-				 wire [0:payload_length_width-1] payload_length;
-				 assign payload_length
-				   = header_info[la_route_info_width+
-						 route_info_width:
-						 la_route_info_width+
-						 route_info_width+
-						 payload_length_width-1];
-				 
-				 assign flit_ctr_next
-				   = (min_payload_length - 1) + payload_length;
-				 
-				 if(max_payload_length == 0)
-				   assign flit_tail = flit_head ?
-						      ~|payload_length :
-						      ~|flit_ctr_q;
-				 else
-				   assign flit_tail = ~flit_head & ~|flit_ctr_q;
-				 
-			      end
-			    else
-			      begin
-				 assign flit_ctr_next = max_payload_length - 1;
-				 assign flit_tail = ~flit_head & ~|flit_ctr_q;
-			      end
-			    
-			    wire [0:flit_ctr_width-1] flit_ctr_s;
-			    assign flit_ctr_s = flit_valid ? 
-						flit_head ? 
-						flit_ctr_next : 
-						(flit_ctr_q - 1'b1) : 
-						flit_ctr_q;
-			    c_dff
-			      #(.width(flit_ctr_width),
-				.reset_type(reset_type))
-			    flit_ctrq
-			      (.clk(clk),
-			       .reset(reset),
-			       .d(flit_ctr_s),
-			       .q(flit_ctr_q));
-			    
-			 end
-		       
-		    end
-		endcase
-		
-		wire [0:num_vcs*port_idx_width-1]     route_port_ivc;
-		wire [0:num_vcs*num_vcs-1] 	      route_ivc_ovc;
-		wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
-		
-		genvar 				       mc;
-		
-		for(mc = 0; mc < num_message_classes; mc = mc + 1)
-		  begin:mcs
-		     
-		     genvar irc;
-		     
-		     for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-		       begin:ircs
-			  
-			  localparam ipc = mc * num_resource_classes + irc;
-			  localparam [0:num_resource_classes-1] sel_irc
-			    = (1 << (num_resource_classes - 1 - irc));
-			  
-			  wire [0:port_idx_width-1] 	 route_port;
-			  wire 				 inc_rc;
-			  vcr_routing_logic
-			    #(.num_resource_classes(num_resource_classes),
-			      .num_routers_per_dim(num_routers_per_dim),
-			      .num_dimensions(num_dimensions),
-			      .num_nodes_per_router(num_nodes_per_router),
-			      .connectivity(connectivity),
-			      .routing_type(routing_type),
-			      .dim_order(dim_order),
-			      .reset_type(reset_type))
-			  rtl
-			    (.clk(clk),
-			     .reset(reset),
-			     .router_address(router_address),
-			     .sel_rc(sel_irc),
-			     .route_info(route_info),
-			     .route_port(route_port),
-			     .inc_rc(inc_rc));
-			  
-			  wire [0:num_vcs-1] 		 route_ovc;
-			  
-			  if(ipc > 0)
-			    assign route_ovc[0:ipc*num_vcs_per_class-1]
-				     = {(ipc*num_vcs_per_class){1'b0}};
-			  
-			  assign route_ovc[ipc*num_vcs_per_class:
-					   (ipc+1)*num_vcs_per_class-1]
-				   = {num_vcs_per_class{~inc_rc}};
-			  
-			  if(irc < (num_resource_classes - 1))
-			    assign route_ovc[(ipc+1)*num_vcs_per_class:
-					     (ipc+2)*num_vcs_per_class-1]
-				     = {num_vcs_per_class{inc_rc}};
-			  
-			  if(irc < (num_resource_classes - 2))
-			    assign route_ovc[(ipc+2)*num_vcs_per_class:
-					     (mc+1)*num_resource_classes*
-					     num_vcs_per_class-1]
-				     = {((num_resource_classes-irc-2)*
-					 num_vcs_per_class){1'b0}};
-			  
-			  if(mc < (num_message_classes - 1))
-			    assign route_ovc[(mc+1)*num_resource_classes*
-					     num_vcs_per_class:
-					     num_vcs-1]
-				     = {((num_message_classes-mc-1)*
-					 num_resource_classes*
-					 num_vcs_per_class){1'b0}};
-			  
-			  assign route_port_ivc[ipc*num_vcs_per_class*
-						port_idx_width:
-						(ipc+1)*num_vcs_per_class*
-						port_idx_width-1]
-				   = {num_vcs_per_class{route_port}};
-			  assign route_ivc_ovc[ipc*
-					       num_vcs_per_class*num_vcs:
-					       (ipc+1)*
-					       num_vcs_per_class*num_vcs-1]
-				   = {num_vcs_per_class{route_ovc}};
-			  
-			  wire [0:((irc ==
-				    (num_resource_classes - 1)) ?
-				   addr_width :
-				   (irc ==
-				    (num_resource_classes - 2)) ?
-				   (router_addr_width + addr_width) :
-				   (2*router_addr_width))-1] hop_route_info_la;
-			  
-			  if(irc == (num_resource_classes - 1))
-			    assign hop_route_info_la
-			      = route_info[route_info_width-addr_width:
-					   route_info_width-1];
-			  else if(irc == (num_resource_classes - 2))
-			    assign hop_route_info_la
-			      = route_info[route_info_width-
-					   (router_addr_width+addr_width):
-					   route_info_width-1];
-			  else
-			    assign hop_route_info_la
-			      = route_info[irc*router_addr_width:
-					   (irc+2)*router_addr_width-1];
-			  
-			  wire [0:la_route_info_width-1]     la_route_info;
-			  vcr_la_routing_logic
-			    #(.num_resource_classes(num_resource_classes),
-			      .num_routers_per_dim(num_routers_per_dim),
-			      .num_dimensions(num_dimensions),
-			      .num_nodes_per_router(num_nodes_per_router),
-			      .connectivity(connectivity),
-			      .routing_type(routing_type),
-			      .dim_order(dim_order),
-			      .resource_class(irc),
-			      .reset_type(reset_type))
-			  lar
-			    (.clk(clk),
-			     .reset(reset),
-			     .router_address(router_address),
-			     .route_port(la_route_port),
-			     .inc_rc(la_inc_rc),
-			     .hop_route_info(hop_route_info_la),
-			     .la_route_info(la_route_info));
-			  
-			  assign la_route_info_ivc[ipc*num_vcs_per_class*
-						   la_route_info_width:
-						   (ipc+1)*num_vcs_per_class*
-						   la_route_info_width-1]
-				   = {num_vcs_per_class{la_route_info}};
-			  
-		       end
-		     
-		  end
-		
-		wire [0:port_idx_width-1] 		     route_port;
-		
-		if(num_vcs > 1)
-		  begin:route_port_mux
-		     
-		     wire [0:vc_idx_width-1] flit_vc;
-		     assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		     
-		     assign route_port
-		       = route_port_ivc[flit_vc*port_idx_width +: 
-					port_idx_width];
-		     
-		  end
-		else
-		  assign route_port = route_port_ivc;
-		
-		wire [0:port_idx_width-1]    dest_port_s, dest_port_q;
-		assign dest_port_s = flit_valid ?
-				     (flit_head ?
-				      route_port :
-				      dest_port_q) :
-				     dest_port_q;
-		c_dff
-		  #(.width(port_idx_width),
-		    .reset_type(reset_type))
-		dest_portq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(dest_port_s),
-		   .q(dest_port_q));
-		
-		wire [0:port_idx_width-1]    dest_port;
-		assign dest_port = (flit_valid & flit_head) ?
-				   route_port :
-				   dest_port_q;
-		
-		wire [0:num_vcs-1] 	     route_ovc;
-		
-		if(num_vcs > 1)
-		  begin:route_ovc_mux
-		     
-		     wire [0:vc_idx_width-1] flit_vc;
-		     assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		     
-		     assign route_ovc
-		       = route_ivc_ovc[flit_vc*num_vcs +: num_vcs];
-		     
-		  end
-		else
-		  assign route_ovc = route_ivc_ovc;
-		
-		wire [0:num_vcs-1] 	     dest_ovc_s, dest_ovc_q;
-		assign dest_ovc_s = flit_valid ?
-				    (flit_head ?
-				     route_ovc :
-				     dest_ovc_q) :
-				    dest_ovc_q;
-		c_dff
-		  #(.width(num_vcs),
-		    .reset_type(reset_type))
-		dest_ovcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(dest_ovc_s),
-		   .q(dest_ovc_q));
-		
-		wire [0:num_vcs-1] 	     dest_ovc;
-		assign dest_ovc = (flit_valid & flit_head) ?
-				  route_ovc :
-				  dest_ovc_q;
-		
-		wire [0:la_route_info_width-1] la_route_info_out;
-		
-		if(num_vcs > 1)
-		  begin:la_route_info_out_mux
-		     
-		     wire [0:vc_idx_width-1] flit_vc;
-		     assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		     
-		     assign la_route_info_out
-		       = la_route_info_ivc[flit_vc*la_route_info_width +:
-					   la_route_info_width];
-		     
-		  end
-		else
-		  assign la_route_info_out = la_route_info_ivc;
-		
-		wire [0:(flit_ctrl_width+flit_data_width+port_idx_width+
-			 num_vcs)-1] 	     data_in;
-		assign data_in[0:flit_ctrl_width-1] = flit_ctrl;
-		assign data_in[flit_ctrl_width:
-			       flit_ctrl_width+la_route_info_width-1]
-			 = flit_head ? 
-			   la_route_info_out : 
-			   flit_data[0:la_route_info_width-1];
-		assign data_in[flit_ctrl_width+la_route_info_width:
-			       flit_ctrl_width+flit_data_width-1]
-			 = flit_data[la_route_info_width:flit_data_width-1];
-		assign data_in[flit_ctrl_width+flit_data_width:
-			       flit_ctrl_width+flit_data_width+port_idx_width-1]
-			 = dest_port;
-		assign data_in[flit_ctrl_width+flit_data_width+port_idx_width:
-			       flit_ctrl_width+flit_data_width+port_idx_width+
-			       num_vcs-1]
-			 = dest_ovc;
-		
-		genvar 			     ivc;
-		for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-		  begin:ivcs
-		     
-		     wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
-			   num_vcs-1] data_out;
-		     
-		     wire [0:flit_ctrl_width-1] ref_ctrl;
-		     assign ref_ctrl = data_out[0:flit_ctrl_width-1];
-		     
-		     wire [0:flit_data_width-1] ref_data;
-		     assign ref_data
-		       = data_out[flit_ctrl_width:
-				  flit_ctrl_width+flit_data_width-1];
-		     
-		     wire [0:port_idx_width-1] 	ref_port;
-		     assign ref_port
-		       = data_out[flit_ctrl_width+flit_data_width:
-				  flit_ctrl_width+flit_data_width+
-				  port_idx_width-1];
-		     
-		     wire [0:num_vcs-1] 	ref_ovc;
-		     assign ref_ovc
-		       = data_out[flit_ctrl_width+flit_data_width+
-				  port_idx_width:
-				  flit_ctrl_width+flit_data_width+
-				  port_idx_width+num_vcs-1];
-		     
-		     wire [0:flit_ctrl_width-1] check_ctrl;
-		     assign check_ctrl
-		       = flit_ctrl_out_op[ref_port*flit_ctrl_width +:
-					  flit_ctrl_width];
-		     
-		     wire [0:flit_data_width-1] check_data;
-		     assign check_data
-		       = flit_data_out_op[ref_port*flit_data_width +: 
-					  flit_data_width];
-		     
-		     wire 			push;
-		     
-		     if(num_vcs > 1)
-		       begin
-			  
-			  wire [0:vc_idx_width-1] flit_vc;
-			  assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-			  
-			  assign push = flit_valid && (flit_vc == ivc);
-			  
-		       end
-		     else
-		       assign push = flit_valid;
-		     
-		     wire 			  valid;
-		     assign valid = check_ctrl[0];
-		     
-		     wire 			  match_ctrl;
-		     
-		     if(flit_ctrl_width > (1 + vc_idx_width))
-		       assign match_ctrl = (ref_ctrl[0] == check_ctrl[0]) &&
-					   (ref_ctrl[1+vc_idx_width:
-						     flit_ctrl_width-1] ==
-					    check_ctrl[1+vc_idx_width:
-						       flit_ctrl_width-1]);
-		     else
-		       assign match_ctrl = (ref_ctrl[0] == check_ctrl[0]);
-		     
-		     wire 			  match_data;
-		     assign match_data = (ref_data == check_data);
-		     
-		     wire 			  match_vcs;
-		     
-		     if(num_vcs > 1)
-		       begin
-			  
-			  wire [0:vc_idx_width-1] check_vc;
-			  assign check_vc = check_ctrl[1:1+vc_idx_width-1];
-			  
-			  assign match_vcs = ref_ovc[check_vc];
-			  
-		       end
-		     else
-		       assign match_vcs = ref_ovc[0];
-		     
-		     wire 			  fifo_empty;
-		     
-		     wire 			  match;
-		     assign match = valid & ~fifo_empty & 
-				    match_ctrl & match_data & match_vcs;
-		     
-		     wire 			  pop;
-		     assign pop = match;
-		     
-		     wire 			  fifo_full;
-		     wire [0:1] 		  fifo_errors;
-		     
-		     c_fifo
-		       #(.depth(num_flit_buffers),
-			 .width(flit_ctrl_width+flit_data_width+port_idx_width+
-				num_vcs),
-			 .reset_type(reset_type))
-		     ref_fifo
-		       (.clk(clk),
-			.reset(reset),
-			.full(fifo_full),
-			.data_in(data_in),
-			.push(push),
-			.empty(fifo_empty),
-			.data_out(data_out),
-			.pop(pop),
-			.errors(fifo_errors));
-		     
-		     assign fifo_errors_ip_ivc[(ip*num_vcs+ivc)*2:
-					       (ip*num_vcs+ivc+1)*2-1]
-			      = fifo_errors;
-		     
-		     wire [0:num_ports-1] 	  port_mask;
-		     c_decoder
-		       #(.num_ports(num_ports))
-		     port_mask_dec
-		       (.data_in(ref_port),
-			.data_out(port_mask));
-		     
-		     wire [0:num_ports-1] 	  match_op;
-		     assign match_op = {num_ports{match}} & port_mask;
-		     
-		     assign match_ip_ivc_op[(ip*num_vcs+ivc)*num_ports:
-					    (ip*num_vcs+ivc+1)*num_ports-1]
-			      = match_op;
-		     
-		     assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~fifo_empty;
-		     assign ref_ctrl_ip_ivc[(ip*num_vcs+ivc)*flit_ctrl_width:
-					    (ip*num_vcs+ivc+1)*flit_ctrl_width-1]
-			      = ref_ctrl;
-		     assign ref_data_ip_ivc[(ip*num_vcs+ivc)*flit_data_width:
-					    (ip*num_vcs+ivc+1)*flit_data_width-1]
-			      = ref_data;
-		     assign ref_port_ip_ivc[(ip*num_vcs+ivc)*port_idx_width:
-					    (ip*num_vcs+ivc+1)*port_idx_width-1]
-			      = ref_port;
-		     assign ref_vcs_ip_ivc[(ip*num_vcs+ivc)*num_vcs:
-					   (ip*num_vcs+ivc+1)*num_vcs-1]
-			      = ref_ovc;
-		     
-		  end
 	     end
 	end
       
-      router_wrap
-	#(.topology(topology),
-	  .num_flit_buffers(num_flit_buffers),
-	  .num_header_buffers(num_header_buffers),
-	  .num_message_classes(num_message_classes),
-	  .num_resource_classes(num_resource_classes),
-	  .num_vcs_per_class(num_vcs_per_class),
-	  .num_nodes(num_nodes),
-	  .num_dimensions(num_dimensions),
-	  .num_nodes_per_router(num_nodes_per_router),
-	  .packet_format(packet_format),
-	  .max_payload_length(max_payload_length),
-	  .min_payload_length(min_payload_length),
-	  .perf_ctr_enable(perf_ctr_enable),
-	  .perf_ctr_width(perf_ctr_width),
-	  .error_capture_mode(error_capture_mode),
-	  .track_vcs_at_output(track_vcs_at_output),
-	  .router_type(router_type),
-	  .flit_data_width(flit_data_width),
-	  .dim_order(dim_order),
-	  .int_flow_ctrl_type(int_flow_ctrl_type),
-	  .header_fifo_type(header_fifo_type),
-	  .fbf_regfile_type(fbf_regfile_type),
-	  .vc_alloc_type(vc_alloc_type),
-	  .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
-	  .sw_alloc_type(sw_alloc_type),
-	  .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
-	  .sw_alloc_spec_type(sw_alloc_spec_type),
-	  .ctrl_crossbar_type(ctrl_crossbar_type),
-	  .data_crossbar_type(data_crossbar_type),
-	  .reset_type(reset_type))
-      rtr
-	(.clk(clk),
-	 .reset(reset),
-	 .router_address(router_address),
-	 .flit_ctrl_in_ip(flit_ctrl_in_ip),
-	 .flit_data_in_ip(flit_data_in_ip),
-	 .flow_ctrl_out_ip(flow_ctrl_out_ip),
-	 .flit_ctrl_out_op(flit_ctrl_out_op),
-	 .flit_data_out_op(flit_data_out_op),
-	 .flow_ctrl_in_op(flow_ctrl_in_op),
-	 .error(rtr_error));
+   endgenerate
+   
+   router_wrap
+     #(.topology(topology),
+       .num_flit_buffers(num_flit_buffers),
+       .num_header_buffers(num_header_buffers),
+       .num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_nodes(num_nodes),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .perf_ctr_enable(perf_ctr_enable),
+       .perf_ctr_width(perf_ctr_width),
+       .error_capture_mode(error_capture_mode),
+       .track_vcs_at_output(track_vcs_at_output),
+       .router_type(router_type),
+       .flit_data_width(flit_data_width),
+       .dim_order(dim_order),
+       .int_flow_ctrl_type(int_flow_ctrl_type),
+       .header_fifo_type(header_fifo_type),
+       .fbf_regfile_type(fbf_regfile_type),
+       .vc_alloc_type(vc_alloc_type),
+       .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+       .sw_alloc_type(sw_alloc_type),
+       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
+       .sw_alloc_spec_type(sw_alloc_spec_type),
+       .ctrl_crossbar_type(ctrl_crossbar_type),
+       .data_crossbar_type(data_crossbar_type),
+       .reset_type(reset_type))
+   rtr
+     (.clk(clk),
+      .reset(reset),
+      .router_address(router_address),
+      .flit_ctrl_in_ip(flit_ctrl_in_ip),
+      .flit_data_in_ip(flit_data_in_ip),
+      .flow_ctrl_out_ip(flow_ctrl_out_ip),
+      .flit_ctrl_out_op(flit_ctrl_out_op),
+      .flit_data_out_op(flit_data_out_op),
+      .flow_ctrl_in_op(flow_ctrl_in_op),
+      .error(rtr_error));
+   
+   wire 				      rchk_error;
+   
+   router_checker
+     #(.num_flit_buffers(num_flit_buffers),
+       .num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .flit_data_width(flit_data_width),
+       .error_capture_mode(error_capture_mode),
+       .routing_type(routing_type),
+       .dim_order(dim_order),
+       .reset_type(reset_type))
+   rchk
+     (.clk(clk),
+      .reset(reset),
+      .router_address(router_address),
+      .flit_ctrl_in_ip(flit_ctrl_in_ip),
+      .flit_data_in_ip(flit_data_in_ip),
+      .flit_ctrl_out_op(flit_ctrl_out_op),
+      .flit_data_out_op(flit_data_out_op),
+      .error(rchk_error));
+   
+   generate
       
-      genvar 					    op;
+      genvar 				      op;
+      
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
@@ -835,40 +328,16 @@ module testbench
 	   assign flit_valid_out_op[op] = flit_ctrl_out[0];
 	   
 	   wire [0:flit_ctrl_width-1] flit_ctrl_dly;
-	   
-	   if(channel_latency == 0)
-	     assign flit_ctrl_dly = flit_ctrl_out;
-	   else
-	     begin
-		
-		wire [0:channel_latency*flit_ctrl_width-1] flit_ctrl_dly_s,
-							   flit_ctrl_dly_q;
-		c_dff
-		  #(.width(channel_latency*flit_ctrl_width),
-		    .reset_type(reset_type))
-		flit_ctrl_dlyq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(flit_ctrl_dly_s),
-		   .q(flit_ctrl_dly_q));
-		
-		if(channel_latency == 1)
-		  begin
-		     assign flit_ctrl_dly_s = flit_ctrl_out;
-		     assign flit_ctrl_dly = flit_ctrl_dly_q;
-		  end
-		else
-		  begin
-		     assign flit_ctrl_dly_s
-		       = {flit_ctrl_out, 
-			  flit_ctrl_dly_q[0:(channel_latency-1)*
-					  flit_ctrl_width-1]};
-		     assign flit_ctrl_dly
-		       = flit_ctrl_dly_q[(channel_latency-1)*flit_ctrl_width:
-					 channel_latency*flit_ctrl_width-1];
-		  end
-		
-	     end
+	   c_shift_reg
+	     #(.width(flit_ctrl_width),
+	       .depth(channel_latency),
+	       .reset_type(reset_type))
+	   flit_ctrl_dly_sr
+	     (.clk(clk),
+	      .reset(reset),
+	      .enable(1'b1),
+	      .data_in(flit_ctrl_out),
+	      .data_out(flit_ctrl_dly));
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl_s, flow_ctrl_q;
 	   assign flow_ctrl_s = flit_ctrl_dly[0:1+vc_idx_width-1];
@@ -882,116 +351,27 @@ module testbench
 	      .q(flow_ctrl_q));
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
-	   
-	   if(channel_latency == 0)
-	     assign flow_ctrl_in = flow_ctrl_q;
-	   else
-	     begin
-		
-		wire [0:channel_latency*flow_ctrl_width-1] flow_ctrl_dly_s,
-							   flow_ctrl_dly_q;
-		
-		c_dff
-		  #(.width(channel_latency*flow_ctrl_width),
-		    .reset_type(reset_type))
-		flow_ctrl_dlyq
-		  (.clk(clk),
-		   .reset(reset),
-		   .d(flow_ctrl_dly_s),
-		   .q(flow_ctrl_dly_q));
-		
-		if(channel_latency == 1)
-		  begin
-		     assign flow_ctrl_dly_s = flow_ctrl_q;
-		     assign flow_ctrl_in = flow_ctrl_dly_q;
-		  end
-		else
-		  begin
-		     assign flow_ctrl_dly_s
-		       = {flow_ctrl_q,
-			  flow_ctrl_dly_q[0:(channel_latency-1)*
-					  flow_ctrl_width-1]};
-		     assign flow_ctrl_in
-		       = flow_ctrl_dly_q[(channel_latency-1)*flow_ctrl_width:
-					 channel_latency*flow_ctrl_width-1];
-		  end
-		
-	     end
+	   c_shift_reg
+	     #(.width(flow_ctrl_width),
+	       .depth(channel_latency),
+	       .reset_type(reset_type))
+	   flow_ctrl_in_sr
+	     (.clk(clk),
+	      .reset(reset),
+	      .enable(1'b1),
+	      .data_in(flow_ctrl_q),
+	      .data_out(flow_ctrl_in));
 	   
 	   assign flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1]
 		    = flow_ctrl_in;
 	   assign cred_valid_in_op[op] = flow_ctrl_in[0];
 	   
-	   wire 		      flit_valid_out;
-	   assign flit_valid_out = flit_ctrl_out[0];
-	   
-	   wire [0:flit_data_width-1] flit_data_out;
-	   assign flit_data_out = flit_data_out_op[op*flit_data_width +: 
-						   flit_data_width];
-	   
-	   assign x_error_op[op]
-		    = (flit_valid_out === 1'bx) ||
-		      ((flit_valid_out === 1'b1) &&
-		       (^{flit_ctrl_out, flit_data_out} === 1'bx));
-	   
 	end
       
    endgenerate
    
-   wire [0:num_ports-1] 	      match_op;
-   c_or_nto1
-     #(.num_ports(num_ports*num_vcs),
-       .width(num_ports))
-   match_op_or
-     (.data_in(match_ip_ivc_op),
-      .data_out(match_op));
-   
-   wire [0:num_ports-1] 	      check_error_op;
-   assign check_error_op = (flit_valid_out_op & ~match_op);
-   
-   integer 			      port;
-   integer 			      x;
-   always @(posedge clk)
-     begin
-	for(port = 0; port < num_ports; port = port + 1)
-	  begin
-	     if(check_error_op[port])
-	       begin
-		  $display("check error: op=%d, cyc=%d", port, $time);
-		  $display("ctrl=%b, data=%x",
-			   flit_ctrl_out_op[port*flit_ctrl_width +: 
-					    flit_ctrl_width],
-			   flit_data_out_op[port*flit_data_width +: 
-					    flit_data_width]);
-		  $display("expected flits:");
-		  for(x = 0; x < num_ports*num_vcs; x = x + 1)
-		    begin
-		       if(ref_valid_ip_ivc[x])
-			 $display("ip=%d,ivc=%d,ctrl=%b,data=%x,op=%d,vcs=%b",
-				  x / num_vcs, x % num_vcs,
-				  ref_ctrl_ip_ivc[x*flit_ctrl_width +: flit_ctrl_width],
-				  ref_data_ip_ivc[x*flit_data_width +: flit_data_width],
-				  ref_port_ip_ivc[x*port_idx_width +: port_idx_width],
-				  ref_vcs_ip_ivc[x*num_vcs +: num_vcs]);
-		    end
-	       end
-	     if(x_error_op[port])
-	       begin
-		  $display("X value error: op=%d, cyc=%d", port, $time);
-		  $display("ctrl=%b, data=%x",
-			   flit_ctrl_out_op[port*flit_ctrl_width +:
-					    flit_ctrl_width],
-			   flit_data_out_op[port*flit_data_width +: 
-					    flit_data_width]);
-	       end
-	  end
-     end
-   
-   wire [0:3] tb_errors;
-   assign tb_errors = {|ps_error_ip,
-		       |check_error_op,
-		       |x_error_op,
-		       |fifo_errors_ip_ivc};
+   wire [0:1] tb_errors;
+   assign tb_errors = {|ps_error_ip, rchk_error};
    
    wire       tb_error;
    assign tb_error = |tb_errors;
@@ -1113,10 +493,17 @@ module testbench
      end
    
    integer cycles;
+   integer d;
    
    initial
    begin
-
+      
+      for(d = 0; d < num_dimensions; d = d + 1)
+	begin
+	   router_address[d*dim_addr_width +: dim_addr_width]
+	     = num_routers_per_dim / 2;
+	end
+      
       reset = 1'b0;
       clk_en = 1'b0;
       run = 1'b0;
