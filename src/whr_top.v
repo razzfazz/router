@@ -265,7 +265,7 @@ module whr_top
 	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
 	   
-	   c_flit_buffer_mac
+	   c_pseudo_sram_mac
 	     #(.width(flit_data_width),
 	       .depth(fbf_depth),
 	       .regfile_type(fbf_regfile_type))

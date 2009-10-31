@@ -30,8 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// external shared flit buffer
-module c_flit_buffer_mac
+// register file wrapper that implements SRAM-like timing
+module c_pseudo_sram_mac
   (clk, write_enable, write_address, write_data, read_enable, read_address, 
    read_data);
    
