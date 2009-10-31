@@ -1121,6 +1121,50 @@ module vcr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
+	   // synopsys translate_off
+	   
+	   integer i;
+	   
+	   always @(posedge clk)
+	     begin
+		
+		for(i = 0; i < num_vcs; i = i + 1)
+		  begin
+		     
+		     if(ivcc_errors_ivc[i*7])
+		       $display("ERROR: Flit buffer underflow at input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		     if(ivcc_errors_ivc[i*7+1])
+		       $display("ERROR: Flit buffer overflow at input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		     if(ivcc_errors_ivc[i*7+2])
+		       $display("ERROR: Head FIFO underflow at input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		     if(ivcc_errors_ivc[i*7+3])
+		       $display("ERROR: Head FIFO overflow at input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		     if(ivcc_errors_ivc[i*7+4])
+		       $display("ERROR: Stray flit received at input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		     if(ivcc_errors_ivc[i*7+5])
+		       $display("ERROR: Credit tracker overflow at input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		     if(ivcc_errors_ivc[i*7+6])
+		       $display("ERROR: Received flit's destination does " +
+				"not match constraints for input " +
+				"port %d, VC %d.", port_id, i);
+		     
+		  end
+		
+	     end
+	   // synopsys translate_on
+	   
 	   wire [0:num_vcs*7-1] errors_s, errors_q;
 	   assign errors_s = ivcc_errors_ivc;
 	   c_err_rpt

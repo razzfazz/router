@@ -855,6 +855,37 @@ module whr_ip_ctrl_mac
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
+
+	   // synopsys translate_off
+	   always @(posedge clk)
+	     begin
+		
+		if(error_fbc_underflow)
+		     $display("ERROR: Flit buffer controller underflow at " +
+			      "input port %d.", port_id);
+		
+		if(error_fbc_overflow)
+		     $display("ERROR: Flit buffer controller overflow at " +
+			      "input port %d.", port_id);
+		
+		if(error_hdff_underflow)
+		     $display("ERROR: Head FIFO underflow at input port %d.",
+			      port_id);
+		
+		if(error_hdff_overflow)
+		     $display("ERROR: Head FIFO overflow at input port %d.",
+			      port_id);
+		
+		if(error_no_header)
+		     $display("ERROR: Stray flit received at input port %d.",
+			      port_id);
+		
+		if(error_invalid_port)
+		     $display("ERROR: Received flit's destination does not " +
+			      "match constraints for input port %d.", port_id);
+		
+	     end
+	   // synopsys translate_on
 	   
 	   wire [0:5] errors_s, errors_q;
 	   assign errors_s = {error_fbc_underflow,

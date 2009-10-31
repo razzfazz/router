@@ -114,6 +114,9 @@ module whr_op_ctrl_mac
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
+   // ID of current input port
+   parameter port_id = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -613,6 +616,29 @@ module whr_op_ctrl_mac
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
+	   
+	   // synopsys translate_off
+	   always @(posedge clk)
+	     begin
+		
+		if(error_ct_underflow)
+		  $display("ERROR: Credit tracker underflow at output port %d.",
+			   port_id);
+		
+		if(error_ct_overflow)
+		  $display("ERROR: Credit tracker overflow at output port %d.",
+			   port_id);
+		
+		if(error_hct_underflow)
+		  $display("ERROR: Head credit tracker underflow at output " +
+			   "port %d.", port_id);
+		
+		if(error_hct_overflow)
+		  $display("ERROR: Head credit tracker overflow at output " +
+			   "port %d.", port_id);
+		
+	     end
+	   // synopsys translate_on
 	   
 	   wire [0:3] errors_s, errors_q;
 	   assign errors_s = {error_ct_underflow,

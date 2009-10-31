@@ -142,6 +142,9 @@ module vcr_op_ctrl_mac
    // select speculation type for switch allocator
    parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
+   // ID of current input port
+   parameter port_id = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -722,6 +725,41 @@ module vcr_op_ctrl_mac
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
+	   
+	   // synopsys translate_off
+	   
+	   integer i;
+	   
+	   always @(posedge clk)
+	     begin
+		
+		if(error_unmatched)
+		     $display("ERROR: Unmatched flit at output port %d.",
+			      port_id);
+		
+		for(i = 0; i < num_vcs; i = i + 1)
+		  begin
+		     
+		     if(ovcc_errors_ovc[i*4])
+		       $display("ERROR: Credit tracker underflow at " +
+				"output port %d, VC %d.", port_id, i);
+		     
+		     if(ovcc_errors_ovc[i*4+1])
+		       $display("ERROR: Credit tracker overflow at " +
+				"output port %d, VC %d.", port_id, i);
+		     
+		     if(ovcc_errors_ovc[i*4+2])
+		       $display("ERROR: Head credit tracker underflow at " +
+				"output port %d, VC %d.", port_id, i);
+		     
+		     if(ovcc_errors_ovc[i*4+3])
+		       $display("ERROR: Head credit tracker overflow at " +
+				"output port %d, VC %d.", port_id, i);
+		     
+		  end
+		
+	     end
+	   // synopsys translate_on
 	   
 	   wire [0:1+num_vcs*4-1] errors_s, errors_q;
 	   assign errors_s = {error_unmatched, ovcc_errors_ovc};

@@ -705,6 +705,7 @@ module vcr_top
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .port_id(op),
 	       .reset_type(reset_type))
 	   opc
 	     (.clk(clk),
@@ -759,6 +760,30 @@ module vcr_top
 	   
 	   wire [0:num_ports+num_ports-1] errors_in;
 	   assign errors_in = {ipc_error_ip, opc_error_op};
+	   
+	   // synopsys translate_off
+	   
+	   integer 			  i;
+	   
+	   always @(posedge clk)
+	     begin
+
+		for(i = 0; i < num_ports; i = i + 1)
+		  begin
+		     if(ipc_error_ip[i])
+		       $display("ERROR: Router error detected in input " +
+				"port %d.", i);
+		  end
+		
+		for(i = 0; i < num_ports; i = i + 1)
+		  begin
+		     if(opc_error_op[i])
+		       $display("ERROR: Router error detected in output " +
+				"port %d.", i);
+		  end
+		
+	     end
+	   // synopsys translate_on
 	   
 	   wire [0:num_ports+num_ports-1] errors_out;
 	   c_err_rpt
