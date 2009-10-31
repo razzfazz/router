@@ -758,9 +758,6 @@ module vcr_top
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_ports+num_ports-1] errors_in;
-	   assign errors_in = {ipc_error_ip, opc_error_op};
-	   
 	   // synopsys translate_off
 	   
 	   integer 			  i;
@@ -785,7 +782,8 @@ module vcr_top
 	     end
 	   // synopsys translate_on
 	   
-	   wire [0:num_ports+num_ports-1] errors_out;
+	   wire [0:num_ports+num_ports-1] errors_s, errors_q;
+	   assign errors_s = {ipc_error_ip, opc_error_op};
 	   c_err_rpt
 	     #(.num_errors(num_ports+num_ports),
 	       .capture_mode(error_capture_mode),
@@ -793,10 +791,10 @@ module vcr_top
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
-	      .errors_in(errors_in),
-	      .errors_out(errors_out));
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
 	   
-	   assign error = |errors_out;
+	   assign error = |errors_q;
 	   
 	end
       else

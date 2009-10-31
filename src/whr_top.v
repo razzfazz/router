@@ -413,9 +413,6 @@ module whr_top
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:2*num_ports-1] errors_in;
-	   assign errors_in = {ipc_error_ip, opc_error_op};
-	   
 	   // synopsys translate_off
 	   
 	   integer 		  i;
@@ -440,7 +437,8 @@ module whr_top
 	     end
 	   // synopsys translate_on
 	   
-	   wire [0:2*num_ports-1] errors_out;
+	   wire [0:2*num_ports-1] errors_s, errors_q;
+	   assign errors_s = {ipc_error_ip, opc_error_op};
 	   c_err_rpt
 	     #(.num_errors(2*num_ports),
 	       .capture_mode(error_capture_mode),
@@ -448,10 +446,10 @@ module whr_top
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
-	      .errors_in(errors_in),
-	      .errors_out(errors_out));
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
 	   
-	   assign error = |errors_out;
+	   assign error = |errors_q;
 	   
 	end
       else
