@@ -1731,7 +1731,7 @@ module tc_node_mac
 	end
       
       if(packet_format == `PACKET_FORMAT_HEAD_TAIL)
-	assign flit_ctrl_out[1+vc_idx_width+1] = flit_tail;
+	assign flit_ctrl_out[1+vc_idx_width+1] = flit_tail_q;
       
    endgenerate
    
