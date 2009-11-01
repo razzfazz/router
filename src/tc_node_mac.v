@@ -1900,10 +1900,6 @@ module tc_node_mac
 	   always @(posedge clk)
 	     begin
 		
-		if(error_unmatched)
-		     $display("ERROR: Unmatched flit at output port %d.",
-			      port_id);
-		
 		for(i = 0; i < num_vcs; i = i + 1)
 		  begin
 		     
