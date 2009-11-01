@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // network pseudo-node (combined packet source / sink)
 module tc_node_mac
-  (clk, reset, address, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
+  (clk, reset, address, port_id, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
    flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_addr_prefixes, cfg_req, 
    cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, error);
    
@@ -249,6 +249,9 @@ module tc_node_mac
    
    // current node's address
    input [0:addr_width-1] address;
+   
+   // router port to which this node is attached
+   input [0:port_idx_width-1] port_id;
    
    // control signals for outgoing flit
    output [0:flit_ctrl_width-1] flit_ctrl_out;
@@ -1205,8 +1208,6 @@ module tc_node_mac
 			route_info_width-1]
 	    = dest_addr_rv;
    
-   assign packet_to_self = (dest_addr_rv == address);
-   
    genvar 			   dim;
    
    generate
@@ -1348,6 +1349,8 @@ module tc_node_mac
       .route_info(route_info_rv),
       .route_port(route_port_rv),
       .inc_rc(inc_rc_rv));
+   
+   assign packet_to_self = (route_port_rv == port_id) && !inc_rc_rv;
    
    wire [0:la_route_info_width-1] 	     la_route_info_rv;
    assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
