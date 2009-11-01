@@ -30,9 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // network pseudo-node (combined packet source / sink)
 module tc_node_mac
-  (clk, reset, address, port_id, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
-   flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_addr_prefixes, cfg_req, 
-   cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, error);
+  (clk, reset, router_address, port_id, flit_ctrl_out, flit_data_out, 
+   flow_ctrl_in, flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_addr_prefixes, 
+   cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, 
+   error);
    
 // register address declarations
 `define CFG_ADDR_CTRL            0
@@ -248,7 +249,7 @@ module tc_node_mac
    input reset;
    
    // current node's address
-   input [0:addr_width-1] address;
+   input [0:router_addr_width-1] router_address;
    
    // router port to which this node is attached
    input [0:port_idx_width-1] port_id;
@@ -1327,9 +1328,6 @@ module tc_node_mac
    // generate random lookahead routing info
    //---------------------------------------------------------------------------
 
-   wire [0:router_addr_width-1] 	     router_address;
-   assign router_address = address[0:router_addr_width-1];
-   
    wire [0:port_idx_width-1] 		     route_port_rv;
    wire 				     inc_rc_rv;
    vcr_routing_logic

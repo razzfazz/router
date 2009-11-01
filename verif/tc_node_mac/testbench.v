@@ -237,7 +237,7 @@ module testbench
    wire [0:flit_data_width-1] dut1_flit_data_dly;
    wire [0:flow_ctrl_width-1] dut1_flow_ctrl_dly;
    
-   reg [0:addr_width-1]       dut0_address;
+   reg [0:addr_width-1]       dut0_router_address;
    reg [0:port_idx_width-1]   dut0_port_id;
    reg [0:2*cfg_addr_prefix_width-1] dut0_cfg_addr_prefixes;
    wire [0:cfg_data_width-1] 	     dut0_cfg_read_data;
@@ -278,7 +278,7 @@ module testbench
    dut0
      (.clk(clk),
       .reset(reset),
-      .address(dut0_address),
+      .router_address(dut0_router_address),
       .port_id(dut0_port_id),
       .flit_ctrl_out(dut0_flit_ctrl),
       .flit_data_out(dut0_flit_data),
@@ -367,7 +367,7 @@ module testbench
       .data_in(dut0_flow_ctrl),
       .data_out(dut0_flow_ctrl_dly));
    
-   reg [0:addr_width-1] 	     dut1_address;
+   reg [0:addr_width-1] 	     dut1_router_address;
    reg [0:port_idx_width-1] 	     dut1_port_id;
    reg [0:2*cfg_addr_prefix_width-1] dut1_cfg_addr_prefixes;
    wire [0:cfg_data_width-1] 	     dut1_cfg_read_data;
@@ -408,7 +408,7 @@ module testbench
    dut1
      (.clk(clk),
       .reset(reset),
-      .address(dut1_address),
+      .router_address(dut1_router_address),
       .port_id(dut1_port_id),
       .flit_ctrl_out(dut1_flit_ctrl),
       .flit_data_out(dut1_flit_data),
@@ -457,10 +457,18 @@ module testbench
    initial
    begin
       
-      dut0_address = 'd0;
+      dut0_router_address = 'd0;
       dut0_port_id = 'd0;
-      dut1_address = 'd1;
-      dut1_port_id = (num_nodes_per_router > 1) ? 'd1 : 'd0;
+      if(num_nodes_per_router > 1)
+	begin
+	   dut1_router_address = 'd0;
+	   dut1_port_id = 'd1;
+	end
+      else
+	begin
+	   dut1_router_address = 'd1;
+	   dut1_port_id = 'd0;
+	end
       
       reset = 1'b0;
       clk_en = 1'b0;
