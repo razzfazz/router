@@ -1781,7 +1781,7 @@ module tc_node_mac
       .q(flit_data_rv_q));
    
    assign flit_data_out[0:header_info_width-1]
-	    = flit_head ? 
+	    = flit_head_q ? 
 	      header_info_rv : 
 	      flit_data_rv_q[0:header_info_width-1];
    assign flit_data_out[header_info_width:flit_data_width-1]
