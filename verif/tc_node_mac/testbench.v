@@ -68,9 +68,6 @@ module testbench
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // current node's address
-   localparam [0:addr_width-1] address = {addr_width{1'b0}};
-   
    // connectivity within each dimension
    localparam connectivity
      = (topology == `TOPOLOGY_MESH) ?
@@ -240,6 +237,8 @@ module testbench
    wire [0:flit_data_width-1] dut1_flit_data_dly;
    wire [0:flow_ctrl_width-1] dut1_flow_ctrl_dly;
    
+   reg [0:addr_width-1]       dut0_address;
+   reg [0:port_idx_width-1]   dut0_port_id;
    reg [0:2*cfg_addr_prefix_width-1] dut0_cfg_addr_prefixes;
    wire [0:cfg_data_width-1] 	     dut0_cfg_read_data;
    wire 			     dut0_cfg_done;
@@ -279,7 +278,8 @@ module testbench
    dut0
      (.clk(clk),
       .reset(reset),
-      .address(address),
+      .address(dut0_address),
+      .port_id(dut0_port_id),
       .flit_ctrl_out(dut0_flit_ctrl),
       .flit_data_out(dut0_flit_data),
       .flow_ctrl_in(dut1_flow_ctrl_dly),
@@ -295,7 +295,7 @@ module testbench
       .cfg_done(dut0_cfg_done),
       .error(dut0_error));
    
-   wire [0:flit_ctrl_width-1] dut1_flit_ctrl;
+   wire [0:flit_ctrl_width-1] 	     dut1_flit_ctrl;
    c_shift_reg
      #(.width(flit_ctrl_width),
        .depth(channel_latency),
@@ -307,7 +307,7 @@ module testbench
       .data_in(dut1_flit_ctrl),
       .data_out(dut1_flit_ctrl_dly));
    
-   wire [0:flit_data_width-1] dut1_flit_data;
+   wire [0:flit_data_width-1] 	     dut1_flit_data;
    c_shift_reg
      #(.width(flit_data_width),
        .depth(channel_latency),
@@ -319,7 +319,7 @@ module testbench
       .data_in(dut1_flit_data),
       .data_out(dut1_flit_data_dly));
    
-   wire [0:flow_ctrl_width-1] dut1_flow_ctrl;
+   wire [0:flow_ctrl_width-1] 	     dut1_flow_ctrl;
    c_shift_reg
      #(.width(flow_ctrl_width),
        .depth(channel_latency),
@@ -331,7 +331,7 @@ module testbench
       .data_in(dut1_flow_ctrl),
       .data_out(dut1_flow_ctrl_dly));
    
-   wire [0:flit_ctrl_width-1] dut0_flit_ctrl_dly;
+   wire [0:flit_ctrl_width-1] 	     dut0_flit_ctrl_dly;
    c_shift_reg
      #(.width(flit_ctrl_width),
        .depth(channel_latency),
@@ -343,7 +343,7 @@ module testbench
       .data_in(dut0_flit_ctrl),
       .data_out(dut0_flit_ctrl_dly));
    
-   wire [0:flit_data_width-1] dut0_flit_data_dly;
+   wire [0:flit_data_width-1] 	     dut0_flit_data_dly;
    c_shift_reg
      #(.width(flit_data_width),
        .depth(channel_latency),
@@ -355,7 +355,7 @@ module testbench
       .data_in(dut0_flit_data),
       .data_out(dut0_flit_data_dly));
    
-   wire [0:flow_ctrl_width-1] dut0_flow_ctrl_dly;
+   wire [0:flow_ctrl_width-1] 	     dut0_flow_ctrl_dly;
    c_shift_reg
      #(.width(flow_ctrl_width),
        .depth(channel_latency),
@@ -367,6 +367,8 @@ module testbench
       .data_in(dut0_flow_ctrl),
       .data_out(dut0_flow_ctrl_dly));
    
+   reg [0:addr_width-1] 	     dut1_address;
+   reg [0:port_idx_width-1] 	     dut1_port_id;
    reg [0:2*cfg_addr_prefix_width-1] dut1_cfg_addr_prefixes;
    wire [0:cfg_data_width-1] 	     dut1_cfg_read_data;
    wire 			     dut1_cfg_done;
@@ -406,7 +408,8 @@ module testbench
    dut1
      (.clk(clk),
       .reset(reset),
-      .address(address),
+      .address(dut1_address),
+      .port_id(dut1_port_id),
       .flit_ctrl_out(dut1_flit_ctrl),
       .flit_data_out(dut1_flit_data),
       .flow_ctrl_in(dut0_flow_ctrl_dly),
@@ -453,6 +456,11 @@ module testbench
    
    initial
    begin
+      
+      dut0_address = 'd0;
+      dut0_port_id = 'd0;
+      dut1_address = 'd1;
+      dut1_port_id = (num_nodes_per_router > 1) ? 'd1 : 'd0;
       
       reset = 1'b0;
       clk_en = 1'b0;
