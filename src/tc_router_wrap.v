@@ -149,7 +149,7 @@ module tc_router_wrap
    parameter done_delay_width = 6;
    
    // number of node control signals to generate
-   localparam node_ctrl_width = 1 + 1;
+   localparam node_ctrl_width = 2 + 2;
    
    // number of node status signals to accept
    localparam node_status_width = 1 + num_ports;
@@ -239,17 +239,29 @@ module tc_router_wrap
       .node_ctrl(node_ctrl),
       .node_status(node_status));
    
-   wire 			force_reset_b;
-   assign force_reset_b = node_ctrl[0];
+   wire 			force_node_reset_b;
+   assign force_node_reset_b = node_ctrl[0];
    
-   wire 			gated_reset;
-   assign gated_reset = reset | ~force_reset_b;
+   wire 			node_reset;
+   assign node_reset = reset | ~force_node_reset_b;
    
-   wire 			clk_en;
-   assign clk_en = node_ctrl[1];
+   wire 			node_clk_en;
+   assign node_clk_en = node_ctrl[1];
    
-   wire 			gated_clk;
-   assign gated_clk = clk & clk_en;
+   wire 			node_clk;
+   assign node_clk = clk & node_clk_en;
+   
+   wire 			force_rtr_reset_b;
+   assign force_rtr_reset_b = node_ctrl[2];
+   
+   wire 			rtr_reset;
+   assign rtr_reset = reset | ~force_rtr_reset_b;
+   
+   wire 			rtr_clk_en;
+   assign rtr_clk_en = node_ctrl[3];
+   
+   wire 			rtr_clk;
+   assign rtr_clk = clk & rtr_clk_en;
    
    wire [0:num_ports*flit_ctrl_width-1] node_rtr_flit_ctrl_p;
    wire [0:num_ports*flit_data_width-1] node_rtr_flit_data_p;
@@ -333,8 +345,8 @@ module tc_router_wrap
 	       .packet_count_width(packet_count_width),
 	       .reset_type(reset_type))
 	   node
-	     (.clk(gated_clk),
-	      .reset(gated_reset),
+	     (.clk(node_clk),
+	      .reset(node_reset),
 	      .router_address(router_address),
 	      .port_id(port),
 	      .flit_ctrl_out(flit_ctrl_out),
@@ -406,8 +418,8 @@ module tc_router_wrap
        .data_crossbar_type(data_crossbar_type),
        .reset_type(reset_type))
    rtr
-     (.clk(gated_clk),
-      .reset(gated_reset),
+     (.clk(rtr_clk),
+      .reset(rtr_reset),
       .router_address(router_address),
       .flit_ctrl_in_ip(node_rtr_flit_ctrl_p),
       .flit_data_in_ip(node_rtr_flit_data_p),

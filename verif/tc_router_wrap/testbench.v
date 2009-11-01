@@ -189,9 +189,6 @@ module testbench
    // RNG seed value
    parameter initial_seed = 0;
    
-   // channel latency in cycles
-   parameter channel_latency = 1;
-   
    reg 		    reset;
    reg 		    clk;
    
@@ -319,6 +316,7 @@ module testbench
       io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
       io_write_data = 'd0;
       io_write_data[0] = 1'b1;
+      io_write_data[2] = 1'b1;
       while(!io_done)
 	#(Tclk);
       #(Tclk);
@@ -336,6 +334,8 @@ module testbench
       io_write_data = 'd0;
       io_write_data[0] = 1'b1;
       io_write_data[1] = 1'b1;
+      io_write_data[2] = 1'b1;
+      io_write_data[3] = 1'b1;
       while(!io_done)
 	#(Tclk);
       #(Tclk);
@@ -371,7 +371,7 @@ module testbench
       io_addr[0:cfg_addr_prefix_width-1] = 1 + num_ports;
       io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd4;
       io_write_data = 'd0;
-      io_write_data[0:num_packets_width-1] = 'd100;
+      io_write_data[0:num_packets_width-1] = 'd1024;
       while(!io_done)
 	#(Tclk);
       #(Tclk);
@@ -525,6 +525,25 @@ module testbench
       #(Tclk);
       
       
+      // disable router clocks
+      
+      io_write = 1'b1;
+      io_addr[0:cfg_addr_prefix_width-1] = 'd0;
+      io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
+      io_write_data = 'd0;
+      io_write_data[0] = 1'b1;
+      io_write_data[1] = 1'b1;
+      io_write_data[2] = 1'b1;
+      while(!io_done)
+	#(Tclk);
+      #(Tclk);
+      io_write = 1'b0;
+      while(io_done)
+	#(Tclk);
+      
+      #(Tclk);
+      
+      
       // reset number of packets
       
       io_write = 1'b1;
@@ -541,8 +560,9 @@ module testbench
       
       #(10*Tclk);
       
-      /*
+      
       // restart experiment in loopback mode
+      
       io_write = 1'b1;
       io_addr[0:cfg_addr_prefix_width-1] = 1 + num_ports;
       io_addr[cfg_addr_prefix_width:cfg_addr_width-1] = 'd0;
@@ -580,7 +600,7 @@ module testbench
       done = 1'b0;
       
       #(Tclk);
-      */
+      
       
       // disable nodes
       
