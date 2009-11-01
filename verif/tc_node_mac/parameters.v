@@ -85,6 +85,11 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // controller
 parameter track_vcs_at_output = 1;
 
+// filter out illegal destination ports
+// (the intent is to allow synthesis to optimize away the logic associated with 
+// such turns)
+parameter restrict_turns = 0;
+
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_DOR;
 
