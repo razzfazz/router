@@ -825,10 +825,10 @@ module tc_node_mac
 	     begin
 		initial
 		begin
-		   $display("ERROR: The value of the cfg_data_width " +
-			    "parameter is too small to accomodate the " +
-			    "specified number of message class selection " +
-			    "thresholds.");
+		   $display({"ERROR: The value of the cfg_data_width ", 
+			     "parameter is too small to accomodate the ", 
+			     "specified number of message class selection ", 
+			     "thresholds."});
 		   $stop;
 		end
 	     end
@@ -927,10 +927,10 @@ module tc_node_mac
 	     begin
 		initial
 		begin
-		   $display("ERROR: The value of the cfg_data_width " +
-			    "parameter is too small to accomodate the " +
-			    "specified number of resource class selection " +
-			    "thresholds.");
+		   $display({"ERROR: The value of the cfg_data_width ", 
+			     "parameter is too small to accomodate the ", 
+			     "specified number of resource class selection ", 
+			     "thresholds."});
 		   $stop;
 		end
 	     end
@@ -1380,10 +1380,10 @@ module tc_node_mac
 	     begin
 		initial
 		begin
-		   $display("ERROR: The value of the cfg_data_width " +
-			    "parameter is too small to accomodate the " +
-			    "specified number of packet length selection " +
-			    "thresholds.");
+		   $display({"ERROR: The value of the cfg_data_width ", 
+			     "parameter is too small to accomodate the ", 
+			     "specified number of packet length selection ", 
+			     "thresholds."});
 		   $stop;
 		end
 	     end
@@ -1391,9 +1391,9 @@ module tc_node_mac
 	     begin
 		initial
 		begin
-		   $display("ERROR: The value of the cfg_data_width " +
-			    "parameter is too small to accomodate the " +
-			    "specified number of packet length values.");
+		   $display({"ERROR: The value of the cfg_data_width ", 
+			     "parameter is too small to accomodate the ", 
+			     "specified number of packet length values."});
 		   $stop;
 		end
 	     end

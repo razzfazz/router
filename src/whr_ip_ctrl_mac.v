@@ -861,12 +861,12 @@ module whr_ip_ctrl_mac
 	     begin
 		
 		if(error_fbc_underflow)
-		     $display("ERROR: Flit buffer controller underflow at " +
-			      "input port %d.", port_id);
+		     $display({"ERROR: Flit buffer controller underflow at ", 
+			       "input port %d."}, port_id);
 		
 		if(error_fbc_overflow)
-		     $display("ERROR: Flit buffer controller overflow at " +
-			      "input port %d.", port_id);
+		     $display({"ERROR: Flit buffer controller overflow at ", 
+			       "input port %d."}, port_id);
 		
 		if(error_hdff_underflow)
 		     $display("ERROR: Head FIFO underflow at input port %d.",
@@ -881,8 +881,9 @@ module whr_ip_ctrl_mac
 			      port_id);
 		
 		if(error_invalid_port)
-		     $display("ERROR: Received flit's destination does not " +
-			      "match constraints for input port %d.", port_id);
+		     $display({"ERROR: Received flit's destination does not ", 
+			       "match constraints for input port %d."}, 
+			      port_id);
 		
 	     end
 	   // synopsys translate_on

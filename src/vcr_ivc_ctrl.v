@@ -372,10 +372,10 @@ module vcr_ivc_ctrl
 		    begin
 		       initial
 		       begin
-			  $display("ERROR: The value of the " +
-				   "max_payload_length parameter cannot be " +
-				   "smaller than that of the " +
-				   "min_payload_length parameter.");
+			  $display({"ERROR: The value of the ", 
+				    "max_payload_length parameter cannot be ", 
+				    "smaller than that of the ", 
+				    "min_payload_length parameter."});
 			  $stop;
 		       end
 		    end
@@ -398,10 +398,10 @@ module vcr_ivc_ctrl
 		    begin
 		       initial
 		       begin
-			  $display("ERROR: The value of the " +
-				   "max_payload_length parameter cannot be " +
-				   "smaller than that of the " +
-				   "min_payload_length parameter.");
+			  $display({"ERROR: The value of the ", 
+				    "max_payload_length parameter cannot be ", 
+				    "smaller than that of the ", 
+				    "min_payload_length parameter."});
 			  $stop;
 		       end
 		    end
@@ -448,10 +448,10 @@ module vcr_ivc_ctrl
 		    begin
 		       initial
 		       begin
-			  $display("ERROR: The value of the " +
-				   "max_payload_length parameter cannot be " +
-				   "smaller than that of the " +
-				   "min_payload_length parameter.");
+			  $display({"ERROR: The value of the ", 
+				    "max_payload_length parameter cannot be ", 
+				    "smaller than that of the ", 
+				    "min_payload_length parameter."});
 			  $stop;
 		       end
 		    end

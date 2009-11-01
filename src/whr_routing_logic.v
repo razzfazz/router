@@ -179,9 +179,9 @@ module whr_routing_logic
 			 // synopsys translate_off
 			 initial
 			 begin
-			    $display("ERROR: The routing logic module does " +
-				     "not yet support ring connectivity " +
-				     "within each dimension.");
+			    $display({"ERROR: The routing logic module does ", 
+				      "not yet support ring connectivity ", 
+				      "within each dimension."});
 			    $stop;
 			 end
 			 // synopsys translate_on

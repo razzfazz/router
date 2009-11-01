@@ -758,12 +758,12 @@ module router_checker
 		       begin
 			  
 			  if(fifo_errors_ivc[i*2])
-			    $display("ERROR: Reference FIFO underflow at " +
-				     "port %d, VC %d.", ip, i);
+			    $display({"ERROR: Reference FIFO underflow at ", 
+				      "port %d, VC %d."}, ip, i);
 			  
 			  if(fifo_errors_ivc[i*2+1])
-			    $display("ERROR: Reference FIFO overflow at " +
-				     "port %dm VC %d.", ip, i);
+			    $display({"ERROR: Reference FIFO overflow at ", 
+				      "port %dm VC %d."}, ip, i);
 			  
 		       end
 		     
@@ -899,8 +899,8 @@ module router_checker
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
 		     if(fifo_errors_ip[i])
-		       $display("ERROR: Reference FIFO error detected at " +
-				"input port %d.", i);
+		       $display({"ERROR: Reference FIFO error detected at ", 
+				 "input port %d."}, i);
 		  end
 		
 	     end

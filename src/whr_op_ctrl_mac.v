@@ -630,12 +630,12 @@ module whr_op_ctrl_mac
 			   port_id);
 		
 		if(error_hct_underflow)
-		  $display("ERROR: Head credit tracker underflow at output " +
-			   "port %d.", port_id);
+		  $display({"ERROR: Head credit tracker underflow at output ", 
+			    "port %d."}, port_id);
 		
 		if(error_hct_overflow)
-		  $display("ERROR: Head credit tracker overflow at output " +
-			   "port %d.", port_id);
+		  $display({"ERROR: Head credit tracker overflow at output ", 
+			    "port %d."}, port_id);
 		
 	     end
 	   // synopsys translate_on
