@@ -165,7 +165,7 @@ module tc_node_mac
        -1;
    
    // width of flit payload data
-   parameter  flit_data_width = 64;
+   parameter flit_data_width = 64;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
@@ -660,7 +660,7 @@ module tc_node_mac
    wire [0:arrival_rv_width-1] 	    arrival_rv_feedback;
    c_fbgen
      #(.width(arrival_rv_width),
-       .index(lfsr_index+0))
+       .index(4*lfsr_index+0))
    arrival_rv_feedback_fbgen
      (.feedback(arrival_rv_feedback));
    
@@ -732,7 +732,7 @@ module tc_node_mac
    wire [0:packet_rvs_width-1] 	    packet_rvs_feedback;
    c_fbgen
      #(.width(packet_rvs_width),
-       .index(lfsr_index+1))
+       .index(4*lfsr_index+1))
    packet_rvs_feedback_fbgen
      (.feedback(packet_rvs_feedback));
    
@@ -1747,7 +1747,7 @@ module tc_node_mac
    wire [0:flit_data_width-1] 	   flit_data_rv_feedback;
    c_fbgen
      #(.width(flit_data_width),
-       .index(lfsr_index+2))
+       .index(4*lfsr_index+2))
    flit_data_rv_feedback_fbgen
      (.feedback(flit_data_rv_feedback));
    
@@ -1798,7 +1798,7 @@ module tc_node_mac
    wire [0:flit_data_width-1] 	   flit_sig_feedback;
    c_fbgen
      #(.width(flit_data_width),
-       .index(lfsr_index+3))
+       .index(4*lfsr_index+3))
    flit_sig_feedback_fbgen
      (.feedback(flit_sig_feedback));
    
