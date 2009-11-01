@@ -83,7 +83,7 @@ module tc_node_ctrl_mac
    input io_read;
    
    // register address
-   input [0:cfg_addr_width-1] io_addr;
+   input [0:io_addr_width-1] io_addr;
    
    // input data
    input [0:io_data_width-1] io_write_data;
