@@ -87,6 +87,9 @@ module tcnode_wrap
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
