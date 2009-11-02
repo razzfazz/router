@@ -58,7 +58,7 @@ parameter num_dimensions = 1;
 parameter num_nodes_per_router = 1;
 
 // select packet format
-parameter packet_format = `PACKET_FORMAT_HEAD_TAIL/*EXPLICIT_LENGTH*/;
+parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
 
 // maximum payload length (in flits)
 parameter max_payload_length = 4;
