@@ -284,7 +284,7 @@ module whr_ip_ctrl_mac
    c_dff
      #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   flit_dataq
+   flit_data_inq
      (.clk(clk),
       .reset(reset),
       .d(flit_data_in_s),
