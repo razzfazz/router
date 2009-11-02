@@ -1589,11 +1589,10 @@ module tc_node_mac
    assign flit_ctrl_out[0] = flit_sent_q;
    assign int_flit_ctrl[0] = flit_sent_q;
    
+   wire [0:packet_length_width-1] 	   flit_count;
+   
    wire [0:packet_length_width-1] 	   flit_count_s, flit_count_q;
-   assign flit_count_s
-     = active_q ? 
-       ((start_q | packet_sent) ? flit_count_rv : (flit_count_q - flit_sent)) : 
-       flit_count_q;
+   assign flit_count_s = active_q ? (flit_count - flit_sent) : flit_count_q;
    c_dff
      #(.width(packet_length_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -1603,8 +1602,12 @@ module tc_node_mac
       .d(flit_count_s),
       .q(flit_count_q));
    
+   wire 				   flit_head;
+   
+   assign flit_count = flit_head ? flit_count_rv : flit_count_q;
+   
    wire 				   flit_count_zero;
-   assign flit_count_zero = ~|flit_count_q;
+   assign flit_count_zero = ~|flit_count;
    
    assign packet_sent
      = (flit_sent & flit_count_zero) | (packet_valid_q & packet_to_self);
@@ -1662,9 +1665,8 @@ module tc_node_mac
       
    endgenerate
    
-   wire 				   flit_head;
    wire 				   flit_head_q;
-   
+      
    generate
       
       if(max_payload_length > 0)
@@ -1780,9 +1782,21 @@ module tc_node_mac
       .d(flit_data_rv_s),
       .q(flit_data_rv_q));
    
+   // line up header info with flit data
+   wire [0:header_info_width-1]    header_info_rv_s, header_info_rv_q;
+   assign header_info_rv_s = active_q ? header_info_rv : header_info_rv_q;
+   c_dff
+     #(.width(header_info_width),
+       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+   header_info_rvq
+     (.clk(clk),
+      .reset(reset),
+      .d(header_info_rv_s),
+      .q(header_info_rv_q));
+   
    assign flit_data_out[0:header_info_width-1]
 	    = flit_head_q ? 
-	      header_info_rv : 
+	      header_info_rv_q : 
 	      flit_data_rv_q[0:header_info_width-1];
    assign flit_data_out[header_info_width:flit_data_width-1]
 	    = flit_data_rv_q[header_info_width:flit_data_width-1];
