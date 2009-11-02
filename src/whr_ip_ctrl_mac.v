@@ -412,8 +412,8 @@ module whr_ip_ctrl_mac
 
    wire 				    fbc_empty;
    
-   wire 				    flit_present;
-   assign flit_present = flit_valid_in | ~fbc_empty;
+   wire 				    flit_valid;
+   assign flit_valid = flit_valid_in | ~fbc_empty;
    
    wire [0:fbf_addr_width-1] 		    fbc_write_addr;
    wire [0:fbf_addr_width-1] 		    fbc_read_addr;
@@ -488,7 +488,7 @@ module whr_ip_ctrl_mac
 	   assign head_in = flit_valid_in & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
-	   assign head_valid_s = flit_present ? 
+	   assign head_valid_s = flit_valid ? 
 				 ((head_valid_q | head_in) & ~flit_valid_out) : 
 				 head_valid_q;
 	   c_dff
@@ -520,7 +520,7 @@ module whr_ip_ctrl_mac
 	      .q(tail_idx_q));
 	   
 	   wire 		     tail_valid_s, tail_valid_q;
-	   assign tail_valid_s = flit_present ? 
+	   assign tail_valid_s = flit_valid ? 
 				 ((tail_valid_q | tail_in) & 
 				  ~(flit_valid_out & flit_tail_out)) : 
 				 tail_valid_q;
@@ -651,7 +651,7 @@ module whr_ip_ctrl_mac
 	     = hdff_empty ? route_info_in : hdff_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
-	   assign hdff_empty_s = flit_present ? 
+	   assign hdff_empty_s = flit_valid ? 
 				 ((hdff_empty_q | (hdff_pop & ~hdff_push)) & 
 				  ~(hdff_push & ~hdff_pop)) : 
 				 hdff_empty_q;
@@ -676,8 +676,6 @@ module whr_ip_ctrl_mac
    
    wire 	header_valid;
    assign header_valid = ~hdff_empty | hdff_push;
-   
-   wire 	flit_valid;
    
    wire 	error_no_header;
    assign error_no_header = flit_valid & ~header_valid;
@@ -772,14 +770,12 @@ module whr_ip_ctrl_mac
    assign error_fbc_overflow = fbc_errors[1];
    
    // read enable doesn't need to be exact, so we read whenever we have a flit
-   assign fbf_read_enable = flit_present /*flit_valid_out*/;
+   assign fbf_read_enable = flit_valid /*flit_valid_out*/;
    
    assign fbf_read_addr = fbc_read_addr;
    assign fbf_write_enable = flit_valid_in;
    assign fbf_write_addr = fbc_write_addr;
    assign fbf_write_data = flit_data_in_q;
-   
-   assign flit_valid = flit_valid_in | ~fbc_empty;
    
    
    //---------------------------------------------------------------------------
@@ -800,7 +796,7 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire                      flit_head_out_s, flit_head_out_q;
-   assign flit_head_out_s = flit_present ? flit_head_out : flit_head_out_q;
+   assign flit_head_out_s = flit_valid ? flit_head_out : flit_head_out_q;
    c_dff
      #(.width(1),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -811,7 +807,7 @@ module whr_ip_ctrl_mac
       .q(flit_head_out_q));
    
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
-   assign la_route_info_s = flit_present ? la_route_info_out : la_route_info_q;
+   assign la_route_info_s = flit_valid ? la_route_info_out : la_route_info_q;
    c_dff
      #(.width(la_route_info_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
