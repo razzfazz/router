@@ -763,7 +763,7 @@ module router_checker
 			  
 			  if(fifo_errors_ivc[i*2+1])
 			    $display({"ERROR: Reference FIFO overflow at ", 
-				      "port %dm VC %d."}, ip, i);
+				      "port %d, VC %d."}, ip, i);
 			  
 		       end
 		     
