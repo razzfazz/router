@@ -517,7 +517,7 @@ module whr_op_ctrl_mac
    assign cred_count_zero = ~|cred_count_q;
    
    wire 					 error_ct_underflow;
-   assign error_ct_underflow = cred_count_zero & debit;
+   assign error_ct_underflow = cred_count_zero & debit & ~credit;
    
    wire 					 cred_count_all;
    assign cred_count_all = (cred_count_q == num_flit_buffers);
