@@ -31,8 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // network pseudo-node controller 
 module tc_node_ctrl_mac
   (clk, reset, io_write, io_read, io_addr, io_write_data, io_read_data, io_done,
-   cfg_addr_prefixes, cfg_req, cfg_write, cfg_addr, cfg_write_data, 
-   cfg_read_data, cfg_done, node_ctrl, node_status);
+   cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, 
+   cfg_done, node_ctrl, node_status);
    
 // register address declarations
 `define CFG_ADDR_NODE_CTRL   0
@@ -41,16 +41,16 @@ module tc_node_ctrl_mac
 `include "c_constants.v"
    
    // number of bits in address that are considered base address
-   parameter cfg_addr_prefix_width = 10;
+   parameter cfg_node_addr_width = 10;
    
    // width of register selector part of control register address
-   parameter cfg_addr_suffix_width = 6;
+   parameter cfg_reg_addr_width = 6;
    
    // width of configuration bus addresses
-   localparam cfg_addr_width = cfg_addr_prefix_width + cfg_addr_suffix_width;
+   localparam cfg_addr_width = cfg_node_addr_width + cfg_reg_addr_width;
    
    // number of distinct base addresses to which this node replies
-   parameter num_cfg_addr_prefixes = 2;
+   parameter num_cfg_node_addrs = 2;
    
    // width of configuration bus datapath
    parameter cfg_data_width = 32;
@@ -96,8 +96,8 @@ module tc_node_ctrl_mac
    output io_done;
    wire 		    io_done;
    
-   // address prefixes assigned to this node
-   input [0:num_cfg_addr_prefixes*cfg_addr_prefix_width-1] cfg_addr_prefixes;
+   // node addresses assigned to this node
+   input [0:num_cfg_node_addrs*cfg_node_addr_width-1] cfg_node_addrs;
    
    // config register access pending
    output cfg_req;
@@ -296,43 +296,43 @@ module tc_node_ctrl_mac
    // internal pseudo-node that generates a bunch of generic control signals
    //---------------------------------------------------------------------------
    
-   wire [0:cfg_addr_prefix_width-1] cfg_addr_prefix_q;
-   assign cfg_addr_prefix_q = cfg_addr_q[0:cfg_addr_prefix_width-1];
+   wire [0:cfg_node_addr_width-1] cfg_node_addr_q;
+   assign cfg_node_addr_q = cfg_addr_q[0:cfg_node_addr_width-1];
    
-   wire [0:num_cfg_addr_prefixes-1] cfg_prefix_match;
+   wire [0:num_cfg_node_addrs-1] cfg_node_addr_match;
    
-   genvar 			    prefix;
+   genvar 			 naddr;
    
    generate
       
-      for(prefix = 0; prefix < num_cfg_addr_prefixes; prefix = prefix + 1)
-	begin:prefixes
+      for(naddr = 0; naddr < num_cfg_node_addrs; naddr = naddr + 1)
+	begin:naddrs
 	   
-	   assign cfg_prefix_match[prefix]
-		    = (cfg_addr_prefix_q == 
-		       cfg_addr_prefixes[prefix*cfg_addr_prefix_width:
-					 (prefix+1)*cfg_addr_prefix_width-1]);
+	   assign cfg_node_addr_match[naddr]
+		    = (cfg_node_addr_q == 
+		       cfg_node_addrs[naddr*cfg_node_addr_width:
+				      (naddr+1)*cfg_node_addr_width-1]);
 	   
 	end
       
    endgenerate
    
-   wire 		     cfg_sel_node;
-   assign cfg_sel_node = |cfg_prefix_match;
+   wire cfg_sel_node;
+   assign cfg_sel_node = |cfg_node_addr_match;
    
-   wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix_q;
-   assign cfg_addr_suffix_q
-     = cfg_addr_q[cfg_addr_prefix_width:cfg_addr_width-1];
+   wire [0:cfg_reg_addr_width-1] cfg_reg_addr_q;
+   assign cfg_reg_addr_q
+     = cfg_addr_q[cfg_node_addr_width:cfg_addr_width-1];
    
-   wire 		     cfg_sel_node_ctrl;
+   wire 			 cfg_sel_node_ctrl;
    assign cfg_sel_node_ctrl
-     = cfg_sel_node && (cfg_addr_suffix_q == `CFG_ADDR_NODE_CTRL);
+     = cfg_sel_node && (cfg_reg_addr_q == `CFG_ADDR_NODE_CTRL);
    
-   wire 		     cfg_sel_node_status;
+   wire 			 cfg_sel_node_status;
    assign cfg_sel_node_status
-     = cfg_sel_node && (cfg_addr_suffix_q == `CFG_ADDR_NODE_STATUS);
+     = cfg_sel_node && (cfg_reg_addr_q == `CFG_ADDR_NODE_STATUS);
    
-   wire [0:cfg_data_width-1] 	cfg_read_data_node_status;
+   wire [0:cfg_data_width-1] 	 cfg_read_data_node_status;
    
    c_select_1ofn
      #(.num_ports(2),

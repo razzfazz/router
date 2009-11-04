@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wrapper around router component, pseudo-nodes and controller
 module tc_router_wrap
-  (clk, reset, io_addr_prefix_base, io_write, io_read, io_addr, io_write_data, 
+  (clk, reset, io_node_addr_base, io_write, io_read, io_addr, io_write_data, 
    io_read_data, io_done, error);
    
 `include "c_functions.v"   
@@ -100,22 +100,22 @@ module tc_router_wrap
    parameter lfsr_index = 0;
    
    // number of bits in address that are considered base address
-   parameter cfg_addr_prefix_width = 10;
+   parameter cfg_node_addr_width = 10;
    
    // width of register selector part of control register address
-   parameter cfg_addr_suffix_width = 6;
+   parameter cfg_reg_addr_width = 6;
    
    // width of configuration bus addresses
-   localparam cfg_addr_width = cfg_addr_prefix_width + cfg_addr_suffix_width;
+   localparam cfg_addr_width = cfg_node_addr_width + cfg_reg_addr_width;
    
    // width of configuration bus datapath
    parameter cfg_data_width = 32;
    
    // base address width for interface bus
-   localparam io_addr_prefix_width = cfg_addr_prefix_width;
+   localparam io_node_addr_width = cfg_node_addr_width;
    
    // register index width for interface bus
-   localparam io_addr_suffix_width = cfg_addr_suffix_width;
+   localparam io_addr_suffix_width = cfg_reg_addr_width;
    
    // width of interface bus addresses
    localparam io_addr_width = cfg_addr_width;
@@ -158,7 +158,7 @@ module tc_router_wrap
    input reset;
    
    // base address for this router
-   input [0:io_addr_prefix_width-1] io_addr_prefix_base;
+   input [0:io_node_addr_width-1] io_node_addr_base;
    
    // write request indicator from chip controller
    input io_write;
@@ -198,23 +198,23 @@ module tc_router_wrap
       
    endgenerate
    
-   wire [0:cfg_addr_prefix_width-1] nctl_cfg_addr_prefixes;
-   assign nctl_cfg_addr_prefixes = io_addr_prefix_base;
+   wire [0:cfg_node_addr_width-1] nctl_cfg_node_addrs;
+   assign nctl_cfg_node_addrs = io_node_addr_base;
    
-   wire 			    cfg_req;
-   wire 			    cfg_write;
-   wire [0:cfg_addr_width-1] 	    cfg_addr;
-   wire [0:cfg_data_width-1] 	    cfg_write_data;
-   wire [0:cfg_data_width-1] 	    cfg_read_data;
-   wire 			    cfg_done;
+   wire 			  cfg_req;
+   wire 			  cfg_write;
+   wire [0:cfg_addr_width-1] 	  cfg_addr;
+   wire [0:cfg_data_width-1] 	  cfg_write_data;
+   wire [0:cfg_data_width-1] 	  cfg_read_data;
+   wire 			  cfg_done;
    
-   wire [0:node_ctrl_width-1] node_ctrl;
-   wire [0:node_status_width-1] node_status;
+   wire [0:node_ctrl_width-1] 	  node_ctrl;
+   wire [0:node_status_width-1]   node_status;
    
    tc_node_ctrl_mac
-     #(.cfg_addr_prefix_width(cfg_addr_prefix_width),
-       .cfg_addr_suffix_width(cfg_addr_suffix_width),
-       .num_cfg_addr_prefixes(1),
+     #(.cfg_node_addr_width(cfg_node_addr_width),
+       .cfg_reg_addr_width(cfg_reg_addr_width),
+       .num_cfg_node_addrs(1),
        .cfg_data_width(cfg_data_width),
        .done_delay_width(done_delay_width),
        .node_ctrl_width(node_ctrl_width),
@@ -229,7 +229,7 @@ module tc_router_wrap
       .io_write_data(io_write_data),
       .io_read_data(io_read_data),
       .io_done(io_done),
-      .cfg_addr_prefixes(nctl_cfg_addr_prefixes),
+      .cfg_node_addrs(nctl_cfg_node_addrs),
       .cfg_req(cfg_req),
       .cfg_write(cfg_write),
       .cfg_addr(cfg_addr),
@@ -239,28 +239,28 @@ module tc_router_wrap
       .node_ctrl(node_ctrl),
       .node_status(node_status));
    
-   wire 			force_node_reset_b;
+   wire 			  force_node_reset_b;
    assign force_node_reset_b = node_ctrl[0];
    
-   wire 			node_reset;
+   wire 			  node_reset;
    assign node_reset = reset | ~force_node_reset_b;
    
-   wire 			node_clk_en;
+   wire 			  node_clk_en;
    assign node_clk_en = node_ctrl[1];
    
-   wire 			node_clk;
+   wire 			  node_clk;
    assign node_clk = clk & node_clk_en;
    
-   wire 			force_rtr_reset_b;
+   wire 			  force_rtr_reset_b;
    assign force_rtr_reset_b = node_ctrl[2];
    
-   wire 			rtr_reset;
+   wire 			  rtr_reset;
    assign rtr_reset = reset | ~force_rtr_reset_b;
    
-   wire 			rtr_clk_en;
+   wire 			  rtr_clk_en;
    assign rtr_clk_en = node_ctrl[3];
    
-   wire 			rtr_clk;
+   wire 			  rtr_clk;
    assign rtr_clk = clk & rtr_clk_en;
    
    wire [0:num_ports*flit_ctrl_width-1] node_rtr_flit_ctrl_p;
@@ -298,21 +298,21 @@ module tc_router_wrap
 	     = rtr_node_flow_ctrl_p[port*flow_ctrl_width:
 				    (port+1)*flow_ctrl_width-1];
 	   
-	   wire [0:2*cfg_addr_prefix_width-1] node_cfg_addr_prefixes;
-	   assign node_cfg_addr_prefixes[0:cfg_addr_prefix_width-1]
-		    = io_addr_prefix_base + port + 1;
-	   assign node_cfg_addr_prefixes[cfg_addr_prefix_width:
-					 2*cfg_addr_prefix_width-1]
-		    = io_addr_prefix_base + num_ports + 1;
+	   wire [0:2*cfg_node_addr_width-1] node_cfg_node_addrs;
+	   assign node_cfg_node_addrs[0:cfg_node_addr_width-1]
+		    = io_node_addr_base + port + 1;
+	   assign node_cfg_node_addrs[cfg_node_addr_width:
+				      2*cfg_node_addr_width-1]
+		    = io_node_addr_base + num_ports + 1;
 	   
-	   wire [0:flit_ctrl_width-1] 	      flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	      flit_data_out;
-	   wire [0:flow_ctrl_width-1] 	      flow_ctrl_out;
+	   wire [0:flit_ctrl_width-1] 	    flit_ctrl_out;
+	   wire [0:flit_data_width-1] 	    flit_data_out;
+	   wire [0:flow_ctrl_width-1] 	    flow_ctrl_out;
 	   
-	   wire [0:cfg_data_width-1] 	      cfg_read_data;
-	   wire 			      cfg_done;
+	   wire [0:cfg_data_width-1] 	    cfg_read_data;
+	   wire 			    cfg_done;
 	   
-	   wire 			      node_error;
+	   wire 			    node_error;
 	   
 	   tc_node_mac
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -332,9 +332,9 @@ module tc_router_wrap
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .lfsr_index(/*num_ports * */ lfsr_index /*+ port*/),
-	       .cfg_addr_prefix_width(cfg_addr_prefix_width),
-	       .cfg_addr_suffix_width(cfg_addr_suffix_width),
-	       .num_cfg_addr_prefixes(2),
+	       .cfg_node_addr_width(cfg_node_addr_width),
+	       .cfg_reg_addr_width(cfg_reg_addr_width),
+	       .num_cfg_node_addrs(2),
 	       .cfg_data_width(cfg_data_width),
 	       .num_packets_width(num_packets_width),
 	       .arrival_rv_width(arrival_rv_width),
@@ -355,7 +355,7 @@ module tc_router_wrap
 	      .flit_ctrl_in(flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .flow_ctrl_out(flow_ctrl_out),
-	      .cfg_addr_prefixes(node_cfg_addr_prefixes),
+	      .cfg_node_addrs(node_cfg_node_addrs),
 	      .cfg_req(cfg_req),
 	      .cfg_write(cfg_write),
 	      .cfg_addr(cfg_addr),
@@ -384,7 +384,7 @@ module tc_router_wrap
       
    endgenerate
    
-   wire 				      rtr_error;
+   wire 				    rtr_error;
    
    router_wrap
      #(.topology(topology),
@@ -443,7 +443,7 @@ module tc_router_wrap
      (.data_in(cfg_done_p),
       .data_out(cfg_done));
    
-   wire [0:num_ports] 			      errors;
+   wire [0:num_ports] 			    errors;
    assign errors = {rtr_error, node_error_p};
    
    assign error = |errors;
