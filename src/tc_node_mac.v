@@ -46,7 +46,6 @@ module tc_node_mac
 `define CFG_ADDR_PLENGTH_VALS    7
 `define CFG_ADDR_MC_THRESHS      8
 `define CFG_ADDR_RC_THRESHS      9
-`define CFG_ADDR_ERROR           10
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -380,6 +379,9 @@ module tc_node_mac
    wire 		     cfg_sel_node;
    assign cfg_sel_node = |cfg_prefix_match;
    
+   wire 		     done;
+   assign done = cfg_active_q & cfg_sel_node;
+   
    wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix;
    assign cfg_addr_suffix = cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1];
    
@@ -439,7 +441,7 @@ module tc_node_mac
    wire [0:cfg_data_width-1] 	    cfg_read_data_num_packets;
    
    wire [0:cfg_data_width-1] 	    cfg_read_data_muxed;
-   c_select_mofn
+   c_select_1ofn
      #(.num_ports(3),
        .width(cfg_data_width))
    cfg_read_data_muxed_sel
@@ -453,7 +455,9 @@ module tc_node_mac
    
    wire [0:cfg_data_width-1] 	    cfg_data_s, cfg_data_q;
    assign cfg_data_s = cfg_enable ? 
-		       (cfg_req_q ? cfg_write_data : cfg_read_data_muxed) : 
+		       (cfg_req_q ? 
+			cfg_write_data : 
+			(done ? cfg_read_data_muxed : cfg_data_q)) : 
 		       cfg_data_q;
    c_dff
      #(.width(cfg_data_width),
@@ -467,7 +471,7 @@ module tc_node_mac
    assign cfg_read_data = cfg_data_q;
    
    wire 			    cfg_done_s, cfg_done_q;
-   assign cfg_done_s = cfg_enable ? (cfg_active_q & cfg_sel_node) : cfg_done_q;
+   assign cfg_done_s = cfg_enable ? done : cfg_done_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
