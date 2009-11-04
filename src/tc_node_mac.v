@@ -306,8 +306,36 @@ module tc_node_mac
    // configuration register interface
    //---------------------------------------------------------------------------
    
+   wire 		     cfg_stop;
+   
+   wire 		     cfg_active_s, cfg_active_q;
+   assign cfg_active_s = (cfg_active_q | cfg_req) & ~cfg_stop;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   cfg_activeq
+     (.clk(clk),
+      .reset(reset),
+      .d(cfg_active_s),
+      .q(cfg_active_q));
+   
+   wire 		     cfg_active_dly_s, cfg_active_dly_q;
+   assign cfg_active_dly_s
+     = cfg_active_q ? (cfg_active_q & ~cfg_stop) : cfg_active_dly_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   cfg_active_dlyq
+     (.clk(clk),
+      .reset(reset),
+      .d(cfg_active_dly_s),
+      .q(cfg_active_dly_q));
+   
+   wire 		     cfg_active_rise;
+   assign cfg_active_rise = cfg_active_q & ~cfg_active_dly_q;
+   
    wire 		     cfg_req_s, cfg_req_q;
-   assign cfg_req_s = cfg_req;
+   assign cfg_req_s = cfg_active_q ? cfg_active_rise : cfg_req_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -317,24 +345,12 @@ module tc_node_mac
       .d(cfg_req_s),
       .q(cfg_req_q));
    
-   wire 		     cfg_enable;
-   
-   wire 		     cfg_active_s, cfg_active_q;
-   assign cfg_active_s = cfg_enable ? cfg_req_q : cfg_active_q;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   cfg_activeq
-     (.clk(clk),
-      .reset(reset),
-      .d(cfg_active_s),
-      .q(cfg_active_q));
-
    wire 		     cfg_write_s, cfg_write_q;
-   assign cfg_write_s = cfg_enable ? cfg_write : cfg_write_q;
+   assign cfg_write_s
+     = cfg_active_q ? (cfg_active_rise ? cfg_write : cfg_write_q) : cfg_write_q;
    c_dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
    cfg_writeq
      (.clk(clk),
       .reset(reset),
@@ -342,21 +358,22 @@ module tc_node_mac
       .q(cfg_write_q));
    
    wire 		     cfg_do_write;
-   assign cfg_do_write = cfg_active_q & cfg_write_q;
+   assign cfg_do_write = cfg_req_q & cfg_write_q;
    
-   wire [0:cfg_addr_prefix_width-1] cfg_addr_prefix;
-   assign cfg_addr_prefix = cfg_addr[0:cfg_addr_prefix_width-1];
-   
-   wire [0:cfg_addr_prefix_width-1] cfg_addr_prefix_s, cfg_addr_prefix_q;
-   assign cfg_addr_prefix_s = cfg_enable ? cfg_addr_prefix : cfg_addr_prefix_q;
+   wire [0:cfg_addr_width-1] cfg_addr_s, cfg_addr_q;
+   assign cfg_addr_s
+     = cfg_active_q ? (cfg_active_rise ? cfg_addr : cfg_addr_q) : cfg_addr_q;
    c_dff
-     #(.width(cfg_addr_prefix_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   cfg_addr_prefixq
+     #(.width(cfg_addr_width),
+       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+   cfg_addrq
      (.clk(clk),
       .reset(reset),
-      .d(cfg_addr_prefix_s),
-      .q(cfg_addr_prefix_q));
+      .d(cfg_addr_s),
+      .q(cfg_addr_q));
+   
+   wire [0:cfg_addr_prefix_width-1] cfg_addr_prefix_q;
+   assign cfg_addr_prefix_q = cfg_addr_q[0:cfg_addr_prefix_width-1];
    
    wire [0:num_cfg_addr_prefixes-1] cfg_prefix_match;
    
@@ -380,21 +397,11 @@ module tc_node_mac
    assign cfg_sel_node = |cfg_prefix_match;
    
    wire 		     done;
-   assign done = cfg_active_q & cfg_sel_node;
+   assign done = cfg_req_q & cfg_sel_node;
    
-   wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix;
-   assign cfg_addr_suffix = cfg_addr[cfg_addr_prefix_width:cfg_addr_width-1];
-   
-   wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix_s, cfg_addr_suffix_q;
-   assign cfg_addr_suffix_s = cfg_enable ? cfg_addr_suffix : cfg_addr_suffix_q;
-   c_dff
-     #(.width(cfg_addr_suffix_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   cfg_addr_suffixq
-     (.clk(clk),
-      .reset(reset),
-      .d(cfg_addr_suffix_s),
-      .q(cfg_addr_suffix_q));
+   wire [0:cfg_addr_suffix_width-1] cfg_addr_suffix_q;
+   assign cfg_addr_suffix_q
+     = cfg_addr_q[cfg_addr_prefix_width:cfg_addr_width-1];
    
    wire 			    cfg_sel_ctrl;
    assign cfg_sel_ctrl
@@ -454,8 +461,8 @@ module tc_node_mac
       .data_out(cfg_read_data_muxed));
    
    wire [0:cfg_data_width-1] 	    cfg_data_s, cfg_data_q;
-   assign cfg_data_s = cfg_enable ? 
-		       (cfg_req_q ? 
+   assign cfg_data_s = cfg_active_q ? 
+		       (cfg_active_rise ? 
 			cfg_write_data : 
 			(done ? cfg_read_data_muxed : cfg_data_q)) : 
 		       cfg_data_q;
@@ -471,7 +478,7 @@ module tc_node_mac
    assign cfg_read_data = cfg_data_q;
    
    wire 			    cfg_done_s, cfg_done_q;
-   assign cfg_done_s = cfg_enable ? done : cfg_done_q;
+   assign cfg_done_s = cfg_active_q ? done : cfg_done_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -483,7 +490,7 @@ module tc_node_mac
    
    assign cfg_done = cfg_done_q;
    
-   assign cfg_enable = cfg_req_q | cfg_active_q | cfg_done_q;
+   assign cfg_stop = cfg_done_q | (cfg_req_q & ~cfg_sel_node);
    
    
    //---------------------------------------------------------------------------
@@ -533,7 +540,7 @@ module tc_node_mac
    assign flow_ctrl_muxed = loopback_q ? flow_ctrl_out : flow_ctrl_in;
    
    wire 			    start_s, start_q;
-   assign start_s = cfg_enable ? (write_ctrl & cfg_data_q[0]) : start_q;
+   assign start_s = cfg_active_q ? (write_ctrl & cfg_data_q[0]) : start_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
