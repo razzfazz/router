@@ -331,7 +331,7 @@ module tc_node_ctrl_mac
       .data_out(cfg_read_data_muxed));
    
    wire 		     cfg_req_s, cfg_req_q;
-   assign cfg_req_s = req_active ? req_rise : cfg_req_q;
+   assign cfg_req_s = req_active ? cfg_req : cfg_req_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
