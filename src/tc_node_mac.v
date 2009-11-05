@@ -488,7 +488,7 @@ module tc_node_mac
 		      running_q;
    c_dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    runningq
      (.clk(clk),
       .reset(reset),
@@ -1694,7 +1694,7 @@ module tc_node_mac
    assign header_info_rv_s = active_q ? header_info_rv : header_info_rv_q;
    c_dff
      #(.width(header_info_width),
-       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
    header_info_rvq
      (.clk(clk),
       .reset(reset),
