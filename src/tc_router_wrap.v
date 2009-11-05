@@ -115,10 +115,10 @@ module tc_router_wrap
    localparam io_node_addr_width = cfg_node_addr_width;
    
    // register index width for interface bus
-   localparam io_addr_suffix_width = cfg_reg_addr_width;
+   localparam io_reg_addr_width = cfg_reg_addr_width;
    
    // width of interface bus addresses
-   localparam io_addr_width = cfg_addr_width;
+   localparam io_addr_width = io_node_addr_width + io_reg_addr_width;
    
    // width of interface bus datapath
    localparam io_data_width = cfg_data_width;
