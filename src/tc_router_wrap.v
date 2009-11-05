@@ -429,11 +429,12 @@ module tc_router_wrap
       .flow_ctrl_in_op(node_rtr_flow_ctrl_p),
       .error(rtr_error));
    
-   c_or_nto1
+   c_select_mofn
      #(.num_ports(num_ports),
        .width(cfg_data_width))
-   cfg_read_data_or
-     (.data_in(cfg_read_data_p),
+   cfg_read_data_sel
+     (.select(cfg_done_p),
+      .data_in(cfg_read_data_p),
       .data_out(cfg_read_data));
    
    c_or_nto1
