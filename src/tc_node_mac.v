@@ -521,12 +521,12 @@ module tc_node_mac
       .data_out(num_packets_loadval));
    
    wire 			 num_packets_zero;
+   wire 			 num_packets_inf;
    wire [0:num_packets_width-1]  num_packets_q;
-   wire 			 inf_packets_q;
    wire 			 new_packet_rv;
    
    wire [0:num_packets_width-1]  num_packets_next;
-   assign num_packets_next = (~active_q | inf_packets_q | num_packets_zero) ? 
+   assign num_packets_next = (~active_q | num_packets_inf | num_packets_zero) ? 
 			     num_packets_q : 
 			     (num_packets_q - new_packet_rv);
    
@@ -548,6 +548,9 @@ module tc_node_mac
       .q(num_packets_q));
    
    assign num_packets_zero = ~|num_packets_q;
+   assign num_packets_inf = &num_packets_q;
+   
+   assign gen_packets = ~num_packets_zero;
    
    c_align
      #(.data_width(num_packets_width),
@@ -556,25 +559,6 @@ module tc_node_mac
      (.data_in(num_packets_q),
       .dest_in({cfg_data_width{1'b0}}),
       .data_out(ifc_read_data_num_packets));
-   
-   wire 			 inf_packets_loadval;
-   assign inf_packets_loadval = &num_packets_loadval;
-   
-   wire 			 inf_packets_s;
-   assign inf_packets_s
-     = ifc_active ? 
-       (write_num_packets ? inf_packets_loadval : inf_packets_q) : 
-       inf_packets_q;
-   c_dff
-     #(.width(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
-   inf_packetsq
-     (.clk(clk),
-      .reset(reset),
-      .d(inf_packets_s),
-      .q(inf_packets_q));
-   
-   assign gen_packets = ~num_packets_zero | inf_packets_q;
    
    
    //---------------------------------------------------------------------------
