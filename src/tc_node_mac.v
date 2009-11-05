@@ -375,7 +375,7 @@ module tc_node_mac
    wire [0:cfg_node_addr_width-1] cfg_node_addr_q;
    assign cfg_node_addr_q = cfg_addr_q[0:cfg_node_addr_width-1];
    
-   wire [0:num_cfg_node_addrs-1] cfg_naddr_match;
+   wire [0:num_cfg_node_addrs-1] cfg_node_addr_match;
    
    genvar 			 naddr;
    
@@ -384,7 +384,7 @@ module tc_node_mac
       for(naddr = 0; naddr < num_cfg_node_addrs; naddr = naddr + 1)
 	begin:naddrs
 	   
-	   assign cfg_naddr_match[naddr]
+	   assign cfg_node_addr_match[naddr]
 		    = (cfg_node_addr_q == 
 		       cfg_node_addrs[naddr*cfg_node_addr_width:
 				      (naddr+1)*cfg_node_addr_width-1]);
@@ -394,7 +394,7 @@ module tc_node_mac
    endgenerate
    
    wire 		     cfg_sel_node;
-   assign cfg_sel_node = |cfg_naddr_match;
+   assign cfg_sel_node = |cfg_node_addr_match;
    
    wire 		     done;
    assign done = cfg_req_q & cfg_sel_node;
