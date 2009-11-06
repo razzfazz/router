@@ -33,9 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // output port controller (tracks state of buffers in downstream router)
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip, vc_gnt_ovc_ivc, 
-   sw_oreq_nonspec_ip, sw_oreq_spec_ip, sw_ognt_nonspec_ip, sw_ognt_spec_ip, 
-   sw_gnt_nonspec_ip, sw_gnt_spec_ip, int_flit_ctrl_in, flit_data_in, 
-   flit_ctrl_out, flit_data_out, elig_ovc, int_flow_ctrl_ovc, error);
+   sw_alloc_in_ip, sw_alloc_out_ip, int_flit_ctrl_in, flit_data_in, 
+   flit_ctrl_out, flit_data_out, elig_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -142,6 +141,36 @@ module vcr_op_ctrl_mac
    // select speculation type for switch allocator
    parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
+   // number of bits requires for request signals
+   localparam sw_alloc_req_width
+     = (sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : (1 + 1);
+   
+   // number of bits required for grant signals
+   localparam sw_alloc_gnt_width = sw_alloc_req_width;
+   
+   // width of incoming allocator control signals
+   localparam sw_alloc_in_width
+     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ?
+       sw_alloc_req_width :
+       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
+       (sw_alloc_req_width + sw_alloc_gnt_width) : 
+       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
+       sw_alloc_gnt_width : 
+       -1;
+   
+   // width of outgoing allocator control signals
+   localparam sw_alloc_out_width
+     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ?
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width + 
+	((sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0)) : 
+       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
+       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
+       num_vcs*int_flow_ctrl_width : 
+       -1;
+   
    // ID of current input port
    parameter port_id = 0;
    
@@ -162,25 +191,12 @@ module vcr_op_ctrl_mac
    // input VC that each output VC was granted to
    input [0:num_vcs*num_vcs-1] vc_gnt_ovc_ivc;
    
-   // non-speculative switch allocation requests from input stage
-   input [0:num_ports-1] sw_oreq_nonspec_ip;
+   // incoming allocator control signals
+   input [0:num_ports*sw_alloc_in_width-1] sw_alloc_in_ip;
    
-   // speculative switch allocation requests from input stage
-   input [0:num_ports-1] sw_oreq_spec_ip;
-   
-   // non-speculative switch allocation grants to input stage
-   output [0:num_ports-1] sw_ognt_nonspec_ip;
-   wire [0:num_ports-1] sw_ognt_nonspec_ip;
-   
-   // speculative switch allocation grants to input stage
-   output [0:num_ports-1] sw_ognt_spec_ip;
-   wire [0:num_ports-1] sw_ognt_spec_ip;
-   
-   // non-speculative global switch allocation grants
-   input [0:num_ports-1] sw_gnt_nonspec_ip;
-   
-   // speculative global switch allocation grants
-   input [0:num_ports-1] sw_gnt_spec_ip;
+   // outgoing allocator control signals
+   output [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_ip;
+   wire [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_ip;
    
    // incoming flit control signals
    input [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
@@ -198,16 +214,142 @@ module vcr_op_ctrl_mac
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output [0:num_vcs-1] elig_ovc;
-   wire [0:num_vcs-1] elig_ovc;
-   
-   // internal flow control signalling from output controller to input 
-   // controllers
-   output [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:num_vcs-1] 	      elig_ovc;
    
    // internal error condition detected
    output error;
-   wire 				  error;
+   wire 		      error;
+   
+   
+   //---------------------------------------------------------------------------
+   // pack / unpack switch allocator control signals
+   //---------------------------------------------------------------------------
+   
+   // non-speculative switch allocation requests to output-side arbitration 
+   // stage / wavefront block
+   wire [0:num_ports-1]       sw_oreq_nonspec_ip;
+   
+   // speculative switch allocation requests to output-side arbitration stage or
+   // wavefront block
+   wire [0:num_ports-1]       sw_oreq_spec_ip;
+   
+   // non-speculative switch allocation grants from output-side arbitration 
+   // stage / wavefront block
+   wire [0:num_ports-1]       sw_ognt_nonspec_ip;
+   
+   // speculative switch allocation grants from output-side arbitration stage or
+   // wavefront block
+   wire [0:num_ports-1]       sw_ognt_spec_ip;
+   
+   // gobal non-speculative switch allocation grants
+   wire [0:num_ports-1]       sw_gnt_nonspec_ip;
+   
+   // global speculative switch allocation grants
+   wire [0:num_ports-1]       sw_gnt_spec_ip;
+   
+   // internal flow control signalling from output controller to input 
+   // controllers
+   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   
+   // global grant signal
+   wire [0:num_ports-1] 		  sw_gnt_ip;
+   
+   genvar 				  ip;
+   
+   generate
+      
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
+	   
+	   wire [0:sw_alloc_in_width-1] sw_alloc_in;
+	   assign sw_alloc_in = sw_alloc_in_ip[ip*sw_alloc_in_width:
+					       (ip+1)*sw_alloc_in_width-1];
+	   
+	   wire [0:sw_alloc_out_width-1] sw_alloc_out;
+	   
+	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
+	     begin
+		
+		assign sw_oreq_nonspec_ip[ip] = sw_alloc_in[0];
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_oreq_spec_ip[ip] = sw_alloc_in[1];
+		else
+		  assign sw_oreq_spec_ip[ip] = 1'b0;
+		
+		assign sw_gnt_nonspec_ip[ip] = sw_ognt_nonspec_ip[ip];
+		assign sw_gnt_spec_ip[ip] = sw_ognt_spec_ip[ip];
+		
+		assign sw_alloc_out[0] = sw_ognt_nonspec_ip[ip];
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_alloc_out[1] = sw_ognt_spec_ip[ip];
+		
+		assign sw_alloc_out[sw_alloc_gnt_width:
+				    sw_alloc_gnt_width+
+				    num_vcs*int_flow_ctrl_width-1]
+			 = int_flow_ctrl_ovc;
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_alloc_out[sw_alloc_gnt_width+
+				      num_vcs*int_flow_ctrl_width]
+			   = sw_gnt_ip[ip];
+		
+	     end
+	   else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
+	     begin
+		
+		assign sw_oreq_nonspec_ip[ip] = sw_alloc_in[0];
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_oreq_spec_ip[ip] = sw_alloc_in[1];
+		else
+		  assign sw_oreq_spec_ip[ip] = 1'b0;
+		
+		assign sw_gnt_nonspec_ip[ip] = sw_alloc_in[sw_alloc_req_width];
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_gnt_spec_ip[ip] = sw_alloc_in[sw_alloc_req_width+1];
+		else
+		  assign sw_gnt_spec_ip[ip] = 1'b0;
+		
+		assign sw_alloc_out[0] = sw_ognt_nonspec_ip[ip];
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_alloc_out[1] = sw_ognt_spec_ip[ip];
+		
+		assign sw_alloc_out[sw_alloc_gnt_width:
+				    sw_alloc_gnt_width+
+				    num_vcs*int_flow_ctrl_width-1]
+			 = int_flow_ctrl_ovc;
+		
+	     end
+	   else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
+		   (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
+	     begin
+		
+		assign sw_oreq_nonspec_ip[ip] = 1'b0;
+		assign sw_oreq_spec_ip[ip] = 1'b0;
+		
+		assign sw_gnt_nonspec_ip[ip] = sw_alloc_in[0];
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  assign sw_gnt_spec_ip[ip] = sw_alloc_in[1];
+		else
+		  assign sw_gnt_spec_ip[ip] = 1'b0;
+		
+		assign sw_alloc_out[0:num_vcs*int_flow_ctrl_width-1]
+			 = int_flow_ctrl_ovc;
+		
+	     end
+	   
+	   assign sw_alloc_out_ip[ip*sw_alloc_out_width:
+				  (ip+1)*sw_alloc_out_width-1]
+		    = sw_alloc_out;
+	   
+	end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -253,8 +395,6 @@ module vcr_op_ctrl_mac
    // switch allocation
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] sw_gnt_ip;
-   
    generate
       
       if((sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ||
@@ -265,7 +405,7 @@ module vcr_op_ctrl_mac
 	   wire sw_oreq_nonspec;
 	   assign sw_oreq_nonspec = |sw_oreq_nonspec_ip;
 	   
-	   //any non-speculative grants for this port?
+	   // any non-speculative grants for this port?
 	   wire sw_gnt_nonspec;
 	   assign sw_gnt_nonspec = |sw_gnt_nonspec_ip;
 	   

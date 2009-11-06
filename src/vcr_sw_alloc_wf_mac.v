@@ -32,8 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // wavefront block for switch allocation
 module vcr_sw_alloc_wf_mac
-  (clk, reset, req_nonspec_ip_op, req_spec_ip_op, gnt_nonspec_ip_op, 
-   gnt_spec_ip_op);
+  (clk, reset, alloc_in_ip_op, alloc_out_ip_op);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -47,24 +46,87 @@ module vcr_sw_alloc_wf_mac
    // select speculation type
    parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
+   // number of bits required for request signals
+   localparam req_width = (spec_type == `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : (1 + 1);
+   
+   // number of bits required for grant signals
+   localparam gnt_width = req_width;
+   
+   // width of incoming allocator control signals
+   localparam alloc_in_width = req_width;
+   
+   // width of outgoing allocator control signals
+   localparam alloc_out_width
+     = gnt_width + ((spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0);
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    
-   // non-speculative switch allocator requests from input stage
-   input [0:num_ports*num_ports-1] req_nonspec_ip_op;
+   // incoming allocator control signals
+   input [0:num_ports*num_ports*alloc_in_width-1] alloc_in_ip_op;
    
-   // speculative switch allocator requests from input stage
-   input [0:num_ports*num_ports-1] req_spec_ip_op;
+   // outgoing allocator control signals
+   output [0:num_ports*num_ports*alloc_out_width-1] alloc_out_ip_op;
+   wire [0:num_ports*num_ports*alloc_out_width-1] alloc_out_ip_op;
    
-   // non-speculative global grants
-   output [0:num_ports*num_ports-1] gnt_nonspec_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_nonspec_ip_op;
    
-   // speculative global requests
-   output [0:num_ports*num_ports-1] gnt_spec_ip_op;
-   wire [0:num_ports*num_ports-1] gnt_spec_ip_op;
+   //---------------------------------------------------------------------------
+   // pack/unpack control signals
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_ports-1] 		  req_nonspec_ip_op;
+   wire [0:num_ports*num_ports-1] 		  gnt_nonspec_ip_op;
+   
+   wire [0:num_ports*num_ports-1] 		  req_spec_ip_op;
+   wire [0:num_ports*num_ports-1] 		  gnt_spec_ip_op;
+   
+   generate
+      
+      genvar 					  ip;
+      
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
+	   
+	   genvar op;
+	   
+	   for(op = 0; op < num_ports; op = op + 1)
+	     begin:ops
+		
+		assign req_nonspec_ip_op[ip*num_ports+op]
+			 = alloc_in_ip_op[(ip*num_ports+op)*alloc_in_width];
+		
+		assign alloc_out_ip_op[(ip*num_ports+op)*alloc_out_width]
+			 = gnt_nonspec_ip_op[ip*num_ports+op];
+		
+		if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  begin
+		     
+		     assign req_spec_ip_op[ip*num_ports+op]
+			      = alloc_in_ip_op[(ip*num_ports+op)*
+					       alloc_in_width+1];
+		     
+		     assign alloc_out_ip_op[(ip*num_ports+op)*alloc_out_width+1]
+			      = gnt_spec_ip_op[ip*num_ports+op];
+		     
+		     wire gnt;
+		     assign gnt = gnt_nonspec_ip_op[ip*num_ports+op] |
+				  gnt_spec_ip_op[ip*num_ports+op];
+		     
+		     assign alloc_out_ip_op[(ip*num_ports+op)*alloc_out_width+
+					    gnt_width]
+			      = gnt;
+		     
+		  end
+		else
+		  assign req_spec_ip_op[ip*num_ports+op] = 1'b0;
+		
+	     end
+	   
+	end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------

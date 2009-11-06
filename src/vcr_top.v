@@ -193,6 +193,67 @@ module vcr_top
    // select speculation type for switch allocator
    parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
+   // number of bits required for request signals
+   localparam sw_alloc_req_width
+     = (sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : (1 + 1);
+   
+   // number of bits required for grant signals
+   localparam sw_alloc_gnt_width = sw_alloc_req_width;
+   
+   // width of outgoing allocator control signals for input controller
+   localparam sw_alloc_ipc_out_width
+     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ? 
+       sw_alloc_req_width : 
+       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
+       (sw_alloc_req_width + sw_alloc_gnt_width + 
+	((sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0)) : 
+       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
+       sw_alloc_req_width : 
+       -1;
+   
+   // width of incoming allocator control signals for input controller
+   localparam sw_alloc_ipc_in_width
+     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ? 
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
+       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) :
+       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
+       -1;
+   
+   // width of incoming allocator control signals for wavefront allocator block
+   localparam sw_alloc_wf_in_width = sw_alloc_req_width;
+   
+   // width of outgoing allocator control signals for wavefront allocator block
+   localparam sw_alloc_wf_out_width
+     = sw_alloc_gnt_width + 
+       ((sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0);
+   
+   // width of incoming allocator control signals for output controller
+   localparam sw_alloc_opc_in_width
+     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ?
+       sw_alloc_req_width :
+       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
+       (sw_alloc_req_width + sw_alloc_gnt_width) : 
+       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
+       sw_alloc_gnt_width : 
+       -1;
+   
+   // width of outgoing allocator control signals for output controller
+   localparam sw_alloc_opc_out_width
+     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ?
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width + 
+	((sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0)) : 
+       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
+       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
+       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
+       num_vcs*int_flow_ctrl_width : 
+       -1;
+   
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
    
@@ -237,9 +298,6 @@ module vcr_top
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 	elig_op_ovc;
-   wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
-   
    wire [0:num_ports*num_vcs*port_idx_width-1] 	    route_port_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		    inc_rc_ip_ivc;
    
@@ -247,24 +305,160 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	    vc_gnt_ip_ivc_ovc;
    
-   wire [0:num_ports*num_ports-1] 		    sw_oreq_nonspec_ip_op;
-   wire [0:num_ports*num_ports-1] 		    sw_oreq_spec_ip_op;
-   wire [0:num_ports*num_ports-1] 		    sw_ognt_nonspec_ip_op;
-   wire [0:num_ports*num_ports-1] 		    sw_ognt_spec_ip_op;
-   wire [0:num_ports*num_ports-1] 		    sw_ignt_nonspec_ip_op;
-   wire [0:num_ports*num_ports-1] 		    sw_ignt_spec_ip_op;
+   wire [0:num_ports*num_ports*sw_alloc_opc_out_width-1] sw_alloc_opc_out_ip_op;
+   wire [0:num_ports*num_ports*sw_alloc_ipc_out_width-1] sw_alloc_ipc_out_ip_op;
+   wire [0:num_ports*num_ports*sw_alloc_wf_in_width-1] 	 sw_alloc_wf_in_ip_op;
+   wire [0:num_ports*num_ports*sw_alloc_wf_out_width-1]  sw_alloc_wf_out_ip_op;
    
-   wire [0:num_ports*int_flit_ctrl_width-1] 	    xbc_data_in_ip;
-   wire [0:num_ports*flit_data_width-1] 	    xbd_data_in_ip;
+   wire [0:num_ports*num_ports-1] 			 xbc_ctrl_ip_op;
+   wire [0:num_ports*num_ports-1] 			 xbd_ctrl_ip_op;
    
-   wire [0:num_ports-1] 			    ipc_error_ip;
+   wire [0:num_ports*int_flit_ctrl_width-1] 		 xbc_data_in_ip;
+   wire [0:num_ports*flit_data_width-1] 		 xbd_data_in_ip;
+   
+   wire [0:num_ports-1] 				 ipc_error_ip;
    
    generate
       
-      genvar 					    ip;
+      genvar 						 ip;
       
       for (ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
+	   
+	   //-------------------------------------------------------------------
+	   // connect switch allocator control signals
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:num_ports*sw_alloc_ipc_out_width-1] sw_alloc_ipc_out_op;
+	   
+	   wire [0:num_ports*sw_alloc_ipc_in_width-1] sw_alloc_ipc_in_op;
+	   
+	   genvar op;
+	   
+	   for(op = 0; op < num_ports; op = op + 1)
+	     begin:ops
+		
+		wire [0:sw_alloc_ipc_out_width-1] sw_alloc_ipc_out;
+		assign sw_alloc_ipc_out
+		  = sw_alloc_ipc_out_op[op*sw_alloc_ipc_out_width:
+					(op+1)*sw_alloc_ipc_out_width-1];
+		
+		wire [0:sw_alloc_opc_out_width-1] sw_alloc_opc_out;
+		assign sw_alloc_opc_out
+		  = sw_alloc_opc_out_ip_op[(ip*num_ports+op)*
+					   sw_alloc_opc_out_width:
+					   (ip*num_ports+op+1)*
+					   sw_alloc_opc_out_width-1];
+		
+		wire [0:sw_alloc_ipc_in_width-1]  sw_alloc_ipc_in;
+		
+		wire [0:sw_alloc_wf_in_width-1]   sw_alloc_wf_in;
+		
+		if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
+		  begin
+		     
+		     assign sw_alloc_ipc_in[0:sw_alloc_gnt_width-1]
+			      = sw_alloc_opc_out[0:sw_alloc_gnt_width-1];
+		     assign sw_alloc_ipc_in[sw_alloc_gnt_width:
+					    sw_alloc_gnt_width+
+					    num_vcs*int_flow_ctrl_width-1]
+			      = sw_alloc_opc_out[sw_alloc_gnt_width:
+						 sw_alloc_gnt_width+
+						 num_vcs*int_flow_ctrl_width-1];
+		     
+		     assign sw_alloc_wf_in = {sw_alloc_wf_in_width{1'b0}};
+		     
+		  end
+		else if (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
+		  begin
+		     
+		     assign sw_alloc_ipc_in[0:sw_alloc_gnt_width-1]
+			      = sw_alloc_opc_out[0:sw_alloc_gnt_width-1];
+		     assign sw_alloc_ipc_in[sw_alloc_gnt_width:
+					    sw_alloc_gnt_width+
+					    num_vcs*int_flow_ctrl_width-1]
+			      = sw_alloc_opc_out[sw_alloc_gnt_width:
+						 sw_alloc_gnt_width+
+						 num_vcs*int_flow_ctrl_width-1];
+		     
+		     assign sw_alloc_wf_in = {sw_alloc_wf_in_width{1'b0}};
+		     
+		     if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		       begin
+			  
+			  assign xbc_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_ipc_out[sw_alloc_req_width+
+						      sw_alloc_gnt_width];
+			  assign xbd_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_ipc_out[sw_alloc_req_width+
+						      sw_alloc_gnt_width];
+			  
+		       end
+		     else
+		       begin
+			  
+			  assign xbc_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_ipc_out[sw_alloc_req_width];
+			  assign xbd_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_ipc_out[sw_alloc_req_width];
+			  
+		       end
+		     
+		  end
+		else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
+			(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
+		  begin
+		     
+		     wire [0:sw_alloc_wf_out_width-1]  sw_alloc_wf_out;
+		     assign sw_alloc_wf_out
+		       = sw_alloc_wf_out_ip_op[(ip*num_ports+op)*
+					       sw_alloc_wf_out_width:
+					       (ip*num_ports+op+1)*
+					       sw_alloc_wf_out_width-1];
+		     
+		     assign sw_alloc_ipc_in[0:sw_alloc_gnt_width-1]
+			      = sw_alloc_wf_out[0:sw_alloc_gnt_width-1];
+		     assign sw_alloc_ipc_in[sw_alloc_gnt_width:
+					    sw_alloc_gnt_width+
+					    num_vcs*int_flow_ctrl_width-1]
+			      = sw_alloc_opc_out[0:
+						 num_vcs*int_flow_ctrl_width-1];
+		     
+		     assign sw_alloc_wf_in[0:sw_alloc_req_width-1]
+			      = sw_alloc_ipc_out[0:sw_alloc_req_width-1];
+		     
+		     if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		       begin
+			  
+			  assign xbc_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_wf_out[sw_alloc_gnt_width];
+			  assign xbd_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_wf_out[sw_alloc_gnt_width];
+			  
+		       end
+		     else
+		       begin
+			  
+			  assign xbc_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_wf_out[0];
+			  assign xbd_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_wf_out[0];
+			  
+		       end
+		     
+		  end
+		
+		assign sw_alloc_ipc_in_op[op*sw_alloc_ipc_in_width:
+					  (op+1)*sw_alloc_ipc_in_width-1]
+			 = sw_alloc_ipc_in;
+		
+		assign sw_alloc_wf_in_ip_op[(ip*num_ports+op)*
+					    sw_alloc_wf_in_width:
+					    (ip*num_ports+op+1)*
+					    sw_alloc_wf_in_width-1]
+			 = sw_alloc_wf_in;
+		
+	     end
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -286,31 +480,19 @@ module vcr_top
 	   assign vc_gnt_ivc_ovc
 	     = vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:(ip+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_ports-1]       sw_ognt_nonspec_op;
-	   assign sw_ognt_nonspec_op
-	     = sw_ognt_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
-	   
-	   wire [0:num_ports-1]       sw_ognt_spec_op;
-	   assign sw_ognt_spec_op
-	     = sw_ognt_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
-	   
-	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
-	   wire [0:num_vcs-1] 		     inc_rc_ivc;
-	   wire [0:num_vcs-1] 		     vc_req_ivc;
-	   wire [0:num_ports-1] 	     sw_oreq_nonspec_op;
-	   wire [0:num_ports-1] 	     sw_oreq_spec_op;
-	   wire [0:num_ports-1] 	     sw_ignt_nonspec_op;
-	   wire [0:num_ports-1] 	     sw_ignt_spec_op;
-	   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	     flit_data_out;
-	   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out;
-	   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
-	   wire 			     fbf_write_enable;
-	   wire [0:flit_data_width-1] 	     fbf_write_data;
-	   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
-	   wire 			     fbf_read_enable;
-	   wire [0:flit_data_width-1] 	     fbf_read_data;
-	   wire 			     ipc_error;
+	   wire [0:num_vcs*port_idx_width-1] 	      route_port_ivc;
+	   wire [0:num_vcs-1] 			      inc_rc_ivc;
+	   wire [0:num_vcs-1] 			      vc_req_ivc;
+	   wire [0:int_flit_ctrl_width-1] 	      int_flit_ctrl_out;
+	   wire [0:flit_data_width-1] 		       flit_data_out;
+	   wire [0:flow_ctrl_width-1] 		       flow_ctrl_out;
+	   wire [0:fbf_addr_width-1] 		       fbf_write_addr;
+	   wire 				       fbf_write_enable;
+	   wire [0:flit_data_width-1] 		       fbf_write_data;
+	   wire [0:fbf_addr_width-1] 		       fbf_read_addr;
+	   wire 				       fbf_read_enable;
+	   wire [0:flit_data_width-1] 		       fbf_read_data;
+	   wire 				       ipc_error;
 	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -347,18 +529,13 @@ module vcr_top
 	      .router_address(router_address),
 	      .flit_ctrl_in(flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
-	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_port_ivc(route_port_ivc),
 	      .inc_rc_ivc(inc_rc_ivc),
 	      .vc_req_ivc(vc_req_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
-	      .sw_oreq_nonspec_op(sw_oreq_nonspec_op),
-	      .sw_oreq_spec_op(sw_oreq_spec_op),
-	      .sw_ognt_nonspec_op(sw_ognt_nonspec_op),
-	      .sw_ognt_spec_op(sw_ognt_spec_op),
-	      .sw_ignt_nonspec_op(sw_ignt_nonspec_op),
-	      .sw_ignt_spec_op(sw_ignt_spec_op),
+	      .sw_alloc_out_op(sw_alloc_ipc_out_op),
+	      .sw_alloc_in_op(sw_alloc_ipc_in_op),
 	      .int_flit_ctrl_out(int_flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
@@ -387,23 +564,25 @@ module vcr_top
 				    (ip+1)*num_vcs*port_idx_width-1]
 		    = route_port_ivc;
 	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = inc_rc_ivc;
+	   
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
-	   assign sw_oreq_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = sw_oreq_nonspec_op;
-	   assign sw_oreq_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = sw_oreq_spec_op;
-	   assign sw_ignt_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = sw_ignt_nonspec_op;
-	   assign sw_ignt_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = sw_ignt_spec_op;
+	   
+	   assign sw_alloc_ipc_out_ip_op[ip*num_ports*
+					 sw_alloc_ipc_out_width:
+					 (ip+1)*num_ports*
+					 sw_alloc_ipc_out_width-1]
+		    = sw_alloc_ipc_out_op;
+	   
 	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
 				 (ip+1)*int_flit_ctrl_width-1]
 		    = int_flit_ctrl_out;
 	   assign xbd_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
 		    = flit_data_out;
+	   
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
 				   (ip+1)*flow_ctrl_width-1]
 		    = flow_ctrl_out;
+	   
 	   assign ipc_error_ip[ip] = ipc_error;
 	   
 	end
@@ -415,9 +594,11 @@ module vcr_top
    // virtual channel allocator
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 	  vc_gnt_op_ovc;
-   wire [0:num_ports*num_vcs*num_ports-1] vc_gnt_op_ovc_ip;
-   wire [0:num_ports*num_vcs*num_vcs-1]   vc_gnt_op_ovc_ivc;
+   wire [0:num_ports*num_vcs-1] 		       elig_op_ovc;
+   
+   wire [0:num_ports*num_vcs-1] 		       vc_gnt_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] 	       vc_gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	       vc_gnt_op_ovc_ivc;
    
    generate
       
@@ -449,104 +630,15 @@ module vcr_top
    
    
    //---------------------------------------------------------------------------
-   // switch allocation
+   // wavefronmt switch allocator
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] sw_oreq_nonspec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_oreq_spec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_ognt_nonspec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_ognt_spec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_ignt_nonspec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_ignt_spec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_gnt_nonspec_op_ip;
-   wire [0:num_ports*num_ports-1] sw_gnt_spec_op_ip;
-   
    generate
-
-      if((sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ||
-	 (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF))
+      
+      if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
+	 (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
 	begin
 	   
-	   c_interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   sw_oreq_nonspec_op_ip_intl
-	     (.data_in(sw_oreq_nonspec_ip_op),
-	      .data_out(sw_oreq_nonspec_op_ip));
-	   
-	   c_interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   sw_oreq_spec_op_ip_intl
-	     (.data_in(sw_oreq_spec_ip_op),
-	      .data_out(sw_oreq_spec_op_ip));
-	   
-	   c_interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   sw_ognt_nonspec_ip_op_intl
-	     (.data_in(sw_ognt_nonspec_op_ip),
-	      .data_out(sw_ognt_nonspec_ip_op));
-	   
-	   c_interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   sw_ognt_spec_ip_op_intl
-	     (.data_in(sw_ognt_spec_op_ip),
-	      .data_out(sw_ognt_spec_ip_op));
-	   
-	   case(sw_alloc_type)
-	     
-	     `SW_ALLOC_TYPE_SEP_IF:
-	       begin
-		  
-		  /*
-		  assign sw_ignt_nonspec_op_ip = {num_ports*num_ports{1'b0}};
-		  assign sw_ignt_spec_op_ip = {num_ports*num_ports{1'b0}};
-		  */
-		  
-		  assign sw_gnt_nonspec_op_ip = sw_ognt_nonspec_op_ip;
-		  assign sw_gnt_spec_op_ip = sw_ognt_spec_op_ip;
-		  
-	       end
-	     
-	     `SW_ALLOC_TYPE_SEP_OF:
-	       begin
-		  
-		  c_interleaver
-		    #(.width(num_ports*num_ports),
-		      .num_blocks(num_ports))
-		  sw_ignt_nonspec_op_ip_intl
-		    (.data_in(sw_ignt_nonspec_op_ip),
-		     .data_out(sw_ignt_nonspec_ip_op));
-		  
-		  c_interleaver
-		    #(.width(num_ports*num_ports),
-		      .num_blocks(num_ports))
-		  sw_ignt_spec_op_ip_intl
-		    (.data_in(sw_ignt_spec_op_ip),
-		     .data_out(sw_ignt_spec_ip_op));
-		  
-		  assign sw_gnt_nonspec_op_ip = sw_ignt_nonspec_op_ip;
-		  assign sw_gnt_spec_op_ip = sw_ignt_spec_op_ip;
-		  
-	       end
-	     
-	   endcase
-
-	end
-      else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
-	      (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
-	begin
-	   
-	   wire [0:num_ports*num_ports-1] req_wf_nonspec_ip_op;
-	   assign req_wf_nonspec_ip_op = sw_oreq_nonspec_ip_op;
-	   
-	   wire [0:num_ports*num_ports-1] req_wf_spec_ip_op;
-	   assign req_wf_spec_ip_op = sw_oreq_spec_ip_op;
-	   
-	   wire [0:num_ports*num_ports-1] gnt_wf_nonspec_ip_op;
-	   wire [0:num_ports*num_ports-1] gnt_wf_spec_ip_op;
 	   vcr_sw_alloc_wf_mac
 	     #(.num_ports(num_ports),
 	       .wf_alloc_type(sw_alloc_type - `SW_ALLOC_TYPE_WF_BASE),
@@ -555,34 +647,8 @@ module vcr_top
 	   swa_wf
 	     (.clk(clk),
 	      .reset(reset),
-	      .req_nonspec_ip_op(req_wf_nonspec_ip_op),
-	      .req_spec_ip_op(req_wf_spec_ip_op),
-	      .gnt_nonspec_ip_op(gnt_wf_nonspec_ip_op),
-	      .gnt_spec_ip_op(gnt_wf_spec_ip_op));
-	   
-	   assign sw_ognt_nonspec_ip_op = gnt_wf_nonspec_ip_op;
-	   
-	   wire [0:num_ports*num_ports-1] sw_gnt_nonspec_ip_op;
-	   assign sw_gnt_nonspec_ip_op = gnt_wf_nonspec_ip_op;
-	   
-	   c_interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   sw_gnt_nonspec_op_ip_intl
-	     (.data_in(sw_gnt_nonspec_ip_op),
-	      .data_out(sw_gnt_nonspec_op_ip));
-	   
-	   assign sw_ognt_spec_ip_op = gnt_wf_spec_ip_op;
-	   
-	   wire [0:num_ports*num_ports-1] sw_gnt_spec_ip_op;
-	   assign sw_gnt_spec_ip_op = gnt_wf_spec_ip_op;
-	   
-	   c_interleaver
-	     #(.width(num_ports*num_ports),
-	       .num_blocks(num_ports))
-	   sw_gnt_spec_op_ip_intl
-	     (.data_in(sw_gnt_spec_ip_op),
-	      .data_out(sw_gnt_spec_op_ip));
+	      .alloc_in_ip_op(sw_alloc_wf_in_ip_op),
+	      .alloc_out_ip_op(sw_alloc_wf_out_ip_op));
 	   
 	end
       
@@ -599,13 +665,11 @@ module vcr_top
        .num_out_ports(num_ports),
        .width(int_flit_ctrl_width),
        .crossbar_type(ctrl_crossbar_type),
-       .sw_alloc_spec_type(sw_alloc_spec_type),
        .reset_type(reset_type))
    xbc
      (.clk(clk),
       .reset(reset),
-      .ctrl_nonspec_op_ip(sw_gnt_nonspec_op_ip),
-      .ctrl_spec_op_ip(sw_gnt_spec_op_ip),
+      .ctrl_ip_op(xbc_ctrl_ip_op),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
@@ -615,13 +679,11 @@ module vcr_top
        .num_out_ports(num_ports),
        .width(flit_data_width),
        .crossbar_type(data_crossbar_type),
-       .sw_alloc_spec_type(sw_alloc_spec_type),
        .reset_type(reset_type))
    xbd
      (.clk(clk),
       .reset(reset),
-      .ctrl_nonspec_op_ip(sw_gnt_nonspec_op_ip),
-      .ctrl_spec_op_ip(sw_gnt_spec_op_ip),
+      .ctrl_ip_op(xbd_ctrl_ip_op),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
    
@@ -638,6 +700,113 @@ module vcr_top
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
+	   
+	   //-------------------------------------------------------------------
+	   // connect switch allocator control signals
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:num_ports*sw_alloc_opc_out_width-1] sw_alloc_opc_out_ip;
+	   
+	   wire [0:num_ports*sw_alloc_opc_in_width-1]  sw_alloc_opc_in_ip;
+	   
+	   genvar 				       ip;
+	   
+	   for(ip = 0; ip < num_ports; ip = ip + 1)
+	     begin:ips
+		
+		wire [0:sw_alloc_opc_out_width-1] sw_alloc_opc_out;
+		assign sw_alloc_opc_out
+		  = sw_alloc_opc_out_ip[ip*sw_alloc_opc_out_width:
+					(ip+1)*sw_alloc_opc_out_width-1];
+		
+		assign sw_alloc_opc_out_ip_op[(ip*num_ports+op)*
+					      sw_alloc_opc_out_width:
+					      (ip*num_ports+op+1)*
+					      sw_alloc_opc_out_width-1]
+			 = sw_alloc_opc_out;
+		
+		wire [0:sw_alloc_ipc_out_width-1] sw_alloc_ipc_out;
+		assign sw_alloc_ipc_out
+		  = sw_alloc_ipc_out_ip_op[(ip*num_ports+op)*
+					   sw_alloc_ipc_out_width:
+					   (ip*num_ports+op+1)*
+					   sw_alloc_ipc_out_width-1];
+		
+		wire [0:sw_alloc_opc_in_width-1] sw_alloc_opc_in;
+		
+		if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
+		  begin
+		     
+		     assign sw_alloc_opc_in[0:sw_alloc_req_width-1]
+			      = sw_alloc_ipc_out[0:sw_alloc_req_width-1];
+		     
+		     if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		       begin
+			  
+			  assign xbc_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_opc_out[sw_alloc_gnt_width+
+						      num_vcs*
+						      int_flow_ctrl_width];
+			  assign xbd_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_opc_out[sw_alloc_gnt_width+
+						      num_vcs*
+						      int_flow_ctrl_width];
+			  
+		       end
+		     else
+		       begin
+			  
+			  assign xbc_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_opc_out[0];
+			  assign xbd_ctrl_ip_op[ip*num_ports+op]
+				   = sw_alloc_opc_out[0];
+			  
+		       end
+		     
+		  end
+		else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
+		  begin
+		     
+		     assign sw_alloc_opc_in[0:sw_alloc_req_width-1]
+			      = sw_alloc_ipc_out[0:sw_alloc_req_width-1];
+		     assign sw_alloc_opc_in[sw_alloc_req_width:
+					    sw_alloc_req_width+
+					    sw_alloc_gnt_width-1]
+			      = sw_alloc_ipc_out[sw_alloc_req_width:
+						 sw_alloc_req_width+
+						 sw_alloc_gnt_width-1];
+		     
+		  end
+		else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
+			(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
+		  begin
+		     
+		     wire [0:sw_alloc_gnt_width-1] sw_alloc_wf_out;
+		     assign sw_alloc_wf_out
+		       = sw_alloc_wf_out_ip_op[(ip*num_ports+op)*
+					       sw_alloc_wf_out_width:
+					       (ip*num_ports+op+1)*
+					       sw_alloc_wf_out_width-1];
+		     
+		     assign sw_alloc_opc_in[0:sw_alloc_req_width-1]
+			      = sw_alloc_ipc_out[0:sw_alloc_req_width-1];
+		     assign sw_alloc_opc_in[sw_alloc_req_width:
+					    sw_alloc_req_width+
+					    sw_alloc_gnt_width-1]
+			      = sw_alloc_wf_out[0:sw_alloc_gnt_width-1];
+		     
+		  end
+		
+		assign sw_alloc_opc_in_ip[ip*sw_alloc_opc_in_width:
+					  (ip+1)*sw_alloc_opc_in_width-1]
+			 = sw_alloc_opc_in;
+		
+	     end
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // output controller
+	   //-------------------------------------------------------------------
 	   
 	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
 	   assign int_flit_ctrl_in
@@ -663,29 +832,10 @@ module vcr_top
 	   assign vc_gnt_ovc_ivc
 	     = vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:(op+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_ports-1] 	sw_oreq_nonspec_ip;
-	   assign sw_oreq_nonspec_ip
-	     = sw_oreq_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
-	   wire [0:num_ports-1] 	sw_oreq_spec_ip;
-	   assign sw_oreq_spec_ip
-	     = sw_oreq_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
-	   wire [0:num_ports-1] 	sw_gnt_nonspec_ip;
-	   assign sw_gnt_nonspec_ip
-	     = sw_gnt_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
-	   wire [0:num_ports-1] 	sw_gnt_spec_ip;
-	   assign sw_gnt_spec_ip
-	     = sw_gnt_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
-	   wire [0:num_ports-1] 	sw_ognt_nonspec_ip;
-	   wire [0:num_ports-1] 	sw_ognt_spec_ip;
-	   wire [0:flit_ctrl_width-1] 	flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	flit_data_out;
-	   wire [0:num_vcs-1] 		elig_ovc;
-	   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-	   wire 				  opc_error;
+	   wire [0:flit_ctrl_width-1] 		      flit_ctrl_out;
+	   wire [0:flit_data_width-1] 		      flit_data_out;
+	   wire [0:num_vcs-1] 			      elig_ovc;
+	   wire 				      opc_error;
 	   vcr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -714,33 +864,21 @@ module vcr_top
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
-	      .sw_oreq_nonspec_ip(sw_oreq_nonspec_ip),
-	      .sw_oreq_spec_ip(sw_oreq_spec_ip),
-	      .sw_ognt_nonspec_ip(sw_ognt_nonspec_ip),
-	      .sw_ognt_spec_ip(sw_ognt_spec_ip),
-	      .sw_gnt_nonspec_ip(sw_gnt_nonspec_ip),
-	      .sw_gnt_spec_ip(sw_gnt_spec_ip),
+	      .sw_alloc_in_ip(sw_alloc_opc_in_ip),
+	      .sw_alloc_out_ip(sw_alloc_opc_out_ip),
 	      .int_flit_ctrl_in(int_flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
 	      .flit_ctrl_out(flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
 	      .elig_ovc(elig_ovc),
-	      .int_flow_ctrl_ovc(int_flow_ctrl_ovc),
 	      .error(opc_error));
 	   
-	   assign sw_ognt_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
-		    = sw_ognt_nonspec_ip;
-	   assign sw_ognt_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
-		    = sw_ognt_spec_ip;
 	   assign flit_ctrl_out_op[op*flit_ctrl_width:(op+1)*flit_ctrl_width-1]
 		    = flit_ctrl_out;
 	   assign flit_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1]
 		    = flit_data_out;
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
-	   assign int_flow_ctrl_op_ovc[op*num_vcs*int_flow_ctrl_width:
-				       (op+1)*num_vcs*int_flow_ctrl_width-1]
-		    = int_flow_ctrl_ovc;
 	   
 	   assign opc_error_op[op] = opc_error;
 	   

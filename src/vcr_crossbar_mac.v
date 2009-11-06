@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // configurable crossbar module for VC router
 module vcr_crossbar_mac
-  (clk, reset, ctrl_nonspec_op_ip, ctrl_spec_op_ip, data_in_ip, data_out_op);
+  (clk, reset, ctrl_ip_op, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -46,19 +46,13 @@ module vcr_crossbar_mac
    // select implementation variant
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
-   // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
       
    input clk;
    input reset;
    
-   // incoming non-speculative control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_nonspec_op_ip;
-   
-   // incoming speculative control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_spec_op_ip;
+   // crosspoint control signals
+   input [0:num_in_ports*num_out_ports-1] ctrl_ip_op;
    
    // vector of input data
    input [0:num_in_ports*width-1] data_in_ip;
@@ -67,34 +61,16 @@ module vcr_crossbar_mac
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
    
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s;
-   
-   generate
-      
-      if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	assign ctrl_op_ip_s = ctrl_nonspec_op_ip;
-      else
-	assign ctrl_op_ip_s = ctrl_nonspec_op_ip | ctrl_spec_op_ip;
-      
-   endgenerate
-   
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_q;
+   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_s, ctrl_ip_op_q;
+   assign ctrl_ip_op_s = ctrl_ip_op;
    c_dff
-     #(.width(num_out_ports*num_in_ports),
+     #(.width(num_in_ports*num_out_ports),
        .reset_type(reset_type))
-   ctrl_op_ipq
+   ctrl_ip_opq
      (.clk(clk),
       .reset(reset),
-      .d(ctrl_op_ip_s),
-      .q(ctrl_op_ip_q));
-   
-   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
-   c_interleaver
-     #(.width(num_out_ports*num_in_ports),
-       .num_blocks(num_out_ports))
-   ctrl_ip_op_q_intl
-     (.data_in(ctrl_op_ip_q),
-      .data_out(ctrl_ip_op_q));
+      .d(ctrl_ip_op_s),
+      .q(ctrl_ip_op_q));
    
    c_crossbar
      #(.num_in_ports(num_in_ports),
