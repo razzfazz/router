@@ -137,7 +137,6 @@ module c_fifo_ctrl
    
    assign write_addr[0:addr_width-1] = write_ptr_q;
    
-   wire 		 almost_empty;
    assign almost_empty = (read_ptr_next == write_ptr_q);
    
    wire 		 empty_s, empty_q;
