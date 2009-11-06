@@ -153,8 +153,12 @@ module whr_ip_ctrl_mac
    // total number of bits of header information required for each VC
    localparam hdff_width = la_route_info_width + route_info_width;
    
+   // use input register as part of the flit buffer
+   parameter input_stage_can_hold = 0;
+   
    // number of entries in flit buffer
-   localparam fbf_depth = num_flit_buffers;
+   localparam fbf_depth
+     = input_stage_can_hold ? (num_flit_buffers - 1) : num_flit_buffers;
    
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
@@ -240,10 +244,49 @@ module whr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
+   wire 			  flit_valid_in;
+   wire 			  flit_valid_out;
+   
+   wire 			  fbc_almost_full;
+   
+   wire 			  hold_input_stage;
+   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = flit_ctrl_in;
+   assign flit_ctrl_in_s = hold_input_stage ? flit_ctrl_in_q : flit_ctrl_in;
+	   
+   wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
+   assign flit_data_in_s = hold_input_stage ? flit_data_in_q : flit_data_in;
    
    generate
+      
+      if(input_stage_can_hold)
+	begin
+	   
+	   wire hold_input_enable_set;
+	   assign hold_input_enable_set
+	     = fbc_almost_full & flit_valid_in & ~flit_valid_out;
+	   
+	   wire hold_input_enable_reset;
+	   assign hold_input_enable_reset = flit_valid_out;
+	   
+	   wire hold_input_enable_s, hold_input_enable_q;
+	   assign hold_input_enable_s
+	     = (hold_input_enable_q | hold_input_enable_set) & 
+	       ~hold_input_enable_reset;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   hold_input_enableq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(hold_input_enable_s),
+	      .q(hold_input_enable_q));
+	   
+	   assign hold_input_stage = flit_valid_in & hold_input_enable_q;
+	   
+	end
+      else
+	assign hold_input_stage = 1'b0;
       
       case(packet_format)
 	
@@ -279,8 +322,6 @@ module whr_ip_ctrl_mac
       
    endgenerate
    
-   wire [0:flit_data_width-1] flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = flit_data_in;
    c_dff
      #(.width(flit_data_width),
        .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
@@ -299,7 +340,6 @@ module whr_ip_ctrl_mac
    // decode control signals
    //---------------------------------------------------------------------------
    
-   wire 			flit_valid_in;
    wire 			flit_head_in;   
    wire 			flit_tail_in;
    
@@ -379,7 +419,7 @@ module whr_ip_ctrl_mac
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s;
 		  assign flit_ctr_s
-		    = flit_valid_in ? 
+		    = (flit_valid_in & ~hold_input_stage) ? 
 		      (flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1)) : 
 		      flit_ctr_q;
 		  c_dff
@@ -407,7 +447,6 @@ module whr_ip_ctrl_mac
    wire                                     gnt;
    assign gnt = |gnt_op;
    
-   wire 				    flit_valid_out;
    assign flit_valid_out = gnt;
 
    wire 				    fbc_empty;
@@ -442,7 +481,8 @@ module whr_ip_ctrl_mac
 		assign read_sel[idx] = (fbc_read_addr == idx);
 		
 		wire capture;
-		assign capture = flit_valid_in & write_sel[idx];
+		assign capture
+		  = (flit_valid_in & ~hold_input_stage) & write_sel[idx];
 		
 		reg  head_q, tail_q;
 		always @(posedge clk)
@@ -485,7 +525,7 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire head_in;
-	   assign head_in = flit_valid_in & flit_head_in;
+	   assign head_in = (flit_valid_in & ~hold_input_stage) & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
 	   assign head_valid_s = flit_valid ? 
@@ -503,7 +543,7 @@ module whr_ip_ctrl_mac
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_valid_q;
 	   
 	   wire 		     tail_in;
-	   assign tail_in = flit_valid_in & flit_tail_in;
+	   assign tail_in = (flit_valid_in & ~hold_input_stage) & flit_tail_in;
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
 	   assign tail_idx_s
@@ -558,7 +598,7 @@ module whr_ip_ctrl_mac
    wire 			     hdff_empty;
    
    wire 			     hdff_push;
-   assign hdff_push = flit_valid_in & flit_head_in;
+   assign hdff_push = (flit_valid_in & ~hold_input_stage) & flit_head_in;
    
    wire 			     hdff_pop;
    assign hdff_pop = flit_valid_out & flit_tail_out;
@@ -741,7 +781,7 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 		     fbc_push;
-   assign fbc_push = flit_valid_in;
+   assign fbc_push = (flit_valid_in & ~hold_input_stage);
    
    wire 		     fbc_pop;
    assign fbc_pop = flit_valid_out;
@@ -777,7 +817,7 @@ module whr_ip_ctrl_mac
    assign fbf_read_enable = flit_valid /*flit_valid_out*/;
    
    assign fbf_read_addr = fbc_read_addr;
-   assign fbf_write_enable = flit_valid_in;
+   assign fbf_write_enable = (flit_valid_in & ~hold_input_stage);
    assign fbf_write_addr = fbc_write_addr;
    assign fbf_write_data = flit_data_in_q;
    

@@ -128,14 +128,18 @@ module whr_top
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
-   // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   // use input register as part of the flit buffer
+   parameter input_stage_can_hold = 1;
    
    // number of entries in flit buffer
-   localparam fbf_depth = num_flit_buffers;
+   localparam fbf_depth
+     = input_stage_can_hold ? (num_flit_buffers - 1) : num_flit_buffers;
    
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
+   
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select which arbiter type to use for switch allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
