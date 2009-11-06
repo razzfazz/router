@@ -32,7 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // simple FIFO controller
 module c_fifo_ctrl
-  (clk, reset, push, pop, write_addr, read_addr, empty, full, errors);
+  (clk, reset, push, pop, write_addr, read_addr, almost_empty, empty, 
+   almost_full, full, errors);
    
 `include "c_constants.v"
    
@@ -70,9 +71,17 @@ module c_fifo_ctrl
    output [0:addr_width-1] read_addr;
    wire [0:addr_width-1] read_addr;
    
+   // buffer nearly empty (1 used slot remaining) indication
+   output almost_empty;
+   wire 		 almost_empty;
+   
    // buffer empty indication
    output empty;
    wire 		 empty;
+   
+   // buffer almost full (1 unused slot remaining) indication
+   output almost_full;
+   wire 		 almost_full;
    
    // buffer full indication
    output full;
@@ -103,6 +112,8 @@ module c_fifo_ctrl
       .d(read_ptr_s),
       .q(read_ptr_q));
    
+   assign read_addr[0:addr_width-1] = read_ptr_q;
+   
    wire [0:addr_width-1] write_ptr_next, write_ptr_q;
    c_incr
      #(.width(addr_width),
@@ -124,12 +135,13 @@ module c_fifo_ctrl
       .d(write_ptr_s),
       .q(write_ptr_q));
    
+   assign write_addr[0:addr_width-1] = write_ptr_q;
+   
    wire 		 almost_empty;
    assign almost_empty = (read_ptr_next == write_ptr_q);
    
    wire 		 empty_s, empty_q;
    assign empty_s = (empty_q | (almost_empty & pop & ~push)) & ~(push & ~pop);
-   
    c_dff
      #(.width(1),
        .reset_type(reset_type),
@@ -140,11 +152,22 @@ module c_fifo_ctrl
       .d(empty_s),
       .q(empty_q));
    
-   assign read_addr[0:addr_width-1] = read_ptr_q;
-   assign write_addr[0:addr_width-1] = write_ptr_q;
-   
    assign empty = empty_q;
-   assign full = (read_ptr_q == write_ptr_q) && !empty_q;
+   
+   assign almost_full = (write_ptr_next == read_ptr_q);
+   
+   wire 		 full_s, full_q;
+   assign full_s = (full_q | (almost_full & push & ~pop)) & ~(pop & ~push);
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   fullq
+     (.clk(clk),
+      .reset(reset),
+      .d(full_s),
+      .q(full_q));
+   
+   assign full = full_q;
    
    wire 		 error_underflow;
    assign error_underflow = empty & pop & ~push;

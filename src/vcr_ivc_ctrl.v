@@ -1209,6 +1209,8 @@ module vcr_ivc_ctrl
    assign fbc_pop = flit_valid_out;
    
    wire [0:1] 		       fbc_errors;
+   wire 		       fbc_almost_empty;
+   wire 		       fbc_almost_full;
    wire 		       fbc_full;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
@@ -1222,7 +1224,9 @@ module vcr_ivc_ctrl
       .pop(fbc_pop),
       .write_addr(fbc_write_addr),
       .read_addr(fbc_read_addr),
+      .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
+      .almost_full(fbc_almost_full),
       .full(fbc_full),
       .errors(fbc_errors));
    

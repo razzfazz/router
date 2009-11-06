@@ -195,6 +195,8 @@ module c_fifo
 	  begin
 
 	     wire [0:rw_ptr_width-1] read_ptr, write_ptr;
+	     wire 		     almost_empty;
+	     wire 		     almost_full;
 	     c_fifo_ctrl
 	       #(.addr_width(rw_ptr_width),
 		 .offset(0),
@@ -207,7 +209,9 @@ module c_fifo
 		.pop(pop),
 		.write_addr(write_ptr),
 		.read_addr(read_ptr),
+		.almost_empty(almost_empty),
 		.empty(empty),
+		.almost_full(almost_full),
 		.full(full),
 		.errors(errors));
 	     

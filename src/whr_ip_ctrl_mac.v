@@ -746,6 +746,8 @@ module whr_ip_ctrl_mac
    wire 		     fbc_pop;
    assign fbc_pop = flit_valid_out;
    
+   wire 		     fbc_almost_empty;
+   wire 		     fbc_almost_full;
    wire 		     fbc_full;
    wire [0:1]		     fbc_errors;
    c_fifo_ctrl
@@ -759,7 +761,9 @@ module whr_ip_ctrl_mac
       .pop(fbc_pop),
       .write_addr(fbc_write_addr),
       .read_addr(fbc_read_addr),
+      .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
+      .almost_full(fbc_almost_full),
       .full(fbc_full),
       .errors(fbc_errors));
    
