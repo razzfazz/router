@@ -834,7 +834,9 @@ module vcr_ip_ctrl_mac
 	     assign flit_valid_spec_out
 	       = |sw_ognt_spec_op & |(vc_gnt_ivc & vc_sel_spec_ivc);
 	   
-	   else
+	   else if((sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) || 
+		   ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
+		    (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)))
 	     
 	     // for separable output-first and wavefront allocation, we don't
 	     // know until the end of allocation which input-side VC was 
