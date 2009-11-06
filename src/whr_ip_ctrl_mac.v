@@ -787,7 +787,6 @@ module whr_ip_ctrl_mac
    assign fbc_pop = flit_valid_out;
    
    wire 		     fbc_almost_empty;
-   wire 		     fbc_almost_full;
    wire 		     fbc_full;
    wire [0:1]		     fbc_errors;
    c_fifo_ctrl
