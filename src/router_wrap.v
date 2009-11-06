@@ -156,6 +156,7 @@ module router_wrap
 		 .routing_type(routing_type),
 		 .dim_order(dim_order),
 		 .header_fifo_type(header_fifo_type),
+		 .input_stage_can_hold(input_stage_can_hold),
 		 .fbf_regfile_type(fbf_regfile_type),
 		 .arbiter_type(sw_alloc_arbiter_type),
 		 .crossbar_type(data_crossbar_type),

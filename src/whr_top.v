@@ -129,7 +129,7 @@ module whr_top
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
    // use input register as part of the flit buffer
-   parameter input_stage_can_hold = 1;
+   parameter input_stage_can_hold = 0;
    
    // number of entries in flit buffer
    localparam fbf_depth
@@ -244,6 +244,7 @@ module whr_top
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .header_fifo_type(header_fifo_type),
+	       .input_stage_can_hold(input_stage_can_hold),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .error_capture_mode(error_capture_mode),

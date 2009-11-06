@@ -102,6 +102,9 @@ parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 // select implementation variant for header FIFO
 parameter header_fifo_type = `FIFO_TYPE_INDEXED;
 
+// use input register as part of the flit buffer (wormhole router only)
+parameter input_stage_can_hold = 0;
+
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_LAT_1D_MUX;
 
