@@ -535,7 +535,31 @@ module vcr_ip_ctrl_mac
    
    // speculative switch allocator grants
    wire [0:num_vcs-1] 		sw_gnt_spec_ivc;
-
+   
+   wire [0:num_vcs-1] 		flit_valid_in_ivc;
+   wire [0:num_vcs-1] 		flit_head_in_ivc;
+   wire [0:num_vcs-1] 		flit_tail_in_ivc;
+   vcr_flit_ctrl_dec
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .reset_type(reset_type))
+   fcdec
+     (.clk(clk),
+      .reset(reset),
+      .flit_ctrl_in(flit_ctrl_in_q),
+      .header_info_in(header_info_in_q),
+      .flit_valid_out_ivc(flit_valid_in_ivc),
+      .flit_head_out_ivc(flit_head_in_ivc),
+      .flit_tail_out_ivc(flit_tail_in_ivc));
+   
    wire [0:num_vcs*int_flit_ctrl_width-1] int_flit_ctrl_out_ivc;
    wire [0:num_vcs*fbf_addr_width-1] 	  fbc_write_addr_ivc;
    wire [0:num_vcs*fbf_addr_width-1] 	  fbc_read_addr_ivc;
@@ -553,6 +577,15 @@ module vcr_ip_ctrl_mac
       
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
+	   
+	   wire flit_valid_in;
+	   assign flit_valid_in = flit_valid_in_ivc[ivc];
+	   
+	   wire flit_head_in;
+	   assign flit_head_in = flit_head_in_ivc[ivc];
+	   
+	   wire flit_tail_in;
+	   assign flit_tail_in = flit_tail_in_ivc[ivc];
 	   
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ivc[ivc];
@@ -609,7 +642,9 @@ module vcr_ip_ctrl_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .router_address(router_address),
-	      .flit_ctrl_in(flit_ctrl_in_q),
+	      .flit_valid_in(flit_valid_in),
+	      .flit_head_in(flit_head_in),
+	      .flit_tail_in(flit_tail_in),
 	      .header_info_in(header_info_in_q),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_op(route_op),
