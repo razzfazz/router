@@ -32,9 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input VC controller
 module vcr_ivc_ctrl
-  (clk, reset, router_address, flit_ctrl_in, header_info_in, 
-   int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, vc_gnt, 
-   vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
+  (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
+   header_info_in, int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, 
+   vc_gnt, vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec,
    int_flit_ctrl_out, la_route_info_out, fbc_write_addr, fbc_read_addr, 
    fbc_empty, errors, events);
    
@@ -240,8 +240,14 @@ module vcr_ivc_ctrl
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // incoming flit control signals
-   input [0:flit_ctrl_width-1] flit_ctrl_in;
+   // incoming flit valid
+   input flit_valid_in;
+   
+   // incoming flit is head flit
+   input flit_head_in;
+   
+   // incoming flit is tail
+   input flit_tail_in;
    
    // header information associated with current flit
    input [0:header_info_width-1] header_info_in;
@@ -314,170 +320,6 @@ module vcr_ivc_ctrl
    // (note: only valid if perf_ctr_enable=1)
    output [0:5] events;
    wire [0:5] 			  events;
-   
-   
-   //---------------------------------------------------------------------------
-   // decode control signals
-   //---------------------------------------------------------------------------
-   
-   wire 			  flit_valid_in;
-   wire 			  flit_head_in;   
-   wire 			  flit_tail_in;
-   
-   generate
-
-      case(packet_format)
-	
-	`PACKET_FORMAT_HEAD_TAIL,
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     
-	     if(num_vcs > 1)
-	       begin
-		  
-		  wire [0:vc_idx_width-1] flit_vc_in;
-		  assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
-		  
-		  assign flit_valid_in
-		    = flit_ctrl_in[0] && (flit_vc_in == vc_id);
-		  
-	       end
-	     else
-		  assign flit_valid_in = flit_ctrl_in[0];
-	     
-	     assign flit_head_in = flit_ctrl_in[1+vc_idx_width+0];
-	     
-	  end
-	
-	endcase
-      
-      case(packet_format)
-	
-	`PACKET_FORMAT_HEAD_TAIL:
-	  begin
-	     assign flit_tail_in = flit_ctrl_in[1+vc_idx_width+1];
-	  end
-	
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     
-	     if(max_payload_length == 0)
-	       begin
-		  
-		  if(max_payload_length == min_payload_length)
-		    assign flit_tail_in = flit_head_in;
-		  
-		  // synopsys translate_off
-		  else
-		    begin
-		       initial
-		       begin
-			  $display({"ERROR: The value of the ", 
-				    "max_payload_length parameter cannot be ", 
-				    "smaller than that of the ", 
-				    "min_payload_length parameter."});
-			  $stop;
-		       end
-		    end
-		  // synopsys translate_on
-		  
-	       end
-	     else if(max_payload_length == 1)
-	       begin
-		  
-		  wire has_payload;
-		  
-		  if(max_payload_length > min_payload_length)
-		    assign has_payload
-		      = header_info_in[la_route_info_width+route_info_width];
-		  else if(max_payload_length == min_payload_length)
-		    assign has_payload = 1'b1;
-		  
-		  // synopsys translate_off
-		  else
-		    begin
-		       initial
-		       begin
-			  $display({"ERROR: The value of the ", 
-				    "max_payload_length parameter cannot be ", 
-				    "smaller than that of the ", 
-				    "min_payload_length parameter."});
-			  $stop;
-		       end
-		    end
-		  // synopsys translate_on
-		  
-		  assign flit_tail_in = ~flit_head_in | ~has_payload;
-		  
-	       end
-	     else
-	       begin
-		  
-		  wire [0:flit_ctr_width-1] flit_ctr_q;
-		  wire [0:flit_ctr_width-1] flit_ctr_next;
-		  
-		  if(max_payload_length > min_payload_length)
-		    begin
-		       
-		       wire [0:payload_length_width-1] payload_length;
-		       assign payload_length
-			 = header_info_in[la_route_info_width+
-					  route_info_width:
-					  la_route_info_width+
-					  route_info_width+
-					  payload_length_width-1];
-		       
-		       assign flit_ctr_next
-			 = (min_payload_length - 1) + payload_length;
-		       
-		       if(min_payload_length == 0)
-			 assign flit_tail_in
-			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
-		       else
-			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
-		       
-		    end
-		  else if(max_payload_length == min_payload_length)
-		    begin
-		       assign flit_ctr_next = max_payload_length - 1;
-		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
-		    end
-		  
-		  // synopsys translate_off
-		  else
-		    begin
-		       initial
-		       begin
-			  $display({"ERROR: The value of the ", 
-				    "max_payload_length parameter cannot be ", 
-				    "smaller than that of the ", 
-				    "min_payload_length parameter."});
-			  $stop;
-		       end
-		    end
-		  // synopsys translate_on
-		  
-		  wire [0:flit_ctr_width-1] flit_ctr_s;
-		  assign flit_ctr_s
-		    = flit_valid_in ? 
-		      (flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1)) : 
-		      flit_ctr_q;
-		  c_dff
-		    #(.width(flit_ctr_width),
-		      .reset_type(reset_type))
-		  flit_ctrq
-		    (.clk(clk),
-		     .reset(reset),
-		     .d(flit_ctr_s),
-		     .q(flit_ctr_q));
-		  
-	       end
-	     
-	  end
-	
-      endcase
-      
-   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -838,7 +680,7 @@ module vcr_ivc_ctrl
    endgenerate
    
    wire 	header_valid;
-   assign header_valid = ~hdff_empty | hdff_push;
+   assign header_valid = ~hdff_empty | flit_valid_in /*hdff_push*/;
    
    wire 	flit_valid;
    
