@@ -326,13 +326,13 @@ module vcr_ivc_ctrl
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire 				    flit_valid_out;
-   wire 				    flit_tail_out;
+   wire 			  flit_valid_out;
+   wire 			  flit_tail_out;
    
-   wire 				    packet_done;
+   wire 			  packet_done;
    assign packet_done = flit_valid_out & flit_tail_out;
    
-   wire 				    vc_allocated_s, vc_allocated_q;
+   wire 			  vc_allocated_s, vc_allocated_q;
    assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
    c_dff
      #(.width(1),
@@ -343,8 +343,7 @@ module vcr_ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
-   wire [0:num_vcs_per_class-1] 	    vc_allocated_hold_ocvc;
-   wire [0:num_vcs_per_class-1] 	    vc_allocated_ocvc_q;
+   wire [0:num_vcs_per_class-1]   vc_allocated_ocvc_s, vc_allocated_ocvc_q;
    
    generate
       
@@ -374,11 +373,8 @@ module vcr_ivc_ctrl
 		
 	     end
 	   
-	   assign vc_allocated_hold_ocvc = vc_allocated_ocvc_q | vc_gnt_ocvc;
-	   
-	   wire [0:num_vcs_per_class-1]      vc_allocated_ocvc_s;
 	   assign vc_allocated_ocvc_s
-	     = vc_allocated_hold_ocvc & ~{num_vcs_per_class{packet_done}};
+	     = vc_allocated_q ? vc_allocated_ocvc_q : vc_gnt_ocvc;
 	   c_dff
 	     #(.width(num_vcs_per_class),
 	       .reset_type(reset_type))
@@ -391,14 +387,14 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
-	   assign vc_allocated_hold_ocvc = vc_allocated_q | vc_gnt;
+	   assign vc_allocated_ocvc_s = vc_allocated_q | vc_gnt;
 	   assign vc_allocated_ocvc_q = vc_allocated_q;
 	end
       
    endgenerate
    
-   wire 				vc_allocated;
-   wire 				sw_allocated;
+   wire vc_allocated;
+   wire sw_allocated;
    
    generate
       
@@ -800,7 +796,7 @@ module vcr_ivc_ctrl
 	     
 	     wire 				 flit_sent_prev_s,
 						 flit_sent_prev_q;
-	     assign flit_sent_prev_s = flit_valid_out & ~flit_tail_out;
+	     assign flit_sent_prev_s = flit_valid_out /*& ~flit_tail_out*/;
 	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type))
@@ -835,7 +831,7 @@ module vcr_ivc_ctrl
 	     
 	     wire 	     free_allocated_s, free_allocated_q;
 	     assign free_allocated_s
-	       = |(next_free_ocvc & vc_allocated_hold_ocvc)/* & ~packet_done*/;
+	       = |(next_free_ocvc & vc_allocated_ocvc_s)/* & ~packet_done*/;
 	     c_dff
 	       #(.width(1),
 		 .reset_value(1'b1),
@@ -886,15 +882,15 @@ module vcr_ivc_ctrl
 	     
 	     wire 			       cred;
 	     assign cred
-	       = |(cred_ocvc & vc_allocated_hold_ocvc)/* & ~packet_done*/;
+	       = |(cred_ocvc & vc_allocated_ocvc_s)/* & ~packet_done*/;
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_q;
 	     
 	     wire 			       has_cred_s, has_cred_q;
 	     assign has_cred_s
-	       = (vc_gnt ?
-		  ~sw_gnt_spec :
-		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q))) | 
+	       = (vc_allocated_q ?
+		  ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q)) :
+		  ~sw_gnt_spec) | 
 		 cred;
 	     c_dff
 	       #(.width(1),
@@ -918,11 +914,9 @@ module vcr_ivc_ctrl
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_s;
 	     assign cred_hold_s
-	       = vc_gnt ?
-		 cred_hold_new :
-		 vc_allocated_q ?
+	       = vc_allocated_q ?
 		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
-		 cred_hold_q;
+		 cred_hold_new;
 	     c_dff
 	       #(.width(cred_hold_width),
 		 .reset_type(reset_type))
@@ -991,7 +985,7 @@ module vcr_ivc_ctrl
 		
 		if((vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK) || 
 		   (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
-		  assign flit_ocvc = vc_allocated_hold_ocvc;
+		  assign flit_ocvc = vc_allocated_ocvc_s;
 		else
 		  assign flit_ocvc = vc_allocated_ocvc_q;
 		
