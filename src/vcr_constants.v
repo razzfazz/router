@@ -63,10 +63,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define VC_ALLOC_TYPE_WF_BASE   2
 `define VC_ALLOC_TYPE_WF_LIMIT  (`VC_ALLOC_TYPE_WF_BASE + `WF_ALLOC_TYPE_LAST)
 
-// VC allocation is piggy-backed onto switch allocation
-`define VC_ALLOC_TYPE_PIGGYBACK (`VC_ALLOC_TYPE_WF_LIMIT + 1)
-
-`define VC_ALLOC_TYPE_LAST `VC_ALLOC_TYPE_PIGGYBACK
+`define VC_ALLOC_TYPE_LAST `VC_ALLOC_TYPE_WF_LIMIT
 
 
 //------------------------------------------------------------------------------

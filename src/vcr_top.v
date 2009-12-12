@@ -599,34 +599,26 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 		       vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] 	       vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1] 	       vc_gnt_op_ovc_ivc;
-   
-   generate
-      
-      if(vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK)
-	begin
-	   vcr_vc_alloc_mac
-	     #(.num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
-	       .num_ports(num_ports),
-	       .allocator_type(vc_alloc_type),
-	       .arbiter_type(vc_alloc_arbiter_type),
-	       .reset_type(reset_type))
-	   vca
-	     (.clk(clk),
-	      .reset(reset),
-	      .route_port_ip_ivc(route_port_ip_ivc),
-	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
-	      .elig_op_ovc(elig_op_ovc),
-	      .req_ip_ivc(vc_req_ip_ivc),
-	      .gnt_ip_ivc(vc_gnt_ip_ivc),
-	      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
-	      .gnt_op_ovc(vc_gnt_op_ovc),
-	      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
-	      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
-	end
-      
-   endgenerate
+   vcr_vc_alloc_mac
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_ports(num_ports),
+       .allocator_type(vc_alloc_type),
+       .arbiter_type(vc_alloc_arbiter_type),
+       .reset_type(reset_type))
+   vca
+     (.clk(clk),
+      .reset(reset),
+      .route_port_ip_ivc(route_port_ip_ivc),
+      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+      .elig_op_ovc(elig_op_ovc),
+      .req_ip_ivc(vc_req_ip_ivc),
+      .gnt_ip_ivc(vc_gnt_ip_ivc),
+      .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
+      .gnt_op_ovc(vc_gnt_op_ovc),
+      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
+      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
    
    
    //---------------------------------------------------------------------------

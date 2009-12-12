@@ -398,16 +398,15 @@ module vcr_ivc_ctrl
    
    generate
       
-      if((vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK) && 
-	 (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
-	begin
-	   assign vc_allocated = vc_gnt | vc_allocated_q;
-	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
-	end
-      else
+      if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
 	   assign vc_allocated = vc_allocated_q;
 	   assign sw_allocated = sw_gnt_nonspec;
+	end
+      else
+	begin
+	   assign vc_allocated = vc_gnt | vc_allocated_q;
+	   assign sw_allocated = sw_gnt_nonspec | sw_gnt_spec;
 	end
       
    endgenerate
@@ -943,18 +942,13 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK)
-	assign sw_req_nonspec
-	  = header_valid & flit_valid & (free_allocated | ~vc_allocated_q);
-      else
-	assign sw_req_nonspec
-	  = header_valid & flit_valid & vc_allocated_q & free_allocated;
+      assign sw_req_nonspec
+	= header_valid & flit_valid & vc_allocated_q & free_allocated;
       
-      if((vc_alloc_type != `VC_ALLOC_TYPE_PIGGYBACK) && 
-	 (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
-	assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
-      else
+      if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	assign sw_req_spec = 1'b0;
+      else
+	assign sw_req_spec = header_valid & flit_valid & ~vc_allocated_q;
       
    endgenerate
    
@@ -983,11 +977,10 @@ module vcr_ivc_ctrl
 		
 		wire [0:num_vcs_per_class-1] flit_ocvc;
 		
-		if((vc_alloc_type == `VC_ALLOC_TYPE_PIGGYBACK) || 
-		   (sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE))
-		  assign flit_ocvc = vc_allocated_ocvc_s;
-		else
+		if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 		  assign flit_ocvc = vc_allocated_ocvc_q;
+		else
+		  assign flit_ocvc = vc_allocated_ocvc_s;
 		
 		wire [0:num_vcs-1] 	     flit_ovc;
 		
