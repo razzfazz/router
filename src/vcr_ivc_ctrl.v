@@ -940,10 +940,10 @@ module vcr_ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
+   assign sw_req_nonspec
+     = header_valid & flit_valid & vc_allocated_q & free_allocated;
+   
    generate
-      
-      assign sw_req_nonspec
-	= header_valid & flit_valid & vc_allocated_q & free_allocated;
       
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	assign sw_req_spec = 1'b0;
