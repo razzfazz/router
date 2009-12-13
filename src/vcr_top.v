@@ -184,6 +184,10 @@ module vcr_top
    // select which arbiter type to use for VC allocator
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
+   // select whether VCs must have credits available in order to be considered 
+   // for VC allocation
+   parameter vc_alloc_requires_credit = 0;
+   
    // select implementation variant for switch allocator
    parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
    
@@ -515,6 +519,7 @@ module vcr_top
 	       .cred_level_width(cred_level_width),
 	       .header_fifo_type(header_fifo_type),
 	       .vc_alloc_type(vc_alloc_type),
+	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
@@ -847,6 +852,7 @@ module vcr_top
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .port_id(op),
 	       .reset_type(reset_type))
 	   opc

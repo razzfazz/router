@@ -114,6 +114,10 @@ parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 // select which arbiter type to use for VC allocator
 parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
+// select whether VCs must have credits available in order to be considered for
+// VC allocation
+parameter vc_alloc_requires_credit = 0;
+
 // select implementation variant for switch allocator
 parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 

@@ -109,6 +109,10 @@ module vcr_op_ctrl_mac
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
+   // select whether VCs must have credits available in order to be considered 
+   // for VC allocation
+   parameter vc_alloc_requires_credit = 0;
+   
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
    parameter track_vcs_at_output = 0;
@@ -732,6 +736,7 @@ module vcr_op_ctrl_mac
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
 	       .vc_id(ovc),
+	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),

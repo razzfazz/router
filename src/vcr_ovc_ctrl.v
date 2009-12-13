@@ -45,12 +45,6 @@ module vcr_ovc_ctrl
    // width required to select a buffer
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    
-   // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_flit_buffers+1);
-   
-   // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width = clogb(num_flit_buffers);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
@@ -114,6 +108,10 @@ module vcr_ovc_ctrl
    // ID of current input VC
    parameter vc_id = 0;
    
+   // select whether VCs must have credits available in order to be considered 
+   // for VC allocation
+   parameter vc_alloc_requires_credit = 0;
+   
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
    parameter track_vcs_at_output = 0;
@@ -136,6 +134,18 @@ module vcr_ovc_ctrl
        (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ?
        1 :
        -1;
+   
+   // width for full range of credit count ([0:num_credits])
+   localparam cred_count_width = clogb(num_flit_buffers + 1);
+   
+   // width of counter for credits waiting to be sent to input controller
+   localparam cred_hold_width = vc_alloc_requires_credit ? 
+				clogb(num_flit_buffers) : 
+				clogb(num_flit_buffers + 1);
+   
+   // initial value for credit hold counter
+   localparam [0:cred_hold_width-1] cred_hold_reset_value
+     = vc_alloc_requires_credit ? (num_flit_buffers - 1) : num_flit_buffers;
    
    // capped reset value for credit level
    localparam [0:cred_level_width-1] free_reset_value
@@ -599,10 +609,15 @@ module vcr_ovc_ctrl
 	  begin
 	     
 	     wire [0:cred_hold_width-1]  cred_hold_copy;
-	     assign cred_hold_copy
-	       = cred_count_next[(cred_count_width-cred_hold_width):
-				 cred_count_width-1] - 
-		 |cred_count_next /*1'b1*/;
+	     if(vc_alloc_requires_credit)
+	       assign cred_hold_copy
+		 = cred_count_next[(cred_count_width-cred_hold_width):
+				   cred_count_width-1] - 
+		   /*|cred_count_next*/ 1'b1;
+	     else
+	       assign cred_hold_copy
+		 = cred_count_next[(cred_count_width-cred_hold_width):
+				   cred_count_width-1];
 	     
 	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 	     assign cred_hold_s = next_allocated ?
@@ -611,7 +626,7 @@ module vcr_ovc_ctrl
 	     c_dff
 	       #(.width(cred_hold_width),
 		 .reset_type(reset_type),
-		 .reset_value(num_flit_buffers-1))
+		 .reset_value(cred_hold_reset_value))
 	     cred_holdq
 	       (.clk(clk),
 		.reset(reset),
@@ -652,7 +667,16 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 				 elig_s, elig_q;
-   assign elig_s = ~allocated_s & head_free_early & next_cred;
+   
+   generate
+      
+      if(vc_alloc_requires_credit)
+	assign elig_s = ~allocated_s & head_free_early & next_cred;
+      else
+	assign elig_s = ~allocated_s & head_free_early;
+      
+   endgenerate
+   
    c_dff
      #(.width(1),
        .reset_type(reset_type),
