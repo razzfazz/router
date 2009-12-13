@@ -36,7 +36,8 @@ module vcr_ivc_ctrl
    header_info_in, int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, 
    vc_gnt, vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec,
    flit_head, flit_tail, la_route_info, fbc_write_addr, fbc_read_addr, 
-   fbc_empty, free_unallocated, free_allocated, errors, events);
+   fbc_empty, allocated, allocated_ovc, free_unallocated, free_allocated, 
+   errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -317,6 +318,14 @@ module vcr_ivc_ctrl
    output fbc_empty;
    wire 			  fbc_empty;
    
+   // has an output VC been assigned to this input VC?
+   output allocated;
+   wire 			  allocated;
+   
+   // if so, which output VC has been assigned?
+   output [0:num_vcs-1] allocated_ovc;
+   wire [0:num_vcs-1] 		  allocated_ovc;
+   
    // credit availability if no VC has been assigned yet
    output free_unallocated;
    wire 			  free_unallocated;
@@ -355,6 +364,8 @@ module vcr_ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
+   assign allocated = vc_allocated_q;
+   
    wire [0:num_vcs_per_class-1]   vc_gnt_ocvc;
    wire [0:num_vcs_per_class-1]   vc_allocated_ocvc_q;
    
@@ -369,7 +380,20 @@ module vcr_ivc_ctrl
 			  (packet_class+1)*num_vcs_per_class-1];
 	   
 	   if(resource_class == (num_resource_classes - 1))
-	     assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
+	     begin
+		
+		assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
+		
+		c_align
+		  #(.data_width(num_vcs_per_class),
+		    .dest_width(num_vcs),
+		    .offset(packet_class*num_vcs_per_class))
+		allocated_ovc_alg
+		  (.data_in(vc_allocated_ocvc_q),
+		   .dest_in({num_vcs{1'b0}}),
+		   .data_out(allocated_ovc));
+		
+	     end
 	   else
 	     begin
 		
@@ -381,6 +405,18 @@ module vcr_ivc_ctrl
 		// only one of the two will have a bit set, so we just OR them
 		assign vc_gnt_ocvc
 		  = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
+		
+		c_align
+		  #(.data_width(2*num_vcs_per_class),
+		    .dest_width(num_vcs),
+		    .offset(packet_class*num_vcs_per_class))
+		allocated_ovc_alg
+		  (.data_in({{num_vcs_per_class{~inc_rc}} & 
+			     vc_allocated_ocvc_q,
+			     {num_vcs_per_class{inc_rc}} & 
+			     vc_allocated_ocvc_q}),
+		   .dest_in({num_vcs{1'b0}}),
+		   .data_out(allocated_ovc));
 		
 	     end
 	   
@@ -401,6 +437,7 @@ module vcr_ivc_ctrl
 	begin
 	   assign vc_gnt_ocvc = 1'b1;
 	   assign vc_allocated_ocvc_q = 1'b1;
+	   assign allocated_ovc = 1'b1;
 	end
       
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
@@ -835,7 +872,8 @@ module vcr_ivc_ctrl
 	     
 	     wire 	     free_allocated_s, free_allocated_q;
 	     assign free_allocated_s
-	       = |(next_free_ocvc & (vc_gnt_ocvc | vc_allocated_ocvc_q));
+	       = |(next_free_ocvc & 
+		   (vc_allocated_q ? vc_allocated_ocvc_q : vc_gnt_ocvc));
 	     c_dff
 	       #(.width(1),
 		 .reset_value(1'b1),

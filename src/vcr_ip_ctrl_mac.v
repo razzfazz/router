@@ -573,6 +573,8 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_read_offset_ivc;
    wire [0:num_vcs-1] 			    fbc_empty_ivc;
+   wire [0:num_vcs-1] 			    allocated_ivc;
+   wire [0:num_vcs*num_vcs-1] 		    allocated_ivc_ovc;
    wire [0:num_vcs-1] 			    free_unallocated_ivc;
    wire [0:num_vcs-1] 			    free_allocated_ivc;
    wire [0:num_vcs*7-1] 		    ivcc_errors_ivc;
@@ -618,6 +620,8 @@ module vcr_ip_ctrl_mac
 	   wire [0:fbf_addr_width-1] 	  fbc_write_addr;
 	   wire [0:fbf_addr_width-1] 	  fbc_read_addr;
 	   wire 			  fbc_empty;
+	   wire 			  allocated;
+	   wire [0:num_vcs-1] 		  allocated_ovc;
 	   wire 			  free_unallocated;
 	   wire 			  free_allocated;
 	   wire [0:6] 			  ivcc_errors;
@@ -674,6 +678,8 @@ module vcr_ip_ctrl_mac
 	      .fbc_write_addr(fbc_write_addr),
 	      .fbc_read_addr(fbc_read_addr),
 	      .fbc_empty(fbc_empty),
+	      .allocated(allocated),
+	      .allocated_ovc(allocated_ovc),
 	      .free_unallocated(free_unallocated),
 	      .free_allocated(free_allocated),
 	      .errors(ivcc_errors),
@@ -707,6 +713,9 @@ module vcr_ip_ctrl_mac
 		    = fbc_read_addr[fbf_addr_width-flit_buffer_idx_width:
 				    fbf_addr_width-1];
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
+	   assign allocated_ivc[ivc] = allocated;
+	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
+		    = allocated_ovc;
 	   assign free_unallocated_ivc[ivc] = free_unallocated;
 	   assign free_allocated_ivc[ivc] = free_allocated;
 	   assign ivcc_errors_ivc[ivc*7:(ivc+1)*7-1] = ivcc_errors;
@@ -753,6 +762,7 @@ module vcr_ip_ctrl_mac
    wire 					    sw_ognt_nonspec;
    assign sw_ognt_nonspec = |sw_ognt_nonspec_op;
    
+   wire [0:num_vcs-1] 				    vc_sel_spec_ivc;
    wire [0:num_vcs-1] 				    vc_sel_ivc;
    wire 					    flit_sent;
    
@@ -768,7 +778,6 @@ module vcr_ip_ctrl_mac
 	   wire [0:num_ports-1] sw_oreq_spec_unqual_op;
 	   wire [0:num_vcs-1] 	sw_gnt_spec_unqual_ivc;
 	   wire [0:num_ports-1] sw_ignt_spec_unqual_op;
-	   wire [0:num_vcs-1] 	vc_sel_spec_ivc;
 	   wire 		allow_update_spec;
 	   vcr_sw_alloc_ip
 	     #(.num_vcs(num_vcs),
@@ -1041,6 +1050,7 @@ module vcr_ip_ctrl_mac
 	   assign sw_ignt_spec_op = {num_ports{1'b0}};
 	   
 	   // selector for flit buffer read address
+	   assign vc_sel_spec_ivc = {num_vcs{1'b0}};
 	   assign vc_sel_ivc = vc_sel_nonspec_ivc;
 	   
 	   // in the absence of speculation, if any output port was granted to 
@@ -1169,16 +1179,75 @@ module vcr_ip_ctrl_mac
       .q(flit_valid_out_q));
    
    generate
+      
       if(num_vcs > 1)
 	begin
+	   
 	   wire [0:vc_idx_width-1] flit_vc;
-	   c_encoder
-	     #(.num_ports(num_vcs))
-	   flit_vc_enc
-	     (.data_in(vc_sel_ivc),
-	      .data_out(flit_vc));
-	   assign int_flit_ctrl_out[1:1+vc_idx_width-1] = flit_vc;
+	   
+	   if(track_vcs_at_output)
+	     begin
+		
+		c_encoder
+		  #(.num_ports(num_vcs))
+		flit_vc_enc
+		  (.data_in(vc_sel_ivc),
+		   .data_out(flit_vc));
+		
+	     end
+	   else
+	     begin
+		
+		wire [0:num_vcs-1] allocated_ovc;
+		c_select_1ofn
+		  #(.num_ports(num_vcs),
+		    .width(num_vcs))
+		allocated_ovc_sel
+		  (.select(vc_sel_nonspec_ivc),
+		   .data_in(allocated_ivc_ovc),
+		   .data_out(allocated_ovc));
+		
+		wire [0:num_vcs-1] dest_ovc;
+		
+		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+		  begin
+		     
+		     wire allocated;
+		     c_select_1ofn
+		       #(.num_ports(num_vcs),
+			 .width(1))
+		     allocated_sel
+		       (.select(vc_sel_ivc),
+			.data_in(allocated_ivc),
+			.data_out(allocated));
+		     
+		     wire [0:num_vcs-1] vc_gnt_ovc;
+		     c_select_1ofn
+		       #(.num_ports(num_vcs),
+			 .width(num_vcs))
+		     vc_gnt_ovc_sel
+		       (.select(vc_sel_spec_ivc),
+			.data_in(vc_gnt_ivc_ovc),
+			.data_out(vc_gnt_ovc));
+		     
+		     assign dest_ovc = allocated ? allocated_ovc : vc_gnt_ovc;
+		     
+		  end
+		else
+		  assign dest_ovc = allocated_ovc;
+		
+		c_encoder
+		  #(.num_ports(num_vcs))
+		flit_vc_enc
+		  (.data_in(dest_ovc),
+		   .data_out(flit_vc));
+		
+	     end
+	   
+	   assign int_flit_ctrl_out_s[1:1+vc_idx_width-1] = flit_vc;
+	   
 	end
+      
    endgenerate
    
    assign int_flit_ctrl_out_s[1+vc_idx_width] = flit_head_muxed;
