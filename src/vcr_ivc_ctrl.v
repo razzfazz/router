@@ -340,8 +340,8 @@ module vcr_ivc_ctrl
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
-   output [0:5] events;
-   wire [0:5] 			  events;
+   output [0:7] events;
+   wire [0:7] 			  events;
    
    
    //---------------------------------------------------------------------------
@@ -1081,6 +1081,9 @@ module vcr_ivc_ctrl
 	   wire 		       ev_no_flit;
 	   assign ev_no_flit = header_valid & ~flit_valid;
 	   
+	   wire 		       ev_flit_ready;
+	   assign ev_flit_ready = header_valid & flit_valid;
+	   
 	   wire 		       ev_flit_stalled_vc;
 	   assign ev_flit_stalled_vc
 	     = header_valid & flit_valid & ~vc_allocated_q & ~vc_gnt;
@@ -1094,6 +1097,10 @@ module vcr_ivc_ctrl
 	       = header_valid & flit_valid & 
 		 (vc_allocated_q & ~sw_gnt_nonspec) | 
 		 (vc_gnt & ~sw_gnt_spec);
+	   
+	   wire 		       ev_spec_attempted;
+	   assign ev_spec_attempted
+	     = header_valid & flit_valid & ~vc_allocated;
 	   
 	   wire 		       ev_spec_failed;
 	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
@@ -1109,15 +1116,17 @@ module vcr_ivc_ctrl
 	   wire 		       ev_flit_sent_spec;
 	   assign ev_flit_sent_spec = flit_sent & ~vc_allocated_q;
 	   
-	   wire [0:5] 		       events_s, events_q;
+	   wire [0:7] 		       events_s, events_q;
 	   assign events_s = {ev_no_flit,
+			      ev_flit_ready,
 			      ev_flit_stalled_vc,
 			      ev_flit_stalled_sw,
+			      ev_spec_attempted,
 			      ev_spec_failed,
 			      ev_flit_sent,
 			      ev_flit_sent_spec};
 	   c_dff
-	     #(.width(6),
+	     #(.width(8),
 	       .reset_type(reset_type))
 	   eventsq
 	     (.clk(clk),
@@ -1128,7 +1137,7 @@ module vcr_ivc_ctrl
 	   
 	end
       else
-	assign events = 6'd0;
+	assign events = 8'd0;
       
    endgenerate
    

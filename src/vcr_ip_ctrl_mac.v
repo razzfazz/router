@@ -578,7 +578,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 			    free_unallocated_ivc;
    wire [0:num_vcs-1] 			    free_allocated_ivc;
    wire [0:num_vcs*7-1] 		    ivcc_errors_ivc;
-   wire [0:num_vcs*6-1] 		    events_ivc;
+   wire [0:num_vcs*8-1] 		    events_ivc;
    
    genvar 				    ivc;
    
@@ -625,7 +625,7 @@ module vcr_ip_ctrl_mac
 	   wire 			  free_unallocated;
 	   wire 			  free_allocated;
 	   wire [0:6] 			  ivcc_errors;
-	   wire [0:5] 			  events;
+	   wire [0:7] 			  events;
 	   vcr_ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -719,7 +719,7 @@ module vcr_ip_ctrl_mac
 	   assign free_unallocated_ivc[ivc] = free_unallocated;
 	   assign free_allocated_ivc[ivc] = free_allocated;
 	   assign ivcc_errors_ivc[ivc*7:(ivc+1)*7-1] = ivcc_errors;
-	   assign events_ivc[ivc*6:(ivc+1)*6-1] = events;
+	   assign events_ivc[ivc*8:(ivc+1)*8-1] = events;
 	   
 	end
       
@@ -1352,9 +1352,9 @@ module vcr_ip_ctrl_mac
       if(perf_ctr_enable > 0)
 	begin
 	   
-	   wire [0:6*num_vcs-1] events;
+	   wire [0:8*num_vcs-1] events;
 	   c_interleaver
-	     #(.width(num_vcs*6),
+	     #(.width(num_vcs*8),
 	       .num_blocks(num_vcs))
 	   events_intl
 	     (.data_in(events_ivc),
@@ -1362,7 +1362,7 @@ module vcr_ip_ctrl_mac
 	   
 	   genvar ctr;
 	   
-	   for(ctr = 0; ctr < 6; ctr = ctr + 1)
+	   for(ctr = 0; ctr < 8; ctr = ctr + 1)
 	     begin:ctrs
 		
 		wire [0:num_vcs-1] ctr_events;
