@@ -1100,7 +1100,7 @@ module vcr_ivc_ctrl
 	   
 	   wire 		       ev_spec_attempted;
 	   assign ev_spec_attempted
-	     = header_valid & flit_valid & ~vc_allocated;
+	     = header_valid & flit_valid & ~vc_allocated_q;
 	   
 	   wire 		       ev_spec_failed;
 	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
