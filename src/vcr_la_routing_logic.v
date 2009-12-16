@@ -144,8 +144,8 @@ module vcr_la_routing_logic
 	   else
 	     assign dest_router_address
 	       = inc_rc ?
-		 hop_route_info[0:router_addr_width-1] :
-		 hop_route_info[router_addr_width:2*router_addr_width-1];
+		 hop_route_info[router_addr_width:2*router_addr_width-1] :
+		 hop_route_info[0:router_addr_width-1];
 	   
 	   wire next_inc_rc;
 	   assign next_inc_rc = (next_router_address == dest_router_address);
