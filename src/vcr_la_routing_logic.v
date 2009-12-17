@@ -139,16 +139,23 @@ module vcr_la_routing_logic
       if(num_resource_classes > 1)
 	begin
 	   
-	   if(resource_class == (num_resource_classes - 1))
-	     assign dest_router_address = hop_route_info[0:router_addr_width-1];
-	   else
-	     assign dest_router_address
-	       = inc_rc ?
-		 hop_route_info[router_addr_width:2*router_addr_width-1] :
-		 hop_route_info[0:router_addr_width-1];
-	   
 	   wire next_inc_rc;
-	   assign next_inc_rc = (next_router_address == dest_router_address);
+	   
+	   if(resource_class == (num_resource_classes - 1))
+	     begin
+		assign dest_router_address
+		  = hop_route_info[0:router_addr_width-1];
+		assign next_inc_rc = 1'b0;
+	     end
+	   else
+	     begin
+		assign dest_router_address
+		  = inc_rc ?
+		    hop_route_info[router_addr_width:2*router_addr_width-1] :
+		    hop_route_info[0:router_addr_width-1];
+		assign next_inc_rc
+		  = (next_router_address == dest_router_address);
+	     end
 	   
 	   assign la_route_info[port_idx_width] = next_inc_rc;
 	   
