@@ -43,6 +43,9 @@ module c_regfile
    // width of each entry
    parameter width = 64;
    
+   // number of read ports
+   parameter num_read_ports = 1;
+   
    // select implementation variant
    parameter regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -61,13 +64,14 @@ module c_regfile
    input [0:width-1] write_data;
    
    // entry to read out
-   input [0:addr_width-1] read_address;
+   input [0:num_read_ports*addr_width-1] read_address;
    
    // contents of entry selected by read_address
-   output [0:width-1] read_data;
-   wire [0:width-1] read_data;
+   output [0:num_read_ports*width-1] read_data;
+   wire [0:num_read_ports*width-1] read_data;
    
    genvar 	    level;
+   genvar 	    read_port;
    
    generate
       
@@ -87,12 +91,28 @@ module c_regfile
 	       
 	       `REGFILE_TYPE_LAT_2D:
 		 always @(clk, write_enable, write_address, write_data)
-		   if(~clk & write_enable)
-		     storage[write_address] <= write_data;
+		   if(~clk)
+		     if(write_enable)
+		       storage[write_address] <= write_data;
 	       
 	     endcase
 	     
-	     assign read_data = storage[read_address];
+	     for(read_port = 0; read_port < num_read_ports; 
+		 read_port = read_port + 1)
+	       begin:read_ports
+		  
+		  wire [0:addr_width-1] port_read_address;
+		  assign port_read_address
+		    = read_address[read_port*addr_width:
+				   (read_port+1)*addr_width-1];
+		  
+		  wire [0:width-1] 	port_read_data;
+		  assign port_read_data = storage[port_read_address];
+		  
+		  assign read_data[read_port*width:(read_port+1)*width-1]
+			   = port_read_data;
+		  
+	       end
 	     
 	  end
 	
@@ -118,8 +138,9 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_LAT_1D_MUX:
 		      always @(clk, write, write_data)
-			if(~clk & write)
-			  storage <= write_data;
+			if(~clk)
+			  if(write)
+			    storage <= write_data;
 		    
 		  endcase
 		  
@@ -151,15 +172,31 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_LAT_1D_TRISTATE:
 		      always @(clk, write, write_data)
-			if(~clk & write)
-			  storage <= write_data;
+			if(~clk)
+			  if(write)
+			    storage <= write_data;
 		    
 		  endcase
 		  
-		  wire 		  read;
-		  assign read = (read_address == level);
-		  
-		  assign read_data = read ? storage : {width{1'bz}};
+		  for(read_port = 0; read_port < num_read_ports;
+		      read_port = read_port + 1)
+		    begin:read_ports
+		       
+		       wire [0:addr_width-1] port_read_address;
+		       assign port_read_address
+			 = read_address[read_port*addr_width:
+					(read_port+1)*addr_width-1];
+		       
+		       wire read;
+		       assign read = (port_read_address == level);
+		       
+		       wire [0:width-1] port_read_data;
+		       assign port_read_data = read ? storage : {width{1'bz}};
+		       
+		       assign read_data[read_port*width:(read_port+1)*width-1]
+				= port_read_data;
+		       
+		    end
 		  
 	       end
 	     
@@ -171,38 +208,119 @@ module c_regfile
 	     wire write_enable_b;
 	     assign write_enable_b = ~write_enable;
 	     
-	     case(regfile_type)
+	     case(num_read_ports)
 	       
-	       `REGFILE_TYPE_FF_DW:
+	       1:
 		 begin
-		    DW_ram_r_w_s_dff
-		      #(.data_width(width),
-			.depth(depth),
-			.rst_mode(1))
-		    DW_rf_dff
-		      (.clk(clk),
-		       .rst_n(1'b1),
-		       .cs_n(write_enable_b),
-		       .wr_n(write_enable_b),
-		       .rd_addr(read_address),
-		       .wr_addr(write_address),
-		       .data_in(write_data),
-		       .data_out(read_data));
+		    
+		    case(regfile_type)
+		      
+		      `REGFILE_TYPE_FF_DW:
+			begin
+			   DW_ram_r_w_s_dff
+			     #(.data_width(width),
+			       .depth(depth),
+			       .rst_mode(1))
+			   DW_rf_dff
+			     (.clk(clk),
+			      .rst_n(1'b1),
+			      .cs_n(write_enable_b),
+			      .wr_n(write_enable_b),
+			      .rd_addr(read_address),
+			      .wr_addr(write_address),
+			      .data_in(write_data),
+			      .data_out(read_data));
+			end
+		      
+		      `REGFILE_TYPE_LAT_DW:
+			begin
+			   DW_ram_r_w_s_lat
+			     #(.data_width(width),
+			       .depth(depth))
+			   DW_rf_lat
+			     (.clk(clk),
+			      .cs_n(write_enable_b),
+			      .wr_n(write_enable_b),
+			      .rd_addr(read_address),
+			      .wr_addr(write_address),
+			      .data_in(write_data),
+			      .data_out(read_data));
+			end
+		      
+		    endcase
+
 		 end
-	
-	       `REGFILE_TYPE_LAT_DW:
+	       
+	       2:
 		 begin
-		    DW_ram_r_w_s_lat
-		      #(.data_width(width),
-			.depth(depth))
-		    DW_rf_lat
-		      (.clk(clk),
-		       .cs_n(write_enable_b),
-		       .wr_n(write_enable_b),
-		       .rd_addr(read_address),
-		       .wr_addr(write_address),
-		       .data_in(write_data),
-		       .data_out(read_data));
+		    
+		    wire [0:addr_width-1] read_address_1;
+		    assign read_address_1
+		      = read_address[0:addr_width-1];
+		    
+		    wire [0:addr_width-1] read_address_2;
+		    assign read_address_2
+		      = read_address[addr_width:2*addr_width-1];
+		    
+		    wire [0:width-1] 	  read_data_1;
+		    wire [0:width-1] 	  read_data_2;
+		    
+		    case(regfile_type)
+		      
+		      `REGFILE_TYPE_FF_DW:
+			begin
+			   DW_ram_r_w_s_dff
+			     #(.data_width(width),
+			       .depth(depth),
+			       .rst_mode(1))
+			   DW_rf_dff
+			     (.clk(clk),
+			      .rst_n(1'b1),
+			      .cs_n(write_enable_b),
+			      .wr_n(write_enable_b),
+			      .rd1_addr(read_address_1),
+			      .rd2_addr(read_address_2),
+			      .wr_addr(write_address),
+			      .data_in(write_data),
+			      .data_rd1_out(read_data_1),
+			      .data_rd2_out(read_data_2));
+			end
+		      
+		      `REGFILE_TYPE_LAT_DW:
+			begin
+			   DW_ram_r_w_s_lat
+			     #(.data_width(width),
+			       .depth(depth))
+			   DW_rf_lat
+			     (.clk(clk),
+			      .cs_n(write_enable_b),
+			      .wr_n(write_enable_b),
+			      .rd1_addr(read_address_1),
+			      .rd2_addr(read_address_2),
+			      .wr_addr(write_address),
+			      .data_in(write_data),
+			      .data_rd1_out(read_data_1),
+			      .data_rd2_out(read_data_2));
+			end
+		      
+		    endcase
+		    
+		    assign read_data = {read_data_1, read_data_2};
+		    
+		 end
+	       
+	       default:
+		 begin
+		    
+		    // synopsys translate_off
+		    initial
+		    begin
+		       $display({"ERROR: DesignWare only provides register ",
+				 "file models with up to two read ports."});
+		       $stop;
+		    end
+		    // synopsys translate_on
+		    
 		 end
 	       
 	     endcase
