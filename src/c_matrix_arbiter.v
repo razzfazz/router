@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic matrix arbiter
 module c_matrix_arbiter
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -43,9 +43,7 @@ module c_matrix_arbiter
    
    input clk;
    input reset;
-   
-   // update port priorities
-   input update;
+   input active;
    
    // request vector
    input [0:num_ports-1] req;
@@ -53,6 +51,9 @@ module c_matrix_arbiter
    // grant vector
    output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
+   
+   // update port priorities
+   input update;
    
    generate
       
@@ -87,11 +88,10 @@ module c_matrix_arbiter
 		  begin
 		     
 		     wire [(row+1):num_ports-1] prio_s, prio_q;
-		     assign prio_s
-		       = update ?
-			 (prio_q | gnt[(row+1):num_ports-1]) &
-			 ~{(num_ports-row-1){gnt[row]}} :
-			 prio_q;
+		     assign prio_s = update ? 
+				     ((prio_q | gnt[(row+1):num_ports-1]) &
+				      ~{(num_ports-row-1){gnt[row]}}) : 
+				     prio_q;
 		     c_dff
 		       #(.width(num_ports-row-1),
 			 .offset(row+1),
@@ -100,6 +100,7 @@ module c_matrix_arbiter
 		     prioq
 		       (.clk(clk),
 			.reset(reset),
+			.active(active),
 			.d(prio_s),
 			.q(prio_q));
 		     

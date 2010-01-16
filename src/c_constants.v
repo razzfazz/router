@@ -33,37 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `ifndef _C_CONSTANTS_V_
 `define _C_CONSTANTS_V_
 
-//------------------------------------------------------------------------------
-// network topologies
-//------------------------------------------------------------------------------
-
-// mesh
-`define TOPOLOGY_MESH  0
-
-// torus
-`define TOPOLOGY_TORUS 1
-
-// flattened butterfly
-`define TOPOLOGY_FBFLY 2
-
-`define TOPOLOGY_LAST  `TOPOLOGY_FBFLY
-
-
-//------------------------------------------------------------------------------
-// what does connectivity look like within a dimension?
-//------------------------------------------------------------------------------
-
-// nodes are connected to their neighbors with no wraparound (e.g. mesh)
-`define CONNECTIVITY_LINE 0
-
-// nodes are connected to their neighbors with wraparound (e.g. torus)
-`define CONNECTIVITY_RING 1
-
-// nodes are fully connected (e.g. flattened butterfly)
-`define CONNECTIVITY_FULL 2
-
-`define CONNECTIVITY_LAST `CONNECTIVITY_FULL
-
 
 //------------------------------------------------------------------------------
 // router implementations
@@ -76,40 +45,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define ROUTER_TYPE_VC       1
 
 `define ROUTER_TYPE_LAST `ROUTER_TYPE_VC
-
-
-//------------------------------------------------------------------------------
-// routing function types
-//------------------------------------------------------------------------------
-
-// dimension-order routing (using multiple phases if num_resource_classes > 1)
-`define ROUTING_TYPE_DOR 0
-
-`define ROUTING_TYPE_LAST `ROUTING_TYPE_DOR
-
-
-//------------------------------------------------------------------------------
-// dimension order
-//------------------------------------------------------------------------------
-
-// traverse dimensions in ascending order
-`define DIM_ORDER_ASCENDING  0
-
-// traverse dimensions in descending order
-`define DIM_ORDER_DESCENDING 1
-
-
-//------------------------------------------------------------------------------
-// packet formats
-//------------------------------------------------------------------------------
-
-// packets are delimited by head and tail bits
-`define PACKET_FORMAT_HEAD_TAIL       0
-
-// head flits are identified by header bit, and contain encoded packet length
-`define PACKET_FORMAT_EXPLICIT_LENGTH 1
-
-`define PACKET_FORMAT_LAST `PACKET_FORMAT_EXPLICIT_LENGTH
 
 
 //------------------------------------------------------------------------------
@@ -219,10 +154,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // set of registers with moving read and write pointer
 `define FIFO_TYPE_INDEXED  1
 
-// DesignWare FIFO implementation
-`define FIFO_TYPE_DW       2
-
-`define FIFO_TYPE_LAST `FIFO_TYPE_DW
+`define FIFO_TYPE_LAST `FIFO_TYPE_INDEXED
 
 
 //------------------------------------------------------------------------------

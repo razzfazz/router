@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic wavefront allocator synthesis wrapper
 module c_wf_alloc_wrapper
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt);
    
 `include "c_constants.v"
    
@@ -43,16 +43,11 @@ module c_wf_alloc_wrapper
    // select implementation variant
    parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
-   
-   // update arbitration priorities
-   input update;
+   input active;
    
    // request matrix
    input [0:num_ports*num_ports-1] req;
@@ -68,6 +63,7 @@ module c_wf_alloc_wrapper
    reqq
      (.clk(clk),
       .reset(1'b0),
+      .active(active),
       .d(req),
       .q(req_int));
    
@@ -78,18 +74,18 @@ module c_wf_alloc_wrapper
    gntq
      (.clk(clk),
       .reset(1'b0),
+      .active(active),
       .d(gnt_int),
       .q(gnt));
    
    c_wf_alloc
      #(.num_ports(num_ports),
        .wf_alloc_type(wf_alloc_type),
-       .error_recovery(error_recovery),
        .reset_type(reset_type))
    alloc
      (.clk(clk),
       .reset(reset),
-      .update(update),
+      .active(active),
       .req(req_int),
       .gnt(gnt_int));
    

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic round-robin arbiter
 module c_rr_arbiter
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -43,9 +43,7 @@ module c_rr_arbiter
    
    input clk;
    input reset;
-   
-   // update priority vector
-   input update;
+   input active;
    
    // vector of requests
    input [0:num_ports-1] req;
@@ -53,6 +51,9 @@ module c_rr_arbiter
    // vector of grants
    output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
+   
+   // update port priorities
+   input update;
    
    generate
       
@@ -102,9 +103,6 @@ module c_rr_arbiter
 	     (.data_in(gnt_rev),
 	      .data_out(gnt));
 	   
-	   // The worst-case effect of bit errors in prev_q is screwing up 
-	   // priorities until the next update; this only affects performance, 
-	   // not functionality, so no need to add protection here.
 	   wire [0:num_ports-2] prev_s;
 	   assign prev_s = update ? gnt_rev[1:num_ports-1] : prev_q;
 	   c_dff
@@ -113,6 +111,7 @@ module c_rr_arbiter
 	   prevq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(active),
 	      .d(prev_s),
 	      .q(prev_q));
 	   

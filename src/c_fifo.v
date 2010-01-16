@@ -32,7 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic FIFO buffer built from registers
 module c_fifo
-  (clk, reset, full, data_in, push, empty, data_out, pop, errors);
+  (clk, reset, active, almost_full, full, write_data, push, almost_empty, empty,
+   read_data, peek_data, pop, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -59,24 +60,37 @@ module c_fifo
    
    input clk;
    input reset;
+   input active;
+   
+   // a single entry is not occupied
+   output almost_full;
+   wire almost_full;
    
    // all entries occupied
    output full;
    wire full;
    
    // input data
-   input [0:width-1] data_in;
+   input [0:width-1] write_data;
    
-   // write data from data_in into shift register
+   // write data from write_data into shift register
    input push;
    
-   // no entries occupied
+   // a single entry is occupied
+   output almost_empty;
+   wire almost_empty;
+   
+   // no entries are occupied
    output empty;
    wire empty;
    
    // output data (head element)
-   output [0:width-1] data_out;
-   wire [0:width-1] data_out;
+   output [0:width-1] read_data;
+   wire [0:width-1] read_data;
+   
+   // output data (next element)
+   output [0:width-1] peek_data;
+   wire [0:width-1] peek_data;
    
    // remove head element from shift register
    input pop;
@@ -132,12 +146,13 @@ module c_fifo
 	     insert_ptrq
 	       (.clk(clk),
 		.reset(reset),
+		.active(active),
 		.d(insert_ptr_s),
 		.q(insert_ptr_q));
 	     
+	     assign almost_full = (insert_ptr_q == 1);
 	     assign full = ~|insert_ptr_q;
 	     
-	     wire 			   almost_empty;
 	     assign almost_empty = (insert_ptr_q == (depth - 1));
 	     
 	     wire 			   empty_s, empty_q;
@@ -150,6 +165,7 @@ module c_fifo
 	     emptyq
 	       (.clk(clk),
 		.reset(reset),
+		.active(active),
 		.d(empty_s),
 		.q(empty_q));
 	     
@@ -167,19 +183,22 @@ module c_fifo
 		  assign shift = pop;
 		  
 		  wire [0:width-1] data_s;
-		  assign data_s
-		    = capture ? data_in : data[level*width:(level+1)*width-1];
+		  assign data_s = capture ? 
+				  write_data : 
+				  data[level*width:(level+1)*width-1];
 		  
 		  reg [0:width-1] data_q;
 		  always @(posedge clk)
-		    if(capture | shift)
-		      data_q <= data_s;
+		    if(active)
+		      if(capture | shift)
+			data_q <= data_s;
 		  
 		  assign data[(level+1)*width:(level+2)*width-1] = data_q;
 		  
 	       end
 	     
-	     assign data_out = data[depth*width:(depth+1)*width-1];
+	     assign read_data = data[depth*width:(depth+1)*width-1];
+	     assign peek_data = data[(depth-1)*width:depth*width-1];
 	     
 	     wire 		   error_underflow;
 	     assign error_underflow = empty & pop & ~push;
@@ -193,10 +212,8 @@ module c_fifo
 	
 	`FIFO_TYPE_INDEXED:
 	  begin
-
-	     wire [0:rw_ptr_width-1] read_ptr, write_ptr;
-	     wire 		     almost_empty;
-	     wire 		     almost_full;
+	     
+	     wire [0:rw_ptr_width-1] write_ptr, read_ptr, peek_ptr;
 	     c_fifo_ctrl
 	       #(.addr_width(rw_ptr_width),
 		 .offset(0),
@@ -205,10 +222,12 @@ module c_fifo
 	     ctrl
 	       (.clk(clk),
 		.reset(reset),
+		.active(active),
 		.push(push),
 		.pop(pop),
 		.write_addr(write_ptr),
 		.read_addr(read_ptr),
+		.peek_addr(peek_ptr),
 		.almost_empty(almost_empty),
 		.empty(empty),
 		.almost_full(almost_full),
@@ -218,53 +237,12 @@ module c_fifo
 	     reg [0:width-1] 	     storage [0:depth-1];
 	     
 	     always @(posedge clk)
-	       if(push)
-		 storage[write_ptr] <= data_in;
+	       if(active)
+		 if(push)
+		   storage[write_ptr] <= write_data;
 	     
-	     assign data_out = storage[read_ptr];
-	     
-	  end
-	
-	`FIFO_TYPE_DW:
-	  begin
-	     
-	     wire rst_n;
-	     if(reset_type != `RESET_TYPE_NONE)
-	       assign rst_n = ~reset;
-	     else
-	       assign rst_n = 1'b1;
-	     
-	     wire push_req_n;
-	     assign push_req_n = ~push;
-	     
-	     wire pop_req_n;
-	     assign pop_req_n = ~pop;
-	     
-	     wire almost_empty;
-	     wire half_full;
-	     wire almost_full;
-	     wire error;
-	     DW_fifo_s1_sf
-	       #(.width(width),
-		 .depth(depth),
-		 .err_mode(2),
-		 .rst_mode((reset_type == `RESET_TYPE_ASYNC) ? 2 : 3))
-	     dw_fifo
-	       (.clk(clk),
-		.rst_n(rst_n),
-		.push_req_n(push_req_n),
-		.pop_req_n(pop_req_n),
-		.diag_n(1'b1),
-		.data_in(data_in),
-		.empty(empty),
-		.almost_empty(almost_empty),
-		.half_full(half_full),
-		.almost_full(almost_full),
-		.full(full),
-		.error(error),
-		.data_out(data_out));
-	     
-	     assign errors = {error, 1'b0};
+	     assign read_data = storage[read_ptr];
+	     assign peek_data = storage[peek_ptr];
 	     
 	  end
 	

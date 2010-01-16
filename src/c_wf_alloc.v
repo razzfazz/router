@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic wavefront allocator
 module c_wf_alloc
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt);
    
 `include "c_constants.v"
    
@@ -43,16 +43,11 @@ module c_wf_alloc
    // select implementation variant
    parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
-   // try to recover from errors
-   parameter error_recovery = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
-   
-   // update arbitration priorities
-   input update;
+   input active;
    
    // request matrix
    input [0:num_ports*num_ports-1] req;
@@ -68,12 +63,11 @@ module c_wf_alloc
 	  begin
 	     c_wf_alloc_mux
 	       #(.num_ports(num_ports),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_mux
 	       (.clk(clk),
 		.reset(reset),
-		.update(update),
+		.active(active),
 		.req(req),
 		.gnt(gnt));
 	  end
@@ -81,12 +75,11 @@ module c_wf_alloc
 	  begin
 	     c_wf_alloc_rep
 	       #(.num_ports(num_ports),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_rep
 	       (.clk(clk),
 		.reset(reset),
-		.update(update),
+		.active(active),
 		.req(req),
 		.gnt(gnt));
 	  end
@@ -94,12 +87,11 @@ module c_wf_alloc
 	  begin
 	     c_wf_alloc_dpa
 	       #(.num_ports(num_ports),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_dpa
 	       (.clk(clk),
 		.reset(reset),
-		.update(update),
+		.active(active),
 		.req(req),
 		.gnt(gnt));
 	  end      
@@ -107,12 +99,11 @@ module c_wf_alloc
 	  begin
 	     c_wf_alloc_rot
 	       #(.num_ports(num_ports),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_rot
 	       (.clk(clk),
 		.reset(reset),
-		.update(update),
+		.active(active),
 		.req(req),
 		.gnt(gnt));
 	  end
@@ -120,12 +111,11 @@ module c_wf_alloc
 	  begin
 	     c_wf_alloc_loop
 	       #(.num_ports(num_ports),
-		 .error_recovery(error_recovery),
 		 .reset_type(reset_type))
 	     core_loop
 	       (.clk(clk),
 		.reset(reset),
-		.update(update),
+		.active(active),
 		.req(req),
 		.gnt(gnt));
 	  end

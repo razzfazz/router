@@ -29,18 +29,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 
-
 // module to filter output port requests based on turn restrictions
-module c_port_filter
+module rtr_port_filter
   (route_in_op, inc_rc, route_out_op, error);
    
+   
 `include "c_constants.v"
+   
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
+   
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
    
    // number of input and output ports on router
    parameter num_ports = 5;
@@ -65,11 +69,24 @@ module c_port_filter
    // ID of current port
    parameter port_id = 0;
    
-   // current message class
-   parameter message_class = 0;
+   // ID of current VC
+   parameter vc_id = 0;
    
-   // current resource class
-   parameter resource_class = 0;
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // message class to which this VC belongs
+   localparam message_class
+     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
+   
+   // resource class to which this VC belongs
+   localparam resource_class
+     = (vc_id / num_vcs_per_class) % num_resource_classes;
+   
+   // packet class to which this VC belongs
+   localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
+   
    
    // unmasked output port
    input [0:num_ports-1] route_in_op;
@@ -85,6 +102,7 @@ module c_port_filter
    // internal error condition detected
    output error;
    wire error;   
+   
    
    wire [0:num_ports-1] route_restricted_op;
    wire [0:num_ports-1] error_op;

@@ -34,16 +34,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // described in Hurt et al, "Design and Implementation of High-Speed Symmetric 
 // Crossbar Schedulers"
 module c_wf_alloc_dpa
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt);
    
 `include "c_constants.v"
    
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
-   
-   // try to recover from errors
-   parameter error_recovery = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -53,9 +50,7 @@ module c_wf_alloc_dpa
    
    input clk;
    input reset;
-   
-   // update arbitration priorities
-   input update;
+   input active;
    
    // request matrix
    input [0:num_ports*num_ports-1] req;
@@ -64,21 +59,14 @@ module c_wf_alloc_dpa
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
-   // Need to make sure priority is one-hot, otherwise conflicting grants can be
-   // generated!
-   wire [0:(2*num_ports-1)-1] 	  prio_s, prio_q;
-   wire 			  prio_bad;
-   assign prio_bad = ^prio_q ^ ^prio_init;
+   wire [0:(2*num_ports-1)-1] 	  prio_q;
    
    wire 			  reset_prio;
-   assign reset_prio = ~|prio_q[0:(num_ports-1)-1] ||
-		       (error_recovery && prio_bad);
+   assign reset_prio = ~|prio_q[0:(num_ports-1)-1];
    
-   assign prio_s = update ?
-		   (reset_prio ?
-		    prio_init :
-		    {1'b0, prio_q[0:(2*num_ports-1)-2]}) :
-		   prio_q;
+   wire [0:(2*num_ports-1)-1] 	  prio_s;
+   assign prio_s
+     = reset_prio ? prio_init : {1'b0, prio_q[0:(2*num_ports-1)-2]};
    c_dff
      #(.width(2*num_ports-1),
        .reset_type(reset_type),
@@ -86,6 +74,7 @@ module c_wf_alloc_dpa
    prioq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(prio_s),
       .q(prio_q));
    

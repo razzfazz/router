@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // error reporting module
 module c_err_rpt
-  (clk, reset, errors_in, errors_out);
+  (clk, reset, active, errors_in, errors_out);
    
 `include "c_constants.v"
    
@@ -47,7 +47,8 @@ module c_err_rpt
    
    input clk;
    input reset;
-
+   input active;
+   
    // raw error inputs
    input [0:num_errors-1] errors_in;
    
@@ -87,6 +88,7 @@ module c_err_rpt
 	   errorsq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(active),
 	      .d(errors_s),
 	      .q(errors_q));
 	   

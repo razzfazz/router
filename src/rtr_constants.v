@@ -28,82 +28,85 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// global constant definitions
+// router-related constant definitions
 
-`ifndef _VCR_CONSTANTS_V_
-`define _VCR_CONSTANTS_V_
-
-`include "c_constants.v"
-
-//------------------------------------------------------------------------------
-// credit handling implementation variants
-//------------------------------------------------------------------------------
-
-// indicate credit level to input side
-`define INT_FLOW_CTRL_TYPE_LEVEL 0
-
-// push credits to input side one by one
-`define INT_FLOW_CTRL_TYPE_PUSH  1
-
-`define INT_FLOW_CTRL_TYPE_LAST `INT_FLOW_CTRL_TYPE_PUSH
+`ifndef _RTR_CONSTANTS_V_
+`define _RTR_CONSTANTS_V_
 
 
 //------------------------------------------------------------------------------
-// VC allocator implementation variants
+// topology types
 //------------------------------------------------------------------------------
 
-// separable, input-first
-`define VC_ALLOC_TYPE_SEP_IF    0
+// mesh
+`define TOPOLOGY_MESH  0
 
-// separable, output-first
-`define VC_ALLOC_TYPE_SEP_OF    1
+// torus
+`define TOPOLOGY_TORUS 1
 
-// wavefront-based
-// (note: add WF_ALLOC_TYPE_* constant to select wavefront variant)
-`define VC_ALLOC_TYPE_WF_BASE   2
-`define VC_ALLOC_TYPE_WF_LIMIT  (`VC_ALLOC_TYPE_WF_BASE + `WF_ALLOC_TYPE_LAST)
+// flattened butterfly
+`define TOPOLOGY_FBFLY 2
 
-`define VC_ALLOC_TYPE_LAST `VC_ALLOC_TYPE_WF_LIMIT
+`define TOPOLOGY_LAST  `TOPOLOGY_FBFLY
 
 
 //------------------------------------------------------------------------------
-// switch allocator implementation variants
+// degrees of connectivity within each dimension
 //------------------------------------------------------------------------------
 
-// separable, input-first
-`define SW_ALLOC_TYPE_SEP_IF   0
+// nodes are connected to their neighbors with no wraparound (e.g. mesh)
+`define CONNECTIVITY_LINE 0
 
-// separable, output-first
-`define SW_ALLOC_TYPE_SEP_OF   1
+// nodes are connected to their neighbors with wraparound (e.g. torus)
+`define CONNECTIVITY_RING 1
 
-// wavefront-based
-// (note: add WF_ALLOC_TYPE_* constant to select wavefront variant)
-`define SW_ALLOC_TYPE_WF_BASE  2
-`define SW_ALLOC_TYPE_WF_LIMIT (`SW_ALLOC_TYPE_WF_BASE + `WF_ALLOC_TYPE_LAST)
+// nodes are fully connected (e.g. flattened butterfly)
+`define CONNECTIVITY_FULL 2
 
-`define SW_ALLOC_TYPE_LAST `SW_ALLOC_TYPE_WF_LIMIT
+`define CONNECTIVITY_LAST `CONNECTIVITY_FULL
 
 
 //------------------------------------------------------------------------------
-// speculation types for switch allocator
+// routing function types
 //------------------------------------------------------------------------------
 
-// disable speculative switch allocation
-`define SW_ALLOC_SPEC_TYPE_NONE           0
+// dimension-order routing (using multiple phases if num_resource_classes > 1)
+`define ROUTING_TYPE_DOR 0
 
-// use non-speculative requests to mask non-speculative grants
-`define SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS 1
+`define ROUTING_TYPE_LAST `ROUTING_TYPE_DOR
 
-// use non-speculative requests to mask speculative requests
-`define SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS 2
 
-// use non-speculative grants to mask non-speculative grants
-`define SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS 3
+//------------------------------------------------------------------------------
+// order of dimension traversal
+//------------------------------------------------------------------------------
 
-// use non-speculative grants to mask speculative requests
-`define SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS 4
+// traverse dimensions in ascending order
+`define DIM_ORDER_ASCENDING  0
 
-`define SW_ALLOC_SPEC_TYPE_LAST `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS
+// traverse dimensions in descending order
+`define DIM_ORDER_DESCENDING 1
 
+
+//------------------------------------------------------------------------------
+// packet formats
+//------------------------------------------------------------------------------
+
+// packets are delimited by head and tail bits
+`define PACKET_FORMAT_HEAD_TAIL       0
+
+// head flits are identified by header bit, and contain encoded packet length
+`define PACKET_FORMAT_EXPLICIT_LENGTH 1
+
+`define PACKET_FORMAT_LAST `PACKET_FORMAT_EXPLICIT_LENGTH
+
+
+//------------------------------------------------------------------------------
+// flow control types
+//------------------------------------------------------------------------------
+
+// credit-based flow control
+`define FLOW_CTRL_TYPE_CREDIT 0
+
+`define FLOW_CTLR_TYPE_LAST `FLOW_CTLR_TYPE_CREDIT
 
 `endif

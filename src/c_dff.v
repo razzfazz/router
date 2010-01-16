@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // configurable register
 module c_dff
-  (clk, reset, d, q);
+  (clk, reset, active, d, q);
    
 `include "c_constants.v"
    
@@ -48,6 +48,7 @@ module c_dff
    
    input clk;
    input reset;
+   input active;
    
    // data input
    input [offset:(offset+width)-1] d;
@@ -62,20 +63,21 @@ module c_dff
 	
 	`RESET_TYPE_NONE:
 	  always @(posedge clk)
-	    q <= d;
+	    if(active)
+	      q <= d;
 	
 	`RESET_TYPE_ASYNC:
 	  always @(posedge clk, posedge reset)
 	    if(reset)
 	      q <= reset_value;
-	    else
+	    else if(active)
 	      q <= d;
 	
 	`RESET_TYPE_SYNC:
 	  always @(posedge clk)
 	    if(reset)
 	      q <= reset_value;
-	    else
+	    else if(active)
 	      q <= d;
 	
       endcase 

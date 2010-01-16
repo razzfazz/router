@@ -30,9 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// configurable crossbar module for wormhole router
-module whr_crossbar_mac
-  (clk, reset, ctrl_op_ip, data_in_ip, data_out_op);
+// configurable crossbar module
+module rtr_crossbar_mac
+  (clk, reset, active, ctrl_ip_op, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -50,9 +50,10 @@ module whr_crossbar_mac
       
    input clk;
    input reset;
+   input active;
    
-   // incoming control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_op_ip;
+   // crosspoint control signals
+   input [0:num_in_ports*num_out_ports-1] ctrl_ip_op;
    
    // vector of input data
    input [0:num_in_ports*width-1] data_in_ip;
@@ -61,32 +62,13 @@ module whr_crossbar_mac
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
    
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s, ctrl_op_ip_q;
-   assign ctrl_op_ip_s = ctrl_op_ip;
-   c_dff
-     #(.width(num_out_ports*num_in_ports),
-       .reset_type(reset_type))
-   ctrl_op_ipq
-     (.clk(clk),
-      .reset(reset),
-      .d(ctrl_op_ip_s),
-      .q(ctrl_op_ip_q));
-   
-   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
-   c_interleaver
-     #(.width(num_out_ports*num_in_ports),
-       .num_blocks(num_out_ports))
-   ctrl_ip_op_q_intl
-     (.data_in(ctrl_op_ip_q),
-      .data_out(ctrl_ip_op_q));
-   
    c_crossbar
      #(.num_in_ports(num_in_ports),
        .num_out_ports(num_out_ports),
        .width(width),
        .crossbar_type(crossbar_type))
    xbr
-     (.ctrl_ip_op(ctrl_ip_op_q),
+     (.ctrl_ip_op(ctrl_ip_op),
       .data_in_ip(data_in_ip),
       .data_out_op(data_out_op));
    
