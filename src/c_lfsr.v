@@ -72,101 +72,15 @@ module c_lfsr
    
    wire [offset:(offset+width)-1] state_q;
    
-   wire [0:width-1] 		  feedback_seeds;
-   assign feedback_seeds[0:(width-1)-1] = state_q[offset:(offset+width-1)-1];
-   assign feedback_seeds[width-1]
-	    = (~|state_q[offset:(offset+width-1)-1] & complete) ^ 
-	      state_q[offset+width-1];
-   
-   wire [0:width*width-1] 	  iter_matrix_noshift_transposed;
-   assign iter_matrix_noshift_transposed
-     = {{((width-1)*width){1'b0}}, feedback};
-   
-   wire [0:width*width-1] 	  iter_matrix_noshift;
-   c_interleaver
-     #(.width(width*width),
-       .num_blocks(width))
-   iter_matrix_noshift_intl
-     (.data_in(iter_matrix_noshift_transposed),
-      .data_out(iter_matrix_noshift));
-   
-   wire [0:width*width-1] 	  initial_matrix;
-   
-   wire [0:(iterations+1)*width*width-1] matrices;
-   assign matrices[0:width*width-1] = initial_matrix;
-   
-   wire [0:width*width-1] 		 feedback_matrix;
-   assign feedback_matrix
-     = matrices[iterations*width*width:(iterations+1)*width*width-1];
-   
-   wire [0:width*width-1] 		 iter_matrix;
-   wire [0:width*width-1] 		 feedback_matrix_noshift;
-   
-   generate
-      
-      genvar 				 row;
-      
-      for(row = 0; row < width; row = row + 1)
-	begin:rows
-	   
-	   genvar col;
-	   
-	   for(col = 0; col < width; col = col + 1)
-	     begin:cols
-		
-		wire invert;
-		assign invert = (row == (col + 1));
-		
-		assign iter_matrix[row*width+col]
-			 = iter_matrix_noshift[row*width+col] ^ invert;
-		
-		assign feedback_matrix_noshift[row*width+col]
-			 = feedback_matrix[row*width+col] ^ invert;
-		
-		wire sethi;
-		assign sethi = (row == col);
-		
-		assign initial_matrix[row*width+col] = sethi;
-		
-	     end
-	   
-	end
-      
-      genvar 	     iter;
-      
-      for(iter = 0; iter < iterations; iter = iter+1)
-	begin:iters
-	   
-	   wire [0:width*width-1] in_matrix;
-	   assign in_matrix
-	     = matrices[iter*width*width:(iter+1)*width*width-1];
-	   
-	   wire [0:width*width-1] out_matrix;
-	   c_mat_mult
-	     #(.dim1_width(width),
-	       .dim2_width(width),
-	       .dim3_width(width))
-	   out_matrix_mmult
-	     (.input_a(iter_matrix),
-	      .input_b(in_matrix),
-	      .result(out_matrix));
-	   
-	   assign matrices[(iter+1)*width*width:(iter+2)*width*width-1]
-		    = out_matrix;
-	   
-	end
-      
-   endgenerate
-   
    wire [0:width-1] 		  feedback_sum;
-   c_mat_mult
-     #(.dim1_width(width),
-       .dim2_width(width),
-       .dim3_width(1))
-   feedback_sum_mmult
-     (.input_a(feedback_matrix_noshift),
-      .input_b(feedback_seeds),
-      .result(feedback_sum));
+   c_fbmult
+     #(.width(width),
+       .iterations(iterations))
+   fbmult
+     (.feedback(feedback),
+      .complete(complete),
+      .data_in(state_q),
+      .data_out(feedback_sum));
    
    wire [offset:(offset+width)-1] feedback_value;
    assign feedback_value = {width{~load}} & feedback_sum;
