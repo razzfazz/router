@@ -738,6 +738,7 @@ module vcr_ivc_ctrl
        .restrict_turns(restrict_turns),
        .connectivity(connectivity),
        .routing_type(routing_type),
+       .dim_order(dim_order),
        .port_id(port_id),
        .message_class(message_class),
        .resource_class(resource_class))

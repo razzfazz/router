@@ -177,8 +177,8 @@ module packet_source
    // which router port is this packet source attached to?
    parameter port_id = 0;
    
-   // allow nodes to send packets to themselves
-   parameter allow_loopback = 1;
+   // which dimension does the current input port belong to?
+   localparam curr_dim = port_id / num_neighbors_per_dim;
    
    // maximum packet length (in flits)
    localparam max_packet_length = 1 + max_payload_length;
@@ -580,12 +580,14 @@ module packet_source
    endgenerate
    
    wire [0:la_route_info_width-1] 	  la_route_info;
-
+   
    wire [0:header_info_width-1] 	  header_info;
    assign header_info[0:la_route_info_width-1] = la_route_info;
    
+   wire [0:router_addr_width-1] 	  rc_dest;
+   
    generate
-
+      
       if(num_vcs > 1)
 	begin:la_route_info_mux
 
@@ -596,19 +598,128 @@ module packet_source
 	     = la_route_info_ivc[flit_vc*la_route_info_width +: 
 				 la_route_info_width];
 	   
+	   assign rc_dest = route_info[((flit_vc / num_vcs_per_class) %
+					num_resource_classes)*
+				       router_addr_width +: router_addr_width];
+	   				       
 	end
       else
-	assign la_route_info = la_route_info_ivc;
+	begin
+	   
+	   assign la_route_info = la_route_info_ivc;
+	   
+	   assign rc_dest = route_info[0:router_addr_width-1];
+	   
+	end
       
    endgenerate
    
    wire [0:addr_width-1] 	   source_address;
    assign source_address[0:router_addr_width-1] = router_address;
    
-   assign flit_kill
-     = (port_id >= (num_ports - num_nodes_per_router)) &&
-       (route_info[route_info_width-addr_width:route_info_width-1] ==
-	source_address);
+   wire [0:router_addr_width-1]    curr_dest_addr;
+   
+   generate
+      
+      if(port_id >= (num_ports - num_nodes_per_router))
+	begin
+	   
+	   assign flit_kill
+	     = (route_info[route_info_width-addr_width:route_info_width-1] ==
+		source_address);
+	   
+	end
+      else if(routing_type == `ROUTING_TYPE_DOR)
+	begin
+	   
+	   case(connectivity)
+	     
+	     `CONNECTIVITY_LINE:
+	       begin
+		  
+		  if(((dim_order == `DIM_ORDER_ASCENDING) && 
+		      (curr_dim > 0)) ||
+		     ((dim_order == `DIM_ORDER_DESCENDING) &&
+		      (curr_dim < (num_dimensions - 1))))
+		    begin
+		       
+		       assign flit_kill
+			 = ((dim_order == `DIM_ORDER_ASCENDING) && 
+			    (rc_dest[0:curr_dim*dim_addr_width-1] !=
+			     router_address[0:curr_dim*dim_addr_width-1])) ||
+			   ((dim_order == `DIM_ORDER_DESCENDING) && 
+			    (rc_dest[(curr_dim+1)*dim_addr_width:
+				     router_addr_width-1] !=
+			     router_address[(curr_dim+1)*dim_addr_width:
+					    router_addr_width-1])) ||
+			   (((port_id % 2) == 0) && 
+			    (rc_dest[curr_dim*dim_addr_width:
+				     (curr_dim+1)*dim_addr_width-1] <
+			     router_address[curr_dim*dim_addr_width:
+					    (curr_dim+1)*dim_addr_width-1])) ||
+			   (((port_id % 2) == 1) && 
+			    (rc_dest[curr_dim*dim_addr_width:
+				     (curr_dim+1)*dim_addr_width-1] >
+			     router_address[curr_dim*dim_addr_width:
+					    (curr_dim+1)*dim_addr_width-1]));
+		       
+		    end
+		  else
+		    begin
+		       
+		       assign flit_kill
+			 = (((port_id % 2) == 0) && 
+			    (rc_dest[curr_dim*dim_addr_width:
+				     (curr_dim+1)*dim_addr_width-1] <
+			     router_address[curr_dim*dim_addr_width:
+					    (curr_dim+1)*dim_addr_width-1])) ||
+			   (((port_id % 2) == 1) && 
+			    (rc_dest[curr_dim*dim_addr_width:
+				     (curr_dim+1)*dim_addr_width-1] >
+			     router_address[curr_dim*dim_addr_width:
+					    (curr_dim+1)*dim_addr_width-1]));
+		       
+		    end
+		  
+	       end
+	     
+	     `CONNECTIVITY_RING:
+	       begin
+		  
+		  // FIXME: add implementation here!
+		  
+		  // synopsys translate_off
+		  initial
+		  begin
+		     $display({"ERROR: The routing logic module does not yet ", 
+			       "support ring connectivity within each ", 
+			       "dimension."});
+		     $stop;
+		  end
+		  // synopsys translate_on
+		  
+	       end
+	     
+	     `CONNECTIVITY_FULL:
+	       begin
+		  
+		  assign flit_kill
+		    = ((dim_order == `DIM_ORDER_ASCENDING) &&
+		       (rc_dest[0:(curr_dim+1)*dim_addr_width-1] !=
+			router_address[0:(curr_dim+1)*dim_addr_width-1])) ||
+		      ((dim_order == `DIM_ORDER_DESCENDING) &&
+		       (rc_dest[curr_dim*dim_addr_width:
+				router_addr_width-1] !=
+			router_address[curr_dim*dim_addr_width:
+				       router_addr_width-1]));
+		  
+	       end
+	     
+	   endcase
+	   
+	end
+      
+   endgenerate
    
    reg [0:router_addr_width-1] 	   random_router_address;
    
@@ -643,8 +754,7 @@ module packet_source
 		     random_node_address
 		       = (node_address +
 			  $dist_uniform(seed, 
-					((allow_loopback == 0) &&
-					 (port_id >= 
+					((port_id >= 
 					  (num_ports - num_nodes_per_router)) &&
 					 (random_router_address == 
 					  router_address)) ? 1 : 0, 
@@ -676,8 +786,7 @@ module packet_source
 		       = (router_address[router_addr_width-dim_addr_width:
 					 router_addr_width-1] +
 			  $dist_uniform(seed,
-					((allow_loopback == 0) &&
-					 (port_id >= 
+					((port_id >= 
 					  (num_ports - num_nodes_per_router)) &&
 					 (random_router_address == 
 					  router_address)) ? 1 : 0,
@@ -809,6 +918,14 @@ module packet_source
 	   
 	   assign flit_ctrl[1:1+vc_idx_width-1] = vc_q;
 	   
+	   assign curr_dest_addr
+	     = route_info[((vc_q / num_vcs_per_class) % num_resource_classes)*
+			  router_addr_width +: router_addr_width];
+	   
+	end
+      else
+	begin
+	   assign curr_dest_addr = route_info[0:router_addr_width-1];
 	end
       
    endgenerate

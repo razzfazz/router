@@ -746,6 +746,7 @@ module whr_ip_ctrl_mac
        .restrict_turns(restrict_turns),
        .connectivity(connectivity),
        .routing_type(routing_type),
+       .dim_order(dim_order),
        .port_id(port_id),
        .message_class(0),
        .resource_class(0))
