@@ -30,10 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // network pseudo-node (combined packet source / sink)
 module tc_node_mac
-  (clk, reset, router_address, port_id, flit_ctrl_out, flit_data_out, 
-   flow_ctrl_in, flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_node_addrs, 
-   cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, 
-   error);
+  (clk, reset, address, flit_ctrl_out, flit_data_out, flow_ctrl_in, 
+   flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_node_addrs, cfg_req, 
+   cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, error);
    
 // register address declarations
 `define CFG_ADDR_CTRL            0
@@ -248,10 +247,7 @@ module tc_node_mac
    input reset;
    
    // current node's address
-   input [0:router_addr_width-1] router_address;
-   
-   // router port to which this node is attached
-   input [0:port_idx_width-1] port_id;
+   input [0:addr_width-1] address;
    
    // control signals for outgoing flit
    output [0:flit_ctrl_width-1] flit_ctrl_out;
@@ -414,6 +410,8 @@ module tc_node_mac
    // idle mode.
    // If bit 1 of this register is set, the traffic generator is operated in
    // loopback mode; i.e., its outputs are fed back into its inputs.
+   // If bit 2 of this register is set, packets from node ports whose 
+   // destination address corresponds to that same port are discarded.
    //---------------------------------------------------------------------------
    
    wire 			 write_ctrl;
@@ -442,6 +440,18 @@ module tc_node_mac
       .reset(reset),
       .d(loopback_s),
       .q(loopback_q));
+   
+   wire 			 suppress_s, suppress_q;
+   assign suppress_s
+     = ifc_active ? (write_ctrl ? ifc_write_data[1] : suppress_q) : suppress_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   suppressq
+     (.clk(clk),
+      .reset(reset),
+      .d(suppress_s),
+      .q(suppress_q));
    
    wire [0:flit_ctrl_width-1] 	 flit_ctrl_muxed;
    assign flit_ctrl_muxed = loopback_q ? flit_ctrl_out : flit_ctrl_in;
@@ -1110,7 +1120,17 @@ module tc_node_mac
    // generate random route info
    //---------------------------------------------------------------------------
    
+   wire [0:addr_width-1] 	dest_addr_1_rv;
+   
+   wire 			first_addr_match;
+   assign first_addr_match = (dest_addr_1_rv == address);
+   
+   assign packet_to_self = first_addr_match & suppress_q;
+   
+   wire [0:addr_width-1] 	dest_addr_2_rv;
+   
    wire [0:addr_width-1] 	dest_addr_rv;
+   assign dest_addr_rv = first_addr_match ? dest_addr_2_rv : dest_addr_1_rv;
    
    wire [0:route_info_width-1] 	route_info_rv;
    assign route_info_rv[(num_resource_classes-1)*router_addr_width:
@@ -1122,13 +1142,13 @@ module tc_node_mac
    generate
       
       //------------------------------------------------------------------------
-      // generate random final destination address
+      // generate two (distinct) candidate random final destination addresses
       //------------------------------------------------------------------------
-	   
+      
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
 	   
-	   assign dest_addr_rv[dim*dim_addr_width:(dim+1)*dim_addr_width-1]
+	   assign dest_addr_1_rv[dim*dim_addr_width:(dim+1)*dim_addr_width-1]
 		    = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
 				   (num_resource_classes-1)*router_addr_width+
 				   dim*dim_addr_width:
@@ -1140,13 +1160,46 @@ module tc_node_mac
 	end
       
       if(num_nodes_per_router > 1)
-	   assign dest_addr_rv[router_addr_width:addr_width-1]
+	begin
+	   
+	   assign dest_addr_1_rv[router_addr_width:addr_width-1]
 		    = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
 				   num_resource_classes*router_addr_width:
 				   mc_idx_rv_width+rc_idx_rv_width+
 				   num_resource_classes*router_addr_width+
 				   node_addr_width-1] % 
 		      num_nodes_per_router;
+	   
+	   assign dest_addr_2_rv[0:router_addr_width-1]
+		    = dest_addr_1_rv[0:router_addr_width-1];
+	   
+	   assign dest_addr_2_rv[router_addr_width:addr_width-1]
+		    = (packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
+				    num_resource_classes*router_addr_width:
+				    mc_idx_rv_width+rc_idx_rv_width+
+				    num_resource_classes*router_addr_width+
+				    node_addr_width-1] + 1) % 
+		      num_nodes_per_router;
+	   
+	end
+      else
+	begin
+	   
+	   if(num_dimensions > 1)
+	     assign dest_addr_2_rv[0:(num_dimensions-1)*dim_addr_width-1]
+		      = dest_addr_1_rv[0:(num_dimensions-1)*dim_addr_width-1];
+	   
+	   assign dest_addr_2_rv[(num_dimensions-1)*dim_addr_width:
+				 num_dimensions*dim_addr_width-1]
+		    = (packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
+				    (num_resource_classes-1)*router_addr_width+
+				    (num_dimensions-1)*dim_addr_width:
+				    mc_idx_rv_width+rc_idx_rv_width+
+				    (num_resource_classes-1)*router_addr_width+
+				    num_dimensions*dim_addr_width-1] + 1) % 
+		      num_routers_per_dim;
+	   
+	end
       
       
       //------------------------------------------------------------------------
@@ -1165,14 +1218,19 @@ module tc_node_mac
 	   
 	   for(rc = 0; rc < (num_resource_classes - 1); rc = rc + 1)
 	     begin:rcs
-
-		wire [0:router_addr_width-1] intm_addr_rv;
+		
+		wire rc_active;
+		assign rc_active = sel_rc_rv[rc];
+		
+		// as with the final destination, we generate two candidates
+		wire [0:router_addr_width-1] rand_addr_1_rv;
+		wire [0:router_addr_width-1] rand_addr_2_rv;
 		
 		for(dim = 0; dim < num_dimensions; dim = dim + 1)
 		  begin:dims
 		     
-		     assign intm_addr_rv[dim*dim_addr_width:
-					 (dim+1)*dim_addr_width-1]
+		     assign rand_addr_1_rv[dim*dim_addr_width:
+					   (dim+1)*dim_addr_width-1]
 			      = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
 					     rc*router_addr_width+
 					     dim*dim_addr_width:
@@ -1183,9 +1241,19 @@ module tc_node_mac
 		     
 		  end
 		
-		assign intm_addr_rvs[rc*router_addr_width:
-				     (rc+1)*router_addr_width-1]
-			 = intm_addr_rv;
+		if(num_dimensions > 1)
+		  assign rand_addr_2_rv[0:(num_dimensions-1)*dim_addr_width-1]
+		    = rand_addr_1_rv[0:(num_dimensions-1)*dim_addr_width-1];
+		
+		assign rand_addr_2_rv[(num_dimensions-1)*dim_addr_width:
+				      num_dimensions*dim_addr_width-1]
+			 = (packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
+					 rc*router_addr_width+
+					 (num_dimensions-1)*dim_addr_width:
+					 mc_idx_rv_width+rc_idx_rv_width+
+					 rc*router_addr_width+
+					 num_dimensions*dim_addr_width-1] + 1) %
+			   num_routers_per_dim;
 		
 		// get the intermediate address for the next resource class
 		wire [0:router_addr_width-1] next_addr_rv;
@@ -1210,15 +1278,23 @@ module tc_node_mac
 		// final destination addresses are pairwise identical. 
 		//--------------------------------------------------------------
 		
-		// if the intermediate address for the current resource class 
-		// matches that for the next one, ...
-		wire 			     flip_bits;
-		assign flip_bits = (intm_addr_rv == next_addr_rv);
+		// if the first candidate intermediate address for the current 
+		// resource class matches that for the next one, ...
+		wire 			     first_addr_match;
+		assign first_addr_match = (rand_addr_1_rv == next_addr_rv);
 		
-		// ... flip all its bits to get a different intermediate address
+		// ... we use the second candidate instead
+		wire [0:router_addr_width-1] intm_addr_rv;
+		assign intm_addr_rv
+		  = first_addr_match ? rand_addr_2_rv : rand_addr_1_rv;
+		
+		assign intm_addr_rvs[rc*router_addr_width:
+				     (rc+1)*router_addr_width-1]
+			 = intm_addr_rv;
+		
 		assign route_info_rv[rc*router_addr_width:
 				     (rc+1)*router_addr_width-1]
-			 = intm_addr_rv ^ {router_addr_width{flip_bits}};
+			 = intm_addr_rv;
 		
 	     end
 	   
@@ -1234,7 +1310,10 @@ module tc_node_mac
    //---------------------------------------------------------------------------
    // generate random lookahead routing info
    //---------------------------------------------------------------------------
-
+   
+   wire [0:router_addr_width-1] 	     router_address;
+   assign router_address = address[0:router_addr_width-1];
+   
    wire [0:port_idx_width-1] 		     route_port_rv;
    wire 				     inc_rc_rv;
    vcr_routing_logic
@@ -1254,8 +1333,6 @@ module tc_node_mac
       .route_info(route_info_rv),
       .route_port(route_port_rv),
       .inc_rc(inc_rc_rv));
-   
-   assign packet_to_self = (route_port_rv == port_id) && !inc_rc_rv;
    
    wire [0:la_route_info_width-1] 	     la_route_info_rv;
    assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
@@ -1826,19 +1903,19 @@ module tc_node_mac
 		     
 		     if(ovcc_errors_ovc[i*4])
 		       $display({"ERROR: Credit tracker underflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+				 "node %d, VC %d."}, address, i);
 		     
 		     if(ovcc_errors_ovc[i*4+1])
 		       $display({"ERROR: Credit tracker overflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+				 "node %d, VC %d."}, address, i);
 		     
 		     if(ovcc_errors_ovc[i*4+2])
 		       $display({"ERROR: Head credit tracker underflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+				 "node %d, VC %d."}, address, i);
 		     
 		     if(ovcc_errors_ovc[i*4+3])
 		       $display({"ERROR: Head credit tracker overflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+				 "node %d, VC %d."}, address, i);
 		     
 		  end
 		

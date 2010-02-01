@@ -62,6 +62,12 @@ module tc_router_wrap
    // width required to select individual router in entire network
    localparam router_addr_width = num_dimensions * dim_addr_width;
    
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // width of global addresses
+   localparam addr_width = router_addr_width + node_addr_width;
+   
    // connectivity within each dimension
    localparam connectivity
      = (topology == `TOPOLOGY_MESH) ?
@@ -153,6 +159,9 @@ module tc_router_wrap
    
    // number of node status signals to accept
    localparam node_status_width = 1 + num_ports;
+   
+   // delay before credits are returned
+   parameter credit_delay = 1;
    
    input clk;
    input reset;
@@ -314,55 +323,92 @@ module tc_router_wrap
 	   
 	   wire 			    node_error;
 	   
-	   tc_node_mac
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
-	       .num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
-	       .packet_format(packet_format),
-	       .max_payload_length(max_payload_length),
-	       .min_payload_length(min_payload_length),
-	       .flit_data_width(flit_data_width),
-	       .error_capture_mode(error_capture_mode),
-	       .routing_type(routing_type),
-	       .dim_order(dim_order),
-	       .lfsr_index(/*num_ports * */ lfsr_index /*+ port*/),
-	       .cfg_node_addr_width(cfg_node_addr_width),
-	       .cfg_reg_addr_width(cfg_reg_addr_width),
-	       .num_cfg_node_addrs(2),
-	       .cfg_data_width(cfg_data_width),
-	       .num_packets_width(num_packets_width),
-	       .arrival_rv_width(arrival_rv_width),
-	       .mc_idx_rv_width(mc_idx_rv_width),
-	       .rc_idx_rv_width(rc_idx_rv_width),
-	       .plength_idx_rv_width(plength_idx_rv_width),
-	       .num_plength_vals(num_plength_vals),
-	       .packet_count_width(packet_count_width),
-	       .reset_type(reset_type))
-	   node
-	     (.clk(node_clk),
-	      .reset(node_reset),
-	      .router_address(router_address),
-	      .port_id(port),
-	      .flit_ctrl_out(flit_ctrl_out),
-	      .flit_data_out(flit_data_out),
-	      .flow_ctrl_in(flow_ctrl_in),
-	      .flit_ctrl_in(flit_ctrl_in),
-	      .flit_data_in(flit_data_in),
-	      .flow_ctrl_out(flow_ctrl_out),
-	      .cfg_node_addrs(node_cfg_node_addrs),
-	      .cfg_req(cfg_req),
-	      .cfg_write(cfg_write),
-	      .cfg_addr(cfg_addr),
-	      .cfg_write_data(cfg_write_data),
-	      .cfg_read_data(cfg_read_data),
-	      .cfg_done(cfg_done),
-	      .error(node_error));
+	   if(port >= (num_ports - num_nodes_per_router))
+	     begin
+		
+		wire [0:addr_width-1] address;
+		assign address[0:router_addr_width-1] = router_address;
+		
+		if(num_nodes_per_router > 1)
+		  assign address[router_addr_width:addr_width-1]
+			   = (port - (num_ports - num_nodes_per_router));
+		
+		tc_node_mac
+		  #(.num_flit_buffers(num_flit_buffers),
+		    .num_header_buffers(num_header_buffers),
+		    .num_message_classes(num_message_classes),
+		    .num_resource_classes(num_resource_classes),
+		    .num_vcs_per_class(num_vcs_per_class),
+		    .num_routers_per_dim(num_routers_per_dim),
+		    .num_dimensions(num_dimensions),
+		    .num_nodes_per_router(num_nodes_per_router),
+		    .connectivity(connectivity),
+		    .packet_format(packet_format),
+		    .max_payload_length(max_payload_length),
+		    .min_payload_length(min_payload_length),
+		    .flit_data_width(flit_data_width),
+		    .error_capture_mode(error_capture_mode),
+		    .routing_type(routing_type),
+		    .dim_order(dim_order),
+		    .lfsr_index(/*num_ports * */ lfsr_index /*+ port*/),
+		    .cfg_node_addr_width(cfg_node_addr_width),
+		    .cfg_reg_addr_width(cfg_reg_addr_width),
+		    .num_cfg_node_addrs(2),
+		    .cfg_data_width(cfg_data_width),
+		    .num_packets_width(num_packets_width),
+		    .arrival_rv_width(arrival_rv_width),
+		    .mc_idx_rv_width(mc_idx_rv_width),
+		    .rc_idx_rv_width(rc_idx_rv_width),
+		    .plength_idx_rv_width(plength_idx_rv_width),
+		    .num_plength_vals(num_plength_vals),
+		    .packet_count_width(packet_count_width),
+		    .reset_type(reset_type))
+		node
+		  (.clk(node_clk),
+		   .reset(node_reset),
+		   .address(address),
+		   .flit_ctrl_out(flit_ctrl_out),
+		   .flit_data_out(flit_data_out),
+		   .flow_ctrl_in(flow_ctrl_in),
+		   .flit_ctrl_in(flit_ctrl_in),
+		   .flit_data_in(flit_data_in),
+		   .flow_ctrl_out(flow_ctrl_out),
+		   .cfg_node_addrs(node_cfg_node_addrs),
+		   .cfg_req(cfg_req),
+		   .cfg_write(cfg_write),
+		   .cfg_addr(cfg_addr),
+		   .cfg_write_data(cfg_write_data),
+		   .cfg_read_data(cfg_read_data),
+		   .cfg_done(cfg_done),
+		   .error(node_error));
+		
+	     end
+	   else
+	     begin
+		
+		assign flit_ctrl_out = {flit_ctrl_width{1'b0}};
+		assign flit_data_out = {flit_data_width{1'b0}};
+		
+		wire [0:flit_ctrl_width-1] flit_ctrl_dly;
+		c_shift_reg
+		  #(.width(flit_ctrl_width),
+		    .depth(credit_delay),
+		    .reset_type(reset_type))
+		flit_ctrl_dly_sr
+		  (.clk(clk),
+		   .reset(reset),
+		   .enable(1'b1),
+		   .data_in(flit_ctrl_in),
+		   .data_out(flit_ctrl_dly));
+		
+		assign flow_ctrl_out = flit_ctrl_dly[0:flow_ctrl_width-1];
+		
+		assign cfg_read_data = {cfg_data_width{1'b0}};
+		assign cfg_done = 1'b0;
+		
+		assign node_error = 1'b0;
+		
+	     end
 	   
 	   assign node_rtr_flit_ctrl_p[port*flit_ctrl_width:
 				       (port+1)*flit_ctrl_width-1]
