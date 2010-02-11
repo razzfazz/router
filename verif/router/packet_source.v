@@ -637,47 +637,45 @@ module packet_source
 	     `CONNECTIVITY_LINE:
 	       begin
 		  
-		  if(((dim_order == `DIM_ORDER_ASCENDING) && 
-		      (curr_dim > 0)) ||
-		     ((dim_order == `DIM_ORDER_DESCENDING) &&
-		      (curr_dim < (num_dimensions - 1))))
+		  wire flit_kill_base;
+		  assign flit_kill_base
+		    = (((port_id % 2) == 0) && 
+		       (rc_dest[curr_dim*dim_addr_width:
+				(curr_dim+1)*dim_addr_width-1] <
+			router_address[curr_dim*dim_addr_width:
+				       (curr_dim+1)*dim_addr_width-1])) ||
+		      (((port_id % 2) == 1) && 
+		       (rc_dest[curr_dim*dim_addr_width:
+				(curr_dim+1)*dim_addr_width-1] >
+			router_address[curr_dim*dim_addr_width:
+				       (curr_dim+1)*dim_addr_width-1]));
+		       
+		  if((dim_order == `DIM_ORDER_ASCENDING) && 
+		     (curr_dim > 0))
+ 		    begin
+		       
+		       assign flit_kill
+			 = (rc_dest[0:curr_dim*dim_addr_width-1] !=
+			    router_address[0:curr_dim*dim_addr_width-1]) ||
+			   flit_kill_base;
+		       
+		    end
+		  else if((dim_order == `DIM_ORDER_DESCENDING) &&
+			  (curr_dim < (num_dimensions - 1)))
 		    begin
 		       
 		       assign flit_kill
-			 = ((dim_order == `DIM_ORDER_ASCENDING) && 
-			    (rc_dest[0:curr_dim*dim_addr_width-1] !=
-			     router_address[0:curr_dim*dim_addr_width-1])) ||
-			   ((dim_order == `DIM_ORDER_DESCENDING) && 
-			    (rc_dest[(curr_dim+1)*dim_addr_width:
-				     router_addr_width-1] !=
-			     router_address[(curr_dim+1)*dim_addr_width:
-					    router_addr_width-1])) ||
-			   (((port_id % 2) == 0) && 
-			    (rc_dest[curr_dim*dim_addr_width:
-				     (curr_dim+1)*dim_addr_width-1] <
-			     router_address[curr_dim*dim_addr_width:
-					    (curr_dim+1)*dim_addr_width-1])) ||
-			   (((port_id % 2) == 1) && 
-			    (rc_dest[curr_dim*dim_addr_width:
-				     (curr_dim+1)*dim_addr_width-1] >
-			     router_address[curr_dim*dim_addr_width:
-					    (curr_dim+1)*dim_addr_width-1]));
+			 = (rc_dest[(curr_dim+1)*dim_addr_width:
+				    router_addr_width-1] !=
+			    router_address[(curr_dim+1)*dim_addr_width:
+					   router_addr_width-1]) ||
+			   flit_kill_base;
 		       
 		    end
 		  else
 		    begin
 		       
-		       assign flit_kill
-			 = (((port_id % 2) == 0) && 
-			    (rc_dest[curr_dim*dim_addr_width:
-				     (curr_dim+1)*dim_addr_width-1] <
-			     router_address[curr_dim*dim_addr_width:
-					    (curr_dim+1)*dim_addr_width-1])) ||
-			   (((port_id % 2) == 1) && 
-			    (rc_dest[curr_dim*dim_addr_width:
-				     (curr_dim+1)*dim_addr_width-1] >
-			     router_address[curr_dim*dim_addr_width:
-					    (curr_dim+1)*dim_addr_width-1]));
+		       assign flit_kill = flit_kill_base;
 		       
 		    end
 		  
