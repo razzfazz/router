@@ -1,4 +1,4 @@
-// $Id: c_lfsr.v 1534 2009-09-16 16:10:23Z dub $
+// $Id$
 
 /*
 Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
