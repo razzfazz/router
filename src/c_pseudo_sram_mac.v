@@ -76,8 +76,7 @@ module c_pseudo_sram_mac
    wire [0:addr_width-1] read_address_s, read_address_q;
    assign read_address_s = read_enable ? read_address : read_address_q;
    c_dff
-     #(.width(addr_width),
-       .reset_type(`RESET_TYPE_NONE))
+     #(.width(addr_width))
    read_addrq
      (.clk(clk),
       .reset(1'b0),

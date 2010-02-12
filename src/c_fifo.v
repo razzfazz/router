@@ -229,10 +229,7 @@ module c_fifo
 	  begin
 	     
 	     wire rst_n;
-	     if(reset_type != `RESET_TYPE_NONE)
-	       assign rst_n = ~reset;
-	     else
-	       assign rst_n = 1'b1;
+	     assign rst_n = ~reset;
 	     
 	     wire push_req_n;
 	     assign push_req_n = ~push;

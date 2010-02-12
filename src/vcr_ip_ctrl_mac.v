@@ -494,11 +494,10 @@ module vcr_ip_ctrl_mac
 	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
 	     
 	     c_dff
-	       #(.width(flit_ctrl_width-1),
-		 .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       #(.width(flit_ctrl_width-1))
 	     flit_ctrl_inq
 	       (.clk(clk),
-	      .reset(reset),
+		.reset(1'b0),
 		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
 		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
 	     
@@ -511,11 +510,10 @@ module vcr_ip_ctrl_mac
    wire [0:flit_data_width-1] flit_data_in_s, flit_data_in_q;
    assign flit_data_in_s = flit_data_in;
    c_dff
-     #(.width(flit_data_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(flit_data_width))
    flit_data_inq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(flit_data_in_s),
       .q(flit_data_in_q));
    
@@ -1253,11 +1251,10 @@ module vcr_ip_ctrl_mac
    assign int_flit_ctrl_out_s[1+vc_idx_width] = flit_head_muxed;
    assign int_flit_ctrl_out_s[1+vc_idx_width+1] = flit_tail_muxed;
    c_dff
-     #(.width(int_flit_ctrl_width-1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(int_flit_ctrl_width-1))
    int_flit_ctrl_outq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(int_flit_ctrl_out_s[1:int_flit_ctrl_width-1]),
       .q(int_flit_ctrl_out_q[1:int_flit_ctrl_width-1]));
    
@@ -1280,11 +1277,10 @@ module vcr_ip_ctrl_mac
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
    assign la_route_info_s = la_route_info_muxed;
    c_dff
-     #(.width(la_route_info_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(la_route_info_width))
    la_route_infoq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(la_route_info_s),
       .q(la_route_info_q));
    
@@ -1328,11 +1324,10 @@ module vcr_ip_ctrl_mac
 	   wire [0:vc_idx_width-1] cred_vc_s, cred_vc_q;
 	   assign cred_vc_s = cred_vc;
 	   c_dff
-	     #(.width(vc_idx_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(vc_idx_width))
 	   cred_vcq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(cred_vc_s),
 	      .q(cred_vc_q));
 	   

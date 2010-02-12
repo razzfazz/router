@@ -497,11 +497,10 @@ module tc_node_mac
 		      ((running_q & ~last_credit_received) | start_q) : 
 		      running_q;
    c_dff
-     #(.width(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(1))
    runningq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(running_s),
       .q(running_q));
    
@@ -549,11 +548,10 @@ module tc_node_mac
        (write_num_packets ? num_packets_loadval : num_packets_next) : 
        num_packets_q;
    c_dff
-     #(.width(num_packets_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(num_packets_width))
    num_packetsq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(num_packets_s),
       .q(num_packets_q));
    
@@ -602,11 +600,10 @@ module tc_node_mac
      = {arrival_rv_width{write_lfsr_seed}} & arrival_rv_loadval;
    c_lfsr
      #(.width(arrival_rv_width),
-       .iterations(arrival_rv_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .iterations(arrival_rv_width))
    arrival_rv_lfsr
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .load(write_lfsr_seed),
       .run(update_arrival_rv),
       .feedback(arrival_rv_feedback),
@@ -632,11 +629,10 @@ module tc_node_mac
        (write_arrival_thresh ? arrival_thresh_loadval : arrival_thresh_q) : 
        arrival_thresh_q;
    c_dff
-     #(.width(arrival_rv_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(arrival_rv_width))
    arrival_threshq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(arrival_thresh_s),
       .q(arrival_thresh_q));
    
@@ -673,11 +669,10 @@ module tc_node_mac
      = {packet_rvs_width{write_lfsr_seed}} & packet_rvs_loadval;
    c_lfsr
      #(.width(packet_rvs_width),
-       .iterations(packet_rvs_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .iterations(packet_rvs_width))
    packet_rvs_lfsr
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .load(write_lfsr_seed),
       .run(update_packet_rvs),
       .feedback(packet_rvs_feedback),
@@ -771,11 +766,10 @@ module tc_node_mac
 				  mc_threshs_q) : 
 				 mc_threshs_q;
 	   c_dff
-	     #(.width(mc_threshs_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(mc_threshs_width))
 	   mc_threshsq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(mc_threshs_s),
 	      .q(mc_threshs_q));
 	   
@@ -873,11 +867,10 @@ module tc_node_mac
 				  rc_threshs_q) : 
 				 rc_threshs_q;
 	   c_dff
-	     #(.width(rc_threshs_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(rc_threshs_width))
 	   rc_threshsq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(rc_threshs_s),
 	      .q(rc_threshs_q));
 	   
@@ -1019,11 +1012,10 @@ module tc_node_mac
 	begin
 	   
 	   c_dff
-	     #(.width(flow_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(flow_ctrl_width-1))
 	   flow_ctrl_inq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(flow_ctrl_in_s[1:flow_ctrl_width-1]),
 	      .q(flow_ctrl_in_q[1:flow_ctrl_width-1]));
 	   
@@ -1401,11 +1393,10 @@ module tc_node_mac
 	       (write_plength_vals ? plength_vals_loadval : plength_vals_q) : 
 	       plength_vals_q;
 	   c_dff
-	     #(.width(plength_vals_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(plength_vals_width))
 	   plength_valsq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(plength_vals_s),
 	      .q(plength_vals_q));
 	   
@@ -1435,11 +1426,10 @@ module tc_node_mac
 					    plength_threshs_q) : 
 					   plength_threshs_q;
 		c_dff
-		  #(.width(plength_threshs_width),
-		    .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+		  #(.width(plength_threshs_width))
 		plength_threshsq
 		  (.clk(clk),
-		   .reset(reset),
+		   .reset(1'b0),
 		   .d(plength_threshs_s),
 		   .q(plength_threshs_q));
 		
@@ -1528,11 +1518,10 @@ module tc_node_mac
 	(packet_count_q + packet_count_incr - packet_count_decr)) : 
        packet_count_q;
    c_dff
-     #(.width(packet_count_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(packet_count_width))
    packet_countq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(packet_count_s),
       .q(packet_count_q));
    
@@ -1578,11 +1567,10 @@ module tc_node_mac
    wire [0:packet_length_width-1] 		 flit_count_s, flit_count_q;
    assign flit_count_s = active_q ? (flit_count - flit_sent) : flit_count_q;
    c_dff
-     #(.width(packet_length_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(packet_length_width))
    flit_countq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(flit_count_s),
       .q(flit_count_q));
    
@@ -1602,11 +1590,10 @@ module tc_node_mac
    wire 					 flit_tail_s, flit_tail_q;
    assign flit_tail_s = active_q ? flit_tail : flit_tail_q;
    c_dff
-     #(.width(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(1))
    flit_tailq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(flit_tail_s),
       .q(flit_tail_q));
       
@@ -1635,11 +1622,10 @@ module tc_node_mac
 	       (vc_alloc_q ? vc_alloc_ocvc_q : next_elig_ocvc) : 
 	       vc_alloc_ocvc_q;
 	   c_dff
-	     #(.width(num_vcs_per_class),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(num_vcs_per_class))
 	   vc_alloc_ocvcq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(vc_alloc_ocvc_s),
 	      .q(vc_alloc_ocvc_q));
 	   
@@ -1662,11 +1648,10 @@ module tc_node_mac
 	       ((flit_head_gen_q & ~flit_sent) | start_q | packet_sent) : 
 	       flit_head_gen_q;
 	   c_dff
-	     #(.width(1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(1))
 	   flit_head_genq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(flit_head_gen_s),
 	      .q(flit_head_gen_q));
 	   
@@ -1675,11 +1660,10 @@ module tc_node_mac
 	   wire flit_head_s;
 	   assign flit_head_s = active_q ? flit_head : flit_head_q;
 	   c_dff
-	     #(.width(1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(1))
 	   flit_headq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(flit_head_s),
 	      .q(flit_head_q));
 	   
@@ -1703,11 +1687,10 @@ module tc_node_mac
 	   wire [0:vc_idx_width-1] flit_vc_s, flit_vc_q;
 	   assign flit_vc_s = active_q ? flit_vc : flit_vc_q;
 	   c_dff
-	     #(.width(vc_idx_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(vc_idx_width))
 	   flit_vcq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(flit_vc_s),
 	      .q(flit_vc_q));
 	   	   
@@ -1754,11 +1737,10 @@ module tc_node_mac
      = {flit_data_width{write_lfsr_seed}} & flit_data_rv_loadval;
    c_lfsr
      #(.width(flit_data_width),
-       .iterations(flit_data_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .iterations(flit_data_width))
    flit_data_rv_lfsr
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .load(write_lfsr_seed),
       .run(update_flit_data_rv),
       .feedback(flit_data_rv_feedback),
@@ -1770,11 +1752,10 @@ module tc_node_mac
    wire [0:header_info_width-1]    header_info_rv_s, header_info_rv_q;
    assign header_info_rv_s = active_q ? header_info_rv : header_info_rv_q;
    c_dff
-     #(.width(header_info_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(header_info_width))
    header_info_rvq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(header_info_rv_s),
       .q(header_info_rv_q));
    
@@ -1810,11 +1791,10 @@ module tc_node_mac
    assign flit_sig_s = start_q ? flit_sig_loadval : flit_data_muxed;
    c_lfsr
      #(.width(flit_data_width),
-       .iterations(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .iterations(1))
    flit_sig_lfsr
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .load(start_q),
       .run(update_flit_sig),
       .feedback(flit_sig_feedback),
@@ -1867,11 +1847,10 @@ module tc_node_mac
 	begin
 	   
 	   c_dff
-	     #(.width(flow_ctrl_width-1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(flow_ctrl_width-1))
 	   flow_ctrl_outq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(flow_ctrl_out_s[1:flow_ctrl_width-1]),
 	      .q(flow_ctrl_out_q[1:flow_ctrl_width-1]));
 	   

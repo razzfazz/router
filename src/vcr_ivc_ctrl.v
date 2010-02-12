@@ -538,11 +538,10 @@ module vcr_ivc_ctrl
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
 	   assign tail_idx_s = tail_in ? fbc_write_addr : tail_idx_q;
 	   c_dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	     #(.width(fbf_addr_width))
 	   tail_idxq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(tail_idx_s),
 	      .q(tail_idx_q));
 	   

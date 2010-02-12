@@ -63,8 +63,7 @@ module c_wf_alloc_wrapper
    
    wire [0:num_ports*num_ports-1] req_int;
    c_dff
-     #(.width(num_ports*num_ports),
-       .reset_type(`RESET_TYPE_NONE))
+     #(.width(num_ports*num_ports))
    reqq
      (.clk(clk),
       .reset(1'b0),
@@ -73,8 +72,7 @@ module c_wf_alloc_wrapper
    
    wire [0:num_ports*num_ports-1] gnt_int;
    c_dff
-     #(.width(num_ports*num_ports),
-       .reset_type(`RESET_TYPE_NONE))
+     #(.width(num_ports*num_ports))
    gntq
      (.clk(clk),
       .reset(1'b0),

@@ -116,14 +116,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // reset handling
 //------------------------------------------------------------------------------
 
-// no reset
-`define RESET_TYPE_NONE  0
-
 // asynchronous reset
-`define RESET_TYPE_ASYNC 1
+`define RESET_TYPE_ASYNC 0
 
 // synchronous reset
-`define RESET_TYPE_SYNC  2
+`define RESET_TYPE_SYNC  1
 
 `define RESET_TYPE_LAST `RESET_TYPE_SYNC
 

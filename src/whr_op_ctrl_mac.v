@@ -216,11 +216,10 @@ module whr_op_ctrl_mac
    wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
    assign allocated_ip_s = update ? gnt_int_ip : allocated_ip_q;
    c_dff
-     #(.width(num_ports),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(num_ports))
    allocated_ipq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(allocated_ip_s),
       .q(allocated_ip_q));
    
@@ -285,11 +284,10 @@ module whr_op_ctrl_mac
    wire                 flit_head_s, flit_head_q;
    assign flit_head_s = ~allocated_q | |(held_gnt_ip & req_head_ip);
    c_dff
-     #(.width(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(1))
    flit_headq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(flit_head_s),
       .q(flit_head_q));
    
@@ -299,11 +297,10 @@ module whr_op_ctrl_mac
    wire                 flit_tail_s, flit_tail_q;
    assign flit_tail_s = |(gnt_unqual_ip & req_tail_ip);
    c_dff
-     #(.width(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(1))
    flit_tailq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(flit_tail_s),
       .q(flit_tail_q));
    
@@ -566,11 +563,10 @@ module whr_op_ctrl_mac
 	     
 	     c_dff
 	       #(.width(flit_ctrl_width-1),
-		 .reset_type(/*reset_type*/ `RESET_TYPE_NONE),
 		 .offset(1))
 	     flit_ctrlq
 	       (.clk(clk),
-		.reset(reset),
+		.reset(1'b0),
 		.d(flit_ctrl_s[1:flit_ctrl_width-1]),
 		.q(flit_ctrl_q[1:flit_ctrl_width-1]));
 	     
@@ -597,11 +593,10 @@ module whr_op_ctrl_mac
    wire [0:flit_data_width-1] 		         flit_data_s, flit_data_q;
    assign flit_data_s = flit_valid_in ? flit_data_in : flit_data_q;
    c_dff
-     #(.width(flit_data_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+     #(.width(flit_data_width))
    flit_dataq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(flit_data_s),
       .q(flit_data_q));
    
