@@ -660,7 +660,7 @@ module whr_ip_ctrl_mac
 	       hdff_la_route_info_q;
 	   c_dff
 	     #(.width(la_route_info_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(reset),
@@ -677,7 +677,7 @@ module whr_ip_ctrl_mac
 	       hdff_route_info_q;
 	   c_dff
 	     #(.width(route_info_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   hdff_route_infoq
 	     (.clk(clk),
 	      .reset(reset),

@@ -657,7 +657,7 @@ module vcr_ivc_ctrl
 	     = hdff_push ? la_route_info_in : hdff_la_route_info_q;
 	   c_dff
 	     #(.width(la_route_info_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(reset),
@@ -673,7 +673,7 @@ module vcr_ivc_ctrl
 	     = hdff_push ? hop_route_info_in : hdff_hop_route_info_q;
 	   c_dff
 	     #(.width(hop_route_info_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_ASYNC))
+	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
 	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(reset),
