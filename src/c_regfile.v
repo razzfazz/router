@@ -32,7 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic register file
 module c_regfile
-  (clk, write_enable, write_address, write_data, read_address, read_data);
+  (clk, active, write_enable, write_address, write_data, read_address, 
+   read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -53,6 +54,7 @@ module c_regfile
    localparam addr_width = clogb(depth);
    
    input clk;
+   input active;
    
    // if high, write to entry selected by write_address
    input write_enable;
@@ -86,14 +88,16 @@ module c_regfile
 	       
 	       `REGFILE_TYPE_FF_2D:
 		 always @(posedge clk)
-		   if(write_enable)
-		     storage[write_address] <= write_data;
-	       
-	       `REGFILE_TYPE_LAT_2D:
-		 always @(clk, write_enable, write_address, write_data)
-		   if(~clk)
+		   if(active)
 		     if(write_enable)
 		       storage[write_address] <= write_data;
+	       
+	       `REGFILE_TYPE_LAT_2D:
+		 always @(clk, active, write_enable, write_address, write_data)
+		   if(~clk)
+		     if(active)
+		       if(write_enable)
+			 storage[write_address] <= write_data;
 	       
 	     endcase
 	     
@@ -133,14 +137,16 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_FF_1D_MUX:
 		      always @(posedge clk)
-			if(write)
-			  storage <= write_data;
-		    
-		    `REGFILE_TYPE_LAT_1D_MUX:
-		      always @(clk, write, write_data)
-			if(~clk)
+			if(active)
 			  if(write)
 			    storage <= write_data;
+		    
+		    `REGFILE_TYPE_LAT_1D_MUX:
+		      always @(clk, active, write, write_data)
+			if(~clk)
+			  if(active)
+			    if(write)
+			      storage <= write_data;
 		    
 		  endcase
 		  
@@ -167,14 +173,16 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_FF_1D_TRISTATE:
 		      always @(posedge clk)
-			if(write)
-			  storage <= write_data;
-		    
-		    `REGFILE_TYPE_LAT_1D_TRISTATE:
-		      always @(clk, write, write_data)
-			if(~clk)
+			if(active)
 			  if(write)
 			    storage <= write_data;
+		    
+		    `REGFILE_TYPE_LAT_1D_TRISTATE:
+		      always @(clk, active, write, write_data)
+			if(~clk)
+			  if(active)
+			    if(write)
+			      storage <= write_data;
 		    
 		  endcase
 		  

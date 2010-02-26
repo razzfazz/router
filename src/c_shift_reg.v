@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // shift register
 module c_shift_reg
-  (clk, reset, enable, data_in, data_out);
+  (clk, reset, active, data_in, data_out);
    
 `include "c_constants.v"
    
@@ -46,9 +46,7 @@ module c_shift_reg
    
    input clk;
    input reset;
-   
-   // perform shift
-   input enable;
+   input active;
    
    // data input
    input [0:width-1] data_in;
@@ -68,14 +66,14 @@ module c_shift_reg
 	begin:levels
 	   
 	   wire [0:width-1] data_s, data_q;
-	   assign data_s
-	     = enable ? data[level*width:(level+1)*width-1] : data_q;
+	   assign data_s = data[level*width:(level+1)*width-1];
 	   c_dff
 	     #(.width(width),
 	       .reset_type(reset_type))
 	   dataq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(active),
 	      .d(data_s),
 	      .q(data_q));
 	   

@@ -30,6 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // global function definitions
 
+`ifndef _C_FUNCTIONS_V_
+`define _C_FUNCTIONS_V_
+
+
 // compute ceiling of binary logarithm
 function integer clogb(input integer argument);
    integer 		     i;
@@ -67,6 +71,4 @@ function integer pop_count(input integer argument);
    end
 endfunction
 
-
-
-
+`endif

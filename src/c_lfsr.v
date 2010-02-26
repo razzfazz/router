@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic multi-input linear feedback shift register register
 module c_lfsr
-  (clk, reset, load, run, feedback, complete, d, q);
+  (clk, reset, active, load, feedback, complete, d, q);
    
 `include "c_constants.v"
    
@@ -52,12 +52,10 @@ module c_lfsr
    
    input clk;
    input reset;
+   input active;
    
    // load data input into signature register
    input load;
-   
-   // activate signature updates
-   input run;
    
    // feedback polynomial(s)
    input [0:width-1] feedback;
@@ -95,7 +93,7 @@ module c_lfsr
      = {1'b0, {(width-1){~load}} & state_q[offset:(offset+width-1)-1]};
    
    wire [offset:(offset+width)-1] state_s;
-   assign state_s = (load | run) ? (base_value ^ toggle_value) : state_q;
+   assign state_s = base_value ^ toggle_value;
    c_dff
      #(.width(width),
        .offset(offset),
@@ -104,6 +102,7 @@ module c_lfsr
    stateq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(state_s),
       .q(state_q));
    
