@@ -182,6 +182,12 @@ module vcr_vc_alloc_sep_if
 					     num_ports*num_resource_classes*
 					     num_vcs_per_class-1];
 			  
+			  // NOTE: Logically, what we want to do here is select 
+			  // the subvector that corresponds to the current input
+			  // VC's selected output port; however, because the 
+			  // subvectors for all other ports will never have any 
+			  // grants anyway, we can just OR all the subvectors
+			  // instead of using a proper MUX.
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
                             gnt_out_orc_ocvc;
 			  c_or_nto1
@@ -331,12 +337,7 @@ module vcr_vc_alloc_sep_if
 			  
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
                             gnt_orc_ocvc;
-			  c_or_nto1
-			    #(.width(num_resource_classes*num_vcs_per_class),
-			      .num_ports(num_ports))
-			  gnt_orc_ocvc_or
-			    (.data_in(gnt_out_op_orc_ocvc),
-			     .data_out(gnt_orc_ocvc));
+			  assign gnt_orc_ocvc = gnt_out_orc_ocvc;
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
 			  c_align
