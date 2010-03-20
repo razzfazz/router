@@ -659,8 +659,7 @@ module whr_ip_ctrl_mac
 	       (hdff_push ? la_route_info_in : hdff_la_route_info_q) : 
 	       hdff_la_route_info_q;
 	   c_dff
-	     #(.width(la_route_info_width),
-	       .reset_type(reset_type))
+	     #(.width(la_route_info_width))
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -676,8 +675,7 @@ module whr_ip_ctrl_mac
 	       (hdff_push ? route_info_in : hdff_route_info_q) : 
 	       hdff_route_info_q;
 	   c_dff
-	     #(.width(route_info_width),
-	       .reset_type(reset_type))
+	     #(.width(route_info_width))
 	   hdff_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
