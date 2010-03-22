@@ -374,7 +374,7 @@ module vcr_ivc_ctrl
       if(num_vcs_per_class > 1)
 	begin
 	   
-	   wire [0:num_vcs_per_class-1] vc_gnt_unchanged_ocvc;
+	   wire [0:num_vcs_per_class-1]   vc_gnt_unchanged_ocvc;
 	   assign vc_gnt_unchanged_ocvc
 	     = vc_gnt_ovc[packet_class*num_vcs_per_class:
 			  (packet_class+1)*num_vcs_per_class-1];
@@ -383,15 +383,6 @@ module vcr_ivc_ctrl
 	     begin
 		
 		assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
-		
-		c_align
-		  #(.data_width(num_vcs_per_class),
-		    .dest_width(num_vcs),
-		    .offset(packet_class*num_vcs_per_class))
-		allocated_ovc_alg
-		  (.data_in(vc_allocated_ocvc_q),
-		   .dest_in({num_vcs{1'b0}}),
-		   .data_out(allocated_ovc));
 		
 	     end
 	   else
@@ -405,18 +396,6 @@ module vcr_ivc_ctrl
 		// only one of the two will have a bit set, so we just OR them
 		assign vc_gnt_ocvc
 		  = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
-		
-		c_align
-		  #(.data_width(2*num_vcs_per_class),
-		    .dest_width(num_vcs),
-		    .offset(packet_class*num_vcs_per_class))
-		allocated_ovc_alg
-		  (.data_in({{num_vcs_per_class{~inc_rc}} & 
-			     vc_allocated_ocvc_q,
-			     {num_vcs_per_class{inc_rc}} & 
-			     vc_allocated_ocvc_q}),
-		   .dest_in({num_vcs{1'b0}}),
-		   .data_out(allocated_ovc));
 		
 	     end
 	   
@@ -435,9 +414,40 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
+	   
 	   assign vc_gnt_ocvc = 1'b1;
 	   assign vc_allocated_ocvc_q = 1'b1;
-	   assign allocated_ovc = 1'b1;
+	   
+	end
+      
+      if(resource_class == (num_resource_classes - 1))
+	begin
+	   
+	   c_align
+	     #(.data_width(num_vcs_per_class),
+	       .dest_width(num_vcs),
+	       .offset(packet_class*num_vcs_per_class))
+	   allocated_ovc_alg
+	     (.data_in(vc_allocated_ocvc_q),
+	      .dest_in({num_vcs{1'b0}}),
+	      .data_out(allocated_ovc));
+	   
+	end
+      else
+	begin
+	   
+	   c_align
+	     #(.data_width(2*num_vcs_per_class),
+	       .dest_width(num_vcs),
+	       .offset(packet_class*num_vcs_per_class))
+	   allocated_ovc_alg
+	     (.data_in({{num_vcs_per_class{~inc_rc}} & 
+			vc_allocated_ocvc_q,
+			{num_vcs_per_class{inc_rc}} & 
+			vc_allocated_ocvc_q}),
+	      .dest_in({num_vcs{1'b0}}),
+	      .data_out(allocated_ovc));
+	   
 	end
       
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
