@@ -308,7 +308,8 @@ module whr_ip_ctrl_mac
 	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
 	     
 	     c_dff
-	       #(.width(flit_ctrl_width-1))
+	       #(.width(flit_ctrl_width-1),
+		 .reset_type(reset_type))
 	     flit_ctrl_inq
 	       (.clk(clk),
 		.reset(1'b0),
@@ -322,7 +323,8 @@ module whr_ip_ctrl_mac
    endgenerate
    
    c_dff
-     #(.width(flit_data_width))
+     #(.width(flit_data_width),
+       .reset_type(reset_type))
    flit_data_inq
      (.clk(clk),
       .reset(1'b0),
@@ -549,7 +551,8 @@ module whr_ip_ctrl_mac
 	       (tail_in ? fbf_write_addr : tail_idx_q) : 
 	       tail_idx_q;
 	   c_dff
-	     #(.width(fbf_addr_width))
+	     #(.width(fbf_addr_width),
+	       .reset_type(reset_type))
 	   tail_idxq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -659,7 +662,8 @@ module whr_ip_ctrl_mac
 	       (hdff_push ? la_route_info_in : hdff_la_route_info_q) : 
 	       hdff_la_route_info_q;
 	   c_dff
-	     #(.width(la_route_info_width))
+	     #(.width(la_route_info_width),
+	       .reset_type(reset_type))
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -675,7 +679,8 @@ module whr_ip_ctrl_mac
 	       (hdff_push ? route_info_in : hdff_route_info_q) : 
 	       hdff_route_info_q;
 	   c_dff
-	     #(.width(route_info_width))
+	     #(.width(route_info_width),
+	       .reset_type(reset_type))
 	   hdff_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -837,7 +842,8 @@ module whr_ip_ctrl_mac
    wire                      flit_head_out_s, flit_head_out_q;
    assign flit_head_out_s = flit_valid ? flit_head_out : flit_head_out_q;
    c_dff
-     #(.width(1))
+     #(.width(1),
+       .reset_type(reset_type))
    flit_head_outq
      (.clk(clk),
       .reset(1'b0),
@@ -847,7 +853,8 @@ module whr_ip_ctrl_mac
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
    assign la_route_info_s = flit_valid ? la_route_info_out : la_route_info_q;
    c_dff
-     #(.width(la_route_info_width))
+     #(.width(la_route_info_width),
+       .reset_type(reset_type))
    la_route_infoq
      (.clk(clk),
       .reset(1'b0),

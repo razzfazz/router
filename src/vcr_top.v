@@ -555,9 +555,11 @@ module vcr_top
 	   c_pseudo_sram_mac
 	     #(.width(flit_data_width),
 	       .depth(fbf_depth),
-	       .regfile_type(fbf_regfile_type))
+	       .regfile_type(fbf_regfile_type),
+	       .reset_type(reset_type))
 	   fbf
 	     (.clk(clk),
+	      .reset(1'b0),
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbf_write_addr),
 	      .write_data(fbf_write_data),

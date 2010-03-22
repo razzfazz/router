@@ -382,7 +382,8 @@ module vcr_op_ctrl_mac
 	begin
 	   
 	   c_dff
-	     #(.width(flow_ctrl_width-1))
+	     #(.width(flow_ctrl_width-1),
+	       .reset_type(reset_type))
 	   flow_ctrlq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -831,7 +832,8 @@ module vcr_op_ctrl_mac
 	     
 	     c_dff
 	       #(.width(flit_ctrl_width-1),
-		 .offset(1))
+		 .offset(1),
+		 .reset_type(reset_type))
 	     flit_ctrlq
 	       (.clk(clk),
 		.reset(1'b0),
@@ -849,7 +851,8 @@ module vcr_op_ctrl_mac
    wire [0:flit_data_width-1] 		  flit_data_s, flit_data_q;
    assign flit_data_s = sw_gnt_q ? flit_data_in : flit_data_q;
    c_dff
-     #(.width(flit_data_width))
+     #(.width(flit_data_width),
+       .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
       .reset(1'b0),
