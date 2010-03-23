@@ -48,7 +48,20 @@ module c_fbgen
    
    generate
       
-      if(width == 4)
+      if(width == 1)
+	begin
+	   assign feedback = 1'h1;
+	end
+      else if(width == 2)
+	begin
+	   assign feedback = 2'h3;
+	end
+      else if(width == 3)
+	begin
+	   if((index % 2) == 0) assign feedback = 3'h5;
+	   else if((index % 2) == 1) assign feedback = 3'h6;
+	end
+      else if(width == 4)
          begin
             if((index % 2) == 0) assign feedback = 4'h9;
             else if((index % 2) == 1) assign feedback = 4'hC;

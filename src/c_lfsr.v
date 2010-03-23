@@ -43,7 +43,7 @@ module c_lfsr
    parameter offset = 0;
    
    // initial state
-   parameter [offset:(offset+width)-1] reset_value = {{(width-1){1'b0}}, 1'b1};
+   parameter [offset:(offset+width)-1] reset_value = {width{1'b1}};
    
    // how many iterations to perform at once
    parameter iterations = 1;
@@ -91,8 +91,24 @@ module c_lfsr
    assign toggle_value = feedback_value ^ d;
    
    wire [offset:(offset+width)-1] base_value;
-   assign base_value
-     = {1'b0, {(width-1){~load}} & state_q[offset:(offset+width-1)-1]};
+   
+   generate
+      
+      if(width == 1)
+	begin
+	   
+	   assign base_value = 1'b0;
+	   
+	end
+      else
+	begin
+	   
+	   assign base_value
+	     = {1'b0, {(width-1){~load}} & state_q[offset:(offset+width-1)-1]};
+	   
+	end
+      
+   endgenerate
    
    wire [offset:(offset+width)-1] state_s;
    assign state_s = (load | run) ? (base_value ^ toggle_value) : state_q;

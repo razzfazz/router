@@ -73,7 +73,7 @@ module testbench
       complete = 1'b0;
       load = 1'b1;
       run = 1'b0;
-      d = {{(width-1){1'b0}}, 1'b1};
+      d = {width{1'b1}};
       
       #(Tclk);
       
@@ -93,7 +93,7 @@ module testbench
       complete = 1'b1;
       load = 1'b1;
       run = 1'b0;
-      d = {{(width-1){1'b0}}, 1'b1};
+      d = {width{1'b1}};
       
       #(Tclk);
       
