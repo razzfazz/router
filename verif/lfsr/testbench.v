@@ -4,17 +4,24 @@ module testbench
 `include "c_constants.v"
    
    parameter width = 4;
-//   parameter width = 16;
-      
+   
+   parameter index = 0;
+   
    parameter Tclk = 2;
    
-   reg clk;
-   reg reset;
-   reg [0:width-1] feedback;
-   reg 		   complete;
-   reg 		   load;
-   reg 		   run;
-   reg [0:width-1] d;
+   wire [0:width-1] feedback;
+   c_fbgen
+     #(.width(width),
+       .index(index))
+   fbgen
+     (.feedback(feedback));
+   
+   reg 		    clk;
+   reg 		    reset;
+   reg 		    complete;
+   reg 		    load;
+   reg 		    run;
+   reg [0:width-1]  d;
    
    wire [0:width-1] lfsr_q;
    c_lfsr
@@ -62,9 +69,6 @@ module testbench
       #(Tclk/2);
       
       reset = 1'b0;
-      feedback = 4'b1001;
-//      feedback = 4'b1100;
-//      feedback = 16'b1000000000010110;
       
       complete = 1'b0;
       load = 1'b1;
