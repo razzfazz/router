@@ -56,13 +56,31 @@ module c_fbmult
    wire [0:width-1] data_out;
    
    wire [0:width-1] feedback_seeds;
-   assign feedback_seeds[0:(width-1)-1] = data_in[0:(width-1)-1];
-   assign feedback_seeds[width-1]
-	    = (~|data_in[0:(width-1)-1] & complete) ^ data_in[width-1];
-   
    wire [0:width*width-1] iter_matrix_noshift_transposed;
-   assign iter_matrix_noshift_transposed
-     = {{((width-1)*width){1'b0}}, feedback};
+   
+   generate
+      
+      if(width == 1)
+	begin
+	   
+	   assign feedback_seeds = complete ^ data_in;
+	   
+	   assign iter_matrix_noshift_transposed = feedback;
+	   
+	end
+      else
+	begin
+	   
+	   assign feedback_seeds[0:(width-1)-1] = data_in[0:(width-1)-1];
+	   assign feedback_seeds[width-1]
+		    = (~|data_in[0:(width-1)-1] & complete) ^ data_in[width-1];
+	   
+	   assign iter_matrix_noshift_transposed
+	     = {{((width-1)*width){1'b0}}, feedback};
+	   
+	end
+      
+   endgenerate
    
    wire [0:width*width-1] iter_matrix_noshift;
    c_interleaver

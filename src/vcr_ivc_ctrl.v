@@ -374,7 +374,7 @@ module vcr_ivc_ctrl
       if(num_vcs_per_class > 1)
 	begin
 	   
-	   wire [0:num_vcs_per_class-1] vc_gnt_unchanged_ocvc;
+	   wire [0:num_vcs_per_class-1]   vc_gnt_unchanged_ocvc;
 	   assign vc_gnt_unchanged_ocvc
 	     = vc_gnt_ovc[packet_class*num_vcs_per_class:
 			  (packet_class+1)*num_vcs_per_class-1];
@@ -383,15 +383,6 @@ module vcr_ivc_ctrl
 	     begin
 		
 		assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
-		
-		c_align
-		  #(.data_width(num_vcs_per_class),
-		    .dest_width(num_vcs),
-		    .offset(packet_class*num_vcs_per_class))
-		allocated_ovc_alg
-		  (.data_in(vc_allocated_ocvc_q),
-		   .dest_in({num_vcs{1'b0}}),
-		   .data_out(allocated_ovc));
 		
 	     end
 	   else
@@ -405,18 +396,6 @@ module vcr_ivc_ctrl
 		// only one of the two will have a bit set, so we just OR them
 		assign vc_gnt_ocvc
 		  = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
-		
-		c_align
-		  #(.data_width(2*num_vcs_per_class),
-		    .dest_width(num_vcs),
-		    .offset(packet_class*num_vcs_per_class))
-		allocated_ovc_alg
-		  (.data_in({{num_vcs_per_class{~inc_rc}} & 
-			     vc_allocated_ocvc_q,
-			     {num_vcs_per_class{inc_rc}} & 
-			     vc_allocated_ocvc_q}),
-		   .dest_in({num_vcs{1'b0}}),
-		   .data_out(allocated_ovc));
 		
 	     end
 	   
@@ -435,9 +414,40 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
+	   
 	   assign vc_gnt_ocvc = 1'b1;
 	   assign vc_allocated_ocvc_q = 1'b1;
-	   assign allocated_ovc = 1'b1;
+	   
+	end
+      
+      if(resource_class == (num_resource_classes - 1))
+	begin
+	   
+	   c_align
+	     #(.data_width(num_vcs_per_class),
+	       .dest_width(num_vcs),
+	       .offset(packet_class*num_vcs_per_class))
+	   allocated_ovc_alg
+	     (.data_in(vc_allocated_ocvc_q),
+	      .dest_in({num_vcs{1'b0}}),
+	      .data_out(allocated_ovc));
+	   
+	end
+      else
+	begin
+	   
+	   c_align
+	     #(.data_width(2*num_vcs_per_class),
+	       .dest_width(num_vcs),
+	       .offset(packet_class*num_vcs_per_class))
+	   allocated_ovc_alg
+	     (.data_in({{num_vcs_per_class{~inc_rc}} & 
+			vc_allocated_ocvc_q,
+			{num_vcs_per_class{inc_rc}} & 
+			vc_allocated_ocvc_q}),
+	      .dest_in({num_vcs{1'b0}}),
+	      .data_out(allocated_ovc));
+	   
 	end
       
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
@@ -538,7 +548,8 @@ module vcr_ivc_ctrl
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
 	   assign tail_idx_s = tail_in ? fbc_write_addr : tail_idx_q;
 	   c_dff
-	     #(.width(fbf_addr_width))
+	     #(.width(fbf_addr_width),
+	       .reset_type(reset_type))
 	   tail_idxq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -657,10 +668,10 @@ module vcr_ivc_ctrl
 	     = hdff_push ? la_route_info_in : hdff_la_route_info_q;
 	   c_dff
 	     #(.width(la_route_info_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   hdff_la_route_infoq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(hdff_la_route_info_s),
 	      .q(hdff_la_route_info_q));
 	   
@@ -673,10 +684,10 @@ module vcr_ivc_ctrl
 	     = hdff_push ? hop_route_info_in : hdff_hop_route_info_q;
 	   c_dff
 	     #(.width(hop_route_info_width),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   hdff_hop_route_infoq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .d(hdff_hop_route_info_s),
 	      .q(hdff_hop_route_info_q));
 	   
