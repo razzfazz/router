@@ -1,4 +1,4 @@
-# $Id: Makefile 1437 2009-08-18 01:45:25Z dub $
+# $Id$
 
 TOP_SRC = testbench.v
 DEP_SRCS = 

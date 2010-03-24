@@ -1,4 +1,4 @@
-// $Id: parameters.v 1519 2009-09-10 23:36:06Z dub $
+// $Id$
 
 /*
 Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
