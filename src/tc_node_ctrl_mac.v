@@ -195,10 +195,10 @@ module tc_node_ctrl_mac
 			cfg_write_q;
    c_dff
      #(.width(1),
-       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+       .reset_type(reset_type))
    cfg_writeq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(cfg_write_s),
       .q(cfg_write_q));
    
@@ -210,10 +210,10 @@ module tc_node_ctrl_mac
 		       cfg_addr_q;
    c_dff
      #(.width(cfg_addr_width),
-       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+       .reset_type(reset_type))
    cfg_addrq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(cfg_addr_s),
       .q(cfg_addr_q));
    
@@ -230,10 +230,10 @@ module tc_node_ctrl_mac
 		       cfg_data_q;
    c_dff
      #(.width(cfg_data_width),
-       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+       .reset_type(reset_type))
    cfg_dataq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(cfg_data_s),
       .q(cfg_data_q));
    
@@ -249,10 +249,10 @@ module tc_node_ctrl_mac
        done_delay_q;
    c_dff
      #(.width(done_delay_width),
-       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+       .reset_type(reset_type))
    done_delayq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(done_delay_s),
       .q(done_delay_q));
    
@@ -394,10 +394,10 @@ module tc_node_ctrl_mac
      = io_active ? (cfg_req_q ? node_status : node_status_q) : node_status_q;
    c_dff
      #(.width(node_status_width),
-       .reset_type(`RESET_TYPE_NONE /*reset_type*/))
+       .reset_type(reset_type))
    node_statusq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(node_status_s),
       .q(node_status_q));
    

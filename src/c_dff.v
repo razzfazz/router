@@ -61,11 +61,6 @@ module c_dff
       
       case(reset_type)
 	
-	`RESET_TYPE_NONE:
-	  always @(posedge clk)
-	    if(active)
-	      q <= d;
-	
 	`RESET_TYPE_ASYNC:
 	  always @(posedge clk, posedge reset)
 	    if(reset)

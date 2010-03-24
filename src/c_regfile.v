@@ -94,8 +94,8 @@ module c_regfile
 	       
 	       `REGFILE_TYPE_LAT_2D:
 		 always @(clk, active, write_enable, write_address, write_data)
-		   if(active)
-		     if(~clk)
+		   if(~clk)
+		     if(active)
 		       if(write_enable)
 			 storage[write_address] <= write_data;
 	       
@@ -143,8 +143,8 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_LAT_1D_MUX:
 		      always @(clk, active, write, write_data)
-			if(active)
-			  if(~clk)
+			if(~clk)
+			  if(active)
 			    if(write)
 			      storage <= write_data;
 		    
@@ -179,8 +179,8 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_LAT_1D_TRISTATE:
 		      always @(clk, active, write, write_data)
-			if(active)
-			  if(~clk)
+			if(~clk)
+			  if(active)
 			    if(write)
 			      storage <= write_data;
 		    

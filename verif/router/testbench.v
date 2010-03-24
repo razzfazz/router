@@ -54,7 +54,7 @@ module testbench
    parameter channel_latency = 1;
    
    // only inject traffic at the node ports
-   parameter inject_node_ports_only = 1;
+   parameter inject_node_ports_only = 0;
    
    // warmup time in cycles
    parameter warmup_time = 100;
@@ -64,9 +64,6 @@ module testbench
    
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
-   
-   // allow nodes to send packets to themselves
-   parameter allow_loopback = 1;
    
    
    // total number of packet classes
@@ -215,7 +212,6 @@ module testbench
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
 		    .port_id(ip),
-		    .allow_loopback(allow_loopback),
 		    .reset_type(reset_type))
 		ps
 		  (.clk(clk),

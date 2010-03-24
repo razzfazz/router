@@ -66,6 +66,9 @@ module rtr_port_filter
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
+   // select order of dimension traversal
+   parameter dim_order = `DIM_ORDER_ASCENDING;
+   
    // ID of current port
    parameter port_id = 0;
    
@@ -119,14 +122,24 @@ module rtr_port_filter
 	   // destination router for their current resource class (this cannot 
 	   // happen for packets in the highest resource class); for the
 	   // flattened butterfly, this applies to all links in the same
-	   // dimension
-	   if((op < (num_ports - num_nodes_per_router)) &&
-	      ((routing_type == `ROUTING_TYPE_DOR) &&
-	       (((connectivity == `CONNECTIVITY_LINE) || 
-		 (connectivity == `CONNECTIVITY_RING)) && (op == port_id)) ||
-	       ((connectivity == `CONNECTIVITY_FULL) &&
-		((op / num_neighbors_per_dim) == 
-		 (port_id / num_neighbors_per_dim)))))
+	   // dimension; likewise, in the case of dimension-order routing, 
+	   // ports for dimensions that were already traversed can only be used 
+	   // when changing resource classes
+	   if(((op < (num_ports - num_nodes_per_router)) && 
+	       ((routing_type == `ROUTING_TYPE_DOR) && 
+		((((connectivity == `CONNECTIVITY_LINE) || 
+		   (connectivity == `CONNECTIVITY_RING)) && 
+		  (op == port_id)) || 
+		 ((connectivity == `CONNECTIVITY_FULL) && 
+		  ((op / num_neighbors_per_dim) == 
+		   (port_id / num_neighbors_per_dim))) || 
+		 ((port_id < (num_ports - num_nodes_per_router)) && 
+		  (((dim_order == `DIM_ORDER_ASCENDING) && 
+		    ((op / num_neighbors_per_dim) < 
+		     (port_id / num_neighbors_per_dim))) || 
+		   ((dim_order == `DIM_ORDER_DESCENDING) && 
+		    ((op / num_neighbors_per_dim) > 
+		     (port_id / num_neighbors_per_dim)))))))))
 	     begin
 		if(resource_class == (num_resource_classes - 1))
 		  begin

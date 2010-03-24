@@ -302,10 +302,10 @@ module tc_chan_test_mac
 		      running_q;
    c_dff
      #(.width(1),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    runningq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(running_s),
       .q(running_q));
    
@@ -335,10 +335,10 @@ module tc_chan_test_mac
 		     errors_q;
    c_dff
      #(.width(channel_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    errorsq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(errors_s),
       .q(errors_q));
    
@@ -388,10 +388,10 @@ module tc_chan_test_mac
 			    test_duration_q;
    c_dff
      #(.width(test_duration_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    test_durationq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(test_duration_s),
       .q(test_duration_q));
    
@@ -433,10 +433,10 @@ module tc_chan_test_mac
 			      warmup_duration_q;
    c_dff
      #(.width(warmup_duration_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    warmup_durationq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(warmup_duration_s),
       .q(warmup_duration_q));
    
@@ -468,10 +468,10 @@ module tc_chan_test_mac
        cal_interval_q;
    c_dff
      #(.width(cal_interval_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    cal_intervalq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(cal_interval_s),
       .q(cal_interval_q));
    
@@ -501,10 +501,10 @@ module tc_chan_test_mac
        cal_duration_q;
    c_dff
      #(.width(cal_duration_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    cal_durationq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(cal_duration_s),
       .q(cal_duration_q));
    
@@ -534,10 +534,10 @@ module tc_chan_test_mac
        pattern_addr_q;
    c_dff
      #(.width(pattern_addr_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    pattern_addrq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(pattern_addr_s),
       .q(pattern_addr_q));
    
@@ -559,10 +559,10 @@ module tc_chan_test_mac
    assign cal_ctr_s = active_q ? cal_ctr_next : cal_ctr_q;
    c_dff
      #(.width(cal_interval_width),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    cal_ctrq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .d(cal_ctr_s),
       .q(cal_ctr_q));
    
@@ -692,10 +692,10 @@ module tc_chan_test_mac
 	   c_lfsr
 	     #(.width(lfsr_width),
 	       .iterations(1),
-	       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   pattern_data_rv_lfsr
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .load(write_pattern_data_rv),
 	      .run(active_q),
 	      .feedback(pattern_data_rv_feedback_muxed),
@@ -718,10 +718,10 @@ module tc_chan_test_mac
    c_shift_reg
      #(.width(channel_width),
        .depth(2),
-       .reset_type(/*reset_type*/ `RESET_TYPE_NONE))
+       .reset_type(reset_type))
    ref_data_sr
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .enable(active_q),
       .data_in(xmit_data),
       .data_out(ref_data));

@@ -347,7 +347,7 @@ module testbench
       
       // set LFSR seeds
       
-      for(j = 0; j < num_ports; j = j + 1)
+      for(j = (num_ports - num_nodes_per_router); j < num_ports; j = j + 1)
 	begin
 	   io_write = 1'b1;
 	   io_addr[0:cfg_node_addr_width-1] = 1 + j;
