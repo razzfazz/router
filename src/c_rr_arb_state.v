@@ -64,7 +64,7 @@ module c_rr_arb_state
 	   // inputs to the right of this grant (if any) in the next cycle; if 
 	   // no grant was generated, the priorities are left unchanged
 	   wire [0:num_ports-1] prio_s;
-	   assign prio_s = (update & |gnt) ? (gnt - 1'b1) : prio_q;
+	   assign prio_s = update ? (gnt - 1'b1) : prio_q;
 	   assign prio_q[0] = 1'b0;
 	   c_dff
 	     #(.width(num_ports-1),
