@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// generic matrix arbiter
+// generic matrix arbiter grant generation logic
 module c_matrix_arbiter
   (state, req, gnt);
    
