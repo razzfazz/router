@@ -979,7 +979,7 @@ module vcr_ivc_ctrl
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_new;
 	     if(vc_alloc_requires_credit)
-	       assign cred_hold_new = !sw_gnt_spec & cred_unallocated;
+	       assign cred_hold_new = ~sw_gnt_spec & cred_unallocated;
 	     else
 	       assign cred_hold_new = {cred_hold_width{1'b0}};
 	     
