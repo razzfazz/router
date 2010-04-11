@@ -788,10 +788,6 @@ module vcr_top
 					       sw_alloc_wf_out_width-1];
 		     
 		     assign sw_alloc_opc_in[0:sw_alloc_req_width-1]
-			      = sw_alloc_ipc_out[0:sw_alloc_req_width-1];
-		     assign sw_alloc_opc_in[sw_alloc_req_width:
-					    sw_alloc_req_width+
-					    sw_alloc_gnt_width-1]
 			      = sw_alloc_wf_out[0:sw_alloc_gnt_width-1];
 		     
 		  end
