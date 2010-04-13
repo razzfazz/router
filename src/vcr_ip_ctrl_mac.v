@@ -857,10 +857,6 @@ module vcr_ip_ctrl_mac
 	   else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
 	     begin
 		
-		// flit buffer read address can be determined early
-		assign vc_sel_ivc
-		  = sw_req_nonspec ? vc_sel_nonspec_ivc : vc_sel_spec_ivc;
-		       
 		case(sw_alloc_spec_type)
 		  
 		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
@@ -875,6 +871,11 @@ module vcr_ip_ctrl_mac
 						sw_gnt_spec_qual_ivc;
 		       assign sw_ignt_spec_op = {num_ports{~sw_req_nonspec}} & 
 						sw_ignt_spec_unqual_op;
+		       
+		       // flit buffer read address can be determined early
+		       assign vc_sel_ivc = sw_req_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
 		       
 		       // inhibit updates if non-speculative requests are 
 		       // present
@@ -895,6 +896,11 @@ module vcr_ip_ctrl_mac
 		       // grants
 		       assign sw_gnt_spec_ivc = sw_gnt_spec_qual_ivc;
 		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
+		       
+		       // flit buffer read address can be determined early
+		       assign vc_sel_ivc = sw_req_nonspec ? 
+					   vc_sel_nonspec_ivc : 
+					   vc_sel_spec_ivc;
 		       
 		       // updates are masked indirectly via output-side grants
 		       assign allow_update_spec = 1'b1;
