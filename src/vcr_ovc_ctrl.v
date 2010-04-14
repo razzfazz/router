@@ -499,9 +499,12 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
+
+   wire [0:cred_count_width-1] 			 cred_count_plus_credit;
+   assign cred_count_plus_credit = cred_count_q + credit;
    
    wire [0:cred_count_width-1] 			 cred_count_next;
-   assign cred_count_next = cred_count_q + credit - debit;
+   assign cred_count_next = cred_count_plus_credit - debit;
    
    wire [0:cred_count_width-1] 			 cred_count_s;
    assign cred_count_s = update_credits ? cred_count_next : cred_count_q;
@@ -585,23 +588,33 @@ module vcr_ovc_ctrl
 	     assign int_flow_ctrl = free_q;
 	     */
 	     
+	     // The debit input to this module is driven by the input VC 
+	     // controller. Consequently, the debit signal is already readily 
+	     // available at the input controller, and we can simply pass the 
+	     // current credit level, incremented by one if a credit was just 
+	     // received, from output to input controller, rather having the 
+	     // debit signal effectively go from input to output controller 
+	     // and back.
+	     
 	     if(cred_count_width > cred_level_width)
 	       begin
 		  
 		  wire limit_cred_level;
 		  assign limit_cred_level
-		    = |cred_count_next[0:cred_count_width-cred_level_width-1];
+		    = |cred_count_plus_credit[0:
+					      cred_count_width-
+					      cred_level_width-1];
 		  
 		  assign int_flow_ctrl
 		    = {cred_level_width{limit_cred_level}} | 
-		      cred_count_next[cred_count_width-cred_level_width:
-				      cred_count_width-1];
+		      cred_count_plus_credit[cred_count_width-cred_level_width:
+					     cred_count_width-1];
 		  
 	       end
 	     else
 	       assign int_flow_ctrl
-		 = cred_count_next[cred_count_width-cred_level_width:
-				   cred_count_width-1];
+		 = cred_count_plus_credit[cred_count_width-cred_level_width:
+					  cred_count_width-1];
 	     
 	  end
 	
