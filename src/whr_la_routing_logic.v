@@ -220,7 +220,7 @@ module whr_la_routing_logic
 				initial
 				begin
 				   $display({"ERROR: The lookahead routing ", 
-					     "logic module does not yet ", 
+					     "logic module %m does not yet ", 
 					     "support ring connectivity ", 
 					     "within each dimension."});
 				   $stop;

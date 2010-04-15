@@ -879,27 +879,26 @@ module vcr_op_ctrl_mac
 	     begin
 		
 		if(error_unmatched)
-		     $display("ERROR: Unmatched flit at output port %d.",
-			      port_id);
+		  $display("ERROR: Unmatched flit in module %m.");
 		
 		for(i = 0; i < num_vcs; i = i + 1)
 		  begin
 		     
 		     if(ovcc_errors_ovc[i*4])
-		       $display({"ERROR: Credit tracker underflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+		       $display({"ERROR: Credit tracker underflow in module ",
+				 "%m."});
 		     
 		     if(ovcc_errors_ovc[i*4+1])
-		       $display({"ERROR: Credit tracker overflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+		       $display({"ERROR: Credit tracker overflow in module ", 
+				 "%m."});
 		     
 		     if(ovcc_errors_ovc[i*4+2])
-		       $display({"ERROR: Head credit tracker underflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+		       $display({"ERROR: Head credit tracker underflow in ", 
+				 "module %m."});
 		     
 		     if(ovcc_errors_ovc[i*4+3])
-		       $display({"ERROR: Head credit tracker overflow at ", 
-				 "output port %d, VC %d."}, port_id, i);
+		       $display({"ERROR: Head credit tracker overflow in ", 
+				 "module %m."});
 		     
 		  end
 		

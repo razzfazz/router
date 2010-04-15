@@ -315,8 +315,9 @@ module c_regfile
 		    // synopsys translate_off
 		    initial
 		    begin
-		       $display({"ERROR: DesignWare only provides register ",
-				 "file models with up to two read ports."});
+		       $display({"ERROR: Register file %m does not support ",
+				 "DesignWare register file models with %d ",
+				 "read ports."}, num_read_ports);
 		       $stop;
 		    end
 		    // synopsys translate_on

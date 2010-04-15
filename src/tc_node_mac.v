@@ -744,9 +744,11 @@ module tc_node_mac
 		initial
 		begin
 		   $display({"ERROR: The value of the cfg_data_width ", 
-			     "parameter is too small to accomodate the ", 
-			     "specified number of message class selection ", 
-			     "thresholds."});
+			     "parameter (%d) in module %m is too small to ",
+			     "accomodate %d message class selection ",
+			     "thresholds of width %d."}, 
+			    cfg_data_width, num_message_classes - 1, 
+			    mc_idx_rv_width);
 		   $stop;
 		end
 	     end
@@ -846,9 +848,11 @@ module tc_node_mac
 		initial
 		begin
 		   $display({"ERROR: The value of the cfg_data_width ", 
-			     "parameter is too small to accomodate the ", 
-			     "specified number of resource class selection ", 
-			     "thresholds."});
+			     "parameter (%d) in module %m is too small to ",
+			     "accomodate %d resource class selection ",
+			     "thresholds of width %d."}, 
+			    cfg_data_width, num_resource_classes - 1, 
+			    rc_idx_rv_width);
 		   $stop;
 		end
 	     end
@@ -1365,9 +1369,11 @@ module tc_node_mac
 		initial
 		begin
 		   $display({"ERROR: The value of the cfg_data_width ", 
-			     "parameter is too small to accomodate the ", 
-			     "specified number of packet length selection ", 
-			     "thresholds."});
+			     "parameter (%d) in module %m is too small to ",
+			     "accomodate %d packet length selection ",
+			     "thresholds of width %d."}, 
+			    cfg_data_width, num_plength_vals - 1, 
+			    plength_idx_rv_width);
 		   $stop;
 		end
 	     end
@@ -1376,8 +1382,11 @@ module tc_node_mac
 		initial
 		begin
 		   $display({"ERROR: The value of the cfg_data_width ", 
-			     "parameter is too small to accomodate the ", 
-			     "specified number of packet length values."});
+			     "parameter (%d) in module %m is too small to ",
+			     "accomodate %d packet length values of ", 
+			     "width %d."},
+			    cfg_data_width, num_plength_vals, 
+			    payload_length_width);
 		   $stop;
 		end
 	     end
@@ -1902,20 +1911,19 @@ module tc_node_mac
 		  begin
 		     
 		     if(ovcc_errors_ovc[i*4])
-		       $display({"ERROR: Credit tracker underflow at ", 
-				 "node %d, VC %d."}, address, i);
+		       $display({"ERROR: Credit tracker underflow in module ",
+				 "%m."});
 		     
 		     if(ovcc_errors_ovc[i*4+1])
-		       $display({"ERROR: Credit tracker overflow at ", 
-				 "node %d, VC %d."}, address, i);
+		       $display("ERROR: Credit tracker overflow in module %m.");
 		     
 		     if(ovcc_errors_ovc[i*4+2])
-		       $display({"ERROR: Head credit tracker underflow at ", 
-				 "node %d, VC %d."}, address, i);
+		       $display({"ERROR: Head credit tracker underflow in ", 
+				 "module %m."});
 		     
 		     if(ovcc_errors_ovc[i*4+3])
-		       $display({"ERROR: Head credit tracker overflow at ", 
-				 "node %d, VC %d."}, address, i);
+		       $display({"ERROR: Head credit tracker overflow in ", 
+				 "module %m"});
 		     
 		  end
 		

@@ -1419,33 +1419,26 @@ module vcr_ip_ctrl_mac
 		  begin
 		     
 		     if(ivcc_errors_ivc[i*7])
-		       $display({"ERROR: Flit buffer underflow at input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display("ERROR: Flit buffer underflow in module %m.");
 		     
 		     if(ivcc_errors_ivc[i*7+1])
-		       $display({"ERROR: Flit buffer overflow at input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display("ERROR: Flit buffer overflow in module %m.");
 		     
 		     if(ivcc_errors_ivc[i*7+2])
-		       $display({"ERROR: Head FIFO underflow at input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display("ERROR: Head FIFO underflow in module %m.");
 		     
 		     if(ivcc_errors_ivc[i*7+3])
-		       $display({"ERROR: Head FIFO overflow at input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display("ERROR: Head FIFO overflow in module %m.");
 		     
 		     if(ivcc_errors_ivc[i*7+4])
-		       $display({"ERROR: Stray flit received at input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display("ERROR: Stray flit received in module %m.");
 		     
 		     if(ivcc_errors_ivc[i*7+5])
-		       $display({"ERROR: Credit tracker overflow at input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display("ERROR: Credit tracker overflow in module %m.");
 		     
 		     if(ivcc_errors_ivc[i*7+6])
-		       $display({"ERROR: Received flit's destination does ", 
-				 "not match constraints for input ", 
-				 "port %d, VC %d."}, port_id, i);
+		       $display({"ERROR: Received flit's destination does ",
+				 "not match port constraints in module %m."});
 		     
 		  end
 		
