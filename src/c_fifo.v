@@ -253,7 +253,7 @@ module c_fifo
 	begin
 	   initial
 	   begin
-	      $display({"ERROR: The FIFO module must have a depth of at least ",
+	      $display({"ERROR: FIFO module %m must have a depth of at least ",
 			"two entries."});
 	      $stop;
 	   end

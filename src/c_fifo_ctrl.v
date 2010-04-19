@@ -193,7 +193,7 @@ module c_fifo_ctrl
 	begin
 	   initial
 	   begin
-	      $display({"ERROR: The FIFO controller requires that addr_width ", 
+	      $display({"ERROR: FIFO controller %m requires that addr_width ", 
 			"be at least wide enough to cover the entire depth."});
 	      $stop;
 	   end
