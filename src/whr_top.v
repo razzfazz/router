@@ -431,14 +431,14 @@ module whr_top
 		  begin
 		     if(ipc_error_ip[i])
 		       $display({"ERROR: Router error detected at input ", 
-				 "port %d."}, i);
+				 "port %d in module %m."}, i);
 		  end
 		
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
 		     if(opc_error_op[i])
 		       $display({"ERROR: Router error detected at output ", 
-				 "port %d."}, i);
+				 "port %d in module %m."}, i);
 		  end
 		
 	     end

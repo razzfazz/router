@@ -901,28 +901,26 @@ module whr_ip_ctrl_mac
 	     begin
 		
 		if(error_fbc_underflow)
-		     $display({"ERROR: Flit buffer controller underflow at ", 
-			       "input port %d."}, port_id);
+		     $display({"ERROR: Flit buffer controller underflow in ", 
+			       "module %m."});
 		
 		if(error_fbc_overflow)
-		     $display({"ERROR: Flit buffer controller overflow at ", 
-			       "input port %d."}, port_id);
+		     $display({"ERROR: Flit buffer controller overflow in ", 
+			       "module %m."});
 		
 		if(error_hdff_underflow)
-		     $display("ERROR: Head FIFO underflow at input port %d.",
-			      port_id);
+		  $display("ERROR: Head FIFO underflow in module %m.");
 		
 		if(error_hdff_overflow)
-		     $display("ERROR: Head FIFO overflow at input port %d.",
-			      port_id);
+		     $display("ERROR: Head FIFO overflow in module %m.");
 		
 		if(error_no_header)
-		     $display("ERROR: Stray flit received at input port %d.",
-			      port_id);
+		     $display("ERROR: Stray flit received in module %m.");
 		
 		if(error_invalid_port)
 		     $display({"ERROR: Received flit's destination does not ", 
-			       "match constraints for input port %d."}, 
+			       "match constraints for input port %d in ",
+			       "module %m."}, 
 			      port_id);
 		
 	     end

@@ -227,9 +227,12 @@ module vcr_flit_ctrl_dec
 			      begin
 				 $display({"ERROR: The value of the ", 
 					   "max_payload_length parameter ", 
-					   "cannot be smaller than that of ", 
-					   "the min_payload_length ",
-					   "parameter."});
+					   "(%d) in module %m cannot be ",
+					   "smaller than that of the ",
+					   "min_payload_length parameter ",
+					   "(%d)."},
+					  max_payload_length, 
+					  min_payload_length);
 				 $stop;
 			      end
 			   end
@@ -254,10 +257,13 @@ module vcr_flit_ctrl_dec
 			      initial
 			      begin
 				 $display({"ERROR: The value of the ", 
-					   "max_payload_length parameter ", 
-					   "cannot be smaller than that of ", 
-					   "the min_payload_length ", 
-					   "parameter."});
+					   "max_payload_length parameter ",
+					   "(%d) in module %m cannot be ",
+					   "smaller than that of the ",
+					   "min_payload_length parameter ",
+					   "(%d)."},
+					  max_payload_length,
+					  min_payload_length);
 				 $stop;
 			      end
 			   end
@@ -337,9 +343,12 @@ module vcr_flit_ctrl_dec
 				   begin
 				      $display({"ERROR: The value of the ", 
 						"max_payload_length parameter ",
-						"cannot be smaller than that ", 
-						"of the min_payload_length ", 
-						"parameter."});
+						"(%d) in module %m cannot be ",
+						"smaller than that of the ",
+						"min_payload_length ", 
+						"parameter (%d)."},
+					       max_payload_length,
+					       min_payload_length);
 				      $stop;
 				   end
 				end
