@@ -709,8 +709,8 @@ module vcr_ivc_ctrl
 	   
 	   assign hdff_empty = hdff_empty_q;
 	   
-	   assign error_hdff_underflow = hdff_empty_q & hdff_pop;
-	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push;
+	   assign error_hdff_underflow = hdff_empty_q & ~hdff_push & hdff_pop;
+	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push & ~hdff_pop;
 	   
 	end
       
@@ -979,7 +979,7 @@ module vcr_ivc_ctrl
 	     
 	     wire [0:cred_hold_width-1]        cred_hold_new;
 	     if(vc_alloc_requires_credit)
-	       assign cred_hold_new = !sw_gnt_spec & cred_unallocated;
+	       assign cred_hold_new = ~sw_gnt_spec & cred_unallocated;
 	     else
 	       assign cred_hold_new = {cred_hold_width{1'b0}};
 	     
