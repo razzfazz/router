@@ -788,10 +788,6 @@ module vcr_top
 					       sw_alloc_wf_out_width-1];
 		     
 		     assign sw_alloc_opc_in[0:sw_alloc_req_width-1]
-			      = sw_alloc_ipc_out[0:sw_alloc_req_width-1];
-		     assign sw_alloc_opc_in[sw_alloc_req_width:
-					    sw_alloc_req_width+
-					    sw_alloc_gnt_width-1]
 			      = sw_alloc_wf_out[0:sw_alloc_gnt_width-1];
 		     
 		  end
@@ -907,14 +903,14 @@ module vcr_top
 		  begin
 		     if(ipc_error_ip[i])
 		       $display({"ERROR: Router error detected at input ", 
-				 "port %d."}, i);
+				 "port %d in module %m."}, i);
 		  end
 		
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
 		     if(opc_error_op[i])
 		       $display({"ERROR: Router error detected at output ", 
-				 "port %d."}, i);
+				 "port %d in module %m."}, i);
 		  end
 		
 	     end
