@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic matrix arbiter state
 module c_matrix_arb_state
-  (clk, reset, active, upgate, gnt);
+  (clk, reset, active, update, gnt, state);
    
 `include "c_constants.v"
    
