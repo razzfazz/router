@@ -253,6 +253,7 @@ module packet_source
 	   waiting_packet_countq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(waiting_packet_count_s),
 	      .q(waiting_packet_count_q));
 	   
@@ -280,6 +281,7 @@ module packet_source
    ready_packet_countq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(ready_packet_count_s),
       .q(ready_packet_count_q));
    
@@ -364,6 +366,7 @@ module packet_source
 		tail_queueq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
@@ -384,6 +387,7 @@ module packet_source
 		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
 		
@@ -410,6 +414,7 @@ module packet_source
 		pop_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
@@ -445,6 +450,7 @@ module packet_source
 	   hct
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .credit(head_credit),
 	      .debit(head_debit),
 	      .free(head_free),
@@ -463,6 +469,7 @@ module packet_source
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
@@ -510,6 +517,7 @@ module packet_source
    flit_validq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(flit_valid_s),
       .q(flit_valid_q));
    
@@ -879,6 +887,7 @@ module packet_source
 	   headq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(head_s),
 	      .q(head_q));
 	   
@@ -945,6 +954,7 @@ module packet_source
    out_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(out_flits_s),
       .q(out_flits_q));
    

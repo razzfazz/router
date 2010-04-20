@@ -312,6 +312,7 @@ module router_checker
 		       flit_ctrq
 			 (.clk(clk),
 			  .reset(reset),
+			  .active(1'b1),
 			  .d(flit_ctr_s),
 			  .q(flit_ctr_q));
 		       
@@ -491,6 +492,7 @@ module router_checker
 	   dest_portq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(dest_port_s),
 	      .q(dest_port_q));
 	   
@@ -531,6 +533,7 @@ module router_checker
 	   dest_ovcq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(dest_ovc_s),
 	      .q(dest_ovc_q));
 	   
@@ -614,10 +617,13 @@ module router_checker
 		wire 			     pop;
 		assign pop = match;
 		
+		wire 			     fifo_almost_full;
 		wire 			     fifo_full;
+		wire 			     fifo_almost_empty;
 		wire 			     fifo_empty;
 		wire [0:1] 		     fifo_errors;
-		
+		wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
+		      num_vcs-1] fifo_peek_data;
 		
 		// instantiate the FIFO
 		
@@ -629,11 +635,15 @@ module router_checker
 		ref_fifo
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
+		   .almost_full(fifo_almost_full),
 		   .full(fifo_full),
-		   .data_in(data_in),
+		   .write_data(data_in),
 		   .push(push),
+		   .almost_empty(fifo_almost_empty),
 		   .empty(fifo_empty),
-		   .data_out(data_out),
+		   .read_data(data_out),
+		   .peek_data(fifo_peek_data),
 		   .pop(pop),
 		   .errors(fifo_errors));
 		
@@ -779,6 +789,7 @@ module router_checker
 		chk
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .errors_in(errors_s),
 		   .errors_out(errors_q));
 		
@@ -915,6 +926,7 @@ module router_checker
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   

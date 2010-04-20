@@ -341,7 +341,7 @@ module testbench
 	   flit_ctrl_dly_sr
 	     (.clk(clk),
 	      .reset(reset),
-	      .enable(1'b1),
+	      .active(1'b1),
 	      .data_in(flit_ctrl_out),
 	      .data_out(flit_ctrl_dly));
 	   
@@ -396,6 +396,7 @@ module testbench
 		buffer_sel_vc_arb
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .update(update),
 		   .req(req_vc),
 		   .gnt(gnt_vc));
@@ -435,6 +436,7 @@ module testbench
 		
 		wire [0:flit_buffer_idx_width-1] buffer_write_addr;
 		wire [0:flit_buffer_idx_width-1] buffer_read_addr;		
+		wire [0:flit_buffer_idx_width-1] buffer_peek_addr;		
 		wire buffer_almost_empty;
 		wire buffer_empty;
 		wire buffer_almost_full;
@@ -447,10 +449,12 @@ module testbench
 		buffer
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .push(buffer_push),
 		   .pop(buffer_pop),
 		   .write_addr(buffer_write_addr),
 		   .read_addr(buffer_read_addr),
+		   .peek_addr(buffer_peek_addr),
 		   .almost_empty(buffer_almost_empty),
 		   .empty(buffer_empty),
 		   .almost_full(buffer_almost_full),
@@ -471,6 +475,7 @@ module testbench
 	   flow_ctrlq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(flow_ctrl_s),
 	      .q(flow_ctrl_q));
 	   
@@ -482,7 +487,7 @@ module testbench
 	   flow_ctrl_in_sr
 	     (.clk(clk),
 	      .reset(reset),
-	      .enable(1'b1),
+	      .active(1'b1),
 	      .data_in(flow_ctrl_q),
 	      .data_out(flow_ctrl_in));
 	   
@@ -508,6 +513,7 @@ module testbench
    in_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(in_flits_s),
       .q(in_flits_q));
    
@@ -522,6 +528,7 @@ module testbench
    in_credsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(in_creds_s),
       .q(in_creds_q));
    
@@ -536,6 +543,7 @@ module testbench
    out_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(out_flits_s),
       .q(out_flits_q));
    
@@ -550,6 +558,7 @@ module testbench
    out_credsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(out_creds_s),
       .q(out_creds_q));
    
@@ -569,6 +578,7 @@ module testbench
    count_in_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(count_in_flits_s),
       .q(count_in_flits_q));
    
@@ -586,6 +596,7 @@ module testbench
    count_out_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(count_out_flits_s),
       .q(count_out_flits_q));
    
