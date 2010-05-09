@@ -443,7 +443,7 @@ module tc_node_mac
    
    wire 			 suppress_s, suppress_q;
    assign suppress_s
-     = ifc_active ? (write_ctrl ? ifc_write_data[1] : suppress_q) : suppress_q;
+     = ifc_active ? (write_ctrl ? ifc_write_data[2] : suppress_q) : suppress_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
