@@ -354,8 +354,8 @@ module router_checker
 		     
 		     // compute destination port
 		     
-		     wire [0:port_idx_width-1] 	     route_port;
-		     wire 			 inc_rc;
+		     wire [0:num_ports-1] 	     route_op;
+		     wire 			     inc_rc;
 		     vcr_routing_logic
 		       #(.num_resource_classes(num_resource_classes),
 			 .num_routers_per_dim(num_routers_per_dim),
@@ -371,9 +371,15 @@ module router_checker
 			.router_address(router_address),
 			.sel_rc(sel_irc),
 			.route_info(route_info),
-			.route_port(route_port),
+			.route_op(route_op),
 			.inc_rc(inc_rc));
 		     
+		     wire [0:port_idx_width-1] 	     route_port;
+		     c_encoder
+		       #(.num_ports(num_ports))
+		     route_port_enc
+		       (.data_in(route_op),
+			.data_out(route_port));
 		     
 		     // determine candidate output VCs
 		     

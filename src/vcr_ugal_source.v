@@ -116,7 +116,7 @@ module vcr_ugal_source(/*autoarg*/
      = (1 << (num_resource_classes - 1-1));
    wire [0:num_ports-1] min_route_unmasked;
    wire 			       inc_rc;
-    vcr_routing_logic_ugal
+    vcr_routing_logic
       #(.num_resource_classes(num_resource_classes),
 	.num_routers_per_dim(num_routers_per_dim),
 	.num_dimensions(num_dimensions),

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for VC router
 module vcr_routing_logic
-  (clk, reset, router_address, sel_rc, route_info, route_port, inc_rc);
+  (clk, reset, router_address, sel_rc, route_info, route_op, inc_rc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -77,9 +77,6 @@ module vcr_routing_logic
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
    
@@ -106,8 +103,8 @@ module vcr_routing_logic
    input [0:route_info_width-1] route_info;
    
    // output port to forward to
-   output [0:port_idx_width-1] route_port;
-   wire [0:port_idx_width-1] route_port;
+   output [0:num_ports-1] route_op;
+   wire [0:num_ports-1] route_op;
    
    // if we have reached our destination for the current resource class, 
    // increment the resource class (unless it's already the highest)
@@ -138,7 +135,6 @@ module vcr_routing_logic
    assign inc_rc = reached_dest & ~final_rc;
    
    wire [0:num_dimensions-1] 			     dim_addr_match;
-   wire [0:num_ports-1] 			     route_op;
    
    generate
       
@@ -277,11 +273,5 @@ module vcr_routing_logic
 	assign route_op[num_ports-1] = &dim_addr_match & final_rc;
       
    endgenerate
-   
-   c_encoder
-     #(.num_ports(num_ports))
-   route_port_enc
-     (.data_in(route_op),
-      .data_out(route_port));
    
 endmodule
