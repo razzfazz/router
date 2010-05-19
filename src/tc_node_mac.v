@@ -445,7 +445,7 @@ module tc_node_mac
       .q(loopback_q));
    
    wire 			 suppress_s, suppress_q;
-   assign suppress_s = write_ctrl ? ifc_write_data[1] : suppress_q;
+   assign suppress_s = write_ctrl ? ifc_write_data[2] : suppress_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -1320,7 +1320,7 @@ module tc_node_mac
    wire [0:router_addr_width-1] 	     router_address;
    assign router_address = address[0:router_addr_width-1];
    
-   wire [0:port_idx_width-1] 		     route_port_rv;
+   wire [0:num_ports-1] 		     route_op_rv;
    wire 				     inc_rc_rv;
    vcr_routing_logic
      #(.num_resource_classes(num_resource_classes),
@@ -1338,8 +1338,15 @@ module tc_node_mac
       .router_address(router_address),
       .sel_rc(sel_rc_rv),
       .route_info(route_info_rv),
-      .route_port(route_port_rv),
+      .route_op(route_op_rv),
       .inc_rc(inc_rc_rv));
+   
+   wire [0:port_idx_width-1] 		     route_port_rv;
+   c_encoder
+     #(.num_ports(num_ports))
+   route_port_rv_enc
+     (.data_in(route_op_rv),
+      .data_out(route_port_rv));
    
    wire [0:la_route_info_width-1] 	     la_route_info_rv;
    assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;

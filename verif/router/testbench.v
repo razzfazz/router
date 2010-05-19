@@ -396,8 +396,8 @@ module testbench
 		buffer_sel_vc_arb
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(1'b1),
 		   .update(update),
+		   .active(1'b1),
 		   .req(req_vc),
 		   .gnt(gnt_vc));
 		
@@ -436,7 +436,6 @@ module testbench
 		
 		wire [0:flit_buffer_idx_width-1] buffer_write_addr;
 		wire [0:flit_buffer_idx_width-1] buffer_read_addr;		
-		wire [0:flit_buffer_idx_width-1] buffer_peek_addr;		
 		wire buffer_almost_empty;
 		wire buffer_empty;
 		wire buffer_almost_full;
@@ -454,7 +453,6 @@ module testbench
 		   .pop(buffer_pop),
 		   .write_addr(buffer_write_addr),
 		   .read_addr(buffer_read_addr),
-		   .peek_addr(buffer_peek_addr),
 		   .almost_empty(buffer_almost_empty),
 		   .empty(buffer_empty),
 		   .almost_full(buffer_almost_full),

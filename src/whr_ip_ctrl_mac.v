@@ -827,7 +827,7 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire                      req;
-   assign req = header_valid & flit_valid;
+   assign req = flit_valid;
    
    assign req_op = {num_ports{req}} & route_op;
    

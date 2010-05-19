@@ -462,7 +462,8 @@ module vcr_top
 					    sw_alloc_wf_in_width-1]
 			 = sw_alloc_wf_in;
 		
-	     end
+	     end // block: ops
+	   
 	   
 	   
 	   //-------------------------------------------------------------------
