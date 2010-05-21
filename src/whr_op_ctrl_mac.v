@@ -377,7 +377,7 @@ module whr_op_ctrl_mac
 		assign head_credit =  tail_sent_q & last_credit_received;
 		
 		wire head_free_s, head_free_q;
-		assign head_free_s = (head_free_q & ~head_debit) | head_credit;
+		assign head_free_s = (head_free_q | head_credit) & ~head_debit;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
