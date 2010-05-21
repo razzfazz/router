@@ -359,13 +359,7 @@ module whr_op_ctrl_mac
 		assign last_credit_received
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
-		wire tail_sent_q;
-		wire head_free_q;
-		
-		assign head_credit =  tail_sent_q & last_credit_received;
-		assign head_debit = head_free_q & gnt;
-		
-		wire tail_sent_s;
+		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
 		  = update_credits ? 
 		    ((tail_sent_q | (flit_valid_in & flit_tail_in)) &
@@ -380,7 +374,9 @@ module whr_op_ctrl_mac
 		   .d(tail_sent_s),
 		   .q(tail_sent_q));
 		
-		wire head_free_s;
+		assign head_credit =  tail_sent_q & last_credit_received;
+		
+		wire head_free_s, head_free_q;
 		assign head_free_s = (head_free_q & ~head_debit) | head_credit;
 		c_dff
 		  #(.width(1),
@@ -393,6 +389,8 @@ module whr_op_ctrl_mac
 		   .q(head_free_q));
 		
 		assign head_free = head_free_q;
+		
+		assign head_debit = head_free_q & gnt;
 		
 		assign error_hct_underflow = head_debit & ~head_free_q;
 		assign error_hct_overflow = head_credit & head_free_q;
