@@ -707,8 +707,8 @@ module whr_ip_ctrl_mac
 	   
 	   assign hdff_empty = hdff_empty_q;
 	   
-	   assign error_hdff_underflow = hdff_empty_q & hdff_pop;
-	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push;
+	   assign error_hdff_underflow = hdff_empty_q & hdff_pop & ~hdff_push;
+	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push & ~hdff_pop;
 	   
 	end
       
