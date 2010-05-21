@@ -377,7 +377,10 @@ module whr_op_ctrl_mac
 		assign head_credit =  tail_sent_q & last_credit_received;
 		
 		wire head_free_s, head_free_q;
-		assign head_free_s = (head_free_q | head_credit) & ~head_debit;
+		assign head_free_s
+		  = update_credits ?
+		    ((head_free_q & ~head_debit) | head_credit) : 
+		    head_free_q;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -388,9 +391,10 @@ module whr_op_ctrl_mac
 		   .d(head_free_s),
 		   .q(head_free_q));
 		
-		assign head_free = head_free_q;
+		assign head_free
+		  = head_free_q & ~(flit_valid_in & flit_head_in);
 		
-		assign head_debit = head_free_q & gnt;
+		assign head_debit = head_free_q & flit_valid_in & flit_head_in;
 		
 		assign error_hct_underflow = head_debit & ~head_free_q;
 		assign error_hct_overflow = head_credit & head_free_q;
