@@ -327,14 +327,12 @@ module whr_op_ctrl_mac
    
    generate
       
-      if((num_header_buffers == 1) || (num_header_buffers == num_flit_buffers))
+      if(num_header_buffers == num_flit_buffers)
 	begin
 	   
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
-	   // on the normal credit tracking mechanism; on the other hand, if
-	   // only one packet can be in any given buffer, it is enough to just 
-	   // check if the VC is currently assigned 
+	   // on the normal credit tracking mechanism
 	   assign head_free = 1'b1;
 	   
 	   assign error_hct_underflow = 1'b0;
@@ -347,83 +345,142 @@ module whr_op_ctrl_mac
 	   // if only a subset of the flit buffer entries can be headers, we 
 	   // need to keep track of how many such slots are left
 	   
-	   wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
-	   c_incr
-	     #(.width(flit_buffer_idx_width),
-	       .min_value(0),
-	       .max_value(num_flit_buffers-1))
-	   push_ptr_incr
-	     (.data_in(push_ptr_q),
-	      .data_out(push_ptr_next));
-	   
-	   wire [0:flit_buffer_idx_width-1] push_ptr_s;
-	   assign push_ptr_s = update_credits ? 
-			       (flit_valid_in ? push_ptr_next : push_ptr_q) : 
-			       push_ptr_q;
-	   c_dff
-	     #(.width(flit_buffer_idx_width),
-	       .reset_type(reset_type))
-	   push_ptrq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(push_ptr_s),
-	      .q(push_ptr_q));
-	   
-	   wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
-	   c_incr
-	     #(.width(flit_buffer_idx_width),
-	       .min_value(0),
-	       .max_value(num_flit_buffers-1))
-	   pop_ptr_incr
-	     (.data_in(pop_ptr_q),
-	      .data_out(pop_ptr_next));
-	   
-	   wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-	   assign pop_ptr_s = update_credits ? 
-			      (cred_valid ? pop_ptr_next : pop_ptr_q) : 
-			      pop_ptr_q;
-	   c_dff
-	     #(.width(flit_buffer_idx_width),
-	       .reset_type(reset_type))
-	   pop_ptrq
-	     (.clk(clk),
-	      .reset(reset),
-	      .d(pop_ptr_s),
-	      .q(pop_ptr_q));
-	   
-	   reg [0:num_flit_buffers-1] 	    tail_queue;
-	   
-	   always @(posedge clk)
-	     if(update_credits)
-	       if(flit_valid_in)
-		 tail_queue[push_ptr_q] <= flit_tail_in;
-	   
-	   wire 			    tail;
-	   assign tail = tail_queue[pop_ptr_q];
-	   
 	   wire head_credit;
-	   assign head_credit = credit & tail;
-	   
 	   wire head_debit;
-	   assign head_debit = ~allocated_q & new_gnt & free;
 	   
-	   // track header credits using stock credit tracker module
-	   wire head_free_early;
-	   wire [0:1] hct_errors;
-	   c_credit_tracker
-	     #(.num_credits(num_header_buffers),
-	       .reset_type(reset_type))
-	   hct
-	     (.clk(clk),
-	      .reset(reset),
-	      .credit(head_credit),
-	      .debit(head_debit),
-	      .free(head_free),
-	      .free_early(head_free_early),
-	      .errors(hct_errors));
-	   
-	   assign error_hct_underflow = hct_errors[0];
-	   assign error_hct_overflow = hct_errors[1];
+	   if(num_header_buffers == 1)
+	     begin
+		
+		// if we can only have one packet per buffer, we can accept the 
+		// next one once the buffer has been completely drained after 
+		// the tail has been sent
+		
+		wire last_credit_received;
+		assign last_credit_received
+		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
+		
+		wire tail_sent_s, tail_sent_q;
+		assign tail_sent_s
+		  = update_credits ? 
+		    ((tail_sent_q | (flit_valid_in & flit_tail_in)) &
+		     ~last_credit_received) : 
+		    tail_sent_q;
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		tail_sentq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(tail_sent_s),
+		   .q(tail_sent_q));
+		
+		assign head_credit =  tail_sent_q & last_credit_received;
+		
+		wire head_free_s, head_free_q;
+		assign head_free_s
+		  = update_credits ?
+		    ((head_free_q & ~head_debit) | head_credit) : 
+		    head_free_q;
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type),
+		    .reset_value(1'b1))
+		head_freeq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(head_free_s),
+		   .q(head_free_q));
+		
+		assign head_free
+		  = head_free_q & ~(flit_valid_in & flit_head_in);
+		
+		assign head_debit = head_free_q & flit_valid_in & flit_head_in;
+		
+		assign error_hct_underflow = head_debit & ~head_free_q;
+		assign error_hct_overflow = head_credit & head_free_q;
+		
+	     end
+	   else
+	     begin
+		
+		wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
+		c_incr
+		  #(.width(flit_buffer_idx_width),
+		    .min_value(0),
+		    .max_value(num_flit_buffers-1))
+		push_ptr_incr
+		  (.data_in(push_ptr_q),
+		   .data_out(push_ptr_next));
+		
+		wire [0:flit_buffer_idx_width-1] push_ptr_s;
+		assign push_ptr_s
+		  = update_credits ? 
+		    (flit_valid_in ? push_ptr_next : push_ptr_q) : 
+		    push_ptr_q;
+		c_dff
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
+		push_ptrq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(push_ptr_s),
+		   .q(push_ptr_q));
+		
+		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
+		c_incr
+		  #(.width(flit_buffer_idx_width),
+		    .min_value(0),
+		    .max_value(num_flit_buffers-1))
+		pop_ptr_incr
+		  (.data_in(pop_ptr_q),
+		   .data_out(pop_ptr_next));
+		
+		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
+		assign pop_ptr_s
+		  = update_credits ? 
+		    (cred_valid ? pop_ptr_next : pop_ptr_q) : 
+		    pop_ptr_q;
+		c_dff
+		  #(.width(flit_buffer_idx_width),
+		    .reset_type(reset_type))
+		pop_ptrq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(pop_ptr_s),
+		   .q(pop_ptr_q));
+		
+		reg [0:num_flit_buffers-1] 	 tail_queue;
+		
+		always @(posedge clk)
+		  if(update_credits)
+		    if(flit_valid_in)
+		      tail_queue[push_ptr_q] <= flit_tail_in;
+		
+		wire 				 tail;
+		assign tail = tail_queue[pop_ptr_q];
+		
+		assign head_credit = credit & tail;
+		assign head_debit = ~allocated_q & new_gnt & free;
+		
+		// track header credits using stock credit tracker module
+		wire 				 head_free_early;
+		wire [0:1] 			 hct_errors;
+		c_credit_tracker
+		  #(.num_credits(num_header_buffers),
+		    .reset_type(reset_type))
+		hct
+		  (.clk(clk),
+		   .reset(reset),
+		   .credit(head_credit),
+		   .debit(head_debit),
+		   .free(head_free),
+		   .free_early(head_free_early),
+		   .errors(hct_errors));
+		
+		assign error_hct_underflow = hct_errors[0];
+		assign error_hct_overflow = hct_errors[1];
+		
+	     end
 	   
 	end
       
