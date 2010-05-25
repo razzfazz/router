@@ -362,8 +362,8 @@ module whr_op_ctrl_mac
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
 		  = update_credits ? 
-		    ((tail_sent_q | (flit_valid_in & flit_tail_in)) &
-		     ~last_credit_received) : 
+		    ((tail_sent_q & ~last_credit_received) | 
+		     (flit_valid_in & flit_tail_in)) : 
 		    tail_sent_q;
 		c_dff
 		  #(.width(1),
