@@ -251,12 +251,6 @@ module whr_ip_ctrl_mac
    
    wire 			  hold_input_stage;
    
-   wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = hold_input_stage ? flit_ctrl_in_q : flit_ctrl_in;
-	   
-   wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = hold_input_stage ? flit_data_in_q : flit_data_in;
-   
    generate
       
       if(input_stage_can_hold)
@@ -288,6 +282,19 @@ module whr_ip_ctrl_mac
       else
 	assign hold_input_stage = 1'b0;
       
+   endgenerate
+   
+   wire 	flit_valid_thru;
+   assign flit_valid_thru = flit_valid_in & ~hold_input_stage;
+   
+   wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
+   assign flit_ctrl_in_s = hold_input_stage ? flit_ctrl_in_q : flit_ctrl_in;
+	   
+   wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
+   assign flit_data_in_s = hold_input_stage ? flit_data_in_q : flit_data_in;
+   
+   generate
+	   
       case(packet_format)
 	
 	`PACKET_FORMAT_HEAD_TAIL,
@@ -419,7 +426,7 @@ module whr_ip_ctrl_mac
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s;
 		  assign flit_ctr_s
-		    = (flit_valid_in & ~hold_input_stage) ? 
+		    = flit_valid_thru ? 
 		      (flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1)) : 
 		      flit_ctr_q;
 		  c_dff
@@ -466,57 +473,23 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   // keep track of location(s) of head and tail flits in flit buffer
-	   wire [0:num_flit_buffers-1] head_queue;
-	   wire [0:num_flit_buffers-1] tail_queue;
+	   reg [0:num_flit_buffers-1] head_queue;
+	   reg [0:num_flit_buffers-1] tail_queue;
 	   
-	   wire [0:num_flit_buffers-1] write_sel;
-	   wire [0:num_flit_buffers-1] read_sel;
-	   
-	   genvar 		       idx;
-	   
-	   for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
-	     begin:idxs
-		
-		assign write_sel[idx] = (fbc_write_addr == idx);
-		assign read_sel[idx] = (fbc_read_addr == idx);
-		
-		wire capture;
-		assign capture
-		  = (flit_valid_in & ~hold_input_stage) & write_sel[idx];
-		
-		reg  head_q, tail_q;
-		always @(posedge clk)
-		  if(flit_valid_in)
-		    if(capture)
-		      begin
-			 head_q <= flit_head_in;
-			 tail_q <= flit_tail_in;
-		      end
-		
-		assign head_queue[idx] = head_q;
-		assign tail_queue[idx] = tail_q;
-		
-	     end
+	   always @(posedge clk)
+	     if(flit_valid_thru)
+		begin
+		   head_queue[fbc_write_addr] <= flit_head_in;
+		   tail_queue[fbc_write_addr] <= flit_tail_in;
+		end
 	   
 	   wire head_queue_muxed;
-	   c_select_1ofn
-	     #(.num_ports(num_flit_buffers),
-	       .width(1))
-	   head_queue_muxed_sel
-	     (.select(read_sel),
-	      .data_in(head_queue),
-	      .data_out(head_queue_muxed));
+	   assign head_queue_muxed = head_queue[fbc_read_addr];
 	   
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_queue_muxed;
 	   
 	   wire tail_queue_muxed;
-	   c_select_1ofn
-	     #(.num_ports(num_flit_buffers),
-	       .width(1))
-	   tail_queue_muxed_sel
-	     (.select(read_sel),
-	      .data_in(tail_queue),
-	      .data_out(tail_queue_muxed));
+	   assign tail_queue_muxed = tail_queue[fbc_read_addr];
 	   
 	   assign flit_tail_out = fbc_empty ? flit_tail_in : tail_queue_muxed;
 	   
@@ -525,7 +498,7 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire head_in;
-	   assign head_in = (flit_valid_in & ~hold_input_stage) & flit_head_in;
+	   assign head_in = flit_valid_thru & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
 	   assign head_valid_s = flit_valid ? 
@@ -543,7 +516,7 @@ module whr_ip_ctrl_mac
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_valid_q;
 	   
 	   wire 		     tail_in;
-	   assign tail_in = (flit_valid_in & ~hold_input_stage) & flit_tail_in;
+	   assign tail_in = flit_valid_thru & flit_tail_in;
 	   
 	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
 	   assign tail_idx_s
@@ -598,7 +571,7 @@ module whr_ip_ctrl_mac
    wire 			     hdff_empty;
    
    wire 			     hdff_push;
-   assign hdff_push = (flit_valid_in & ~hold_input_stage) & flit_head_in;
+   assign hdff_push = flit_valid_thru & flit_head_in;
    
    wire 			     hdff_pop;
    assign hdff_pop = flit_valid_out & flit_tail_out;
@@ -782,7 +755,7 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 		     fbc_push;
-   assign fbc_push = (flit_valid_in & ~hold_input_stage);
+   assign fbc_push = flit_valid_thru;
    
    wire 		     fbc_pop;
    assign fbc_pop = flit_valid_out;
@@ -817,7 +790,7 @@ module whr_ip_ctrl_mac
    assign fbf_read_enable = flit_valid /*flit_valid_out*/;
    
    assign fbf_read_addr = fbc_read_addr;
-   assign fbf_write_enable = (flit_valid_in & ~hold_input_stage);
+   assign fbf_write_enable = flit_valid_thru;
    assign fbf_write_addr = fbc_write_addr;
    assign fbf_write_data = flit_data_in_q;
    

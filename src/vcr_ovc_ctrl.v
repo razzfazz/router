@@ -379,8 +379,8 @@ module vcr_ovc_ctrl
 		wire tail_sent_s;
 		assign tail_sent_s
 		  = update_credits ? 
-		    ((tail_sent_q | (flit_valid_qual & flit_tail)) &
-		     ~last_credit_received) : 
+		    ((tail_sent_q & ~last_credit_received) | 
+		     (flit_valid_qual & flit_tail)) : 
 		    tail_sent_q;
 		c_dff
 		  #(.width(1),

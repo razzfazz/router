@@ -282,13 +282,16 @@ module vcr_flit_ctrl_dec
 			 for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 			   begin:ivcs
 			      
+			      wire flit_valid_out;
+			      assign flit_valid_out = flit_valid_out_ivc[ivc];
+			      
 			      wire flit_head_out;
 			      assign flit_head_out = flit_head_out_ivc[ivc];
 			      
 			      wire [0:flit_ctr_width-1] flit_ctr_next;
 			      wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
 			      assign flit_ctr_s
-				= flit_valid_in ? 
+				= flit_valid_out ? 
 				  (flit_head_out ? 
 				   flit_ctr_next : 
 				   (flit_ctr_q - 1'b1)) : 
