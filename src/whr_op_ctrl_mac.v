@@ -162,8 +162,21 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
+   // NOTE: Because we need to be ready to receive credits at any time unless 
+   // we know for sure that no more credits are outstanding, this register 
+   // cannot be included in any of the other clock gating domains. As a single 
+   // register, it will most likely end up being free-running; this could
+   // be avoided by including the cred_valid_active term in one of the other 
+   // clock gating domains, allowing cred_validq to be gated at the cost of 
+   // slightly increased activity in the domain.
+   
    wire [0:flow_ctrl_width-1] flow_ctrl_s, flow_ctrl_q;
    assign flow_ctrl_s = flow_ctrl_in;
+   
+   wire 		      cred_count_all;
+   
+   wire 		      cred_valid_active;
+   assign cred_valid_active = ~cred_count_all;
    
    wire 		      cred_valid_s, cred_valid_q;
    assign cred_valid_s = flow_ctrl_s[0];
@@ -173,6 +186,7 @@ module whr_op_ctrl_mac
    cred_validq
      (.clk(clk),
       .reset(reset),
+      .active(cred_valid_active),
       .d(cred_valid_s),
       .q(cred_valid_q));
    
@@ -191,6 +205,14 @@ module whr_op_ctrl_mac
    
    wire                 gnt_int;
    assign gnt_int = |req_int_ip;
+
+   // NOTE: For the wormhole router, credit and eligibility checking happens at
+   // the output controller, so request generation is simple and fast; however,
+   // if clock gating based on requests proves to be timing-critical, we could
+   // just enable all output controllers whenever any input controller has data
+   // available.
+   wire 		arb_active;
+   assign arb_active = |req_ip;
    
    wire                 update;
    wire [0:num_ports-1] gnt_int_ip;
@@ -201,6 +223,7 @@ module whr_op_ctrl_mac
    gnt_int_ip_arb
      (.clk(clk),
       .reset(reset),
+      .active(arb_active),
       .update(update),
       .req(req_int_ip),
       .gnt(gnt_int_ip));
@@ -221,6 +244,7 @@ module whr_op_ctrl_mac
    allocated_ipq
      (.clk(clk),
       .reset(1'b0),
+      .active(arb_active),
       .d(allocated_ip_s),
       .q(allocated_ip_q));
    
@@ -242,6 +266,7 @@ module whr_op_ctrl_mac
    allocatedq
      (.clk(clk),
       .reset(reset),
+      .active(arb_active),
       .d(allocated_s),
       .q(allocated_q));
    
@@ -265,6 +290,22 @@ module whr_op_ctrl_mac
    // staging for flit control signals
    //---------------------------------------------------------------------------
    
+   // NOTE: Because we need to clear it in the cycle after a flit has been 
+   // received, this register currently cannot be included in any of the 
+   // other clock gating domains. If we could change this to transmit flits 
+   // using edge-based signaling (i.e., transitions), it could be included in 
+   // the clock gating domain controlled by arb_active.
+   // Alternatively, we could include the flit_valid_in term in arb_active; 
+   // this would allow us to include flit_valid_inq in the gating domain at the 
+   // cost of some unnecessary activity. As synthesis will probably not create 
+   // a clock gating domain for just this register, it currently will most 
+   // likely end up being free-running, so this may be a good tradeoff.
+   
+   wire                 flit_valid_in;
+   
+   wire 		flit_valid_in_active;
+   assign flit_valid_in_active = arb_active | flit_valid_in;
+   
    wire                 flit_valid_in_s, flit_valid_in_q;
    assign flit_valid_in_s = gnt;
    c_dff
@@ -273,10 +314,10 @@ module whr_op_ctrl_mac
    flit_valid_inq
      (.clk(clk),
       .reset(reset),
+      .active(flit_valid_in_active),
       .d(flit_valid_in_s),
       .q(flit_valid_in_q));
    
-   wire                 flit_valid_in;
    assign flit_valid_in = flit_valid_in_q;
    
    // when the output port is not allocated, the next flit must be a head flits;
@@ -290,6 +331,7 @@ module whr_op_ctrl_mac
    flit_headq
      (.clk(clk),
       .reset(1'b0),
+      .active(arb_active),
       .d(flit_head_s),
       .q(flit_head_q));
    
@@ -304,6 +346,7 @@ module whr_op_ctrl_mac
    flit_tailq
      (.clk(clk),
       .reset(1'b0),
+      .active(arb_active),
       .d(flit_tail_s),
       .q(flit_tail_q));
    
@@ -315,8 +358,11 @@ module whr_op_ctrl_mac
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 		update_credits;
-   assign update_credits = flit_valid_in | cred_valid;
+   wire 		flags_active;
+   assign flags_active = flit_valid_in | cred_valid;
+   
+   wire 		cred_active;
+   assign cred_active = arb_active | cred_valid;
    
    wire 		credit;
    assign credit = cred_valid;
@@ -360,27 +406,22 @@ module whr_op_ctrl_mac
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
 		wire tail_sent_s, tail_sent_q;
-		assign tail_sent_s
-		  = update_credits ? 
-		    ((tail_sent_q & ~last_credit_received) | 
-		     (flit_valid_in & flit_tail_in)) : 
-		    tail_sent_q;
+		assign tail_sent_s = (tail_sent_q & ~last_credit_received) | 
+				     (flit_valid_in & flit_tail_in);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
 		tail_sentq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(tail_sent_s),
 		   .q(tail_sent_q));
 		
 		assign head_credit =  tail_sent_q & last_credit_received;
 		
 		wire head_free_s, head_free_q;
-		assign head_free_s
-		  = update_credits ?
-		    ((head_free_q & ~head_debit) | head_credit) : 
-		    head_free_q;
+		assign head_free_s = (head_free_q & ~head_debit) | head_credit;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type),
@@ -388,6 +429,7 @@ module whr_op_ctrl_mac
 		head_freeq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(head_free_s),
 		   .q(head_free_q));
 		
@@ -413,16 +455,14 @@ module whr_op_ctrl_mac
 		   .data_out(push_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s
-		  = update_credits ? 
-		    (flit_valid_in ? push_ptr_next : push_ptr_q) : 
-		    push_ptr_q;
+		assign push_ptr_s = flit_valid_in ? push_ptr_next : push_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
 		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
 		
@@ -436,23 +476,21 @@ module whr_op_ctrl_mac
 		   .data_out(pop_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s
-		  = update_credits ? 
-		    (cred_valid ? pop_ptr_next : pop_ptr_q) : 
-		    pop_ptr_q;
+		assign pop_ptr_s = cred_valid ? pop_ptr_next : pop_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
 		pop_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
 		reg [0:num_flit_buffers-1] 	 tail_queue;
 		
 		always @(posedge clk)
-		  if(update_credits)
+		  if(flags_active)
 		    if(flit_valid_in)
 		      tail_queue[push_ptr_q] <= flit_tail_in;
 		
@@ -471,6 +509,7 @@ module whr_op_ctrl_mac
 		hct
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(cred_active),
 		   .credit(head_credit),
 		   .debit(head_debit),
 		   .free(head_free),
@@ -512,6 +551,7 @@ module whr_op_ctrl_mac
    cred_countq
      (.clk(clk),
       .reset(reset),
+      .active(cred_active),
       .d(cred_count_s),
       .q(cred_count_q));
    
@@ -521,13 +561,12 @@ module whr_op_ctrl_mac
    wire 					 error_ct_underflow;
    assign error_ct_underflow = cred_count_zero & debit & ~credit;
    
-   wire 					 cred_count_all;
    assign cred_count_all = (cred_count_q == num_flit_buffers);
    
    wire 					 error_ct_overflow;
    assign error_ct_overflow = cred_count_all & credit;
    
-   // Note: For the wormhole router, the credit check can be performed at the 
+   // NOTE: For the wormhole router, the credit check can be performed at the 
    // allocator (here, arbiter) output; thus, the follwoing computation can be
    // performed in parallel with arbitration, so we don't need an additional
    // register stage as in the general VC case.
@@ -537,6 +576,9 @@ module whr_op_ctrl_mac
    //---------------------------------------------------------------------------
    // output staging
    //---------------------------------------------------------------------------
+   
+   wire 					 flit_out_active;
+   assign flit_out_active = flit_valid_in;
    
    wire [0:flit_ctrl_width-1] 		         flit_ctrl_s, flit_ctrl_q;
    
@@ -548,7 +590,23 @@ module whr_op_ctrl_mac
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
+	     // NOTE: Because we need to clear it in the cycle after a flit has 
+	     // been transmitted, this register currently cannot be included in 
+	     // any of the other clock gating domains. If we could change this 
+	     // to send flits downstream using edge-based signaling (i.e., 
+	     // transitions), it could be included in the clock gating domain 
+	     // controlled by flit_out_active.
+	     // Alternatively, we could include the flit_ctrl_q[0] term in 
+	     // flit_out_active; this would allow us to include flit_validq in 
+	     // the gating domain at the cost of some unnecessary activity. As 
+	     // synthesis will probably not create a clock gating domain for 
+	     // just this register, it currently will most likely end up being 
+	     // free-running, so this may be a good tradeoff.
+   
 	     assign flit_ctrl_s[0] = flit_valid_in;
+	     
+	     wire flit_valid_out_active;
+	     assign flit_valid_out_active = flit_valid_in | flit_ctrl_q[0];
 	     
 	     wire flit_valid_s, flit_valid_q;
 	     assign flit_valid_s = flit_ctrl_s[0];
@@ -558,13 +616,13 @@ module whr_op_ctrl_mac
 	     flit_validq
 	       (.clk(clk),
 		.reset(reset),
+		.active(flit_valid_out_active),
 		.d(flit_valid_s),
 		.q(flit_valid_q));
 	     
 	     assign flit_ctrl_q[0] = flit_valid_q;
 	     
-   	     assign flit_ctrl_s[1]
-		      = flit_valid_in ? flit_head_in : flit_ctrl_q[1];
+   	     assign flit_ctrl_s[1] = flit_head_in;
 	     
 	     c_dff
 	       #(.width(flit_ctrl_width-1),
@@ -573,6 +631,7 @@ module whr_op_ctrl_mac
 	     flit_ctrlq
 	       (.clk(clk),
 		.reset(1'b0),
+		.active(flit_out_active),
 		.d(flit_ctrl_s[1:flit_ctrl_width-1]),
 		.q(flit_ctrl_q[1:flit_ctrl_width-1]));
 	     
@@ -585,8 +644,7 @@ module whr_op_ctrl_mac
 	`PACKET_FORMAT_HEAD_TAIL:
 	  begin
 	     
-	     assign flit_ctrl_s[2]
-		      = flit_valid_in ? flit_tail_in : flit_ctrl_q[2];
+	     assign flit_ctrl_s[2] = flit_tail_in;
 	     
 	  end
 	
@@ -597,13 +655,14 @@ module whr_op_ctrl_mac
    assign flit_ctrl_out = flit_ctrl_q;
    
    wire [0:flit_data_width-1] 		         flit_data_s, flit_data_q;
-   assign flit_data_s = flit_valid_in ? flit_data_in : flit_data_q;
+   assign flit_data_s = flit_data_in;
    c_dff
      #(.width(flit_data_width),
        .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
       .reset(1'b0),
+      .active(flit_out_active),
       .d(flit_data_s),
       .q(flit_data_q));
    
@@ -651,6 +710,7 @@ module whr_op_ctrl_mac
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   

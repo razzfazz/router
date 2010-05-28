@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // configurable crossbar module for wormhole router
 module whr_crossbar_mac
-  (clk, reset, ctrl_op_ip, data_in_ip, data_out_op);
+  (clk, reset, active_ip, ctrl_op_ip, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -50,6 +50,9 @@ module whr_crossbar_mac
       
    input clk;
    input reset;
+
+   // clock enable signals for crosspoint control registers
+   input [0:num_in_ports-1] active_ip;
    
    // incoming control signals (request matrix)
    input [0:num_in_ports*num_out_ports-1] ctrl_op_ip;
@@ -61,24 +64,51 @@ module whr_crossbar_mac
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
    
-   wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip_s, ctrl_op_ip_q;
-   assign ctrl_op_ip_s = ctrl_op_ip;
-   c_dff
-     #(.width(num_out_ports*num_in_ports),
-       .reset_type(reset_type))
-   ctrl_op_ipq
-     (.clk(clk),
-      .reset(reset),
-      .d(ctrl_op_ip_s),
-      .q(ctrl_op_ip_q));
-   
-   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
+   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op;
    c_interleaver
      #(.width(num_out_ports*num_in_ports),
        .num_blocks(num_out_ports))
-   ctrl_ip_op_q_intl
-     (.data_in(ctrl_op_ip_q),
-      .data_out(ctrl_ip_op_q));
+   ctrl_ip_op_intl
+     (.data_in(ctrl_op_ip),
+      .data_out(ctrl_ip_op));
+   
+   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
+   
+   generate
+      
+      genvar 			  ip;
+      
+      for(ip = 0; ip < num_in_ports; ip = ip + 1)
+	begin:ips
+	   
+	   wire [0:num_out_ports-1] ctrl_op;
+	   assign ctrl_op = ctrl_ip_op[ip*num_out_ports:(ip+1)*num_out_ports-1];
+	   
+	   wire 		    granted;
+	   
+	   wire 		    active;
+	   assign active = active_ip[ip] | granted;
+	   
+	   wire [0:num_out_ports-1] ctrl_op_s, ctrl_op_q;
+	   assign ctrl_op_s = ctrl_op;
+	   c_dff
+	     #(.width(num_out_ports),
+	       .reset_type(reset_type))
+	   ctrl_opq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(ctrl_op_s),
+	      .q(ctrl_op_q));
+	   
+	   assign granted = |ctrl_op_q;
+	   
+	   assign ctrl_ip_op_q[ip*num_out_ports:(ip+1)*num_out_ports-1]
+		    = ctrl_op_q;
+	   
+	end
+      
+   endgenerate
    
    c_crossbar
      #(.num_in_ports(num_in_ports),
