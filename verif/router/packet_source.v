@@ -562,6 +562,7 @@ module packet_source
 		rtl
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .router_address(router_address),
 		   .sel_rc(sel_irc),
 		   .route_info(route_info),

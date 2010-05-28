@@ -369,6 +369,7 @@ module router_checker
 		     rtl
 		       (.clk(clk),
 			.reset(reset),
+			.active(1'b1),
 			.router_address(router_address),
 			.sel_rc(sel_irc),
 			.route_info(route_info),
@@ -447,6 +448,7 @@ module router_checker
 		     lar
 		       (.clk(clk),
 			.reset(reset),
+			.active(1'b1),
 			.router_address(router_address),
 			.route_port(la_route_port),
 			.inc_rc(la_inc_rc),
