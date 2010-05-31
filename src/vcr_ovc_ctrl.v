@@ -141,7 +141,7 @@ module vcr_ovc_ctrl
    // width of counter for credits waiting to be sent to input controller
    localparam cred_hold_width = vc_alloc_requires_credit ? 
 				clogb(num_flit_buffers) : 
-				clogb(num_flit_buffers + 1);
+				cred_count_width;
    
    // initial value for credit hold counter
    localparam [0:cred_hold_width-1] cred_hold_reset_value
@@ -542,30 +542,6 @@ module vcr_ovc_ctrl
 	`INT_FLOW_CTRL_TYPE_LEVEL:
 	  begin
 	     
-	     // NOTE: Having an additional register here is likely overkill, and
-	     // increases the credit round-trip delay by a cycle, so we just 
-	     // send out the value directly for now.
-	     
-	     /*
-	     wire [0:cred_level_width-1] free_s, free_q;
-	     assign free_s = (cred_count_next > max_cred_level) ?
-			     max_cred_level :
-			     cred_count_next[cred_count_width-
-					     cred_level_width:
-					     cred_count_width-1];
-	     c_dff
-	       #(.width(cred_level_width),
-		 .reset_type(reset_type),
-		 .reset_value(free_reset_value))
-	     freeq
-	       (.clk(clk),
-		.reset(reset),
-		.d(free_s),
-		.q(free_q));
-	     
-	     assign int_flow_ctrl = free_q;
-	     */
-	     
 	     // NOTE: The debit input to this module is driven by the input VC 
 	     // controller. Consequently, the debit signal is already readily 
 	     // available at the input controller, and we can simply pass the 
@@ -617,45 +593,34 @@ module vcr_ovc_ctrl
 				   cred_count_width-1] - 
 		   |cred_count_next;
 	     else
-	       assign cred_hold_copy
-		 = cred_count_next[(cred_count_width-cred_hold_width):
-				   cred_count_width-1];
+	       assign cred_hold_copy = cred_count_next;
 	     
-	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
-	     assign cred_hold_s = next_allocated ?
-				  (cred_hold_q - (|cred_hold_q & ~credit)) :
-				  cred_hold_copy;
-	     c_dff
-	       #(.width(cred_hold_width),
-		 .reset_type(reset_type),
-		 .reset_value(cred_hold_reset_value))
-	     cred_holdq
-	       (.clk(clk),
-		.reset(reset),
-		.d(cred_hold_s),
-		.q(cred_hold_q));
-	     
-	     // NOTE: Having an additional register here is likely overkill, and
-	     // increases the credit round-trip delay by a cycle, so we just 
-	     // send out the value directly for now.
-	     
-	     /*
-	     wire 			 cred_s, cred_q;
-	     assign cred_s = |cred_hold_s | (credit & next_allocated);
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type),
-		 .reset_value(1))
-	     credq
-	       (.clk(clk),
-		.reset(reset),
-		.d(cred_s),
-		.q(cred_q));
-	     
-	     assign int_flow_ctrl = cred_q;
-	     */
-	     
-	     assign int_flow_ctrl = |cred_hold_s | (credit & next_allocated);
+	     if(cred_hold_width >= 2)
+	       begin
+		  
+		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
+		  assign cred_hold_s
+		    = next_allocated ?
+		      (cred_hold_q - (|cred_hold_q & ~credit)) :
+		      cred_hold_copy;
+		  c_dff
+		    #(.width(cred_hold_width),
+		      .reset_type(reset_type),
+		      .reset_value(cred_hold_reset_value))
+		  cred_holdq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(cred_hold_s),
+		     .q(cred_hold_q));
+		  
+		  assign int_flow_ctrl
+		    = next_allocated ?
+		      (|cred_hold_q[0:cred_hold_width-2] | credit) :
+		      |cred_hold_copy;
+		  
+	       end
+	     else
+	       assign int_flow_ctrl = next_allocated ? credit : |cred_hold_copy;
 	     
 	  end
 	
