@@ -357,8 +357,10 @@ module vcr_ovc_ctrl
 	   // if only a subset of the flit buffer entries can be headers, we 
 	   // need to keep track of how many such slots are left
 	   
-	   wire head_credit;
 	   wire head_debit;
+	   assign head_debit = vc_gnt;
+	   
+	   wire head_credit;
 	   
 	   if(num_header_buffers == 1)
 	     begin
@@ -374,7 +376,6 @@ module vcr_ovc_ctrl
 		wire tail_sent_q;
 		
 		assign head_credit = tail_sent_q & last_credit_received;
-		assign head_debit = vc_gnt;
 		
 		wire tail_sent_s;
 		assign tail_sent_s
@@ -469,7 +470,6 @@ module vcr_ovc_ctrl
 		assign tail = tail_queue[pop_ptr_q];
 		
 		assign head_credit = credit & tail;		
-		assign head_debit = vc_gnt;
 		
 		// track header credits using stock credit tracker module
 		wire [0:1] 			 hct_errors;
