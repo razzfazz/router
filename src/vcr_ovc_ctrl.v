@@ -542,7 +542,7 @@ module vcr_ovc_ctrl
 	`INT_FLOW_CTRL_TYPE_LEVEL:
 	  begin
 	     
-	     // Having an additional register here is likely overkill, and
+	     // NOTE: Having an additional register here is likely overkill, and
 	     // increases the credit round-trip delay by a cycle, so we just 
 	     // send out the value directly for now.
 	     
@@ -566,7 +566,7 @@ module vcr_ovc_ctrl
 	     assign int_flow_ctrl = free_q;
 	     */
 	     
-	     // The debit input to this module is driven by the input VC 
+	     // NOTE: The debit input to this module is driven by the input VC 
 	     // controller. Consequently, the debit signal is already readily 
 	     // available at the input controller, and we can simply pass the 
 	     // current credit level, incremented by one if a credit was just 
@@ -589,10 +589,17 @@ module vcr_ovc_ctrl
 					     cred_count_width-1];
 		  
 	       end
-	     else
+	     else if(cred_count_width == cred_level_width)
 	       assign int_flow_ctrl
-		 = cred_count_plus_credit[cred_count_width-cred_level_width:
-					  cred_count_width-1];
+		 = cred_count_plus_credit[0:cred_count_width-1];
+	     else
+	       begin
+		  assign int_flow_ctrl[0:cred_level_width-cred_count_width-1]
+			   = {(cred_level_width-cred_count_width){1'b0}};
+		  assign int_flow_ctrl[cred_level_width-cred_count_width:
+				       cred_level_width-1]
+			   = cred_count_plus_credit;
+	       end
 	     
 	  end
 	
@@ -604,7 +611,7 @@ module vcr_ovc_ctrl
 	       assign cred_hold_copy
 		 = cred_count_next[(cred_count_width-cred_hold_width):
 				   cred_count_width-1] - 
-		   /*|cred_count_next*/ 1'b1;
+		   |cred_count_next;
 	     else
 	       assign cred_hold_copy
 		 = cred_count_next[(cred_count_width-cred_hold_width):
@@ -624,7 +631,7 @@ module vcr_ovc_ctrl
 		.d(cred_hold_s),
 		.q(cred_hold_q));
 	     
-	     // Having an additional register here is likely overkill, and
+	     // NOTE: Having an additional register here is likely overkill, and
 	     // increases the credit round-trip delay by a cycle, so we just 
 	     // send out the value directly for now.
 	     
