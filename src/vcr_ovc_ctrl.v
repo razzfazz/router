@@ -333,7 +333,7 @@ module vcr_ovc_ctrl
    assign update_credits = sw_gnt | cred_valid;
    
    wire [0:cred_count_width-1] cred_count_q;
-   wire 		       head_free_early;
+   wire 		       head_free;
    wire 		       error_hct_underflow;
    wire 		       error_hct_overflow;
    
@@ -345,7 +345,7 @@ module vcr_ovc_ctrl
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
 	   // on the normal credit tracking mechanism
-	   assign head_free_early = 1'b1;
+	   assign head_free = 1'b1;
 	   
 	   assign error_hct_underflow = 1'b0;
 	   assign error_hct_overflow = 1'b0;
@@ -403,7 +403,7 @@ module vcr_ovc_ctrl
 		   .d(head_free_s),
 		   .q(head_free_q));
 		
-		assign head_free_early = head_free_s;
+		assign head_free = head_free_q;
 		
 		assign error_hct_underflow = head_debit & ~head_free_q;
 		assign error_hct_overflow = head_credit & head_free_q;
@@ -472,7 +472,6 @@ module vcr_ovc_ctrl
 		assign head_debit = vc_gnt;
 		
 		// track header credits using stock credit tracker module
-		wire 				 head_free;
 		wire [0:1] 			 hct_errors;
 		c_credit_tracker
 		  #(.num_credits(num_header_buffers),
@@ -483,7 +482,6 @@ module vcr_ovc_ctrl
 		   .credit(head_credit),
 		   .debit(head_debit),
 		   .free(head_free),
-		   .free_early(head_free_early),
 		   .errors(hct_errors));
 		
 		assign error_hct_underflow = hct_errors[0];
@@ -531,26 +529,6 @@ module vcr_ovc_ctrl
    assign error_ct_overflow = cred_count_all & credit;
    
    assign empty = cred_count_all;
-   
-   // Instead of just computing this as the reduction of of the updated credit
-   // count sum, we can optimize a bit. In particular, we have one or more 
-   // credits available iff...
-   //  a) ... we just received a credit. In this case, we either had credits 
-   //     available to begin with, or there cannot be a debit at the same time.
-   //  b) ... we currently have at least two credits available. In this case,
-   //     even if there is a debit and no credit, we will still have at least
-   //     one credit left.
-   //  c) ... we currently have an odd number of credits available, and did not
-   //     just receive a debit. For odd numbers greater than one, we will always
-   //     have credit left, and in case we have one credit left, we will still
-   //     have at least one left if no debit occurs.
-   // This only leaves out the case where we are not receiving a credit, do not
-   // currently have two or more credits and either have no credits left or have
-   // a single credit left and receive a debit.
-   wire 					 next_cred;
-   assign next_cred = credit | 
-		      |cred_count_q[0:cred_count_width-2] | 
-		      (cred_count_q[cred_count_width-1] & ~debit);
    
    
    //-------------------------------------------------------------------
@@ -679,30 +657,50 @@ module vcr_ovc_ctrl
    // keep track of whether current VC is available for allocation
    //---------------------------------------------------------------------------
    
-   wire 				 elig_s, elig_q;
-   
    generate
       
       if(vc_alloc_requires_credit)
-	assign elig_s = ~allocated_s & head_free_early & next_cred;
+	begin
+	   
+	   // Instead of just computing this as the reduction of of the updated 
+	   // credit count sum, we can optimize a bit. In particular, we have 
+	   // one or more credits available iff...
+	   //  a) ... we just received a credit. In this case, we either had 
+	   //     credits available to begin with, or there cannot be a debit 
+	   //     at the same time.
+	   //  b) ... we currently have at least two credits available. In this 
+	   //     case, even if there is a debit and no credit, we will still 
+	   //     have at least one credit left.
+	   //  c) ... we currently have an odd number of credits available, and 
+	   //     did not just receive a debit. For odd numbers greater than 
+	   //     one, we will always have credit left, and in case we have one 
+	   //     credit left, we will still have at least one left if no debit 
+	   //     occurs.
+	   // This only leaves out the case where we are not receiving a credit,
+	   // do not currently have two or more credits and either have no 
+	   // credits left or have a single credit left and receive a debit.
+	   wire cred_s, cred_q;
+	   assign cred_s = credit | 
+			   |cred_count_q[0:cred_count_width-2] | 
+			   (cred_count_q[cred_count_width-1] & ~debit);
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   credq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(cred_s),
+	      .q(cred_q));
+	   
+	   assign elig = ~allocated_q & head_free & cred_q;
+	   
+	end
       else
-	assign elig_s = ~allocated_s & head_free_early;
+	assign elig = ~allocated_q & head_free;
       
    endgenerate
    
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type),
-       .reset_value(1'b1))
-   eligq
-     (.clk(clk),
-      .reset(reset),
-      .d(elig_s),
-      .q(elig_q));
    
-   assign elig = elig_q;
-   
-
    //---------------------------------------------------------------------------
    // error checking
    //---------------------------------------------------------------------------
