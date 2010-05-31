@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module vcr_ovc_ctrl
-  (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt, sw_gnt_ip, 
+  (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt_q, sw_gnt_ip_q, 
    int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
    
 `include "c_functions.v"
@@ -171,10 +171,10 @@ module vcr_ovc_ctrl
    input [0:num_vcs-1] vc_gnt_ivc;
    
    // switch allocation produced a grant for this output port
-   input sw_gnt;
+   input sw_gnt_q;
    
    // input port that this output port was granted to during switch allocation
-   input [0:num_ports-1] sw_gnt_ip;
+   input [0:num_ports-1] sw_gnt_ip_q;
    
    // incoming flit control signals
    input [0:int_flit_ctrl_width-1] int_flit_ctrl;
@@ -207,7 +207,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			  flit_valid;
-   assign flit_valid = int_flit_ctrl[0] & sw_gnt;
+   assign flit_valid = int_flit_ctrl[0] & sw_gnt_q;
    
    wire 			  flit_tail;
    assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
@@ -304,7 +304,7 @@ module vcr_ovc_ctrl
 		   .q(allocated_vc_q));
 		
 		assign match = allocated_q &&
-			       |(allocated_ip_q & sw_gnt_ip) &&
+			       |(allocated_ip_q & sw_gnt_ip_q) &&
 			       (allocated_vc_q == flit_vc);
 		
 	     end
@@ -330,7 +330,7 @@ module vcr_ovc_ctrl
    // credit info only ever gets update when this output was granted or a credit
    // was received
    wire 			     update_credits;
-   assign update_credits = sw_gnt | cred_valid;
+   assign update_credits = sw_gnt_q | cred_valid;
    
    wire [0:cred_count_width-1] cred_count_q;
    wire 		       head_free;
