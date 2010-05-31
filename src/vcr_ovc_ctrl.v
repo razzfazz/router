@@ -613,13 +613,13 @@ module vcr_ovc_ctrl
 	     wire [0:cred_hold_width-1]  cred_hold_copy;
 	     if(vc_alloc_requires_credit)
 	       assign cred_hold_copy
-		 = cred_count_plus_credit[(cred_count_width-cred_hold_width):
-					  cred_count_width-1] - 
-		   (|cred_count_q | credit);
+		 = cred_count_next[(cred_count_width-cred_hold_width):
+				   cred_count_width-1] - 
+		   |cred_count_next;
 	     else
 	       assign cred_hold_copy
-		 = cred_count_plus_credit[(cred_count_width-cred_hold_width):
-					  cred_count_width-1];
+		 = cred_count_next[(cred_count_width-cred_hold_width):
+				   cred_count_width-1];
 	     
 	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
 	     assign cred_hold_s = next_allocated ?
