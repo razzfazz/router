@@ -572,7 +572,11 @@ module vcr_ovc_ctrl
 	     // current credit level, incremented by one if a credit was just 
 	     // received, from output to input controller, rather having the 
 	     // debit signal effectively go from input to output controller 
-	     // and back.
+	     // and back. Note that whenever an output VC is allocated to an 
+	     // input VC, no flit can have been sent in the current cycle, as
+	     // in order for VC allocation to succeed, the output VC must be 
+	     // eligible for allocation in the current cycle, and thus cannot 
+	     // be assigned to another input VC.
 	     
 	     if(cred_count_width > cred_level_width)
 	       begin
