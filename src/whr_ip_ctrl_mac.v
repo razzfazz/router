@@ -504,8 +504,8 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   // keep track of location(s) of head and tail flits in flit buffer
-	   reg [0:num_flit_buffers-1] head_queue;
-	   reg [0:num_flit_buffers-1] tail_queue;
+	   reg [0:fbf_depth-1] head_queue;
+	   reg [0:fbf_depth-1] tail_queue;
 	   
 	   always @(posedge clk)
 	     if(buffer_in_active)
