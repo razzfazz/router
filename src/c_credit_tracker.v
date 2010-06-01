@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module for tracking available credit in a buffer
 module c_credit_tracker
-  (clk, reset, active, debit, credit, free, free_early, errors);
+  (clk, reset, active, debit, credit, free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -61,10 +61,6 @@ module c_credit_tracker
    output free;
    wire free;
    
-   // 1 cycle early version of "free"
-   output free_early;
-   wire free_early;
-   
    // internal error condition encountered
    output [0:1] errors;
    wire [0:1] errors;
@@ -84,7 +80,6 @@ module c_credit_tracker
       .q(cred_q));
    
    assign free = cred_q;
-   assign free_early = cred_s;
    
    wire incr;
    assign incr = credit & ~debit;

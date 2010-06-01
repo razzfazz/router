@@ -864,16 +864,21 @@ module vcr_ivc_ctrl
 		  wire [0:2] free_by_count;
 		  assign free_by_count = {|free, free[0], &free};
 		  
-		  // for allocated VCs, the free state must be updated 
+		  // NOTE: For allocated VCs, the free state must be updated 
 		  // depending on how many flits were sent to the VC that are 
-		  // not already reflected in the incoming credit count
+		  // not already reflected in the incoming credit count.
+		  
 		  wire       next_free;
 		  assign next_free = free_by_count[flit_sent_count];
 		  
 		  assign next_free_ocvc[ocvc] = next_free;
 		  
-		  // for the first flit, we know that we did not send a flit to 
-		  // the destination VC in the previous cycle
+		  // NOTE: When sending the first flit in each packet, we must 
+		  // have won VC allocation. Consequently, the destination 
+		  // output VC must have been eligible and thus not assigned to 
+		  // any input VC, so we know that nobody sent a flit to it in 
+		  // the previous cycle.
+		  
 		  wire 	     free_unallocated;
 		  assign free_unallocated = |free;
 		  

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module vcr_ovc_ctrl
-  (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt, sw_gnt_ip, 
+  (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt_q, sw_gnt_ip_q, 
    int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
    
 `include "c_functions.v"
@@ -141,7 +141,7 @@ module vcr_ovc_ctrl
    // width of counter for credits waiting to be sent to input controller
    localparam cred_hold_width = vc_alloc_requires_credit ? 
 				clogb(num_flit_buffers) : 
-				clogb(num_flit_buffers + 1);
+				cred_count_width;
    
    // initial value for credit hold counter
    localparam [0:cred_hold_width-1] cred_hold_reset_value
@@ -171,10 +171,10 @@ module vcr_ovc_ctrl
    input [0:num_vcs-1] vc_gnt_ivc;
    
    // switch allocation produced a grant for this output port
-   input sw_gnt;
+   input sw_gnt_q;
    
    // input port that this output port was granted to during switch allocation
-   input [0:num_ports-1] sw_gnt_ip;
+   input [0:num_ports-1] sw_gnt_ip_q;
    
    // incoming flit control signals
    input [0:int_flit_ctrl_width-1] int_flit_ctrl;
@@ -207,7 +207,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			  flit_valid;
-   assign flit_valid = int_flit_ctrl[0] & sw_gnt;
+   assign flit_valid = int_flit_ctrl[0] & sw_gnt_q;
    
    wire 			  flit_tail;
    assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
@@ -304,7 +304,7 @@ module vcr_ovc_ctrl
 		   .q(allocated_vc_q));
 		
 		assign match = allocated_q &&
-			       |(allocated_ip_q & sw_gnt_ip) &&
+			       |(allocated_ip_q & sw_gnt_ip_q) &&
 			       (allocated_vc_q == flit_vc);
 		
 	     end
@@ -330,10 +330,10 @@ module vcr_ovc_ctrl
    // credit info only ever gets update when this output was granted or a credit
    // was received
    wire 			     update_credits;
-   assign update_credits = sw_gnt | cred_valid;
+   assign update_credits = sw_gnt_q | cred_valid;
    
    wire [0:cred_count_width-1] cred_count_q;
-   wire 		       head_free_early;
+   wire 		       head_free;
    wire 		       error_hct_underflow;
    wire 		       error_hct_overflow;
    
@@ -345,7 +345,7 @@ module vcr_ovc_ctrl
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
 	   // on the normal credit tracking mechanism
-	   assign head_free_early = 1'b1;
+	   assign head_free = 1'b1;
 	   
 	   assign error_hct_underflow = 1'b0;
 	   assign error_hct_overflow = 1'b0;
@@ -357,8 +357,10 @@ module vcr_ovc_ctrl
 	   // if only a subset of the flit buffer entries can be headers, we 
 	   // need to keep track of how many such slots are left
 	   
-	   wire head_credit;
 	   wire head_debit;
+	   assign head_debit = vc_gnt;
+	   
+	   wire head_credit;
 	   
 	   if(num_header_buffers == 1)
 	     begin
@@ -374,7 +376,6 @@ module vcr_ovc_ctrl
 		wire tail_sent_q;
 		
 		assign head_credit = tail_sent_q & last_credit_received;
-		assign head_debit = vc_gnt;
 		
 		wire tail_sent_s;
 		assign tail_sent_s
@@ -403,7 +404,7 @@ module vcr_ovc_ctrl
 		   .d(head_free_s),
 		   .q(head_free_q));
 		
-		assign head_free_early = head_free_s;
+		assign head_free = head_free_q;
 		
 		assign error_hct_underflow = head_debit & ~head_free_q;
 		assign error_hct_overflow = head_credit & head_free_q;
@@ -469,10 +470,8 @@ module vcr_ovc_ctrl
 		assign tail = tail_queue[pop_ptr_q];
 		
 		assign head_credit = credit & tail;		
-		assign head_debit = vc_gnt;
 		
 		// track header credits using stock credit tracker module
-		wire 				 head_free;
 		wire [0:1] 			 hct_errors;
 		c_credit_tracker
 		  #(.num_credits(num_header_buffers),
@@ -483,7 +482,6 @@ module vcr_ovc_ctrl
 		   .credit(head_credit),
 		   .debit(head_debit),
 		   .free(head_free),
-		   .free_early(head_free_early),
 		   .errors(hct_errors));
 		
 		assign error_hct_underflow = hct_errors[0];
@@ -532,30 +530,10 @@ module vcr_ovc_ctrl
    
    assign empty = cred_count_all;
    
-   // Instead of just computing this as the reduction of of the updated credit
-   // count sum, we can optimize a bit. In particular, we have one or more 
-   // credits available iff...
-   //  a) ... we just received a credit. In this case, we either had credits 
-   //     available to begin with, or there cannot be a debit at the same time.
-   //  b) ... we currently have at least two credits available. In this case,
-   //     even if there is a debit and no credit, we will still have at least
-   //     one credit left.
-   //  c) ... we currently have an odd number of credits available, and did not
-   //     just receive a debit. For odd numbers greater than one, we will always
-   //     have credit left, and in case we have one credit left, we will still
-   //     have at least one left if no debit occurs.
-   // This only leaves out the case where we are not receiving a credit, do not
-   // currently have two or more credits and either have no credits left or have
-   // a single credit left and receive a debit.
-   wire 					 next_cred;
-   assign next_cred = credit | 
-		      |cred_count_q[0:cred_count_width-2] | 
-		      (cred_count_q[cred_count_width-1] & ~debit);
    
-   
-   //-------------------------------------------------------------------
+   //---------------------------------------------------------------------------
    // generate flow control signals to input controller
-   //-------------------------------------------------------------------
+   //---------------------------------------------------------------------------
    
    generate
       
@@ -564,37 +542,17 @@ module vcr_ovc_ctrl
 	`INT_FLOW_CTRL_TYPE_LEVEL:
 	  begin
 	     
-	     // Having an additional register here is likely overkill, and
-	     // increases the credit round-trip delay by a cycle, so we just 
-	     // send out the value directly for now.
-	     
-	     /*
-	     wire [0:cred_level_width-1] free_s, free_q;
-	     assign free_s = (cred_count_next > max_cred_level) ?
-			     max_cred_level :
-			     cred_count_next[cred_count_width-
-					     cred_level_width:
-					     cred_count_width-1];
-	     c_dff
-	       #(.width(cred_level_width),
-		 .reset_type(reset_type),
-		 .reset_value(free_reset_value))
-	     freeq
-	       (.clk(clk),
-		.reset(reset),
-		.d(free_s),
-		.q(free_q));
-	     
-	     assign int_flow_ctrl = free_q;
-	     */
-	     
-	     // The debit input to this module is driven by the input VC 
+	     // NOTE: The debit input to this module is driven by the input VC 
 	     // controller. Consequently, the debit signal is already readily 
 	     // available at the input controller, and we can simply pass the 
 	     // current credit level, incremented by one if a credit was just 
 	     // received, from output to input controller, rather having the 
 	     // debit signal effectively go from input to output controller 
-	     // and back.
+	     // and back. Note that whenever an output VC is allocated to an 
+	     // input VC, no flit can have been sent in the current cycle, as
+	     // in order for VC allocation to succeed, the output VC must be 
+	     // eligible for allocation in the current cycle, and thus cannot 
+	     // be assigned to another input VC.
 	     
 	     if(cred_count_width > cred_level_width)
 	       begin
@@ -611,10 +569,17 @@ module vcr_ovc_ctrl
 					     cred_count_width-1];
 		  
 	       end
-	     else
+	     else if(cred_count_width == cred_level_width)
 	       assign int_flow_ctrl
-		 = cred_count_plus_credit[cred_count_width-cred_level_width:
-					  cred_count_width-1];
+		 = cred_count_plus_credit[0:cred_count_width-1];
+	     else
+	       begin
+		  assign int_flow_ctrl[0:cred_level_width-cred_count_width-1]
+			   = {(cred_level_width-cred_count_width){1'b0}};
+		  assign int_flow_ctrl[cred_level_width-cred_count_width:
+				       cred_level_width-1]
+			   = cred_count_plus_credit;
+	       end
 	     
 	  end
 	
@@ -626,47 +591,36 @@ module vcr_ovc_ctrl
 	       assign cred_hold_copy
 		 = cred_count_next[(cred_count_width-cred_hold_width):
 				   cred_count_width-1] - 
-		   /*|cred_count_next*/ 1'b1;
+		   |cred_count_next;
 	     else
-	       assign cred_hold_copy
-		 = cred_count_next[(cred_count_width-cred_hold_width):
-				   cred_count_width-1];
+	       assign cred_hold_copy = cred_count_next;
 	     
-	     wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
-	     assign cred_hold_s = next_allocated ?
-				  (cred_hold_q - (|cred_hold_q & ~credit)) :
-				  cred_hold_copy;
-	     c_dff
-	       #(.width(cred_hold_width),
-		 .reset_type(reset_type),
-		 .reset_value(cred_hold_reset_value))
-	     cred_holdq
-	       (.clk(clk),
-		.reset(reset),
-		.d(cred_hold_s),
-		.q(cred_hold_q));
-	     
-	     // Having an additional register here is likely overkill, and
-	     // increases the credit round-trip delay by a cycle, so we just 
-	     // send out the value directly for now.
-	     
-	     /*
-	     wire 			 cred_s, cred_q;
-	     assign cred_s = |cred_hold_s | (credit & next_allocated);
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type),
-		 .reset_value(1))
-	     credq
-	       (.clk(clk),
-		.reset(reset),
-		.d(cred_s),
-		.q(cred_q));
-	     
-	     assign int_flow_ctrl = cred_q;
-	     */
-	     
-	     assign int_flow_ctrl = |cred_hold_s | (credit & next_allocated);
+	     if(cred_hold_width >= 2)
+	       begin
+		  
+		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
+		  assign cred_hold_s
+		    = next_allocated ?
+		      (cred_hold_q - (|cred_hold_q & ~credit)) :
+		      cred_hold_copy;
+		  c_dff
+		    #(.width(cred_hold_width),
+		      .reset_type(reset_type),
+		      .reset_value(cred_hold_reset_value))
+		  cred_holdq
+		    (.clk(clk),
+		     .reset(reset),
+		     .d(cred_hold_s),
+		     .q(cred_hold_q));
+		  
+		  assign int_flow_ctrl
+		    = next_allocated ?
+		      (|cred_hold_q[0:cred_hold_width-2] | credit) :
+		      |cred_hold_copy;
+		  
+	       end
+	     else
+	       assign int_flow_ctrl = next_allocated ? credit : |cred_hold_copy;
 	     
 	  end
 	
@@ -679,30 +633,50 @@ module vcr_ovc_ctrl
    // keep track of whether current VC is available for allocation
    //---------------------------------------------------------------------------
    
-   wire 				 elig_s, elig_q;
-   
    generate
       
       if(vc_alloc_requires_credit)
-	assign elig_s = ~allocated_s & head_free_early & next_cred;
+	begin
+	   
+	   // Instead of just computing this as the reduction of of the updated 
+	   // credit count sum, we can optimize a bit. In particular, we have 
+	   // one or more credits available iff...
+	   //  a) ... we just received a credit. In this case, we either had 
+	   //     credits available to begin with, or there cannot be a debit 
+	   //     at the same time.
+	   //  b) ... we currently have at least two credits available. In this 
+	   //     case, even if there is a debit and no credit, we will still 
+	   //     have at least one credit left.
+	   //  c) ... we currently have an odd number of credits available, and 
+	   //     did not just receive a debit. For odd numbers greater than 
+	   //     one, we will always have credit left, and in case we have one 
+	   //     credit left, we will still have at least one left if no debit 
+	   //     occurs.
+	   // This only leaves out the case where we are not receiving a credit,
+	   // do not currently have two or more credits and either have no 
+	   // credits left or have a single credit left and receive a debit.
+	   wire cred_s, cred_q;
+	   assign cred_s = credit | 
+			   |cred_count_q[0:cred_count_width-2] | 
+			   (cred_count_q[cred_count_width-1] & ~debit);
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   credq
+	     (.clk(clk),
+	      .reset(reset),
+	      .d(cred_s),
+	      .q(cred_q));
+	   
+	   assign elig = ~allocated_q & head_free & cred_q;
+	   
+	end
       else
-	assign elig_s = ~allocated_s & head_free_early;
+	assign elig = ~allocated_q & head_free;
       
    endgenerate
    
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type),
-       .reset_value(1'b1))
-   eligq
-     (.clk(clk),
-      .reset(reset),
-      .d(elig_s),
-      .q(elig_q));
    
-   assign elig = elig_q;
-   
-
    //---------------------------------------------------------------------------
    // error checking
    //---------------------------------------------------------------------------

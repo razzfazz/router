@@ -442,7 +442,6 @@ module packet_source
 	   
 	   // track header credits using stock credit tracker module
 	   wire 			    head_free;
-	   wire 			    head_free_early;
 	   wire [0:1] 			    errors_hct;
 	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
@@ -454,7 +453,6 @@ module packet_source
 	      .credit(head_credit),
 	      .debit(head_debit),
 	      .free(head_free),
-	      .free_early(head_free_early),
 	      .errors(errors_hct));
 
 	   assign head_free_ovc[ovc] = head_free;

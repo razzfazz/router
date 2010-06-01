@@ -501,7 +501,6 @@ module whr_op_ctrl_mac
 		assign head_debit = ~allocated_q & new_gnt & free;
 		
 		// track header credits using stock credit tracker module
-		wire 				 head_free_early;
 		wire [0:1] 			 hct_errors;
 		c_credit_tracker
 		  #(.num_credits(num_header_buffers),
@@ -513,7 +512,6 @@ module whr_op_ctrl_mac
 		   .credit(head_credit),
 		   .debit(head_debit),
 		   .free(head_free),
-		   .free_early(head_free_early),
 		   .errors(hct_errors));
 		
 		assign error_hct_underflow = hct_errors[0];

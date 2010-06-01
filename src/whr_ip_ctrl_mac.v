@@ -259,38 +259,21 @@ module whr_ip_ctrl_mac
    wire 			  flit_valid_in;
    wire 			  flit_valid_out;
    
+   wire 			  fbc_empty;
    wire 			  fbc_almost_full;
    
    wire 			  hold_input_enable;
-   
-   wire 			  flit_valid_thru;
-   assign flit_valid_thru = flit_valid_in & ~hold_input_enable;
-   
-   wire 			  hold_input_stage;
-   assign hold_input_stage = flit_valid_in & hold_input_enable;
-   
-   wire 			  input_stage_active;
-   assign input_stage_active = ~hold_input_stage;
-   
-   wire 			  buffer_in_active;
-   assign buffer_in_active = flit_valid_thru;
-   
-   wire 			  fbc_empty;
-   
-   wire 			  flit_valid;
-   assign flit_valid = flit_valid_in | ~fbc_empty;
-   
-   wire 			  buffer_out_active;
-   assign buffer_out_active = flit_valid;
    
    generate
       
       if(input_stage_can_hold)
 	begin
 	   
+	   wire hold_input_enable_active;
+	   assign hold_input_enable_active = flit_valid_in | ~fbc_empty;
+	   
 	   wire hold_input_enable_set;
-	   assign hold_input_enable_set
-	     = fbc_almost_full & flit_valid_in & ~flit_valid_out;
+	   assign hold_input_enable_set = fbc_almost_full & flit_valid_in;
 	   
 	   wire hold_input_enable_reset;
 	   assign hold_input_enable_reset = flit_valid_out;
@@ -305,7 +288,7 @@ module whr_ip_ctrl_mac
 	   hold_input_enableq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(buffer_out_active),
+	      .active(hold_input_enable_active),
 	      .d(hold_input_enable_s),
 	      .q(hold_input_enable_q));
 	   
@@ -317,11 +300,20 @@ module whr_ip_ctrl_mac
       
    endgenerate
    
+   wire 	flit_valid_thru;
+   assign flit_valid_thru = flit_valid_in & ~hold_input_enable;
+   
+   wire 	hold_input_stage_b;
+   assign hold_input_stage_b = ~(flit_valid_in & hold_input_enable);
+   
+   wire 	input_stage_active;
+   assign input_stage_active = hold_input_stage_b;
+   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = hold_input_stage ? flit_ctrl_in_q : flit_ctrl_in;
+   assign flit_ctrl_in_s = hold_input_stage_b ? flit_ctrl_in : flit_ctrl_in_q;
 	   
    wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = hold_input_stage ? flit_data_in_q : flit_data_in;
+   assign flit_data_in_s = hold_input_stage_b ? flit_data_in : flit_data_in_q;
    
    generate
 	   
@@ -380,6 +372,9 @@ module whr_ip_ctrl_mac
    // decode control signals
    //---------------------------------------------------------------------------
    
+   wire 			buffer_in_active;
+   assign buffer_in_active = flit_valid_thru;
+   
    wire 			flit_head_in;   
    wire 			flit_tail_in;
    
@@ -427,7 +422,7 @@ module whr_ip_ctrl_mac
 	     else
 	       begin
 		  
-		  wire [0:flit_ctr_width-1] flit_ctr_q;
+		  wire flit_ctr_zero;
 		  wire [0:flit_ctr_width-1] flit_ctr_next;
 		  
 		  if(payload_length_width > 0)
@@ -446,20 +441,21 @@ module whr_ip_ctrl_mac
 		       
 		       if(min_payload_length == 0)
 			 assign flit_tail_in
-			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
+			   = flit_head_in ? ~|payload_length : flit_ctr_zero;
 		       else
-			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+			 assign flit_tail_in = ~flit_head_in & flit_ctr_zero;
 		       
 		    end
 		  else
 		    begin
 		       assign flit_ctr_next = max_payload_length - 1;
-		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+		       assign flit_tail_in = ~flit_head_in & flit_ctr_zero;
 		    end
 		  
-		  wire [0:flit_ctr_width-1] flit_ctr_s;
-		  assign flit_ctr_s
-		    = flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1);
+		  wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
+		  assign flit_ctr_s = flit_head_in ? 
+				      flit_ctr_next : 
+				      (flit_ctr_q - hold_input_stage_b);
 		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
@@ -469,6 +465,8 @@ module whr_ip_ctrl_mac
 		     .active(buffer_in_active),
 		     .d(flit_ctr_s),
 		     .q(flit_ctr_q));
+		  
+		  assign flit_ctr_zero = ~|flit_ctr_q;
 		  
 	       end
 	     
@@ -483,6 +481,12 @@ module whr_ip_ctrl_mac
    // generate head and tail indicators
    //---------------------------------------------------------------------------
 
+   wire 				    flit_valid;
+   assign flit_valid = flit_valid_in | ~fbc_empty;
+   
+   wire 				    buffer_out_active;
+   assign buffer_out_active = flit_valid;
+   
    wire                                     gnt;
    assign gnt = |gnt_op;
    
