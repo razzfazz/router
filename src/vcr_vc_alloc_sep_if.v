@@ -160,14 +160,18 @@ module vcr_vc_alloc_sep_if
 					     num_resource_classes+irc)*
 					    num_vcs_per_class+icvc];
 			  
+			  wire [0:num_vcs-1] 	    elig_ovc;
+			  assign elig_ovc
+			    = elig_op_ovc[route_port*num_vcs +: num_vcs];
+			  
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
                             elig_orc_ocvc;
-			  assign elig_orc_ocvc
-			    = elig_op_ovc[(route_port*num_message_classes+mc)*
-					  num_resource_classes*
-					  num_vcs_per_class +: 
-					  num_resource_classes*
-					  num_vcs_per_class];
+			  assign elig_orc_ocvc = elig_ovc[mc*
+							  num_resource_classes*
+							  num_vcs_per_class:
+							  (mc+1)* 
+							  num_resource_classes*
+							  num_vcs_per_class-1];
 			  
 			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] gnt_out_op_orc_ocvc;
