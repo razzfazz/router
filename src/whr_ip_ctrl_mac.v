@@ -249,7 +249,7 @@ module whr_ip_ctrl_mac
    
    wire 			  fbc_almost_full;
    
-   wire 			  hold_input_stage_b;
+   wire 			  hold_input_enable;
    
    generate
       
@@ -257,8 +257,7 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire hold_input_enable_set;
-	   assign hold_input_enable_set
-	     = fbc_almost_full & flit_valid_in & ~flit_valid_out;
+	   assign hold_input_enable_set = fbc_almost_full & flit_valid_in;
 	   
 	   wire hold_input_enable_reset;
 	   assign hold_input_enable_reset = flit_valid_out;
@@ -276,16 +275,19 @@ module whr_ip_ctrl_mac
 	      .d(hold_input_enable_s),
 	      .q(hold_input_enable_q));
 	   
-	   assign hold_input_stage_b = ~(flit_valid_in & hold_input_enable_q);
+	   assign hold_input_enable = hold_input_enable_q;
 	   
 	end
       else
-	assign hold_input_stage_b = 1'b1;
+	assign hold_input_enable = 1'b0;
       
    endgenerate
    
    wire 	flit_valid_thru;
-   assign flit_valid_thru = flit_valid_in & hold_input_stage_b;
+   assign flit_valid_thru = flit_valid_in & ~hold_input_enable;
+   
+   wire 	hold_input_stage_b;
+   assign hold_input_stage_b = ~(flit_valid_in & hold_input_enable);
    
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = hold_input_stage_b ? flit_ctrl_in : flit_ctrl_in_q;
