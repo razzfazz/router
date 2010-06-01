@@ -492,6 +492,7 @@ module whr_ip_ctrl_mac
    
    assign flit_valid_out = gnt;
    
+   wire 				    fbc_almost_empty;
    wire [0:fbf_addr_width-1] 		    fbc_write_addr;
    wire [0:fbf_addr_width-1] 		    fbc_read_addr;
    
@@ -545,18 +546,6 @@ module whr_ip_ctrl_mac
 	   
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_valid_q;
 	   
-	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
-	   assign tail_idx_s = flit_tail_in ? fbf_write_addr : tail_idx_q;
-	   c_dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   tail_idxq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(buffer_in_active),
-	      .d(tail_idx_s),
-	      .q(tail_idx_q));
-	   
 	   wire 		     tail_in;
 	   assign tail_in = (flit_valid_in & ~hold_input_enable) & flit_tail_in;
 	   
@@ -574,9 +563,7 @@ module whr_ip_ctrl_mac
 	      .q(tail_valid_q));
 	   
 	   assign flit_tail_out
-	     = fbc_empty ?
-	       flit_tail_in :
-	       (tail_valid_q && (fbc_read_addr == tail_idx_q));
+	     = fbc_empty ? flit_tail_in : (tail_valid_q & fbc_almost_empty);
 	   
 	end
       
@@ -793,7 +780,6 @@ module whr_ip_ctrl_mac
    assign fbc_pop = flit_valid_out;
 
    wire [0:fbf_addr_width-1] fbc_peek_addr;
-   wire 		     fbc_almost_empty;
    wire 		     fbc_full;
    wire [0:1]		     fbc_errors;
    c_fifo_ctrl
