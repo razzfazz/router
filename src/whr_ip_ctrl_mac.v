@@ -249,7 +249,7 @@ module whr_ip_ctrl_mac
    
    wire 			  fbc_almost_full;
    
-   wire 			  hold_input_stage;
+   wire 			  hold_input_stage_b;
    
    generate
       
@@ -276,22 +276,22 @@ module whr_ip_ctrl_mac
 	      .d(hold_input_enable_s),
 	      .q(hold_input_enable_q));
 	   
-	   assign hold_input_stage = flit_valid_in & hold_input_enable_q;
+	   assign hold_input_stage_b = ~(flit_valid_in & hold_input_enable_q);
 	   
 	end
       else
-	assign hold_input_stage = 1'b0;
+	assign hold_input_stage_b = 1'b1;
       
    endgenerate
    
    wire 	flit_valid_thru;
-   assign flit_valid_thru = flit_valid_in & ~hold_input_stage;
+   assign flit_valid_thru = flit_valid_in & hold_input_stage_b;
    
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = hold_input_stage ? flit_ctrl_in_q : flit_ctrl_in;
+   assign flit_ctrl_in_s = hold_input_stage_b ? flit_ctrl_in : flit_ctrl_in_q;
 	   
    wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = hold_input_stage ? flit_data_in_q : flit_data_in;
+   assign flit_data_in_s = hold_input_stage_b ? flit_data_in : flit_data_in_q;
    
    generate
 	   
@@ -394,7 +394,7 @@ module whr_ip_ctrl_mac
 	     else
 	       begin
 		  
-		  wire [0:flit_ctr_width-1] flit_ctr_q;
+		  wire flit_ctr_zero;
 		  wire [0:flit_ctr_width-1] flit_ctr_next;
 		  
 		  if(payload_length_width > 0)
@@ -413,22 +413,23 @@ module whr_ip_ctrl_mac
 		       
 		       if(min_payload_length == 0)
 			 assign flit_tail_in
-			   = flit_head_in ? ~|payload_length : ~|flit_ctr_q;
+			   = flit_head_in ? ~|payload_length : flit_ctr_zero;
 		       else
-			 assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+			 assign flit_tail_in = ~flit_head_in & flit_ctr_zero;
 		       
 		    end
 		  else
 		    begin
 		       assign flit_ctr_next = max_payload_length - 1;
-		       assign flit_tail_in = ~flit_head_in & ~|flit_ctr_q;
+		       assign flit_tail_in = ~flit_head_in & flit_ctr_zero;
 		    end
 		  
-		  wire [0:flit_ctr_width-1] flit_ctr_s;
-		  assign flit_ctr_s
-		    = flit_valid_thru ? 
-		      (flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1)) : 
-		      flit_ctr_q;
+		  wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
+		  assign flit_ctr_s = flit_valid_in ? 
+				      (flit_head_in ? 
+				       flit_ctr_next : 
+				       (flit_ctr_q - hold_input_stage_b)) : 
+				      flit_ctr_q;
 		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
@@ -437,6 +438,8 @@ module whr_ip_ctrl_mac
 		     .reset(reset),
 		     .d(flit_ctr_s),
 		     .q(flit_ctr_q));
+		  
+		  assign flit_ctr_zero = ~|flit_ctr_q;
 		  
 	       end
 	     
