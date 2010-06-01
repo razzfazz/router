@@ -166,7 +166,7 @@ module whr_op_ctrl_mac
    // we know for sure that no more credits are outstanding, this register 
    // cannot be included in any of the other clock gating domains. As a single 
    // register, it will most likely end up being free-running; this could
-   // be avoided by including the cred_valid_active term in one of the other 
+   // be avoided by including the flow_ctrl_active term in one of the other 
    // clock gating domains, allowing cred_validq to be gated at the cost of 
    // slightly increased activity in the domain.
    
@@ -175,8 +175,8 @@ module whr_op_ctrl_mac
    
    wire 		      cred_count_all;
    
-   wire 		      cred_valid_active;
-   assign cred_valid_active = ~cred_count_all;
+   wire 		      flow_ctrl_active;
+   assign flow_ctrl_active = ~cred_count_all;
    
    wire 		      cred_valid_s, cred_valid_q;
    assign cred_valid_s = flow_ctrl_s[0];
@@ -186,7 +186,7 @@ module whr_op_ctrl_mac
    cred_validq
      (.clk(clk),
       .reset(reset),
-      .active(cred_valid_active),
+      .active(flow_ctrl_active),
       .d(cred_valid_s),
       .q(cred_valid_q));
    
@@ -603,10 +603,12 @@ module whr_op_ctrl_mac
    
 	     assign flit_ctrl_s[0] = flit_valid_in;
 	     
-	     wire flit_valid_out_active;
-	     assign flit_valid_out_active = flit_valid_in | flit_ctrl_q[0];
+	     wire flit_valid_q;
 	     
-	     wire flit_valid_s, flit_valid_q;
+	     wire flit_valid_out_active;
+	     assign flit_valid_out_active = flit_valid_in | flit_valid_q;
+	     
+	     wire flit_valid_s;
 	     assign flit_valid_s = flit_ctrl_s[0];
 	     c_dff
 	       #(.width(1),
