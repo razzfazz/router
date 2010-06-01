@@ -236,6 +236,11 @@ module whr_op_ctrl_mac
    wire 		new_gnt;
    assign new_gnt = gnt_int & head_free;
    
+   wire 		allocated_q;
+   
+   wire 		allocated_ip_active;
+   assign allocated_ip_active = arb_active & ~allocated_q;
+   
    wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
    assign allocated_ip_s = update ? gnt_int_ip : allocated_ip_q;
    c_dff
@@ -244,7 +249,7 @@ module whr_op_ctrl_mac
    allocated_ipq
      (.clk(clk),
       .reset(1'b0),
-      .active(arb_active),
+      .active(allocated_ip_active),
       .d(allocated_ip_s),
       .q(allocated_ip_q));
    
@@ -256,7 +261,7 @@ module whr_op_ctrl_mac
    
    wire                 free;
    
-   wire                 allocated_s, allocated_q;
+   wire                 allocated_s;
    assign allocated_s = allocated_q ?
 			(~|(held_gnt_ip & req_tail_ip) | ~free) :
 			(|(gnt_int_ip & ~req_tail_ip) & head_free & free);
@@ -358,9 +363,6 @@ module whr_op_ctrl_mac
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 		flags_active;
-   assign flags_active = flit_valid_in | cred_valid;
-   
    wire 		cred_active;
    assign cred_active = arb_active | cred_valid;
    
@@ -396,6 +398,9 @@ module whr_op_ctrl_mac
 	   
 	   if(num_header_buffers == 1)
 	     begin
+		
+		wire flags_active;
+		assign flags_active = flit_valid_in | cred_valid;
 		
 		// if we can only have one packet per buffer, we can accept the 
 		// next one once the buffer has been completely drained after 
@@ -445,6 +450,9 @@ module whr_op_ctrl_mac
 	   else
 	     begin
 		
+		wire push_active;
+		assign push_active = flit_valid_in;
+		
 		wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
 		c_incr
 		  #(.width(flit_buffer_idx_width),
@@ -455,16 +463,19 @@ module whr_op_ctrl_mac
 		   .data_out(push_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s = flit_valid_in ? push_ptr_next : push_ptr_q;
+		assign push_ptr_s = push_ptr_next;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
 		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(flags_active),
+		   .active(push_active),
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
+		
+		wire 				 pop_active;
+		assign pop_active = cred_valid;
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
 		c_incr
@@ -476,23 +487,22 @@ module whr_op_ctrl_mac
 		   .data_out(pop_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = cred_valid ? pop_ptr_next : pop_ptr_q;
+		assign pop_ptr_s = pop_ptr_next;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
 		pop_ptrq
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(flags_active),
+		   .active(pop_active),
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
 		reg [0:num_flit_buffers-1] 	 tail_queue;
 		
 		always @(posedge clk)
-		  if(flags_active)
-		    if(flit_valid_in)
-		      tail_queue[push_ptr_q] <= flit_tail_in;
+		  if(push_active)
+		    tail_queue[push_ptr_q] <= flit_tail_in;
 		
 		wire 				 tail;
 		assign tail = tail_queue[pop_ptr_q];

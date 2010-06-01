@@ -260,6 +260,10 @@ module whr_ip_ctrl_mac
    wire 			  flit_valid_out;
    
    wire 			  fbc_empty;
+   
+   wire 			  flit_valid;
+   assign flit_valid = flit_valid_in | ~fbc_empty;
+   
    wire 			  fbc_almost_full;
    
    wire 			  hold_input_enable;
@@ -270,7 +274,7 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire hold_input_enable_active;
-	   assign hold_input_enable_active = flit_valid_in | ~fbc_empty;
+	   assign hold_input_enable_active = flit_valid;
 	   
 	   wire hold_input_enable_set;
 	   assign hold_input_enable_set = fbc_almost_full & flit_valid_in;
@@ -310,10 +314,10 @@ module whr_ip_ctrl_mac
    assign input_stage_active = hold_input_stage_b;
    
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = hold_input_stage_b ? flit_ctrl_in : flit_ctrl_in_q;
+   assign flit_ctrl_in_s = flit_ctrl_in;
 	   
    wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = hold_input_stage_b ? flit_data_in : flit_data_in_q;
+   assign flit_data_in_s = flit_data_in;
    
    generate
 	   
@@ -453,9 +457,8 @@ module whr_ip_ctrl_mac
 		    end
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
-		  assign flit_ctr_s = flit_head_in ? 
-				      flit_ctr_next : 
-				      (flit_ctr_q - hold_input_stage_b);
+		  assign flit_ctr_s
+		    = flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1);
 		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
@@ -481,11 +484,11 @@ module whr_ip_ctrl_mac
    // generate head and tail indicators
    //---------------------------------------------------------------------------
 
-   wire 				    flit_valid;
-   assign flit_valid = flit_valid_in | ~fbc_empty;
-   
    wire 				    buffer_out_active;
-   assign buffer_out_active = flit_valid;
+   assign buffer_out_active = ~fbc_empty;
+   
+   wire 				    flags_active;
+   assign flags_active = flit_valid;
    
    wire                                     gnt;
    assign gnt = |gnt_op;
@@ -540,14 +543,14 @@ module whr_ip_ctrl_mac
 	   head_validq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(buffer_out_active),
+	      .active(flags_active),
 	      .d(head_valid_s),
 	      .q(head_valid_q));
 	   
 	   assign flit_head_out = fbc_empty ? flit_head_in : head_valid_q;
 	   
 	   wire 		     tail_in;
-	   assign tail_in = (flit_valid_in & ~hold_input_enable) & flit_tail_in;
+	   assign tail_in = flit_valid_thru & flit_tail_in;
 	   
 	   wire 		     tail_valid_s, tail_valid_q;
 	   assign tail_valid_s
@@ -558,7 +561,7 @@ module whr_ip_ctrl_mac
 	   tail_validq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(buffer_out_active),
+	      .active(flags_active),
 	      .d(tail_valid_s),
 	      .q(tail_valid_q));
 	   
@@ -620,7 +623,7 @@ module whr_ip_ctrl_mac
 	   hdff
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(buffer_out_active),
+	      .active(flags_active),
 	      .almost_full(hdff_almost_full),
 	      .full(hdff_full),
 	      .write_data(hdff_write_data),
@@ -692,7 +695,7 @@ module whr_ip_ctrl_mac
 	   hdff_emptyq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(buffer_out_active),
+	      .active(flags_active),
 	      .d(hdff_empty_s),
 	      .q(hdff_empty_q));
 	   
@@ -762,7 +765,7 @@ module whr_ip_ctrl_mac
    lar
      (.clk(clk),
       .reset(reset),
-      .active(buffer_out_active),
+      .active(flags_active),
       .router_address(router_address),
       .route_op(route_op),
       .route_info(hdff_route_info),
@@ -789,7 +792,7 @@ module whr_ip_ctrl_mac
    fbc
      (.clk(clk),
       .reset(reset),
-      .active(buffer_out_active),
+      .active(flags_active),
       .push(fbc_push),
       .pop(fbc_pop),
       .write_addr(fbc_write_addr),
@@ -807,10 +810,10 @@ module whr_ip_ctrl_mac
    wire 		     error_fbc_overflow;
    assign error_fbc_overflow = fbc_errors[1];
    
-   assign fbf_read_active = buffer_out_active;
+   assign fbf_read_active = flit_valid;
    assign fbf_read_enable = flit_valid_out;
    assign fbf_read_addr = fbc_read_addr;
-   assign fbf_write_active = buffer_in_active;
+   assign fbf_write_active = flit_valid_thru;
    assign fbf_write_enable = flit_valid_thru;
    assign fbf_write_addr = fbc_write_addr;
    assign fbf_write_data = flit_data_in_q;
@@ -833,7 +836,7 @@ module whr_ip_ctrl_mac
    // generate clock enable signal to crossbar module
    //---------------------------------------------------------------------------
    
-   assign xbr_active = buffer_out_active;
+   assign xbr_active = flit_valid;
    
    
    //---------------------------------------------------------------------------
@@ -848,7 +851,7 @@ module whr_ip_ctrl_mac
    flit_head_outq
      (.clk(clk),
       .reset(1'b0),
-      .active(buffer_out_active),
+      .active(flags_active),
       .d(flit_head_out_s),
       .q(flit_head_out_q));
    
@@ -860,7 +863,7 @@ module whr_ip_ctrl_mac
    la_route_infoq
      (.clk(clk),
       .reset(1'b0),
-      .active(buffer_out_active),
+      .active(flags_active),
       .d(la_route_info_s),
       .q(la_route_info_q));
    
