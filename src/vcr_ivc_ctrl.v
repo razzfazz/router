@@ -462,6 +462,8 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
+   wire fbc_almost_empty;
+   
    generate
       
       if(num_header_buffers > 1)
@@ -545,17 +547,6 @@ module vcr_ivc_ctrl
 	   wire 		     tail_in;
 	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
-	   wire [0:fbf_addr_width-1] tail_idx_s, tail_idx_q;
-	   assign tail_idx_s = tail_in ? fbc_write_addr : tail_idx_q;
-	   c_dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   tail_idxq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .d(tail_idx_s),
-	      .q(tail_idx_q));
-	   
 	   wire 		     tail_valid_s, tail_valid_q;
 	   assign tail_valid_s
 	     = (tail_valid_q | tail_in) & ~(flit_sent & flit_tail);
@@ -569,9 +560,7 @@ module vcr_ivc_ctrl
 	      .q(tail_valid_q));
 	   
 	   assign flit_tail
-	     = fbc_empty ?
-	       flit_tail_in :
-	       (tail_valid_q && (fbc_read_addr == tail_idx_q));
+	     = fbc_empty ? flit_tail_in : (tail_valid_q & fbc_almost_empty);
 	   
 	end
       
@@ -1042,7 +1031,6 @@ module vcr_ivc_ctrl
    assign fbc_pop = flit_sent;
    
    wire [0:1] 		       fbc_errors;
-   wire 		       fbc_almost_empty;
    wire 		       fbc_almost_full;
    wire 		       fbc_full;
    c_fifo_ctrl
