@@ -466,9 +466,15 @@ module packet_source
 	   
 	   assign free_ovc[ovc] = |cred_count_q;
 	   
+	   wire 		       error_cred_overflow;
+	   assign error_cred_overflow
+	     = (cred_count_q == num_flit_buffers) && credit;
+	   
+	   wire 		       error_cred_underflow;
+	   assign error_cred_underflow = (cred_count_q == 0) && debit;
+	   
 	   wire [0:1] 		       errors_cred;
-	   assign errors_cred = {(cred_count_q == num_flit_buffers) && credit,
-				 (cred_count_q == 0) && debit};
+	   assign errors_cred = {error_cred_overflow, error_cred_underflow};
 	   
 	   assign errors_cred_ovc[ovc*2:(ovc+1)*2-1] = errors_cred;
 	   
