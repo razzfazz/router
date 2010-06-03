@@ -564,6 +564,7 @@ module vcr_ip_ctrl_mac
       .flit_head_out_ivc(flit_head_in_ivc),
       .flit_tail_out_ivc(flit_tail_in_ivc));
    
+   wire [0:num_vcs-1] 		flit_sent_prev_ivc;
    wire [0:num_vcs-1] 		flit_head_ivc;
    wire [0:num_vcs-1] 		flit_tail_ivc;
    wire [0:num_vcs*num_ports-1] route_ivc_op;
@@ -608,12 +609,15 @@ module vcr_ip_ctrl_mac
 	   wire               sw_gnt_spec;
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
+	   wire 		     flit_sent_prev;
+	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
+	   
 	   wire [0:num_ports-1] route_op;
 	   wire [0:port_idx_width-1] route_port;
 	   wire 		     inc_rc;
 	   wire 		     vc_req;
 	   wire 		     sw_req_nonspec;
-	   wire 		     sw_req_spec;
+	   wire 		     sw_req_spec;	   
 	   wire 		     flit_head;
 	   wire 		     flit_tail;
 	   wire [0:la_route_info_width-1] la_route_info;
@@ -672,6 +676,7 @@ module vcr_ip_ctrl_mac
 	      .sw_req_spec(sw_req_spec),
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
+	      .flit_sent_prev(flit_sent_prev),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .la_route_info(la_route_info),
@@ -1152,29 +1157,8 @@ module vcr_ip_ctrl_mac
    // generate outputs to switch
    //---------------------------------------------------------------------------
    
-   wire 			     flit_head_muxed;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   flit_head_muxed_sel
-     (.select(vc_sel_ivc),
-      .data_in(flit_head_ivc),
-      .data_out(flit_head_muxed));
-   
-   wire 			     flit_tail_muxed;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   flit_tail_muxed_sel
-     (.select(vc_sel_ivc),
-      .data_in(flit_tail_ivc),
-      .data_out(flit_tail_muxed));
-   
-   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out_s, int_flit_ctrl_out_q;
-   assign int_flit_ctrl_out_s[0] = flit_sent;
-
    wire 			     flit_valid_out_s, flit_valid_out_q;
-   assign flit_valid_out_s = int_flit_ctrl_out_s[0];
+   assign flit_valid_out_s = flit_sent;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -1184,23 +1168,43 @@ module vcr_ip_ctrl_mac
       .d(flit_valid_out_s),
       .q(flit_valid_out_q));
    
+   assign int_flit_ctrl_out[0] = flit_valid_out_q;
+   
    generate
       
       if(num_vcs > 1)
 	begin
 	   
 	   wire [0:vc_idx_width-1] flit_vc;
+	   c_encoder
+	     #(.num_ports(num_vcs))
+	   flit_vc_enc
+	     (.data_in(vc_sel_ivc),
+	      .data_out(flit_vc));
+	   
+	   wire [0:vc_idx_width-1] vc_sel_s, vc_sel_q;
+	   assign vc_sel_s = flit_vc;
+	   c_dff
+	     #(.width(vc_idx_width),
+	       .reset_type(reset_type))
+	   vc_selq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .d(vc_sel_s),
+	      .q(vc_sel_q));
+	   
+	   wire [0:num_vcs-1] 	   prev_vc_sel_ivc;
+	   c_decoder
+	     #(.num_ports(num_vcs))
+	   prev_vc_sel_ivc_dec
+	     (.data_in(vc_sel_q),
+	      .data_out(prev_vc_sel_ivc));
+	   
+	   assign flit_sent_prev_ivc
+	     = {num_vcs{flit_valid_out_q}} & prev_vc_sel_ivc;
 	   
 	   if(track_vcs_at_output)
-	     begin
-		
-		c_encoder
-		  #(.num_ports(num_vcs))
-		flit_vc_enc
-		  (.data_in(vc_sel_ivc),
-		   .data_out(flit_vc));
-		
-	     end
+	     assign int_flit_ctrl_out[1:1+vc_idx_width-1] = vc_sel_q;
 	   else
 	     begin
 		
@@ -1242,39 +1246,79 @@ module vcr_ip_ctrl_mac
 		else
 		  assign dest_ovc = allocated_ovc;
 		
+		wire [0:vc_idx_width-1] dest_vc_sel;
 		c_encoder
 		  #(.num_ports(num_vcs))
-		flit_vc_enc
+		dest_vc_sel_enc
 		  (.data_in(dest_ovc),
-		   .data_out(flit_vc));
+		   .data_out(dest_vc_sel));
+		
+		wire [0:vc_idx_width-1] dest_vc_sel_s, dest_vc_sel_q;
+		assign dest_vc_sel_s = dest_vc_sel;
+		c_dff
+		  #(.width(vc_idx_width),
+		    .reset_type(reset_type))
+		dest_vc_selq
+		  (.clk(clk),
+		   .reset(reset),
+		   .d(dest_vc_sel_s),
+		   .q(dest_vc_sel_q));
+		
+		assign int_flit_ctrl_out[1:1+vc_idx_width-1] = dest_vc_sel_q;
 		
 	     end
 	   
-	   assign int_flit_ctrl_out_s[1:1+vc_idx_width-1] = flit_vc;
-	   
 	end
+      else
+	assign flit_sent_prev_ivc = flit_valid_out_q;
       
    endgenerate
    
-   assign int_flit_ctrl_out_s[1+vc_idx_width] = flit_head_muxed;
-   assign int_flit_ctrl_out_s[1+vc_idx_width+1] = flit_tail_muxed;
+   wire 				flit_head_muxed;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_head_muxed_sel
+     (.select(vc_sel_ivc),
+      .data_in(flit_head_ivc),
+      .data_out(flit_head_muxed));
+   
+   wire 				flit_head_out_s, flit_head_out_q;
+   assign flit_head_out_s = flit_head_muxed;
    c_dff
-     #(.width(int_flit_ctrl_width-1),
+     #(.width(1),
        .reset_type(reset_type))
-   int_flit_ctrl_outq
+   flit_head_outq
      (.clk(clk),
       .reset(1'b0),
-      .d(int_flit_ctrl_out_s[1:int_flit_ctrl_width-1]),
-      .q(int_flit_ctrl_out_q[1:int_flit_ctrl_width-1]));
+      .d(flit_head_out_s),
+      .q(flit_head_out_q));
    
-   assign int_flit_ctrl_out_q[0] = flit_valid_out_q;
+   assign int_flit_ctrl_out[1+vc_idx_width] = flit_head_out_q;
    
-   wire flit_head_out_q;
-   assign flit_head_out_q = int_flit_ctrl_out_q[1+vc_idx_width+0];
+   wire 				flit_tail_muxed;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_tail_muxed_sel
+     (.select(vc_sel_ivc),
+      .data_in(flit_tail_ivc),
+      .data_out(flit_tail_muxed));
    
-   assign int_flit_ctrl_out = int_flit_ctrl_out_q;
+   wire 				flit_tail_out_s, flit_tail_out_q;
+   assign flit_tail_out_s = flit_tail_muxed;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_tail_outq
+     (.clk(clk),
+      .reset(1'b0),
+      .d(flit_tail_out_s),
+      .q(flit_tail_out_q));
    
-   wire [0:la_route_info_width-1] la_route_info_muxed;
+   assign int_flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out_q;
+   
+   wire [0:la_route_info_width-1] 	la_route_info_muxed;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(la_route_info_width))
@@ -1283,7 +1327,7 @@ module vcr_ip_ctrl_mac
       .data_in(la_route_info_ivc),
       .data_out(la_route_info_muxed));
    
-   wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
+   wire [0:la_route_info_width-1] 	la_route_info_s, la_route_info_q;
    assign la_route_info_s = la_route_info_muxed;
    c_dff
      #(.width(la_route_info_width),
@@ -1306,7 +1350,7 @@ module vcr_ip_ctrl_mac
    // generate outgoing credits
    //---------------------------------------------------------------------------
    
-   wire 			     cred_valid_s, cred_valid_q;
+   wire 				cred_valid_s, cred_valid_q;
    assign cred_valid_s = flit_sent;
    c_dff
      #(.width(1),
