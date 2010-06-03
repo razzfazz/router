@@ -221,6 +221,7 @@ module vcr_ugal_source(/*autoarg*/
       // Inputs
       .clk				(clk),
       .reset				(reset),
+      .active				(active),
       .d				((flit_head&flit_valid)?compare:compare_q));
    
 

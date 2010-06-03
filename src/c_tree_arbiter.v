@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic tree arbiter
 module c_tree_arbiter
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -52,9 +52,7 @@ module c_tree_arbiter
    
    input clk;
    input reset;
-   
-   // update port priorities
-   input update;
+   input active;
    
    // request vector
    input [0:num_ports-1] req;
@@ -62,6 +60,9 @@ module c_tree_arbiter
    // grant vector
    output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
+   
+   // update port priorities
+   input update;
    
    // effective second-stage request vector
    wire [0:num_blocks-1] stg2_req;
@@ -89,9 +90,10 @@ module c_tree_arbiter
 	   stg1_arb
 	     (.clk(clk),
 	      .reset(reset),
-	      .update(update),
+	      .active(active),
 	      .req(stg1_req),
-	      .gnt(stg1_gnt));
+	      .gnt(stg1_gnt),
+	      .update(update));
 	   
 	   assign gnt[i*ports_per_block:(i+1)*ports_per_block-1]
 		    = {ports_per_block{stg2_gnt[i]}} & stg1_gnt;
@@ -108,8 +110,9 @@ module c_tree_arbiter
    stg2_arb
      (.clk(clk),
       .reset(reset),
-      .update(update),
+      .active(active),
       .req(stg2_req),
-      .gnt(stg2_gnt));
+      .gnt(stg2_gnt),
+      .update(update));
    
 endmodule

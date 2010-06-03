@@ -351,6 +351,11 @@ module vcr_ivc_ctrl
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
+   wire 			  flit_valid;
+   
+   wire 			  alloc_active;
+   assign alloc_active = flit_valid;
+   
    wire 			  flit_sent;
    
    wire 			  packet_done;
@@ -364,6 +369,7 @@ module vcr_ivc_ctrl
    vc_allocatedq
      (.clk(clk),
       .reset(reset),
+      .active(alloc_active),
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
@@ -411,6 +417,7 @@ module vcr_ivc_ctrl
 	   vc_allocated_ocvcq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(alloc_active),
 	      .d(vc_allocated_ocvc_s),
 	      .q(vc_allocated_ocvc_q));
 	   
@@ -542,6 +549,7 @@ module vcr_ivc_ctrl
 	   headq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(alloc_active),
 	      .d(head_s),
 	      .q(head_q));
 	   
@@ -559,6 +567,7 @@ module vcr_ivc_ctrl
 	   tail_validq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(alloc_active),
 	      .d(tail_valid_s),
 	      .q(tail_valid_q));
 	   
@@ -612,14 +621,17 @@ module vcr_ivc_ctrl
       if(num_header_buffers > 1)
 	begin
 	   
-	   wire [0:hdff_width-1] 	  hdff_data_in;
-	   assign hdff_data_in[0:la_route_info_width-1] = la_route_info_in;
-	   assign hdff_data_in[la_route_info_width:
-			       la_route_info_width+hop_route_info_width-1]
+	   wire [0:hdff_width-1] hdff_write_data;
+	   assign hdff_write_data[0:la_route_info_width-1] = la_route_info_in;
+	   assign hdff_write_data[la_route_info_width:
+				  la_route_info_width+hop_route_info_width-1]
 		    = hop_route_info_in;
 	   
-	   wire hdff_full;
-	   wire [0:hdff_width-1] hdff_data_out;
+	   wire 		 hdff_almost_full;
+	   wire 		 hdff_full;
+	   wire 		 hdff_almost_empty;
+	   wire [0:hdff_width-1] hdff_read_data;
+	   wire [0:hdff_width-1] hdff_peek_data;
 	   wire [0:1] 		 hdff_errors;
 	   c_fifo
 	     #(.depth(num_header_buffers),
@@ -629,23 +641,27 @@ module vcr_ivc_ctrl
 	   hdff
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(alloc_active),
+	      .almost_full(hdff_almost_full),
 	      .full(hdff_full),
-	      .data_in(hdff_data_in),
+	      .write_data(hdff_write_data),
 	      .push(hdff_push),
+	      .almost_empty(hdff_almost_empty),
 	      .empty(hdff_empty),
-	      .data_out(hdff_data_out),
+	      .read_data(hdff_read_data),
 	      .pop(hdff_pop),
+	      .peek_data(hdff_peek_data),
 	      .errors(hdff_errors));
 	   
 	   assign hdff_la_route_info
 	     = hdff_empty ?
 	       la_route_info_in :
-	       hdff_data_out[0:la_route_info_width-1];
+	       hdff_read_data[0:la_route_info_width-1];
 	   assign hdff_hop_route_info
 	     = hdff_empty ?
 	       hop_route_info_in :
-	       hdff_data_out[la_route_info_width:
-			     la_route_info_width+hop_route_info_width-1];
+	       hdff_read_data[la_route_info_width:
+			      la_route_info_width+hop_route_info_width-1];
 	   
 	   assign error_hdff_underflow = hdff_errors[0];
 	   assign error_hdff_overflow = hdff_errors[1];
@@ -653,6 +669,9 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
+
+	   wire route_active;
+	   assign route_active = flit_valid_in;
 	   
 	   wire [0:la_route_info_width-1] hdff_la_route_info_s,
 					  hdff_la_route_info_q;
@@ -664,6 +683,7 @@ module vcr_ivc_ctrl
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(route_active),
 	      .d(hdff_la_route_info_s),
 	      .q(hdff_la_route_info_q));
 	   
@@ -680,6 +700,7 @@ module vcr_ivc_ctrl
 	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(route_active),
 	      .d(hdff_hop_route_info_s),
 	      .q(hdff_hop_route_info_q));
 	   
@@ -696,6 +717,7 @@ module vcr_ivc_ctrl
 	   hdff_emptyq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(alloc_active),
 	      .d(hdff_empty_s),
 	      .q(hdff_empty_q));
 	   
@@ -710,8 +732,6 @@ module vcr_ivc_ctrl
    
    wire 	header_valid;
    assign header_valid = ~hdff_empty | flit_valid_in /*hdff_push*/;
-   
-   wire 	flit_valid;
    
    wire 	error_no_header;
    assign error_no_header = flit_valid & ~header_valid;
@@ -775,6 +795,7 @@ module vcr_ivc_ctrl
    lar
      (.clk(clk),
       .reset(reset),
+      .active(alloc_active),
       .router_address(router_address),
       .route_port(route_port),
       .inc_rc(inc_rc),
@@ -785,6 +806,9 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    // credit tracking
    //---------------------------------------------------------------------------
+   
+   wire 		cred_track_active;
+   assign cred_track_active = flit_valid | vc_allocated_q;
    
    wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
    assign int_flow_ctrl_ovc
@@ -877,6 +901,7 @@ module vcr_ivc_ctrl
 	     free_allocatedq
 	       (.clk(clk),
 		.reset(reset),
+		.active(cred_track_active),
 		.d(free_allocated_s),
 		.q(free_allocated_q));
 	     
@@ -947,6 +972,7 @@ module vcr_ivc_ctrl
 	     has_credq
 	       (.clk(clk),
 		.reset(reset),
+		.active(cred_track_active),
 		.d(has_cred_s),
 		.q(has_cred_q));
 	     
@@ -979,6 +1005,7 @@ module vcr_ivc_ctrl
 	     cred_holdq
 	       (.clk(clk),
 		.reset(reset),
+		.active(cred_track_active),
 		.d(cred_hold_s),
 		.q(cred_hold_q));
 	     
@@ -1022,6 +1049,7 @@ module vcr_ivc_ctrl
    assign fbc_pop = flit_sent;
    
    wire [0:1] 		       fbc_errors;
+   wire [0:fbf_addr_width-1]   fbc_peek_addr;
    wire 		       fbc_almost_full;
    wire 		       fbc_full;
    c_fifo_ctrl
@@ -1032,10 +1060,12 @@ module vcr_ivc_ctrl
    fbc
      (.clk(clk),
       .reset(reset),
+      .active(alloc_active),
       .push(fbc_push),
       .pop(fbc_pop),
       .write_addr(fbc_write_addr),
       .read_addr(fbc_read_addr),
+      .peek_addr(fbc_peek_addr),
       .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
       .almost_full(fbc_almost_full),
@@ -1126,6 +1156,7 @@ module vcr_ivc_ctrl
 	   eventsq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(events_s),
 	      .q(events_q));
 	   assign events = events_q;

@@ -190,6 +190,8 @@ module whr_top
    wire [0:num_ports-1] 		req_tail_ip;
    wire [0:num_ports*num_ports-1] 	gnt_ip_op;
    
+   wire [0:num_ports-1] 		xbr_active_ip;
+   
    wire [0:num_ports*flit_data_width-1] xbr_data_in_ip;
    
    wire [0:num_ports-1] 		ipc_error_ip;
@@ -220,12 +222,15 @@ module whr_top
 	   wire [0:num_ports-1]       req_op;
 	   wire                       req_head;
 	   wire                       req_tail;
+	   wire 		      xbr_active;
 	   wire [0:flit_data_width-1] 	  flit_data_out;
 	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
-	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+	   wire 			  fbf_write_active;
 	   wire 			  fbf_write_enable;
+	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
 	   wire [0:flit_data_width-1] 	  fbf_write_data;
 	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+	   wire 			  fbf_read_active;
 	   wire 			  fbf_read_enable;
 	   wire [0:flit_data_width-1] 	  fbf_read_data;
 	   wire 			  ipc_error;
@@ -260,11 +265,14 @@ module whr_top
 	      .req_head(req_head),
 	      .req_tail(req_tail),
 	      .gnt_op(gnt_op),
+	      .xbr_active(xbr_active),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
-	      .fbf_write_addr(fbf_write_addr),
+	      .fbf_write_active(fbf_write_active),
 	      .fbf_write_enable(fbf_write_enable),
+	      .fbf_write_addr(fbf_write_addr),
 	      .fbf_write_data(fbf_write_data),
+	      .fbf_read_active(fbf_read_active),
 	      .fbf_read_enable(fbf_read_enable),
 	      .fbf_read_addr(fbf_read_addr),
 	      .fbf_read_data(fbf_read_data),
@@ -278,9 +286,11 @@ module whr_top
 	   fbf
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .write_active(fbf_write_active),
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbf_write_addr),
 	      .write_data(fbf_write_data),
+	      .read_active(fbf_read_active),
 	      .read_enable(fbf_read_enable),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
@@ -288,6 +298,7 @@ module whr_top
 	   assign req_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req_op;
 	   assign req_head_ip[ip] = req_head;
 	   assign req_tail_ip[ip] = req_tail;
+	   assign xbr_active_ip[ip] = xbr_active;
 	   assign xbr_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
 		    = flit_data_out;
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
@@ -316,6 +327,7 @@ module whr_top
    xbr
      (.clk(clk),
       .reset(reset),
+      .active_ip(xbr_active_ip),
       .ctrl_op_ip(xbr_ctrl_op_ip),
       .data_in_ip(xbr_data_in_ip),
       .data_out_op(xbr_data_out_op));
@@ -453,6 +465,7 @@ module whr_top
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   

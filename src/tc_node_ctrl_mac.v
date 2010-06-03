@@ -145,7 +145,7 @@ module tc_node_ctrl_mac
    io_req_stable_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(io_req),
       .data_out(io_req_stable));
    
@@ -157,6 +157,7 @@ module tc_node_ctrl_mac
    io_req_stableq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(io_req_stable_s),
       .q(io_req_stable_q));
    
@@ -177,43 +178,42 @@ module tc_node_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 		     cfg_req_s, cfg_req_q;
-   assign cfg_req_s = io_active ? io_req_stable_rise : cfg_req_q;
+   assign cfg_req_s = io_req_stable_rise;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cfg_reqq
      (.clk(clk),
       .reset(reset),
+      .active(io_active),
       .d(cfg_req_s),
       .q(cfg_req_q));
    
    assign cfg_req = cfg_req_q;
    
    wire 		     cfg_write_s, cfg_write_q;
-   assign cfg_write_s = io_active ? 
-			(io_req_stable_rise ? io_write : cfg_write_q) : 
-			cfg_write_q;
+   assign cfg_write_s = io_req_stable_rise ? io_write : cfg_write_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cfg_writeq
      (.clk(clk),
       .reset(1'b0),
+      .active(io_active),
       .d(cfg_write_s),
       .q(cfg_write_q));
    
    assign cfg_write = cfg_write_q;
    
    wire [0:cfg_addr_width-1] cfg_addr_s, cfg_addr_q;
-   assign cfg_addr_s = io_active ? 
-		       (io_req_stable_rise ? io_addr : cfg_addr_q) : 
-		       cfg_addr_q;
+   assign cfg_addr_s = io_req_stable_rise ? io_addr : cfg_addr_q;
    c_dff
      #(.width(cfg_addr_width),
        .reset_type(reset_type))
    cfg_addrq
      (.clk(clk),
       .reset(1'b0),
+      .active(io_active),
       .d(cfg_addr_s),
       .q(cfg_addr_q));
    
@@ -223,17 +223,16 @@ module tc_node_ctrl_mac
    wire [0:cfg_data_width-1] cfg_read_data_muxed;
    
    wire [0:cfg_data_width-1] cfg_data_s, cfg_data_q;
-   assign cfg_data_s = io_active ? 
-		       (io_req_stable_rise ? 
-			io_write_data : 
-			(cfg_done_muxed ? cfg_read_data_muxed : cfg_data_q)) : 
-		       cfg_data_q;
+   assign cfg_data_s = io_req_stable_rise ? 
+		       io_write_data : 
+		       (cfg_done_muxed ? cfg_read_data_muxed : cfg_data_q);
    c_dff
      #(.width(cfg_data_width),
        .reset_type(reset_type))
    cfg_dataq
      (.clk(clk),
       .reset(1'b0),
+      .active(io_active),
       .d(cfg_data_s),
       .q(cfg_data_q));
    
@@ -244,15 +243,14 @@ module tc_node_ctrl_mac
    
    wire [0:done_delay_width-1] done_delay_s, done_delay_q;
    assign done_delay_s
-     = io_active ? 
-       ({done_delay_width{cfg_done_muxed}} | (done_delay_q - done_pending_q)) : 
-       done_delay_q;
+     = {done_delay_width{cfg_done_muxed}} | (done_delay_q - done_pending_q);
    c_dff
      #(.width(done_delay_width),
        .reset_type(reset_type))
    done_delayq
      (.clk(clk),
       .reset(1'b0),
+      .active(io_active),
       .d(done_delay_s),
       .q(done_delay_q));
    
@@ -261,30 +259,27 @@ module tc_node_ctrl_mac
    
    wire 		       done_pending_s;
    assign done_pending_s
-     = io_active ?
-       ((done_pending_q & ~done_delay_elapsed) | cfg_done_muxed) :
-       done_pending_q;
+     = (done_pending_q & ~done_delay_elapsed) | cfg_done_muxed;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    done_pendingq
      (.clk(clk),
       .reset(reset),
+      .active(io_active),
       .d(done_pending_s),
       .q(done_pending_q));
    
    wire 		  io_done_s, io_done_q;
-   assign io_done_s
-     = io_active ? 
-       ((io_done_q & ~io_req_stable_fall) | 
-	(done_pending_q & done_delay_elapsed)) : 
-       io_done_q;
+   assign io_done_s = (io_done_q & ~io_req_stable_fall) | 
+		      (done_pending_q & done_delay_elapsed);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    io_doneq
      (.clk(clk),
       .reset(reset),
+      .active(io_active),
       .d(io_done_s),
       .q(io_done_q));
    
@@ -367,15 +362,14 @@ module tc_node_ctrl_mac
    assign write_node_ctrl = cfg_req_q & cfg_write_q & cfg_sel_node_ctrl;
    
    wire [0:node_ctrl_width-1] node_ctrl_s, node_ctrl_q;
-   assign node_ctrl_s = io_active ? 
-			(write_node_ctrl ? node_ctrl_loadval : node_ctrl_q) : 
-			node_ctrl_q;
+   assign node_ctrl_s = write_node_ctrl ? node_ctrl_loadval : node_ctrl_q;
    c_dff
      #(.width(node_ctrl_width),
        .reset_type(reset_type))
    node_ctrlq
      (.clk(clk),
       .reset(reset),
+      .active(io_active),
       .d(node_ctrl_s),
       .q(node_ctrl_q));
    
@@ -390,14 +384,14 @@ module tc_node_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:node_status_width-1] node_status_s, node_status_q;
-   assign node_status_s
-     = io_active ? (cfg_req_q ? node_status : node_status_q) : node_status_q;
+   assign node_status_s = cfg_req_q ? node_status : node_status_q;
    c_dff
      #(.width(node_status_width),
        .reset_type(reset_type))
    node_statusq
      (.clk(clk),
       .reset(1'b0),
+      .active(io_active),
       .d(node_status_s),
       .q(node_status_q));
    

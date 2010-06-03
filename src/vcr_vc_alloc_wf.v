@@ -33,7 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC allocator variant based using wavefront allocation
 module vcr_vc_alloc_wf
   (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
+   req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, 
+   gnt_op_ovc_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -80,6 +81,10 @@ module vcr_vc_alloc_wf
    // request VC allocation
    input [0:num_ports*num_vcs-1] req_ip_ivc;
    
+   // VC allocation requested (to output controller)
+   output [0:num_ports*num_vcs-1] req_op_ovc;
+   wire [0:num_ports*num_vcs-1] req_op_ovc;
+   
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
@@ -101,9 +106,11 @@ module vcr_vc_alloc_wf
    wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
    
    
+   wire [0:num_ports*num_vcs*num_ports*num_vcs-1] req_ip_ivc_op_ovc;
+   
    generate
       
-      genvar 						    mc;
+      genvar 					  mc;
       
       for(mc = 0; mc < num_message_classes; mc = mc + 1)
 	begin:mcs
@@ -111,16 +118,20 @@ module vcr_vc_alloc_wf
 	   //-------------------------------------------------------------------
 	   // global wires
 	   //-------------------------------------------------------------------
-
+	   
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class-1]
 	     req_ip_irc_icvc;
 	   
-	   wire 					     update_alloc;
-	   assign update_alloc = |req_ip_irc_icvc;
+	   wire 						      wf_active;
+	   assign wf_active = |req_ip_irc_icvc;
 	   
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1]
              req_wf_ip_irc_icvc_op_orc_ocvc;
+	   
+	   wire 					     update_alloc;
+	   assign update_alloc = |req_wf_ip_irc_icvc_op_orc_ocvc;
+	   
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              gnt_wf_ip_irc_icvc_op_orc_ocvc;
@@ -131,6 +142,7 @@ module vcr_vc_alloc_wf
 	   gnt_wf_ip_irc_icvc_op_orc_ocvc_alloc
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(wf_active),
 	      .update(update_alloc),
 	      .req(req_wf_ip_irc_icvc_op_orc_ocvc),
 	      .gnt(gnt_wf_ip_irc_icvc_op_orc_ocvc));
@@ -260,6 +272,28 @@ module vcr_vc_alloc_wf
 				    else
 				      assign class_match = 1'b0;
 				    
+				    wire [0:num_vcs_per_class-1] sel_ocvc;
+				    assign sel_ocvc
+				      = {num_vcs_per_class
+					 {(req & route & class_match)}};
+				    
+				    assign req_ip_ivc_op_ovc
+				      [((((((ip*num_message_classes+mc)*
+					    num_resource_classes+irc)*
+					   num_vcs_per_class+icvc)*
+					  num_ports+op)*
+					 num_message_classes+mc)*
+					num_resource_classes+orc)*
+				       num_vcs_per_class:
+				       ((((((ip*num_message_classes+mc)*
+					    num_resource_classes+irc)*
+					   num_vcs_per_class+icvc)*
+					  num_ports+op)*
+					 num_message_classes+mc)*
+					num_resource_classes+orc+1)*
+				       num_vcs_per_class-1]
+					     = sel_ocvc;
+				    
 				    wire [0:num_vcs_per_class-1] elig_ocvc;
 				    assign elig_ocvc
 				      = elig_op_ovc[((op*num_message_classes+
@@ -274,10 +308,7 @@ module vcr_vc_alloc_wf
 						    num_vcs_per_class-1];
 				    
 				    wire [0:num_vcs_per_class-1] req_wf_ocvc;
-				    assign req_wf_ocvc
-				      = {num_vcs_per_class{
-					  (req & route & class_match)}} &
-					elig_ocvc;
+				    assign req_wf_ocvc = sel_ocvc & elig_ocvc;
 				    
 				    assign req_wf_orc_ocvc[orc*
 							   num_vcs_per_class:
@@ -576,5 +607,17 @@ module vcr_vc_alloc_wf
 	end
       
    endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // generate activity signals for output controllers
+   //---------------------------------------------------------------------------
+   
+   c_or_nto1
+     #(.num_ports(num_ports*num_vcs),
+       .width(num_ports*num_vcs))
+   req_op_ovc_or
+     (.data_in(req_ip_ivc_op_ovc),
+      .data_out(req_op_ovc));
    
 endmodule

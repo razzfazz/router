@@ -34,16 +34,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // combinational loop) as described in Dally et al, "Principles and Practices of
 // Interconnection Networks"
 module c_wf_alloc_loop
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
    // number of input/output ports
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
-   
-   // try to recover from errors
-   parameter error_recovery = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -52,9 +49,7 @@ module c_wf_alloc_loop
    
    input clk;
    input reset;
-   
-   // update arbitration priorities
-   input update;
+   input active;
    
    // request matrix
    input [0:num_ports*num_ports-1] req;
@@ -63,16 +58,14 @@ module c_wf_alloc_loop
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
    // Need to make sure priority is one-hot, otherwise conflicting grants can be
    // generated!
    wire [0:num_ports-1] 	  prio_s, prio_q;
-   wire 			  prio_bad;
-   assign prio_bad = ~^prio_q;
-   wire [0:num_ports-1] 	  prio_fixed;
-   assign prio_fixed = (error_recovery && prio_bad) ? prio_init : prio_q;
-   assign prio_s = update ?
-		   {prio_fixed[num_ports-1], prio_fixed[0:num_ports-2]} :
-		   prio_fixed;
+   assign prio_s
+     = update ? {prio_q[num_ports-1], prio_q[0:num_ports-2]} : prio_q;
    c_dff
      #(.width(num_ports),
        .reset_type(reset_type),
@@ -80,6 +73,7 @@ module c_wf_alloc_loop
    prioq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(prio_s),
       .q(prio_q));
    

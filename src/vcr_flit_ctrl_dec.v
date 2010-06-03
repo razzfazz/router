@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // flit control signal decoding logic
 module vcr_flit_ctrl_dec
-  (clk, reset, flit_ctrl_in, header_info_in, flit_valid_out_ivc, 
+  (clk, reset, active, flit_ctrl_in, header_info_in, flit_valid_out_ivc, 
    flit_head_out_ivc, flit_tail_out_ivc);
    
 `include "c_functions.v"
@@ -143,6 +143,7 @@ module vcr_flit_ctrl_dec
    
    input clk;
    input reset;
+   input active;
    
    // incoming flit control signals
    input [0:flit_ctrl_width-1] flit_ctrl_in;
@@ -301,6 +302,7 @@ module vcr_flit_ctrl_dec
 			      flit_ctrq
 				(.clk(clk),
 				 .reset(reset),
+				 .active(active),
 				 .d(flit_ctr_s),
 				 .q(flit_ctr_q));
 			      

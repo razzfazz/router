@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // simple FIFO controller
 module c_fifo_ctrl
-  (clk, reset, push, pop, write_addr, read_addr, almost_empty, empty, 
-   almost_full, full, errors);
+  (clk, reset, active, push, pop, write_addr, read_addr, peek_addr, 
+   almost_empty, empty, almost_full, full, errors);
    
 `include "c_constants.v"
    
@@ -56,6 +56,7 @@ module c_fifo_ctrl
    
    input clk;
    input reset;
+   input active;
    
    // write (add) an element
    input push;
@@ -67,9 +68,13 @@ module c_fifo_ctrl
    output [0:addr_width-1] write_addr;
    wire [0:addr_width-1] write_addr;
    
-   // address to read next output element from
+   // address to read current output element from
    output [0:addr_width-1] read_addr;
    wire [0:addr_width-1] read_addr;
+   
+   // address to read next output element from
+   output [0:addr_width-1] peek_addr;
+   wire [0:addr_width-1] peek_addr;
    
    // buffer nearly empty (1 used slot remaining) indication
    output almost_empty;
@@ -109,10 +114,12 @@ module c_fifo_ctrl
    read_ptrq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(read_ptr_s),
       .q(read_ptr_q));
    
-   assign read_addr[0:addr_width-1] = read_ptr_q;
+   assign read_addr = read_ptr_q;
+   assign peek_addr = read_ptr_next;
    
    wire [0:addr_width-1] write_ptr_next, write_ptr_q;
    c_incr
@@ -132,10 +139,11 @@ module c_fifo_ctrl
    write_ptrq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(write_ptr_s),
       .q(write_ptr_q));
    
-   assign write_addr[0:addr_width-1] = write_ptr_q;
+   assign write_addr = write_ptr_q;
    
    assign almost_empty = (read_ptr_next == write_ptr_q);
    
@@ -148,6 +156,7 @@ module c_fifo_ctrl
    emptyq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(empty_s),
       .q(empty_q));
    
@@ -163,6 +172,7 @@ module c_fifo_ctrl
    fullq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(full_s),
       .q(full_q));
    

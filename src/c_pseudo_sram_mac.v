@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // register file wrapper that implements SRAM-like timing
 module c_pseudo_sram_mac
-  (clk, reset, write_enable, write_address, write_data, read_enable, 
-   read_address, read_data);
+  (clk, reset, write_active, write_enable, write_address, write_data, 
+   read_active, read_enable, read_address, read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -55,6 +55,9 @@ module c_pseudo_sram_mac
    input clk;
    input reset;
    
+   // enable clocks for storage cells
+   input write_active;
+   
    // if high, write to entry selected by write_address
    input write_enable;
    
@@ -63,6 +66,9 @@ module c_pseudo_sram_mac
    
    // data to be written
    input [0:width-1] write_data;
+   
+   // enable clocks to read address register
+   input read_active;
    
    // if high, enable read for next cycle
    input read_enable;
@@ -84,6 +90,7 @@ module c_pseudo_sram_mac
    read_addrq
      (.clk(clk),
       .reset(reset),
+      .active(read_active),
       .d(read_address_s),
       .q(read_address_q));
    
@@ -93,6 +100,7 @@ module c_pseudo_sram_mac
        .regfile_type(regfile_type))
    rf
      (.clk(clk),
+      .active(write_active),
       .write_enable(write_enable),
       .write_address(write_address),
       .write_data(write_data),

@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input-side switch allocator logic
 module vcr_sw_alloc_ip
-  (clk, reset, route_ivc_op, req_in_ivc, req_out_op, gnt_in_op, gnt_out_op, 
-   gnt_out_ivc, sel_ivc, allow_update);
+  (clk, reset, active, route_ivc_op, req_in_ivc, req_out_op, gnt_in_op, 
+   gnt_out_op, gnt_out_ivc, sel_ivc, allow_update);
    
 `include "c_constants.v"
 `include "vcr_constants.v"
@@ -54,6 +54,7 @@ module vcr_sw_alloc_ip
    
    input clk;
    input reset;
+   input active;
    
    // destination port selects
    input [0:num_vcs*num_ports-1] route_ivc_op;
@@ -117,6 +118,7 @@ module vcr_sw_alloc_ip
 	   gnt_ivc_arb
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(active),
 	      .update(update_arb),
 	      .req(req_ivc),
 	      .gnt(gnt_ivc));
@@ -221,6 +223,7 @@ module vcr_sw_alloc_ip
 		gnt_ivc_arb
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(active),
 		   .update(update_arb),
 		   .req(req_ivc),
 		   .gnt(gnt_ivc));
@@ -283,6 +286,7 @@ module vcr_sw_alloc_ip
 		     gnt_ivc_arb
 		       (.clk(clk),
 			.reset(reset),
+			.active(active),
 			.update(update_arb),
 			.req(req_ivc),
 			.gnt(gnt_ivc));

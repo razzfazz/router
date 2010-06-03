@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // configurable crossbar module for VC router
 module vcr_crossbar_mac
-  (clk, reset, ctrl_ip_op, data_in_ip, data_out_op);
+  (clk, reset, active_ip, ctrl_ip_op, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -51,6 +51,9 @@ module vcr_crossbar_mac
    input clk;
    input reset;
    
+   // clock enable signals for crosspoint control registers
+   input [0:num_in_ports-1] active_ip;
+   
    // crosspoint control signals
    input [0:num_in_ports*num_out_ports-1] ctrl_ip_op;
    
@@ -61,16 +64,43 @@ module vcr_crossbar_mac
    output [0:num_out_ports*width-1] data_out_op;
    wire [0:num_out_ports*width-1] data_out_op;
    
-   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_s, ctrl_ip_op_q;
-   assign ctrl_ip_op_s = ctrl_ip_op;
-   c_dff
-     #(.width(num_in_ports*num_out_ports),
-       .reset_type(reset_type))
-   ctrl_ip_opq
-     (.clk(clk),
-      .reset(reset),
-      .d(ctrl_ip_op_s),
-      .q(ctrl_ip_op_q));
+   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
+   
+   generate
+      
+      genvar 			  ip;
+      
+      for(ip = 0; ip < num_in_ports; ip = ip + 1)
+	begin:ips
+	   
+	   wire [0:num_out_ports-1] ctrl_op;
+	   assign ctrl_op = ctrl_ip_op[ip*num_out_ports:(ip+1)*num_out_ports-1];
+	   
+	   wire 		    granted;
+	   
+	   wire 		    active;
+	   assign active = active_ip[ip] | granted;
+	   
+	   wire [0:num_out_ports-1] ctrl_op_s, ctrl_op_q;
+	   assign ctrl_op_s = ctrl_op;
+	   c_dff
+	     #(.width(num_out_ports),
+	       .reset_type(reset_type))
+	   ctrl_ip_opq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(ctrl_op_s),
+	      .q(ctrl_op_q));
+	   
+	   assign granted = |ctrl_op_q;
+	   
+	   assign ctrl_ip_op_q[ip*num_out_ports:(ip+1)*num_out_ports-1]
+		    = ctrl_op_q;
+	   
+	end
+      
+   endgenerate
    
    c_crossbar
      #(.num_in_ports(num_in_ports),

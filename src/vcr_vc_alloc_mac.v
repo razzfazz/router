@@ -33,7 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC allocator
 module vcr_vc_alloc_mac
   (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
+   req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, 
+   gnt_op_ovc_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -83,6 +84,10 @@ module vcr_vc_alloc_mac
    // request VC allocation
    input [0:num_ports*num_vcs-1] req_ip_ivc;
    
+   // VC allocation requested (to output controller)
+   output [0:num_ports*num_vcs-1] req_op_ovc;
+   wire [0:num_ports*num_vcs-1] req_op_ovc;
+   
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] gnt_ip_ivc;
    wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
@@ -121,6 +126,7 @@ module vcr_vc_alloc_mac
 	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(req_ip_ivc),
+	      .req_op_ovc(req_op_ovc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
 	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 	      .gnt_op_ovc(gnt_op_ovc),
@@ -143,7 +149,8 @@ module vcr_vc_alloc_mac
 	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(req_ip_ivc),
-		.gnt_ip_ivc(gnt_ip_ivc),
+	      .req_op_ovc(req_op_ovc),
+	      .gnt_ip_ivc(gnt_ip_ivc),
 	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 	      .gnt_op_ovc(gnt_op_ovc),
 	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
@@ -166,6 +173,7 @@ module vcr_vc_alloc_mac
 	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(req_ip_ivc),
+	      .req_op_ovc(req_op_ovc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
 	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
 	      .gnt_op_ovc(gnt_op_ovc),

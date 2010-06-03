@@ -314,6 +314,8 @@ module vcr_top
    wire [0:num_ports*num_ports*sw_alloc_wf_in_width-1] 	 sw_alloc_wf_in_ip_op;
    wire [0:num_ports*num_ports*sw_alloc_wf_out_width-1]  sw_alloc_wf_out_ip_op;
    
+   wire [0:num_ports-1] 				 xbr_active_ip;
+   
    wire [0:num_ports*num_ports-1] 			 xbc_ctrl_ip_op;
    wire [0:num_ports*num_ports-1] 			 xbd_ctrl_ip_op;
    
@@ -485,19 +487,22 @@ module vcr_top
 	   assign vc_gnt_ivc_ovc
 	     = vc_gnt_ip_ivc_ovc[ip*num_vcs*num_vcs:(ip+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_vcs*port_idx_width-1] 	      route_port_ivc;
-	   wire [0:num_vcs-1] 			      inc_rc_ivc;
-	   wire [0:num_vcs-1] 			      vc_req_ivc;
-	   wire [0:int_flit_ctrl_width-1] 	      int_flit_ctrl_out;
-	   wire [0:flit_data_width-1] 		       flit_data_out;
-	   wire [0:flow_ctrl_width-1] 		       flow_ctrl_out;
-	   wire [0:fbf_addr_width-1] 		       fbf_write_addr;
-	   wire 				       fbf_write_enable;
-	   wire [0:flit_data_width-1] 		       fbf_write_data;
-	   wire [0:fbf_addr_width-1] 		       fbf_read_addr;
-	   wire 				       fbf_read_enable;
-	   wire [0:flit_data_width-1] 		       fbf_read_data;
-	   wire 				       ipc_error;
+	   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+	   wire [0:num_vcs-1] 		     inc_rc_ivc;
+	   wire [0:num_vcs-1] 		     vc_req_ivc;
+	   wire 			     xbr_active;
+	   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out;
+	   wire [0:flit_data_width-1] 	     flit_data_out;
+	   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out;
+	   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
+	   wire 			     fbf_write_active;
+	   wire 			     fbf_write_enable;
+	   wire [0:flit_data_width-1] 	     fbf_write_data;
+	   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
+	   wire 			     fbf_read_active;
+	   wire 			     fbf_read_enable;
+	   wire [0:flit_data_width-1] 	     fbf_read_data;
+	   wire 			     ipc_error;
 	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -542,13 +547,16 @@ module vcr_top
 	      .vc_gnt_ivc_ovc(vc_gnt_ivc_ovc),
 	      .sw_alloc_out_op(sw_alloc_ipc_out_op),
 	      .sw_alloc_in_op(sw_alloc_ipc_in_op),
+	      .xbr_active(xbr_active),
 	      .int_flit_ctrl_out(int_flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .fbf_write_addr(fbf_write_addr),
+	      .fbf_write_active(fbf_write_active),
 	      .fbf_write_enable(fbf_write_enable),
 	      .fbf_write_data(fbf_write_data),
 	      .fbf_read_addr(fbf_read_addr),
+	      .fbf_read_active(fbf_read_active),
 	      .fbf_read_enable(fbf_read_enable),
 	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
@@ -561,9 +569,11 @@ module vcr_top
 	   fbf
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .write_active(fbf_write_active),
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbf_write_addr),
 	      .write_data(fbf_write_data),
+	      .read_active(fbf_read_active),
 	      .read_enable(fbf_read_enable),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
@@ -580,6 +590,8 @@ module vcr_top
 					 (ip+1)*num_ports*
 					 sw_alloc_ipc_out_width-1]
 		    = sw_alloc_ipc_out_op;
+	   
+	   assign xbr_active_ip[ip] = xbr_active;
 	   
 	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
 				 (ip+1)*int_flit_ctrl_width-1]
@@ -604,6 +616,7 @@ module vcr_top
    
    wire [0:num_ports*num_vcs-1] 		       elig_op_ovc;
    
+   wire [0:num_ports*num_vcs-1] 		       vc_req_op_ovc;
    wire [0:num_ports*num_vcs-1] 		       vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] 	       vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1] 	       vc_gnt_op_ovc_ivc;
@@ -622,6 +635,7 @@ module vcr_top
       .inc_rc_ip_ivc(inc_rc_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),
+      .req_op_ovc(vc_req_op_ovc),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ovc(vc_gnt_ip_ivc_ovc),
       .gnt_op_ovc(vc_gnt_op_ovc),
@@ -669,6 +683,7 @@ module vcr_top
    xbc
      (.clk(clk),
       .reset(reset),
+      .active_ip(xbr_active_ip),
       .ctrl_ip_op(xbc_ctrl_ip_op),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
@@ -683,6 +698,7 @@ module vcr_top
    xbd
      (.clk(clk),
       .reset(reset),
+      .active_ip(xbr_active_ip),
       .ctrl_ip_op(xbd_ctrl_ip_op),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
@@ -817,6 +833,9 @@ module vcr_top
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
+	   wire [0:num_vcs-1] 	      vc_req_ovc;
+	   assign vc_req_ovc = vc_req_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
 	   wire [0:num_vcs-1] 	      vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
@@ -858,6 +877,7 @@ module vcr_top
 	     (.clk(clk),
 	      .reset(reset),
 	      .flow_ctrl_in(flow_ctrl_in),
+	      .vc_req_ovc(vc_req_ovc),
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
@@ -926,6 +946,7 @@ module vcr_top
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   

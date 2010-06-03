@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic for wormhole router
 module whr_la_routing_logic
-  (clk, reset, router_address, route_op, route_info, la_route_info);
+  (clk, reset, active, router_address, route_op, route_info, la_route_info);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -94,6 +94,7 @@ module whr_la_routing_logic
    
    input clk;
    input reset;
+   input active;
    
    // current router's address
    input [0:router_addr_width-1] router_address;

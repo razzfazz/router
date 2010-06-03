@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module for tracking available credit in a buffer
 module c_credit_tracker
-  (clk, reset, debit, credit, free, errors);
+  (clk, reset, active, debit, credit, free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -51,6 +51,7 @@ module c_credit_tracker
    
    input clk;
    input reset;
+   input active;
    
    // inputs for subtracting and adding credits
    input debit;
@@ -74,6 +75,7 @@ module c_credit_tracker
    credq
      (.clk(clk),
       .reset(reset),
+      .active(active),
       .d(cred_s),
       .q(cred_q));
    
@@ -130,6 +132,7 @@ module c_credit_tracker
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(active),
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   

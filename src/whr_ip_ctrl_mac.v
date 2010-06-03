@@ -33,9 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module whr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, req_op, req_head, 
-   req_tail, gnt_op, flit_data_out, flow_ctrl_out, fbf_write_addr, 
-   fbf_write_enable, fbf_write_data, fbf_read_enable, fbf_read_addr, 
-   fbf_read_data, error);
+   req_tail, gnt_op, xbr_active, flit_data_out, flow_ctrl_out, 
+   fbf_write_active, fbf_write_enable, fbf_write_addr, fbf_write_data, 
+   fbf_read_active, fbf_read_enable, fbf_read_addr, fbf_read_data, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -204,6 +204,10 @@ module whr_ip_ctrl_mac
    // output port granted
    input [0:num_ports-1] gnt_op;
    
+   // crossbar enable signal
+   output xbr_active;
+   wire 		       xbr_active;
+   
    // outgoing flit data
    output [0:flit_data_width-1] flit_data_out;
    wire [0:flit_data_width-1] 	  flit_data_out;
@@ -212,17 +216,25 @@ module whr_ip_ctrl_mac
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
    
-   // flit buffer write address
-   output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+   // enable flit buffer storage cell clocks
+   output fbf_write_active;
+   wire 			  fbf_write_active;
    
    // flit buffer write enable
    output fbf_write_enable;
    wire 			  fbf_write_enable;
    
+   // flit buffer write address
+   output [0:fbf_addr_width-1] fbf_write_addr;
+   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
+   
    // flit buffer write data
    output [0:flit_data_width-1] fbf_write_data;
    wire [0:flit_data_width-1] 	  fbf_write_data;
+   
+   // enable flit buffer read address register clocks
+   output fbf_read_active;
+   wire 			  fbf_read_active;
    
    // flit buffer read enable
    output fbf_read_enable;
@@ -247,6 +259,11 @@ module whr_ip_ctrl_mac
    wire 			  flit_valid_in;
    wire 			  flit_valid_out;
    
+   wire 			  fbc_empty;
+   
+   wire 			  flit_valid;
+   assign flit_valid = flit_valid_in | ~fbc_empty;
+   
    wire 			  fbc_almost_full;
    
    wire 			  hold_input_enable;
@@ -255,6 +272,9 @@ module whr_ip_ctrl_mac
       
       if(input_stage_can_hold)
 	begin
+	   
+	   wire hold_input_enable_active;
+	   assign hold_input_enable_active = flit_valid;
 	   
 	   wire hold_input_enable_set;
 	   assign hold_input_enable_set = fbc_almost_full & flit_valid_in;
@@ -272,6 +292,7 @@ module whr_ip_ctrl_mac
 	   hold_input_enableq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(hold_input_enable_active),
 	      .d(hold_input_enable_s),
 	      .q(hold_input_enable_q));
 	   
@@ -289,11 +310,14 @@ module whr_ip_ctrl_mac
    wire 	hold_input_stage_b;
    assign hold_input_stage_b = ~(flit_valid_in & hold_input_enable);
    
+   wire 	input_stage_active;
+   assign input_stage_active = hold_input_stage_b;
+   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = hold_input_stage_b ? flit_ctrl_in : flit_ctrl_in_q;
+   assign flit_ctrl_in_s = flit_ctrl_in;
 	   
    wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = hold_input_stage_b ? flit_data_in : flit_data_in_q;
+   assign flit_data_in_s = flit_data_in;
    
    generate
 	   
@@ -303,7 +327,7 @@ module whr_ip_ctrl_mac
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
-	     wire                 flit_valid_in_s, flit_valid_in_q;
+	     wire flit_valid_in_s, flit_valid_in_q;
 	     assign flit_valid_in_s = flit_ctrl_in_s[0];
 	     c_dff
 	       #(.width(1),
@@ -311,6 +335,7 @@ module whr_ip_ctrl_mac
 	     flit_valid_inq
 	       (.clk(clk),
 		.reset(reset),
+		.active(input_stage_active),
 		.d(flit_valid_in_s),
 		.q(flit_valid_in_q));
 	     
@@ -322,6 +347,7 @@ module whr_ip_ctrl_mac
 	     flit_ctrl_inq
 	       (.clk(clk),
 		.reset(1'b0),
+		.active(input_stage_active),
 		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
 		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
 	     
@@ -337,6 +363,7 @@ module whr_ip_ctrl_mac
    flit_data_inq
      (.clk(clk),
       .reset(1'b0),
+      .active(input_stage_active),
       .d(flit_data_in_s),
       .q(flit_data_in_q));
    
@@ -348,6 +375,9 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // decode control signals
    //---------------------------------------------------------------------------
+   
+   wire 			buffer_in_active;
+   assign buffer_in_active = flit_valid_thru;
    
    wire 			flit_head_in;   
    wire 			flit_tail_in;
@@ -427,17 +457,15 @@ module whr_ip_ctrl_mac
 		    end
 		  
 		  wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
-		  assign flit_ctr_s = flit_valid_in ? 
-				      (flit_head_in ? 
-				       flit_ctr_next : 
-				       (flit_ctr_q - hold_input_stage_b)) : 
-				      flit_ctr_q;
+		  assign flit_ctr_s
+		    = flit_head_in ? flit_ctr_next : (flit_ctr_q - 1'b1);
 		  c_dff
 		    #(.width(flit_ctr_width),
 		      .reset_type(reset_type))
 		  flit_ctrq
 		    (.clk(clk),
 		     .reset(reset),
+		     .active(buffer_in_active),
 		     .d(flit_ctr_s),
 		     .q(flit_ctr_q));
 		  
@@ -456,15 +484,16 @@ module whr_ip_ctrl_mac
    // generate head and tail indicators
    //---------------------------------------------------------------------------
 
+   wire 				    buffer_out_active;
+   assign buffer_out_active = ~fbc_empty;
+   
+   wire 				    flags_active;
+   assign flags_active = flit_valid;
+   
    wire                                     gnt;
    assign gnt = |gnt_op;
    
    assign flit_valid_out = gnt;
-
-   wire 				    fbc_empty;
-   
-   wire 				    flit_valid;
-   assign flit_valid = flit_valid_in | ~fbc_empty;
    
    wire 				    fbc_almost_empty;
    wire [0:fbf_addr_width-1] 		    fbc_write_addr;
@@ -483,7 +512,7 @@ module whr_ip_ctrl_mac
 	   reg [0:fbf_depth-1] tail_queue;
 	   
 	   always @(posedge clk)
-	     if(flit_valid_thru)
+	     if(buffer_in_active)
 		begin
 		   head_queue[fbc_write_addr] <= flit_head_in;
 		   tail_queue[fbc_write_addr] <= flit_tail_in;
@@ -507,15 +536,14 @@ module whr_ip_ctrl_mac
 	   assign head_in = flit_valid_thru & flit_head_in;
 	   
 	   wire head_valid_s, head_valid_q;
-	   assign head_valid_s = flit_valid ? 
-				 ((head_valid_q | head_in) & ~flit_valid_out) : 
-				 head_valid_q;
+	   assign head_valid_s = (head_valid_q | head_in) & ~flit_valid_out;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
 	   head_validq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(flags_active),
 	      .d(head_valid_s),
 	      .q(head_valid_q));
 	   
@@ -525,16 +553,15 @@ module whr_ip_ctrl_mac
 	   assign tail_in = flit_valid_thru & flit_tail_in;
 	   
 	   wire 		     tail_valid_s, tail_valid_q;
-	   assign tail_valid_s = flit_valid ? 
-				 ((tail_valid_q | tail_in) & 
-				  ~(flit_valid_out & flit_tail_out)) : 
-				 tail_valid_q;
+	   assign tail_valid_s
+	     = (tail_valid_q | tail_in) & ~(flit_valid_out & flit_tail_out);
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
 	   tail_validq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(flags_active),
 	      .d(tail_valid_s),
 	      .q(tail_valid_q));
 	   
@@ -576,14 +603,17 @@ module whr_ip_ctrl_mac
       if(num_header_buffers > 1)
 	begin
 	   
-	   wire [0:hdff_width-1] hdff_data_in;
-	   assign hdff_data_in[0:la_route_info_width-1] = la_route_info_in;
-	   assign hdff_data_in[la_route_info_width:
-			       la_route_info_width+route_info_width-1]
+	   wire [0:hdff_width-1] hdff_write_data;
+	   assign hdff_write_data[0:la_route_info_width-1] = la_route_info_in;
+	   assign hdff_write_data[la_route_info_width:
+				  la_route_info_width+route_info_width-1]
 		    = route_info_in;
 	   
+	   wire 		 hdff_almost_full;
 	   wire 		 hdff_full;
-	   wire [0:hdff_width-1] hdff_data_out;
+	   wire 		 hdff_almost_empty;
+	   wire [0:hdff_width-1] hdff_read_data;
+	   wire [0:hdff_width-1] hdff_peek_data;
 	   wire [0:1] 		 hdff_errors;
 	   c_fifo
 	     #(.depth(num_header_buffers),
@@ -593,23 +623,27 @@ module whr_ip_ctrl_mac
 	   hdff
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(flags_active),
+	      .almost_full(hdff_almost_full),
 	      .full(hdff_full),
-	      .data_in(hdff_data_in),
+	      .write_data(hdff_write_data),
 	      .push(hdff_push),
 	      .empty(hdff_empty),
-	      .data_out(hdff_data_out),
+	      .almost_empty(hdff_almost_empty),
+	      .read_data(hdff_read_data),
 	      .pop(hdff_pop),
+	      .peek_data(hdff_peek_data),
 	      .errors(hdff_errors));
 	   
 	   assign hdff_la_route_info
 	     = hdff_empty ?
 	       la_route_info_in :
-	       hdff_data_out[0:la_route_info_width-1];
+	       hdff_read_data[0:la_route_info_width-1];
 	   assign hdff_route_info
 	     = hdff_empty ?
 	       route_info_in :
-	       hdff_data_out[la_route_info_width:
-			     la_route_info_width+route_info_width-1];
+	       hdff_read_data[la_route_info_width:
+			      la_route_info_width+route_info_width-1];
 	   
 	   assign error_hdff_underflow = hdff_errors[0];
 	   assign error_hdff_overflow = hdff_errors[1];
@@ -621,15 +655,14 @@ module whr_ip_ctrl_mac
 	   wire [0:la_route_info_width-1] hdff_la_route_info_s,
 					  hdff_la_route_info_q;
 	   assign hdff_la_route_info_s
-	     = flit_valid_in ? 
-	       (hdff_push ? la_route_info_in : hdff_la_route_info_q) : 
-	       hdff_la_route_info_q;
+	     = flit_head_in ? la_route_info_in : hdff_la_route_info_q;
 	   c_dff
 	     #(.width(la_route_info_width),
 	       .reset_type(reset_type))
 	   hdff_la_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(buffer_in_active),
 	      .d(hdff_la_route_info_s),
 	      .q(hdff_la_route_info_q));
 	   
@@ -638,15 +671,14 @@ module whr_ip_ctrl_mac
 	   
 	   wire [0:route_info_width-1] hdff_route_info_s, hdff_route_info_q;
 	   assign hdff_route_info_s
-	     = flit_valid_in ? 
-	       (hdff_push ? route_info_in : hdff_route_info_q) : 
-	       hdff_route_info_q;
+	     = flit_head_in ? route_info_in : hdff_route_info_q;
 	   c_dff
 	     #(.width(route_info_width),
 	       .reset_type(reset_type))
 	   hdff_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(buffer_in_active),
 	      .d(hdff_route_info_s),
 	      .q(hdff_route_info_q));
 	   
@@ -654,10 +686,8 @@ module whr_ip_ctrl_mac
 	     = hdff_empty ? route_info_in : hdff_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
-	   assign hdff_empty_s = flit_valid ? 
-				 ((hdff_empty_q | (hdff_pop & ~hdff_push)) & 
-				  ~(hdff_push & ~hdff_pop)) : 
-				 hdff_empty_q;
+	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) & 
+				 ~(hdff_push & ~hdff_pop);
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -665,6 +695,7 @@ module whr_ip_ctrl_mac
 	   hdff_emptyq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(flags_active),
 	      .d(hdff_empty_s),
 	      .q(hdff_empty_q));
 	   
@@ -734,6 +765,7 @@ module whr_ip_ctrl_mac
    lar
      (.clk(clk),
       .reset(reset),
+      .active(flags_active),
       .router_address(router_address),
       .route_op(route_op),
       .route_info(hdff_route_info),
@@ -749,7 +781,8 @@ module whr_ip_ctrl_mac
    
    wire 		     fbc_pop;
    assign fbc_pop = flit_valid_out;
-   
+
+   wire [0:fbf_addr_width-1] fbc_peek_addr;
    wire 		     fbc_full;
    wire [0:1]		     fbc_errors;
    c_fifo_ctrl
@@ -759,10 +792,12 @@ module whr_ip_ctrl_mac
    fbc
      (.clk(clk),
       .reset(reset),
+      .active(flags_active),
       .push(fbc_push),
       .pop(fbc_pop),
       .write_addr(fbc_write_addr),
       .read_addr(fbc_read_addr),
+      .peek_addr(fbc_peek_addr),
       .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
       .almost_full(fbc_almost_full),
@@ -775,10 +810,10 @@ module whr_ip_ctrl_mac
    wire 		     error_fbc_overflow;
    assign error_fbc_overflow = fbc_errors[1];
    
-   // read enable doesn't need to be exact, so we read whenever we have a flit
-   assign fbf_read_enable = flit_valid /*flit_valid_out*/;
-   
+   assign fbf_read_active = flit_valid;
+   assign fbf_read_enable = flit_valid_out;
    assign fbf_read_addr = fbc_read_addr;
+   assign fbf_write_active = flit_valid_thru;
    assign fbf_write_enable = flit_valid_thru;
    assign fbf_write_addr = fbc_write_addr;
    assign fbf_write_data = flit_data_in_q;
@@ -798,28 +833,37 @@ module whr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
+   // generate clock enable signal to crossbar module
+   //---------------------------------------------------------------------------
+   
+   assign xbr_active = flit_valid;
+   
+   
+   //---------------------------------------------------------------------------
    // generate outputs to switch
    //---------------------------------------------------------------------------
    
    wire                      flit_head_out_s, flit_head_out_q;
-   assign flit_head_out_s = flit_valid ? flit_head_out : flit_head_out_q;
+   assign flit_head_out_s = flit_head_out;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    flit_head_outq
      (.clk(clk),
       .reset(1'b0),
+      .active(flags_active),
       .d(flit_head_out_s),
       .q(flit_head_out_q));
    
    wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
-   assign la_route_info_s = flit_valid ? la_route_info_out : la_route_info_q;
+   assign la_route_info_s = la_route_info_out;
    c_dff
      #(.width(la_route_info_width),
        .reset_type(reset_type))
    la_route_infoq
      (.clk(clk),
       .reset(1'b0),
+      .active(flags_active),
       .d(la_route_info_s),
       .q(la_route_info_q));
    
@@ -835,6 +879,22 @@ module whr_ip_ctrl_mac
    // generate outgoing credits
    //---------------------------------------------------------------------------
    
+   // NOTE: Because we need to clear it in the cycle after a credit has been 
+   // transmitted, this register currently cannot be included in any of the 
+   // other clock gating domains. If we could change this to send credits 
+   // upstream using edge-based signaling (i.e., transitions), it could be 
+   // included in the clock gating domain controlled by buffer_out_active.
+   // Alternatively, we could include the cred_valid term in buffer_out_active; 
+   // this would allow us to include cred_validq in the gating domain at the 
+   // cost of some unnecessary activity. As synthesis will probably not create 
+   // a clock gating domain for just this register, it currently will most 
+   // likely end up being free-running, so this may be a good tradeoff.
+   
+   wire 			  cred_valid;
+   
+   wire 			  cred_active;
+   assign cred_active = flit_valid | cred_valid;
+   
    wire 			  cred_valid_s, cred_valid_q;
    assign cred_valid_s = flit_valid_out;
    c_dff
@@ -843,10 +903,13 @@ module whr_ip_ctrl_mac
    cred_validq
      (.clk(clk),
       .reset(reset),
+      .active(cred_active),
       .d(cred_valid_s),
       .q(cred_valid_q));
+
+   assign cred_valid = cred_valid_q;
    
-   assign flow_ctrl_out[0] = cred_valid_q;
+   assign flow_ctrl_out[0] = cred_valid;
    
    
    //---------------------------------------------------------------------------
@@ -902,6 +965,7 @@ module whr_ip_ctrl_mac
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   
@@ -942,6 +1006,7 @@ module whr_ip_ctrl_mac
 	   eventsq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(events_s),
 	      .q(events_q));
 	   
@@ -958,6 +1023,7 @@ module whr_ip_ctrl_mac
 		ctrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(ctr_s),
 		   .q(ctr_q));
 		

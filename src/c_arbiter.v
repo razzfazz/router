@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic arbiter
 module c_arbiter
-  (clk, reset, update, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -50,9 +50,7 @@ module c_arbiter
    
    input clk;
    input reset;
-   
-   // update port priorities
-   input update;
+   input active;
    
    // request vector
    input [0:num_ports-1] req;
@@ -60,6 +58,9 @@ module c_arbiter
    // grant vector
    output [0:num_ports-1] gnt;
    wire [0:num_ports-1] gnt;
+   
+   // update port priorities
+   input update;
    
    generate
 
@@ -75,9 +76,10 @@ module c_arbiter
 		  rr_arb
 		    (.clk(clk),
 		     .reset(reset),
-		     .update(update),
+		     .active(active),
 		     .req(req),
-		     .gnt(gnt));
+		     .gnt(gnt),
+		     .update(update));
 	       end
 	     `ARBITER_TYPE_MATRIX:
 	       begin
@@ -87,12 +89,17 @@ module c_arbiter
 		  m_arb
 		    (.clk(clk),
 		     .reset(reset),
-		     .update(update),
+		     .active(active),
 		     .req(req),
-		     .gnt(gnt));
+		     .gnt(gnt),
+		     .update(update));
 	       end
 	     `ARBITER_TYPE_DW_FCFS:
 	       begin
+		  
+		  wire enable;
+		  assign enable = active & update;
+		  
 		  wire rst_n;
 		  if(reset_type == `RESET_TYPE_ASYNC)
 		    assign rst_n = ~reset;
@@ -116,7 +123,7 @@ module c_arbiter
 		    (.clk(clk),
 		     .rst_n(rst_n),
 		     .init_n(init_n),
-		     .enable(update),
+		     .enable(enable),
 		     .request(req),
 		     .lock({num_ports{1'b0}}),
 		     .mask({num_ports{1'b0}}),
@@ -124,6 +131,7 @@ module c_arbiter
 		     .locked(locked),
 		     .grant(gnt),
 		     .grant_index(grant_index));
+		  
 	       end
 	   endcase
 	   

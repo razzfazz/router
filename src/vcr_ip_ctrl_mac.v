@@ -34,9 +34,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, route_port_ivc, 
    inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_alloc_out_op, 
-   sw_alloc_in_op, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
-   fbf_write_addr, fbf_write_enable, fbf_write_data, fbf_read_enable, 
-   fbf_read_addr, fbf_read_data, error);
+   sw_alloc_in_op, xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
+   fbf_write_addr, fbf_write_active, fbf_write_enable, fbf_write_data, 
+   fbf_read_active, fbf_read_enable, fbf_read_addr, fbf_read_data, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -297,6 +297,10 @@ module vcr_ip_ctrl_mac
    // incoming allocator control signals
    input [0:num_ports*sw_alloc_in_width-1] sw_alloc_in_op;
    
+   // crossbar enable signal
+   output xbr_active;
+   wire 				   xbr_active;
+   
    // outgoing flit control signals
    output [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
    wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl_out;
@@ -313,6 +317,10 @@ module vcr_ip_ctrl_mac
    output [0:fbf_addr_width-1] fbf_write_addr;
    wire [0:fbf_addr_width-1] 		   fbf_write_addr;
    
+   // enable flit buffer storage cell clocks
+   output fbf_write_active;
+   wire 				   fbf_write_active;
+   
    // flit buffer write enable
    output fbf_write_enable;
    wire 				   fbf_write_enable;
@@ -320,6 +328,10 @@ module vcr_ip_ctrl_mac
    // flit buffer write data
    output [0:flit_data_width-1] fbf_write_data;
    wire [0:flit_data_width-1] 		   fbf_write_data;
+   
+   // enable flit buffer read address register clocks
+   output fbf_read_active;
+   wire 				   fbf_read_active;
    
    // flit buffer read enable
    output fbf_read_enable;
@@ -465,9 +477,12 @@ module vcr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
-   wire 			     flit_valid_in;
+   wire input_stage_active;
+   assign input_stage_active = 1'b1;
    
-   wire [0:flit_ctrl_width-1] 	     flit_ctrl_in_s, flit_ctrl_in_q;
+   wire 	      flit_valid_in;
+   
+   wire [0:flit_ctrl_width-1] flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = flit_ctrl_in;
    
    generate
@@ -486,6 +501,7 @@ module vcr_ip_ctrl_mac
 	     flit_valid_inq
 	       (.clk(clk),
 		.reset(reset),
+		.active(input_stage_active),
 		.d(flit_valid_in_s),
 		.q(flit_valid_in_q));
 	     
@@ -499,6 +515,7 @@ module vcr_ip_ctrl_mac
 	     flit_ctrl_inq
 	       (.clk(clk),
 		.reset(1'b0),
+		.active(input_stage_active),
 		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
 		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
 	     
@@ -516,6 +533,7 @@ module vcr_ip_ctrl_mac
    flit_data_inq
      (.clk(clk),
       .reset(1'b0),
+      .active(input_stage_active),
       .d(flit_data_in_s),
       .q(flit_data_in_q));
    
@@ -523,6 +541,9 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // input vc controllers
    //---------------------------------------------------------------------------
+   
+   wire 		      buffer_in_active;
+   assign buffer_in_active = flit_valid_in;
    
    // extract header information from header data
    wire [0:header_info_width-1] header_info_in_q;
@@ -558,6 +579,7 @@ module vcr_ip_ctrl_mac
    fcdec
      (.clk(clk),
       .reset(reset),
+      .active(buffer_in_active),
       .flit_ctrl_in(flit_ctrl_in_q),
       .header_info_in(header_info_in_q),
       .flit_valid_out_ivc(flit_valid_in_ivc),
@@ -735,6 +757,12 @@ module vcr_ip_ctrl_mac
    // switch allocation
    //---------------------------------------------------------------------------
    
+   wire 				  flit_valid;
+   assign flit_valid = flit_valid_in | ~&fbc_empty_ivc;
+   
+   wire 				  alloc_active;
+   assign alloc_active = flit_valid;
+   
    wire [0:num_vcs-1] 			  sw_req_nonspec_qual_ivc;
    assign sw_req_nonspec_qual_ivc = sw_req_nonspec_ivc & free_allocated_ivc;
    
@@ -749,6 +777,7 @@ module vcr_ip_ctrl_mac
    swa_nonspec
      (.clk(clk),
       .reset(reset),
+      .active(alloc_active),
       .route_ivc_op(route_ivc_op),
       .req_in_ivc(sw_req_nonspec_qual_ivc),
       .req_out_op(sw_oreq_nonspec_op),
@@ -793,6 +822,7 @@ module vcr_ip_ctrl_mac
 	   swa_spec
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(alloc_active),
 	      .route_ivc_op(route_ivc_op),
 	      .req_in_ivc(sw_req_spec_ivc),
 	      .req_out_op(sw_oreq_spec_unqual_op),
@@ -1148,16 +1178,43 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   assign fbf_write_enable = flit_valid_in;
+   assign fbf_read_active = flit_valid;
    assign fbf_read_enable = flit_sent;
+   assign fbf_write_active = flit_valid_in;
+   assign fbf_write_enable = flit_valid_in;
    assign fbf_write_data = flit_data_in_q;
+   
+   
+   //---------------------------------------------------------------------------
+   // generate clock enable signal to crossbar module
+   //---------------------------------------------------------------------------
+   
+   assign xbr_active = flit_valid;
    
    
    //---------------------------------------------------------------------------
    // generate outputs to switch
    //---------------------------------------------------------------------------
    
-   wire 			     flit_valid_out_s, flit_valid_out_q;
+   // NOTE: Because we need to clear it in the cycle after a flit / credit has 
+   // been transmitted, this register and the cred_valid_q register further 
+   // down cannot be included in any of the other clock gating domains. If we 
+   // could change things such that flits and credits are transmitted using 
+   // edge-based signaling (i.e., transitions), they could be included in the 
+   // clock gating domain controlled by alloc_active.
+   // Alternatively, we could include the flit_valid_out_q term in alloc_active;
+   // this would allow us to include cred_validq and flit_valid_outq in the 
+   // gating domain at the cost of some unnecessary activity. As synthesis will 
+   // probably not create a clock gating domain for just these two registers, 
+   // they currently will most likely end up being free-running, so this may be 
+   // a reasonable tradeoff.
+   
+   wire flit_valid_out_q;
+   
+   wire valid_out_active;
+   assign valid_out_active = flit_valid | flit_valid_out_q;
+   
+   wire flit_valid_out_s;
    assign flit_valid_out_s = flit_sent;
    c_dff
      #(.width(1),
@@ -1165,6 +1222,7 @@ module vcr_ip_ctrl_mac
    flit_valid_outq
      (.clk(clk),
       .reset(reset),
+      .active(valid_out_active),
       .d(flit_valid_out_s),
       .q(flit_valid_out_q));
    
@@ -1190,6 +1248,7 @@ module vcr_ip_ctrl_mac
 	   vc_selq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(alloc_active),
 	      .d(vc_sel_s),
 	      .q(vc_sel_q));
 	   
@@ -1261,6 +1320,7 @@ module vcr_ip_ctrl_mac
 		dest_vc_selq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(alloc_active),
 		   .d(dest_vc_sel_s),
 		   .q(dest_vc_sel_q));
 		
@@ -1291,6 +1351,7 @@ module vcr_ip_ctrl_mac
    flit_head_outq
      (.clk(clk),
       .reset(1'b0),
+      .active(alloc_active),
       .d(flit_head_out_s),
       .q(flit_head_out_q));
    
@@ -1313,6 +1374,7 @@ module vcr_ip_ctrl_mac
    flit_tail_outq
      (.clk(clk),
       .reset(1'b0),
+      .active(alloc_active),
       .d(flit_tail_out_s),
       .q(flit_tail_out_q));
    
@@ -1335,6 +1397,7 @@ module vcr_ip_ctrl_mac
    la_route_infoq
      (.clk(clk),
       .reset(1'b0),
+      .active(alloc_active),
       .d(la_route_info_s),
       .q(la_route_info_q));
    
@@ -1350,6 +1413,9 @@ module vcr_ip_ctrl_mac
    // generate outgoing credits
    //---------------------------------------------------------------------------
    
+   // NOTE: See the comment near the definition of cred_validq for notes on
+   // clock gating this register.
+   
    wire 				cred_valid_s, cred_valid_q;
    assign cred_valid_s = flit_sent;
    c_dff
@@ -1358,6 +1424,7 @@ module vcr_ip_ctrl_mac
    cred_validq
      (.clk(clk),
       .reset(reset),
+      .active(valid_out_active),
       .d(cred_valid_s),
       .q(cred_valid_q));
    
@@ -1383,6 +1450,7 @@ module vcr_ip_ctrl_mac
 	   cred_vcq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(alloc_active),
 	      .d(cred_vc_s),
 	      .q(cred_vc_q));
 	   
@@ -1434,6 +1502,7 @@ module vcr_ip_ctrl_mac
 		ctrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(ctr_s),
 		   .q(ctr_q));
 		
@@ -1498,6 +1567,7 @@ module vcr_ip_ctrl_mac
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   

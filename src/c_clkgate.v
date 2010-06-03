@@ -32,22 +32,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // a generic clock gating module
 module c_clkgate
-  (clk, enable, clk_gated);
+  (clk, active, clk_gated);
    
    input clk;
-   
-   input enable;
+   input active;
    
    output clk_gated;
    wire clk_gated;
    
-   reg 	enable_q;
-   always @(clk, enable)
+   reg 	active_q;
+   always @(clk, active)
      begin
 	if(clk == 0)
-          enable_q <= enable;
+          active_q <= active;
      end
    
-   assign clk_gated = clk & enable_q;
+   assign clk_gated = clk & active_q;
    
 endmodule
