@@ -94,6 +94,7 @@ module vcr_ugal_sniffer(/*autoarg*/
 		  // Inputs
 		  .clk			(clk),
 		  .reset		(reset),
+		  .active		(active),
 		  .d			(count_s[0:credit_count_width-1]));
 	   assign count_s  = count_q
 			     +flit_ctrl[port*flit_ctrl_width]

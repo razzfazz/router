@@ -32,9 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module vcr_op_ctrl_mac
-  (clk, reset, flow_ctrl_in, vc_gnt_ovc, vc_gnt_ovc_ip, vc_gnt_ovc_ivc, 
-   sw_alloc_in_ip, sw_alloc_out_ip, int_flit_ctrl_in, flit_data_in, 
-   flit_ctrl_out, flit_data_out, elig_ovc, error);
+  (clk, reset, flow_ctrl_in, vc_req_ovc, vc_gnt_ovc, vc_gnt_ovc_ip, 
+   vc_gnt_ovc_ivc, sw_alloc_in_ip, sw_alloc_out_ip, int_flit_ctrl_in, 
+   flit_data_in, flit_ctrl_out, flit_data_out, elig_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -186,6 +186,9 @@ module vcr_op_ctrl_mac
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
+   // output VC was requested by an input VC
+   input [0:num_vcs-1] vc_req_ovc;
+   
    // output VC was granted to an input VC
    input [0:num_vcs-1] vc_gnt_ovc;
    
@@ -233,9 +236,17 @@ module vcr_op_ctrl_mac
    // stage / wavefront block
    wire [0:num_ports-1]       sw_oreq_nonspec_ip;
    
+   // any non-speculative requests for this output port?
+   wire 		      sw_oreq_nonspec;
+   assign sw_oreq_nonspec = |sw_oreq_nonspec_ip;
+   
    // speculative switch allocation requests to output-side arbitration stage or
    // wavefront block
    wire [0:num_ports-1]       sw_oreq_spec_ip;
+   
+   // any speculative requests for this output port?
+   wire 		      sw_oreq_spec;
+   assign sw_oreq_spec = |sw_oreq_spec_ip;
    
    // non-speculative switch allocation grants from output-side arbitration 
    // stage / wavefront block
@@ -360,8 +371,21 @@ module vcr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
+   // NOTE: Because we need to be ready to receive credits at any time unless 
+   // we know for sure that no more credits are outstanding, this register 
+   // cannot be included in any of the other clock gating domains. As a single 
+   // register, it will most likely end up being free-running; this could
+   // be avoided by including the flow_ctrl_active term in one of the other 
+   // clock gating domains, allowing cred_validq to be gated at the cost of 
+   // slightly increased activity in the domain.
+   
    wire [0:flow_ctrl_width-1] 		  flow_ctrl_s, flow_ctrl_q;
    assign flow_ctrl_s = flow_ctrl_in;
+   
+   wire [0:num_vcs-1] 			  empty_ovc;
+   
+   wire 				  flow_ctrl_active;
+   assign flow_ctrl_active = ~&empty_ovc;
    
    wire 				  cred_valid_s, cred_valid_q;
    assign cred_valid_s = flow_ctrl_s[0];
@@ -371,6 +395,7 @@ module vcr_op_ctrl_mac
    cred_validq
      (.clk(clk),
       .reset(reset),
+      .active(flow_ctrl_active),
       .d(cred_valid_s),
       .q(cred_valid_q));
    
@@ -387,6 +412,7 @@ module vcr_op_ctrl_mac
 	   flow_ctrlq
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(flow_ctrl_active),
 	      .d(flow_ctrl_s[1:flow_ctrl_width-1]),
 	      .q(flow_ctrl_q[1:flow_ctrl_width-1]));
 	   
@@ -405,9 +431,8 @@ module vcr_op_ctrl_mac
 	 (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF))
 	begin
 	   
-	   // any non-speculative requests for this port?
-	   wire sw_oreq_nonspec;
-	   assign sw_oreq_nonspec = |sw_oreq_nonspec_ip;
+	   wire nonspec_arb_active;
+	   assign nonspec_arb_active = sw_oreq_nonspec;
 	   
 	   // any non-speculative grants for this port?
 	   wire sw_gnt_nonspec;
@@ -467,6 +492,7 @@ module vcr_op_ctrl_mac
 	   gnt_nonspec_ip_arb
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(nonspec_arb_active),
 	      .update(update_arb_nonspec),
 	      .req(req_nonspec_ip),
 	      .gnt(gnt_nonspec_ip));
@@ -486,6 +512,9 @@ module vcr_op_ctrl_mac
 		wire [0:num_ports-1] gnt_spec_ip;
 		wire 		     update_arb_spec;
 
+		wire 		     spec_arb_active;
+		assign spec_arb_active = sw_oreq_spec;
+		
 		case(sw_alloc_type)
 		  
 		  `SW_ALLOC_TYPE_SEP_IF:
@@ -504,8 +533,7 @@ module vcr_op_ctrl_mac
 		       // side grants.
 		       //-------------------------------------------------------
 		       
-		       assign update_arb_spec
-			 = ~sw_oreq_nonspec & |sw_oreq_spec_ip;
+		       assign update_arb_spec = ~sw_oreq_nonspec & sw_oreq_spec;
 		       
 		       assign sw_ognt_spec_ip
 			 = {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
@@ -533,7 +561,7 @@ module vcr_op_ctrl_mac
 			      //------------------------------------------------
 			      
 			      assign update_arb_spec
-				= ~sw_oreq_nonspec & |sw_oreq_spec_ip;
+				= ~sw_oreq_nonspec & sw_oreq_spec;
 			      
 			      assign sw_ognt_spec_ip
 				= {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
@@ -584,6 +612,7 @@ module vcr_op_ctrl_mac
 		gnt_spec_ip_arb
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(spec_arb_active),
 		   .update(update_arb_spec),
 		   .req(req_spec_ip),
 		   .gnt(gnt_spec_ip));
@@ -655,16 +684,32 @@ module vcr_op_ctrl_mac
       
    endgenerate
    
+   wire sw_req;
+   
+   generate
+      
+      if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+	assign sw_req = sw_oreq_nonspec | sw_oreq_spec;
+      else
+	assign sw_req = sw_oreq_nonspec;
+      
+   endgenerate
+   
+   wire sw_gnt_q;
+   
+   wire grant_active;
+   assign grant_active = sw_req | sw_gnt_q;
+   
    wire sw_gnt_s;
    assign sw_gnt_s = |sw_gnt_ip;
    
-   wire sw_gnt_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    sw_gntq
      (.clk(clk),
       .reset(reset),
+      .active(grant_active),
       .d(sw_gnt_s),
       .q(sw_gnt_q));
    
@@ -678,6 +723,7 @@ module vcr_op_ctrl_mac
    sw_gnt_ipq
      (.clk(clk),
       .reset(reset),
+      .active(grant_active),
       .d(sw_gnt_ip_s),
       .q(sw_gnt_ip_q));
    
@@ -710,6 +756,9 @@ module vcr_op_ctrl_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
+	   wire vc_req;
+	   assign vc_req = vc_req_ovc[ovc];
+	   
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc];
 	   
@@ -718,7 +767,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire [0:num_vcs-1] 	vc_gnt_ivc;
 	   assign vc_gnt_ivc = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
-
+	   
 	   wire 		match;
 	   wire 		elig;
 	   wire 		empty;
@@ -745,6 +794,7 @@ module vcr_op_ctrl_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .flow_ctrl(flow_ctrl_q),
+	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ip(vc_gnt_ip),
 	      .vc_gnt_ivc(vc_gnt_ivc),
@@ -758,6 +808,7 @@ module vcr_op_ctrl_mac
 	      .errors(ovcc_errors));
 
 	   assign match_ovc[ovc] = match;
+	   assign empty_ovc[ovc] = empty;
 	   assign elig_ovc[ovc] = elig;
 	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
 				    (ovc+1)*int_flow_ctrl_width-1]
@@ -773,9 +824,13 @@ module vcr_op_ctrl_mac
    // output staging
    //---------------------------------------------------------------------------
    
-   wire [0:flit_ctrl_width-1] flit_ctrl_s, flit_ctrl_q;
+   wire 		      flit_out_active;
+   assign flit_out_active = sw_gnt_q;
    
+   wire [0:flit_ctrl_width-1] flit_ctrl_s, flit_ctrl_q;   
    assign flit_ctrl_s[0] = flit_valid_in;
+   assign flit_ctrl_s[1+vc_idx_width:flit_ctrl_width-1]
+	    = int_flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1];
    
    generate
       
@@ -806,18 +861,31 @@ module vcr_op_ctrl_mac
 	   
 	end
       
-      assign flit_ctrl_s[1+vc_idx_width:flit_ctrl_width-1]
-	       = sw_gnt_q ?
-		 int_flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1] :
-		 flit_ctrl_q[1+vc_idx_width:flit_ctrl_width-1];
-      
       case(packet_format)
 	
 	`PACKET_FORMAT_HEAD_TAIL,
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
-	     wire flit_valid_s, flit_valid_q;
+	     wire flit_valid_q;
+	     
+	     // NOTE: Because we need to clear it in the cycle after a flit has 
+	     // been transmitted, this register currently cannot be included in 
+	     // any of the other clock gating domains. If we could change this 
+	     // to send flits downstream using edge-based signaling (i.e., 
+	     // transitions), it could be included in the clock gating domain 
+	     // controlled by flit_out_active.
+	     // Alternatively, we could include the flit_ctrl_q[0] term in 
+	     // flit_out_active; this would allow us to include flit_validq in 
+	     // the gating domain at the cost of some unnecessary activity. As 
+	     // synthesis will probably not create a clock gating domain for 
+	     // just this register, it currently will most likely end up being 
+	     // free-running, so this may be a good tradeoff.
+	     
+	     wire flit_valid_out_active;
+	     assign flit_valid_out_active = sw_gnt_q | flit_valid_q;
+	     
+	     wire flit_valid_s;
 	     assign flit_valid_s = flit_ctrl_s[0];
 	     c_dff
 	       #(.width(1),
@@ -825,6 +893,7 @@ module vcr_op_ctrl_mac
 	     flit_validq
 	       (.clk(clk),
 		.reset(reset),
+		.active(flit_valid_out_active),
 		.d(flit_valid_s),
 		.q(flit_valid_q));
 	     
@@ -837,6 +906,7 @@ module vcr_op_ctrl_mac
 	     flit_ctrlq
 	       (.clk(clk),
 		.reset(1'b0),
+		.active(flit_out_active),
 		.d(flit_ctrl_s[1:flit_ctrl_width-1]),
 		.q(flit_ctrl_q[1:flit_ctrl_width-1]));
 	     
@@ -856,6 +926,7 @@ module vcr_op_ctrl_mac
    flit_dataq
      (.clk(clk),
       .reset(1'b0),
+      .active(flit_out_active),
       .d(flit_data_s),
       .q(flit_data_q));
    
@@ -914,6 +985,7 @@ module vcr_op_ctrl_mac
 	   chk
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .errors_in(errors_s),
 	      .errors_out(errors_q));
 	   

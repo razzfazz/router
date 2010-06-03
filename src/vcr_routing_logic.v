@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for VC router
 module vcr_routing_logic
-  (clk, reset, router_address, sel_rc, route_info, route_op, inc_rc);
+  (clk, reset, active, router_address, sel_rc, route_info, route_op, inc_rc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -92,6 +92,7 @@ module vcr_routing_logic
    
    input clk;
    input reset;
+   input active;
    
    // current router's address
    input [0:router_addr_width-1] router_address;

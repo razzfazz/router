@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module vcr_ovc_ctrl
-  (clk, reset, flow_ctrl, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt_q, sw_gnt_ip_q, 
-   int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
+  (clk, reset, flow_ctrl, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt_q, 
+   sw_gnt_ip_q, int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -161,6 +161,9 @@ module vcr_ovc_ctrl
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl;
    
+   // output VC was requested by an input VC
+   input vc_req;
+   
    // output VC was granted to an input VC
    input vc_gnt;
    
@@ -244,6 +247,9 @@ module vcr_ovc_ctrl
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
    
+   wire 			   vc_alloc_active;
+   assign vc_alloc_active = vc_req | sw_gnt_q;
+   
    wire 			   allocated_q;
    
    wire 			   next_allocated;   
@@ -257,6 +263,7 @@ module vcr_ovc_ctrl
    allocatedq
      (.clk(clk),
       .reset(reset),
+      .active(vc_alloc_active),
       .d(allocated_s),
       .q(allocated_q));
    
@@ -282,6 +289,7 @@ module vcr_ovc_ctrl
 		allocated_ipq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(vc_alloc_active),
 		   .d(allocated_ip_s),
 		   .q(allocated_ip_q));
 		
@@ -292,7 +300,7 @@ module vcr_ovc_ctrl
 		  (.data_in(vc_gnt_ivc),
 		   .data_out(vc_gnt_vc));
 		
-		wire [0:vc_idx_width-1]   allocated_vc_s, allocated_vc_q;
+		wire [0:vc_idx_width-1] allocated_vc_s, allocated_vc_q;
 		assign allocated_vc_s = vc_gnt ? vc_gnt_vc : allocated_vc_q;
 		c_dff
 		  #(.width(vc_idx_width),
@@ -300,6 +308,7 @@ module vcr_ovc_ctrl
 		allocated_vcq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(vc_alloc_active),
 		   .d(allocated_vc_s),
 		   .q(allocated_vc_q));
 		
@@ -327,15 +336,13 @@ module vcr_ovc_ctrl
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   // credit info only ever gets update when this output was granted or a credit
-   // was received
-   wire 			     update_credits;
-   assign update_credits = sw_gnt_q | cred_valid;
+   wire 				flags_active;
+   assign flags_active = vc_req | sw_gnt_q | cred_valid;
    
-   wire [0:cred_count_width-1] cred_count_q;
-   wire 		       head_free;
-   wire 		       error_hct_underflow;
-   wire 		       error_hct_overflow;
+   wire [0:cred_count_width-1] 		cred_count_q;
+   wire 				head_free;
+   wire 				error_hct_underflow;
+   wire 				error_hct_overflow;
    
    generate
       
@@ -378,17 +385,15 @@ module vcr_ovc_ctrl
 		assign head_credit = tail_sent_q & last_credit_received;
 		
 		wire tail_sent_s;
-		assign tail_sent_s
-		  = update_credits ? 
-		    ((tail_sent_q & ~last_credit_received) | 
-		     (flit_valid_qual & flit_tail)) : 
-		    tail_sent_q;
+		assign tail_sent_s = ((tail_sent_q & ~last_credit_received) | 
+				      (flit_valid_qual & flit_tail));
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
 		tail_sentq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(tail_sent_s),
 		   .q(tail_sent_q));
 		
@@ -401,6 +406,7 @@ module vcr_ovc_ctrl
 		head_freeq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(head_free_s),
 		   .q(head_free_q));
 		
@@ -424,15 +430,14 @@ module vcr_ovc_ctrl
 		
 		wire [0:flit_buffer_idx_width-1] push_ptr_s;
 		assign push_ptr_s
-		  = update_credits ?
-		    (flit_valid_qual ? push_ptr_next : push_ptr_q) : 
-		    push_ptr_q;
+		  = flit_valid_qual ? push_ptr_next : push_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
 		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
 		
@@ -446,23 +451,21 @@ module vcr_ovc_ctrl
 		   .data_out(pop_ptr_next));
 		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s
-		  = update_credits ? 
-		    (credit ? pop_ptr_next : pop_ptr_q) : 
-		    pop_ptr_q;
+		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
 		c_dff
 		  #(.width(flit_buffer_idx_width),
 		    .reset_type(reset_type))
 		pop_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
 		reg [0:num_flit_buffers-1] 	 tail_queue;
 		
 		always @(posedge clk)
-		  if(update_credits)
+		  if(flags_active)
 		    if(flit_valid_qual)
 		      tail_queue[push_ptr_q] <= flit_tail;
 		
@@ -479,6 +482,7 @@ module vcr_ovc_ctrl
 		hct
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(flags_active),
 		   .credit(head_credit),
 		   .debit(head_debit),
 		   .free(head_free),
@@ -505,7 +509,7 @@ module vcr_ovc_ctrl
    assign cred_count_next = cred_count_plus_credit - debit;
    
    wire [0:cred_count_width-1] 			 cred_count_s;
-   assign cred_count_s = update_credits ? cred_count_next : cred_count_q;
+   assign cred_count_s = cred_count_next;
    c_dff
      #(.width(cred_count_width),
        .reset_type(reset_type),
@@ -513,6 +517,7 @@ module vcr_ovc_ctrl
    cred_countq
      (.clk(clk),
       .reset(reset),
+      .active(flags_active),
       .d(cred_count_s),
       .q(cred_count_q));
    
@@ -598,10 +603,21 @@ module vcr_ovc_ctrl
 	     if(cred_hold_width >= 2)
 	       begin
 		  
-		  wire [0:cred_hold_width-1]  cred_hold_s, cred_hold_q;
+		  wire cred_hold_any;
+		  
+		  // NOTE: This doesn't fit in well with any of the other clock
+		  // gating domains, as the register needs to be kept active 
+		  // until all credits have been sent; the register is probably 
+		  // not wide enough to end up in a clock gating domain of its 
+		  // own, so it will most likely end up being free-running.
+		  
+		  wire cred_hold_active;
+		  assign cred_hold_active = flags_active | cred_hold_any;
+		  
+		  wire [0:cred_hold_width-1] cred_hold_s, cred_hold_q;
 		  assign cred_hold_s
 		    = next_allocated ?
-		      (cred_hold_q - (|cred_hold_q & ~credit)) :
+		      (cred_hold_q - (cred_hold_any & ~credit)) :
 		      cred_hold_copy;
 		  c_dff
 		    #(.width(cred_hold_width),
@@ -610,8 +626,11 @@ module vcr_ovc_ctrl
 		  cred_holdq
 		    (.clk(clk),
 		     .reset(reset),
+		     .active(cred_hold_active),
 		     .d(cred_hold_s),
 		     .q(cred_hold_q));
+		  
+		  assign cred_hold_any = |cred_hold_q;
 		  
 		  assign int_flow_ctrl
 		    = next_allocated ?
@@ -665,6 +684,7 @@ module vcr_ovc_ctrl
 	   credq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(flags_active),
 	      .d(cred_s),
 	      .q(cred_q));
 	   

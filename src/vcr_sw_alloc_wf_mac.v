@@ -133,6 +133,12 @@ module vcr_sw_alloc_wf_mac
    // non-speculative allocation
    //---------------------------------------------------------------------------
    
+   // NOTE: The request signal here is already masked for credit availability
+   // at the input controller; from a timing point of view, it would likely be 
+   // better to use the "raw" signal here instead.
+   wire 			  nonspec_active;
+   assign nonspec_active = |req_nonspec_ip_op;
+   
    wire 			  update_alloc_nonspec;
    assign update_alloc_nonspec = |req_nonspec_ip_op;
    
@@ -147,6 +153,7 @@ module vcr_sw_alloc_wf_mac
    gnt_wf_nonspec_ip_op_alloc
      (.clk(clk),
       .reset(reset),
+      .active(nonspec_active),
       .update(update_alloc_nonspec),
       .req(req_wf_nonspec_ip_op),
       .gnt(gnt_wf_nonspec_ip_op));
@@ -162,6 +169,13 @@ module vcr_sw_alloc_wf_mac
 
       if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
+	   
+	   // NOTE: The request signal here is already masked for credit 
+	   // availability at the input controller; from a timing point of 
+	   // view, it would likely be better to use the "raw" signal here 
+	   // instead.
+	   wire spec_active;
+	   assign spec_active = |req_spec_ip_op;
 	   
 	   wire 			  update_alloc_spec;
 	   wire [0:num_ports*num_ports-1] req_wf_spec_ip_op;
@@ -312,6 +326,7 @@ module vcr_sw_alloc_wf_mac
 	   gnt_wf_spec_ip_op_alloc
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(spec_active),
 	      .update(update_alloc_spec),
 	      .req(req_wf_spec_ip_op),
 	      .gnt(gnt_wf_spec_ip_op));
