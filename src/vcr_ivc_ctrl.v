@@ -35,9 +35,9 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, 
    vc_gnt, vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec,
-   flit_head, flit_tail, la_route_info, fbc_write_addr, fbc_read_addr, 
-   fbc_empty, allocated, allocated_ovc, free_unallocated, free_allocated, 
-   errors, events);
+   flit_sent_prev, flit_head, flit_tail, la_route_info, fbc_write_addr, 
+   fbc_read_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
+   free_allocated, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -293,6 +293,9 @@ module vcr_ivc_ctrl
    
    // speculative switch allocator grants
    input sw_gnt_spec;
+   
+   // did this VC send a flit in the previous cycle?
+   input flit_sent_prev;
    
    // outgoing flit is head flit
    output flit_head;
@@ -824,20 +827,8 @@ module vcr_ivc_ctrl
 		  
 	       end
 	     
-	     wire 				 flit_sent_prev_s,
-						 flit_sent_prev_q;
-	     assign flit_sent_prev_s = flit_sent /*& ~flit_tail*/;
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type))
-	     flit_sent_prevq
-	       (.clk(clk),
-		.reset(reset),
-		.d(flit_sent_prev_s),
-		.q(flit_sent_prev_q));
-	     
 	     wire [0:1] 			 flit_sent_count;
-	     assign flit_sent_count = flit_sent_prev_q + flit_sent;
+	     assign flit_sent_count = flit_sent_prev + flit_sent;
 	     
 	     wire [0:num_vcs_per_class-1] 	 next_free_ocvc;
 	     wire [0:num_vcs_per_class-1] 	 free_unallocated_ocvc;
