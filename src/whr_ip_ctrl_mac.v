@@ -39,6 +39,7 @@ module whr_ip_ctrl_mac
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "whr_constants.v"
    
    // flit buffer entries per VC
@@ -112,14 +113,14 @@ module whr_ip_ctrl_mac
    localparam flit_ctr_width = clogb(max_payload_length);
    
    // total number of bits required for storing routing information
-   localparam route_info_width = addr_width;
+   localparam hop_route_info_width = addr_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (la_route_info_width + hop_route_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (la_route_info_width + hop_route_info_width + payload_length_width) : 
        -1;
    
    // width of flit control signals
@@ -151,7 +152,7 @@ module whr_ip_ctrl_mac
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
    // total number of bits of header information required for each VC
-   localparam hdff_width = la_route_info_width + route_info_width;
+   localparam hdff_width = la_route_info_width + hop_route_info_width;
    
    // use input register as part of the flit buffer
    parameter input_stage_can_hold = 0;
@@ -416,7 +417,8 @@ module whr_ip_ctrl_mac
 		  
 		  if(min_payload_length == 0)
 		    assign has_payload
-		      = header_info_in_q[la_route_info_width+route_info_width];
+		      = header_info_in_q[la_route_info_width+
+					 hop_route_info_width];
 		  else
 		    assign has_payload = 1'b1;
 		  
@@ -435,9 +437,9 @@ module whr_ip_ctrl_mac
 		       wire [0:payload_length_width-1] payload_length;
 		       assign payload_length
 			 = header_info_in_q[la_route_info_width+
-					    route_info_width:
+					    hop_route_info_width:
 					    la_route_info_width+
-					    route_info_width+
+					    hop_route_info_width+
 					    payload_length_width-1];
 		       
 		       assign flit_ctr_next
@@ -580,10 +582,10 @@ module whr_ip_ctrl_mac
    wire [0:la_route_info_width-1]    la_route_info_in;
    assign la_route_info_in = header_info_in_q[0:la_route_info_width-1];
    
-   wire [0:route_info_width-1] 	     route_info_in;
-   assign route_info_in
+   wire [0:hop_route_info_width-1]   hop_route_info_in;
+   assign hop_route_info_in
      = header_info_in_q[la_route_info_width:
-			la_route_info_width+route_info_width-1];
+			la_route_info_width+hop_route_info_width-1];
    
    wire 			     hdff_empty;
    
@@ -594,7 +596,7 @@ module whr_ip_ctrl_mac
    assign hdff_pop = flit_valid_out & flit_tail_out;
    
    wire [0:la_route_info_width-1]    hdff_la_route_info;
-   wire [0:route_info_width-1] 	     hdff_route_info;
+   wire [0:hop_route_info_width-1]   hdff_hop_route_info;
    wire 			     error_hdff_underflow;
    wire 			     error_hdff_overflow;
    
@@ -606,8 +608,8 @@ module whr_ip_ctrl_mac
 	   wire [0:hdff_width-1] hdff_write_data;
 	   assign hdff_write_data[0:la_route_info_width-1] = la_route_info_in;
 	   assign hdff_write_data[la_route_info_width:
-				  la_route_info_width+route_info_width-1]
-		    = route_info_in;
+				  la_route_info_width+hop_route_info_width-1]
+		    = hop_route_info_in;
 	   
 	   wire 		 hdff_almost_full;
 	   wire 		 hdff_full;
@@ -639,11 +641,11 @@ module whr_ip_ctrl_mac
 	     = hdff_empty ?
 	       la_route_info_in :
 	       hdff_read_data[0:la_route_info_width-1];
-	   assign hdff_route_info
+	   assign hdff_hop_route_info
 	     = hdff_empty ?
-	       route_info_in :
+	       hop_route_info_in :
 	       hdff_read_data[la_route_info_width:
-			      la_route_info_width+route_info_width-1];
+			      la_route_info_width+hop_route_info_width-1];
 	   
 	   assign error_hdff_underflow = hdff_errors[0];
 	   assign error_hdff_overflow = hdff_errors[1];
@@ -669,21 +671,22 @@ module whr_ip_ctrl_mac
 	   assign hdff_la_route_info
 	     = hdff_empty ? la_route_info_in : hdff_la_route_info_q;
 	   
-	   wire [0:route_info_width-1] hdff_route_info_s, hdff_route_info_q;
-	   assign hdff_route_info_s
-	     = flit_head_in ? route_info_in : hdff_route_info_q;
+	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s, 
+					   hdff_hop_route_info_q;
+	   assign hdff_hop_route_info_s
+	     = flit_head_in ? hop_route_info_in : hdff_hop_route_info_q;
 	   c_dff
-	     #(.width(route_info_width),
+	     #(.width(hop_route_info_width),
 	       .reset_type(reset_type))
-	   hdff_route_infoq
+	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
 	      .active(buffer_in_active),
-	      .d(hdff_route_info_s),
-	      .q(hdff_route_info_q));
+	      .d(hdff_hop_route_info_s),
+	      .q(hdff_hop_route_info_q));
 	   
-	   assign hdff_route_info
-	     = hdff_empty ? route_info_in : hdff_route_info_q;
+	   assign hdff_hop_route_info
+	     = hdff_empty ? hop_route_info_in : hdff_hop_route_info_q;
 	   
 	   wire hdff_empty_s, hdff_empty_q;
 	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) & 
@@ -754,13 +757,15 @@ module whr_ip_ctrl_mac
    assign error_invalid_port = header_valid & pf_error;
    
    wire [0:la_route_info_width-1] la_route_info_out;
-   whr_la_routing_logic
-     #(.num_routers_per_dim(num_routers_per_dim),
+   rtr_la_routing_logic
+     #(.num_resource_classes(1),
+       .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .connectivity(connectivity),
        .routing_type(routing_type),
        .dim_order(dim_order),
+       .resource_class(0),
        .reset_type(reset_type))
    lar
      (.clk(clk),
@@ -768,7 +773,8 @@ module whr_ip_ctrl_mac
       .active(flags_active),
       .router_address(router_address),
       .route_op(route_op),
-      .route_info(hdff_route_info),
+      .inc_rc(1'b0),
+      .hop_route_info(hdff_hop_route_info),
       .la_route_info(la_route_info_out));
    
    

@@ -41,6 +41,7 @@ module vcr_ivc_ctrl
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
    
    // flit buffer entries per VC
@@ -782,7 +783,7 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   vcr_la_routing_logic
+   rtr_la_routing_logic
      #(.num_resource_classes(num_resource_classes),
        .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),

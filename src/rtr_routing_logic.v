@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // routing logic for VC router
-module vcr_routing_logic
+module rtr_routing_logic
   (clk, reset, active, router_address, sel_rc, route_info, route_op, inc_rc);
    
 `include "c_functions.v"

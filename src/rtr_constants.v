@@ -1,0 +1,115 @@
+// $Id$
+
+/*
+Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this 
+list of conditions and the following disclaimer in the documentation and/or 
+other materials provided with the distribution.
+Neither the name of the Stanford University nor the names of its contributors 
+may be used to endorse or promote products derived from this software without 
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+// router-related constant definitions
+
+`ifndef _RTR_CONSTANTS_V_
+`define _RTR_CONSTANTS_V_
+
+//------------------------------------------------------------------------------
+// network topologies
+//------------------------------------------------------------------------------
+
+// mesh
+`define TOPOLOGY_MESH  0
+
+// torus
+`define TOPOLOGY_TORUS 1
+
+// flattened butterfly
+`define TOPOLOGY_FBFLY 2
+
+`define TOPOLOGY_LAST  `TOPOLOGY_FBFLY
+
+
+//------------------------------------------------------------------------------
+// what does connectivity look like within a dimension?
+//------------------------------------------------------------------------------
+
+// nodes are connected to their neighbors with no wraparound (e.g. mesh)
+`define CONNECTIVITY_LINE 0
+
+// nodes are connected to their neighbors with wraparound (e.g. torus)
+`define CONNECTIVITY_RING 1
+
+// nodes are fully connected (e.g. flattened butterfly)
+`define CONNECTIVITY_FULL 2
+
+`define CONNECTIVITY_LAST `CONNECTIVITY_FULL
+
+
+//------------------------------------------------------------------------------
+// router implementations
+//------------------------------------------------------------------------------
+
+// wormhole router
+`define ROUTER_TYPE_WORMHOLE 0
+
+// virtual channel router
+`define ROUTER_TYPE_VC       1
+
+`define ROUTER_TYPE_LAST `ROUTER_TYPE_VC
+
+
+//------------------------------------------------------------------------------
+// routing function types
+//------------------------------------------------------------------------------
+
+// dimension-order routing (using multiple phases if num_resource_classes > 1)
+`define ROUTING_TYPE_DOR 0
+
+`define ROUTING_TYPE_LAST `ROUTING_TYPE_DOR
+
+
+//------------------------------------------------------------------------------
+// dimension order
+//------------------------------------------------------------------------------
+
+// traverse dimensions in ascending order
+`define DIM_ORDER_ASCENDING  0
+
+// traverse dimensions in descending order
+`define DIM_ORDER_DESCENDING 1
+
+
+//------------------------------------------------------------------------------
+// packet formats
+//------------------------------------------------------------------------------
+
+// packets are delimited by head and tail bits
+`define PACKET_FORMAT_HEAD_TAIL       0
+
+// head flits are identified by header bit, and contain encoded packet length
+`define PACKET_FORMAT_EXPLICIT_LENGTH 1
+
+`define PACKET_FORMAT_LAST `PACKET_FORMAT_EXPLICIT_LENGTH
+
+
+`endif

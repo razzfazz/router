@@ -36,6 +36,7 @@ module packet_source
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
    
    parameter initial_seed = 0;
@@ -554,7 +555,7 @@ module packet_source
 		
 		wire [0:num_ports-1]           route_op;
 		wire 			       inc_rc;
-		vcr_routing_logic
+		rtr_routing_logic
 		  #(.num_resource_classes(num_resource_classes),
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_dimensions(num_dimensions),

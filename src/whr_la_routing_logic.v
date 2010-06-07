@@ -36,6 +36,7 @@ module whr_la_routing_logic
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;

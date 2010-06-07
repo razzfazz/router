@@ -35,6 +35,7 @@ module vcr_sw_alloc_wf_mac
   (clk, reset, alloc_in_ip_op, alloc_out_ip_op);
    
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
    
    // number of input and output ports on switch

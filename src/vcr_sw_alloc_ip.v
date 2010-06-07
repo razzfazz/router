@@ -36,6 +36,7 @@ module vcr_sw_alloc_ip
    gnt_out_op, gnt_out_ivc, sel_ivc, allow_update);
    
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
    
    // number of VCs

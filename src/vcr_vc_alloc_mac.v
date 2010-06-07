@@ -38,6 +38,7 @@ module vcr_vc_alloc_mac
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
    
    // number of message classes (e.g. request, reply)

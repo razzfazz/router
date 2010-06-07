@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // lookahead routing logic for VC router
-module vcr_la_routing_logic
+module rtr_la_routing_logic
   (clk, reset, active, router_address, route_port, inc_rc, hop_route_info, 
    la_route_info);
    

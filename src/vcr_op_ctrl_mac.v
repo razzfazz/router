@@ -38,6 +38,7 @@ module vcr_op_ctrl_mac
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
    
    // flit buffer entries per VC

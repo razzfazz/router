@@ -8,7 +8,9 @@ module vcr_ugal_sniffer(/*autoarg*/
 
 `include "c_functions.v"   
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
+
    // flit buffer entries per VC
    parameter num_flit_buffers 	   = 8;
    // number of message classes (e.g. request, reply)
