@@ -31,8 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic
 module rtr_la_routing_logic
-  (router_address, la_route_info_in, route_port, inc_rc, route_info_in, 
-   la_route_info_out, error);
+  (clk, reset, active, router_address, route_port, inc_rc, route_info, 
+   la_route_info);
    
    
 `include "c_functions.v"
@@ -65,9 +65,6 @@ module rtr_la_routing_logic
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
-   
-   // ID of current input port
-   parameter port_id = 0;
    
    // ID of current input VC
    parameter vc_id = 0;
@@ -118,37 +115,27 @@ module rtr_la_routing_logic
    localparam resource_class
      = (vc_id / num_vcs_per_class) % num_resource_classes;
    
-   // packet class to which this VC belongs
-   localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
    
+   input clk;
+   input reset;
+   input active;
    
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // lookahead routing information for current router
-   input [0:la_route_info_width-1] la_route_info_in;
-   
    // port on which the packet will leave the current router
-   output [0:port_idx_width-1] route_port;
-   wire [0:port_idx_width-1] route_port;
-   
+   input [0:port_idx_width-1] route_port;
+      
    // will the resource class be incremented at the current router?
-   output inc_rc;
-   wire 		     inc_rc;
-   
+   input inc_rc;
+      
    // routing data
-   input [0:route_info_width-1] route_info_in;
+   input [0:route_info_width-1] route_info;
    
    // lookahead routing information for next router
-   output [0:la_route_info_width-1] la_route_info_out;
-   wire [0:la_route_info_width-1] la_route_info_out;
+   output [0:la_route_info_width-1] la_route_info;
+   wire [0:la_route_info_width-1] la_route_info;
    
-   // error condition detected
-   output error;
-   wire 			  error;
-   
-   
-   assign route_port = la_route_info_in[0:port_idx_width-1];
    
    // address of destination router for current resource class
    wire [0:router_addr_width-1]   dest_router_address;
@@ -163,13 +150,9 @@ module rtr_la_routing_logic
       if(resource_class == (num_resource_classes - 1))
 	begin
 	   
-	   assign error = la_route_info_in[port_idx_width];
-	   
-	   assign inc_rc = 1'b0;
-	   
 	   assign dest_router_address
-	     = route_info_in[resource_class*router_addr_width:
-			     (resource_class+1)*router_addr_width-1];
+	     = route_info[resource_class*router_addr_width:
+			  (resource_class+1)*router_addr_width-1];
 	   
 	   assign next_inc_rc = 1'b0;
 	   
@@ -177,23 +160,19 @@ module rtr_la_routing_logic
       else
 	begin
 	   
-	   assign error = 1'b0;
-	   
-	   assign inc_rc = la_route_info_in[port_idx_width];
-	   
 	   assign dest_router_address
 	     = inc_rc ?
-	       route_info_in[(resource_class+1)*router_addr_width:
-			     (resource_class+2)*router_addr_width-1] :
-	       route_info_in[resource_class*router_addr_width:
-			     (resource_class+1)*router_addr_width-1];
+	       route_info[(resource_class+1)*router_addr_width:
+			  (resource_class+2)*router_addr_width-1] :
+	       route_info[resource_class*router_addr_width:
+			  (resource_class+1)*router_addr_width-1];
 	   
 	   assign next_inc_rc = (next_router_address == dest_router_address);
 	   
 	end
       
       if(num_resource_classes > 1)
-	assign la_route_info_out[port_idx_width] = next_inc_rc;
+	assign la_route_info[port_idx_width] = next_inc_rc;
       
    endgenerate
    
@@ -375,8 +354,7 @@ module rtr_la_routing_logic
 	   
 	   wire [0:node_addr_width-1] dest_node_address;
 	   assign dest_node_address
-	     = route_info_in[route_info_width-node_addr_width:
-			     route_info_width-1];
+	     = route_info[route_info_width-node_addr_width:route_info_width-1];
 	   
 	   wire [0:num_nodes_per_router-1] node_sel;
 	   c_decoder
@@ -401,6 +379,6 @@ module rtr_la_routing_logic
      (.data_in(next_route_op),
       .data_out(next_route_port));
    
-   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
+   assign la_route_info[0:port_idx_width-1] = next_route_port;
    
 endmodule
