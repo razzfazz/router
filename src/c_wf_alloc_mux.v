@@ -68,7 +68,7 @@ module c_wf_alloc_mux
      #(.width(port_idx_width),
        .min_value(0),
        .max_value(num_ports-1))
-   prio_s_incr
+   prio_next_incr
      (.data_in(prio_q),
       .data_out(prio_next));
    

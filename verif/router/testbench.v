@@ -47,6 +47,9 @@ module testbench
    // packet injection rate (percentage of cycles)
    parameter packet_rate = 25;
    
+   // flit consumption rate (percentage of cycles)
+   parameter consume_rate = 50;
+   
    // width of packet count register
    parameter packet_count_width = 32;
    
@@ -65,6 +68,9 @@ module testbench
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
    
+   
+   // width required to select individual buffer slot
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
@@ -311,6 +317,9 @@ module testbench
       .flit_data_out_op(flit_data_out_op),
       .error(rchk_error));
    
+   
+   wire [0:num_ports-1] 		      buffer_error_op;
+   
    generate
       
       genvar 				      op;
@@ -332,18 +341,141 @@ module testbench
 	   flit_ctrl_dly_sr
 	     (.clk(clk),
 	      .reset(reset),
-	      .enable(1'b1),
+	      .active(1'b1),
 	      .data_in(flit_ctrl_out),
 	      .data_out(flit_ctrl_dly));
 	   
-	   wire [0:flow_ctrl_width-1] flow_ctrl_s, flow_ctrl_q;
-	   assign flow_ctrl_s = flit_ctrl_dly[0:1+vc_idx_width-1];
+	   wire 		      flit_valid_dly;
+	   assign flit_valid_dly = flit_ctrl_dly[0];
+	   
+	   integer 		      seed = initial_seed + num_ports + op;
+	   
+	   reg 			      consume;
+	   initial
+	   begin
+	      consume <= $dist_uniform(seed, 0, 99) < consume_rate;
+	   end
+	   
+	   always @(posedge clk)
+	     begin
+		consume <= $dist_uniform(seed, 0, 99) < consume_rate;
+	     end
+	   
+	   wire [0:flow_ctrl_width-1] flow_ctrl_s;
+	   
+	   wire [0:num_vcs-1] 	      buffer_empty_vc;
+	   
+	   wire [0:num_vcs-1] 	      buffer_push_vc;
+	   wire [0:num_vcs-1] 	      buffer_pop_vc;
+	   
+	   if(num_vcs > 1)
+	     begin
+		
+		wire [0:vc_idx_width-1] flit_vc_dly;
+		assign flit_vc_dly = flit_ctrl_dly[1:1+vc_idx_width-1];
+		
+		wire [0:num_vcs-1] 	sel_vc;
+		c_decoder
+		  #(.num_ports(num_vcs))
+		sel_vc_in_dec
+		  (.data_in(flit_vc_dly),
+		   .data_out(sel_vc));
+		
+		assign buffer_push_vc = {num_vcs{flit_valid_dly}} & sel_vc;
+		
+		wire [0:num_vcs-1] 	req_vc;
+		assign req_vc = ~buffer_empty_vc;
+		
+		wire 			update;
+		assign update = ~&buffer_empty_vc & consume;
+		
+		wire [0:num_vcs-1] 	gnt_vc;
+		c_rr_arbiter
+		  #(.num_ports(num_vcs),
+		    .reset_type(reset_type))
+		buffer_sel_vc_arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .update(update),
+		   .active(1'b1),
+		   .req(req_vc),
+		   .gnt(gnt_vc));
+		
+		assign buffer_pop_vc = {num_vcs{consume}} & gnt_vc;
+		
+		wire [0:vc_idx_width-1] flit_vc_out;
+		c_encoder
+		  #(.num_ports(num_vcs))
+		flit_vc_out_enc
+		  (.data_in(gnt_vc),
+		   .data_out(flit_vc_out));
+		
+		assign flow_ctrl_s[0] = update;
+		assign flow_ctrl_s[1:1+vc_idx_width-1] = flit_vc_out;
+		
+	     end
+	   else
+	     begin
+		assign buffer_push_vc = flit_valid_dly;
+		assign buffer_pop_vc = ~buffer_empty_vc & consume;
+		assign flow_ctrl_s = buffer_pop_vc;
+	     end
+	   
+	   wire [0:num_vcs-1]       buffer_error_vc;
+	   
+	   genvar 		    vc;
+	   
+	   for(vc = 0; vc < num_vcs; vc = vc + 1)
+	     begin:vcs
+		
+		wire buffer_push;
+		assign buffer_push = buffer_push_vc[vc];
+		
+		wire buffer_pop;
+		assign buffer_pop = buffer_pop_vc[vc];
+		
+		wire [0:flit_buffer_idx_width-1] buffer_write_addr;
+		wire [0:flit_buffer_idx_width-1] buffer_read_addr;		
+		wire [0:flit_buffer_idx_width-1] buffer_peek_addr;		
+		wire buffer_almost_empty;
+		wire buffer_empty;
+		wire buffer_almost_full;
+		wire buffer_full;
+		wire [0:1] buffer_errors;
+		c_fifo_ctrl
+		  #(.addr_width(flit_buffer_idx_width),
+		    .depth(num_flit_buffers),
+		    .reset_type(reset_type))
+		buffer
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .push(buffer_push),
+		   .pop(buffer_pop),
+		   .write_addr(buffer_write_addr),
+		   .read_addr(buffer_read_addr),
+		   .peek_addr(buffer_peek_addr),
+		   .almost_empty(buffer_almost_empty),
+		   .empty(buffer_empty),
+		   .almost_full(buffer_almost_full),
+		   .full(buffer_full),
+		   .errors(buffer_errors));
+		
+		assign buffer_empty_vc[vc] = buffer_empty;
+		assign buffer_error_vc[vc] = |buffer_errors;
+		
+	     end
+	   
+	   assign buffer_error_op[op] = |buffer_error_vc;
+	   
+	   wire [0:flow_ctrl_width-1] flow_ctrl_q;
 	   c_dff
 	     #(.width(flow_ctrl_width),
 	       .reset_type(reset_type))
 	   flow_ctrlq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(flow_ctrl_s),
 	      .q(flow_ctrl_q));
 	   
@@ -355,7 +487,7 @@ module testbench
 	   flow_ctrl_in_sr
 	     (.clk(clk),
 	      .reset(reset),
-	      .enable(1'b1),
+	      .active(1'b1),
 	      .data_in(flow_ctrl_q),
 	      .data_out(flow_ctrl_in));
 	   
@@ -367,8 +499,8 @@ module testbench
       
    endgenerate
    
-   wire [0:1] tb_errors;
-   assign tb_errors = {|ps_error_ip, rchk_error};
+   wire [0:2] tb_errors;
+   assign tb_errors = {|ps_error_ip, |buffer_error_op, rchk_error};
    
    wire       tb_error;
    assign tb_error = |tb_errors;
@@ -381,6 +513,7 @@ module testbench
    in_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(in_flits_s),
       .q(in_flits_q));
    
@@ -395,6 +528,7 @@ module testbench
    in_credsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(in_creds_s),
       .q(in_creds_q));
    
@@ -409,6 +543,7 @@ module testbench
    out_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(out_flits_s),
       .q(out_flits_q));
    
@@ -423,6 +558,7 @@ module testbench
    out_credsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(out_creds_s),
       .q(out_creds_q));
    
@@ -442,6 +578,7 @@ module testbench
    count_in_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(count_in_flits_s),
       .q(count_in_flits_q));
    
@@ -459,6 +596,7 @@ module testbench
    count_out_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(count_out_flits_s),
       .q(count_out_flits_q));
    

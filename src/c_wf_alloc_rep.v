@@ -70,7 +70,10 @@ module c_wf_alloc_rep
        .max_value(num_ports-1))
    prio_next_incr
      (.data_in(prio_q),
-      .data_out(prio_s));
+      .data_out(prio_next));
+   
+   wire [0:prio_width-1] 	  prio_s;
+   assign prio_s = update ? prio_next : prio_q;
    c_dff
      #(.width(prio_width),
        .reset_type(reset_type))

@@ -253,6 +253,7 @@ module packet_source
 	   waiting_packet_countq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(waiting_packet_count_s),
 	      .q(waiting_packet_count_q));
 	   
@@ -280,6 +281,7 @@ module packet_source
    ready_packet_countq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(ready_packet_count_s),
       .q(ready_packet_count_q));
    
@@ -364,6 +366,7 @@ module packet_source
 		tail_queueq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(tail_queue_s),
 		   .q(tail_queue_q));
 		
@@ -384,6 +387,7 @@ module packet_source
 		push_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
 		
@@ -410,6 +414,7 @@ module packet_source
 		pop_ptrq
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
@@ -437,7 +442,6 @@ module packet_source
 	   
 	   // track header credits using stock credit tracker module
 	   wire 			    head_free;
-	   wire 			    head_free_early;
 	   wire [0:1] 			    errors_hct;
 	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
@@ -445,10 +449,10 @@ module packet_source
 	   hct
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .credit(head_credit),
 	      .debit(head_debit),
 	      .free(head_free),
-	      .free_early(head_free_early),
 	      .errors(errors_hct));
 
 	   assign head_free_ovc[ovc] = head_free;
@@ -463,14 +467,21 @@ module packet_source
 	   cred_countq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
 	   assign free_ovc[ovc] = |cred_count_q;
 	   
+	   wire 		       error_cred_overflow;
+	   assign error_cred_overflow
+	     = (cred_count_q == num_flit_buffers) && credit;
+	   
+	   wire 		       error_cred_underflow;
+	   assign error_cred_underflow = (cred_count_q == 0) && debit;
+	   
 	   wire [0:1] 		       errors_cred;
-	   assign errors_cred = {(cred_count_q == num_flit_buffers) && credit,
-				 (cred_count_q == 0) && debit};
+	   assign errors_cred = {error_cred_overflow, error_cred_underflow};
 	   
 	   assign errors_cred_ovc[ovc*2:(ovc+1)*2-1] = errors_cred;
 	   
@@ -510,6 +521,7 @@ module packet_source
    flit_validq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(flit_valid_s),
       .q(flit_valid_q));
    
@@ -540,7 +552,7 @@ module packet_source
 		localparam [0:num_resource_classes-1] sel_irc
 		  = (1 << (num_resource_classes - 1 - irc));
 		
-		wire [0:port_idx_width-1]      route_port;
+		wire [0:num_ports-1]           route_op;
 		wire 			       inc_rc;
 		vcr_routing_logic
 		  #(.num_resource_classes(num_resource_classes),
@@ -554,12 +566,20 @@ module packet_source
 		rtl
 		  (.clk(clk),
 		   .reset(reset),
+		   .active(1'b1),
 		   .router_address(router_address),
 		   .sel_rc(sel_irc),
 		   .route_info(route_info),
-		   .route_port(route_port),
+		   .route_op(route_op),
 		   .inc_rc(inc_rc));
 		
+		wire [0:port_idx_width-1]      route_port;
+		c_encoder
+		  #(.num_ports(num_ports))
+		route_port_enc
+		  (.data_in(route_op),
+		   .data_out(route_port));
+   		
 		wire [0:la_route_info_width-1] la_route_info;
 		
 		assign la_route_info[0:port_idx_width-1] = route_port;
@@ -879,6 +899,7 @@ module packet_source
 	   headq
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(1'b1),
 	      .d(head_s),
 	      .q(head_q));
 	   
@@ -945,6 +966,7 @@ module packet_source
    out_flitsq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(out_flits_s),
       .q(out_flits_q));
    

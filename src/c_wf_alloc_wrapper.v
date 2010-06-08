@@ -78,7 +78,6 @@ module c_wf_alloc_wrapper
      (.clk(clk),
       .reset(reset),
       .active(active),
-      .active(active),
       .d(req),
       .q(req_int));
    
@@ -89,7 +88,6 @@ module c_wf_alloc_wrapper
    gntq
      (.clk(clk),
       .reset(reset),
-      .active(active),
       .active(active),
       .d(gnt_int),
       .q(gnt));

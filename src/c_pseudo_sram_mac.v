@@ -83,7 +83,7 @@ module c_pseudo_sram_mac
    // make read timing behave like SRAM (read address selects entry to be read 
    // out in next cycle)
    wire [0:addr_width-1] read_address_s, read_address_q;
-   assign read_address_s = read_address;
+   assign read_address_s = read_enable ? read_address : read_address_q;
    c_dff
      #(.width(addr_width),
        .reset_type(reset_type))
