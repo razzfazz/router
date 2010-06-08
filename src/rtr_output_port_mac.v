@@ -31,9 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port module
 module rtr_output_port_mac
-  (clk, reset, ds_flow_ctrl_out, us_flow_ctrl_in, flit_ctrl_out, 
-   flit_data_out, elig_ovc, free_ovc, free_plus1_ovc, req, req_ovc,
-   req_head, req_tail, gnt, error);
+  (clk, reset, flow_ctrl_out, flow_ctrl_in, flit_data_in, elig_ovc, free_ovc, 
+   free_plus1_ovc, act_ip, req_ip, req_ip_ovc, req_head_ip, req_tail_ip, gnt_ip,
+   flit_ctrl_out, flit_data_out, error);
    
    
 `include "c_functions.v"
@@ -72,9 +72,6 @@ module rtr_output_port_mac
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
-   
-   // enable link power management
-   parameter link_pm_enable = 1;
    
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_CREDIT;
@@ -189,19 +186,10 @@ module rtr_output_port_mac
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 1 : 
        -1;
    
-   // width of link power management signals
-   localparam link_pm_width = 1;
-   
-   // width of downstream flow control signals
-   localparam ds_flow_ctrl_width
+   // width of flow control signals
+   localparam flow_ctrl_width
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ?
-       (link_pm_width + 1 + vc_idx_width) :
-       -1;
-   
-   // width of upstream flow control signals
-   localparam us_flow_ctrl_width
-     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ?
-       (link_pm_width + 1 + vc_idx_width) :
+       (1 + vc_idx_width) :
        -1;
    
    
@@ -212,50 +200,54 @@ module rtr_output_port_mac
    input clk;
    input reset;
    
-   // current router's address
-   input [0:router_addr_width-1] router_address;
-   
    // incoming downstream flow control
-   input [0:ds_flow_ctrl_width-1] ds_flow_ctrl_in;
+   input [0:flow_ctrl_width-1] flow_ctrl_in;
    
    // outgoing upstream flow control
-   output [0:us_flow_ctrl_width-1] us_flow_ctrl_out;
-   wire [0:us_flow_ctrl_width-1] us_flow_ctrl_out;
-   
-   // incoming flit control signals
-   input [0:flit_ctrl_width-1] flit_ctrl_in;
+   output [0:flow_ctrl_width-1] flow_ctrl_out;
+   wire [0:flow_ctrl_width-1] flow_ctrl_out;
    
    // incoming flit data
    input [0:flit_data_width-1] flit_data_in;
    
    // bit mask indicating which out VCs are available for allocation
-   input [0:num_ports*num_vcs-1] elig_op_ovc;
+   output [0:num_vcs-1] elig_ovc;
+   wire [0:num_vcs-1] 	      elig_ovc;
    
    // bit mask indicating which output VCs have credits available
-   input [0:num_ports*num_vcs-1] free_op_ovc;
+   output [0:num_vcs-1] free_ovc;
+   wire [0:num_vcs-1] 	      free_ovc;
    
    // bit mask indicating which output VCs have two or more credits available
-   input [0:num_ports*num_vcs-1] free_plus1_op_ovc;
+   output [0:num_vcs-1] free_plus1_ovc;
+   wire [0:num_vcs-1] 	      free_plus1_ovc;
    
-   // request indicator to individual outpout ports
-   output [0:num_ports-1] req_op;
-   wire [0:num_ports-1]       req_op;
+   // activity indicator from input port controllers
+   input [0:num_ports-1] act_ip;
+   
+   // request indicator from individual input ports
+   input [0:num_ports-1] req_ip;
    
    // output VC selector for current request
-   output [0:num_vcs-1] req_ovc;
-   wire [0:num_vcs-1] 	      req_ovc;
+   input [0:num_ports*num_vcs-1] req_ip_ovc;
    
    // head indicator for current request
-   output req_head;
-   wire 		      req_head;
+   input [0:num_ports-1] req_head_ip;
    
    // tail indicator for current request
-   output req_tail;
-   wire 		      req_tail;
+   input [0:num_ports-1] req_tail_ip;
    
-   // grant indicators from all output ports
-   input [0:num_ports-1] gnt_op;
-
+   // grant indicators to individual input ports
+   input [0:num_ports-1] gnt_ip;
+   
+   // outgoing flit control signals
+   output [0:flit_ctrl_width-1] flit_ctrl_out;
+   wire [0:flit_ctrl_width-1] flit_ctrl_out;
+   
+   // outgoing flit data
+   output [0:flit_data_width-1] flit_data_out;
+   wire [0:flit_data_width-1] flit_data_out;
+   
    // error indicator
    output error;
    wire 		      error;
@@ -265,10 +257,52 @@ module rtr_output_port_mac
    // forward declarations
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	      fbf_empty_ivc;
-   wire [0:num_vcs-1] 	      fbf_full_ivc;
-   wire [0:num_vcs-1] 	      arb_flit_sel_ivc;
-   wire 		      arb_flit_done;
+   
+   //---------------------------------------------------------------------------
+   // input-side arbitration interface
+   //---------------------------------------------------------------------------
+   
+   wire 		      iai_active;
+   assign iai_active = |act_ip;
+   
+   generate
+      
+      begin:iai
+	 
+	 
+      end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // credit checking logic
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      begin:cck
+	 
+	 wire [0:num_vcs*num_ports-1] req_ovc_ip;
+	 c_interleaver
+	   #(.width(num_ports*num_vcs),
+	     .num_blocks(num_ports))
+	 req_ovc_ip_intl
+	   (.data_in(req_ip_ovc),
+	    .data_out(req_ovc_ip));
+	 
+	 wire [0:num_ports-1] 	      free_ip;
+	 c_select_mofn
+	   #(.num_ports(num_vcs),
+	     .width(num_ports))
+	 free_ip_sel
+	   (.select(free_ovc),
+	    .data_in(req_ovc_ip),
+	    .data_out(free_ip));
+	 
+      end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------

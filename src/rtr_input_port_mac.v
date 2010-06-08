@@ -32,13 +32,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port module
 module rtr_input_port_mac
   (clk, reset, router_address, flow_ctrl_in, flow_ctrl_out, flit_ctrl_in, 
-   flit_data_in, elig_op_ovc, free_op_ovc, free_plus1_op_ovc, req_op, req_ovc, 
-   req_head, req_tail, gnt_op, flit_data_out, error);
+   flit_data_in, elig_op_ovc, free_op_ovc, act_op, req_op, req_ovc, req_head, 
+   req_tail, gnt_op, flit_data_out, error);
    
    
-`include "c_functions.v"
-`include "c_constants.v"
-   
+`include "c_constants.v"   
 `include "rtr_constants.v"
    
    
@@ -111,7 +109,11 @@ module rtr_input_port_mac
    parameter port_id = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
-      
+   
+   
+`include "c_functions.v"
+`include "rtr_functions.v"
+   
    
    //---------------------------------------------------------------------------
    // derived parameters
@@ -237,11 +239,12 @@ module rtr_input_port_mac
    // bit mask indicating which out VCs are available for allocation
    input [0:num_ports*num_vcs-1] elig_op_ovc;
    
-   // bit mask indicating which output VCs have credits available
-   input [0:num_ports*num_vcs-1] free_op_ovc;
+   // credit availability indicator for each output VCs
+   input [0:num_ports*num_vcs*2-1] free_op_ovc;
    
-   // bit mask indicating which output VCs have two or more credits available
-   input [0:num_ports*num_vcs-1] free_plus1_op_ovc;
+   // activity indicator to output port controllers
+   output [0:num_ports-1] act_op;
+   wire [0:num_ports-1] 	 act_op;
    
    // request indicator to individual outpout ports
    output [0:num_ports-1] req_op;
@@ -275,12 +278,10 @@ module rtr_input_port_mac
    // forward declarations
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	      fbc_empty_ivc;
    wire [0:num_vcs-1] 	      fbc_full_ivc;
    
    wire [0:num_vcs-1] 	      oai_gnt_ivc;
    wire 		      oai_gnt;
-   wire [0:num_vcs-1] 	      oms_gnt_ivc;
    
    
    //---------------------------------------------------------------------------
@@ -312,6 +313,7 @@ module rtr_input_port_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_vcs-1] 	      irs_flit_valid_ivc;
+   wire 		      irs_flit_valid;
    
    wire 		      irs_active;
    assign irs_active = dfc_active | |irs_flit_valid_ivc;
@@ -339,7 +341,8 @@ module rtr_input_port_mac
 	    .q(flit_valid_ivc_q));
 	 
 	 assign irs_flit_valid_ivc = flit_valid_ivc_q;
-	 
+	 assign irs_flit_valid = |flit_valid_ivc_q;
+	 	 
 	 wire [0:flit_ctrl_width-1] flit_ctrl_s, flit_ctrl_q;
 	 assign flit_ctrl_s = flit_ctrl_in;
 	 c_dff
@@ -382,24 +385,83 @@ module rtr_input_port_mac
    endgenerate
    
    
+   //-------------------------------------------------------------------
+   // head bit decoder for input register stage
+   //-------------------------------------------------------------------
+   
+   wire 			    ihd_active;
+   assign ihd_active = irs_flit_valid;
+   
+   wire 			    ihd_flit_head;
+   rtr_flit_head_dec
+     #(.packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .reset_type(reset_type))
+   ihd
+     (.clk(clk),
+      .reset(reset),
+      .active(ihd_active),
+      .flit_ctrl(irs_flit_ctrl),
+      .header_info(irs_header_info),
+      .flit_done(irs_flit_valid),
+      .flit_head(ihd_flit_head));
+   
+   
+   //---------------------------------------------------------------------------
+   // decode lookahead routing info for input register
+   //---------------------------------------------------------------------------
+   
+   wire [0:port_idx_width-1] 	    ild_route_port;
+   wire 			    ild_inc_rc;
+   rtr_la_route_dec
+     #(.num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity))
+   ild
+     (.la_route_info(irs_la_route_info),
+      .route_port(ild_route_port),
+      .inc_rc(ild_inc_rc));
+   
+   
+   //---------------------------------------------------------------------------
+   // route port decoder for input register
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports-1] 	  ipd_route_op;
+   c_decoder
+     #(.num_ports(num_ports))
+   ipd
+     (.data_in(ild_route_port),
+      .data_out(ipd_route_op));
+   
+   
    //---------------------------------------------------------------------------
    // buffers and control flow for each input VC
    //---------------------------------------------------------------------------
    
    wire [0:num_vcs-1] 		    fct_flit_valid_ivc;
-   wire [0:num_vcs-1] 		    fct_flit_head_ivc;
-   wire [0:num_vcs-1] 		    fct_flit_tail_ivc;
+   
+   wire [0:num_vcs-1] 		    fcm_flit_valid_ivc;
+   wire [0:num_vcs-1] 		    fcm_flit_head_ivc;
+   wire [0:num_vcs-1] 		    fcm_flit_tail_ivc;
+   
+   wire [0:num_vcs-1] 		    rit_valid_ivc;
+   wire [0:num_vcs*num_ports-1]     vpd_route_ivc_op;
    
    wire [0:num_vcs*num_ports-1]     pf_route_ivc_op;
    wire [0:num_vcs*num_vcs-1] 	    ovt_route_ivc_ovc;
    
    wire [0:num_vcs*la_route_info_width-1] lar_la_route_info_ivc;
    
-   wire [0:num_vcs-1] 			  oct_free_ivc;
+   wire [0:num_vcs-1] 			  pst_prio_ivc;
    
    wire [0:num_vcs*flit_data_width-1] 	  fbf_flit_data_ivc;
    
-   wire [0:num_vcs*5-1] 		  ivcs_errors_ivc;
+   wire [0:num_vcs*4-1] 		  ivcs_errors_ivc;
    
    genvar 				  ivc;
    
@@ -412,7 +474,7 @@ module rtr_input_port_mac
 	   // forward declarations
 	   //-------------------------------------------------------------------
 	   
-	   wire fct_flit_valid;
+	   wire fcm_flit_valid;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -424,9 +486,6 @@ module rtr_input_port_mac
 	   
 	   wire oai_gnt;
 	   assign oai_gnt = oai_gnt_ivc[ivc];
-	   
-	   wire oms_gnt;
-	   assign oms_gnt = oms_gnt_ivc[ivc];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -459,7 +518,7 @@ module rtr_input_port_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire fbc_active;
-	   assign fbc_active = fct_flit_valid;
+	   assign fbc_active = fcm_flit_valid;
 	   
 	   wire 			fbc_push;
 	   assign fbc_push = irs_flit_valid;
@@ -587,18 +646,19 @@ module rtr_input_port_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // track control info for current flit
+	   // track control info for front-most flit in buffer
 	   //-------------------------------------------------------------------
 	   
-	   wire 				fct_active;
-	   assign fct_active = fct_flit_valid;
+	   wire 			  fct_active;
+	   assign fct_active = fcm_flit_valid;
 	   
-	   wire 				fct_flit_head;
-	   wire 				fct_flit_tail;
+	   wire 			  fct_flit_valid;
+	   wire 			  fct_flit_head;
+	   wire 			  fct_flit_tail;
 	   
 	   begin:fct
 	      
-	      assign fct_flit_valid = irs_flit_valid | ~fbc_empty;
+	      assign fct_flit_valid = ~fbc_empty;
 	      
 	      wire hold;
 	      assign hold = ~fbc_empty & ~oai_gnt;
@@ -622,7 +682,7 @@ module rtr_input_port_mac
 		 .d(flit_head_s),
 		 .q(flit_head_q));
 	      
-	      assign fct_flit_head = fbc_empty ? fcd_flit_head : flit_head_q;
+	      assign fct_flit_head = flit_head_q;
 	      
 	      wire muxed_flit_tail;
 	      assign muxed_flit_tail
@@ -640,7 +700,34 @@ module rtr_input_port_mac
 		 .d(flit_tail_s),
 		 .q(flit_tail_q));
 	      
-	      assign fct_flit_tail = fbc_empty ? fcd_flit_tail : flit_tail_q;
+	      assign fct_flit_tail = flit_tail_q;
+	      
+	   end
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // control info bypass mux
+	   //-------------------------------------------------------------------
+
+	   wire    fcm_flit_head;
+	   wire    fcm_flit_tail;
+	   
+	   begin:fcm
+	      
+	      wire flit_valid;
+	      assign flit_valid = irs_flit_valid | fct_flit_valid;
+	      
+	      assign fcm_flit_valid = flit_valid;
+	      
+	      wire flit_head;
+	      assign flit_head = fct_flit_valid ? fct_flit_head : fcd_flit_head;
+	      
+	      assign fcm_flit_head = flit_head;
+	      
+	      wire flit_tail;
+	      assign flit_tail = fct_flit_valid ? fct_flit_tail : fcd_flit_tail;
+	      
+	      assign fcm_flit_tail = flit_tail;
 	      
 	   end
 	   
@@ -650,26 +737,25 @@ module rtr_input_port_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire 			rit_active;
-	   assign rit_active = fct_flit_valid;
+	   assign rit_active = fcm_flit_valid;
 	   
 	   wire [0:la_route_info_width-1] rit_la_route_info;
 	   wire [0:route_info_width-1] 	  rit_route_info;
 	   wire 			  rit_valid;
-	   wire 			  rit_error;
 	   
 	   begin:rit
 	      
 	      wire valid_q;
 	      
 	      wire hold;
-	      assign hold = valid_q & (~oai_gnt | ~fct_flit_tail);
+	      assign hold = valid_q & (~oai_gnt | ~fcm_flit_tail);
 	      
 	      wire capture_fbf;
 	      assign capture_fbf = ~fbc_empty & ~fbc_almost_empty;
 	      
 	      wire muxed_valid;
 	      assign muxed_valid = (capture_fbf | irs_flit_valid) &
-				   ~(fbc_empty & oai_gnt & fct_flit_tail);
+				   ~(fbc_empty & oai_gnt & fcm_flit_tail);
 	      
 	      wire valid_s;
 	      assign valid_s = hold ? valid_q : muxed_valid;
@@ -682,6 +768,8 @@ module rtr_input_port_mac
 		 .active(rit_active),
 		 .d(valid_s),
 		 .q(valid_q));
+	      
+	      assign rit_valid = valid_q;
 	      
 	      wire [0:la_route_info_width-1] muxed_la_route_info;
 	      assign muxed_la_route_info
@@ -700,8 +788,7 @@ module rtr_input_port_mac
 		 .d(la_route_info_s),
 		 .q(la_route_info_q));
 	      
-	      assign rit_la_route_info
-		= valid_q ? la_route_info_q : irs_la_route_info;
+	      assign rit_la_route_info = la_route_info_q;
 	      
 	      wire [0:route_info_width-1]    muxed_route_info;
 	      assign muxed_route_info
@@ -720,82 +807,94 @@ module rtr_input_port_mac
 		 .d(route_info_s),
 		 .q(route_info_q));
 	      
-	      assign rit_route_info
-		= valid_q ? route_info_q : irs_route_info;
-	      
-	      assign rit_valid = valid_q | (irs_flit_valid /*& fcd_flit_head*/);
-	      
-	      // check for stray body/tail flit at input
-	      assign rit_error = ~valid_q & irs_flit_valid & ~fcd_flit_head;
+	      assign rit_route_info = route_info_q;
 	      
 	   end
 	   
-	   // synopsys translate_off
-	   always @(posedge clk)
-	     begin
-		if(rit_error)
-		  $display({"ERROR: Stray body/tail flit at input port %d, ", 
-			    "VC %d."}, port_id, ivc);
-	     end
-	   // synopsys translate_on
-	   
 	   
 	   //-------------------------------------------------------------------
-	   // decode and update lookahead routing info
+	   // decode lookahead routing info for this VC
 	   //-------------------------------------------------------------------
 	   
-	   wire 				lar_active;
-	   assign lar_active = fct_flit_valid;
-	   
-	   wire [0:port_idx_width-1] 	  lar_route_port;
-	   wire 			  lar_inc_rc;
-	   wire [0:la_route_info_width-1] lar_la_route_info;
-	   wire 			  lar_error_unmasked;
-	   rtr_la_routing_logic
-	     #(.num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
+	   wire [0:port_idx_width-1] 	    vld_route_port;
+	   wire 			    vld_inc_rc;
+	   rtr_la_route_dec
+	     #(.num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
 	       .connectivity(connectivity),
-	       .routing_type(routing_type),
-	       .dim_order(dim_order),
-	       .port_id(port_id),
 	       .vc_id(ivc))
-	   lar
-	     (.router_address(router_address),
-	      .la_route_info_in(rit_la_route_info),
-	      .route_port(lar_route_port),
-	      .inc_rc(lar_inc_rc),
-	      .route_info_in(rit_route_info),
-	      .la_route_info_out(lar_la_route_info),
-	      .error(lar_error_unmasked));
-	   
-	   wire 			  lar_error;
-	   assign lar_error = rit_valid & lar_error_unmasked;
-	   
-	   // synopsys translate_off
-	   always @(posedge clk)
-	     begin
-		if(lar_error)
-		  $display({"ERROR: Invalid lookahead routing information ", 
-			    "detected at input port %d, VC %d."}, 
-			   port_id, ivc);
-	     end
-	   // synopsys translate_on
+	   vld
+	     (.la_route_info(rit_la_route_info),
+	      .route_port(vld_route_port),
+	      .inc_rc(vld_inc_rc));
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // route port decoder
+	   // route port decoder for this VC
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_ports-1] 	  rpd_route_op;
+	   wire [0:num_ports-1] 	  vpd_route_op;
 	   c_decoder
 	     #(.num_ports(num_ports))
-	   rpd
-	     (.data_in(lar_route_port),
-	      .data_out(rpd_route_op));
+	   vpd
+	     (.data_in(vld_route_port),
+	      .data_out(vpd_route_op));
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // route info mux
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:route_info_width-1] rim_route_info;
+	   wire [0:port_idx_width-1]   rim_route_port;
+	   wire [0:num_ports-1]        rim_route_op;
+	   wire 		       rim_inc_rc;
+	   wire 		       rim_valid;
+	   wire 		       rim_error;
+	   
+	   begin:rim
+	      
+	      wire [0:route_info_width-1] route_info;
+	      assign route_info = rit_valid ? rit_route_info : irs_route_info;
+	      
+	      assign rim_route_info = route_info;
+	      
+	      wire [0:port_idx_width-1]   route_port;
+	      assign route_port = rit_valid ? vld_route_port : ild_route_port;
+	      
+	      assign rim_route_port = route_port;
+	      
+	      wire [0:num_ports-1] 	  route_op;
+	      assign route_op = rit_valid ? vpd_route_op : ipd_route_op;
+	      
+	      assign rim_route_op = route_op;
+	      
+	      wire 			  inc_rc;
+	      assign inc_rc = rit_valid ? vld_inc_rc : ild_inc_rc;
+	      
+	      assign rim_inc_rc = inc_rc;
+	      
+	      // NOTE: At the input register, we're really only interested in 
+	      // head flits; however, if rit_valid is false (i.e., routing info 
+	      // hasn't been set yet for the current VC), the next flit to 
+	      // arrive for this VC must be a head flit. Thus, to simplify the 
+	      // logic, we just assume the correct case, and flag an error 
+	      // otherwise.
+	      wire 			  valid;
+	      assign valid = rit_valid | (irs_flit_valid /*& fcd_flit_head*/);
+	      
+	      assign rim_valid = valid;
+	      
+	      // check for stray body/tail flit at input
+	      wire 			  error;
+	      assign error = ~rit_valid & irs_flit_valid & ~fcd_flit_head;
+	      
+	      assign rim_error = error;
+	      
+	   end
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -817,13 +916,13 @@ module rtr_input_port_mac
 	       .port_id(port_id),
 	       .vc_id(ivc))
 	   pf
-	     (.route_in_op(rpd_route_op),
-	      .inc_rc(lar_inc_rc),
+	     (.route_in_op(rim_route_op),
+	      .inc_rc(rim_inc_rc),
 	      .route_out_op(pf_route_op),
 	      .error(pf_error_unmasked));
 	   
 	   wire 			  pf_error;
-	   assign pf_error = rit_valid & pf_error_unmasked;
+	   assign pf_error = rim_valid & pf_error_unmasked;
 	   
 	   // synopsys translate_off
 	   always @(posedge clk)
@@ -836,11 +935,14 @@ module rtr_input_port_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // mux for selecting next eligible VC for current VC's packet class
+	   // decode and update lookahead routing info
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs_per_class-1]   vem_elig_ocvc;
-	   rtr_vc_flag_mux
+	   wire lar_active;
+	   assign lar_active = irs_flit_valid | fct_flit_valid;// FIXME: this really only needs to be activated for head flits!
+	   
+	   wire [0:la_route_info_width-1] lar_la_route_info;
+	   rtr_la_routing_logic
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
@@ -848,20 +950,87 @@ module rtr_input_port_mac
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
 	       .connectivity(connectivity),
-	       .vc_id(ivc))
-	   vem
-	     (.route_port(lar_route_port),
-	      .inc_rc(lar_inc_rc),
-	      .flag_op_ovc(elig_op_ovc),
-	      .flag_ocvc(vem_elig_ocvc));
+	       .routing_type(routing_type),
+	       .dim_order(dim_order),
+	       .vc_id(ivc),
+	       .reset_type(reset_type))
+	   lar
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(lar_active),
+	      .router_address(router_address),
+	      .route_port(rim_route_port),
+	      .inc_rc(rim_inc_rc),
+	      .route_info(rim_route_info),
+	      .la_route_info(lar_la_route_info));
 	   
+	   
+	   //-------------------------------------------------------------------
+	   // mux for selecting eligible VCs in destination packet class
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:num_vcs_per_class-1]   vem_elig_ocvc;
+	   
+	   begin:vem
+	      
+	      wire [0:num_vcs-1] elig_ovc;
+	      assign elig_ovc = elig_op_ovc[rim_route_port*num_vcs +: num_vcs];
+	      
+	      wire [0:num_vcs_per_class-1] elig_ocvc;
+	      if(vc_resource_class(ivc) == (num_resource_classes - 1))
+		assign elig_ocvc = elig_ovc[vc_packet_class(ivc)*
+					    num_vcs_per_class:
+					    (vc_packet_class(ivc)+1)*
+					    num_vcs_per_class-1];
+	      else
+		   assign elig_ocvc = rim_inc_rc ? 
+				      elig_ovc[(vc_packet_class(ivc)+1)*
+					       num_vcs_per_class:
+					       (vc_packet_class(ivc)+2)*
+					       num_vcs_per_class-1] : 
+				      elig_ovc[vc_packet_class(ivc)*
+					       num_vcs_per_class:
+					       (vc_packet_class(ivc)+1)*
+					       num_vcs_per_class-1];
+	      
+	      assign vem_elig_ocvc = elig_ocvc;
+	      
+	   end
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // arbitrate among all eligible VCs for selected packet class
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:num_vcs_per_class-1]   vea_next_elig_ocvc;
+	   
+	   begin:vea
+	      
+	      wire [0:num_vcs_per_class-1] req;
+	      assign req = vem_elig_ocvc;
+
+	      wire [0:num_vcs_per_class-1] gnt;
+	      c_fp_arbiter
+		#(.num_ports(num_vcs_per_class))
+	      vea
+		(.req(req),
+		 .gnt(gnt));
+
+	      assign vea_next_elig_ocvc = gnt;
+	      
+	   end
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // 
+	   //-------------------------------------------------------------------
 	   
 	   //-------------------------------------------------------------------
 	   // track which output VC this input VC is assigned to
 	   //-------------------------------------------------------------------
 	   
 	   wire 			  ovt_active;
-	   assign ovt_active = fct_flit_valid;
+	   assign ovt_active = fcm_flit_valid;
 	   
 	   wire [0:num_vcs_per_class-1]   ovt_assigned_ocvc;
 	   wire [0:num_vcs-1] 		  ovt_route_ovc;
@@ -870,7 +1039,7 @@ module rtr_input_port_mac
 	      
 	      wire [0:num_vcs_per_class-1] assigned_ocvc_s, assigned_ocvc_q;
 	      assign assigned_ocvc_s
-		= fcd_flit_head ? vem_elig_ocvc : assigned_ocvc_q;
+		= fcm_flit_head ? vea_next_elig_ocvc : assigned_ocvc_q;
 	      c_dff
 		#(.width(num_vcs_per_class),
 		  .reset_type(`RESET_TYPE_NONE))
@@ -885,7 +1054,7 @@ module rtr_input_port_mac
 	      
 	      wire [0:num_vcs_per_class-1] vcmask_ocvc;
 	      assign vcmask_ocvc
-		= {num_vcs_per_class{fcd_flit_head}} | ovt_assigned_ocvc;
+		= {num_vcs_per_class{fcm_flit_head}} | ovt_assigned_ocvc;
 	      
 	      rtr_vc_align
 		#(.num_message_classes(num_message_classes),
@@ -894,116 +1063,101 @@ module rtr_input_port_mac
 		  .vc_id(ivc))
 	      ovt_route_ovc_vagn
 		(.flag_ocvc(vcmask_ocvc),
-		 .inc_rc(lar_inc_rc),
+		 .inc_rc(rim_inc_rc),
 		 .flag_ovc(ovt_route_ovc));
 	      
 	   end
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // track assigned output VC's credit level
+	   // track priority status
 	   //-------------------------------------------------------------------
 	   
-	   wire 			   oct_active;
-	   assign oct_active = fct_flit_valid;
+	   wire 			   pst_active;
+	   assign pst_active = rim_valid;
 	   
-	   wire 			   oct_free;
+	   wire 			   pst_prio;
 	   
-	   begin:oct
+	   begin:pst
 	      
-	      wire [0:num_vcs-1] free_ovc;
-	      assign free_ovc = free_op_ovc[lar_route_port*num_vcs +: num_vcs];
+	      wire [0:num_vcs*2-1] free_ovc;
+	      assign free_ovc
+		= free_op_ovc[rim_route_port*num_vcs*2 +: num_vcs*2];
 	      
-	      wire [0:num_vcs_per_class-1] free_ocvc;
-	      rtr_vc_flag_mux
-		#(.num_message_classes(num_message_classes),
-		  .num_resource_classes(num_resource_classes),
-		  .num_vcs_per_class(num_vcs_per_class),
-		  .num_routers_per_dim(num_routers_per_dim),
-		  .num_dimensions(num_dimensions),
-		  .num_nodes_per_router(num_nodes_per_router),
-		  .connectivity(connectivity),
-		  .vc_id(ivc))
-	      free_ocvc_fm
-		(.route_port(lar_route_port),
-		 .inc_rc(lar_inc_rc),
-		 .flag_op_ovc(free_op_ovc),
-		 .flag_ocvc(free_ocvc));
+	      wire [0:num_vcs_per_class*2-1] free_ocvc;
+	      if(vc_resource_class(ivc) == (num_resource_classes - 1))
+		assign free_ocvc = free_ovc[vc_packet_class(ivc)*
+					    num_vcs_per_class*2:
+					    (vc_packet_class(ivc)+1)*
+					    num_vcs_per_class*2-1];
+	      else
+		   assign free_ocvc = rim_inc_rc ? 
+				      free_ovc[(vc_packet_class(ivc)+1)*
+					       num_vcs_per_class*2:
+					       (vc_packet_class(ivc)+2)*
+					       num_vcs_per_class*2-1] :
+				      free_ovc[vc_packet_class(ivc)*
+					       num_vcs_per_class*2:
+					       (vc_packet_class(ivc)+1)*
+					       num_vcs_per_class*2-1];
 	      
-	      wire [0:num_vcs-1] 	   free_plus1_ovc;
-	      assign free_plus1_ovc
-		= free_plus1_op_ovc[lar_route_port*num_vcs +: num_vcs];
-	      
-	      wire [0:num_vcs_per_class-1] free_plus1_ocvc;
-	      rtr_vc_flag_mux
-		#(.num_message_classes(num_message_classes),
-		  .num_resource_classes(num_resource_classes),
-		  .num_vcs_per_class(num_vcs_per_class),
-		  .num_routers_per_dim(num_routers_per_dim),
-		  .num_dimensions(num_dimensions),
-		  .num_nodes_per_router(num_nodes_per_router),
-		  .connectivity(connectivity),
-		  .vc_id(ivc))
-	      free_plus1_ocvc_fm
-		(.route_port(lar_route_port),
-		 .inc_rc(lar_inc_rc),
-		 .flag_op_ovc(free_plus1_op_ovc),
-		 .flag_ocvc(free_plus1_ocvc));
-	      
-	      wire 			   free;
-	      wire 			   free_plus1;
+	      wire [0:1] 		     free;
 	      
 	      if(num_vcs_per_class > 1)
 		begin
 		   
 		   wire [0:num_vcs_per_class-1] sel_ocvc;
 		   assign sel_ocvc
-		     = fcd_flit_head ? vem_elig_ocvc : ovt_assigned_ocvc;
+		     = fcm_flit_head ? vem_elig_ocvc : ovt_assigned_ocvc;
 		   
-		   assign free = |(sel_ocvc & free_ocvc);
-		   assign free_plus1 = |(sel_ocvc & free_plus1_ocvc);
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(2))
+		   free_sel
+		     (.select(sel_ocvc),
+		      .data_in(free_ocvc),
+		      .data_out(free));
 		   
 		end
 	      else
 		begin
 		   assign free = free_ocvc;
-		   assign free_plus1 = free_plus1_ocvc;
 		end
 	      
-	      wire free_s, free_q;
-	      assign free_s = free;
+	      wire free_1plus;
+	      assign free_1plus = |free;
+	      
+	      wire free_2plus;
+	      assign free_2plus = free[0];
+	      
+	      
+	      wire prio_s, prio_q;
+	      assign prio_s = fcm_flit_valid ?
+			      :
+			      free_1plus;
+	      
+			      /*
+			       FIXME:
+			       packet valid and flit valid and head and not sent --> elig
+			       packet valid and flit valid and head and not tail and sent --> free_2p
+			       packet valid and flit valid and head and tail and sent --> 0
+			       packet valid and flit valid and not head and not sent --> free_1p
+			       packet valid and flit valid and not head and not tail and sent --> free_2p
+			       packet valid and flit valid and not head and tail and sent --> 0
+			       packet valid and flit not valid --> free_1p
+			       packet not valid --> 0
+			       */
 	      c_dff
 		#(.width(1),
 		  .reset_type(`RESET_TYPE_NONE))
-	      free_earlyq
+	      prioq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(oct_active),
-		 .d(free_s),
-		 .q(free_q));
+		 .active(pst_active),
+		 .d(prio_s),
+		 .q(prio_q));
 	      
-	      wire free_plus1_s, free_plus1_q;
-	      assign free_plus1_s = free_plus1;
-	      c_dff
-		#(.width(1),
-		  .reset_type(`RESET_TYPE_NONE))
-	      free_plus1q
-		(.clk(clk),
-		 .reset(1'b0),
-		 .active(oct_active),
-		 .d(free_plus1_s),
-		 .q(free_plus1_q));
-	      
-	      // If we did not send a flit in the previous cycle, the credit 
-	      // status for the current cycle will be the same as that for the 
-	      // previous cycle; otherwise, we only know for sure that credits 
-	      // are still available in the current cycle if there were two or 
-	      // more credits available in the previous cycle. Note, however, 
-	      // that this is pessimistic, as it does not account for any 
-	      // additional credits that may have been received in the previous 
-	      // cycle. Also, the result is only valid once VC allocation has
-	      // been performed; in particular, it is not valid for head flits.
-	      assign oct_free = oms_gnt ? free_plus1_q : free_q;
+	      assign pst_prio = prio_q;
 	      
 	   end
 	   
@@ -1012,11 +1166,10 @@ module rtr_input_port_mac
 	   // collect errors
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:4] 			     ivcs_errors;
+	   wire [0:3] ivcs_errors;
 	   assign ivcs_errors[0:1] = fbc_errors;
-	   assign ivcs_errors[2] = rit_error;
-	   assign ivcs_errors[3] = lar_error;
-	   assign ivcs_errors[4] = pf_error;
+	   assign ivcs_errors[2] = rim_error;
+	   assign ivcs_errors[3] = pf_error;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -1024,18 +1177,23 @@ module rtr_input_port_mac
 	   //-------------------------------------------------------------------
 	   
 	   assign fct_flit_valid_ivc[ivc] = fct_flit_valid;
-	   assign fct_flit_head_ivc[ivc] = fct_flit_head;
-	   assign fct_flit_tail_ivc[ivc] = fct_flit_tail;
+	   
+	   assign fcm_flit_valid_ivc[ivc] = fcm_flit_valid;
+	   assign fcm_flit_head_ivc[ivc] = fcm_flit_head;
+	   assign fcm_flit_tail_ivc[ivc] = fcm_flit_tail;
+	   
+	   assign rit_valid_ivc[ivc] = rit_valid;
+	   assign vpd_route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
+		    = vpd_route_op;
 	   
 	   assign pf_route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 		    = pf_route_op;
 	   assign ovt_route_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
 		    = ovt_route_ovc;
 	   
-	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign fbc_full_ivc[ivc] = fbc_full;
 	   
-	   assign oct_free_ivc[ivc] = oct_free;
+	   assign pst_prio_ivc[ivc] = pst_prio;
 	   
 	   assign lar_la_route_info_ivc[ivc*la_route_info_width:
 					(ivc+1)*la_route_info_width-1]
@@ -1045,7 +1203,7 @@ module rtr_input_port_mac
 				    (ivc+1)*flit_data_width-1]
 		    = fbf_read_flit_data;
 	   
-	   assign ivcs_errors_ivc[ivc*5:(ivc+1)*5-1] = ivcs_errors;
+	   assign ivcs_errors_ivc[ivc*4:(ivc+1)*4-1] = ivcs_errors;
 	   
 	end
       
@@ -1057,7 +1215,7 @@ module rtr_input_port_mac
    //---------------------------------------------------------------------------
    
    wire 				     iva_active;
-   assign iva_active = |(irs_flit_valid_ivc | ~fbc_empty_ivc);
+   assign iva_active = irs_flit_valid | |fct_flit_valid_ivc;
    
    wire [0:num_vcs-1] 			     iva_sel_ivc;
    
@@ -1066,18 +1224,17 @@ module rtr_input_port_mac
       begin:iva
 	 
 	 //---------------------------------------------------------------------
-	 // arbitrate among high-priority requests (body/tail flits with credit)
+	 // arbitrate among high-priority requests
 	 //---------------------------------------------------------------------
 	 
 	 wire [0:num_vcs-1] req_hp_ivc;
-	 assign req_hp_ivc
-	   = fct_flit_valid_ivc & ~fct_flit_head_ivc & oct_free_ivc;
+	 assign req_hp_ivc = fcm_flit_valid_ivc & pst_prio_ivc;
 	 
 	 wire 		    gnt_hp;
 	 assign gnt_hp = |req_hp_ivc;
 	 
 	 wire 		    update_hp;
-	 assign update_hp = gnt_hp;
+	 assign update_hp = gnt_hp & oai_gnt;
 	 
 	 wire [0:num_vcs-1] gnt_hp_ivc;
 	 c_arbiter
@@ -1093,37 +1250,77 @@ module rtr_input_port_mac
 	 
 	 
 	 //---------------------------------------------------------------------
-	 // arbitrate among low-priority requests (head flits or no credit)
+	 // arbitrate among low-priority requests
 	 //---------------------------------------------------------------------
 	 
 	 wire [0:num_vcs-1] req_lp_ivc;
-	 assign req_lp_ivc
-	   = fct_flit_valid_ivc & (fct_flit_head_ivc | ~oct_free_ivc);
+	 assign req_lp_ivc = fcm_flit_valid_ivc;
 	 
 	 wire 		    gnt_lp;
-	 assign gnt_lp = |req_lp_ivc;
+	 assign gnt_lp = |req_lp_ivc & ~gnt_hp;
 	 
 	 wire 		    update_lp;
-	 assign update_lp = gnt_lp & ~gnt_hp;
+	 assign update_lp = gnt_lp & oai_gnt;
 	 
-	 wire [0:num_vcs-1] gnt_lp_ivc;
+	 wire [0:num_vcs-1] gnt_lp_raw_ivc;
 	 c_arbiter
 	   #(.num_ports(num_vcs),
 	     .arbiter_type(arbiter_type))
-	 gnt_lp_ivc_arb
+	 gnt_lp_raw_ivc_arb
 	   (.clk(clk),
 	    .reset(reset),
 	    .active(iva_active),
 	    .req(req_lp_ivc),
-	    .gnt(gnt_lp_ivc),
+	    .gnt(gnt_lp_raw_ivc),
 	    .update(update_lp));
+	 
+	 wire [0:num_vcs-1] gnt_lp_ivc;
+	 assign gnt_lp_ivc = gnt_lp_raw_ivc & {num_vcs{~gnt_hp}};
 	 
 	 
 	 //---------------------------------------------------------------------
 	 // combine grants
 	 //---------------------------------------------------------------------
 	 
-	 assign iva_sel_ivc = gnt_hp ? gnt_hp_ivc : gnt_lp_ivc;
+	 assign iva_sel_ivc = gnt_hp_ivc | gnt_lp_ivc;
+	 
+      end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // output-side power management logic
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      begin:opm
+	 
+	 wire [0:num_ports-1] iact_op;
+	 assign iact_op
+	   = ipd_route_op & {num_ports{irs_flit_valid & ihd_flit_head}};
+	 
+	 wire [0:num_ports-1] vact_op;
+	 c_select_mofn
+	   #(.num_ports(num_vcs),
+	     .width(num_ports))
+	 vact_op_sel
+	   (.select(rit_valid_ivc),
+	    .data_in(vpd_route_ivc_op),
+	    .data_out(vact_op));
+	 
+	 // NOTE: Enable clocks for output modules whenever that output is 
+	 // selected by one or more VCs, or if a new head flit arrives whose 
+	 // lookahead routing information indicates it is destined for it.
+	 // Note that this is pessimistic in both cases: For the VCs, there may
+	 // not currently be a flit available, so a request may not be 
+	 // generated; likewise, a newly arriving head flit may end up getting 
+	 // buffered behind another packet, so it too may not cause a request
+	 // to be generated. The reason we opt to use the pessimistic approach 
+	 // is that this allows us to generate the timing-sensitive clock 
+	 // enable signals relatively early on in the clock cycle.
+	 assign act_op = iact_op | vact_op;
 	 
       end
       
@@ -1146,7 +1343,7 @@ module rtr_input_port_mac
 	     .width(1))
 	 head_sel
 	   (.select(iva_sel_ivc),
-	    .data_in(fct_flit_head_ivc),
+	    .data_in(fcm_flit_head_ivc),
 	    .data_out(head));
 	 
 	 assign oai_head = head;
@@ -1157,7 +1354,7 @@ module rtr_input_port_mac
 	     .width(1))
 	 tail_sel
 	   (.select(iva_sel_ivc),
-	    .data_in(fct_flit_tail_ivc),
+	    .data_in(fcm_flit_tail_ivc),
 	    .data_out(tail));
 	 
 	 wire [0:num_ports-1] route_op;
@@ -1199,8 +1396,10 @@ module rtr_input_port_mac
    // output multiplexer stage
    //---------------------------------------------------------------------------
    
+   wire [0:num_vcs-1] 	      oms_gnt_ivc;
+   
    wire 		      oms_active;
-   assign oms_active = |(irs_flit_valid_ivc | ~fbc_empty_ivc | oms_gnt_ivc);
+   assign oms_active = irs_flit_valid | |fct_flit_valid_ivc | |oms_gnt_ivc;
    
    wire [0:flit_data_width-1] oms_flit_data;
    
@@ -1243,7 +1442,7 @@ module rtr_input_port_mac
    //---------------------------------------------------------------------------
    
    wire 			    lau_active;
-   assign lau_active = |(irs_flit_valid_ivc | ~fbc_empty_ivc);
+   assign lau_active = irs_flit_valid | |fct_flit_valid_ivc;// FIXME: this really only needs to be activated for head flits!
    
    generate
       
@@ -1309,7 +1508,7 @@ module rtr_input_port_mac
    //---------------------------------------------------------------------------
    
    wire 		      ufc_active;
-   assign ufc_active = |(irs_flit_valid_ivc | ~fbc_empty_ivc | oms_gnt_ivc);
+   assign ufc_active = irs_flit_valid | |fct_flit_valid_ivc | |oms_gnt_ivc;
    
    wire 		      ufc_cred_valid;
    assign ufc_cred_valid = oai_gnt;
@@ -1342,7 +1541,7 @@ module rtr_input_port_mac
 	begin
 	   
 	   wire chk_active;
-	   assign chk_active = |(irs_flit_valid_ivc | ~fbc_empty_ivc);
+	   assign chk_active = irs_flit_valid | |fct_flit_valid_ivc;
 	   
 	   wire [0:num_vcs*5-1]  errors_s, errors_q;
 	   assign errors_s = ivcs_errors_ivc;
