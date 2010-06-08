@@ -241,49 +241,53 @@ module tc_chan_test_mac
    assign write_ctrl = do_write & ifc_sel_ctrl;
    
    wire 			 active_s, active_q;
-   assign active_s
-     = ifc_active ? (write_ctrl ? ifc_write_data[0] : active_q) : active_q;
+   assign active_s = write_ctrl ? ifc_write_data[0] : active_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    activeq
      (.clk(clk),
       .reset(reset),
+      .active(ifc_active),
       .d(active_s),
       .q(active_q));
    
+   wire 			 reg_active;
+   assign reg_active = ifc_active | active_q;
+   
    wire 			 preset_s, preset_q;
-   assign preset_s
-     = ifc_active ? (write_ctrl ? ifc_write_data[1] : preset_q) : preset_q;
+   assign preset_s = write_ctrl ? ifc_write_data[1] : preset_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    presetq
      (.clk(clk),
       .reset(reset),
+      .active(ifc_active),
       .d(preset_s),
       .q(preset_q));
    
    wire 			 cal_en_s, cal_en_q;
-   assign cal_en_s
-     = ifc_active ? (write_ctrl ? ifc_write_data[2] : cal_en_q) : cal_en_q;
+   assign cal_en_s = write_ctrl ? ifc_write_data[2] : cal_en_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cal_enq
      (.clk(clk),
       .reset(reset),
+      .active(ifc_active),
       .d(cal_en_s),
       .q(cal_en_q));
    
    wire 			 start_s, start_q;
-   assign start_s = ifc_active ? (write_ctrl & ifc_write_data[0]) : start_q;
+   assign start_s = write_ctrl & ifc_write_data[0];
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    startq
      (.clk(clk),
       .reset(reset),
+      .active(ifc_active),
       .d(start_s),
       .q(start_q));
    
@@ -297,15 +301,14 @@ module tc_chan_test_mac
    wire 			 test_duration_zero;
    
    wire 			 running_s, running_q;
-   assign running_s = active_q ? 
-		      ((running_q & ~test_duration_zero) | start_q) : 
-		      running_q;
+   assign running_s = (running_q & ~test_duration_zero) | start_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    runningq
      (.clk(clk),
       .reset(1'b0),
+      .active(active_q),
       .d(running_s),
       .q(running_q));
    
@@ -329,16 +332,15 @@ module tc_chan_test_mac
    wire [0:channel_width-1] 	 errors;
    
    wire [0:channel_width-1] 	 errors_s, errors_q;
-   assign errors_s = active_q ? 
-		     ((errors_q | (errors & {channel_width{~ignore_errors}})) & 
-		      {channel_width{~start_q}}) : 
-		     errors_q;
+   assign errors_s = (errors_q | (errors & {channel_width{~ignore_errors}})) & 
+		     {channel_width{~start_q}};
    c_dff
      #(.width(channel_width),
        .reset_type(reset_type))
    errorsq
      (.clk(clk),
       .reset(1'b0),
+      .active(active_q),
       .d(errors_s),
       .q(errors_q));
    
@@ -381,17 +383,15 @@ module tc_chan_test_mac
    assign write_test_duration = do_write & ifc_sel_test_duration;
    
    wire [0:test_duration_width-1] test_duration_s;
-   assign test_duration_s = (ifc_active | active_q) ? 
-			    (write_test_duration ? 
-			     test_duration_loadval : 
-			     test_duration_next) : 
-			    test_duration_q;
+   assign test_duration_s
+     = write_test_duration ? test_duration_loadval : test_duration_next;
    c_dff
      #(.width(test_duration_width),
        .reset_type(reset_type))
    test_durationq
      (.clk(clk),
       .reset(1'b0),
+      .active(reg_active),
       .d(test_duration_s),
       .q(test_duration_q));
    
@@ -426,17 +426,15 @@ module tc_chan_test_mac
    assign write_warmup_duration = do_write & ifc_sel_warmup_duration;
    
    wire [0:warmup_duration_width-1] warmup_duration_s;
-   assign warmup_duration_s = (ifc_active | active_q) ? 
-			      (write_warmup_duration ? 
-			       warmup_duration_loadval : 
-			       warmup_duration_next) : 
-			      warmup_duration_q;
+   assign warmup_duration_s
+     = write_warmup_duration ? warmup_duration_loadval : warmup_duration_next;
    c_dff
      #(.width(warmup_duration_width),
        .reset_type(reset_type))
    warmup_durationq
      (.clk(clk),
       .reset(1'b0),
+      .active(reg_active),
       .d(warmup_duration_s),
       .q(warmup_duration_q));
    
@@ -463,15 +461,14 @@ module tc_chan_test_mac
    
    wire [0:cal_interval_width-1] cal_interval_s, cal_interval_q;
    assign cal_interval_s
-     = ifc_active ? 
-       (write_cal_interval ? cal_interval_loadval : cal_interval_q) : 
-       cal_interval_q;
+     = write_cal_interval ? cal_interval_loadval : cal_interval_q;
    c_dff
      #(.width(cal_interval_width),
        .reset_type(reset_type))
    cal_intervalq
      (.clk(clk),
       .reset(1'b0),
+      .active(ifc_active),
       .d(cal_interval_s),
       .q(cal_interval_q));
    
@@ -496,15 +493,14 @@ module tc_chan_test_mac
    
    wire [0:cal_duration_width-1] cal_duration_s, cal_duration_q;
    assign cal_duration_s
-     = ifc_active ? 
-       (write_cal_duration ? cal_duration_loadval : cal_duration_q) : 
-       cal_duration_q;
+     = write_cal_duration ? cal_duration_loadval : cal_duration_q;
    c_dff
      #(.width(cal_duration_width),
        .reset_type(reset_type))
    cal_durationq
      (.clk(clk),
       .reset(1'b0),
+      .active(ifc_active),
       .d(cal_duration_s),
       .q(cal_duration_q));
    
@@ -529,15 +525,14 @@ module tc_chan_test_mac
    
    wire [0:pattern_addr_width-1] pattern_addr_s, pattern_addr_q;
    assign pattern_addr_s
-     = ifc_active ? 
-       (write_pattern_addr ? pattern_addr_loadval : pattern_addr_q) : 
-       pattern_addr_q;
+     = write_pattern_addr ? pattern_addr_loadval : pattern_addr_q;
    c_dff
      #(.width(pattern_addr_width),
        .reset_type(reset_type))
    pattern_addrq
      (.clk(clk),
       .reset(1'b0),
+      .active(ifc_active),
       .d(pattern_addr_s),
       .q(pattern_addr_q));
    
@@ -551,18 +546,16 @@ module tc_chan_test_mac
    wire 			 cal_ctr_max;
    assign cal_ctr_max = (cal_ctr_q == cal_interval_q);
    
-   wire [0:cal_interval_width-1] cal_ctr_next;
-   assign cal_ctr_next
-     = (cal_ctr_q + 1'b1) & {cal_interval_width{~cal_ctr_max & ~start_q}};
-   
    wire [0:cal_interval_width-1] cal_ctr_s;
-   assign cal_ctr_s = active_q ? cal_ctr_next : cal_ctr_q;
+   assign cal_ctr_s
+     = (cal_ctr_q + 1'b1) & {cal_interval_width{~cal_ctr_max & ~start_q}};
    c_dff
      #(.width(cal_interval_width),
        .reset_type(reset_type))
    cal_ctrq
      (.clk(clk),
       .reset(1'b0),
+      .active(active_q),
       .d(cal_ctr_s),
       .q(cal_ctr_q));
    
@@ -596,27 +589,28 @@ module tc_chan_test_mac
        test_duration_zero || ~cal_en_q;
    
    wire 			 tx_cal_s, tx_cal_q;
-   assign tx_cal_s
-     = active_q ? ((tx_cal_q | tx_cal_set) & ~tx_cal_reset) : tx_cal_q;
+   assign tx_cal_s = (tx_cal_q | tx_cal_set) & ~tx_cal_reset;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    tx_calq
      (.clk(clk),
       .reset(reset),
+      .active(active_q),
       .d(tx_cal_s),
       .q(tx_cal_q));
    
    assign xmit_cal = tx_cal_q;
    
    wire 			 invalid_data_s, invalid_data_q;
-   assign invalid_data_s = active_q ? tx_cal_q : invalid_data_q;
+   assign invalid_data_s = tx_cal_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    invalid_dataq
      (.clk(clk),
       .reset(reset),
+      .active(active_q),
       .d(invalid_data_s),
       .q(invalid_data_q));
    
@@ -629,14 +623,14 @@ module tc_chan_test_mac
        test_duration_zero || ~cal_en_q;
    
    wire 			 rx_cal_s, rx_cal_q;
-   assign rx_cal_s
-     = active_q ? ((rx_cal_q | rx_cal_set) & ~rx_cal_reset) : rx_cal_q;
+   assign rx_cal_s = (rx_cal_q | rx_cal_set) & ~rx_cal_reset;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    rx_calq
      (.clk(clk),
       .reset(reset),
+      .active(active_q),
       .d(rx_cal_s),
       .q(rx_cal_q));
    
@@ -696,6 +690,7 @@ module tc_chan_test_mac
 	   pattern_data_rv_lfsr
 	     (.clk(clk),
 	      .reset(1'b0),
+	      .active(reg_active),
 	      .load(write_pattern_data_rv),
 	      .run(active_q),
 	      .feedback(pattern_data_rv_feedback_muxed),
@@ -722,7 +717,7 @@ module tc_chan_test_mac
    ref_data_sr
      (.clk(clk),
       .reset(1'b0),
-      .enable(active_q),
+      .active(active_q),
       .data_in(xmit_data),
       .data_out(ref_data));
    

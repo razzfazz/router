@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic wavefront allocator
 module c_wf_alloc
-  (clk, reset, active, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -56,6 +56,9 @@ module c_wf_alloc
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
    generate
       
       case(wf_alloc_type)
@@ -69,7 +72,8 @@ module c_wf_alloc
 		.reset(reset),
 		.active(active),
 		.req(req),
-		.gnt(gnt));
+		.gnt(gnt),
+		.update(update));
 	  end
 	`WF_ALLOC_TYPE_REP:
 	  begin
@@ -81,7 +85,8 @@ module c_wf_alloc
 		.reset(reset),
 		.active(active),
 		.req(req),
-		.gnt(gnt));
+		.gnt(gnt),
+		.update(update));
 	  end
 	`WF_ALLOC_TYPE_DPA:
 	  begin
@@ -93,7 +98,8 @@ module c_wf_alloc
 		.reset(reset),
 		.active(active),
 		.req(req),
-		.gnt(gnt));
+		.gnt(gnt),
+		.update(update));
 	  end      
 	`WF_ALLOC_TYPE_ROT:
 	  begin
@@ -105,7 +111,8 @@ module c_wf_alloc
 		.reset(reset),
 		.active(active),
 		.req(req),
-		.gnt(gnt));
+		.gnt(gnt),
+		.update(update));
 	  end
 	`WF_ALLOC_TYPE_LOOP:
 	  begin
@@ -117,7 +124,8 @@ module c_wf_alloc
 		.reset(reset),
 		.active(active),
 		.req(req),
-		.gnt(gnt));
+		.gnt(gnt),
+		.update(update));
 	  end
       endcase
       

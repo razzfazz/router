@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // described in Hurt et al, "Design and Implementation of High-Speed Symmetric 
 // Crossbar Schedulers"
 module c_wf_alloc_dpa
-  (clk, reset, active, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -59,14 +59,20 @@ module c_wf_alloc_dpa
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
    wire [0:(2*num_ports-1)-1] 	  prio_q;
    
    wire 			  reset_prio;
    assign reset_prio = ~|prio_q[0:(num_ports-1)-1];
    
-   wire [0:(2*num_ports-1)-1] 	  prio_s;
-   assign prio_s
+   wire [0:(2*num_ports-1)-1] 	  prio_next;
+   assign prio_next
      = reset_prio ? prio_init : {1'b0, prio_q[0:(2*num_ports-1)-2]};
+   
+   wire [0:(2*num_ports-1)-1] 	  prio_s;
+   assign prio_s = update ? prio_next : prio_q;
    c_dff
      #(.width(2*num_ports-1),
        .reset_type(reset_type),

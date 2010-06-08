@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wavefront allocator variant which replicates the entire allocation logic for
 // the different priorities and selects the result from the appropriate one
 module c_wf_alloc_rep
-  (clk, reset, active, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -58,12 +58,17 @@ module c_wf_alloc_rep
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:prio_width-1] 	  prio_s, prio_q;
+   // update port priorities
+   input update;
+   
+   wire [0:prio_width-1] 	  prio_q;
+   
+   wire [0:prio_width-1] 	  prio_next;
    c_incr
      #(.width(prio_width),
        .min_value(0),
        .max_value(num_ports-1))
-   prio_s_incr
+   prio_next_incr
      (.data_in(prio_q),
       .data_out(prio_s));
    c_dff

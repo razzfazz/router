@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic wavefront allocator synthesis wrapper
 module c_wf_alloc_wrapper
-  (clk, reset, active, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -56,13 +56,28 @@ module c_wf_alloc_wrapper
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
+   wire 			  active_int;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   activeq
+     (.clk(clk),
+      .reset(reset),
+      .active(active),
+      .d(active),
+      .q(active_int));
+   
    wire [0:num_ports*num_ports-1] req_int;
    c_dff
      #(.width(num_ports*num_ports),
        .reset_type(reset_type))
    reqq
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
+      .active(active),
       .active(active),
       .d(req),
       .q(req_int));
@@ -73,10 +88,22 @@ module c_wf_alloc_wrapper
        .reset_type(reset_type))
    gntq
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
+      .active(active),
       .active(active),
       .d(gnt_int),
       .q(gnt));
+   
+   wire 			  update_int;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   updateq
+     (.clk(clk),
+      .reset(reset),
+      .active(active),
+      .d(update),
+      .q(update_int));
    
    c_wf_alloc
      #(.num_ports(num_ports),
@@ -85,8 +112,9 @@ module c_wf_alloc_wrapper
    alloc
      (.clk(clk),
       .reset(reset),
-      .active(active),
+      .active(active_int),
       .req(req_int),
-      .gnt(gnt_int));
+      .gnt(gnt_int),
+      .update(update_int));
    
 endmodule

@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wavefront allocator variant which uses multiplexers to permute inputs and
 // outputs based on priority
 module c_wf_alloc_mux
-  (clk, reset, active, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -58,14 +58,22 @@ module c_wf_alloc_mux
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
-   wire [0:port_idx_width-1] 	  prio_s, prio_q;
+   // update port priorities
+   input update;
+   
+   wire [0:port_idx_width-1] 	  prio_q;
+   
+   wire [0:port_idx_width-1] 	  prio_next;
    c_incr
      #(.width(port_idx_width),
        .min_value(0),
        .max_value(num_ports-1))
    prio_s_incr
      (.data_in(prio_q),
-      .data_out(prio_s));
+      .data_out(prio_next));
+   
+   wire [0:port_idx_width-1] 	  prio_s;
+   assign prio_s = update ? prio_next : prio_q;
    c_dff
      #(.width(port_idx_width),
        .reset_type(reset_type))

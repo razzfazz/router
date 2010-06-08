@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // combinational loop) as described in Dally et al, "Principles and Practices of
 // Interconnection Networks"
 module c_wf_alloc_loop
-  (clk, reset, active, req, gnt);
+  (clk, reset, active, req, gnt, update);
    
 `include "c_constants.v"
    
@@ -58,10 +58,14 @@ module c_wf_alloc_loop
    output [0:num_ports*num_ports-1] gnt;
    wire [0:num_ports*num_ports-1] gnt;
    
+   // update port priorities
+   input update;
+   
    // Need to make sure priority is one-hot, otherwise conflicting grants can be
    // generated!
    wire [0:num_ports-1] 	  prio_s, prio_q;
-   assign prio_s = {prio_q[num_ports-1], prio_q[0:num_ports-2]};
+   assign prio_s
+     = update ? {prio_q[num_ports-1], prio_q[0:num_ports-2]} : prio_q;
    c_dff
      #(.width(num_ports),
        .reset_type(reset_type),

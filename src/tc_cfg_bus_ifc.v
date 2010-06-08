@@ -121,20 +121,21 @@ module tc_cfg_bus_ifc
    cfg_activeq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(cfg_active_s),
       .q(cfg_active_q));
    
    assign active = cfg_active_q;
    
    wire 			 cfg_active_dly_s, cfg_active_dly_q;
-   assign cfg_active_dly_s
-     = cfg_active_q ? (cfg_active_q & ~cfg_stop) : cfg_active_dly_q;
+   assign cfg_active_dly_s = cfg_active_q & ~cfg_stop;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cfg_active_dlyq
      (.clk(clk),
       .reset(reset),
+      .active(cfg_active_q),
       .d(cfg_active_dly_s),
       .q(cfg_active_dly_q));
    
@@ -142,27 +143,28 @@ module tc_cfg_bus_ifc
    assign cfg_active_rise = cfg_active_q & ~cfg_active_dly_q;
    
    wire 			 cfg_req_s, cfg_req_q;
-   assign cfg_req_s = cfg_active_q ? cfg_active_rise : cfg_req_q;
+   assign cfg_req_s = cfg_active_rise;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cfg_reqq
      (.clk(clk),
       .reset(reset),
+      .active(cfg_active_q),
       .d(cfg_req_s),
       .q(cfg_req_q));
    
    assign req = cfg_req_q;
    
    wire 			 cfg_write_s, cfg_write_q;
-   assign cfg_write_s
-     = cfg_active_q ? (cfg_active_rise ? cfg_write : cfg_write_q) : cfg_write_q;
+   assign cfg_write_s = cfg_active_rise ? cfg_write : cfg_write_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cfg_writeq
      (.clk(clk),
       .reset(1'b0),
+      .active(cfg_active_q),
       .d(cfg_write_s),
       .q(cfg_write_q));
    
@@ -172,14 +174,14 @@ module tc_cfg_bus_ifc
    assign cfg_do_write = cfg_req_q & cfg_write_q;
    
    wire [0:cfg_addr_width-1] 	 cfg_addr_s, cfg_addr_q;
-   assign cfg_addr_s
-     = cfg_active_q ? (cfg_active_rise ? cfg_addr : cfg_addr_q) : cfg_addr_q;
+   assign cfg_addr_s = cfg_active_rise ? cfg_addr : cfg_addr_q;
    c_dff
      #(.width(cfg_addr_width),
        .reset_type(reset_type))
    cfg_addrq
      (.clk(clk),
       .reset(1'b0),
+      .active(cfg_active_q),
       .d(cfg_addr_s),
       .q(cfg_addr_q));
    
@@ -209,17 +211,15 @@ module tc_cfg_bus_ifc
    assign node_addr_match = cfg_node_addr_match;
    
    wire [0:cfg_data_width-1] cfg_data_s, cfg_data_q;
-   assign cfg_data_s = cfg_active_q ? 
-		       (cfg_active_rise ? 
-			cfg_write_data : 
-			(done ? read_data : cfg_data_q)) : 
-		       cfg_data_q;
+   assign cfg_data_s
+     = cfg_active_rise ? cfg_write_data : (done ? read_data : cfg_data_q);
    c_dff
      #(.width(cfg_data_width),
        .reset_type(reset_type))
    cfg_dataq
      (.clk(clk),
       .reset(1'b0),
+      .active(cfg_active_q),
       .d(cfg_data_s),
       .q(cfg_data_q));
    
@@ -227,13 +227,14 @@ module tc_cfg_bus_ifc
    assign cfg_read_data = cfg_data_q;
    
    wire 		     cfg_done_s, cfg_done_q;
-   assign cfg_done_s = cfg_active_q ? done : cfg_done_q;
+   assign cfg_done_s = done;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
    cfg_doneq
      (.clk(clk),
       .reset(reset),
+      .active(cfg_active_q),
       .d(cfg_done_s),
       .q(cfg_done_q));
    
