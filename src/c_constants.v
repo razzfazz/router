@@ -138,10 +138,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // set of registers with moving read and write pointer
 `define FIFO_TYPE_INDEXED  1
 
-// DesignWare FIFO implementation
-`define FIFO_TYPE_DW       2
-
-`define FIFO_TYPE_LAST `FIFO_TYPE_DW
+`define FIFO_TYPE_LAST `FIFO_TYPE_INDEXED
 
 
 //------------------------------------------------------------------------------
