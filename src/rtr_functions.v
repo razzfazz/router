@@ -51,8 +51,14 @@ endfunction
 // determine packet class for given VC ID
 function integer vc_packet_class(input integer vc_id);
    begin
-      vc_packet_class = (vc_id / num_vcs_per_class) % 
-			(num_message_classes * num_packet_classes);
+      vc_packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
+   end
+endfunction
+
+// determine index of VC within its packet class
+function integer vc_class_index(input integer vc_id);
+   begin
+      vc_packet_class = vc_id % num_vcs_per_class;
    end
 endfunction
 
