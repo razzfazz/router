@@ -144,7 +144,7 @@ module rtr_flow_ctrl_tx
 		     .data_out(vc_s));
 		  c_dff
 		    #(.width(vc_idx_width),
-		      .reset_type(`RESET_TYPE_NONE))
+		      .reset_type(reset_type))
 		  vcq
 		    (.clk(clk),
 		     .reset(1'b0),

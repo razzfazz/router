@@ -378,7 +378,7 @@ module rtr_output_port_mac
       assign flit_ctrl_s = ds_flit_ctrl_in;
       c_dff
 	#(.width(flit_ctrl_width),
-	  .reset_type(`RESET_TYPE_NONE))
+	  .reset_type(reset_type))
       flit_ctrlq
 	(.clk(clk),
 	 .reset(1'b0),
@@ -392,7 +392,7 @@ module rtr_output_port_mac
       assign flit_data_s = flit_data_in;
       c_dff
 	#(.width(flit_data_width),
-	  .reset_type(`RESET_TYPE_NONE))
+	  .reset_type(reset_type))
       flit_dataq
 	(.clk(clk),
 	 .reset(1'b0),
@@ -572,7 +572,7 @@ module rtr_output_port_mac
 	      assign header_info_s = hold ? header_info_q : muxed_header_info;
 	      c_dff
 		#(.width(la_route_info_width),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      header_infoq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -739,7 +739,7 @@ module rtr_output_port_mac
 		= ovt_assigned ? assigned_ocvc_q : next_elig_ocvc;
 	      c_dff
 		#(.width(num_vcs_per_class)
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      assigned_ocvcq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -788,7 +788,7 @@ module rtr_output_port_mac
 	      assign flit_ctrl_s = hold ? flit_ctrl_q : muxed_flit_ctrl;
 	      c_dff
 		#(.width(flit_ctrl_width),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      flit_ctrlq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -936,7 +936,7 @@ module rtr_output_port_mac
 	      assign free_s = free;
 	      c_dff
 		#(.width(1),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      free_earlyq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -948,7 +948,7 @@ module rtr_output_port_mac
 	      assign free_plus1_s = free_plus1;
 	      c_dff
 		#(.width(1),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      free_plus1q
 		(.clk(clk),
 		 .reset(1'b0),

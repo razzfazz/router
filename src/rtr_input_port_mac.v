@@ -347,7 +347,7 @@ module rtr_input_port_mac
 	 assign flit_ctrl_s = flit_ctrl_in;
 	 c_dff
 	   #(.width(flit_ctrl_width),
-	     .reset_type(`RESET_TYPE_NONE))
+	     .reset_type(reset_type))
 	 flit_ctrlq
 	   (.clk(clk),
 	    .reset(1'b0),
@@ -361,7 +361,7 @@ module rtr_input_port_mac
 	 assign flit_data_s = flit_data_in;
 	 c_dff
 	   #(.width(flit_data_width),
-	     .reset_type(`RESET_TYPE_NONE))
+	     .reset_type(reset_type))
 	 flit_dataq
 	   (.clk(clk),
 	    .reset(1'b0),
@@ -584,7 +584,7 @@ module rtr_input_port_mac
 	   assign fbc_read_addr_s = fbc_read_addr;
 	   c_dff
 	     #(.width(fbf_addr_width),
-	       .reset_type(`RESET_TYPE_NONE))
+	       .reset_type(reset_type))
 	   fbc_read_addrq
 	     (.clk(clk),
 	      .reset(1'b0),
@@ -674,7 +674,7 @@ module rtr_input_port_mac
 	      assign flit_head_s = hold ? flit_head_q : muxed_flit_head;
 	      c_dff
 		#(.width(1),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      flit_headq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -692,7 +692,7 @@ module rtr_input_port_mac
 	      assign flit_tail_s = hold ? flit_tail_q : muxed_flit_tail;
 	      c_dff
 		#(.width(1),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      flit_tailq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -780,7 +780,7 @@ module rtr_input_port_mac
 		= hold ? la_route_info_q : muxed_la_route_info;
 	      c_dff
 		#(.width(la_route_info_width),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      la_route_infoq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -799,7 +799,7 @@ module rtr_input_port_mac
 		= hold ? route_info_q : muxed_route_info;
 	      c_dff
 		#(.width(route_info_width),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      route_infoq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -1042,7 +1042,7 @@ module rtr_input_port_mac
 		= fcm_flit_head ? vea_next_elig_ocvc : assigned_ocvc_q;
 	      c_dff
 		#(.width(num_vcs_per_class),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      assigned_ocvcq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -1149,7 +1149,7 @@ module rtr_input_port_mac
 			       */
 	      c_dff
 		#(.width(1),
-		  .reset_type(`RESET_TYPE_NONE))
+		  .reset_type(reset_type))
 	      prioq
 		(.clk(clk),
 		 .reset(1'b0),
@@ -1452,7 +1452,7 @@ module rtr_input_port_mac
 	 assign flit_head_s = oai_head;
 	 c_dff
 	   #(.width(1),
-	     .reset_type(`RESET_TYPE_NONE))
+	     .reset_type(reset_type))
 	 flit_headq
 	   (.clk(clk),
 	    .reset(1'b0),
@@ -1470,7 +1470,7 @@ module rtr_input_port_mac
 	    .data_out(la_route_info_s));
 	 c_dff
 	   #(.width(la_route_info_width),
-	     .reset_type(`RESET_TYPE_NONE))
+	     .reset_type(reset_type))
 	 la_route_infoq
 	   (.clk(clk),
 	    .reset(1'b0),

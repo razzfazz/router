@@ -141,7 +141,7 @@ module rtr_flow_ctrl_rx
 		  assign vc_s = flow_ctrl[1:1+vc_idx_width-1];
 		  c_dff
 		    #(.width(vc_idx_width),
-		      .reset_type(`RESET_TYPE_NONE))
+		      .reset_type(reset_type))
 		  vcq
 		    (.clk(clk),
 		     .reset(1'b0),
