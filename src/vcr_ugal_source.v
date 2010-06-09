@@ -140,7 +140,7 @@ module vcr_ugal_source(/*autoarg*/
 
    wire [0:num_ports-1] nonmin_route_unmasked;
    wire 			       inc_rc_nonmin;
-   vcr_routing_logic_ugal
+   vcr_routing_logic
       #(.num_resource_classes(num_resource_classes),
 	.num_routers_per_dim(num_routers_per_dim),
 	.num_dimensions(num_dimensions),
