@@ -29,13 +29,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 
-
 // routing logic for VC router
 module rtr_routing_logic
-  (clk, reset, active, router_address, sel_rc, route_info, route_op, inc_rc);
+  (clk, reset, active, router_address, sel_rc, route_info, route_port, inc_rc);
+   
    
 `include "c_functions.v"
 `include "c_constants.v"
+   
    
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
@@ -43,26 +44,35 @@ module rtr_routing_logic
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
-   // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 1;
+   
+   // connectivity within each dimension
+   parameter connectivity = `CONNECTIVITY_LINE;
+   
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_DOR;
+   
+   // select order of dimension traversal
+   parameter dim_order = `DIM_ORDER_ASCENDING;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
-   
-   // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
@@ -77,17 +87,12 @@ module rtr_routing_logic
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // select routing function type
-   parameter routing_type = `ROUTING_TYPE_DOR;
-   
-   // select order of dimension traversal
-   parameter dim_order = `DIM_ORDER_ASCENDING;
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // total number of bits required for storing routing information
    localparam route_info_width
      = num_resource_classes * router_addr_width + node_addr_width;
-   
-   parameter reset_type = `RESET_TYPE_ASYNC;
    
    
    input clk;
@@ -104,13 +109,14 @@ module rtr_routing_logic
    input [0:route_info_width-1] route_info;
    
    // output port to forward to
-   output [0:num_ports-1] route_op;
-   wire [0:num_ports-1] route_op;
+   output [0:port_idx_width-1] route_port;
+   wire [0:port_idx_width-1] route_port;
    
    // if we have reached our destination for the current resource class, 
    // increment the resource class (unless it's already the highest)
    output inc_rc;
-   wire 		inc_rc;
+   wire 		     inc_rc;
+   
    
    // all router addresses (intermediate + final)
    wire [0:num_resource_classes*router_addr_width-1] route_info_addresses;
@@ -136,6 +142,7 @@ module rtr_routing_logic
    assign inc_rc = reached_dest & ~final_rc;
    
    wire [0:num_dimensions-1] 			     dim_addr_match;
+   wire [0:num_ports-1] 			     route_op;
    
    generate
       
@@ -208,9 +215,9 @@ module rtr_routing_logic
 			 // synopsys translate_off
 			 initial
 			 begin
-			    $display({"ERROR: The routing logic module %m ",
-				      "does not yet support ring ",
-				      "connectivity within each dimension."});
+			    $display({"ERROR: The routing logic module does ", 
+				      "not yet support ring connectivity ", 
+				      "within each dimension."});
 			    $stop;
 			 end
 			 // synopsys translate_on
@@ -274,5 +281,11 @@ module rtr_routing_logic
 	assign route_op[num_ports-1] = &dim_addr_match & final_rc;
       
    endgenerate
+   
+   c_encoder
+     #(.num_ports(num_ports))
+   route_port_enc
+     (.data_in(route_op),
+      .data_out(route_port));
    
 endmodule

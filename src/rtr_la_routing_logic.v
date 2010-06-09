@@ -29,41 +29,63 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 
-
-// lookahead routing logic for VC router
+// lookahead routing logic
 module rtr_la_routing_logic
-  (clk, reset, active, router_address, route_port, inc_rc, hop_route_info, 
+  (clk, reset, active, router_address, route_port, inc_rc, route_info, 
    la_route_info);
+   
    
 `include "c_functions.v"
 `include "c_constants.v"
    
+   
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
+   
+   // number of VCs available for each class
+   parameter num_vcs_per_class = 1;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
-   // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 1;
+   
+   // connectivity within each dimension
+   parameter connectivity = `CONNECTIVITY_LINE;
+   
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_DOR;
+   
+   // select order of dimension traversal
+   parameter dim_order = `DIM_ORDER_ASCENDING;
+   
+   // ID of current input VC
+   parameter vc_id = 0;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
-   
-   // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
@@ -85,25 +107,14 @@ module rtr_la_routing_logic
    localparam la_route_info_width
      = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
-   // select routing function type
-   parameter routing_type = `ROUTING_TYPE_DOR;
-   
-   // select order of dimension traversal
-   parameter dim_order = `DIM_ORDER_ASCENDING;
-   
-   // current resource class
-   parameter resource_class = 0;
-   
    // total number of bits required for storing routing information
-   localparam hop_route_info_width
-     = (resource_class == (num_resource_classes - 1)) ?
-       addr_width :
-       (resource_class == (num_resource_classes - 2)) ?
-       (router_addr_width + addr_width) :
-       (2 * router_addr_width);
+   localparam route_info_width
+     = num_resource_classes * router_addr_width + node_addr_width;
    
-
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   // resource class to which this VC belongs
+   localparam resource_class
+     = (vc_id / num_vcs_per_class) % num_resource_classes;
+   
    
    input clk;
    input reset;
@@ -114,16 +125,17 @@ module rtr_la_routing_logic
    
    // port on which the packet will leave the current router
    input [0:port_idx_width-1] route_port;
-   
+      
    // will the resource class be incremented at the current router?
    input inc_rc;
-   
+      
    // routing data
-   input [0:hop_route_info_width-1] hop_route_info;
+   input [0:route_info_width-1] route_info;
    
    // lookahead routing information for next router
    output [0:la_route_info_width-1] la_route_info;
    wire [0:la_route_info_width-1] la_route_info;
+   
    
    // address of destination router for current resource class
    wire [0:router_addr_width-1]   dest_router_address;
@@ -131,38 +143,44 @@ module rtr_la_routing_logic
    // address of the downstream router
    wire [0:router_addr_width-1]   next_router_address;
    
+   wire 			  next_inc_rc;
+   
+   generate
+      
+      if(resource_class == (num_resource_classes - 1))
+	begin
+	   
+	   assign dest_router_address
+	     = route_info[resource_class*router_addr_width:
+			  (resource_class+1)*router_addr_width-1];
+	   
+	   assign next_inc_rc = 1'b0;
+	   
+	end
+      else
+	begin
+	   
+	   assign dest_router_address
+	     = inc_rc ?
+	       route_info[(resource_class+1)*router_addr_width:
+			  (resource_class+2)*router_addr_width-1] :
+	       route_info[resource_class*router_addr_width:
+			  (resource_class+1)*router_addr_width-1];
+	   
+	   assign next_inc_rc = (next_router_address == dest_router_address);
+	   
+	end
+      
+      if(num_resource_classes > 1)
+	assign la_route_info[port_idx_width] = next_inc_rc;
+      
+   endgenerate
+   
    wire [0:num_dimensions-1] 	  dim_addr_match;
    
    wire [0:num_ports-1] 	  next_route_op;
    
    generate
-      
-      if(num_resource_classes > 1)
-	begin
-	   
-	   wire next_inc_rc;
-	   
-	   if(resource_class == (num_resource_classes - 1))
-	     begin
-		assign dest_router_address
-		  = hop_route_info[0:router_addr_width-1];
-		assign next_inc_rc = 1'b0;
-	     end
-	   else
-	     begin
-		assign dest_router_address
-		  = inc_rc ?
-		    hop_route_info[router_addr_width:2*router_addr_width-1] :
-		    hop_route_info[0:router_addr_width-1];
-		assign next_inc_rc
-		  = (next_router_address == dest_router_address);
-	     end
-	   
-	   assign la_route_info[port_idx_width] = next_inc_rc;
-	   
-	end
-      else
-	assign dest_router_address = hop_route_info[0:router_addr_width-1];
       
       case(routing_type)
 	
@@ -263,7 +281,7 @@ module rtr_la_routing_logic
 				initial
 				begin
 				   $display({"ERROR: The lookahead routing ", 
-					     "logic module %m does not yet ", 
+					     "logic module does not yet ", 
 					     "support ring connectivity ", 
 					     "within each dimension."});
 				   $stop;
@@ -318,7 +336,11 @@ module rtr_la_routing_logic
 	
       endcase
       
-      wire 						      eject;
+   endgenerate
+   
+   wire eject;
+   
+   generate
       
       if(resource_class == (num_resource_classes - 1))
 	assign eject = &dim_addr_match;
@@ -332,8 +354,7 @@ module rtr_la_routing_logic
 	   
 	   wire [0:node_addr_width-1] dest_node_address;
 	   assign dest_node_address
-	     = hop_route_info[hop_route_info_width-node_addr_width:
-			      hop_route_info_width-1];
+	     = route_info[route_info_width-node_addr_width:route_info_width-1];
 	   
 	   wire [0:num_nodes_per_router-1] node_sel;
 	   c_decoder
