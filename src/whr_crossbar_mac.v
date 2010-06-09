@@ -37,8 +37,7 @@ module whr_crossbar_mac
 `include "c_constants.v"
    
    // number of input/output ports
-   parameter num_in_ports = 5;
-   parameter num_out_ports = 5;
+   parameter num_ports = 5;
    
    // width per port
    parameter width = 32;
@@ -50,49 +49,49 @@ module whr_crossbar_mac
       
    input clk;
    input reset;
-
+   
    // clock enable signals for crosspoint control registers
-   input [0:num_in_ports-1] active_ip;
+   input [0:num_ports-1] active_ip;
    
    // incoming control signals (request matrix)
-   input [0:num_in_ports*num_out_ports-1] ctrl_op_ip;
+   input [0:num_ports*num_ports-1] ctrl_op_ip;
    
    // vector of input data
-   input [0:num_in_ports*width-1] data_in_ip;
+   input [0:num_ports*width-1] data_in_ip;
    
    // vector of output data
-   output [0:num_out_ports*width-1] data_out_op;
-   wire [0:num_out_ports*width-1] data_out_op;
+   output [0:num_ports*width-1] data_out_op;
+   wire [0:num_ports*width-1] data_out_op;
    
-   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op;
+   wire [0:num_ports*num_ports-1] ctrl_ip_op;
    c_interleaver
-     #(.width(num_out_ports*num_in_ports),
-       .num_blocks(num_out_ports))
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
    ctrl_ip_op_intl
      (.data_in(ctrl_op_ip),
       .data_out(ctrl_ip_op));
    
-   wire [0:num_in_ports*num_out_ports-1] ctrl_ip_op_q;
+   wire [0:num_ports*num_ports-1] ctrl_ip_op_q;
    
    generate
       
       genvar 			  ip;
       
-      for(ip = 0; ip < num_in_ports; ip = ip + 1)
+      for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire [0:num_out_ports-1] ctrl_op;
-	   assign ctrl_op = ctrl_ip_op[ip*num_out_ports:(ip+1)*num_out_ports-1];
+	   wire [0:num_ports-1] ctrl_op;
+	   assign ctrl_op = ctrl_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
-	   wire 		    granted;
+	   wire 		granted;
 	   
-	   wire 		    active;
+	   wire 		active;
 	   assign active = active_ip[ip] | granted;
 	   
-	   wire [0:num_out_ports-1] ctrl_op_s, ctrl_op_q;
+	   wire [0:num_ports-1] ctrl_op_s, ctrl_op_q;
 	   assign ctrl_op_s = ctrl_op;
 	   c_dff
-	     #(.width(num_out_ports),
+	     #(.width(num_ports),
 	       .reset_type(reset_type))
 	   ctrl_opq
 	     (.clk(clk),
@@ -103,16 +102,15 @@ module whr_crossbar_mac
 	   
 	   assign granted = |ctrl_op_q;
 	   
-	   assign ctrl_ip_op_q[ip*num_out_ports:(ip+1)*num_out_ports-1]
-		    = ctrl_op_q;
+	   assign ctrl_ip_op_q[ip*num_ports:(ip+1)*num_ports-1] = ctrl_op_q;
 	   
 	end
       
    endgenerate
    
    c_crossbar
-     #(.num_in_ports(num_in_ports),
-       .num_out_ports(num_out_ports),
+     #(.num_in_ports(num_ports),
+       .num_out_ports(num_ports),
        .width(width),
        .crossbar_type(crossbar_type))
    xbr
