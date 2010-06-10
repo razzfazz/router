@@ -320,8 +320,7 @@ module whr_top
    
    wire [0:num_ports*flit_data_width-1]     xbr_data_out_op;
    whr_crossbar_mac
-     #(.num_in_ports(num_ports),
-       .num_out_ports(num_ports),
+     #(.num_ports(num_ports),
        .width(flit_data_width),
        .crossbar_type(crossbar_type),
        .reset_type(reset_type))

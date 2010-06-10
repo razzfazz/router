@@ -676,8 +676,7 @@ module vcr_top
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
    vcr_crossbar_mac
-     #(.num_in_ports(num_ports),
-       .num_out_ports(num_ports),
+     #(.num_ports(num_ports),
        .width(int_flit_ctrl_width),
        .crossbar_type(ctrl_crossbar_type),
        .reset_type(reset_type))
@@ -691,8 +690,7 @@ module vcr_top
    
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
    vcr_crossbar_mac
-     #(.num_in_ports(num_ports),
-       .num_out_ports(num_ports),
+     #(.num_ports(num_ports),
        .width(flit_data_width),
        .crossbar_type(data_crossbar_type),
        .reset_type(reset_type))
