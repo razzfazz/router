@@ -181,8 +181,8 @@ module rtr_routing_logic
 			   assign dim_sel = ~dim_addr_match[dim];
 			 else
 			   assign dim_sel = ~dim_addr_match[dim] &
-					    dim_addr_match[(dim+1):
-							   (num_dimensions-1)];
+					    &dim_addr_match[(dim+1):
+							    (num_dimensions-1)];
 		      end
 		    
 		  endcase
