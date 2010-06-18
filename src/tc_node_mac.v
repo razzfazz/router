@@ -1342,7 +1342,7 @@ module tc_node_mac
       .inc_rc(inc_rc_rv));
    
    wire [0:port_idx_width-1] 		     route_port_rv;
-   c_encoder
+   c_encode
      #(.num_ports(num_ports))
    route_port_rv_enc
      (.data_in(route_op_rv),
@@ -1707,7 +1707,7 @@ module tc_node_mac
 	begin
 	   
 	   wire [0:vc_idx_width-1] flit_vc;
-	   c_encoder
+	   c_encode
 	     #(.num_ports(num_vcs))
 	   flit_vc_enc
 	     (.data_in(sel_ovc),

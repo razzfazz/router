@@ -272,7 +272,7 @@ module testbench
 					 num_vcs_per_class){1'b0}};
 			  
 			  wire [0:num_ports-1] route_op;
-			  c_decoder
+			  c_decode
 			    #(.num_ports(num_ports))
 			  route_op_dec
 			    (.data_in(route_port),

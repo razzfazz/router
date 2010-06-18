@@ -392,7 +392,7 @@ module packet_source
 		   .d(push_ptr_s),
 		   .q(push_ptr_q));
 		
-		c_decoder
+		c_decode
 		  #(.num_ports(num_flit_buffers))
 		push_mask_dec
 		  (.data_in(push_ptr_q),
@@ -419,7 +419,7 @@ module packet_source
 		   .d(pop_ptr_s),
 		   .q(pop_ptr_q));
 		
-		c_decoder
+		c_decode
 		  #(.num_ports(num_flit_buffers))
 		pop_mask_dec
 		  (.data_in(pop_ptr_q),
@@ -575,7 +575,7 @@ module packet_source
 		   .inc_rc(inc_rc));
 		
 		wire [0:port_idx_width-1]      route_port;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_ports))
 		route_port_enc
 		  (.data_in(route_op),

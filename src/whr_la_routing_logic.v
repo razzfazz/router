@@ -247,7 +247,7 @@ module whr_la_routing_logic
 			   = route_dest ? dest_dim_addr : curr_dim_addr;
 			 
 			 wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
-			 c_decoder
+			 c_decode
 			   #(.num_ports(num_routers_per_dim))
 			 dest_dim_addr_dec_dec
 			   (.data_in(dest_dim_addr),
@@ -288,7 +288,7 @@ module whr_la_routing_logic
 	     = route_info[route_info_width-node_addr_width:route_info_width-1];
 	   
 	   wire [0:num_nodes_per_router-1] node_sel;
-	   c_decoder
+	   c_decode
 	     #(.num_ports(num_nodes_per_router))
 	   node_sel_dec
 	     (.data_in(dest_node_address),
@@ -304,7 +304,7 @@ module whr_la_routing_logic
    endgenerate
    
    wire [0:port_idx_width-1] 		   next_route_port;
-   c_encoder
+   c_encode
      #(.num_ports(num_ports))
    next_route_port_enc
      (.data_in(next_route_op),

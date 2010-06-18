@@ -376,7 +376,7 @@ module testbench
 		assign flit_vc_dly = flit_ctrl_dly[1:1+vc_idx_width-1];
 		
 		wire [0:num_vcs-1] 	sel_vc;
-		c_decoder
+		c_decode
 		  #(.num_ports(num_vcs))
 		sel_vc_in_dec
 		  (.data_in(flit_vc_dly),
@@ -405,7 +405,7 @@ module testbench
 		assign buffer_pop_vc = {num_vcs{consume}} & gnt_vc;
 		
 		wire [0:vc_idx_width-1] flit_vc_out;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_vcs))
 		flit_vc_out_enc
 		  (.data_in(gnt_vc),

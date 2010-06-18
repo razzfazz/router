@@ -378,7 +378,7 @@ module router_checker
 			.inc_rc(inc_rc));
 		     
 		     wire [0:port_idx_width-1] 	     route_port;
-		     c_encoder
+		     c_encode
 		       #(.num_ports(num_ports))
 		     route_port_enc
 		       (.data_in(route_op),
@@ -733,7 +733,7 @@ module router_checker
 		// indicate which port matched
 		
 		wire [0:num_ports-1] 	     port_mask;
-		c_decoder
+		c_decode
 		  #(.num_ports(num_ports))
 		port_mask_dec
 		  (.data_in(ref_port),

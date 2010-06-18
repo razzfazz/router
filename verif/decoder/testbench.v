@@ -11,7 +11,7 @@ module testbench
    reg [0:width-1] data_in;
    wire [0:num_ports-1] data_out;
    
-   c_decoder
+   c_decode
      #(.num_ports(num_ports))
    dut
      (.data_in(data_in),

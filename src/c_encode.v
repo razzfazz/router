@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // encoder from one-hot to binary
-module c_encoder
+module c_encode
   (data_in, data_out);
    
 `include "c_functions.v"

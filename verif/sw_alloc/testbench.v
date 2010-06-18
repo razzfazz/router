@@ -208,7 +208,7 @@ module testbench
 			    end
 			  
 			  wire [0:num_ports-1] route_op;
-			  c_decoder
+			  c_decode
 			    #(.num_ports(num_ports))
 			  route_op_dec
 			    (.data_in(route_port),
@@ -296,7 +296,7 @@ module testbench
       .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
       .gnt_op_ip(gnt_op_ip));
    
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_intl

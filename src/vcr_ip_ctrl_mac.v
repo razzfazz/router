@@ -1140,7 +1140,7 @@ module vcr_ip_ctrl_mac
 		   .data_out(fbf_read_offset));
 		
 		wire [0:vc_idx_width-1] 	 fbf_read_base;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_vcs))
 		fbf_read_base_enc
 		  (.data_in(vc_sel_ivc),
@@ -1235,7 +1235,7 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:vc_idx_width-1] flit_vc;
-	   c_encoder
+	   c_encode
 	     #(.num_ports(num_vcs))
 	   flit_vc_enc
 	     (.data_in(vc_sel_ivc),
@@ -1254,7 +1254,7 @@ module vcr_ip_ctrl_mac
 	      .q(vc_sel_q));
 	   
 	   wire [0:num_vcs-1] 	   prev_vc_sel_ivc;
-	   c_decoder
+	   c_decode
 	     #(.num_ports(num_vcs))
 	   prev_vc_sel_ivc_dec
 	     (.data_in(vc_sel_q),
@@ -1307,7 +1307,7 @@ module vcr_ip_ctrl_mac
 		  assign dest_ovc = allocated_ovc;
 		
 		wire [0:vc_idx_width-1] dest_vc_sel;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_vcs))
 		dest_vc_sel_enc
 		  (.data_in(dest_ovc),
@@ -1437,7 +1437,7 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:vc_idx_width-1] cred_vc;
-	   c_encoder
+	   c_encode
 	     #(.num_ports(num_vcs))
 	   cred_vc_enc
 	     (.data_in(vc_sel_ivc),
