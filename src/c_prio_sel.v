@@ -30,9 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// generic round-robin arbiter
+// priority select logic
 module c_prio_sel
-  (port_prios, max_ports);
+  (priorities, select);
    
    // number of input ports
    parameter num_ports = 32;
@@ -44,24 +44,15 @@ module c_prio_sel
    input [0:num_ports*prio_width-1] port_prios;
    
    // vector representing maximum priority ports
-   output [0:num_ports-1] max_ports;
-   wire [0:num_ports-1] max_ports;
-   
-   // for each priority bit, list all ports that have this bit set
-   wire [0:prio_width*num_ports-1] prio_ports
-   c_interleaver
-     #(.width(num_ports*prio_width),
-       .num_blocks(num_ports))
-   prio_ports_intl
-     (.data_in(port_prios),
-      .data_out(prio_ports));
+   output [0:num_ports-1] select;
+   wire [0:num_ports-1] select;
    
    wire [0:prio_width-1] 	   prio_some_set;
    c_or_nto1
      #(.num_ports(num_ports),
        .width(prio_width))
    prio_some_set_or
-     (.data_in(prio_ports),
+     (.data_in(priorities),
       .data_out(prio_some_set));
    
    wire [0:prio_width-1] 	   prio_some_unset;
@@ -69,7 +60,7 @@ module c_prio_sel
      #(.num_ports(num_ports),
        .width(prio_width))
    prio_some_unset_nand
-     (.data_in(prio_ports),
+     (.data_in(priorities),
       .data_out(prio_some_unset));
    
    // find bit positions that are not identical for all ports
@@ -83,12 +74,30 @@ module c_prio_sel
      (.req(prio_diffs),
       .gnt(first_prio_diff));
    
+   // for each priority bit, list all ports that have this bit set
+   wire [0:prio_width*num_ports-1] prio_ports
+   c_interleaver
+     #(.width(num_ports*prio_width),
+       .num_blocks(num_ports))
+   prio_ports_intl
+     (.data_in(priorities),
+      .data_out(prio_ports));
+   
+   // select all those ports who have the first differing bit set
+   wire [0:num_ports-1] 	   max_ports;
    c_select_1ofn
-     #(.num_ports(prio_width+1),
+     #(.num_ports(prio_width),
        .width(num_ports))
    max_ports_sel
-     (.select({first_prio_diff, ~|prio_diffs}),
-      .data_in({prio_ports, {num_ports{1'b1}}}),
+     (.select(first_prio_diff),
+      .data_in(prio_ports),
       .data_out(max_ports));
+   
+   // check if all inputs have the same priority
+   wire 			   all_same_prio;
+   assign all_same_prio = ~|prio_diffs;
+   
+   // if so, we must override the result
+   assign select = max_ports | {num_ports{all_same_prio}};
    
 endmodule
