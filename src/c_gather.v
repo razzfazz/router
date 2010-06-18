@@ -32,52 +32,46 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module for extracting a set of bits from an input word (result is 
 // concatenation of these bits)
-module c_extractor
+module c_gather
   (data_in, data_out);
-
-   // width of input word
-   parameter width = 32;
    
-   function integer pop_count(input [0:width-1] argument);
+   // width of input word
+   parameter in_width = 32;
+   
+   function integer pop_count(input [0:in_width-1] argument);
       integer i;
       begin
 	 pop_count = 0;
-	 for(i = 0; i < width; i = i + 1)
+	 for(i = 0; i < in_width; i = i + 1)
 	   pop_count = pop_count + argument[i];
       end
    endfunction
    
    // mask specifying which bits to extract
-   parameter [0:width-1] mask = {width{1'b1}};
+   parameter [0:in_width-1] mask = {in_width{1'b1}};
    
    // width of result
-   localparam new_width = pop_count(mask);
+   localparam out_width = pop_count(mask);
    
    // input word
-   input [0:width-1] data_in;
+   input [0:in_width-1] data_in;
    
    // result
-   output [0:new_width-1] data_out;
-   reg [0:new_width-1] data_out;
+   output [0:out_width-1] data_out;
+   reg [0:out_width-1] 	  data_out;
    
-   reg 		       unused;
-   
-   integer 	       idx1, idx2;
+   integer 		  idx1, idx2;
    
    always @(data_in)
      begin
 	unused = 1'b0;
 	idx2 = 0;
-	for(idx1 = 0; idx1 < width; idx1 = idx1 + 1)
+	for(idx1 = 0; idx1 < in_width; idx1 = idx1 + 1)
 	  if(mask[idx1] == 1'b1)
 	    begin
 	       data_out[idx2] = data_in[idx1];
 	       idx2 = idx2 + 1;
 	    end
-	  else
-	    begin
-	       unused = unused | data_in[idx1];
-	    end
      end
-
+   
 endmodule
