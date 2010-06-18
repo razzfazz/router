@@ -228,8 +228,8 @@ module vcr_comb_alloc_sep_if
 					       num_vcs_per_class-1];
 			       
 			       c_align
-				 #(.data_width(num_vcs_per_class),
-				   .dest_width(num_vcs),
+				 #(.in_width(num_vcs_per_class),
+				   .out_width(num_vcs),
 				   .offset((mc*num_resource_classes+irc)*
 					   num_vcs_per_class))
 			       gnt_ovc_alg
@@ -289,8 +289,8 @@ module vcr_comb_alloc_sep_if
 				   {num_vcs_per_class{inc_rc}};
 			       
 			       c_align
-				 #(.data_width(2*num_vcs_per_class),
-				   .dest_width(num_vcs),
+				 #(.in_width(2*num_vcs_per_class),
+				   .out_width(num_vcs),
 				   .offset((mc*num_resource_classes+irc)*
 					   num_vcs_per_class))
 			       gnt_ovc_alg

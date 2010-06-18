@@ -435,8 +435,8 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   c_align
-	     #(.data_width(num_vcs_per_class),
-	       .dest_width(num_vcs),
+	     #(.in_width(num_vcs_per_class),
+	       .out_width(num_vcs),
 	       .offset(packet_class*num_vcs_per_class))
 	   allocated_ovc_alg
 	     (.data_in(vc_allocated_ocvc_q),
@@ -448,8 +448,8 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   c_align
-	     #(.data_width(2*num_vcs_per_class),
-	       .dest_width(num_vcs),
+	     #(.in_width(2*num_vcs_per_class),
+	       .out_width(num_vcs),
 	       .offset(packet_class*num_vcs_per_class))
 	   allocated_ovc_alg
 	     (.data_in({{num_vcs_per_class{~inc_rc}} & 

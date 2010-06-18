@@ -313,8 +313,8 @@ module tc_chan_test_mac
       .q(running_q));
    
    c_align
-     #(.data_width(2),
-       .dest_width(cfg_data_width))
+     #(.in_width(2),
+       .out_width(cfg_data_width))
    ifc_read_data_status_alg
      (.data_in({running_q, error}),
       .dest_in({cfg_data_width{1'b0}}),
@@ -347,8 +347,8 @@ module tc_chan_test_mac
    assign error = |errors_q;
    
    c_align
-     #(.data_width(channel_width),
-       .dest_width(cfg_data_width))
+     #(.in_width(channel_width),
+       .out_width(cfg_data_width))
    ifc_read_data_errors_alg
      (.data_in(errors_q),
       .dest_in({cfg_data_width{1'b0}}),
@@ -363,8 +363,8 @@ module tc_chan_test_mac
    
    wire [0:test_duration_width-1] test_duration_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(test_duration_width))
+     #(.in_width(cfg_data_width),
+       .out_width(test_duration_width))
    test_duration_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({test_duration_width{1'b0}}),
@@ -407,8 +407,8 @@ module tc_chan_test_mac
    
    wire [0:warmup_duration_width-1] warmup_duration_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(warmup_duration_width))
+     #(.in_width(cfg_data_width),
+       .out_width(warmup_duration_width))
    warmup_duration_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({warmup_duration_width{1'b0}}),
@@ -449,8 +449,8 @@ module tc_chan_test_mac
    
    wire [0:cal_interval_width-1] cal_interval_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(cal_interval_width))
+     #(.in_width(cfg_data_width),
+       .out_width(cal_interval_width))
    cal_interval_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({cal_interval_width{1'b0}}),
@@ -481,8 +481,8 @@ module tc_chan_test_mac
    
    wire [0:cal_duration_width-1] cal_duration_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(cal_duration_width))
+     #(.in_width(cfg_data_width),
+       .out_width(cal_duration_width))
    cal_duration_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({cal_duration_width{1'b0}}),
@@ -513,8 +513,8 @@ module tc_chan_test_mac
    
    wire [0:pattern_addr_width-1] pattern_addr_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(pattern_addr_width))
+     #(.in_width(cfg_data_width),
+       .out_width(pattern_addr_width))
    pattern_addr_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({pattern_addr_width{1'b0}}),
@@ -564,8 +564,8 @@ module tc_chan_test_mac
    
    wire [0:cal_interval_width-1] cal_duration_ext;
    c_align
-     #(.data_width(cal_duration_width),
-       .dest_width(cal_interval_width),
+     #(.in_width(cal_duration_width),
+       .out_width(cal_interval_width),
        .offset(cal_interval_width-cal_duration_width))
    cal_duration_ext_alg
      (.data_in(cal_duration_q),
@@ -645,8 +645,8 @@ module tc_chan_test_mac
    
    wire [0:lfsr_width-1] 	 pattern_data_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(lfsr_width))
+     #(.in_width(cfg_data_width),
+       .out_width(lfsr_width))
    pattern_data_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({lfsr_width{1'b0}}),

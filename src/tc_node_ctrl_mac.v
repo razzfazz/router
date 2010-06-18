@@ -351,8 +351,8 @@ module tc_node_ctrl_mac
    
    wire [0:node_ctrl_width-1] node_ctrl_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(node_ctrl_width))
+     #(.in_width(cfg_data_width),
+       .out_width(node_ctrl_width))
    node_ctrl_loadval_alg
      (.data_in(cfg_data_q),
       .dest_in({node_ctrl_width{1'b0}}),
@@ -396,8 +396,8 @@ module tc_node_ctrl_mac
       .q(node_status_q));
    
    c_align
-     #(.data_width(node_status_width),
-       .dest_width(cfg_data_width))
+     #(.in_width(node_status_width),
+       .out_width(cfg_data_width))
    cfg_read_data_node_status_alg
      (.data_in(node_status_q),
       .dest_in({cfg_data_width{1'b0}}),

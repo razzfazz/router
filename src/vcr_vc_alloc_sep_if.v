@@ -418,9 +418,8 @@ module vcr_vc_alloc_sep_if
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
 			  c_align
-			    #(.data_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dest_width(num_vcs),
+			    #(.in_width(num_resource_classes*num_vcs_per_class),
+			      .out_width(num_vcs),
 			      .offset(mc*num_resource_classes*
 				      num_vcs_per_class))
 			  gnt_ovc_alg
@@ -630,9 +629,9 @@ module vcr_vc_alloc_sep_if
 				      assign gnt_out_icvc = req_out_icvc;
 				    
 				    c_align
-				      #(.data_width(num_vcs_per_class),
-					.dest_width(num_resource_classes*
-						    num_vcs_per_class),
+				      #(.in_width(num_vcs_per_class),
+					.out_width(num_resource_classes*
+						   num_vcs_per_class),
 					.offset(0))
 				    gnt_out_irc_icvc_alg
 				      (.data_in(gnt_out_icvc),
@@ -687,9 +686,9 @@ module vcr_vc_alloc_sep_if
 					     gnt_out_high_icvc}));
 				    
 				    c_align
-				      #(.data_width(2*num_vcs_per_class),
-					.dest_width(num_resource_classes*
-						    num_vcs_per_class),
+				      #(.in_width(2*num_vcs_per_class),
+					.out_width(num_resource_classes*
+						   num_vcs_per_class),
 					.offset((orc-1)*num_vcs_per_class))
 				    gng_out_irc_icvc_alg
 				      (.data_in({gnt_out_low_icvc,
@@ -712,9 +711,9 @@ module vcr_vc_alloc_sep_if
 			       
 			       wire [0:num_vcs-1] 		 gnt_out_ivc;
 			       c_align
-				 #(.data_width(num_resource_classes*
-					       num_vcs_per_class),
-				   .dest_width(num_vcs),
+				 #(.in_width(num_resource_classes*
+					     num_vcs_per_class),
+				   .out_width(num_vcs),
 				   .offset(mc*num_resource_classes*
 					   num_vcs_per_class))
 			       gnt_out_ivc_alg
