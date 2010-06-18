@@ -1472,7 +1472,7 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:8*num_vcs-1] events;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_vcs*8),
 	       .num_blocks(num_vcs))
 	   events_intl

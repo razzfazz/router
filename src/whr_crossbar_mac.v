@@ -64,7 +64,7 @@ module whr_crossbar_mac
    wire [0:num_ports*width-1] data_out_op;
    
    wire [0:num_ports*num_ports-1] ctrl_ip_op;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    ctrl_ip_op_intl

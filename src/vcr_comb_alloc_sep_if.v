@@ -429,7 +429,7 @@ module vcr_comb_alloc_sep_if
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] req_out_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    req_out_op_ip_intl
@@ -437,7 +437,7 @@ module vcr_comb_alloc_sep_if
       .data_out(req_out_op_ip));
    
    wire [0:num_ports*num_ports-1] gnt_out_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_out_op_ip_intl

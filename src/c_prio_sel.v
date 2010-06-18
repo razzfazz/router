@@ -76,7 +76,7 @@ module c_prio_sel
    
    // for each priority bit, list all ports that have this bit set
    wire [0:prio_width*num_ports-1] prio_ports
-   c_interleaver
+   c_interleave
      #(.width(num_ports*prio_width),
        .num_blocks(num_ports))
    prio_ports_intl

@@ -439,7 +439,7 @@ module vcr_vc_alloc_wf
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              gnt_wf_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))

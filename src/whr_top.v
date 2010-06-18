@@ -338,7 +338,7 @@ module whr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] 	req_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    req_op_ip_intl
@@ -346,7 +346,7 @@ module whr_top
       .data_out(req_op_ip));
    
    wire [0:num_ports*num_ports-1] 	gnt_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_ip_op_intl

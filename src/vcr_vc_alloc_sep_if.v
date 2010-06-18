@@ -475,7 +475,7 @@ module vcr_vc_alloc_sep_if
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              req_out_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
@@ -486,7 +486,7 @@ module vcr_vc_alloc_sep_if
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              gnt_out_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
@@ -549,7 +549,7 @@ module vcr_vc_alloc_sep_if
 			  
 			  wire [0:num_resource_classes*num_vcs_per_class*
 				num_ports-1] req_out_irc_icvc_ip;
-			  c_interleaver
+			  c_interleave
 			    #(.width(num_ports*num_resource_classes*
 				     num_vcs_per_class),
 			      .num_blocks(num_ports))
