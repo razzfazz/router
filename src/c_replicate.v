@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // replicate each bit in a vector a number of times
 // (abc) --> (aaabbbccc)
-module c_replicator
+module c_replicate
   (data_in, data_out);
    
    // width of input vector
