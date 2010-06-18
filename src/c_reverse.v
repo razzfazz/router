@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // module for reversing a set of bits
-module c_reversor
+module c_reverse
   (data_in, data_out);
 
    // width of input word

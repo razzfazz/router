@@ -53,7 +53,7 @@ module c_fp_arbiter
 	   
 	   // reversed request vector
 	   wire [0:num_ports-1] req_rev;
-	   c_reversor
+	   c_reverse
 	     #(.width(num_ports))
 	   req_rev_revr
 	     (.data_in(req),
@@ -64,7 +64,7 @@ module c_fp_arbiter
 	   wire [0:num_ports-1] gnt_rev;
 	   assign gnt_rev = req_rev & -req_rev;
 	   
-	   c_reversor
+	   c_reverse
 	     #(.width(num_ports))
 	   gnt_revr
 	     (.data_in(gnt_rev),
