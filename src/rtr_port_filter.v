@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // module to filter output port requests based on turn restrictions
-module c_port_filter
+module rtr_port_filter
   (route_in_op, inc_rc, route_out_op, error);
    
 `include "c_constants.v"

@@ -734,7 +734,7 @@ module whr_ip_ctrl_mac
    
    wire [0:num_ports-1]      route_op;
    wire 		     pf_error;
-   c_port_filter
+   rtr_port_filter
      #(.num_message_classes(1),
        .num_resource_classes(1),
        .num_ports(num_ports),

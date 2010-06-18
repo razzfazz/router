@@ -752,7 +752,7 @@ module vcr_ivc_ctrl
       .data_out(route_unmasked_op));
    
    wire 		pf_error;
-   c_port_filter
+   rtr_port_filter
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_ports(num_ports),
