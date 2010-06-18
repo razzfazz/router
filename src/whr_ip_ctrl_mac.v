@@ -772,7 +772,7 @@ module whr_ip_ctrl_mac
       .reset(reset),
       .active(flags_active),
       .router_address(router_address),
-      .route_op(route_op),
+      .route_port(route_port),
       .inc_rc(1'b0),
       .hop_route_info(hdff_hop_route_info),
       .la_route_info(la_route_info_out));
