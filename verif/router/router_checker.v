@@ -345,8 +345,8 @@ module router_checker
 		     
 		     wire [0:num_resource_classes-1] sel_irc;
 		     c_align
-		       #(.data_width(1),
-			 .dest_width(num_resource_classes),
+		       #(.in_width(1),
+			 .out_width(num_resource_classes),
 			 .offset(irc))
 		     sel_irc_alg
 		       (.data_in(1'b1),
@@ -388,8 +388,8 @@ module router_checker
 		     
 		     wire [0:num_vcs-1] 	 route_ovc;
 		     c_align
-		       #(.data_width(2*num_vcs_per_class),
-			 .dest_width(num_vcs),
+		       #(.in_width(2*num_vcs_per_class),
+			 .out_width(num_vcs),
 			 .offset((mc*num_resource_classes+irc)*
 				 num_vcs_per_class))
 		     route_ovc_alg
