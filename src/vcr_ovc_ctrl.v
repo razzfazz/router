@@ -295,7 +295,7 @@ module vcr_ovc_ctrl
 		   .q(allocated_ip_q));
 		
 		wire [0:vc_idx_width-1] vc_gnt_vc;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_vcs))
 		vc_gnt_vc_enc
 		  (.data_in(vc_gnt_ivc),

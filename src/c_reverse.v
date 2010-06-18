@@ -30,30 +30,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// replicate each bit in a vector a number of times
-// (abc) --> (aaabbbccc)
-module c_replicator
+// module for reversing a set of bits
+module c_reverse
   (data_in, data_out);
-   
-   // width of input vector
+
+   // width of input word
    parameter width = 32;
    
-   // how many times to replicate each bit
-   parameter count = 2;
-   
-   // input data
+   // input word
    input [0:width-1] data_in;
    
    // result
-   output [0:count*width-1] data_out;
-   wire [0:count*width-1] data_out;
+   output [0:width-1] data_out;
+   wire [0:width-1] data_out;
    
-   generate
-      genvar 		  idx;
-      for(idx = 0; idx < width; idx = idx + 1)
-	begin:idxs
-	   assign data_out[idx*count:(idx+1)*count-1] = {count{data_in[idx]}};
+   generate   
+      
+      genvar 	   i;
+      for(i = 0; i < width; i = i + 1)
+	begin:connect
+	   
+	   // reverse inputs data
+	   assign data_out[i] = data_in[(width-1)-i];
+	   
 	end
+      
    endgenerate
    
 endmodule

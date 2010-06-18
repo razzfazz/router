@@ -183,7 +183,7 @@ module vcr_flit_ctrl_dec
 		  assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
 		  
 		  wire [0:num_vcs-1] 	  flit_valid_unqual_ivc;
-		  c_decoder
+		  c_decode
 		    #(.num_ports(num_vcs))
 		  flit_valid_unqual_ivc_dec
 		    (.data_in(flit_vc_in),

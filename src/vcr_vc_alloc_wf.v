@@ -363,9 +363,8 @@ module vcr_vc_alloc_wf
 			  
 			  wire [0:num_vcs-1] gnt_ovc;
 			  c_align
-			    #(.data_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dest_width(num_vcs),
+			    #(.in_width(num_resource_classes*num_vcs_per_class),
+			      .out_width(num_vcs),
 			      .offset(mc*num_resource_classes*
 				      num_vcs_per_class))
 			  gnt_ovc_alg
@@ -440,7 +439,7 @@ module vcr_vc_alloc_wf
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              gnt_wf_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
@@ -579,9 +578,8 @@ module vcr_vc_alloc_wf
 			  
 			  wire [0:num_vcs-1] gnt_wf_ivc;
 			  c_align
-			    #(.data_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dest_width(num_vcs),
+			    #(.in_width(num_resource_classes*num_vcs_per_class),
+			      .out_width(num_vcs),
 			      .offset(mc*num_resource_classes*
 				      num_vcs_per_class))
 			  gnt_wf_ivc_alg

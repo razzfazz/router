@@ -30,53 +30,41 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// add padding to given vector
-module c_padder
+// interleave a given number of blocks of bits
+// (a0 a1 a1 b0 b1 b2 c0 c1 c2) -> (a0 b0 c0 a1 b1 c1 a2 b2 c2)
+module c_interleave
   (data_in, data_out);
    
-   // width of input data
-   parameter width = 32;
+   // input data width
+   parameter width = 8;
    
-   // number of bits to pad on the left (use negative value to trim bits
-   parameter pad_left = 0;
+   // number of blocks in input data
+   parameter num_blocks = 2;
    
-   // bit value to pad with on the left
-   parameter pad_left_value = 0;
+   // width of each block
+   localparam step = width / num_blocks;
    
-   // number of bits to pad on the right (use negative value to trim bits)
-   parameter pad_right = 0;
-   
-   // bit value to pad with on the right
-   parameter pad_right_value = 0;
-   
-   // width of input vector
-   localparam new_width = pad_left + width + pad_right;
-   
-   // input vector
+   // vector of input data
    input [0:width-1] data_in;
    
-   // result
-   output [0:new_width-1] data_out;
-   wire [0:new_width-1] data_out;
-   
-   genvar 		i;
+   // vector of output data
+   output [0:width-1] data_out;
+   wire [0:width-1] data_out;
    
    generate
       
-      for(i = 0; i < new_width; i = i + 1)
-	begin:bits
+      genvar 	    i;
+      for(i = 0; i < step; i = i + 1)
+	begin:blocks
 	   
-	   if(i < pad_left)
-	     assign data_out[i] = pad_left_value;
-	   else if(i >= (new_width - pad_right))
-	     assign data_out[i] = pad_right_value;
-	   else
-	     assign data_out[i] = data_in[i - pad_left];
+	   genvar j;
+	   for(j = 0; j < num_blocks; j = j + 1)
+	     begin:bits
+		assign data_out[i*num_blocks+j] = data_in[i+j*step];
+	     end
 	   
 	end
       
    endgenerate
    
 endmodule
-
-	   

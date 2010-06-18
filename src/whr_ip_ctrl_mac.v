@@ -726,7 +726,7 @@ module whr_ip_ctrl_mac
    assign route_port = hdff_la_route_info[0:port_idx_width-1];
    
    wire [0:num_ports-1] route_unmasked_op;
-   c_decoder
+   c_decode
      #(.num_ports(num_ports))
    route_unmasked_op_dec
      (.data_in(route_port),

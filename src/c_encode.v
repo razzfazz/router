@@ -30,38 +30,42 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// interleave a given number of blocks of bits
-// (a0 a1 a1 b0 b1 b2 c0 c1 c2) -> (a0 b0 c0 a1 b1 c1 a2 b2 c2)
-module c_interleaver
+// encoder from one-hot to binary
+module c_encode
   (data_in, data_out);
    
-   // input data width
-   parameter width = 8;
+`include "c_functions.v"
    
-   // number of blocks in input data
-   parameter num_blocks = 2;
+   // number of input ports (i.e., decoded width)
+   parameter num_ports = 8;
    
-   // width of each block
-   localparam step = width / num_blocks;
+   localparam width = clogb(num_ports);
    
-   // vector of input data
-   input [0:width-1] data_in;
+   // one-hot input data
+   input [0:num_ports-1] data_in;
    
-   // vector of output data
+   // binary encoded output data
    output [0:width-1] data_out;
    wire [0:width-1] data_out;
    
    generate
       
-      genvar 	    i;
-      for(i = 0; i < step; i = i + 1)
-	begin:blocks
+      genvar 	    level;
+      for(level = 0; level < width; level = level + 1)
+	begin:levels
 	   
-	   genvar j;
-	   for(j = 0; j < num_blocks; j = j + 1)
-	     begin:bits
-		assign data_out[i*num_blocks+j] = data_in[i+j*step];
+	   wire [0:num_ports-1] bits;
+	   
+	   genvar 		position;
+	   for(position = 0; position < num_ports; position = position + 1)
+	     begin:positions
+		if(position & (1 << level))
+		  assign bits[position] = data_in[position];
+		else
+		  assign bits[position] = 1'b0;
 	     end
+	   
+	   assign data_out[(width-1)-level] = |bits;
 	   
 	end
       

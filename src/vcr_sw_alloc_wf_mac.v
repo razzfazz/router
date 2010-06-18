@@ -197,7 +197,7 @@ module vcr_sw_alloc_wf_mac
 		     .data_out(noreq_nonspec_op));
 		  
 		  wire [0:num_ports*num_ports-1] req_nonspec_op_ip;
-		  c_interleaver
+		  c_interleave
 		    #(.width(num_ports*num_ports),
 		      .num_blocks(num_ports))
 		  req_nonspec_op_ip_intl
@@ -264,7 +264,7 @@ module vcr_sw_alloc_wf_mac
 		     .data_out(nognt_nonspec_op));
 		  
 		  wire [0:num_ports*num_ports-1] gnt_nonspec_op_ip;
-		  c_interleaver
+		  c_interleave
 		    #(.width(num_ports*num_ports),
 		      .num_blocks(num_ports))
 		  gnt_nonspec_op_ip_intl

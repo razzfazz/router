@@ -842,7 +842,7 @@ module vcr_op_ctrl_mac
 	     begin
 		
 		wire [0:vc_idx_width-1] match_ovc_enc;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_vcs))
 		match_ovc_enc_enc
 		  (.data_in(match_ovc),

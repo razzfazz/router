@@ -83,7 +83,7 @@ module c_fbmult
    endgenerate
    
    wire [0:width*width-1] iter_matrix_noshift;
-   c_interleaver
+   c_interleave
      #(.width(width*width),
        .num_blocks(width))
    iter_matrix_noshift_intl

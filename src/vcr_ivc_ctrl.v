@@ -435,8 +435,8 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   c_align
-	     #(.data_width(num_vcs_per_class),
-	       .dest_width(num_vcs),
+	     #(.in_width(num_vcs_per_class),
+	       .out_width(num_vcs),
 	       .offset(packet_class*num_vcs_per_class))
 	   allocated_ovc_alg
 	     (.data_in(vc_allocated_ocvc_q),
@@ -448,8 +448,8 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   c_align
-	     #(.data_width(2*num_vcs_per_class),
-	       .dest_width(num_vcs),
+	     #(.in_width(2*num_vcs_per_class),
+	       .out_width(num_vcs),
 	       .offset(packet_class*num_vcs_per_class))
 	   allocated_ovc_alg
 	     (.data_in({{num_vcs_per_class{~inc_rc}} & 
@@ -745,7 +745,7 @@ module vcr_ivc_ctrl
    assign route_port = hdff_la_route_info[0:port_idx_width-1];
    
    wire [0:num_ports-1] route_unmasked_op;
-   c_decoder
+   c_decode
      #(.num_ports(num_ports))
    route_unmasked_op_dec
      (.data_in(route_port),

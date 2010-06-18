@@ -98,8 +98,8 @@ module rtr_vc_align
 	begin
 	   
 	   c_align
-	     #(.data_width(num_vcs_per_class),
-	       .dest_width(num_vcs),
+	     #(.in_width(num_vcs_per_class),
+	       .out_width(num_vcs),
 	       .offset(packet_class*num_vcs_per_class))
 	   flag_ovc_alg
 	     (.data_in(flag_ocvc),
@@ -111,8 +111,8 @@ module rtr_vc_align
 	begin
 	   
 	   c_align
-	     #(.data_width(2*num_vcs_per_class),
-	       .dest_width(num_vcs),
+	     #(.in_width(2*num_vcs_per_class),
+	       .out_width(num_vcs),
 	       .offset(packet_class*num_vcs_per_class))
 	   flag_ovc_alg
 	     (.data_in({{num_vcs_per_class{~inc_rc}} & flag_ocvc,

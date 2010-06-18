@@ -137,7 +137,7 @@ module rtr_flow_ctrl_tx
 	       begin
 		  
 		  wire [0:vc_idx_width-1] vc_s, vc_q;
-		  c_encoder
+		  c_encode
 		    #(.num_ports(num_vcs))
 		  vc_s_enc
 		    (.data_in(sel_ivc),

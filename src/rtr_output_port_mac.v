@@ -645,7 +645,7 @@ module rtr_output_port_mac
 	   assign ivc_errors_ivc[ivc*4+2] = lar_error;
 	   
 	   wire [0:num_ports-1] 	  lar_route_op;
-	   c_decoder
+	   c_decode
 	     #(.num_ports(num_ports))
 	   lar_route_op_dec
 	     (.data_in(lar_route_port),
@@ -852,8 +852,8 @@ module rtr_output_port_mac
 	      
 	      wire [0:flit_data_width-1]     flit_data;
 	      c_align
-		#(.data_width(la_route_info_width),
-		  .dest_width(flit_data_width),
+		#(.in_width(la_route_info_width),
+		  .out_width(flit_data_width),
 		  .offset(la_route_info_offset))
 	      flit_data_alg
 		(.data_in(muxed_data),

@@ -403,9 +403,8 @@ module vcr_vc_alloc_sep_of
 			  
 			  wire [0:num_vcs-1] 	     gnt_in_ovc;
 			  c_align
-			    #(.data_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dest_width(num_vcs),
+			    #(.in_width(num_resource_classes*num_vcs_per_class),
+			      .out_width(num_vcs),
 			      .offset(mc*num_resource_classes*
 				      num_vcs_per_class))
 			  gnt_in_ovc_alg
@@ -442,7 +441,7 @@ module vcr_vc_alloc_sep_of
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              gnt_in_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
@@ -453,7 +452,7 @@ module vcr_vc_alloc_sep_of
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              req_out_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
@@ -464,7 +463,7 @@ module vcr_vc_alloc_sep_of
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
 		 num_ports*num_resource_classes*num_vcs_per_class-1] 
              gnt_out_op_orc_ocvc_ip_irc_icvc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
 		      num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
@@ -614,9 +613,9 @@ module vcr_vc_alloc_sep_of
 				      assign gnt_raw_icvc = req_out_icvc;
 
 				    c_align
-				      #(.data_width(num_vcs_per_class),
-					.dest_width(num_resource_classes*
-						    num_vcs_per_class),
+				      #(.in_width(num_vcs_per_class),
+					.out_width(num_resource_classes*
+						   num_vcs_per_class),
 					.offset(0))
 				    gnt_raw_irc_icvc_alg
 				      (.data_in(gnt_raw_icvc),
@@ -667,9 +666,9 @@ module vcr_vc_alloc_sep_of
 					     gnt_raw_high_icvc}));
 				    
 				    c_align
-				      #(.data_width(2*num_vcs_per_class),
-					.dest_width(num_resource_classes*
-						    num_vcs_per_class),
+				      #(.in_width(2*num_vcs_per_class),
+					.out_width(num_resource_classes*
+						   num_vcs_per_class),
 					.offset((orc-1)*num_vcs_per_class))
 				    gnt_raw_irc_icvc_alg
 				      (.data_in({gnt_raw_low_icvc,
@@ -718,9 +717,8 @@ module vcr_vc_alloc_sep_of
 			  
 			  wire [0:num_vcs-1] gnt_raw_ivc;
 			  c_align
-			    #(.data_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dest_width(num_vcs),
+			    #(.in_width(num_resource_classes*num_vcs_per_class),
+			      .out_width(num_vcs),
 			      .offset(mc*num_resource_classes*
 				      num_vcs_per_class))
 			  gnt_raw_ivc_alg

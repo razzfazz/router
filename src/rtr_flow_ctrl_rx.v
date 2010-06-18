@@ -149,7 +149,7 @@ module rtr_flow_ctrl_rx
 		     .d(vc_s),
 		     .q(vc_q));
 		  
-		  c_decoder
+		  c_decode
 		    #(.num_ports(num_vcs))
 		  sel_ivc_dec
 		    (.data_in(vc_q),

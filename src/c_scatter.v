@@ -30,45 +30,52 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// encoder from one-hot to binary
-module c_encoder
-  (data_in, data_out);
+// spread out bit vector into larger vector
+module c_scatter
+  (data_in, dest_in, data_out);
    
-`include "c_functions.v"
+   // width of output data
+   parameter out_width = 32;
    
-   // number of input ports (i.e., decoded width)
-   parameter num_ports = 8;
+   // population count function (count ones)
+   function integer pop_count(input [0:out_width-1] argument);
+      integer i;
+      begin
+	 pop_count = 0;
+	 for(i = 0; i < out_width; i = i + 1)
+	   pop_count = pop_count + argument[i];
+      end
+   endfunction
    
-   localparam width = clogb(num_ports);
+   // mask indicating at which positions to put the input vector's bits
+   parameter [0:out_width-1] mask = {out_width{1'b1}};
    
-   // one-hot input data
-   input [0:num_ports-1] data_in;
+   // width of input vector
+   localparam in_width = pop_count(mask);
    
-   // binary encoded output data
-   output [0:width-1] data_out;
-   wire [0:width-1] data_out;
+   // input vector
+   input [0:in_width-1] data_in;
    
-   generate
-      
-      genvar 	    level;
-      for(level = 0; level < width; level = level + 1)
-	begin:levels
-	   
-	   wire [0:num_ports-1] bits;
-	   
-	   genvar 		position;
-	   for(position = 0; position < num_ports; position = position + 1)
-	     begin:positions
-		if(position & (1 << level))
-		  assign bits[position] = data_in[position];
-		else
-		  assign bits[position] = 1'b0;
-	     end
-	   
-	   assign data_out[(width-1)-level] = |bits;
-	   
-	end
-      
-   endgenerate
+   // destination vector
+   input [0:out_width-1] dest_in;
+   
+   // result
+   output [0:out_width-1] data_out;
+   reg [0:out_width-1] 	  data_out;
+   
+   integer 		  idx1, idx2;
+   
+   always @(data_in)
+     begin
+	idx2 = 0;
+	for(idx1 = 0; idx1 < out_width; idx1 = idx1 + 1)
+	  if(mask[idx1] == 1'b1)
+	    begin
+	       data_out[idx1] = data_in[idx2];
+	       idx2 = idx2 + 1;
+	    end
+	  else
+	    data_out[idx1] = dest_in[idx1];
+     end
    
 endmodule

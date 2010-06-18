@@ -169,7 +169,7 @@ module vcr_sw_alloc_ip
 	      .data_out(req_out_op));
 	   
 	   wire [0:num_ports*num_vcs-1] route_op_ivc;
-	   c_interleaver
+	   c_interleave
 	     #(.width(num_vcs*num_ports),
 	       .num_blocks(num_vcs))
 	   route_op_ivc_intl
@@ -300,7 +300,7 @@ module vcr_sw_alloc_ip
 		// the preselection mask shows which output (if any) each VC was
 		// preselected for
 		wire [0:num_vcs*num_ports-1] presel_ivc_op;
-		c_interleaver
+		c_interleave
 		  #(.width(num_vcs*num_ports),
 		    .num_blocks(num_ports))
 		presel_ivc_op_intl
@@ -313,7 +313,7 @@ module vcr_sw_alloc_ip
 
 		// ... rearrange them by output port, ...
 		wire [0:num_ports*num_vcs-1] gnt_op_ivc;
-		c_interleaver
+		c_interleave
 		  #(.width(num_vcs*num_ports),
 		    .num_blocks(num_vcs))
 		gnt_op_ivc_intl

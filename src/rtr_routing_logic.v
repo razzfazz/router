@@ -188,8 +188,8 @@ module rtr_routing_logic
 			   assign dim_sel = ~dim_addr_match[dim];
 			 else
 			   assign dim_sel = ~dim_addr_match[dim] &
-					    dim_addr_match[(dim+1):
-							   (num_dimensions-1)];
+					    &dim_addr_match[(dim+1):
+							    (num_dimensions-1)];
 		      end
 		    
 		  endcase
@@ -228,7 +228,7 @@ module rtr_routing_logic
 		      begin
 			 
 			 wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
-			 c_decoder
+			 c_decode
 			   #(.num_ports(num_routers_per_dim))
 			 dest_dim_addr_dec_dec
 			   (.data_in(dest_dim_addr),
@@ -266,7 +266,7 @@ module rtr_routing_logic
 	     = route_info[route_info_width-node_addr_width:route_info_width-1];
 	   
 	   wire [0:num_nodes_per_router-1] node_sel;
-	   c_decoder
+	   c_decode
 	     #(.num_ports(num_nodes_per_router))
 	   node_sel_dec
 	     (.data_in(dest_node_address),
@@ -282,7 +282,7 @@ module rtr_routing_logic
       
    endgenerate
    
-   c_encoder
+   c_encode
      #(.num_ports(num_ports))
    route_port_enc
      (.data_in(route_op),

@@ -35,10 +35,10 @@ module c_align
   (data_in, dest_in, data_out);
    
    // width of input data
-   parameter data_width = 32;
+   parameter in_width = 32;
    
    // width of destination vector
-   parameter dest_width = 32;
+   parameter out_width = 32;
    
    // offset at which to place input data within destination vector
    // (portions of the input data that end up to the left or right of the
@@ -46,23 +46,23 @@ module c_align
    parameter offset = 0;
    
    // input vector
-   input [0:data_width-1] data_in;
+   input [0:in_width-1] data_in;
    
    // destination vector
-   input [0:dest_width-1] dest_in;
+   input [0:out_width-1] dest_in;
    
    // result
-   output [0:dest_width-1] data_out;
-   wire [0:dest_width-1] data_out;
+   output [0:out_width-1] data_out;
+   wire [0:out_width-1]   data_out;
    
-   genvar 		i;
+   genvar 		  i;
    
    generate
       
-      for(i = 0; i < dest_width; i = i + 1)
+      for(i = 0; i < out_width; i = i + 1)
 	begin:bits
 	   
-	   if((i < offset) || (i >= (offset + data_width)))
+	   if((i < offset) || (i >= (offset + in_width)))
 	     assign data_out[i] = dest_in[i];
 	   else
 	     assign data_out[i] = data_in[i - offset];

@@ -98,7 +98,7 @@ module c_wf_alloc_rot
 	   assign current_row = row;
 	   
 	   wire [0:num_ports-1] 	req_tmp;
-	   c_rotator
+	   c_rotate
 	     #(.width(num_ports),
 	       .rotate_dir(`ROTATE_DIR_RIGHT))
 	   req_tmp_rot
@@ -107,7 +107,7 @@ module c_wf_alloc_rot
 	      .data_out(req_tmp));
 	   
 	   wire [0:num_ports-1] 	req_in;
-	   c_rotator
+	   c_rotate
 	     #(.width(num_ports),
 	       .rotate_dir(`ROTATE_DIR_LEFT))
 	   req_in_rot
@@ -133,7 +133,7 @@ module c_wf_alloc_rot
 		    = y_out[0:num_ports-1];
 	   
 	   wire [0:num_ports-1] 	gnt_tmp;
-	   c_rotator
+	   c_rotate
 	     #(.width(num_ports),
 	       .rotate_dir(`ROTATE_DIR_RIGHT))
 	   gnt_tmp_rot
@@ -142,7 +142,7 @@ module c_wf_alloc_rot
 	      .data_out(gnt_tmp));
 	   
 	   wire [0:num_ports-1] 	gnt_row;
-	   c_rotator
+	   c_rotate
 	     #(.width(num_ports),
 	       .rotate_dir(`ROTATE_DIR_LEFT))
 	   gnt_row_rot

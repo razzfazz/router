@@ -55,7 +55,7 @@ module c_crossbar
    wire [0:num_out_ports*width-1] data_out_op;
    
    wire [0:num_out_ports*num_in_ports-1] ctrl_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_in_ports*num_out_ports),
        .num_blocks(num_in_ports))
    ctrl_intl

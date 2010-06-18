@@ -185,7 +185,7 @@ module vcr_comb_alloc_sep_if
 					     port_idx_width-1];
 			  
 			  wire [0:num_ports-1] 	    route_op;
-			  c_decoder
+			  c_decode
 			    #(.num_ports(num_ports))
 			  route_op_dec
 			    (.data_in(route_port),
@@ -228,8 +228,8 @@ module vcr_comb_alloc_sep_if
 					       num_vcs_per_class-1];
 			       
 			       c_align
-				 #(.data_width(num_vcs_per_class),
-				   .dest_width(num_vcs),
+				 #(.in_width(num_vcs_per_class),
+				   .out_width(num_vcs),
 				   .offset((mc*num_resource_classes+irc)*
 					   num_vcs_per_class))
 			       gnt_ovc_alg
@@ -289,8 +289,8 @@ module vcr_comb_alloc_sep_if
 				   {num_vcs_per_class{inc_rc}};
 			       
 			       c_align
-				 #(.data_width(2*num_vcs_per_class),
-				   .dest_width(num_vcs),
+				 #(.in_width(2*num_vcs_per_class),
+				   .out_width(num_vcs),
 				   .offset((mc*num_resource_classes+irc)*
 					   num_vcs_per_class))
 			       gnt_ovc_alg
@@ -429,7 +429,7 @@ module vcr_comb_alloc_sep_if
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] req_out_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    req_out_op_ip_intl
@@ -437,7 +437,7 @@ module vcr_comb_alloc_sep_if
       .data_out(req_out_op_ip));
    
    wire [0:num_ports*num_ports-1] gnt_out_op_ip;
-   c_interleaver
+   c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_out_op_ip_intl

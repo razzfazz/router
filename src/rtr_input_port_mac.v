@@ -432,7 +432,7 @@ module rtr_input_port_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_ports-1] 	  ipd_route_op;
-   c_decoder
+   c_decode
      #(.num_ports(num_ports))
    ipd
      (.data_in(ild_route_port),
@@ -837,7 +837,7 @@ module rtr_input_port_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] 	  vpd_route_op;
-	   c_decoder
+	   c_decode
 	     #(.num_ports(num_ports))
 	   vpd
 	     (.data_in(vld_route_port),
@@ -1488,8 +1488,8 @@ module rtr_input_port_mac
 	 
 	 wire [0:flit_data_width-1] 	flit_data;
 	 c_align
-	   #(.data_width(la_route_info_width),
-	     .dest_width(flit_data_width),
+	   #(.in_width(la_route_info_width),
+	     .out_width(flit_data_width),
 	     .offset(la_route_info_offset))
 	 flit_data_alg
 	   (.data_in(muxed_bits),

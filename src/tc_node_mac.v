@@ -509,8 +509,8 @@ module tc_node_mac
       .q(running_q));
    
    c_align
-     #(.data_width(2),
-       .dest_width(cfg_data_width))
+     #(.in_width(2),
+       .out_width(cfg_data_width))
    ifc_read_data_status_alg
      (.data_in({running_q, error}),
       .dest_in({cfg_data_width{1'b0}}),
@@ -526,8 +526,8 @@ module tc_node_mac
    
    wire [0:num_packets_width-1]  num_packets_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(num_packets_width))
+     #(.in_width(cfg_data_width),
+       .out_width(num_packets_width))
    num_packets_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({num_packets_width{1'b0}}),
@@ -565,8 +565,8 @@ module tc_node_mac
    assign gen_packets = ~num_packets_zero;
    
    c_align
-     #(.data_width(num_packets_width),
-       .dest_width(cfg_data_width))
+     #(.in_width(num_packets_width),
+       .out_width(cfg_data_width))
    ifc_read_data_num_packets_alg
      (.data_in(num_packets_q),
       .dest_in({cfg_data_width{1'b0}}),
@@ -586,8 +586,8 @@ module tc_node_mac
    
    wire [0:arrival_rv_width-1] 	 arrival_rv_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(arrival_rv_width))
+     #(.in_width(cfg_data_width),
+       .out_width(arrival_rv_width))
    arrival_rv_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({arrival_rv_width{1'b0}}),
@@ -619,8 +619,8 @@ module tc_node_mac
    
    wire [0:arrival_rv_width-1] 	 arrival_thresh_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(arrival_rv_width))
+     #(.in_width(cfg_data_width),
+       .out_width(arrival_rv_width))
    arrival_thresh_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({arrival_rv_width{1'b0}}),
@@ -658,8 +658,8 @@ module tc_node_mac
    
    wire [0:packet_rvs_width-1] 	 packet_rvs_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(packet_rvs_width))
+     #(.in_width(cfg_data_width),
+       .out_width(packet_rvs_width))
    packet_rvs_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({packet_rvs_width{1'b0}}),
@@ -759,8 +759,8 @@ module tc_node_mac
 	   
 	   wire [0:mc_threshs_width-1] mc_threshs_loadval;
 	   c_align
-	     #(.data_width(cfg_data_width),
-	       .dest_width(mc_threshs_width))
+	     #(.in_width(cfg_data_width),
+	       .out_width(mc_threshs_width))
 	   mc_threshs_loadval_alg
 	     (.data_in(ifc_write_data),
 	      .dest_in({mc_threshs_width{1'b0}}),
@@ -861,8 +861,8 @@ module tc_node_mac
 	   
 	   wire [0:rc_threshs_width-1] rc_threshs_loadval;
 	   c_align
-	     #(.data_width(cfg_data_width),
-	       .dest_width(rc_threshs_width))
+	     #(.in_width(cfg_data_width),
+	       .out_width(rc_threshs_width))
 	   rc_threshs_loadval_alg
 	     (.data_in(ifc_write_data),
 	      .dest_in({rc_threshs_width{1'b0}}),
@@ -1342,7 +1342,7 @@ module tc_node_mac
       .inc_rc(inc_rc_rv));
    
    wire [0:port_idx_width-1] 		     route_port_rv;
-   c_encoder
+   c_encode
      #(.num_ports(num_ports))
    route_port_rv_enc
      (.data_in(route_op_rv),
@@ -1404,8 +1404,8 @@ module tc_node_mac
 	   
 	   wire [0:plength_vals_width-1] plength_vals_loadval;
 	   c_align
-	     #(.data_width(cfg_data_width),
-	       .dest_width(plength_vals_width))
+	     #(.in_width(cfg_data_width),
+	       .out_width(plength_vals_width))
 	   plength_vals_loadval_alg
 	     (.data_in(ifc_write_data),
 	      .dest_in({(plength_vals_width){1'b0}}),
@@ -1434,8 +1434,8 @@ module tc_node_mac
 		
 		wire [0:plength_threshs_width-1] plength_threshs_loadval;
 		c_align
-		  #(.data_width(cfg_data_width),
-		    .dest_width(plength_threshs_width))
+		  #(.in_width(cfg_data_width),
+		    .out_width(plength_threshs_width))
 		plength_threshs_loadval_alg
 		  (.data_in(ifc_write_data),
 		   .dest_in({plength_threshs_width{1'b0}}),
@@ -1707,7 +1707,7 @@ module tc_node_mac
 	begin
 	   
 	   wire [0:vc_idx_width-1] flit_vc;
-	   c_encoder
+	   c_encode
 	     #(.num_ports(num_vcs))
 	   flit_vc_enc
 	     (.data_in(sel_ovc),
@@ -1753,8 +1753,8 @@ module tc_node_mac
    
    wire [0:flit_data_width-1] 	   flit_data_rv_loadval;
    c_align
-     #(.data_width(cfg_data_width),
-       .dest_width(flit_data_width))
+     #(.in_width(cfg_data_width),
+       .out_width(flit_data_width))
    flit_data_rv_loadval_alg
      (.data_in(ifc_write_data),
       .dest_in({flit_data_width{1'b0}}),
@@ -1842,8 +1842,8 @@ module tc_node_mac
    // expand the signature to a multiple of cfg_data_width, ...
    wire [0:flit_sig_exp_width-1]   flit_sig_expanded;
    c_align
-     #(.data_width(flit_data_width),
-       .dest_width(flit_sig_exp_width))
+     #(.in_width(flit_data_width),
+       .out_width(flit_sig_exp_width))
    flit_sig_expanded_alg
      (.data_in(flit_sig_q),
       .dest_in({flit_sig_exp_width{1'b0}}),

@@ -117,7 +117,7 @@ module rtr_output_flow_ctrl
 	       begin
 		  
 		  wire [0:vc_idx_width-1] flit_vc;
-		  c_encoder
+		  c_encode
 		    #(.num_ports(num_vcs))
 		  flit_vc_enc
 		    (.data_in(flit_sel_in_ivc),
@@ -139,7 +139,7 @@ module rtr_output_flow_ctrl
 		  wire [0:vc_idx_width-1] cred_vc;
 		  assign cred_vc = us_flow_ctrl_in[1:1+vc_idx_width-1];
 		  
-		  c_decoder
+		  c_decode
 		    #(.num_ports(num_vcs))
 		  flit_sel_out_ivc_dec
 		    (.data_in(cred_vc),
