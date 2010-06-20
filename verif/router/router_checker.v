@@ -414,28 +414,7 @@ module router_checker
 		     
 		     // generate lookahead routing information
 		     
-		     wire [0:((irc ==
-			       (num_resource_classes - 1)) ?
-			      addr_width :
-			      (irc ==
-			       (num_resource_classes - 2)) ?
-			      (router_addr_width + addr_width) :
-			      (2*router_addr_width))-1] hop_route_info_la;
-		     if(irc == (num_resource_classes - 1))
-		       assign hop_route_info_la
-			 = route_info[route_info_width-addr_width:
-				      route_info_width-1];
-		     else if(irc == (num_resource_classes - 2))
-		       assign hop_route_info_la
-			 = route_info[route_info_width-
-				      (router_addr_width+addr_width):
-				      route_info_width-1];
-		     else
-		       assign hop_route_info_la
-			 = route_info[irc*router_addr_width:
-				      (irc+2)*router_addr_width-1];
-		     
-		     wire [0:la_route_info_width-1] 	la_route_info;
+		     wire [0:la_route_info_width-1] la_route_info;
 		     rtr_la_routing_logic
 		       #(.num_resource_classes(num_resource_classes),
 			 .num_routers_per_dim(num_routers_per_dim),
@@ -453,7 +432,7 @@ module router_checker
 			.router_address(router_address),
 			.route_port(la_route_port),
 			.inc_rc(la_inc_rc),
-			.hop_route_info(hop_route_info_la),
+			.route_info(route_info),
 			.la_route_info(la_route_info));
 		     
 		     assign la_route_info_ivc[(mc*num_resource_classes+irc)*

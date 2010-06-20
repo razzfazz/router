@@ -481,8 +481,6 @@ module vcr_ip_ctrl_mac
    wire input_stage_active;
    assign input_stage_active = 1'b1;
    
-   wire 	      flit_valid_in;
-   
    wire [0:flit_ctrl_width-1] flit_ctrl_in_s, flit_ctrl_in_q;
    assign flit_ctrl_in_s = flit_ctrl_in;
    
@@ -505,8 +503,6 @@ module vcr_ip_ctrl_mac
 		.active(input_stage_active),
 		.d(flit_valid_in_s),
 		.q(flit_valid_in_q));
-	     
-	     assign flit_valid_in = flit_valid_in_q;
 	     
 	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
 	     
@@ -543,12 +539,14 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
+   wire 		      flit_valid_in;
+   
    wire 		      buffer_in_active;
    assign buffer_in_active = flit_valid_in;
    
    // extract header information from header data
-   wire [0:header_info_width-1] header_info_in_q;
-   assign header_info_in_q = flit_data_in_q[0:header_info_width-1];
+   wire [0:header_info_width-1] header_info_in;
+   assign header_info_in = flit_data_in_q[0:header_info_width-1];
    
    // non-speculative switch allocator requests
    wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
@@ -562,6 +560,8 @@ module vcr_ip_ctrl_mac
    // speculative switch allocator grants
    wire [0:num_vcs-1] 		sw_gnt_spec_ivc;
    
+   wire 			flit_head_in;
+   wire 			flit_tail_in;
    wire [0:num_vcs-1] 		flit_valid_in_ivc;
    wire [0:num_vcs-1] 		flit_head_in_ivc;
    wire [0:num_vcs-1] 		flit_tail_in_ivc;
@@ -582,7 +582,10 @@ module vcr_ip_ctrl_mac
       .reset(reset),
       .active(buffer_in_active),
       .flit_ctrl_in(flit_ctrl_in_q),
-      .header_info_in(header_info_in_q),
+      .header_info_in(header_info_in),
+      .flit_valid_out(flit_valid_in),
+      .flit_head_out(flit_head_in),
+      .flit_tail_out(flit_tail_in),
       .flit_valid_out_ivc(flit_valid_in_ivc),
       .flit_head_out_ivc(flit_head_in_ivc),
       .flit_tail_out_ivc(flit_tail_in_ivc));
@@ -687,7 +690,7 @@ module vcr_ip_ctrl_mac
 	      .flit_valid_in(flit_valid_in),
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
-	      .header_info_in(header_info_in_q),
+	      .header_info_in(header_info_in),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_op(route_op),
 	      .route_port(route_port),
@@ -1183,7 +1186,23 @@ module vcr_ip_ctrl_mac
    assign fbf_read_enable = flit_sent;
    assign fbf_write_active = flit_valid_in;
    assign fbf_write_enable = flit_valid_in;
-   assign fbf_write_data = flit_data_in_q;
+   
+   wire [0:la_route_info_width-1] la_route_info_in;
+   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
+   
+   wire [0:la_route_info_width-1] la_route_info_out;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(la_route_info_width))
+   la_route_info_out_sel
+     (.select(flit_valid_in_ivc),
+      .data_in(la_route_info_ivc),
+      .data_out(la_route_info_out));
+   
+   assign fbf_write_data[0:la_route_info_width-1]
+     = flit_head_in ? la_route_info_out : la_route_info_in;
+   assign fbf_write_data[la_route_info_width:flit_data_width-1]
+     = flit_data_in_q[la_route_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -1381,33 +1400,7 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out_q;
    
-   wire [0:la_route_info_width-1] 	la_route_info_muxed;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(la_route_info_width))
-   la_route_info_muxed_sel
-     (.select(vc_sel_ivc),
-      .data_in(la_route_info_ivc),
-      .data_out(la_route_info_muxed));
-   
-   wire [0:la_route_info_width-1] 	la_route_info_s, la_route_info_q;
-   assign la_route_info_s = la_route_info_muxed;
-   c_dff
-     #(.width(la_route_info_width),
-       .reset_type(reset_type))
-   la_route_infoq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(alloc_active),
-      .d(la_route_info_s),
-      .q(la_route_info_q));
-   
-   assign flit_data_out[0:la_route_info_width-1]
-	    = flit_head_out_q ? 
-	      la_route_info_q : 
-	      fbf_read_data[0:la_route_info_width-1];
-   assign flit_data_out[la_route_info_width:flit_data_width-1]
-	    = fbf_read_data[la_route_info_width:flit_data_width-1];
+   assign flit_data_out = fbf_read_data;
    
    
    //---------------------------------------------------------------------------

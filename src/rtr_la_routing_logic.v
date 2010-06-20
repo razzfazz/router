@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic for VC router
 module rtr_la_routing_logic
-  (clk, reset, active, router_address, route_port, inc_rc, hop_route_info, 
+  (clk, reset, active, router_address, route_port, inc_rc, route_info, 
    la_route_info);
    
 `include "c_functions.v"
@@ -58,6 +58,10 @@ module rtr_la_routing_logic
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = num_resource_classes * router_addr_width + node_addr_width;
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
@@ -94,15 +98,6 @@ module rtr_la_routing_logic
    // current resource class
    parameter resource_class = 0;
    
-   // total number of bits required for storing routing information
-   localparam hop_route_info_width
-     = (resource_class == (num_resource_classes - 1)) ?
-       addr_width :
-       (resource_class == (num_resource_classes - 2)) ?
-       (router_addr_width + addr_width) :
-       (2 * router_addr_width);
-   
-
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -119,7 +114,7 @@ module rtr_la_routing_logic
    input inc_rc;
    
    // routing data
-   input [0:hop_route_info_width-1] hop_route_info;
+   input [0:route_info_width-1] route_info;
    
    // lookahead routing information for next router
    output [0:la_route_info_width-1] la_route_info;
@@ -134,35 +129,33 @@ module rtr_la_routing_logic
    wire [0:num_dimensions-1] 	  dim_addr_match;
    
    wire [0:num_ports-1] 	  next_route_op;
+   wire 			  next_inc_rc;
    
    generate
       
-      if(num_resource_classes > 1)
+      if(resource_class == (num_resource_classes - 1))
 	begin
-	   
-	   wire next_inc_rc;
-	   
-	   if(resource_class == (num_resource_classes - 1))
-	     begin
-		assign dest_router_address
-		  = hop_route_info[0:router_addr_width-1];
-		assign next_inc_rc = 1'b0;
-	     end
-	   else
-	     begin
-		assign dest_router_address
-		  = inc_rc ?
-		    hop_route_info[router_addr_width:2*router_addr_width-1] :
-		    hop_route_info[0:router_addr_width-1];
-		assign next_inc_rc
-		  = (next_router_address == dest_router_address);
-	     end
-	   
-	   assign la_route_info[port_idx_width] = next_inc_rc;
-	   
+	   assign dest_router_address
+	     = route_info[route_info_width-addr_width:
+			  route_info_width-node_addr_width-1];
+	   assign next_inc_rc = 1'b0;
 	end
       else
-	assign dest_router_address = hop_route_info[0:router_addr_width-1];
+	begin
+	   assign dest_router_address
+	     = inc_rc ?
+	       route_info[resource_class*router_addr_width:
+			  (resource_class+1)*router_addr_width-1] :
+	       route_info[(resource_class+1)*router_addr_width:
+			  (resource_class+2)*router_addr_width-1];
+	   assign next_inc_rc
+	     = (next_router_address == dest_router_address);
+	end
+      
+      if(num_resource_classes > 1)
+	begin
+	   assign la_route_info[port_idx_width] = next_inc_rc;
+	end
       
       case(routing_type)
 	
@@ -332,8 +325,7 @@ module rtr_la_routing_logic
 	   
 	   wire [0:node_addr_width-1] dest_node_address;
 	   assign dest_node_address
-	     = hop_route_info[hop_route_info_width-node_addr_width:
-			      hop_route_info_width-1];
+	     = route_info[route_info_width-node_addr_width:route_info_width-1];
 	   
 	   wire [0:num_nodes_per_router-1] node_sel;
 	   c_decode

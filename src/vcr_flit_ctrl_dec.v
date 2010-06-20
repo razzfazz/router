@@ -32,8 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // flit control signal decoding logic
 module vcr_flit_ctrl_dec
-  (clk, reset, active, flit_ctrl_in, header_info_in, flit_valid_out_ivc, 
-   flit_head_out_ivc, flit_tail_out_ivc);
+  (clk, reset, active, flit_ctrl_in, header_info_in, flit_valid_out, 
+   flit_head_out, flit_tail_out, flit_valid_out_ivc, flit_head_out_ivc, 
+   flit_tail_out_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -153,6 +154,18 @@ module vcr_flit_ctrl_dec
    input [0:header_info_width-1] header_info_in;
    
    // flit valid indicators for each VC
+   output flit_valid_out;
+   wire flit_valid_out;
+   
+   // flit is head flit
+   output flit_head_out;
+   wire flit_head_out;
+
+   // flit is tail flit
+   output flit_tail_out;
+   wire flit_tail_out;
+   
+   // flit valid indicators for each VC
    output [0:num_vcs-1] flit_valid_out_ivc;
    wire [0:num_vcs-1] flit_valid_out_ivc;
    
@@ -173,8 +186,7 @@ module vcr_flit_ctrl_dec
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
-	     wire flit_valid_in;
-	     assign flit_valid_in = flit_ctrl_in[0];
+	     assign flit_valid_out = flit_ctrl_in[0];
 	     
 	     if(num_vcs > 1)
 	       begin
@@ -190,13 +202,12 @@ module vcr_flit_ctrl_dec
 		     .data_out(flit_valid_unqual_ivc));
 		  
 		  assign flit_valid_out_ivc
-		    = {num_vcs{flit_valid_in}} & flit_valid_unqual_ivc;
+		    = {num_vcs{flit_valid_out}} & flit_valid_unqual_ivc;
 		  
 	       end
 	     else
-	       assign flit_valid_out_ivc = flit_valid_in;
+	       assign flit_valid_out_ivc = flit_valid_out;
 	     
-	     wire 			  flit_head_out;
 	     assign flit_head_out = flit_ctrl_in[1+vc_idx_width+0];
 	     
 	     assign flit_head_out_ivc = {num_vcs{flit_head_out}};
@@ -206,7 +217,6 @@ module vcr_flit_ctrl_dec
 	       `PACKET_FORMAT_HEAD_TAIL:
 		 begin
 		    
-		    wire flit_tail_out;
 		    assign flit_tail_out = flit_ctrl_in[1+vc_idx_width+1];
 		    
 		    assign flit_tail_out_ivc = {num_vcs{flit_tail_out}};
@@ -365,6 +375,8 @@ module vcr_flit_ctrl_dec
 			   end
 			 
 		      end
+		    
+		    assign flit_tail_out = |flit_tail_out_ivc;
 		    
 		 end
 	       
