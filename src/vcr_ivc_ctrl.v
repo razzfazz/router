@@ -501,6 +501,7 @@ module vcr_ivc_ctrl
        .connectivity(connectivity),
        .routing_type(routing_type),
        .dim_order(dim_order),
+       .message_class(message_class),
        .resource_class(resource_class),
        .reset_type(reset_type))
    lar

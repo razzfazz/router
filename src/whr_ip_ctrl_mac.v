@@ -500,6 +500,7 @@ module whr_ip_ctrl_mac
        .connectivity(connectivity),
        .routing_type(routing_type),
        .dim_order(dim_order),
+       .message_class(0),
        .resource_class(0),
        .reset_type(reset_type))
    lar
