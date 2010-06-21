@@ -1066,6 +1066,39 @@ module vcr_ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
+   // synopsys translate_off
+   
+   integer 		       i;
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_fbc_underflow)
+	  $display("ERROR: Flit buffer underflow in module %m.");
+	
+	if(error_fbc_overflow)
+	  $display("ERROR: Flit buffer overflow in module %m.");
+	
+	if(error_hdff_underflow)
+	  $display("ERROR: Head FIFO underflow in module %m.");
+	
+	if(error_hdff_overflow)
+	  $display("ERROR: Head FIFO overflow in module %m.");
+	
+	if(error_no_header)
+	  $display("ERROR: Stray flit received in module %m.");
+	
+	if(error_ct_overflow)
+	  $display("ERROR: Credit tracker overflow in module %m.");
+	
+	if(error_invalid_port)
+	  $display({"ERROR: Received flit's destination does not match port ",
+		    "constraints in module %m."});
+	
+     end
+   
+   // synopsys translate_on
+   
    assign errors = {error_fbc_underflow,
 		    error_fbc_overflow,
 		    error_hdff_underflow,

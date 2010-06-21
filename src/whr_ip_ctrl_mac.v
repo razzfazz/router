@@ -865,41 +865,37 @@ module whr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
+   // synopsys translate_off
+   always @(posedge clk)
+     begin
+	
+	if(error_fbc_underflow)
+	  $display("ERROR: Flit buffer controller underflow in module %m.");
+	
+	if(error_fbc_overflow)
+	  $display("ERROR: Flit buffer controller overflow in module %m.");
+	
+	if(error_hdff_underflow)
+	  $display("ERROR: Head FIFO underflow in module %m.");
+	
+	if(error_hdff_overflow)
+	  $display("ERROR: Head FIFO overflow in module %m.");
+	
+	if(error_no_header)
+	  $display("ERROR: Stray flit received in module %m.");
+	
+	if(error_invalid_port)
+	  $display({"ERROR: Received flit's destination port does not match ",
+		    "constraints in module %m."});
+	
+     end
+   // synopsys translate_on
+   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 
-	   // synopsys translate_off
-	   always @(posedge clk)
-	     begin
-		
-		if(error_fbc_underflow)
-		     $display({"ERROR: Flit buffer controller underflow in ", 
-			       "module %m."});
-		
-		if(error_fbc_overflow)
-		     $display({"ERROR: Flit buffer controller overflow in ", 
-			       "module %m."});
-		
-		if(error_hdff_underflow)
-		  $display("ERROR: Head FIFO underflow in module %m.");
-		
-		if(error_hdff_overflow)
-		     $display("ERROR: Head FIFO overflow in module %m.");
-		
-		if(error_no_header)
-		     $display("ERROR: Stray flit received in module %m.");
-		
-		if(error_invalid_port)
-		     $display({"ERROR: Received flit's destination does not ", 
-			       "match constraints for input port %d in ",
-			       "module %m."}, 
-			      port_id);
-		
-	     end
-	   // synopsys translate_on
-	   
 	   wire [0:5] errors_s, errors_q;
 	   assign errors_s = {error_fbc_underflow,
 			      error_fbc_overflow,
