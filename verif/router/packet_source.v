@@ -550,26 +550,26 @@ module packet_source
 	     begin:ircs
 		
 		localparam ipc = mc * num_resource_classes + irc;
-		localparam [0:num_resource_classes-1] sel_irc
-		  = (1 << (num_resource_classes - 1 - irc));
 		
 		wire [0:num_ports-1]           route_op;
 		wire 			       inc_rc;
 		rtr_routing_logic
-		  #(.num_resource_classes(num_resource_classes),
+		  #(.num_message_classes(num_message_classes),
+		    .num_resource_classes(num_resource_classes),
 		    .num_routers_per_dim(num_routers_per_dim),
 		    .num_dimensions(num_dimensions),
 		    .num_nodes_per_router(num_nodes_per_router),
 		    .connectivity(connectivity),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
+		    .message_class(mc),
+		    .resource_class(irc),
 		    .reset_type(reset_type))
 		rtl
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(1'b1),
 		   .router_address(router_address),
-		   .sel_rc(sel_irc),
 		   .route_info(route_info),
 		   .route_op(route_op),
 		   .inc_rc(inc_rc));

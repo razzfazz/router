@@ -98,7 +98,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // traverse dimensions in descending order
 `define DIM_ORDER_DESCENDING 1
 
+// order of dimension traversal depends on message class
+`define DIM_ORDER_BY_CLASS   2
 
+`define DIM_ORDER_LAST `DIM_ORDER_BY_CLASS
 //------------------------------------------------------------------------------
 // packet formats
 //------------------------------------------------------------------------------

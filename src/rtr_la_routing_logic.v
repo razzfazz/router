@@ -38,6 +38,9 @@ module rtr_la_routing_logic
 `include "c_functions.v"
 `include "c_constants.v"
    
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
@@ -94,6 +97,9 @@ module rtr_la_routing_logic
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
+   
+   // current message class
+   parameter message_class = 0;
    
    // current resource class
    parameter resource_class = 0;
@@ -183,28 +189,27 @@ module rtr_la_routing_logic
 		  
 		  wire 			    dim_sel;
 		  
-		  case(dim_order)
-		    
-		    `DIM_ORDER_ASCENDING:
-		      begin
-			 if(dim == 0)
-			   assign dim_sel = ~dim_addr_match[dim];
-			 else
-			   assign dim_sel = &dim_addr_match[0:dim-1] &
-					    ~dim_addr_match[dim];
-		      end
-		    
-		    `DIM_ORDER_DESCENDING:
-		      begin
-			 if(dim == (num_dimensions - 1))
-			   assign dim_sel = ~dim_addr_match[dim];
-			 else
-			   assign dim_sel = ~dim_addr_match[dim] &
-					    &dim_addr_match[(dim+1):
-							    (num_dimensions-1)];
-		      end
-		    
-		  endcase
+		  if((dim_order == `DIM_ORDER_ASCENDING) ||
+		     ((dim_order == `DIM_ORDER_BY_CLASS) &&
+		      ((message_class % 2) == 0)))
+		    begin
+		       if(dim == 0)
+			 assign dim_sel = ~dim_addr_match[dim];
+		       else
+			 assign dim_sel = &dim_addr_match[0:dim-1] & 
+					  ~dim_addr_match[dim];
+		    end
+		  else if((dim_order == `DIM_ORDER_DESCENDING) ||
+			  ((dim_order == `DIM_ORDER_BY_CLASS) &&
+			   ((message_class % 2) == 1)))
+		    begin
+		       if(dim == (num_dimensions - 1))
+			 assign dim_sel = ~dim_addr_match[dim];
+		       else
+			 assign dim_sel = ~dim_addr_match[dim] &
+					  &dim_addr_match[(dim+1):
+							  (num_dimensions-1)];
+		    end
 		  
 		  wire [0:num_neighbors_per_dim-1] port_dec;
 		  

@@ -343,36 +343,27 @@ module router_checker
 		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 		  begin:ircs
 		     
-		     wire [0:num_resource_classes-1] sel_irc;
-		     c_align
-		       #(.in_width(1),
-			 .out_width(num_resource_classes),
-			 .offset(irc))
-		     sel_irc_alg
-		       (.data_in(1'b1),
-			.dest_in({num_resource_classes{1'b0}}),
-			.data_out(sel_irc));
-		     
-		     
 		     // compute destination port
 		     
 		     wire [0:num_ports-1] 	     route_op;
 		     wire 			     inc_rc;
 		     rtr_routing_logic
-		       #(.num_resource_classes(num_resource_classes),
+		       #(.num_message_classes(num_message_classes),
+			 .num_resource_classes(num_resource_classes),
 			 .num_routers_per_dim(num_routers_per_dim),
 			 .num_dimensions(num_dimensions),
 			 .num_nodes_per_router(num_nodes_per_router),
 			 .connectivity(connectivity),
 			 .routing_type(routing_type),
 			 .dim_order(dim_order),
+			 .message_class(mc),
+			 .resource_class(irc),
 			 .reset_type(reset_type))
 		     rtl
 		       (.clk(clk),
 			.reset(reset),
 			.active(1'b1),
 			.router_address(router_address),
-			.sel_rc(sel_irc),
 			.route_info(route_info),
 			.route_op(route_op),
 			.inc_rc(inc_rc));
@@ -416,13 +407,15 @@ module router_checker
 		     
 		     wire [0:la_route_info_width-1] la_route_info;
 		     rtr_la_routing_logic
-		       #(.num_resource_classes(num_resource_classes),
+		       #(.num_message_classes(num_message_classes),
+			 .num_resource_classes(num_resource_classes),
 			 .num_routers_per_dim(num_routers_per_dim),
 			 .num_dimensions(num_dimensions),
 			 .num_nodes_per_router(num_nodes_per_router),
 			 .connectivity(connectivity),
 			 .routing_type(routing_type),
 			 .dim_order(dim_order),
+			 .message_class(mc),
 			 .resource_class(irc),
 			 .reset_type(reset_type))
 		     lar
