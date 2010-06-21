@@ -1088,7 +1088,6 @@ module tc_node_mac
 	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      /*.active(ovcc_active),*/
 	      .flow_ctrl(flow_ctrl_in_q),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ip({num_ports{1'b0}}),
@@ -1322,7 +1321,7 @@ module tc_node_mac
    
    wire [0:num_ports-1] 		     route_op_rv;
    wire 				     inc_rc_rv;
-   vcr_routing_logic
+   rtr_routing_logic
      #(.num_resource_classes(num_resource_classes),
        .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
@@ -1334,7 +1333,7 @@ module tc_node_mac
    rtl
      (.clk(clk),
       .reset(reset),
-      /*.active(rtl_active),*/
+      .active(active_q),
       .router_address(router_address),
       .sel_rc(sel_rc_rv),
       .route_info(route_info_rv),
