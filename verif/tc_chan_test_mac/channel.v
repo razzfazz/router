@@ -67,6 +67,7 @@ module channel
    xmit_dataq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(xmit_data_s),
       .q(xmit_data_q));
    
@@ -81,7 +82,7 @@ module channel
    always @(posedge clk)
      for(i = 0; i < channel_width; i = i + 1)
        channel_errors[i]
-	 <= ($dist_uniform(seed, 0, 9999) < error_rate) ? 1'b1 : 1'b0;
+         <= ($dist_uniform(seed, 0, 9999) < error_rate) ? 1'b1 : 1'b0;
    
    wire [0:channel_width-1] channel_data_out;
    assign channel_data_out = channel_data_in ^ channel_errors;
@@ -94,6 +95,7 @@ module channel
    recv_dataq
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .d(recv_data_s),
       .q(recv_data_q));
    
