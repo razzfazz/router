@@ -692,7 +692,6 @@ module tc_chan_test_mac
 	      .reset(1'b0),
 	      .active(reg_active),
 	      .load(write_pattern_data_rv),
-	      .run(active_q),
 	      .feedback(pattern_data_rv_feedback_muxed),
 	      .complete(1'b0),
 	      .d(pattern_data_rv_s),
