@@ -29,8 +29,9 @@ module testbench
    lfsr
      (.clk(clk),
       .reset(reset),
-      .active(run),
+      .active(1'b1),
       .load(load),
+      .run(run),
       .feedback(feedback),
       .complete(complete),
       .d(d),
@@ -43,8 +44,9 @@ module testbench
    ulfsr
      (.clk(clk),
       .reset(reset),
-      .active(run),
+      .active(1'b1),
       .load(load),
+      .run(run),
       .feedback(feedback),
       .complete(complete),
       .d(d),
