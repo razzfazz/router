@@ -19,7 +19,7 @@ module testbench
    wire credit;
    wire free;
    wire free_early;
-   wire error;
+   wire [0:1] errors;
    
    c_credit_tracker
      #(.num_credits(num_credits),
@@ -27,11 +27,11 @@ module testbench
    dut
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .debit(debit),
       .credit(credit),
       .free(free),
-      .free_early(free_early),
-      .error(error));
+      .errors(errors));
    
    always
    begin
