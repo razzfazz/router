@@ -22,6 +22,7 @@ module testbench
    wire pop;
    wire [0:addr_width-1] write_addr;
    wire [0:addr_width-1] read_addr;
+   wire [0:addr_width-1] peek_addr;
    wire 		 almost_empty;
    wire 		 empty;
    wire 		 almost_full;
@@ -34,10 +35,12 @@ module testbench
    ffc
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .push(push),
       .pop(pop),
       .write_addr(write_addr),
       .read_addr(read_addr),
+      .peek_addr(peek_addr),
       .almost_empty(almost_empty),
       .empty(empty),
       .almost_full(almost_full),
@@ -45,7 +48,6 @@ module testbench
       .errors(ffc_errors));
    
    wire free;
-   wire free_early;
    wire [0:1] ct_errors;
    
    c_credit_tracker
@@ -54,10 +56,10 @@ module testbench
    ct
      (.clk(clk),
       .reset(reset),
+      .active(1'b1),
       .debit(push),
       .credit(pop),
       .free(free),
-      .free_early(free_early),
       .errors(ct_errors));
 
    reg [0:data_width-1] write_data;
@@ -68,6 +70,7 @@ module testbench
        .depth(num_buffers))
    rf
      (.clk(clk),
+      .active(1'b1),
       .write_enable(push),
       .write_address(write_addr),
       .write_data(write_data),
