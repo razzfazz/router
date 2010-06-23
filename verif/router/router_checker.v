@@ -234,7 +234,6 @@ module router_checker
 	   wire 			  flit_head;
 	   assign flit_head = flit_ctrl[1+vc_idx_width+0];
 	   
-	   
 	   // determine if this is a tail flit
 	   
 	   wire 			  flit_tail;
@@ -343,6 +342,11 @@ module router_checker
 		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
 		  begin:ircs
 		     
+		     localparam [0:num_message_classes-1] sel_mc
+		       = (1 << (num_message_classes - 1 - mc));
+		     localparam [0:num_resource_classes-1] sel_irc
+		       = (1 << (num_resource_classes - 1 - irc));
+		     
 		     // compute destination port
 		     
 		     wire [0:num_ports-1] 	     route_op;
@@ -355,15 +359,11 @@ module router_checker
 			 .num_nodes_per_router(num_nodes_per_router),
 			 .connectivity(connectivity),
 			 .routing_type(routing_type),
-			 .dim_order(dim_order),
-			 .message_class(mc),
-			 .resource_class(irc),
-			 .reset_type(reset_type))
+			 .dim_order(dim_order))
 		     rtl
-		       (.clk(clk),
-			.reset(reset),
-			.active(1'b1),
-			.router_address(router_address),
+		       (.router_address(router_address),
+			.sel_mc(sel_mc),
+			.sel_rc(sel_irc),
 			.route_info(route_info),
 			.route_op(route_op),
 			.inc_rc(inc_rc));
@@ -375,20 +375,6 @@ module router_checker
 		       (.data_in(route_op),
 			.data_out(route_port));
 		     
-		     // determine candidate output VCs
-		     
-		     wire [0:num_vcs-1] 	 route_ovc;
-		     c_align
-		       #(.in_width(2*num_vcs_per_class),
-			 .out_width(num_vcs),
-			 .offset((mc*num_resource_classes+irc)*
-				 num_vcs_per_class))
-		     route_ovc_alg
-		       (.data_in({{num_vcs_per_class{~inc_rc}},
-				  {num_vcs_per_class{inc_rc}}}),
-			.dest_in({num_vcs{1'b0}}),
-			.data_out(route_ovc));
-		     
 		     assign route_port_ivc[(mc*num_resource_classes+irc)*
 					   num_vcs_per_class*
 					   port_idx_width:
@@ -396,17 +382,68 @@ module router_checker
 					   num_vcs_per_class*
 					   port_idx_width-1]
 			      = {num_vcs_per_class{route_port}};
+		     
+		     wire [0:num_resource_classes-1] sel_orc;
+		     if(irc == (num_resource_classes - 1))
+		       assign sel_orc = 'd1;
+		     else
+		       begin
+			  c_align
+			    #(.in_width(2),
+			      .out_width(num_resource_classes),
+			      .offset(irc))
+			  sel_orc_align
+			    (.data_in({~inc_rc, inc_rc}),
+			     .dest_in({num_resource_classes{1'b0}}),
+			     .data_out(sel_orc));
+		       end
+		     
+		     // determine candidate output VCs
+		     
+		     wire [0:num_resource_classes*num_vcs_per_class-1] 
+		       sel_orc_ocvc;
+		     c_replicate
+		       #(.width(num_resource_classes),
+			 .count(num_vcs_per_class))
+		     sel_orc_ocvc_repl
+		       (.data_in(sel_orc),
+			.data_out(sel_orc_ocvc));
+		     
+		     wire [0:num_vcs-1] route_ovc;
+		     c_align
+		       #(.in_width(num_resource_classes*num_vcs_per_class),
+			 .out_width(num_vcs),
+			 .offset(mc*num_resource_classes*num_vcs_per_class))
+		     route_ovc_alg
+		       (.data_in(sel_orc_ocvc),
+			.dest_in({num_vcs{1'b0}}),
+			.data_out(route_ovc));
+		     
 		     assign route_ivc_ovc[(mc*num_resource_classes+irc)*
 					  num_vcs_per_class*num_vcs:
 					  (mc*num_resource_classes+irc+1)*
 					  num_vcs_per_class*num_vcs-1]
-			      = {num_vcs_per_class{route_ovc}};
-		     
+		       = {num_vcs_per_class{route_ovc}};
 		     
 		     // generate lookahead routing information
 		     
-		     wire [0:la_route_info_width-1] la_route_info;
-		     rtr_la_routing_logic
+		     wire [0:router_addr_width-1]    next_router_address;
+		     rtr_next_hop_addr
+		       #(.num_resource_classes(num_resource_classes),
+			 .num_routers_per_dim(num_routers_per_dim),
+			 .num_dimensions(num_dimensions),
+			 .num_nodes_per_router(num_nodes_per_router),
+			 .connectivity(connectivity))
+		     nha
+		       (.router_address(router_address),
+			.route_port(route_port),
+			.sel_rc(sel_orc),
+			.route_info(route_info),
+			.next_router_address(next_router_address));
+
+		     wire [0:num_ports-1] 	 next_route_op;
+		     wire 			 next_inc_rc;
+		     rtr_routing_logic
 		       #(.num_message_classes(num_message_classes),
 			 .num_resource_classes(num_resource_classes),
 			 .num_routers_per_dim(num_routers_per_dim),
@@ -414,19 +451,27 @@ module router_checker
 			 .num_nodes_per_router(num_nodes_per_router),
 			 .connectivity(connectivity),
 			 .routing_type(routing_type),
-			 .dim_order(dim_order),
-			 .message_class(mc),
-			 .resource_class(irc),
-			 .reset_type(reset_type))
-		     lar
-		       (.clk(clk),
-			.reset(reset),
-			.active(1'b1),
-			.router_address(router_address),
-			.route_port(la_route_port),
-			.inc_rc(la_inc_rc),
+			 .dim_order(dim_order))
+		     nrtl
+		       (.router_address(next_router_address),
+			.sel_mc(sel_mc),
+			.sel_rc(sel_orc),
 			.route_info(route_info),
-			.la_route_info(la_route_info));
+			.route_op(next_route_op),
+			.inc_rc(next_inc_rc));
+		     
+		     wire [0:port_idx_width-1] 	  next_route_port;
+		     c_encode
+		       #(.num_ports(num_ports))
+		     next_route_port_enc
+		       (.data_in(next_route_op),
+			.data_out(next_route_port));
+		     
+		     wire [0:la_route_info_width-1] la_route_info;
+		     assign la_route_info[0:port_idx_width-1] = next_route_port;
+		     
+		     if(num_resource_classes > 1)
+		       assign la_route_info[port_idx_width] = next_inc_rc;
 		     
 		     assign la_route_info_ivc[(mc*num_resource_classes+irc)*
 					      num_vcs_per_class*

@@ -35,6 +35,7 @@ module testbench
    
 `include "c_functions.v"
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
 `include "parameters.v"
    
@@ -301,7 +302,7 @@ module testbench
    dut1_flit_ctrl_dly_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(dut1_flit_ctrl),
       .data_out(dut1_flit_ctrl_dly));
    
@@ -313,7 +314,7 @@ module testbench
    dut1_flit_data_dly_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(dut1_flit_data),
       .data_out(dut1_flit_data_dly));
    
@@ -325,7 +326,7 @@ module testbench
    dut1_flow_ctrl_dly_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(dut1_flow_ctrl),
       .data_out(dut1_flow_ctrl_dly));
    
@@ -337,7 +338,7 @@ module testbench
    dut0_flit_ctrl_dly_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(dut0_flit_ctrl),
       .data_out(dut0_flit_ctrl_dly));
    
@@ -349,7 +350,7 @@ module testbench
    dut0_flit_data_dly_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(dut0_flit_data),
       .data_out(dut0_flit_data_dly));
    
@@ -361,7 +362,7 @@ module testbench
    dut0_flow_ctrl_dly_sr
      (.clk(clk),
       .reset(reset),
-      .enable(1'b1),
+      .active(1'b1),
       .data_in(dut0_flow_ctrl),
       .data_out(dut0_flow_ctrl_dly));
    

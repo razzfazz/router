@@ -492,27 +492,85 @@ module vcr_ivc_ctrl
      = header_info_in[la_route_info_width:
 		      la_route_info_width+route_info_width-1];
    
-   wire [0:la_route_info_width-1] la_route_info_out;
-   rtr_la_routing_logic
+   wire [0:num_message_classes-1] sel_mc;
+   c_align
+     #(.in_width(1),
+       .out_width(num_message_classes),
+       .offset(message_class))
+   sel_mc_agn
+     (.data_in(1'b1),
+      .dest_in({num_message_classes{1'b0}}),
+      .data_out(sel_mc));
+   
+   wire [0:num_resource_classes-1] sel_orc;
+   
+   generate
+      
+      if(resource_class == (num_resource_classes - 1))
+	assign sel_orc = 'd1;
+      else
+	begin
+	   c_align
+	     #(.in_width(2),
+	       .out_width(num_resource_classes),
+	       .offset(resource_class))
+	   sel_orc_align
+	     (.data_in({~la_inc_rc, la_inc_rc}),
+	      .dest_in({num_resource_classes{1'b0}}),
+	      .data_out(sel_orc));
+	end
+      
+   endgenerate
+   
+   wire [0:router_addr_width-1] next_router_address;
+   rtr_next_hop_addr
      #(.num_resource_classes(num_resource_classes),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity))
+   nha
+     (.router_address(router_address),
+      .route_port(la_route_port),
+      .sel_rc(sel_orc),
+      .route_info(route_info_in),
+      .next_router_address(next_router_address));
+   
+   wire [0:num_ports-1] 	   next_route_op;
+   wire 			   next_inc_rc;
+   rtr_routing_logic
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
        .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .connectivity(connectivity),
        .routing_type(routing_type),
-       .dim_order(dim_order),
-       .message_class(message_class),
-       .resource_class(resource_class),
-       .reset_type(reset_type))
-   lar
-     (.clk(clk),
-      .reset(reset),
-      .active(alloc_active),
-      .router_address(router_address),
-      .route_port(la_route_port),
-      .inc_rc(la_inc_rc),
+       .dim_order(dim_order))
+   rtl
+     (.router_address(next_router_address),
+      .sel_mc(sel_mc),
+      .sel_rc(sel_orc),
       .route_info(route_info_in),
-      .la_route_info(la_route_info_out));
+      .route_op(next_route_op),
+      .inc_rc(next_inc_rc));
+   
+   wire [0:port_idx_width-1] 	   next_route_port;
+   c_encode
+     #(.num_ports(num_ports))
+   next_route_port_enc
+     (.data_in(next_route_op),
+      .data_out(next_route_port));
+   
+   wire [0:la_route_info_width-1]  la_route_info_out;
+   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
+   
+   generate
+      
+      if(num_resource_classes > 1)
+	assign la_route_info_out[port_idx_width] = next_inc_rc;
+      
+   endgenerate
    
    // multiplex in updated lookahead routingo info for head flits
    assign la_route_info

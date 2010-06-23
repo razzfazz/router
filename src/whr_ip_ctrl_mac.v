@@ -491,27 +491,48 @@ module whr_ip_ctrl_mac
      = header_info_in[la_route_info_width:
 		      la_route_info_width+route_info_width-1];
    
-   wire [0:la_route_info_width-1] 	    la_route_info_out;
-   rtr_la_routing_logic
+   wire [0:router_addr_width-1] 	    next_router_address;
+   rtr_next_hop_addr
      #(.num_resource_classes(1),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity))
+   nha
+     (.router_address(router_address),
+      .route_port(la_route_port),
+      .sel_rc(1'b1),
+      .route_info(route_info_in),
+      .next_router_address(next_router_address));
+   
+   wire [0:num_ports-1] 		    next_route_op;
+   wire 				    next_inc_rc;
+   rtr_routing_logic
+     #(.num_message_classes(1),
+       .num_resource_classes(1),
        .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .connectivity(connectivity),
        .routing_type(routing_type),
-       .dim_order(dim_order),
-       .message_class(0),
-       .resource_class(0),
-       .reset_type(reset_type))
-   lar
-     (.clk(clk),
-      .reset(reset),
-      .active(buffer_in_active),
-      .router_address(router_address),
-      .route_port(la_route_port),
-      .inc_rc(1'b0),
+       .dim_order(dim_order))
+   rtl
+     (.router_address(next_router_address),
+      .sel_mc(1'b1),
+      .sel_rc(1'b1),
       .route_info(route_info_in),
-      .la_route_info(la_route_info_out));
+      .route_op(next_route_op),
+      .inc_rc(next_inc_rc));
+   
+   wire [0:port_idx_width-1] 		    next_route_port;
+   c_encode
+     #(.num_ports(num_ports))
+   next_route_port_enc
+     (.data_in(next_route_op),
+      .data_out(next_route_port));
+   
+   wire [0:la_route_info_width-1] 	    la_route_info_out;
+   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
    
    
    //---------------------------------------------------------------------------

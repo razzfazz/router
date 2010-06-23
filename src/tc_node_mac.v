@@ -48,7 +48,7 @@ module tc_node_mac
    
 `include "c_functions.v"
 `include "c_constants.v"
-`include "vcr_constants.v"
+`include "rtr_constants.v"
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
@@ -1059,9 +1059,11 @@ module tc_node_mac
 	   wire sel;
 	   assign sel = sel_opc_rv[ovc / num_vcs_per_class];
 	   
+	   wire vc_req;
+	   assign vc_req = packet_valid_q & ~packet_to_self & ~vc_alloc_q & sel;
+	   
 	   wire vc_gnt;
-	   assign vc_gnt
-	     = packet_valid_q & ~packet_to_self & ~vc_alloc_q & sel & next_elig;
+	   assign vc_gnt = vc_req & next_elig;
 	   
 	   wire match;
 	   wire elig;
@@ -1089,11 +1091,12 @@ module tc_node_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .flow_ctrl(flow_ctrl_in_q),
+	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ip({num_ports{1'b0}}),
 	      .vc_gnt_ivc({num_vcs{1'b0}}),
-	      .sw_gnt(1'b1),
-	      .sw_gnt_ip({num_ports{1'b0}}),
+	      .sw_gnt_q(1'b1),
+	      .sw_gnt_ip_q({num_ports{1'b0}}),
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .match(match),
 	      .elig(elig),
@@ -1322,19 +1325,17 @@ module tc_node_mac
    wire [0:num_ports-1] 		     route_op_rv;
    wire 				     inc_rc_rv;
    rtr_routing_logic
-     #(.num_resource_classes(num_resource_classes),
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
        .num_routers_per_dim(num_routers_per_dim),
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .connectivity(connectivity),
        .routing_type(routing_type),
-       .dim_order(dim_order),
-       .reset_type(reset_type))
+       .dim_order(dim_order))
    rtl
-     (.clk(clk),
-      .reset(reset),
-      .active(active_q),
-      .router_address(router_address),
+     (.router_address(router_address),
+      .sel_mc(sel_mc_rv),
       .sel_rc(sel_rc_rv),
       .route_info(route_info_rv),
       .route_op(route_op_rv),

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for VC router
 module rtr_routing_logic
-  (clk, reset, active, router_address, route_info, route_op, inc_rc);
+  (router_address, sel_mc, sel_rc, route_info, route_op, inc_rc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -90,21 +90,17 @@ module rtr_routing_logic
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // current message class
-   parameter message_class = 0;
-   
-   // current resource class
-   parameter resource_class = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
-   input clk;
-   input reset;
-   input active;
-   
    // current router's address
    input [0:router_addr_width-1] router_address;
+   
+   // select current message class
+   input [0:num_message_classes-1] sel_mc;
+   
+   // select current resource class
+   input [0:num_resource_classes-1] sel_rc;
    
    // routing data
    input [0:route_info_width-1] route_info;
@@ -125,21 +121,25 @@ module rtr_routing_logic
    
    // address of destination router for current resource class
    wire [0:router_addr_width-1] 		     dest_router_address;
-   assign dest_router_address
-     = route_info_addresses[resource_class*router_addr_width:
-			    (resource_class+1)*router_addr_width-1];
+   c_select_1ofn
+     #(.width(router_addr_width),
+       .num_ports(num_resource_classes))
+   dest_router_address_sel
+     (.select(sel_rc),
+      .data_in(route_info_addresses),
+      .data_out(dest_router_address));
    
    wire 					     reached_dest;
    assign reached_dest = (router_address == dest_router_address);
    
+   wire 					     final_rc;
+   assign final_rc = sel_rc[num_resource_classes-1];
+   
+   assign inc_rc = reached_dest & ~final_rc;
+   
    wire [0:num_dimensions-1] 			     dim_addr_match;
    
    generate
-      
-      if(resource_class == (num_resource_classes - 1))
-	assign inc_rc = 1'b0;
-      else
-	assign inc_rc = reached_dest;
       
       case(routing_type)
 	
@@ -156,37 +156,71 @@ module rtr_routing_logic
 		    = dest_router_address[dim*dim_addr_width:
 					  (dim+1)*dim_addr_width-1];
 		  
-		  wire [0:dim_addr_width-1] local_dim_addr;
-		  assign local_dim_addr
+		  wire [0:dim_addr_width-1] curr_dim_addr;
+		  assign curr_dim_addr
 		    = router_address[dim*dim_addr_width:
 				     (dim+1)*dim_addr_width-1];
 		  
-		  assign dim_addr_match[dim]
-			   = (dest_dim_addr == local_dim_addr);
+		  assign dim_addr_match[dim] = (dest_dim_addr == curr_dim_addr);
 		  
 		  wire 			    dim_sel;
 		  
-		  if((dim_order == `DIM_ORDER_ASCENDING) ||
-		     ((dim_order == `DIM_ORDER_BY_CLASS) &&
-		      ((message_class % 2) == 0)))
-		    begin
-		       if(dim == 0)
-			 assign dim_sel = ~dim_addr_match[dim];
-		       else
-			 assign dim_sel = &dim_addr_match[0:dim-1] & 
-					  ~dim_addr_match[dim];
+		  case(dim_order)
+		    
+		    `DIM_ORDER_ASCENDING:
+		      begin
+			 if(dim == 0)
+			   assign dim_sel = ~dim_addr_match[0];
+			 else
+			   assign dim_sel = &dim_addr_match[0:dim-1] & 
+					    ~dim_addr_match[dim];
+		      end
+		    
+		    `DIM_ORDER_DESCENDING:
+		      begin
+			 if(dim == (num_dimensions - 1))
+			   assign dim_sel = ~dim_addr_match[num_dimensions-1];
+			 else
+			   assign dim_sel = ~dim_addr_match[dim] &
+					    &dim_addr_match[dim+1:
+							    num_dimensions-1];
 		    end
-		  else if((dim_order == `DIM_ORDER_DESCENDING) ||
-			  ((dim_order == `DIM_ORDER_BY_CLASS) &&
-			   ((message_class % 2) == 1)))
-		    begin
-		       if(dim == (num_dimensions - 1))
-			 assign dim_sel = ~dim_addr_match[dim];
-		       else
-			 assign dim_sel = ~dim_addr_match[dim] &
-					  &dim_addr_match[(dim+1):
-							  (num_dimensions-1)];
-		    end
+		    
+		    `DIM_ORDER_BY_CLASS:
+		      begin
+			 
+			 wire [0:num_message_classes-1] shuffled_mcs;
+			 c_interleaver
+			   #(.width(num_message_classes),
+			     .num_blocks(num_message_classes/2))
+			 shuffled_mcs_intl
+			   (.data_in(sel_mc),
+			    .data_out(shuffled_mcs));
+			 
+			 wire mc_even;
+			 assign mc_even
+			   = |shuffled_mcs[0:num_message_classes/2-1];
+			 
+			 if(num_dimensions == 1)
+			   assign dim_sel = ~dim_addr_match[0];
+			 else if(dim == 0)
+			   assign dim_sel
+			     = ~dim_addr_match[0] &
+			       (&dim_addr_match[1:num_dimensions-1] | mc_even);
+			 else if(dim == (num_dimensions - 1))
+			   assign dim_sel
+			     = ~dim_addr_match[num_dimensions-1] &
+			       (&dim_addr_match[0:num_dimensions-2] | ~mc_even);
+			 else
+			   assign dim_sel
+			     = ~dim_addr_match[dim] &
+			       (mc_even ? 
+				&dim_addr_match[0:dim-1] : 
+				&dim_addr_match[dim+1:num_dimensions-1]);
+			 
+		      end
+		    
+		  endcase
 		  
 		  wire [0:num_neighbors_per_dim-1] port_dec;
 		  
@@ -196,8 +230,8 @@ module rtr_routing_logic
 		      begin
 			 
 			 assign port_dec
-			   = {dest_dim_addr < local_dim_addr, 
-			      dest_dim_addr > local_dim_addr};
+			   = {dest_dim_addr < curr_dim_addr, 
+			      dest_dim_addr > curr_dim_addr};
 			 
 		      end
 		    
@@ -235,7 +269,7 @@ module rtr_routing_logic
 			      dest_dim_addr_dec[0:(num_routers_per_dim-1)-1]};
 			 
 			 assign port_dec
-			   = dest_dim_addr_dec_repl[(local_dim_addr+1) +:
+			   = dest_dim_addr_dec_repl[(curr_dim_addr+1) +:
 						    num_neighbors_per_dim];
 			 
 		      end
@@ -253,11 +287,7 @@ module rtr_routing_logic
       endcase
       
       wire 						      eject;
-      
-      if(resource_class == (num_resource_classes - 1))
-	assign eject = &dim_addr_match;
-      else
-	assign eject = 1'b0;
+      assign eject = &dim_addr_match & final_rc;
       
       if(num_nodes_per_router > 1)
 	begin
