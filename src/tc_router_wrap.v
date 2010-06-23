@@ -37,6 +37,7 @@ module tc_router_wrap
    
 `include "c_functions.v"   
 `include "c_constants.v"
+`include "rtr_constants.v"
 `include "vcr_constants.v"
 `include "parameters.v"
    
@@ -397,7 +398,7 @@ module tc_router_wrap
 		flit_ctrl_dly_sr
 		  (.clk(clk),
 		   .reset(reset),
-		   .enable(1'b1),
+		   .active(1'b1),
 		   .data_in(flit_ctrl_in),
 		   .data_out(flit_ctrl_dly));
 		
