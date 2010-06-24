@@ -255,22 +255,31 @@ module rtr_routing_logic
 		    `CONNECTIVITY_FULL:
 		      begin
 			 
-			 wire [0:num_routers_per_dim-1] dest_dim_addr_dec;
+			 wire curr_gt_dest;
+			 assign curr_gt_dest = (curr_dim_addr > dest_dim_addr);
+			 
+			 wire [0:dim_addr_width-1] dim_addr_diff_lt;
+			 assign dim_addr_diff_lt
+			   = dest_dim_addr - curr_dim_addr;
+			 
+			 wire [0:dim_addr_width-1] dim_addr_diff_gt;
+			 assign dim_addr_diff_gt
+			   = num_routers_per_dim - curr_dim_addr + 
+			     dest_dim_addr;
+			 
+			 wire [0:dim_addr_width-1] dim_addr_diff;
+			 assign dim_addr_diff
+			   = curr_gt_dest ? dim_addr_diff_gt : dim_addr_diff_lt;
+			 
+			 wire [0:num_routers_per_dim-1] dim_addr_diff_dec;
 			 c_decode
 			   #(.num_ports(num_routers_per_dim))
-			 dest_dim_addr_dec_dec
-			   (.data_in(dest_dim_addr),
-			    .data_out(dest_dim_addr_dec));
-			 
-			 wire [0:(2*num_routers_per_dim-1)-1] 
-			   dest_dim_addr_dec_repl;
-			 assign dest_dim_addr_dec_repl
-			   = {dest_dim_addr_dec, 
-			      dest_dim_addr_dec[0:(num_routers_per_dim-1)-1]};
+			 dim_addr_diff_dec_dec
+			   (.data_in(dim_addr_diff),
+			    .data_out(dim_addr_diff_dec));
 			 
 			 assign port_dec
-			   = dest_dim_addr_dec_repl[(curr_dim_addr+1) +:
-						    num_neighbors_per_dim];
+			   = dim_addr_diff_dec[1:num_routers_per_dim-1];
 			 
 		      end
 		    
