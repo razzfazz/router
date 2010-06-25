@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 // flit control signal decoding logic
-module vcr_flit_ctrl_dec
+module rtr_flit_ctrl_dec
   (clk, reset, active, flit_ctrl_in, header_info_in, flit_valid_out, 
    flit_head_out, flit_tail_out, flit_valid_out_ivc, flit_head_out_ivc, 
    flit_tail_out_ivc);
@@ -39,7 +39,6 @@ module vcr_flit_ctrl_dec
 `include "c_functions.v"
 `include "c_constants.v"
 `include "rtr_constants.v"
-`include "vcr_constants.v"
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;

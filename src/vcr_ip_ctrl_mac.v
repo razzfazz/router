@@ -565,7 +565,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 		flit_valid_in_ivc;
    wire [0:num_vcs-1] 		flit_head_in_ivc;
    wire [0:num_vcs-1] 		flit_tail_in_ivc;
-   vcr_flit_ctrl_dec
+   rtr_flit_ctrl_dec
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
