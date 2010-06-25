@@ -115,6 +115,13 @@ module rtr_next_hop_addr
       .data_in(route_info_addresses),
       .data_out(dest_router_address));
    
+   wire [0:num_ports-1] 	  route_op;
+   c_decode
+     #(.num_ports(num_ports))
+   route_op_dec
+     (.data_in(route_port),
+      .data_out(route_op));
+   
    generate
       
       genvar 			  dim;
@@ -138,18 +145,19 @@ module rtr_next_hop_addr
 	   
 	   case(connectivity)
 	     
-	     `CONNECTIVITY_LINE, `CONNECTIVITY_RING:
+	     `CONNECTIVITY_LINE:
 	       begin
 		  
 		  wire route_down;
-		  assign route_down = (route_port == dim*num_neighbors_per_dim);
+		  assign route_down = route_op[dim*2];
 		  
 		  wire route_up;
-		  assign route_up = (route_port == dim*num_neighbors_per_dim+1);
+		  assign route_up = route_op[dim*2+1];
 		  
 		  // Assemble a delta value for the address segment 
 		  // corresponding to the current dimension; the delta can have 
-		  // the values -1 (i.e., all ones in two's complement), 0 or 1
+		  // the values -1 (i.e., all ones in two's complement), 0 or 1.
+		  
 		  wire [0:dim_addr_width-1] addr_delta;
 		  if(dim_addr_width > 1)
 		    assign addr_delta[0:dim_addr_width-2]
@@ -160,13 +168,60 @@ module rtr_next_hop_addr
 		  
 	       end
 	     
+	     `CONNECTIVITY_RING:
+	       begin
+		  
+		  wire [0:dim_addr_width-1] dim_addr_plus1;
+		  c_incr
+		    #(.width(dim_addr_width),
+		      .min_value(0),
+		      .max_value(num_routers_per_dim-1))
+		  dim_addr_plus1_incr
+		    (.data_in(curr_dim_addr),
+		     .data_out(dim_addr_plus1));
+		  
+		  wire [0:dim_addr_width-1] dim_addr_minus1;
+		  c_decr
+		    #(.width(dim_addr_width),
+		      .min_value(0),
+		      .max_value(num_routers_per_dim-1))
+		  dim_addr_minus1_decr
+		    (.data_in(curr_dim_addr),
+		     .data_out(dim_addr_minus1));
+		  
+		  // The first port in each dimension connects to smaller 
+		  // neighbors, while the second one connects to larger ones.
+		  // Thus, interpreted as a two-bit value, we get 0 if neither
+		  // of the ports is selected, 1 if the second port is selected
+		  // (route up) and 2 if the first port is selected (route 
+		  // down); the value 3 is a don't-care, as route_op is the
+		  // output of a decoder, so at most one of the bits can be set.
+		  
+		  wire [0:1] 		    route_sel;
+		  assign route_sel = route_op[dim*2:(dim+1)*2-1];
+		  
+		  wire [0:3*dim_addr_width-1] next_dim_addrs;
+		  assign next_dim_addrs
+		    = {curr_dim_addr, dim_addr_plus1, dim_addr_minus1};
+		  
+		  assign next_dim_addr
+		    = next_dim_addrs[route_sel*dim_addr_width +: 
+				     dim_addr_width];
+		  
+	       end
+	     
 	     `CONNECTIVITY_FULL:
 	       begin
 		  
+		  // With full connectivity, if one of the ports in a given
+		  // dimension is selected, the corresponding part of the 
+		  // address will be changed to the respective part of the 
+		  // destination address when going to the next hop.
+		  
 		  wire route_dest;
 		  assign route_dest
-		    = (route_port >= (dim*num_neighbors_per_dim)) &&
-		      (route_port <= ((dim+1)*num_neighbors_per_dim-1));
+		    = |route_op[dim*num_neighbors_per_dim:
+				(dim+1)*num_neighbors_per_dim-1];
 		  
 		  assign next_dim_addr
 		    = route_dest ? dest_dim_addr : curr_dim_addr;

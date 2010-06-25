@@ -222,6 +222,9 @@ module rtr_routing_logic
 		    
 		  endcase
 		  
+		  wire 	      curr_gt_dest;
+		  assign curr_gt_dest = (curr_dim_addr > dest_dim_addr);
+		  
 		  wire [0:num_neighbors_per_dim-1] port_dec;
 		  
 		  case(connectivity)
@@ -229,34 +232,12 @@ module rtr_routing_logic
 		    `CONNECTIVITY_LINE:
 		      begin
 			 
-			 assign port_dec
-			   = {dest_dim_addr < curr_dim_addr, 
-			      dest_dim_addr > curr_dim_addr};
+			 assign port_dec = {curr_gt_dest, ~curr_gt_dest};
 			 
 		      end
 		    
-		    `CONNECTIVITY_RING:
+		    `CONNECTIVITY_RING, `CONNECTIVITY_FULL:
 		      begin
-			 
-			 // FIXME: add implementation here!
-			 
-			 // synopsys translate_off
-			 initial
-			 begin
-			    $display({"ERROR: The routing logic module %m ",
-				      "does not yet support ring ",
-				      "connectivity within each dimension."});
-			    $stop;
-			 end
-			 // synopsys translate_on
-			 
-		      end
-		    
-		    `CONNECTIVITY_FULL:
-		      begin
-			 
-			 wire curr_gt_dest;
-			 assign curr_gt_dest = (curr_dim_addr > dest_dim_addr);
 			 
 			 wire [0:dim_addr_width-1] dim_addr_diff_lt;
 			 assign dim_addr_diff_lt
@@ -271,15 +252,54 @@ module rtr_routing_logic
 			 assign dim_addr_diff
 			   = curr_gt_dest ? dim_addr_diff_gt : dim_addr_diff_lt;
 			 
-			 wire [0:num_routers_per_dim-1] dim_addr_diff_dec;
-			 c_decode
-			   #(.num_ports(num_routers_per_dim))
-			 dim_addr_diff_dec_dec
-			   (.data_in(dim_addr_diff),
-			    .data_out(dim_addr_diff_dec));
-			 
-			 assign port_dec
-			   = dim_addr_diff_dec[1:num_routers_per_dim-1];
+			 case(connectivity)
+			   
+			   `CONNECTIVITY_RING:
+			     begin
+				
+			 	// multiply by 2
+				wire [0:dim_addr_width]   dim_addr_diff_x2;
+				assign dim_addr_diff_x2 = {dim_addr_diff, 1'b0};
+				
+				wire [0:dim_addr_width]   dim_count;
+				assign dim_count = num_routers_per_dim;
+				
+				// In cases where the destination is equally far
+				// away in both possible directions, we need
+				// some kind of tie breaker to avoid load 
+				// imbalance; one simple solution is to break 
+				// the tie based on whether the current router's
+				// address is even or odd.
+				wire 			  tie_break;
+				assign tie_break
+				  = router_address[router_addr_width-1];
+				
+				wire 			  route_down;
+				assign route_down
+				  = (dim_addr_diff_x2 > dim_count) ||
+				    ((dim_addr_diff_x2 == dim_count) &&
+				     (tie_break));
+				
+				assign port_dec = {route_down, ~route_down};
+				
+			     end
+			   
+			   `CONNECTIVITY_FULL:
+			     begin
+				
+				wire [0:num_routers_per_dim-1] port_sel;
+				c_decode
+				  #(.num_ports(num_routers_per_dim))
+				port_sel_dec
+				  (.data_in(dim_addr_diff),
+				   .data_out(port_sel));
+				
+				assign port_dec
+				  = port_sel[1:num_routers_per_dim-1];
+				
+			     end
+			   
+			 endcase
 			 
 		      end
 		    
@@ -287,7 +307,7 @@ module rtr_routing_logic
 		  
 		  assign route_op[dim*num_neighbors_per_dim:
 				  (dim+1)*num_neighbors_per_dim-1]
-			   = port_dec & {num_neighbors_per_dim{dim_sel}};
+		    = port_dec & {num_neighbors_per_dim{dim_sel}};
 		  
 	       end
 	     
