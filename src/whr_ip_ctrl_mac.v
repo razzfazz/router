@@ -678,8 +678,7 @@ module whr_ip_ctrl_mac
    wire [0:num_ports-1] 		  route_op;
    wire 				  pf_error;
    rtr_port_filter
-     #(.num_message_classes(1),
-       .num_resource_classes(1),
+     #(.num_resource_classes(1),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),

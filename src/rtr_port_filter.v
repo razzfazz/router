@@ -36,9 +36,6 @@ module rtr_port_filter
    
 `include "c_constants.v"
    
-   // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
-   
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
