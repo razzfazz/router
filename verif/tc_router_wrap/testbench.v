@@ -187,6 +187,9 @@ module testbench
    // number of node status signals to accept
    parameter node_status_width = 1;
    
+   // delay before credits are returned
+   parameter credit_delay = 1;
+   
    // RNG seed value
    parameter initial_seed = 0;
    
@@ -217,18 +220,22 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .router_type(router_type),
+       .flit_data_width(flit_data_width),
        .perf_ctr_enable(perf_ctr_enable),
        .perf_ctr_width(perf_ctr_width),
        .error_capture_mode(error_capture_mode),
        .track_vcs_at_output(track_vcs_at_output),
-       .router_type(router_type),
-       .flit_data_width(flit_data_width),
+       .restrict_turns(restrict_turns),
+       .routing_type(routing_type),
        .dim_order(dim_order),
        .int_flow_ctrl_type(int_flow_ctrl_type),
        .header_fifo_type(header_fifo_type),
+       .input_stage_can_hold(input_stage_can_hold),
        .fbf_regfile_type(fbf_regfile_type),
        .vc_alloc_type(vc_alloc_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+       .vc_alloc_requires_credit(vc_alloc_requires_credit),
        .sw_alloc_type(sw_alloc_type),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .sw_alloc_spec_type(sw_alloc_spec_type),
@@ -245,7 +252,9 @@ module testbench
        .rc_idx_rv_width(rc_idx_rv_width),
        .plength_idx_rv_width(plength_idx_rv_width),
        .num_plength_vals(num_plength_vals),
-       .packet_count_width(packet_count_width))
+       .packet_count_width(packet_count_width),
+       .done_delay_width(done_delay_width),
+       .credit_delay(credit_delay))
    dut
      (.clk(clk),
       .reset(reset),
