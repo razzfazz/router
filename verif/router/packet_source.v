@@ -928,19 +928,20 @@ module packet_source
       if(num_vcs > 1)
 	begin
 	   
-	   reg [0:vc_idx_width-1] vc_q;
+	   reg [0:vc_idx_width-1] random_vc;
 	   
 	   always @(posedge clk, posedge reset)
 	     begin
 		if(reset | packet_sent)
-		  vc_q <= $dist_uniform(seed, 0, num_vcs-1);
+		  random_vc <= $dist_uniform(seed, 0, num_vcs-1);
 	     end
 	   
-	   assign flit_ctrl[1:1+vc_idx_width-1] = vc_q;
+	   assign flit_ctrl[1:1+vc_idx_width-1] = random_vc;
 	   
 	   assign curr_dest_addr
-	     = route_info[((vc_q / num_vcs_per_class) % num_resource_classes)*
-			  router_addr_width +: router_addr_width];
+	     = route_info[((random_vc / num_vcs_per_class) % 
+			   num_resource_classes)*router_addr_width +: 
+			  router_addr_width];
 	   
 	end
       else
