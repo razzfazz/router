@@ -40,55 +40,11 @@ module rtr_flit_ctrl_dec
 `include "c_constants.v"
 `include "rtr_constants.v"
    
-   // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
-   
-   // number of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
-   
-   // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
-   
-   // number of VCs available for each class
-   parameter num_vcs_per_class = 1;
-   
    // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   parameter num_vcs = 4;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
-   
-   // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
-   // number of nodes per router (a.k.a. consentration factor)
-   parameter num_nodes_per_router = 1;
-   
-   // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
-   
-   // number of adjacent routers in each dimension
-   localparam num_neighbors_per_dim
-     = ((connectivity == `CONNECTIVITY_LINE) ||
-	(connectivity == `CONNECTIVITY_RING)) ?
-       2 :
-       (connectivity == `CONNECTIVITY_FULL) ?
-       (num_routers_per_dim - 1) :
-       -1;
-   
-   // number of input and output ports on router
-   localparam num_ports
-     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
-   
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
-   // width required for lookahead routing information
-   localparam la_route_info_width
-     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -104,25 +60,15 @@ module rtr_flit_ctrl_dec
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
-
+   
    // width of counter for remaining flits
    localparam flit_ctr_width = clogb(max_payload_length);
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
-   // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
-   // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
-   
-   // width of global addresses
-   localparam addr_width = router_addr_width + node_addr_width;
+   // width required for lookahead routing information
+   parameter la_route_info_width = 4;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
+   parameter route_info_width = 10;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width

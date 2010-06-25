@@ -382,16 +382,12 @@ module whr_ip_ctrl_mac
    wire 			flit_head_in_ivc;
    wire 			flit_tail_in_ivc;
    rtr_flit_ctrl_dec
-     #(.num_message_classes(1),
-       .num_resource_classes(1),
-       .num_vcs_per_class(1),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_dimensions(num_dimensions),
-       .num_nodes_per_router(num_nodes_per_router),
-       .connectivity(connectivity),
+     #(.num_vcs(1),
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .la_route_info_width(la_route_info_width),
+       .route_info_width(route_info_width),
        .reset_type(reset_type))
    fcdec
      (.clk(clk),

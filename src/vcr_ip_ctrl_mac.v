@@ -566,16 +566,12 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 		flit_head_in_ivc;
    wire [0:num_vcs-1] 		flit_tail_in_ivc;
    rtr_flit_ctrl_dec
-     #(.num_message_classes(num_message_classes),
-       .num_resource_classes(num_resource_classes),
-       .num_vcs_per_class(num_vcs_per_class),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_dimensions(num_dimensions),
-       .num_nodes_per_router(num_nodes_per_router),
-       .connectivity(connectivity),
+     #(.num_vcs(num_vcs),
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .la_route_info_width(la_route_info_width),
+       .route_info_width(route_info_width),
        .reset_type(reset_type))
    fcdec
      (.clk(clk),
