@@ -1,15 +1,41 @@
-
+// $Id$
 
 /*
- 
- ONLY SUPPORT 2 REsOURCE clASSES, ZOMG ZOMG ZOMG ZOMG  ZZOMG
- 
- */
-module vcr_ugal_source(/*autoarg*/
+Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this 
+list of conditions and the following disclaimer in the documentation and/or 
+other materials provided with the distribution.
+Neither the name of the Stanford University nor the names of its contributors 
+may be used to endorse or promote products derived from this software without 
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+
+
+// a rudimentary traffic source that implements UGAL routing
+module ugal_source(/*autoarg*/
    // Outputs
    intm_router_address, route_min,
    // Inputs
-   clk, reset, flit_valid, flit_head, src_router_address, route_info,
+   clk, reset, flit_valid, flit_head, src_router_address, sel_mc, route_info,
    credit_count
    );
    
@@ -20,11 +46,12 @@ module vcr_ugal_source(/*autoarg*/
    
    // flit bufwfer entries per VC
    parameter num_flit_buffers 	     = 8;
+   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes     = 1;
    
    // nuber of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes    = 2;
+   localparam num_resource_classes    = 2; // NOTE: UGAL requires this to be 2!
    
    // total number of packet classes
    localparam num_packet_classes     = num_message_classes * num_resource_classes;
@@ -99,6 +126,8 @@ module vcr_ugal_source(/*autoarg*/
 	 
    // current router's address
    input [0:router_addr_width-1] src_router_address;
+   // current message class
+   input [0:num_message_classes-1] sel_mc;
    //destination address
    input [0:addr_width-1] route_info;
    
@@ -110,53 +139,51 @@ module vcr_ugal_source(/*autoarg*/
    output [0:router_addr_width-1] intm_router_address;
    // modified resource class
    output route_min;
-
+   
    //normal routing on the min path
    localparam [0:num_resource_classes-1] sel_irc
-     = (1 << (num_resource_classes - 1-1));
+     = (1 << (num_resource_classes - 1 - 1));
    wire [0:num_ports-1] min_route_unmasked;
    wire 			       inc_rc;
-    vcr_routing_logic
+    rtr_routing_logic
       #(.num_resource_classes(num_resource_classes),
 	.num_routers_per_dim(num_routers_per_dim),
+	.num_vcs_per_class(num_vcs_per_class),
 	.num_dimensions(num_dimensions),
 	.num_nodes_per_router(num_nodes_per_router),
 	.connectivity(connectivity),
 	.routing_type(routing_type),
-	.dim_order(dim_order),
-	.reset_type(reset_type))
+	.dim_order(dim_order))
     min_routing
-      (.clk(clk),
-       .reset(reset),
-       .router_address(src_router_address),
+      (.router_address(src_router_address),
+       .sel_mc('d1),
+       .sel_rc(sel_irc),
        .route_info({src_router_address,route_info}),
        .route_op(min_route_unmasked),
-       .inc_rc(inc_rc),
-       .sel_rc(sel_irc));
+       .inc_rc(inc_rc));
 
    //normal routing on nonmin route
    localparam [0:num_resource_classes-1] sel_irc_nonmin
-     = (1 << (num_resource_classes - 1-0));
+     = (1 << (num_resource_classes - 1 - 0));
 
    wire [0:num_ports-1] nonmin_route_unmasked;
    wire 			       inc_rc_nonmin;
-   vcr_routing_logic
+   rtr_routing_logic
       #(.num_resource_classes(num_resource_classes),
 	.num_routers_per_dim(num_routers_per_dim),
+	.num_vcs_per_class(num_vcs_per_class),
 	.num_dimensions(num_dimensions),
 	.num_nodes_per_router(num_nodes_per_router),
 	.connectivity(connectivity),
 	.routing_type(routing_type),
-	.dim_order(dim_order),
-	.reset_type(reset_type))
+	.dim_order(dim_order))
     nonmin_routing
-      (.clk(clk),
-       .reset(reset),
-       .router_address(src_router_address),
+      (.router_address(src_router_address),
+       .sel_mc('d1),
+       .sel_rc(sel_irc_nonmin),
        .route_info({intm_router_address,route_info}),
        .route_op(nonmin_route_unmasked),
-       .inc_rc(inc_rc_nonmin),
-       .sel_rc(sel_irc_nonmin));
+       .inc_rc(inc_rc_nonmin));
 
 
    wire [0:credit_count_width-1] min_count;
