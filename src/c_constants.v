@@ -144,6 +144,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 // directions of rotation
 //------------------------------------------------------------------------------
+
 `define ROTATE_DIR_LEFT  0
 `define ROTATE_DIR_RIGHT 1
 
@@ -174,5 +175,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 `define WF_ALLOC_TYPE_LAST `WF_ALLOC_TYPE_LOOP
 
+
+//------------------------------------------------------------------------------
+// binary operators
+//------------------------------------------------------------------------------
+
+`define BINARY_OP_AND  0
+`define BINARY_OP_NAND 1
+`define BINARY_OP_OR   2
+`define BINARY_OP_NOR  3
+`define BINARY_OP_XOR  4
+`define BINARY_OP_XNOR 5
 
 `endif
