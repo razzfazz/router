@@ -488,12 +488,7 @@ module tc_router_wrap
       .data_in(cfg_read_data_p),
       .data_out(cfg_read_data));
    
-   c_or_nto1
-     #(.num_ports(num_ports),
-       .width(1))
-   cfg_done_or
-     (.data_in(cfg_done_p),
-      .data_out(cfg_done));
+   assign cfg_done = |cfg_done_p;
    
    wire [0:num_ports] 			    errors;
    assign errors = {rtr_error, node_error_p};
