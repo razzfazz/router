@@ -335,12 +335,14 @@ module router_checker
 		     
 		     wire [0:num_resource_classes*num_vcs_per_class-1] 
 		       sel_orc_ocvc;
-		     c_replicate
-		       #(.width(num_resource_classes),
-			 .count(num_vcs_per_class))
-		     sel_orc_ocvc_repl
-		       (.data_in(sel_orc),
-			.data_out(sel_orc_ocvc));
+		     c_mat_mult
+		       #(.dim1_width(num_resource_classes),
+			 .dim2_width(1),
+			 .dim3_width(num_vcs_per_class))
+		     sel_orc_ocvc_mmult
+		       (.input_a(sel_orc),
+			.input_b({num_vcs_per_class{1'b1}}),
+			.result(sel_orc_ocvc));
 		     
 		     wire [0:num_vcs-1] route_ovc;
 		     c_align
