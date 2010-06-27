@@ -30,14 +30,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// matrix multiplication in GF(2)
+// matrix multiplication
 module c_mat_mult
   (input_a, input_b, result);
+   
+`include "c_constants.v"
    
    // matrix dimensions
    parameter dim1_width = 1;
    parameter dim2_width = 1;
    parameter dim3_width = 1;
+   
+   // multiplication operator
+   parameter prod_op = `BINARY_OP_AND;
+   
+   // addition operator
+   parameter sum_op = `BINARY_OP_XOR;
    
    // first input matrix
    input [0:dim1_width*dim2_width-1] input_a;
@@ -66,12 +74,25 @@ module c_mat_mult
 		
 		for(idx = 0; idx < dim2_width; idx = idx + 1)
 		  begin:idxs
-		     assign products[idx]
-			      = input_a[row*dim2_width+idx] & 
-				input_b[idx*dim3_width+col];
+		     
+		     c_binary_op
+			  #(.num_ports(2),
+			    .width(1),
+			    .op(prod_op))
+		     prod
+			  (.data_in({input_a[row*dim2_width+idx], 
+				     input_b[idx*dim3_width+col]}),
+			   .data_out(products[idx]));
+		     
 		  end
 		
-		assign result[row*dim3_width+col] = ^products;
+		c_binary_op
+		  #(.num_ports(dim2_width),
+		    .width(1),
+		    .op(sum_op))
+		sum
+		  (.data_in(products),
+		   .data_out(result[row*dim3_width+col]));
 		
 	     end
 	   
