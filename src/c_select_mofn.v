@@ -40,6 +40,12 @@ module c_select_mofn
    // width of each port
    parameter width = 32;
    
+   // multiplication operator
+   parameter prod_op = `BINARY_OP_AND;
+   
+   // addition operator
+   parameter sum_op = `BINARY_OP_OR;
+   
    // control signal to select active port
    input [0:num_ports-1] select;
    
@@ -59,12 +65,27 @@ module c_select_mofn
 	   wire [0:num_ports-1] port_bits;
 	   
 	   genvar 		j;
+	   
 	   for(j = 0; j < num_ports; j = j + 1)
 	     begin:ports_loop
-		assign port_bits[j] = data_in[i+j*width] & select[j];
+		
+		c_binary_op
+		   #(.num_ports(2),
+		     .width(1),
+		     .op(prod_op))
+		prod
+		   (.data_in({data_in[i+j*width], select[j]}),
+		    .data_out(port_bits[j]));
+		
 	     end
 	   
-	   assign data_out[i] = |port_bits;
+	   c_binary_op
+	     #(.num_ports(num_ports),
+	       .width(1),
+	       .op(sum_op))
+	   sum
+	     (.data_in(port_bits),
+	      .data_out(data_out[i]));
 	   
 	end
       
