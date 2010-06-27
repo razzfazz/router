@@ -1850,9 +1850,10 @@ module tc_node_mac
       .data_out(flit_sig_expanded));
    
    // ... and reduce it down to a single signature of width cfg_data_width
-   c_xor_nto1
+   c_binary_op
      #(.num_ports(flit_sig_exp_width / cfg_data_width),
-       .width(cfg_data_width))
+       .width(cfg_data_width),
+       .op(`BINARY_OP_XOR))
    ifc_read_data_flit_sig_xor
      (.data_in(flit_sig_expanded),
       .data_out(ifc_read_data_flit_sig));

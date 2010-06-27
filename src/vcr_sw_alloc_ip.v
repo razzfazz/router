@@ -322,9 +322,10 @@ module vcr_sw_alloc_ip
 		
 		// ... and generate per-VC grants
 		wire [0:num_vcs-1] 	     gnt_ivc;
-		c_or_nto1
+		c_binary_op
 		  #(.width(num_vcs),
-		    .num_ports(num_ports))
+		    .num_ports(num_ports),
+		    .op(`BINARY_OP_OR))
 		gnt_ivc_or
 		  (.data_in(gnt_op_ivc),
 		   .data_out(gnt_ivc));

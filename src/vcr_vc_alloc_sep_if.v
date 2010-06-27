@@ -220,9 +220,10 @@ module vcr_vc_alloc_sep_if
 			  // instead of using a proper MUX.
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
                             gnt_out_orc_ocvc;
-			  c_or_nto1
+			  c_binary_op
 			    #(.num_ports(num_ports),
-			      .width(num_resource_classes*num_vcs_per_class))
+			      .width(num_resource_classes*num_vcs_per_class),
+			      .op(`BINARY_OP_OR))
 			  gnt_out_orc_ocvc_or
 			    (.data_in(gnt_out_op_orc_ocvc),
 			     .data_out(gnt_out_orc_ocvc));
@@ -460,9 +461,10 @@ module vcr_vc_alloc_sep_if
 	   
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class-1] 
 	     active_op_orc_ocvc;
-	   c_or_nto1
+	   c_binary_op
 	     #(.width(num_ports*num_resource_classes*num_vcs_per_class),
-	       .num_ports(num_ports*num_resource_classes*num_vcs_per_class))
+	       .num_ports(num_ports*num_resource_classes*num_vcs_per_class),
+	       .op(`BINARY_OP_OR))
 	   active_op_orc_ocvc_or
 	     (.data_in(active_ip_irc_icvc_op_orc_ocvc),
 	      .data_out(active_op_orc_ocvc));
@@ -558,10 +560,11 @@ module vcr_vc_alloc_sep_if
 			     .data_out(req_out_irc_icvc_ip));
 			  
 			  wire [0:num_ports-1] 	       req_out_ip;
-			  c_or_nto1
+			  c_binary_op
 			    #(.width(num_ports),
 			      .num_ports(num_resource_classes*
-					 num_vcs_per_class))
+					 num_vcs_per_class),
+			      .op(`BINARY_OP_OR))
 			  req_out_ip_or
 			    (.data_in(req_out_irc_icvc_ip),
 			     .data_out(req_out_ip));
@@ -809,9 +812,10 @@ module vcr_vc_alloc_sep_if
    // generate activity signals for output controllers
    //---------------------------------------------------------------------------
    
-   c_or_nto1
+   c_binary_op
      #(.num_ports(num_ports*num_vcs),
-       .width(num_ports*num_vcs))
+       .width(num_ports*num_vcs),
+       .op(`BINARY_OP_OR))
    req_op_ovc_or
      (.data_in(req_ip_ivc_op_ovc),
       .data_out(req_op_ovc));

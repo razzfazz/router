@@ -48,17 +48,19 @@ module c_prio_sel
    wire [0:num_ports-1] select;
    
    wire [0:prio_width-1] 	   prio_some_set;
-   c_or_nto1
+   c_binary_op
      #(.num_ports(num_ports),
-       .width(prio_width))
+       .width(prio_width),
+       .op(`BINARY_OP_OR))
    prio_some_set_or
      (.data_in(priorities),
       .data_out(prio_some_set));
    
    wire [0:prio_width-1] 	   prio_some_unset;
-   c_nand_nto1
+   c_binary_op
      #(.num_ports(num_ports),
-       .width(prio_width))
+       .width(prio_width),
+       .op(`BINARY_OP_NAND))
    prio_some_unset_nand
      (.data_in(priorities),
       .data_out(prio_some_unset));

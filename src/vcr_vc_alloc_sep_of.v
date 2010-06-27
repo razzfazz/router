@@ -290,9 +290,10 @@ module vcr_vc_alloc_sep_of
 			  // instead of using a proper MUX.
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
                             gnt_out_orc_ocvc;
-			  c_or_nto1
+			  c_binary_op
 			    #(.width(num_resource_classes*num_vcs_per_class),
-			      .num_ports(num_ports))
+			      .num_ports(num_ports),
+			      .op(`BINARY_OP_OR))
 			  gnt_out_orc_ocvc_or
 			    (.data_in(gnt_out_op_orc_ocvc),
 			     .data_out(gnt_out_orc_ocvc));
@@ -782,9 +783,10 @@ module vcr_vc_alloc_sep_of
    // generate activity signals for output controllers
    //---------------------------------------------------------------------------
    
-   c_or_nto1
+   c_binary_op
      #(.num_ports(num_ports*num_vcs),
-       .width(num_ports*num_vcs))
+       .width(num_ports*num_vcs),
+       .op(`BINARY_OP_OR))
    req_op_ovc_or
      (.data_in(req_ip_ivc_op_ovc),
       .data_out(req_op_ovc));

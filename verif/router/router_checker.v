@@ -800,9 +800,10 @@ module router_checker
    
    // summary signal indicating if any input VC matched the flit at each output
    wire [0:num_ports-1] 	      match_op;
-   c_or_nto1
+   c_binary_op
      #(.num_ports(num_ports*num_vcs),
-       .width(num_ports))
+       .width(num_ports),
+       .op(`BINARY_OP_OR))
    match_op_or
      (.data_in(match_ip_ivc_op),
       .data_out(match_op));

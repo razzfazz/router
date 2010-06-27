@@ -354,9 +354,10 @@ module vcr_vc_alloc_wf
 			  
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
                             gnt_orc_ocvc;
-			  c_or_nto1
+			  c_binary_op
 			    #(.num_ports(num_ports),
-			      .width(num_resource_classes*num_vcs_per_class))
+			      .width(num_resource_classes*num_vcs_per_class),
+			      .op(`BINARY_OP_OR))
 			  gnt_orc_ocvc_or
 			    (.data_in(gnt_wf_op_orc_ocvc),
 			     .data_out(gnt_orc_ocvc));
@@ -564,9 +565,10 @@ module vcr_vc_alloc_wf
 			  
 			  wire [0:num_resource_classes*num_vcs_per_class-1] 
    			    gnt_wf_irc_icvc;
-			  c_or_nto1
+			  c_binary_op
 			    #(.num_ports(num_ports),
-			      .width(num_resource_classes*num_vcs_per_class))
+			      .width(num_resource_classes*num_vcs_per_class),
+			      .op(`BINARY_OP_OR))
 			  gnt_wf_irc_icvc_or
 			    (.data_in(gnt_wf_ip_irc_icvc),
 			     .data_out(gnt_wf_irc_icvc));
@@ -612,9 +614,10 @@ module vcr_vc_alloc_wf
    // generate activity signals for output controllers
    //---------------------------------------------------------------------------
    
-   c_or_nto1
+   c_binary_op
      #(.num_ports(num_ports*num_vcs),
-       .width(num_ports*num_vcs))
+       .width(num_ports*num_vcs),
+       .op(`BINARY_OP_OR))
    req_op_ovc_or
      (.data_in(req_ip_ivc_op_ovc),
       .data_out(req_op_ovc));

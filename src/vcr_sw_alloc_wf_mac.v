@@ -189,9 +189,10 @@ module vcr_sw_alloc_wf_mac
 	       begin
 		  
 		  wire [0:num_ports-1] noreq_nonspec_op;
-		  c_nor_nto1
+		  c_binary_op
 		    #(.width(num_ports),
-		      .num_ports(num_ports))
+		      .num_ports(num_ports),
+		      .op(`BINARY_OP_NOR))
 		  noreq_nonspec_op_nor
 		    (.data_in(req_nonspec_ip_op),
 		     .data_out(noreq_nonspec_op));
@@ -205,9 +206,10 @@ module vcr_sw_alloc_wf_mac
 		     .data_out(req_nonspec_op_ip));
 		  
 		  wire [0:num_ports-1] 		 noreq_nonspec_ip;
-		  c_nor_nto1
+		  c_binary_op
 		    #(.width(num_ports),
-		      .num_ports(num_ports))
+		      .num_ports(num_ports),
+		      .op(`BINARY_OP_NOR))
 		  noreq_nonspec_ip_nor
 		    (.data_in(req_nonspec_op_ip),
 		     .data_out(noreq_nonspec_ip));
@@ -256,9 +258,10 @@ module vcr_sw_alloc_wf_mac
 	       begin
 		  
 		  wire [0:num_ports-1] nognt_nonspec_op;
-		  c_nor_nto1
+		  c_binary_op
 		    #(.width(num_ports),
-		      .num_ports(num_ports))
+		      .num_ports(num_ports),
+		      .op(`BINARY_OP_NOR))
 		  nognt_nonspec_op_nor
 		    (.data_in(gnt_nonspec_ip_op),
 		     .data_out(nognt_nonspec_op));
@@ -272,9 +275,10 @@ module vcr_sw_alloc_wf_mac
 		     .data_out(gnt_nonspec_op_ip));
 		  
 		  wire [0:num_ports-1] 		 nognt_nonspec_ip;
-		  c_nor_nto1
+		  c_binary_op
 		    #(.width(num_ports),
-		      .num_ports(num_ports))
+		      .num_ports(num_ports),
+		      .op(`BINARY_OP_NOR))
 		  nognt_nonspec_ip_nor
 		    (.data_in(gnt_nonspec_op_ip),
 		     .data_out(nognt_nonspec_ip));
