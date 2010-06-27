@@ -33,8 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // flit control signal decoding logic
 module rtr_flit_ctrl_dec
   (clk, reset, active, flit_ctrl_in, header_info_in, flit_valid_out, 
-   flit_head_out, flit_tail_out, flit_valid_out_ivc, flit_head_out_ivc, 
-   flit_tail_out_ivc);
+   flit_head_out, flit_tail_out, sel_out_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -110,17 +109,9 @@ module rtr_flit_ctrl_dec
    output flit_tail_out;
    wire flit_tail_out;
    
-   // flit valid indicators for each VC
-   output [0:num_vcs-1] flit_valid_out_ivc;
-   wire [0:num_vcs-1] flit_valid_out_ivc;
-   
-   // flit is head flit
-   output [0:num_vcs-1] flit_head_out_ivc;
-   wire [0:num_vcs-1] flit_head_out_ivc;
-
-   // flit is tail flit
-   output [0:num_vcs-1] flit_tail_out_ivc;
-   wire [0:num_vcs-1] flit_tail_out_ivc;
+   // indicate which VC the current flit (if any) belongs to
+   output [0:num_vcs-1] sel_out_ivc;
+   wire [0:num_vcs-1] sel_out_ivc;
    
    
    generate
@@ -139,23 +130,17 @@ module rtr_flit_ctrl_dec
 		  wire [0:vc_idx_width-1] flit_vc_in;
 		  assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
 		  
-		  wire [0:num_vcs-1] 	  flit_valid_unqual_ivc;
 		  c_decode
 		    #(.num_ports(num_vcs))
-		  flit_valid_unqual_ivc_dec
+		  sel_out_ivc_dec
 		    (.data_in(flit_vc_in),
-		     .data_out(flit_valid_unqual_ivc));
-		  
-		  assign flit_valid_out_ivc
-		    = {num_vcs{flit_valid_out}} & flit_valid_unqual_ivc;
+		     .data_out(sel_out_ivc));
 		  
 	       end
 	     else
-	       assign flit_valid_out_ivc = flit_valid_out;
+	       assign sel_out_ivc = 1'b1;
 	     
 	     assign flit_head_out = flit_ctrl_in[1+vc_idx_width+0];
-	     
-	     assign flit_head_out_ivc = {num_vcs{flit_head_out}};
 	     
 	     case(packet_format)
 	       
@@ -163,8 +148,6 @@ module rtr_flit_ctrl_dec
 		 begin
 		    
 		    assign flit_tail_out = flit_ctrl_in[1+vc_idx_width+1];
-		    
-		    assign flit_tail_out_ivc = {num_vcs{flit_tail_out}};
 		    
 		 end
 	       
@@ -175,7 +158,7 @@ module rtr_flit_ctrl_dec
 		      begin
 			 
 			 if(max_payload_length == min_payload_length)
-			   assign flit_tail_out_ivc = flit_head_out_ivc;
+			   assign flit_tail_out = flit_head_out;
 			 
 			 // synopsys translate_off
 			 else
@@ -226,28 +209,23 @@ module rtr_flit_ctrl_dec
 			   end
 			 // synopsys translate_on
 			 
-			 assign flit_tail_out_ivc
-			   = ~flit_head_out_ivc | {num_vcs{~has_payload}};
+			 assign flit_tail_out = ~flit_head_out | ~has_payload;
 			 
 		      end
 		    else
 		      begin
+			 
+			 wire [0:num_vcs-1] flit_tail_out_ivc;
 			 
 			 genvar ivc;
 			 
 			 for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 			   begin:ivcs
 			      
-			      wire flit_valid_out;
-			      assign flit_valid_out = flit_valid_out_ivc[ivc];
-			      
-			      wire flit_head_out;
-			      assign flit_head_out = flit_head_out_ivc[ivc];
-			      
 			      wire [0:flit_ctr_width-1] flit_ctr_next;
 			      wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
 			      assign flit_ctr_s
-				= flit_valid_out ? 
+				= (flit_valid_out & sel_out_ivc[ivc]) ? 
 				  (flit_head_out ? 
 				   flit_ctr_next : 
 				   (flit_ctr_q - 1'b1)) : 
@@ -319,9 +297,10 @@ module rtr_flit_ctrl_dec
 			      
 			   end
 			 
+			 assign flit_tail_out
+			   = |(sel_out_ivc & flit_tail_out_ivc);
+			 
 		      end
-		    
-		    assign flit_tail_out = |flit_tail_out_ivc;
 		    
 		 end
 	       

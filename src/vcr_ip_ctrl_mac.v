@@ -562,9 +562,7 @@ module vcr_ip_ctrl_mac
    
    wire 			flit_head_in;
    wire 			flit_tail_in;
-   wire [0:num_vcs-1] 		flit_valid_in_ivc;
-   wire [0:num_vcs-1] 		flit_head_in_ivc;
-   wire [0:num_vcs-1] 		flit_tail_in_ivc;
+   wire [0:num_vcs-1] 		sel_in_ivc;
    rtr_flit_ctrl_dec
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -582,9 +580,10 @@ module vcr_ip_ctrl_mac
       .flit_valid_out(flit_valid_in),
       .flit_head_out(flit_head_in),
       .flit_tail_out(flit_tail_in),
-      .flit_valid_out_ivc(flit_valid_in_ivc),
-      .flit_head_out_ivc(flit_head_in_ivc),
-      .flit_tail_out_ivc(flit_tail_in_ivc));
+      .sel_out_ivc(sel_in_ivc));
+   
+   wire [0:num_vcs-1] 		flit_valid_in_ivc;
+   assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & sel_in_ivc;
    
    wire [0:num_vcs-1] 		flit_sent_prev_ivc;
    wire [0:num_vcs-1] 		flit_head_ivc;
@@ -612,12 +611,6 @@ module vcr_ip_ctrl_mac
 	   
 	   wire flit_valid_in;
 	   assign flit_valid_in = flit_valid_in_ivc[ivc];
-	   
-	   wire flit_head_in;
-	   assign flit_head_in = flit_head_in_ivc[ivc];
-	   
-	   wire flit_tail_in;
-	   assign flit_tail_in = flit_tail_in_ivc[ivc];
 	   
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ivc[ivc];

@@ -378,9 +378,7 @@ module whr_ip_ctrl_mac
    
    wire 			flit_head_in;   
    wire 			flit_tail_in;
-   wire 			flit_valid_in_ivc;
-   wire 			flit_head_in_ivc;
-   wire 			flit_tail_in_ivc;
+   wire 			sel_in_ivc;
    rtr_flit_ctrl_dec
      #(.num_vcs(1),
        .packet_format(packet_format),
@@ -398,9 +396,7 @@ module whr_ip_ctrl_mac
       .flit_valid_out(flit_valid_in),
       .flit_head_out(flit_head_in),
       .flit_tail_out(flit_tail_in),
-      .flit_valid_out_ivc(flit_valid_in_ivc),
-      .flit_head_out_ivc(flit_head_in_ivc),
-      .flit_tail_out_ivc(flit_tail_in_ivc));
+      .sel_out_ivc(sel_in_ivc));
    
    
    //---------------------------------------------------------------------------

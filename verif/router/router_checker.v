@@ -231,9 +231,7 @@ module router_checker
 	   wire 			  flit_valid;
 	   wire 			  flit_head;
 	   wire 			  flit_tail;
-	   wire [0:num_vcs-1] 		  flit_valid_ivc;
-	   wire [0:num_vcs-1] 		  flit_head_ivc;
-	   wire [0:num_vcs-1] 		  flit_tail_ivc;
+	   wire [0:num_vcs-1] 		  sel_ivc;
 	   rtr_flit_ctrl_dec
 	     #(.num_vcs(num_vcs),
 	       .packet_format(packet_format),
@@ -251,9 +249,7 @@ module router_checker
 	      .flit_valid_out(flit_valid),
 	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
-	      .flit_valid_out_ivc(flit_valid_ivc),
-	      .flit_head_out_ivc(flit_head_ivc),
-	      .flit_tail_out_ivc(flit_tail_ivc));
+	      .sel_out_ivc(sel_ivc));
 	   
 	   
 	   //-------------------------------------------------------------------
