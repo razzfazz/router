@@ -229,98 +229,31 @@ module router_checker
 					   route_info_width-1];
 	   
 	   wire 			  flit_valid;
-	   assign flit_valid = flit_ctrl[0];
-	   
 	   wire 			  flit_head;
-	   assign flit_head = flit_ctrl[1+vc_idx_width+0];
-	   
-	   // determine if this is a tail flit
-	   
 	   wire 			  flit_tail;
-	   case(packet_format)
-	     
-	     `PACKET_FORMAT_HEAD_TAIL:
-	       begin
-		  
-		  assign flit_tail = flit_ctrl[1+vc_idx_width+1];
-		  
-	       end
-	     
-	     `PACKET_FORMAT_EXPLICIT_LENGTH:
-	       begin
-		  
-		  if(max_payload_length == 0)
-		    assign flit_tail = flit_head;
-		  else if(max_payload_length == 1)
-		    begin
-		       
-		       wire has_payload;
-		       
-		       if(payload_length_width > 0)
-			 assign has_payload
-			   = header_info[la_route_info_width+
-					 route_info_width];
-		       else
-			 assign has_payload = 1'b1;
-		       
-		       assign flit_tail = ~flit_head | ~has_payload;
-		       
-		    end
-		  else
-		    begin
-		       
-		       wire [0:flit_ctr_width-1] flit_ctr_q;
-		       wire [0:flit_ctr_width-1] flit_ctr_next;
-		       
-		       if(payload_length_width > 0)
-			 begin
-			    
-			    wire [0:payload_length_width-1] payload_length;
-			    assign payload_length
-			      = header_info[la_route_info_width+
-					    route_info_width:
-					    la_route_info_width+
-					    route_info_width+
-					    payload_length_width-1];
-			    
-			    assign flit_ctr_next
-			      = (min_payload_length - 1) + payload_length;
-			    
-			    if(max_payload_length == 0)
-			      assign flit_tail = flit_head ?
-						 ~|payload_length :
-						 ~|flit_ctr_q;
-			    else
-			      assign flit_tail = ~flit_head & ~|flit_ctr_q;
-			    
-			 end
-		       else
-			 begin
-			    assign flit_ctr_next = max_payload_length - 1;
-			    assign flit_tail = ~flit_head & ~|flit_ctr_q;
-			 end
-		       
-		       wire [0:flit_ctr_width-1] flit_ctr_s;
-		       assign flit_ctr_s = flit_valid ? 
-					   flit_head ? 
-					   flit_ctr_next : 
-					   (flit_ctr_q - 1'b1) : 
-					   flit_ctr_q;
-		       c_dff
-			 #(.width(flit_ctr_width),
-			   .reset_type(reset_type))
-		       flit_ctrq
-			 (.clk(clk),
-			  .reset(reset),
-			  .active(1'b1),
-			  .d(flit_ctr_s),
-			  .q(flit_ctr_q));
-		       
-		    end
-		  
-	       end
-	     
-	   endcase
+	   wire [0:num_vcs-1] 		  flit_valid_ivc;
+	   wire [0:num_vcs-1] 		  flit_head_ivc;
+	   wire [0:num_vcs-1] 		  flit_tail_ivc;
+	   rtr_flit_ctrl_dec
+	     #(.num_vcs(num_vcs),
+	       .packet_format(packet_format),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
+	       .la_route_info_width(la_route_info_width),
+	       .route_info_width(route_info_width),
+	       .reset_type(reset_type))
+	   fcdec
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .flit_ctrl_in(flit_ctrl),
+	      .header_info_in(header_info),
+	      .flit_valid_out(flit_valid),
+	      .flit_head_out(flit_head),
+	      .flit_tail_out(flit_tail),
+	      .flit_valid_out_ivc(flit_valid_ivc),
+	      .flit_head_out_ivc(flit_head_ivc),
+	      .flit_tail_out_ivc(flit_tail_ivc));
 	   
 	   
 	   //-------------------------------------------------------------------
