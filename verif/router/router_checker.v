@@ -208,25 +208,8 @@ module router_checker
 	   assign flit_data
 	     = flit_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1];
 	   
-	   wire [0:header_info_width-1]  header_info;
-	   assign header_info = flit_data[0:header_info_width-1];
-	   
-	   wire [0:la_route_info_width-1] la_route_info_in;
-	   assign la_route_info_in = header_info[0:la_route_info_width-1];
-	   
-	   wire [0:port_idx_width-1] 	  la_route_port;
-	   assign la_route_port = la_route_info_in[0:port_idx_width-1];
-	   
-	   wire 			  la_inc_rc;
-	   if(num_resource_classes > 1)
-	     assign la_inc_rc = la_route_info_in[port_idx_width];
-	   else
-	     assign la_inc_rc = 1'b0;
-	   
-	   wire [0:route_info_width-1] 	  route_info;
-	   assign route_info = header_info[la_route_info_width:
-					   la_route_info_width+
-					   route_info_width-1];
+	   wire [0:header_info_width-1]  header_info_in;
+	   assign header_info_in = flit_data[0:header_info_width-1];
 	   
 	   wire 			  flit_valid;
 	   wire 			  flit_head;
@@ -245,7 +228,7 @@ module router_checker
 	      .reset(reset),
 	      .active(1'b1),
 	      .flit_ctrl_in(flit_ctrl),
-	      .header_info_in(header_info),
+	      .header_info_in(header_info_in),
 	      .flit_valid_out(flit_valid),
 	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
@@ -253,295 +236,176 @@ module router_checker
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // compute destination port, VC mask and lookahead routing 
-	   // information depending on packet class
+	   // compute destination port and VC mask
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs*port_idx_width-1] 	 route_port_ivc;
-	   wire [0:num_vcs*num_vcs-1] 		 route_ivc_ovc;
-	   wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
+	   wire [0:num_message_classes*num_resource_classes-1] sel_mc_irc;
+	   c_mat_mult
+	     #(.dim1_width(num_message_classes*num_resource_classes),
+	       .dim2_width(num_vcs_per_class),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   sel_mc_irc_mmult
+	     (.input_a(sel_ivc),
+	      .input_b({num_vcs_per_class{1'b1}}),
+	      .result(sel_mc_irc));
 	   
-	   genvar 				  mc;
+	   wire [0:num_message_classes-1] 		       sel_mc;
+	   c_mat_mult
+	     #(.dim1_width(num_message_classes),
+	       .dim2_width(num_resource_classes),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   sel_mc_mmult
+	     (.input_a(sel_mc_irc),
+	      .input_b({num_resource_classes{1'b1}}),
+	      .result(sel_mc));
 	   
-	   for(mc = 0; mc < num_message_classes; mc = mc + 1)
-	     begin:mcs
-		
-		genvar irc;
-		
-		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-		  begin:ircs
-		     
-		     localparam [0:num_message_classes-1] sel_mc
-		       = (1 << (num_message_classes - 1 - mc));
-		     localparam [0:num_resource_classes-1] sel_irc
-		       = (1 << (num_resource_classes - 1 - irc));
-		     
-		     // compute destination port
-		     
-		     wire [0:num_ports-1] 	     route_op;
-		     wire 			     inc_rc;
-		     rtr_routing_logic
-		       #(.num_message_classes(num_message_classes),
-			 .num_resource_classes(num_resource_classes),
-			 .num_routers_per_dim(num_routers_per_dim),
-			 .num_dimensions(num_dimensions),
-			 .num_nodes_per_router(num_nodes_per_router),
-			 .connectivity(connectivity),
-			 .routing_type(routing_type),
-			 .dim_order(dim_order))
-		     rtl
-		       (.router_address(router_address),
-			.sel_mc(sel_mc),
-			.sel_rc(sel_irc),
-			.route_info(route_info),
-			.route_op(route_op),
-			.inc_rc(inc_rc));
-		     
-		     wire [0:port_idx_width-1] 	     route_port;
-		     c_encode
-		       #(.num_ports(num_ports))
-		     route_port_enc
-		       (.data_in(route_op),
-			.data_out(route_port));
-		     
-		     assign route_port_ivc[(mc*num_resource_classes+irc)*
-					   num_vcs_per_class*
-					   port_idx_width:
-					   (mc*num_resource_classes+irc+1)*
-					   num_vcs_per_class*
-					   port_idx_width-1]
-			      = {num_vcs_per_class{route_port}};
-		     
-		     wire [0:num_resource_classes-1] sel_orc;
-		     if(irc == (num_resource_classes - 1))
-		       assign sel_orc = 'd1;
-		     else
-		       begin
-			  c_align
-			    #(.in_width(2),
-			      .out_width(num_resource_classes),
-			      .offset(irc))
-			  sel_orc_align
-			    (.data_in({~inc_rc, inc_rc}),
-			     .dest_in({num_resource_classes{1'b0}}),
-			     .data_out(sel_orc));
-		       end
-		     
-		     // determine candidate output VCs
-		     
-		     wire [0:num_resource_classes*num_vcs_per_class-1] 
-		       sel_orc_ocvc;
-		     c_mat_mult
-		       #(.dim1_width(num_resource_classes),
-			 .dim2_width(1),
-			 .dim3_width(num_vcs_per_class))
-		     sel_orc_ocvc_mmult
-		       (.input_a(sel_orc),
-			.input_b({num_vcs_per_class{1'b1}}),
-			.result(sel_orc_ocvc));
-		     
-		     wire [0:num_vcs-1] route_ovc;
-		     c_align
-		       #(.in_width(num_resource_classes*num_vcs_per_class),
-			 .out_width(num_vcs),
-			 .offset(mc*num_resource_classes*num_vcs_per_class))
-		     route_ovc_alg
-		       (.data_in(sel_orc_ocvc),
-			.dest_in({num_vcs{1'b0}}),
-			.data_out(route_ovc));
-		     
-		     assign route_ivc_ovc[(mc*num_resource_classes+irc)*
-					  num_vcs_per_class*num_vcs:
-					  (mc*num_resource_classes+irc+1)*
-					  num_vcs_per_class*num_vcs-1]
-		       = {num_vcs_per_class{route_ovc}};
-		     
-		     // generate lookahead routing information
-		     
-		     wire [0:router_addr_width-1]    next_router_address;
-		     rtr_next_hop_addr
-		       #(.num_resource_classes(num_resource_classes),
-			 .num_routers_per_dim(num_routers_per_dim),
-			 .num_dimensions(num_dimensions),
-			 .num_nodes_per_router(num_nodes_per_router),
-			 .connectivity(connectivity))
-		     nha
-		       (.router_address(router_address),
-			.route_port(route_port),
-			.sel_rc(sel_orc),
-			.route_info(route_info),
-			.next_router_address(next_router_address));
-
-		     wire [0:num_ports-1] 	 next_route_op;
-		     wire 			 next_inc_rc;
-		     rtr_routing_logic
-		       #(.num_message_classes(num_message_classes),
-			 .num_resource_classes(num_resource_classes),
-			 .num_routers_per_dim(num_routers_per_dim),
-			 .num_dimensions(num_dimensions),
-			 .num_nodes_per_router(num_nodes_per_router),
-			 .connectivity(connectivity),
-			 .routing_type(routing_type),
-			 .dim_order(dim_order))
-		     nrtl
-		       (.router_address(next_router_address),
-			.sel_mc(sel_mc),
-			.sel_rc(sel_orc),
-			.route_info(route_info),
-			.route_op(next_route_op),
-			.inc_rc(next_inc_rc));
-		     
-		     wire [0:port_idx_width-1] 	  next_route_port;
-		     c_encode
-		       #(.num_ports(num_ports))
-		     next_route_port_enc
-		       (.data_in(next_route_op),
-			.data_out(next_route_port));
-		     
-		     wire [0:la_route_info_width-1] la_route_info;
-		     assign la_route_info[0:port_idx_width-1] = next_route_port;
-		     
-		     if(num_resource_classes > 1)
-		       assign la_route_info[port_idx_width] = next_inc_rc;
-		     
-		     assign la_route_info_ivc[(mc*num_resource_classes+irc)*
-					      num_vcs_per_class*
-					      la_route_info_width:
-					      (mc*num_resource_classes+irc+1)*
-					      num_vcs_per_class*
-					      la_route_info_width-1]
-			      = {num_vcs_per_class{la_route_info}};
-		     
-		  end
-		
-	     end
+	   wire [0:num_resource_classes*num_message_classes-1] sel_irc_mc;
+	   c_interleave
+	     #(.width(num_message_classes*num_resource_classes),
+	       .num_blocks(num_message_classes))
+	   sel_irc_mc_intl
+	     (.data_in(sel_mc_irc),
+	      .data_out(sel_irc_mc));
+	   
+	   wire [0:num_resource_classes-1] 		       sel_irc;
+	   c_mat_mult
+	     #(.dim1_width(num_resource_classes),
+	       .dim2_width(num_message_classes),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   sel_irc_mmult
+	     (.input_a(sel_irc_mc),
+	      .input_b({num_message_classes{1'b1}}),
+	      .result(sel_irc));
 	   
 	   
-	   // select actual destination port given based on packet's actual VC
+	   // compute destination port
 	   
-	   wire [0:port_idx_width-1] 			route_port;
-	   if(num_vcs > 1)
-	     begin:route_port_mux
-		
-		wire [0:vc_idx_width-1] flit_vc;
-		assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		
-		assign route_port
-		  = route_port_ivc[flit_vc*port_idx_width +: 
-				   port_idx_width];
-		
-	     end
-	   else
-	     assign route_port = route_port_ivc;
+	   wire [0:route_info_width-1] 			       route_info;
+	   assign route_info = header_info_in[la_route_info_width:
+					      la_route_info_width+
+					      route_info_width-1];
 	   
+	   wire [0:num_ports-1] 			       route_op;
+	   wire 					       inc_rc;
+	   rtr_routing_logic
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order))
+	   rtl
+	     (.router_address(router_address),
+	      .sel_mc(sel_mc),
+	      .sel_rc(sel_irc),
+	      .route_info(route_info),
+	      .route_op(route_op),
+	      .inc_rc(inc_rc));
 	   
-	   // save destination port for subsequent body and tail flits
+	   wire [0:port_idx_width-1] 			       route_port;
+	   c_encode
+	     #(.num_ports(num_ports))
+	   route_port_enc
+	     (.data_in(route_op),
+	      .data_out(route_port));
 	   
-	   wire [0:port_idx_width-1] 	dest_port_s, dest_port_q;
-	   assign dest_port_s = flit_valid ?
-				(flit_head ?
-				 route_port :
-				 dest_port_q) :
-				dest_port_q;
-	   c_dff
-	     #(.width(port_idx_width),
-	       .reset_type(reset_type))
-	   dest_portq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .d(dest_port_s),
-	      .q(dest_port_q));
-	   
-	   wire [0:port_idx_width-1] 	dest_port;
-	   assign dest_port = (flit_valid & flit_head) ?
-			      route_port :
-			      dest_port_q;
+	   wire [0:num_resource_classes-1] sel_orc;
+	   assign sel_orc = (sel_irc >> inc_rc);
 	   
 	   
-	   // select actual candidate VCs based on packet's actual VC
+	   // determine candidate output VCs
 	   
-	   wire [0:num_vcs-1] 		route_ovc;
-	   if(num_vcs > 1)
-	     begin:route_ovc_mux
-		
-		wire [0:vc_idx_width-1] flit_vc;
-		assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		
-		assign route_ovc
-		  = route_ivc_ovc[flit_vc*num_vcs +: num_vcs];
-		
-	     end
-	   else
-	     assign route_ovc = route_ivc_ovc;
+	   wire [0:num_resource_classes*num_vcs_per_class-1] sel_orc_ocvc;
+	   c_mat_mult
+	     #(.dim1_width(num_resource_classes),
+	       .dim2_width(1),
+	       .dim3_width(num_vcs_per_class))
+	   sel_orc_ocvc_mmult
+	     (.input_a(sel_orc),
+	      .input_b({num_vcs_per_class{1'b1}}),
+	      .result(sel_orc_ocvc));
 	   
-	   
-	   // save candidate VCs for subsequent body and tail flits
-	   
-	   wire [0:num_vcs-1] 		dest_ovc_s, dest_ovc_q;
-	   assign dest_ovc_s = flit_valid ?
-			       (flit_head ?
-				route_ovc :
-				dest_ovc_q) :
-			       dest_ovc_q;
-	   c_dff
-	     #(.width(num_vcs),
-	       .reset_type(reset_type))
-	   dest_ovcq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .d(dest_ovc_s),
-	      .q(dest_ovc_q));
-	   
-	   wire [0:num_vcs-1] 		dest_ovc;
-	   assign dest_ovc = (flit_valid & flit_head) ?
-			     route_ovc :
-			     dest_ovc_q;
+	   wire [0:num_vcs-1] 				     route_ovc;
+	   c_mat_mult
+	     #(.dim1_width(num_message_classes),
+	       .dim2_width(1),
+	       .dim3_width(num_resource_classes*num_vcs_per_class))
+	   route_ovc_mmult
+	     (.input_a(sel_mc),
+	      .input_b(sel_orc_ocvc),
+	      .result(route_ovc));
 	   
 	   
-	   // select actual lookahead routing information based on packet's
-	   // actual VC
+	   //-------------------------------------------------------------------
+	   // update header info
+	   //-------------------------------------------------------------------
 	   
-	   wire [0:la_route_info_width-1] la_route_info_out;
-	   if(num_vcs > 1)
-	     begin:la_route_info_out_mux
-		
-		wire [0:vc_idx_width-1] flit_vc;
-		assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		
-		assign la_route_info_out
-		  = la_route_info_ivc[flit_vc*la_route_info_width +:
-				      la_route_info_width];
-		
-	     end
-	   else
-	     assign la_route_info_out = la_route_info_ivc;
+	   // generate lookahead routing information
+	   
+	   wire [0:router_addr_width-1] next_router_address;
+	   rtr_next_hop_addr
+	     #(.num_resource_classes(num_resource_classes),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity))
+	   nha
+	     (.router_address(router_address),
+	      .route_port(route_port),
+	      .sel_rc(sel_orc),
+	      .route_info(route_info),
+	      .next_router_address(next_router_address));
+	   
+	   wire [0:num_ports-1] 	next_route_op;
+	   wire 			next_inc_rc;
+	   rtr_routing_logic
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order))
+	   nrtl
+	     (.router_address(next_router_address),
+	      .sel_mc(sel_mc),
+	      .sel_rc(sel_orc),
+	      .route_info(route_info),
+	      .route_op(next_route_op),
+	      .inc_rc(next_inc_rc));
+	   
+	   wire [0:port_idx_width-1] 	next_route_port;
+	   c_encode
+	     #(.num_ports(num_ports))
+	   next_route_port_enc
+	     (.data_in(next_route_op),
+	      .data_out(next_route_port));
+	   
+	   wire [0:la_route_info_width-1] la_route_info;
+	   assign la_route_info[0:port_idx_width-1] = next_route_port;
+	   
+	   if(num_resource_classes > 1)
+	     assign la_route_info[port_idx_width] = next_inc_rc;
+	   
+	   wire [0:header_info_width-1] header_info_out;
+	   assign header_info_out[0:la_route_info_width-1] = la_route_info;
+	   assign header_info_out[la_route_info_width:header_info_width-1]
+	     = header_info_in[la_route_info_width:header_info_width-1];
 	   
 	   
 	   //-------------------------------------------------------------------
 	   // store incoming flits with information about expected output and 
 	   // candidate VCs in per-VC FIFOs
 	   //-------------------------------------------------------------------
-	   
-	   wire [0:(flit_ctrl_width+flit_data_width+port_idx_width+
-		    num_vcs)-1] 	data_in;
-	   assign data_in[0:flit_ctrl_width-1] = flit_ctrl;
-	   assign data_in[flit_ctrl_width:
-			  flit_ctrl_width+la_route_info_width-1]
-		    = flit_head ? 
-		      la_route_info_out : 
-		      flit_data[0:la_route_info_width-1];
-	   assign data_in[flit_ctrl_width+la_route_info_width:
-			  flit_ctrl_width+flit_data_width-1]
-		    = flit_data[la_route_info_width:flit_data_width-1];
-	   assign data_in[flit_ctrl_width+flit_data_width:
-			  flit_ctrl_width+flit_data_width+port_idx_width-1]
-		    = dest_port;
-	   assign data_in[flit_ctrl_width+flit_data_width+port_idx_width:
-			  flit_ctrl_width+flit_data_width+port_idx_width+
-			  num_vcs-1]
-		    = dest_ovc;
 	   
 	   wire [0:num_vcs*2-1] 	fifo_errors_ivc;
 	   
@@ -550,35 +414,80 @@ module router_checker
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	     begin:ivcs
 		
+		wire sel;
+		assign sel = sel_ivc[ivc];
+		
+		
+		// save destination port for subsequent body and tail flits
+		
+		wire [0:port_idx_width-1] 	dest_port_s, dest_port_q;
+		assign dest_port_s
+		  = (flit_valid & flit_head & sel) ? route_port : dest_port_q;
+		c_dff
+		  #(.width(port_idx_width),
+		    .reset_type(reset_type))
+		dest_portq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .d(dest_port_s),
+		   .q(dest_port_q));
+		
+		
+		// save candidate VCs for subsequent body and tail flits
+		
+		wire [0:num_vcs-1] 		dest_ovc_s, dest_ovc_q;
+		assign dest_ovc_s
+		  = (flit_valid & flit_head & sel) ? route_ovc : dest_ovc_q;
+		c_dff
+		  #(.width(num_vcs),
+		    .reset_type(reset_type))
+		dest_ovcq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .d(dest_ovc_s),
+		   .q(dest_ovc_q));
+		
+		
+		// generate FIFO input data
+		
+		wire [0:(flit_ctrl_width+flit_data_width+port_idx_width+
+			 num_vcs)-1] data_in;
+		assign data_in[0:flit_ctrl_width-1] = flit_ctrl;
+		assign data_in[flit_ctrl_width:
+			       flit_ctrl_width+header_info_width-1]
+		  = flit_head ? header_info_out : header_info_in;
+		assign data_in[flit_ctrl_width+header_info_width:
+			       flit_ctrl_width+flit_data_width-1]
+		  = flit_data[header_info_width:flit_data_width-1];
+		assign data_in[flit_ctrl_width+flit_data_width:
+			       flit_ctrl_width+flit_data_width+port_idx_width-1]
+		  = dest_port_s;
+		assign data_in[flit_ctrl_width+flit_data_width+port_idx_width:
+			       flit_ctrl_width+flit_data_width+port_idx_width+
+			       num_vcs-1]
+		  = dest_ovc_s;
+		
+		
 		// generate FIFO control signals
 		
 		wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
 		      num_vcs-1] data_out;
 		
 		wire 		 push;
+		assign push = flit_valid & sel;
 		
-		if(num_vcs > 1)
-		  begin
-		     
-		     wire [0:vc_idx_width-1] flit_vc;
-		     assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-		     
-		     assign push = flit_valid && (flit_vc == ivc);
-		     
-		  end
-		else
-		  assign push = flit_valid;
+		wire 		 match;
 		
-		wire 			     match;
-		
-		wire 			     pop;
+		wire 		 pop;
 		assign pop = match;
 		
-		wire 			     fifo_almost_full;
-		wire 			     fifo_full;
-		wire 			     fifo_almost_empty;
-		wire 			     fifo_empty;
-		wire [0:1] 		     fifo_errors;
+		wire 		 fifo_almost_full;
+		wire 		 fifo_full;
+		wire 		 fifo_almost_empty;
+		wire 		 fifo_empty;
+		wire [0:1] 	 fifo_errors;
 		wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
 		      num_vcs-1] fifo_peek_data;
 		
