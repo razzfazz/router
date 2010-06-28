@@ -240,6 +240,7 @@ module packet_source
    assign packet_ready = new_packet & ~waiting_packet_count_zero;
    
    generate
+      
       if(max_packet_count >= 0)
 	begin
 	   
@@ -265,6 +266,7 @@ module packet_source
 	begin
 	   assign waiting_packet_count_zero = 1'b0;
 	end
+      
    endgenerate
    
    wire 			  packet_sent;
@@ -535,110 +537,109 @@ module packet_source
      end
    
    reg [0:route_info_width-1] route_info;
-   wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
+   
+   wire [0:num_vcs-1] 	      sel_ivc;
+   
+   wire [0:num_message_classes*num_resource_classes-1] sel_mc_irc;
+   c_mat_mult
+     #(.dim1_width(num_message_classes*num_resource_classes),
+       .dim2_width(num_vcs_per_class),
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
+   sel_mc_irc_mmult
+     (.input_a(sel_ivc),
+      .input_b({num_vcs_per_class{1'b1}}),
+      .result(sel_mc_irc));
+   
+   wire [0:num_message_classes-1] 		       sel_mc;
+   c_mat_mult
+     #(.dim1_width(num_message_classes),
+       .dim2_width(num_resource_classes),
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
+   sel_mc_mmult
+     (.input_a(sel_mc_irc),
+      .input_b({num_resource_classes{1'b1}}),
+      .result(sel_mc));
+   
+   wire [0:num_resource_classes*num_message_classes-1] sel_irc_mc;
+   c_interleave
+     #(.width(num_message_classes*num_resource_classes),
+       .num_blocks(num_message_classes))
+   sel_irc_mc_intl
+     (.data_in(sel_mc_irc),
+      .data_out(sel_irc_mc));
+   
+   wire [0:num_resource_classes-1] 		       sel_irc;
+   c_mat_mult
+     #(.dim1_width(num_resource_classes),
+       .dim2_width(num_message_classes),
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
+   sel_irc_mmult
+     (.input_a(sel_irc_mc),
+      .input_b({num_message_classes{1'b1}}),
+      .result(sel_irc));
+   
+   wire [0:num_ports-1] 			       route_op;
+   wire 					       inc_rc;
+   rtr_routing_logic
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .dim_order(dim_order))
+   rtl
+     (.router_address(router_address),
+      .sel_mc(sel_mc),
+      .sel_rc(sel_irc),
+      .route_info(route_info),
+      .route_op(route_op),
+      .inc_rc(inc_rc));
+   
+   wire [0:port_idx_width-1] 			       route_port;
+   c_encode
+     #(.num_ports(num_ports))
+   route_port_enc
+     (.data_in(route_op),
+      .data_out(route_port));
+   
+   wire [0:la_route_info_width-1] 		       la_route_info;
+   assign la_route_info[0:port_idx_width-1] = route_port;
    
    generate
       
-      genvar 				  mc;
-      
-      for(mc = 0; mc < num_message_classes; mc = mc + 1)
-	begin:mcs
-	   
-	   genvar irc;
-	   
-	   for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-	     begin:ircs
-		
-		localparam ipc = mc * num_resource_classes + irc;
-		localparam [0:num_message_classes-1] sel_mc
-		  = (1 << (num_message_classes - 1 - mc));
-		localparam [0:num_resource_classes-1] sel_irc
-		  = (1 << (num_resource_classes - 1 - irc));
-		
-		wire [0:num_ports-1]           route_op;
-		wire 			       inc_rc;
-		rtr_routing_logic
-		  #(.num_message_classes(num_message_classes),
-		    .num_resource_classes(num_resource_classes),
-		    .num_routers_per_dim(num_routers_per_dim),
-		    .num_dimensions(num_dimensions),
-		    .num_nodes_per_router(num_nodes_per_router),
-		    .connectivity(connectivity),
-		    .routing_type(routing_type),
-		    .dim_order(dim_order))
-		rtl
-		  (.router_address(router_address),
-		   .sel_mc(sel_mc),
-		   .sel_rc(sel_irc),
-		   .route_info(route_info),
-		   .route_op(route_op),
-		   .inc_rc(inc_rc));
-		
-		wire [0:port_idx_width-1]      route_port;
-		c_encode
-		  #(.num_ports(num_ports))
-		route_port_enc
-		  (.data_in(route_op),
-		   .data_out(route_port));
-   		
-		wire [0:la_route_info_width-1] la_route_info;
-		
-		assign la_route_info[0:port_idx_width-1] = route_port;
-		
-		if(num_resource_classes > 1)
-		  assign la_route_info[port_idx_width] = inc_rc;
-		
-		assign la_route_info_ivc[ipc*num_vcs_per_class*
-					 la_route_info_width:
-					 (ipc+1)*num_vcs_per_class*
-					 la_route_info_width-1]
-		    = {num_vcs_per_class{la_route_info}};
-		
-	     end
-	   
-	end
+      if(num_resource_classes > 1)
+	assign la_route_info[port_idx_width] = inc_rc;
       
    endgenerate
    
-   wire [0:la_route_info_width-1] 	  la_route_info;
-   
-   wire [0:header_info_width-1] 	  header_info;
+   wire [0:header_info_width-1] 		       header_info;
    assign header_info[0:la_route_info_width-1] = la_route_info;
    
-   wire [0:router_addr_width-1] 	  rc_dest;
+   wire [0:num_resource_classes*router_addr_width-1]   route_info_addresses;
+   assign route_info_addresses
+     = route_info[0:num_resource_classes*router_addr_width-1];
    
-   generate
-      
-      if(num_vcs > 1)
-	begin:la_route_info_mux
-
-	   wire [0:vc_idx_width-1] flit_vc;
-	   assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-	   
-	   assign la_route_info
-	     = la_route_info_ivc[flit_vc*la_route_info_width +: 
-				 la_route_info_width];
-	   
-	   assign rc_dest = route_info[((flit_vc / num_vcs_per_class) %
-					num_resource_classes)*
-				       router_addr_width +: router_addr_width];
-	   				       
-	end
-      else
-	begin
-	   
-	   assign la_route_info = la_route_info_ivc;
-	   
-	   assign rc_dest = route_info[0:router_addr_width-1];
-	   
-	end
-      
-   endgenerate
+   wire [0:router_addr_width-1] 		       rc_dest;
+   c_select_1ofn
+     #(.num_ports(num_resource_classes),
+       .width(router_addr_width))
+   rc_dest_sel
+     (.select(sel_irc),
+      .data_in(route_info_addresses),
+      .data_out(rc_dest));
    
-   wire [0:addr_width-1] 	   source_address;
+   wire [0:addr_width-1] 			       source_address;
    assign source_address[0:router_addr_width-1] = router_address;
    
-   wire [0:router_addr_width-1]    curr_dest_addr;
+   wire [0:router_addr_width-1] 		       curr_dest_addr;
    
    generate
       
@@ -936,6 +937,12 @@ module packet_source
 		  random_vc <= $dist_uniform(seed, 0, num_vcs-1);
 	     end
 	   
+	   c_decode
+	     #(.num_ports(num_vcs))
+	   sel_ivc_dec
+	     (.data_in(random_vc),
+	      .data_out(sel_ivc));
+	   
 	   assign flit_ctrl[1:1+vc_idx_width-1] = random_vc;
 	   
 	   assign curr_dest_addr
@@ -946,6 +953,7 @@ module packet_source
 	end
       else
 	begin
+	   assign sel_ivc = 1'b1;
 	   assign curr_dest_addr = route_info[0:router_addr_width-1];
 	end
       
