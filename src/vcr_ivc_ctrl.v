@@ -428,42 +428,24 @@ module vcr_ivc_ctrl
 	   
 	end
       
-      if(resource_class == (num_resource_classes - 1))
-	begin
-	   
-	   c_align
-	     #(.in_width(num_vcs_per_class),
-	       .out_width(num_vcs),
-	       .offset(packet_class*num_vcs_per_class))
-	   allocated_ovc_alg
-	     (.data_in(vc_allocated_ocvc_q),
-	      .dest_in({num_vcs{1'b0}}),
-	      .data_out(allocated_ovc));
-	   
-	end
-      else
-	begin
-	   
-	   c_align
-	     #(.in_width(2*num_vcs_per_class),
-	       .out_width(num_vcs),
-	       .offset(packet_class*num_vcs_per_class))
-	   allocated_ovc_alg
-	     (.data_in({{num_vcs_per_class{~inc_rc}} & 
-			vc_allocated_ocvc_q,
-			{num_vcs_per_class{inc_rc}} & 
-			vc_allocated_ocvc_q}),
-	      .dest_in({num_vcs{1'b0}}),
-	      .data_out(allocated_ovc));
-	   
-	end
-      
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	assign flit_sent = sw_gnt_nonspec;
       else
 	assign flit_sent = (vc_gnt & sw_gnt_spec) | sw_gnt_nonspec;
       
    endgenerate
+   
+   c_align
+     #(.in_width(2*num_vcs_per_class),
+       .out_width(num_vcs),
+       .offset(packet_class*num_vcs_per_class))
+   allocated_ovc_alg
+     (.data_in({{num_vcs_per_class{~inc_rc}} & 
+		vc_allocated_ocvc_q,
+		{num_vcs_per_class{inc_rc}} & 
+		vc_allocated_ocvc_q}),
+      .dest_in({num_vcs{1'b0}}),
+      .data_out(allocated_ovc));
    
    
    //---------------------------------------------------------------------------
