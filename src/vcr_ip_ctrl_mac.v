@@ -110,9 +110,9 @@ module vcr_ip_ctrl_mac
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // width required for lookahead routing information
-   localparam la_route_info_width
-     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
+   // width required for routing information for a single hop
+   localparam hop_route_info_width
+     = (port_idx_width + ((num_resource_classes > 1) ? 1 : 0));
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -132,14 +132,6 @@ module vcr_ip_ctrl_mac
    // total number of bits required for storing routing information
    localparam route_info_width
      = num_resource_classes * router_addr_width + node_addr_width;
-   
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
-       -1;
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -163,6 +155,21 @@ module vcr_ip_ctrl_mac
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
    parameter restrict_turns = 1;
+   
+   // enable lookahead routing
+   parameter lookahead_routing = 1;
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = lookahead_routing ? hop_route_info_width : 0;
+   
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
@@ -589,9 +596,9 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 		flit_head_ivc;
    wire [0:num_vcs-1] 		flit_tail_ivc;
    wire [0:num_vcs*num_ports-1] route_ivc_op;
-   wire [0:num_vcs*la_route_info_width-1] la_route_info_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 	  fbc_write_addr_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 	  fbc_read_addr_ivc;
+   wire [0:num_vcs*header_info_width-1] header_info_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 	fbc_write_addr_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 	fbc_read_addr_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_write_offset_ivc;
    wire [0:num_vcs*flit_buffer_idx_width-1] fbc_read_offset_ivc;
    wire [0:num_vcs-1] 			    fbc_empty_ivc;
@@ -635,16 +642,16 @@ module vcr_ip_ctrl_mac
 	   wire 		     sw_req_spec;	   
 	   wire 		     flit_head;
 	   wire 		     flit_tail;
-	   wire [0:la_route_info_width-1] la_route_info;
-	   wire [0:fbf_addr_width-1] 	  fbc_write_addr;
-	   wire [0:fbf_addr_width-1] 	  fbc_read_addr;
-	   wire 			  fbc_empty;
-	   wire 			  allocated;
-	   wire [0:num_vcs-1] 		  allocated_ovc;
-	   wire 			  free_unallocated;
-	   wire 			  free_allocated;
-	   wire [0:6] 			  ivcc_errors;
-	   wire [0:7] 			  events;
+	   wire [0:header_info_width-1] header_info_out;
+	   wire [0:fbf_addr_width-1] 	fbc_write_addr;
+	   wire [0:fbf_addr_width-1] 	fbc_read_addr;
+	   wire 			fbc_empty;
+	   wire 			allocated;
+	   wire [0:num_vcs-1] 		allocated_ovc;
+	   wire 			free_unallocated;
+	   wire 			free_allocated;
+	   wire [0:6] 			ivcc_errors;
+	   wire [0:7] 			events;
 	   vcr_ivc_ctrl
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -660,6 +667,7 @@ module vcr_ip_ctrl_mac
 	       .min_payload_length(min_payload_length),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
+	       .lookahead_routing(lookahead_routing),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
@@ -694,7 +702,7 @@ module vcr_ip_ctrl_mac
 	      .flit_sent_prev(flit_sent_prev),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
-	      .la_route_info(la_route_info),
+	      .header_info_out(header_info_out),
 	      .fbc_write_addr(fbc_write_addr),
 	      .fbc_read_addr(fbc_read_addr),
 	      .fbc_empty(fbc_empty),
@@ -715,23 +723,23 @@ module vcr_ip_ctrl_mac
 	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
 	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
-	   assign la_route_info_ivc[ivc*la_route_info_width:
-				    (ivc+1)*la_route_info_width-1]
-		    = la_route_info;
+	   assign header_info_ivc[ivc*header_info_width:
+				  (ivc+1)*header_info_width-1]
+	     = header_info_out;
 	   assign fbc_write_addr_ivc[ivc*fbf_addr_width:
 				     (ivc+1)*fbf_addr_width-1]
-		    = fbc_write_addr;
+	     = fbc_write_addr;
 	   assign fbc_read_addr_ivc[ivc*fbf_addr_width:
 				    (ivc+1)*fbf_addr_width-1]
-		    = fbc_read_addr;
+	     = fbc_read_addr;
 	   assign fbc_write_offset_ivc[ivc*flit_buffer_idx_width:
 				       (ivc+1)*flit_buffer_idx_width-1]
-		    = fbc_write_addr[fbf_addr_width-flit_buffer_idx_width:
-				     fbf_addr_width-1];
+	     = fbc_write_addr[fbf_addr_width-flit_buffer_idx_width:
+			      fbf_addr_width-1];
 	   assign fbc_read_offset_ivc[ivc*flit_buffer_idx_width:
 				      (ivc+1)*flit_buffer_idx_width-1]
-		    = fbc_read_addr[fbf_addr_width-flit_buffer_idx_width:
-				    fbf_addr_width-1];
+	     = fbc_read_addr[fbf_addr_width-flit_buffer_idx_width:
+			     fbf_addr_width-1];
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
@@ -1176,22 +1184,19 @@ module vcr_ip_ctrl_mac
    assign fbf_write_active = flit_valid_in;
    assign fbf_write_enable = flit_valid_in;
    
-   wire [0:la_route_info_width-1] la_route_info_in;
-   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
-   
-   wire [0:la_route_info_width-1] la_route_info_out;
+   wire [0:header_info_width-1] header_info_out;
    c_select_1ofn
      #(.num_ports(num_vcs),
-       .width(la_route_info_width))
-   la_route_info_out_sel
-     (.select(flit_valid_in_ivc),
-      .data_in(la_route_info_ivc),
-      .data_out(la_route_info_out));
+       .width(header_info_width))
+   header_info_out_sel
+     (.select(sel_in_ivc),
+      .data_in(header_info_ivc),
+      .data_out(header_info_out));
    
-   assign fbf_write_data[0:la_route_info_width-1]
-     = flit_head_in ? la_route_info_out : la_route_info_in;
-   assign fbf_write_data[la_route_info_width:flit_data_width-1]
-     = flit_data_in_q[la_route_info_width:flit_data_width-1];
+   assign fbf_write_data[0:header_info_width-1]
+     = flit_head_in ? header_info_out : header_info_in;
+   assign fbf_write_data[header_info_width:flit_data_width-1]
+     = flit_data_in_q[header_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------

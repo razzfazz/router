@@ -216,6 +216,7 @@ module testbench
 		    .max_payload_length(max_payload_length),
 		    .min_payload_length(min_payload_length),
 		    .flit_data_width(flit_data_width),
+		    .lookahead_routing(lookahead_routing),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
 		    .port_id(ip),
@@ -265,6 +266,7 @@ module testbench
        .error_capture_mode(error_capture_mode),
        .track_vcs_at_output(track_vcs_at_output),
        .restrict_turns(restrict_turns),
+       .lookahead_routing(lookahead_routing),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .int_flow_ctrl_type(int_flow_ctrl_type),
@@ -308,6 +310,7 @@ module testbench
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
+       .lookahead_routing(lookahead_routing),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .reset_type(reset_type))

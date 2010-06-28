@@ -117,10 +117,6 @@ module tc_node_mac
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // width required for lookahead routing information
-   localparam la_route_info_width
-     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -146,14 +142,6 @@ module tc_node_mac
    localparam route_info_width
      = num_resource_classes * router_addr_width + node_addr_width;
    
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
-       -1;
-   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -173,6 +161,23 @@ module tc_node_mac
    
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   
+   // enable lookahead routing
+   parameter lookahead_routing = 1;
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = lookahead_routing ? 
+       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
+       0;
+   
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
@@ -1348,18 +1353,23 @@ module tc_node_mac
      (.data_in(route_op_rv),
       .data_out(route_port_rv));
    
-   wire [0:la_route_info_width-1] 	     la_route_info_rv;
-   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
-   
    generate
       
-      if(num_resource_classes > 1)
-	assign la_route_info_rv[port_idx_width] = inc_rc_rv;
+      if(lookahead_routing)
+	begin
+	   
+	   wire [0:la_route_info_width-1] la_route_info_rv;
+	   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
+	   
+	   if(num_resource_classes > 1)
+	     assign la_route_info_rv[port_idx_width] = inc_rc_rv;
+	   
+	   assign header_info_rv[0:la_route_info_width-1]
+	     = la_route_info_rv;
+	   
+	end
       
    endgenerate
-   
-   assign header_info_rv[0:la_route_info_width-1]
-	    = la_route_info_rv;
    
    
    //---------------------------------------------------------------------------

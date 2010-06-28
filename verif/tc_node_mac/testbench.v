@@ -97,7 +97,9 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
+     = lookahead_routing ? 
+       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
+       0;
    
    // total number of bits required for storing routing information
    localparam route_info_width
@@ -260,6 +262,7 @@ module testbench
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
+       .lookahead_routing(lookahead_routing),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),

@@ -90,6 +90,9 @@ parameter track_vcs_at_output = 0;
 // such turns)
 parameter restrict_turns = 0;
 
+// enable lookahead routing
+parameter lookahead_routing = 1;
+
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_DOR;
 

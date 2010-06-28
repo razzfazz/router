@@ -88,8 +88,8 @@ module whr_ip_ctrl_mac
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width;
+   // width required for routing information for a single hop
+   localparam hop_route_info_width = port_idx_width;
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
@@ -115,14 +115,6 @@ module whr_ip_ctrl_mac
    // total number of bits required for storing routing information
    localparam route_info_width = addr_width;
    
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
-       -1;
-   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -141,6 +133,21 @@ module whr_ip_ctrl_mac
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
    parameter restrict_turns = 1;
+   
+   // enable lookahead routing
+   parameter lookahead_routing = 1;
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = lookahead_routing ? hop_route_info_width : 0;
+   
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
@@ -400,62 +407,117 @@ module whr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // update lookahead routing information
+   // routing
    //---------------------------------------------------------------------------
    
-   wire [0:la_route_info_width-1] 	    la_route_info_in;
-   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
-   
-   wire [0:port_idx_width-1] 		    la_route_port;
-   assign la_route_port = la_route_info_in[0:port_idx_width-1];
-   
-   wire [0:route_info_width-1] 		    route_info_in;
+   wire [0:route_info_width-1] 	route_info_in;
    assign route_info_in
      = header_info_in[la_route_info_width:
 		      la_route_info_width+route_info_width-1];
    
-   wire [0:router_addr_width-1] 	    next_router_address;
-   rtr_next_hop_addr
-     #(.num_resource_classes(1),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_dimensions(num_dimensions),
-       .num_nodes_per_router(num_nodes_per_router),
-       .connectivity(connectivity))
-   nha
-     (.router_address(router_address),
-      .route_port(la_route_port),
-      .sel_rc(1'b1),
-      .route_info(route_info_in),
-      .next_router_address(next_router_address));
+   wire [0:hop_route_info_width-1] hop_route_info;
+   wire [0:num_ports-1] 	   hop_route_op;
+   wire [0:port_idx_width-1] 	   hop_route_port;
+   wire [0:header_info_width-1]    header_info_out;
    
-   wire [0:num_ports-1] 		    next_route_op;
-   wire 				    next_inc_rc;
-   rtr_routing_logic
-     #(.num_message_classes(1),
-       .num_resource_classes(1),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_dimensions(num_dimensions),
-       .num_nodes_per_router(num_nodes_per_router),
-       .connectivity(connectivity),
-       .routing_type(routing_type),
-       .dim_order(dim_order))
-   rtl
-     (.router_address(next_router_address),
-      .sel_mc(1'b1),
-      .sel_rc(1'b1),
-      .route_info(route_info_in),
-      .route_op(next_route_op),
-      .inc_rc(next_inc_rc));
+   generate
+      
+      if(lookahead_routing)
+	begin
+	   
+	   wire [0:la_route_info_width-1] la_route_info_in;
+	   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
+	   
+	   assign hop_route_info = la_route_info_in;
+	   assign hop_route_port = la_route_info_in[0:port_idx_width-1];
+	   
+	   c_decode
+	     #(.num_ports(num_ports))
+	   hop_route_op_dec
+	     (.data_in(hop_route_port),
+	      .data_out(hop_route_op));
+	   
+	   wire [0:router_addr_width-1]   next_router_address;
+	   rtr_next_hop_addr
+	     #(.num_resource_classes(1),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity))
+	   nha
+	     (.router_address(router_address),
+	      .route_port(hop_route_port),
+	      .sel_rc(1'b1),
+	      .route_info(route_info_in),
+	      .next_router_address(next_router_address));
+	   
+	   wire [0:num_ports-1] 	  next_route_op;
+	   wire 			  next_inc_rc;
+	   rtr_routing_logic
+	     #(.num_message_classes(1),
+	       .num_resource_classes(1),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order))
+	   rtl
+	     (.router_address(next_router_address),
+	      .sel_mc(1'b1),
+	      .sel_rc(1'b1),
+	      .route_info(route_info_in),
+	      .route_op(next_route_op),
+	      .inc_rc(next_inc_rc));
+	   
+	   wire [0:port_idx_width-1] 	  next_route_port;
+	c_encode
+	  #(.num_ports(num_ports))
+	   next_route_port_enc
+	     (.data_in(next_route_op),
+	      .data_out(next_route_port));
+	   
+	   wire [0:la_route_info_width-1] la_route_info_out;
+	   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
+	   
+	   assign header_info_out[0:la_route_info_width-1] = la_route_info_out;
+	   
+	end
+      else
+	begin
+	   
+	   wire inc_rc;
+	   rtr_routing_logic
+	     #(.num_message_classes(1),
+	       .num_resource_classes(1),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order))
+	   rtl
+	     (.router_address(router_address),
+	      .sel_mc(1'b1),
+	      .sel_rc(1'b1),
+	      .route_info(route_info_in),
+	      .route_op(hop_route_op),
+	      .inc_rc(inc_rc));
+	   
+	   c_encode
+	     #(.num_ports(num_ports))
+	   hop_route_port_enc
+	     (.data_in(hop_route_op),
+	      .data_out(hop_route_port));
+	   
+	   assign hop_route_info[0:port_idx_width-1] = hop_route_port;
+	   
+	end
+      
+   endgenerate
    
-   wire [0:port_idx_width-1] 		    next_route_port;
-   c_encode
-     #(.num_ports(num_ports))
-   next_route_port_enc
-     (.data_in(next_route_op),
-      .data_out(next_route_port));
-   
-   wire [0:la_route_info_width-1] 	    la_route_info_out;
-   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
+   assign header_info_out[la_route_info_width:header_info_width-1]
+     = header_info_in[la_route_info_width:header_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -562,7 +624,7 @@ module whr_ip_ctrl_mac
    assign hdff_pop = flit_valid_out & flit_tail_out;
    
    wire 			     hdff_empty;
-   wire [0:la_route_info_width-1]    hdff_la_route_info;
+   wire [0:hop_route_info_width-1]   hdff_hop_route_info;
    wire 			     error_hdff_underflow;
    wire 			     error_hdff_overflow;
    
@@ -571,18 +633,18 @@ module whr_ip_ctrl_mac
       if(num_header_buffers > 1)
 	begin
 	   
-	   wire [0:la_route_info_width-1] hdff_write_data;
-	   assign hdff_write_data = la_route_info_in;
+	   wire [0:hop_route_info_width-1] hdff_write_data;
+	   assign hdff_write_data = hop_route_info;
 	   
-	   wire 			  hdff_almost_full;
-	   wire 			  hdff_full;
-	   wire 			  hdff_almost_empty;
-	   wire [0:la_route_info_width-1] hdff_read_data;
-	   wire [0:la_route_info_width-1] hdff_peek_data;
-	   wire [0:1] 			  hdff_errors;
+	   wire 			   hdff_almost_full;
+	   wire 			   hdff_full;
+	   wire 			   hdff_almost_empty;
+	   wire [0:hop_route_info_width-1] hdff_read_data;
+	   wire [0:hop_route_info_width-1] hdff_peek_data;
+	   wire [0:1] 			   hdff_errors;
 	   c_fifo
 	     #(.depth(num_header_buffers),
-	       .width(la_route_info_width),
+	       .width(hop_route_info_width),
 	       .fifo_type(header_fifo_type),
 	       .reset_type(reset_type))
 	   hdff
@@ -600,8 +662,7 @@ module whr_ip_ctrl_mac
 	      .peek_data(hdff_peek_data),
 	      .errors(hdff_errors));
 	   
-	   assign hdff_la_route_info
-	     = hdff_empty ? la_route_info_in : hdff_read_data;
+	   assign hdff_hop_route_info = hdff_read_data;
 	   
 	   assign error_hdff_underflow = hdff_errors[0];
 	   assign error_hdff_overflow = hdff_errors[1];
@@ -610,24 +671,23 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   
-	   wire [0:la_route_info_width-1] hdff_la_route_info_s,
-					  hdff_la_route_info_q;
-	   assign hdff_la_route_info_s
-	     = flit_head_in ? la_route_info_in : hdff_la_route_info_q;
+	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
+	   wire [0:hop_route_info_width-1] hdff_hop_route_info_q;
+	   assign hdff_hop_route_info_s
+	     = flit_head_in ? hop_route_info : hdff_hop_route_info_q;
 	   c_dff
-	     #(.width(la_route_info_width),
+	     #(.width(hop_route_info_width),
 	       .reset_type(reset_type))
-	   hdff_la_route_infoq
+	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
 	      .active(buffer_in_active),
-	      .d(hdff_la_route_info_s),
-	      .q(hdff_la_route_info_q));
+	      .d(hdff_hop_route_info_s),
+	      .q(hdff_hop_route_info_q));
 	   
-	   assign hdff_la_route_info
-	     = hdff_empty ? la_route_info_in : hdff_la_route_info_q;
+	   assign hdff_hop_route_info = hdff_hop_route_info_q;
 	   
-	   wire 			  hdff_empty_s, hdff_empty_q;
+	   wire 		     hdff_empty_s, hdff_empty_q;
 	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) & 
 				 ~(hdff_push & ~hdff_pop);
 	   c_dff
@@ -661,15 +721,18 @@ module whr_ip_ctrl_mac
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 		  route_port;
-   assign route_port = hdff_la_route_info[0:port_idx_width-1];
+   wire [0:port_idx_width-1] 		  hdff_route_port;
+   assign hdff_route_port = hdff_hop_route_info[0:port_idx_width-1];
    
-   wire [0:num_ports-1] 		  route_unmasked_op;
+   wire [0:num_ports-1] 		  hdff_route_op;
    c_decode
      #(.num_ports(num_ports))
-   route_unmasked_op_dec
-     (.data_in(route_port),
-      .data_out(route_unmasked_op));
+   hdff_route_op_dec
+     (.data_in(hdff_route_port),
+      .data_out(hdff_route_op));
+   
+   wire [0:num_ports-1] 		  route_unmasked_op;
+   assign route_unmasked_op = hdff_empty ? hop_route_op : hdff_route_op;
    
    wire [0:num_ports-1] 		  route_op;
    wire 				  pf_error;
@@ -685,7 +748,7 @@ module whr_ip_ctrl_mac
        .port_id(port_id),
        .message_class(0),
        .resource_class(0))
-   route_op_pf
+   pf
      (.route_in_op(route_unmasked_op),
       .inc_rc(1'b0),
       .route_out_op(route_op),
@@ -741,10 +804,10 @@ module whr_ip_ctrl_mac
    assign fbf_write_addr = fbc_write_addr;
    
    // multiplex in updated lookahead routingo info for head flits
-   assign fbf_write_data[0:la_route_info_width-1]
-     = flit_head_in ? la_route_info_out : la_route_info_in;
-   assign fbf_write_data[la_route_info_width:flit_data_width-1]
-     = flit_data_in_q[la_route_info_width:flit_data_width-1];
+   assign fbf_write_data[0:header_info_width-1]
+     = flit_head_in ? header_info_out : header_info_in;
+   assign fbf_write_data[header_info_width:flit_data_width-1]
+     = flit_data_in_q[header_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------

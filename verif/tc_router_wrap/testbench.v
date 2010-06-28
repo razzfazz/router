@@ -97,7 +97,9 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = port_idx_width + ((num_resource_classes > 1) ? 1 : 0);
+     = lookahead_routing ? 
+       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
+       0;
    
    // total number of bits required for storing routing information
    localparam route_info_width
@@ -107,9 +109,6 @@ module testbench
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
    
-   // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length);
-   
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -117,6 +116,9 @@ module testbench
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
+   
+   // width of counter for remaining flits
+   localparam flit_ctr_width = clogb(max_payload_length);
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -227,6 +229,7 @@ module testbench
        .error_capture_mode(error_capture_mode),
        .track_vcs_at_output(track_vcs_at_output),
        .restrict_turns(restrict_turns),
+       .lookahead_routing(lookahead_routing),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .int_flow_ctrl_type(int_flow_ctrl_type),
