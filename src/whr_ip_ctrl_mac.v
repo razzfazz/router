@@ -33,9 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module whr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, req_op, req_head, 
-   req_tail, gnt_op, xbr_active, flit_data_out, flow_ctrl_out, 
-   fbf_write_active, fbf_write_enable, fbf_write_addr, fbf_write_data, 
-   fbf_read_active, fbf_read_enable, fbf_read_addr, fbf_read_data, error);
+   req_tail, gnt_op, xbr_active, flit_data_out, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -168,6 +166,9 @@ module whr_ip_ctrl_mac
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -220,37 +221,6 @@ module whr_ip_ctrl_mac
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
-   
-   // enable flit buffer storage cell clocks
-   output fbf_write_active;
-   wire 			  fbf_write_active;
-   
-   // flit buffer write enable
-   output fbf_write_enable;
-   wire 			  fbf_write_enable;
-   
-   // flit buffer write address
-   output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
-   
-   // flit buffer write data
-   output [0:flit_data_width-1] fbf_write_data;
-   wire [0:flit_data_width-1] 	  fbf_write_data;
-   
-   // enable flit buffer read address register clocks
-   output fbf_read_active;
-   wire 			  fbf_read_active;
-   
-   // flit buffer read enable
-   output fbf_read_enable;
-   wire 			  fbf_read_enable;
-   
-   // flit buffer read address
-   output [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-   
-   // flit buffer read data
-   input [0:flit_data_width-1] fbf_read_data;
    
    // internal error condition detected
    output error;
@@ -796,18 +766,55 @@ module whr_ip_ctrl_mac
    wire 		     error_fbc_overflow;
    assign error_fbc_overflow = fbc_errors[1];
    
-   assign fbf_read_active = flit_valid;
-   assign fbf_read_enable = flit_valid_out;
-   assign fbf_read_addr = fbc_read_addr;
-   assign fbf_write_active = flit_valid_thru;
+   
+   //---------------------------------------------------------------------------
+   // flit buffer
+   //---------------------------------------------------------------------------
+   
+   wire 		     fbf_write_enable;
    assign fbf_write_enable = flit_valid_thru;
-   assign fbf_write_addr = fbc_write_addr;
+   
    
    // multiplex in updated lookahead routingo info for head flits
+   
+   wire [0:flit_data_width-1] fbf_write_data;
    assign fbf_write_data[0:header_info_width-1]
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in_q[header_info_width:flit_data_width-1];
+   
+   
+   // flit buffer read address is delayed by one cycle so flit data and
+   // allocator grants line up
+   
+   wire [0:fbf_addr_width-1] 	  fbf_read_addr_s, fbf_read_addr_q;
+   assign fbf_read_addr_s = flit_valid_out ? fbc_read_addr : fbf_read_addr_q;
+   c_dff
+     #(.width(fbf_addr_width),
+       .reset_type(reset_type))
+   fbf_read_addrq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(flags_active),
+      .d(fbf_read_addr_s),
+      .q(fbf_read_addr_q));
+   
+   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+   assign fbf_read_addr = fbf_read_addr_q;
+   
+   wire [0:flit_data_width-1] 	  fbf_read_data;
+   c_regfile
+     #(.depty(fbf_depth),
+       .width(flit_data_width),
+       .regfile_type(fbf_regfile_type))
+   fbf
+     (.clk(clk),
+      .active(buffer_in_active),
+      .write_enable(fbf_write_enable),
+      .write_address(fbc_write_addr),
+      .write_data(fbf_write_data),
+      .read_address(fbf_read_addr),
+      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------

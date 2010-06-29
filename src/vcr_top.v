@@ -176,12 +176,6 @@ module vcr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flit_buffers;
-   
-   // required address size for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
-   
    // select implementation variant for VC allocator
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
@@ -498,14 +492,6 @@ module vcr_top
 	   wire [0:int_flit_ctrl_width-1]    int_flit_ctrl_out;
 	   wire [0:flit_data_width-1] 	     flit_data_out;
 	   wire [0:flow_ctrl_width-1] 	     flow_ctrl_out;
-	   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
-	   wire 			     fbf_write_active;
-	   wire 			     fbf_write_enable;
-	   wire [0:flit_data_width-1] 	     fbf_write_data;
-	   wire [0:fbf_addr_width-1] 	     fbf_read_addr;
-	   wire 			     fbf_read_active;
-	   wire 			     fbf_read_enable;
-	   wire [0:flit_data_width-1] 	     fbf_read_data;
 	   wire 			     ipc_error;
 	   vcr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
@@ -529,6 +515,7 @@ module vcr_top
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),
 	       .header_fifo_type(header_fifo_type),
+	       .fbf_regfile_type(fbf_regfile_type),
 	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_type(sw_alloc_type),
@@ -556,32 +543,7 @@ module vcr_top
 	      .int_flit_ctrl_out(int_flit_ctrl_out),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
-	      .fbf_write_addr(fbf_write_addr),
-	      .fbf_write_active(fbf_write_active),
-	      .fbf_write_enable(fbf_write_enable),
-	      .fbf_write_data(fbf_write_data),
-	      .fbf_read_addr(fbf_read_addr),
-	      .fbf_read_active(fbf_read_active),
-	      .fbf_read_enable(fbf_read_enable),
-	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
-	   
-	   c_pseudo_sram_mac
-	     #(.width(flit_data_width),
-	       .depth(fbf_depth),
-	       .regfile_type(fbf_regfile_type),
-	       .reset_type(reset_type))
-	   fbf
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .write_active(fbf_write_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_active(fbf_read_active),
-	      .read_enable(fbf_read_enable),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
 	   
 	   assign route_port_ip_ivc[ip*num_vcs*port_idx_width:
 				    (ip+1)*num_vcs*port_idx_width-1]

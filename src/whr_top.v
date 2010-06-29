@@ -135,13 +135,6 @@ module whr_top
    // use input register as part of the flit buffer
    parameter input_stage_can_hold = 0;
    
-   // number of entries in flit buffer
-   localparam fbf_depth
-     = input_stage_can_hold ? (num_flit_buffers - 1) : num_flit_buffers;
-   
-   // required address size for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
-   
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -227,17 +220,9 @@ module whr_top
 	   wire                       req_head;
 	   wire                       req_tail;
 	   wire 		      xbr_active;
-	   wire [0:flit_data_width-1] 	  flit_data_out;
-	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
-	   wire 			  fbf_write_active;
-	   wire 			  fbf_write_enable;
-	   wire [0:fbf_addr_width-1] 	  fbf_write_addr;
-	   wire [0:flit_data_width-1] 	  fbf_write_data;
-	   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-	   wire 			  fbf_read_active;
-	   wire 			  fbf_read_enable;
-	   wire [0:flit_data_width-1] 	  fbf_read_data;
-	   wire 			  ipc_error;
+	   wire [0:flit_data_width-1] flit_data_out;
+	   wire [0:flow_ctrl_width-1] flow_ctrl_out;
+	   wire 		      ipc_error;
 	   whr_ip_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -255,6 +240,7 @@ module whr_top
 	       .dim_order(dim_order),
 	       .header_fifo_type(header_fifo_type),
 	       .input_stage_can_hold(input_stage_can_hold),
+	       .fbf_regfile_type(fbf_regfile_type),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .error_capture_mode(error_capture_mode),
@@ -273,32 +259,7 @@ module whr_top
 	      .xbr_active(xbr_active),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
-	      .fbf_write_active(fbf_write_active),
-	      .fbf_write_enable(fbf_write_enable),
-	      .fbf_write_addr(fbf_write_addr),
-	      .fbf_write_data(fbf_write_data),
-	      .fbf_read_active(fbf_read_active),
-	      .fbf_read_enable(fbf_read_enable),
-	      .fbf_read_addr(fbf_read_addr),
-	      .fbf_read_data(fbf_read_data),
 	      .error(ipc_error));
-	   
-	   c_pseudo_sram_mac
-	     #(.width(flit_data_width),
-	       .depth(fbf_depth),
-	       .regfile_type(fbf_regfile_type),
-	       .reset_type(reset_type))
-	   fbf
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .write_active(fbf_write_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_active(fbf_read_active),
-	      .read_enable(fbf_read_enable),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
 	   
 	   assign req_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req_op;
 	   assign req_head_ip[ip] = req_head;

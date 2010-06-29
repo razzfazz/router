@@ -35,8 +35,7 @@ module vcr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, route_port_ivc, 
    inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_alloc_out_op, 
    sw_alloc_in_op, xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
-   fbf_write_addr, fbf_write_active, fbf_write_enable, fbf_write_data, 
-   fbf_read_active, fbf_read_enable, fbf_read_addr, fbf_read_data, error);
+   error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -199,6 +198,9 @@ module vcr_ip_ctrl_mac
    // select implementation variant for header FIFO
    parameter header_fifo_type = `FIFO_TYPE_INDEXED;
    
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // number of entries in flit buffer
    localparam fbf_depth = num_vcs*num_flit_buffers;
    
@@ -320,37 +322,6 @@ module vcr_ip_ctrl_mac
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
-   
-   // flit buffer write address
-   output [0:fbf_addr_width-1] fbf_write_addr;
-   wire [0:fbf_addr_width-1] 		   fbf_write_addr;
-   
-   // enable flit buffer storage cell clocks
-   output fbf_write_active;
-   wire 				   fbf_write_active;
-   
-   // flit buffer write enable
-   output fbf_write_enable;
-   wire 				   fbf_write_enable;
-   
-   // flit buffer write data
-   output [0:flit_data_width-1] fbf_write_data;
-   wire [0:flit_data_width-1] 		   fbf_write_data;
-   
-   // enable flit buffer read address register clocks
-   output fbf_read_active;
-   wire 				   fbf_read_active;
-   
-   // flit buffer read enable
-   output fbf_read_enable;
-   wire 				   fbf_read_enable;
-   
-   // flit buffer read address
-   output [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:fbf_addr_width-1] 		   fbf_read_addr;
-   
-   // flit buffer read data
-   input [0:flit_data_width-1] fbf_read_data;
    
    // internal error condition detected
    output error;
@@ -1108,6 +1079,9 @@ module vcr_ip_ctrl_mac
    // flit buffer control signals
    //---------------------------------------------------------------------------
    
+   wire [0:fbf_addr_width-1] fbc_write_addr;
+   wire [0:fbf_addr_width-1] fbc_read_addr;
+   
    generate
       
       if(num_vcs > 1)
@@ -1120,33 +1094,33 @@ module vcr_ip_ctrl_mac
 	   if(num_flit_buffers == (1 << flit_buffer_idx_width))
 	     begin
 		
-		wire [0:flit_buffer_idx_width-1] fbf_write_offset;
-		assign fbf_write_offset
+		wire [0:flit_buffer_idx_width-1] fbc_write_offset;
+		assign fbc_write_offset
 		  = fbc_write_offset_ivc[flit_vc_in_q*flit_buffer_idx_width +:
 					 flit_buffer_idx_width];
 		
-		wire [0:vc_idx_width-1] 	 fbf_write_base;
-		assign fbf_write_base = flit_vc_in_q;
+		wire [0:vc_idx_width-1] 	 fbc_write_base;
+		assign fbc_write_base = flit_vc_in_q;
 		
-		assign fbf_write_addr = {fbf_write_base, fbf_write_offset};
+		assign fbc_write_addr = {fbc_write_base, fbc_write_offset};
 		
-		wire [0:flit_buffer_idx_width-1] fbf_read_offset;
+		wire [0:flit_buffer_idx_width-1] fbc_read_offset;
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_buffer_idx_width))
-		fbf_read_offset_sel
+		fbc_read_offset_sel
 		  (.select(vc_sel_ivc),
 		   .data_in(fbc_read_offset_ivc),
-		   .data_out(fbf_read_offset));
+		   .data_out(fbc_read_offset));
 		
-		wire [0:vc_idx_width-1] 	 fbf_read_base;
+		wire [0:vc_idx_width-1] 	 fbc_read_base;
 		c_encode
 		  #(.num_ports(num_vcs))
-		fbf_read_base_enc
+		fbc_read_base_enc
 		  (.data_in(vc_sel_ivc),
-		   .data_out(fbf_read_base));
+		   .data_out(fbc_read_base));
 		
-		assign fbf_read_addr = {fbf_read_base, fbf_read_offset};
+		assign fbc_read_addr = {fbc_read_base, fbc_read_offset};
 		
 	     end
 	   
@@ -1154,17 +1128,17 @@ module vcr_ip_ctrl_mac
 	   else
 	     begin
 		
-		assign fbf_write_addr
+		assign fbc_write_addr
 		  = fbc_write_addr_ivc[flit_vc_in_q*fbf_addr_width +:
 				       fbf_addr_width];
 		
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(fbf_addr_width))
-		fbf_read_addr_sel
+		fbc_read_addr_sel
 		  (.select(vc_sel_ivc),
 		   .data_in(fbc_read_addr_ivc),
-		   .data_out(fbf_read_addr));
+		   .data_out(fbc_read_addr));
 		
 	     end
 	   
@@ -1173,16 +1147,29 @@ module vcr_ip_ctrl_mac
       // if we only have a single VC, just use the address as is
       else
 	begin
-	   assign fbf_write_addr = fbc_write_addr_ivc;
-	   assign fbf_read_addr = fbc_read_addr_ivc;
+	   assign fbc_write_addr = fbc_write_addr_ivc;
+	   assign fbc_read_addr = fbc_read_addr_ivc;
 	end
       
    endgenerate
    
-   assign fbf_read_active = flit_valid;
-   assign fbf_read_enable = flit_sent;
-   assign fbf_write_active = flit_valid_in;
-   assign fbf_write_enable = flit_valid_in;
+   wire [0:fbf_addr_width-1] fbf_write_addr;
+   assign fbf_write_addr = fbc_write_addr;
+   
+   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+   assign fbf_read_addr_s = flit_sent ? fbc_read_addr : fbf_read_addr_q;
+   c_dff
+     #(.width(fbf_addr_width),
+       .reset_type(reset_type))
+   fbf_read_addrq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(fbf_read_addr_s),
+      .q(fbf_read_addr_q));
+   
+   wire [0:fbf_addr_width-1] fbf_read_addr;
+   assign fbf_read_addr = fbf_read_addr_q;
    
    wire [0:header_info_width-1] header_info_out;
    c_select_1ofn
@@ -1193,10 +1180,28 @@ module vcr_ip_ctrl_mac
       .data_in(header_info_ivc),
       .data_out(header_info_out));
    
+   wire [0:flit_data_width-1] 	fbf_write_data;
    assign fbf_write_data[0:header_info_width-1]
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in_q[header_info_width:flit_data_width-1];
+   
+   wire 			fbf_write_enable;
+   assign fbf_write_enable = flit_valid_in;
+   
+   wire [0:flit_data_width-1] 	fbf_read_data;
+   c_regfile
+     #(.depth(fbf_depth),
+       .width(flit_data_width),
+       .regfile_type(fbf_regfile_type))
+   fbf
+     (.clk(clk),
+      .active(buffer_in_active),
+      .write_enable(fbf_write_enable),
+      .write_address(fbf_write_addr),
+      .write_data(fbf_write_data),
+      .read_address(fbf_read_addr),
+      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------
