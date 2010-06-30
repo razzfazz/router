@@ -111,6 +111,9 @@ parameter input_stage_can_hold = 0;
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_LAT_1D_MUX;
 
+// use explicit pipeline register between flit buffer and crossbar?
+parameter explicit_pipeline_register = 0;
+
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 

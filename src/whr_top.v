@@ -138,6 +138,9 @@ module whr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // use explicit pipeline register between flit buffer and crossbar?
+   parameter explicit_pipeline_register = 0;
+   
    // select which arbiter type to use for switch allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -241,6 +244,7 @@ module whr_top
 	       .header_fifo_type(header_fifo_type),
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fbf_regfile_type(fbf_regfile_type),
+	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
 	       .error_capture_mode(error_capture_mode),

@@ -176,6 +176,9 @@ module vcr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // use explicit pipeline register between flit buffer and crossbar?
+   parameter explicit_pipeline_register = 0;
+   
    // select implementation variant for VC allocator
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
@@ -516,6 +519,7 @@ module vcr_top
 	       .cred_level_width(cred_level_width),
 	       .header_fifo_type(header_fifo_type),
 	       .fbf_regfile_type(fbf_regfile_type),
+	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_type(sw_alloc_type),

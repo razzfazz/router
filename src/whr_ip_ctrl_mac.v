@@ -169,6 +169,9 @@ module whr_ip_ctrl_mac
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // use explicit pipeline register between flit buffer and crossbar?
+   parameter explicit_pipeline_register = 0;
+   
    // enable performance counter
    parameter perf_ctr_enable = 1;
    
@@ -732,15 +735,15 @@ module whr_ip_ctrl_mac
    // flit buffer control
    //---------------------------------------------------------------------------
    
-   wire 		     fbc_push;
+   wire 				  fbc_push;
    assign fbc_push = flit_valid_thru;
    
-   wire 		     fbc_pop;
+   wire 				  fbc_pop;
    assign fbc_pop = flit_valid_out;
-
-   wire [0:fbf_addr_width-1] fbc_peek_addr;
-   wire 		     fbc_full;
-   wire [0:1]		     fbc_errors;
+   
+   wire [0:fbf_addr_width-1] 		  fbc_peek_addr;
+   wire 				  fbc_full;
+   wire [0:1] 				  fbc_errors;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .depth(fbf_depth),
@@ -771,9 +774,6 @@ module whr_ip_ctrl_mac
    // flit buffer
    //---------------------------------------------------------------------------
    
-   wire 		     fbf_write_enable;
-   assign fbf_write_enable = flit_valid_thru;
-   
    
    // multiplex in updated lookahead routingo info for head flits
    
@@ -783,28 +783,75 @@ module whr_ip_ctrl_mac
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in_q[header_info_width:flit_data_width-1];
    
+   wire 		      fbf_write_enable;
+   wire [0:fbf_addr_width-1]  fbf_read_addr;
+   wire [0:flit_data_width-1] fbf_read_data;
    
-   // flit buffer read address is delayed by one cycle so flit data and
-   // allocator grants line up
+   generate
+      
+      if(explicit_pipeline_register)
+	begin
+	   
+	   wire fbf_bypass;
+	   assign fbf_bypass = fbc_empty;
+	   
+	   assign fbf_write_enable
+	     = flit_valid_thru & ~(fbf_bypass & flit_valid_out);
+	   
+	   assign fbf_read_addr = fbc_read_addr;
+	   
+	   wire [0:flit_data_width-1] flit_data_muxed;
+	   assign flit_data_muxed = fbf_bypass ? fbf_write_data : fbf_read_data;
+	   
+	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
+	   assign flit_data_s = flit_valid_out ? flit_data_muxed : flit_data_q;
+	   c_dff
+	     #(.width(flit_data_width),
+	       .reset_type(reset_type))
+	   flit_dataq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(flags_active),
+	      .d(flit_data_s),
+	      .q(flit_data_q));
+	   
+	   assign flit_data_out = flit_data_q;
+	   
+	end
+      else
+	begin
+	   
+	   assign fbf_write_enable = flit_valid_thru;
+	   
+	   
+	   // In the absence of an explicit pipeline register between flit 
+	   // buffer and crossbar, the read address is delayed by one clock 
+	   // cycle such as to line up the flit data read from the buffer with 
+	   // the crossbar control signals.
+	   
+	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+	   assign fbf_read_addr_s
+	     = flit_valid_out ? fbc_read_addr : fbf_read_addr_q;
+	   c_dff
+	     #(.width(fbf_addr_width),
+	       .reset_type(reset_type))
+	   fbf_read_addrq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(flags_active),
+	      .d(fbf_read_addr_s),
+	      .q(fbf_read_addr_q));
+	   
+	   assign fbf_read_addr = fbf_read_addr_q;
+	   
+	   assign flit_data_out = fbf_read_data;
+	   
+	end
+      
+   endgenerate
    
-   wire [0:fbf_addr_width-1] 	  fbf_read_addr_s, fbf_read_addr_q;
-   assign fbf_read_addr_s = flit_valid_out ? fbc_read_addr : fbf_read_addr_q;
-   c_dff
-     #(.width(fbf_addr_width),
-       .reset_type(reset_type))
-   fbf_read_addrq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(flags_active),
-      .d(fbf_read_addr_s),
-      .q(fbf_read_addr_q));
-   
-   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
-   assign fbf_read_addr = fbf_read_addr_q;
-   
-   wire [0:flit_data_width-1] 	  fbf_read_data;
    c_regfile
-     #(.depty(fbf_depth),
+     #(.depth(fbf_depth),
        .width(flit_data_width),
        .regfile_type(fbf_regfile_type))
    fbf
@@ -821,7 +868,7 @@ module whr_ip_ctrl_mac
    // generate control signals to switch allocator
    //---------------------------------------------------------------------------
    
-   wire                      req;
+   wire 			     req;
    assign req = flit_valid;
    
    assign req_op = {num_ports{req}} & route_op;
@@ -831,10 +878,9 @@ module whr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // generate signals to crossbar module
+   // generate control signals to crossbar module
    //---------------------------------------------------------------------------
    
-   assign flit_data_out = fbf_read_data;
    assign xbr_active = flit_valid;
    
    
