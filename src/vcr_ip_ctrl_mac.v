@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input port controller
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, flit_ctrl_in, flit_data_in, route_port_ivc, 
-   inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ovc, sw_alloc_out_op, 
+   inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_alloc_out_op, 
    sw_alloc_in_op, xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
    error);
    
@@ -280,55 +280,55 @@ module vcr_ip_ctrl_mac
    input [0:router_addr_width-1] router_address;
    
    // incoming flit control signals
-   input [0:flit_ctrl_width-1] flit_ctrl_in;
+   input [0:flit_ctrl_width-1] 	 flit_ctrl_in;
    
    // incoming flit data
-   input [0:flit_data_width-1] flit_data_in;
+   input [0:flit_data_width-1] 	 flit_data_in;
    
    // destination port
    output [0:num_vcs*port_idx_width-1] route_port_ivc;
-   wire [0:num_vcs*port_idx_width-1] route_port_ivc;
+   wire [0:num_vcs*port_idx_width-1]   route_port_ivc;
    
    // transition to next resource class
-   output [0:num_vcs-1] inc_rc_ivc;
-   wire [0:num_vcs-1] 		     inc_rc_ivc;
+   output [0:num_vcs-1] 	       inc_rc_ivc;
+   wire [0:num_vcs-1] 		       inc_rc_ivc;
    
    // request VC allocation
-   output [0:num_vcs-1] vc_req_ivc;
-   wire [0:num_vcs-1] 		     vc_req_ivc;
+   output [0:num_vcs-1] 	       vc_req_ivc;
+   wire [0:num_vcs-1] 		       vc_req_ivc;
    
    // VC allocation successful
-   input [0:num_vcs-1] vc_gnt_ivc;
+   input [0:num_vcs-1] 		       vc_gnt_ivc;
    
    // granted output VC
-   input [0:num_vcs*num_vcs-1] vc_gnt_ivc_ovc;
+   input [0:num_vcs*num_vcs_per_class-1] vc_gnt_ivc_ocvc;
    
    // outgoing allocator contorl signals
    output [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_op;
-   wire [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_op;
+   wire [0:num_ports*sw_alloc_out_width-1]   sw_alloc_out_op;
    
    // incoming allocator control signals
-   input [0:num_ports*sw_alloc_in_width-1] sw_alloc_in_op;
+   input [0:num_ports*sw_alloc_in_width-1]   sw_alloc_in_op;
    
    // crossbar enable signal
-   output xbr_active;
-   wire 				   xbr_active;
+   output 				     xbr_active;
+   wire 				     xbr_active;
    
    // outgoing flit control signals
-   output [0:int_flit_ctrl_width-1] int_flit_ctrl_out;
-   wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl_out;
+   output [0:int_flit_ctrl_width-1] 	     int_flit_ctrl_out;
+   wire [0:int_flit_ctrl_width-1] 	     int_flit_ctrl_out;
    
    // outgoing flit data
-   output [0:flit_data_width-1] flit_data_out;
-   wire [0:flit_data_width-1] 		   flit_data_out;
+   output [0:flit_data_width-1] 	     flit_data_out;
+   wire [0:flit_data_width-1] 		     flit_data_out;
    
    // outgoing flow control signals
-   output [0:flow_ctrl_width-1] flow_ctrl_out;
-   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
+   output [0:flow_ctrl_width-1] 	     flow_ctrl_out;
+   wire [0:flow_ctrl_width-1] 		     flow_ctrl_out;
    
    // internal error condition detected
-   output error;
-   wire 				   error;
+   output 				     error;
+   wire 				     error;
    
    
    //---------------------------------------------------------------------------
@@ -337,27 +337,27 @@ module vcr_ip_ctrl_mac
    
    // non-speculative switch allocation requests to output-side arbitration 
    // stage / wavefront block
-   wire [0:num_ports-1] 		   sw_oreq_nonspec_op;
+   wire [0:num_ports-1] 		     sw_oreq_nonspec_op;
    
    // speculative switch allocation requests to output-side arbitration stage or
    // wavefront block
-   wire [0:num_ports-1] 		   sw_oreq_spec_op;
+   wire [0:num_ports-1] 		     sw_oreq_spec_op;
    
    // non-speculative switch allocation grants from output-side arbitration 
    // stage / wavefront block
-   wire [0:num_ports-1] 		   sw_ognt_nonspec_op;
+   wire [0:num_ports-1] 		     sw_ognt_nonspec_op;
    
    // speculative switch allocation grants from output-side arbitration stage or
    // wavefront block
-   wire [0:num_ports-1] 		   sw_ognt_spec_op;
+   wire [0:num_ports-1] 		     sw_ognt_spec_op;
    
    // non-speculative switch allocation grants to output-side arbitration stage 
    // or wavefront block
-   wire [0:num_ports-1] 		   sw_ignt_nonspec_op;
+   wire [0:num_ports-1] 		     sw_ignt_nonspec_op;
    
    // speculative switch allocation grants to output-side arbitration stage or 
    // wavefront block
-   wire [0:num_ports-1] 		   sw_ignt_spec_op;
+   wire [0:num_ports-1] 		     sw_ignt_spec_op;
    
    // internal flow control signalling from output controller to input 
    // controllers
@@ -596,26 +596,27 @@ module vcr_ip_ctrl_mac
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ivc[ivc];
 	   
-	   wire [0:num_vcs-1] vc_gnt_ovc;
-	   assign vc_gnt_ovc = vc_gnt_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
+	   wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
+	   assign vc_gnt_ocvc = vc_gnt_ivc_ocvc[ivc*num_vcs_per_class:
+						(ivc+1)*num_vcs_per_class-1];
 	   
-	   wire 	      sw_gnt_nonspec;
+	   wire 			sw_gnt_nonspec;
 	   assign sw_gnt_nonspec = sw_gnt_nonspec_ivc[ivc];
 	   
-	   wire               sw_gnt_spec;
+	   wire 			sw_gnt_spec;
 	   assign sw_gnt_spec = sw_gnt_spec_ivc[ivc];
 	   
-	   wire 		     flit_sent_prev;
+	   wire 			flit_sent_prev;
 	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
 	   
-	   wire [0:num_ports-1] route_op;
-	   wire [0:port_idx_width-1] route_port;
-	   wire 		     inc_rc;
-	   wire 		     vc_req;
-	   wire 		     sw_req_nonspec;
-	   wire 		     sw_req_spec;	   
-	   wire 		     flit_head;
-	   wire 		     flit_tail;
+	   wire [0:num_ports-1] 	route_op;
+	   wire [0:port_idx_width-1] 	route_port;
+	   wire 			inc_rc;
+	   wire 			vc_req;
+	   wire 			sw_req_nonspec;
+	   wire 			sw_req_spec;	   
+	   wire 			flit_head;
+	   wire 			flit_tail;
 	   wire [0:header_info_width-1] header_info_out;
 	   wire [0:fbf_addr_width-1] 	fbc_write_addr;
 	   wire [0:fbf_addr_width-1] 	fbc_read_addr;
@@ -668,7 +669,7 @@ module vcr_ip_ctrl_mac
 	      .inc_rc(inc_rc),
 	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ovc(vc_gnt_ovc),
+	      .vc_gnt_ocvc(vc_gnt_ocvc),
 	      .sw_req_nonspec(sw_req_nonspec),
 	      .sw_req_spec(sw_req_spec),
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
@@ -717,7 +718,7 @@ module vcr_ip_ctrl_mac
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
-		    = allocated_ovc;
+	     = allocated_ovc;
 	   assign free_unallocated_ivc[ivc] = free_unallocated;
 	   assign free_allocated_ivc[ivc] = free_allocated;
 	   assign ivcc_errors_ivc[ivc*7:(ivc+1)*7-1] = ivcc_errors;
@@ -732,16 +733,16 @@ module vcr_ip_ctrl_mac
    // switch allocation
    //---------------------------------------------------------------------------
    
-   wire 				  flit_valid;
+   wire 				flit_valid;
    assign flit_valid = flit_valid_in | ~&fbc_empty_ivc;
    
-   wire 				  alloc_active;
+   wire 				alloc_active;
    assign alloc_active = flit_valid;
    
-   wire [0:num_vcs-1] 			  sw_req_nonspec_qual_ivc;
+   wire [0:num_vcs-1] 			sw_req_nonspec_qual_ivc;
    assign sw_req_nonspec_qual_ivc = sw_req_nonspec_ivc & free_allocated_ivc;
    
-   wire [0:num_vcs-1] 				    vc_sel_nonspec_ivc;
+   wire [0:num_vcs-1] 			vc_sel_nonspec_ivc;
    
    vcr_sw_alloc_ip
      #(.num_vcs(num_vcs),
@@ -768,12 +769,12 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    // any non-speculative grants?
-   wire 					    sw_ognt_nonspec;
+   wire 				sw_ognt_nonspec;
    assign sw_ognt_nonspec = |sw_ognt_nonspec_op;
    
-   wire [0:num_vcs-1] 				    vc_sel_spec_ivc;
-   wire [0:num_vcs-1] 				    vc_sel_ivc;
-   wire 					    flit_sent;
+   wire [0:num_vcs-1] 			vc_sel_spec_ivc;
+   wire [0:num_vcs-1] 			vc_sel_ivc;
+   wire 				flit_sent;
    
    generate
       
@@ -1024,7 +1025,7 @@ module vcr_ip_ctrl_mac
 	   
 	   // for speculative grants, on the other hand, we must make sure that 
 	   // no misspeculation occurred
-	   wire 	      flit_sent_spec;
+	   wire flit_sent_spec;
 	   
 	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
 	     begin
@@ -1225,7 +1226,7 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   wire [0:fbf_addr_width-1] fbf_write_addr;
+   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
    assign fbf_write_addr = fbc_write_addr;
 
    c_regfile
@@ -1259,12 +1260,12 @@ module vcr_ip_ctrl_mac
    // they currently will most likely end up being free-running, so this may be 
    // a reasonable tradeoff.
    
-   wire flit_valid_out_q;
+   wire 			     flit_valid_out_q;
    
-   wire valid_out_active;
+   wire 			     valid_out_active;
    assign valid_out_active = flit_valid | flit_valid_out_q;
    
-   wire flit_valid_out_s;
+   wire 			     flit_valid_out_s;
    assign flit_valid_out_s = flit_sent;
    c_dff
      #(.width(1),
@@ -1322,44 +1323,15 @@ module vcr_ip_ctrl_mac
 		  #(.num_ports(num_vcs),
 		    .width(num_vcs))
 		allocated_ovc_sel
-		  (.select(vc_sel_nonspec_ivc),
+		  (.select(vc_sel_ivc),
 		   .data_in(allocated_ivc_ovc),
 		   .data_out(allocated_ovc));
-		
-		wire [0:num_vcs-1] dest_ovc;
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  begin
-		     
-		     wire allocated;
-		     c_select_1ofn
-		       #(.num_ports(num_vcs),
-			 .width(1))
-		     allocated_sel
-		       (.select(vc_sel_ivc),
-			.data_in(allocated_ivc),
-			.data_out(allocated));
-		     
-		     wire [0:num_vcs-1] vc_gnt_ovc;
-		     c_select_1ofn
-		       #(.num_ports(num_vcs),
-			 .width(num_vcs))
-		     vc_gnt_ovc_sel
-		       (.select(vc_sel_spec_ivc),
-			.data_in(vc_gnt_ivc_ovc),
-			.data_out(vc_gnt_ovc));
-		     
-		     assign dest_ovc = allocated ? allocated_ovc : vc_gnt_ovc;
-		     
-		  end
-		else
-		  assign dest_ovc = allocated_ovc;
 		
 		wire [0:vc_idx_width-1] dest_vc_sel;
 		c_encode
 		  #(.num_ports(num_vcs))
 		dest_vc_sel_enc
-		  (.data_in(dest_ovc),
+		  (.data_in(allocated_ovc),
 		   .data_out(dest_vc_sel));
 		
 		wire [0:vc_idx_width-1] dest_vc_sel_s, dest_vc_sel_q;
@@ -1384,7 +1356,7 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   wire 				flit_head_muxed;
+   wire 					  flit_head_muxed;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(1))
@@ -1393,7 +1365,8 @@ module vcr_ip_ctrl_mac
       .data_in(flit_head_ivc),
       .data_out(flit_head_muxed));
    
-   wire 				flit_head_out_s, flit_head_out_q;
+   wire 					  flit_head_out_s, 
+						  flit_head_out_q;
    assign flit_head_out_s = flit_head_muxed;
    c_dff
      #(.width(1),
@@ -1407,7 +1380,7 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl_out[1+vc_idx_width] = flit_head_out_q;
    
-   wire 				flit_tail_muxed;
+   wire 					  flit_tail_muxed;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(1))
@@ -1416,7 +1389,8 @@ module vcr_ip_ctrl_mac
       .data_in(flit_tail_ivc),
       .data_out(flit_tail_muxed));
    
-   wire 				flit_tail_out_s, flit_tail_out_q;
+   wire 					  flit_tail_out_s, 
+						  flit_tail_out_q;
    assign flit_tail_out_s = flit_tail_muxed;
    c_dff
      #(.width(1),
@@ -1440,7 +1414,7 @@ module vcr_ip_ctrl_mac
    // NOTE: See the comment near the definition of cred_validq for notes on
    // clock gating this register.
    
-   wire 				cred_valid_s, cred_valid_q;
+   wire 					  cred_valid_s, cred_valid_q;
    assign cred_valid_s = flit_sent;
    c_dff
      #(.width(1),
@@ -1502,7 +1476,7 @@ module vcr_ip_ctrl_mac
 	     (.data_in(events_ivc),
 	      .data_out(events));
 	   
-	   genvar ctr;
+	   genvar 		ctr;
 	   
 	   for(ctr = 0; ctr < 8; ctr = ctr + 1)
 	     begin:ctrs
@@ -1531,6 +1505,7 @@ module vcr_ip_ctrl_mac
 		   .q(ctr_q));
 		
 	     end
+	   
 	end
       
    endgenerate

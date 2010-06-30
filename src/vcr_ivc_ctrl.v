@@ -34,10 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, 
-   vc_gnt, vc_gnt_ovc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec,
-   flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_write_addr, 
-   fbc_read_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
-   free_allocated, errors, events);
+   vc_gnt, vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, 
+   sw_gnt_spec, flit_sent_prev, flit_head, flit_tail, header_info_out,
+   fbc_write_addr, fbc_read_addr, fbc_empty, allocated, allocated_ovc, 
+   free_unallocated, free_allocated, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -240,13 +240,13 @@ module vcr_ivc_ctrl
    input [0:router_addr_width-1] router_address;
    
    // incoming flit valid
-   input flit_valid_in;
+   input 			 flit_valid_in;
    
    // incoming flit is head flit
-   input flit_head_in;
+   input 			 flit_head_in;
    
    // incoming flit is tail
-   input flit_tail_in;
+   input 			 flit_tail_in;
    
    // header information associated with current flit
    input [0:header_info_width-1] header_info_in;
@@ -256,109 +256,110 @@ module vcr_ivc_ctrl
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // destination port (1-hot)
-   output [0:num_ports-1] route_op;
-   wire [0:num_ports-1] route_op;
+   output [0:num_ports-1] 			     route_op;
+   wire [0:num_ports-1] 			     route_op;
    
    // destination port (encoded)
-   output [0:port_idx_width-1] route_port;
-   wire [0:port_idx_width-1] route_port;
+   output [0:port_idx_width-1] 			     route_port;
+   wire [0:port_idx_width-1] 			     route_port;
    
    // transition to next resource class
-   output inc_rc;
-   wire 		inc_rc;
+   output 					     inc_rc;
+   wire 					     inc_rc;
    
    // request VC allocation
-   output vc_req;
-   wire vc_req;
+   output 					     vc_req;
+   wire 					     vc_req;
    
    // VC allocation successful
-   input vc_gnt;
+   input 					     vc_gnt;
    
    // granted output VC
-   input [0:num_vcs-1] vc_gnt_ovc;
+   input [0:num_vcs_per_class-1] 		     vc_gnt_ocvc;
    
    // non-speculative switch allocator requests
-   output sw_req_nonspec;
-   wire 		sw_req_nonspec;
+   output 					     sw_req_nonspec;
+   wire 					     sw_req_nonspec;
    
    // speculative switch allocator requests
-   output sw_req_spec;
-   wire 		sw_req_spec;
+   output 					     sw_req_spec;
+   wire 					     sw_req_spec;
    
    // non-speculative switch allocator grants
-   input sw_gnt_nonspec;
+   input 					     sw_gnt_nonspec;
    
    // speculative switch allocator grants
-   input sw_gnt_spec;
+   input 					     sw_gnt_spec;
    
    // did this VC send a flit in the previous cycle?
-   input flit_sent_prev;
+   input 					     flit_sent_prev;
    
    // outgoing flit is head flit
-   output flit_head;
-   wire 		flit_head;
+   output 					     flit_head;
+   wire 					     flit_head;
    
    // outgoign flit is tail flit
-   output flit_tail;
-   wire 		flit_tail;
+   output 					     flit_tail;
+   wire 					     flit_tail;
    
    // lookahead routing information for outgoing flit
-   output [0:header_info_width-1] header_info_out;
-   wire [0:header_info_width-1]   header_info_out;
+   output [0:header_info_width-1] 		     header_info_out;
+   wire [0:header_info_width-1] 		     header_info_out;
    
    // write pointer for shared flit buffer
-   output [0:fbf_addr_width-1] fbc_write_addr;
-   wire [0:fbf_addr_width-1] 	  fbc_write_addr;
+   output [0:fbf_addr_width-1] 			     fbc_write_addr;
+   wire [0:fbf_addr_width-1] 			     fbc_write_addr;
    
    // read pointer for shared flit buffer
-   output [0:fbf_addr_width-1] fbc_read_addr;
-   wire [0:fbf_addr_width-1] 	  fbc_read_addr;
+   output [0:fbf_addr_width-1] 			     fbc_read_addr;
+   wire [0:fbf_addr_width-1] 			     fbc_read_addr;
    
    // flit buffer does not have any valid entries
-   output fbc_empty;
-   wire 			  fbc_empty;
+   output 					     fbc_empty;
+   wire 					     fbc_empty;
    
    // has an output VC been assigned to this input VC?
-   output allocated;
-   wire 			  allocated;
+   output 					     allocated;
+   wire 					     allocated;
    
    // if so, which output VC has been assigned?
-   output [0:num_vcs-1] allocated_ovc;
-   wire [0:num_vcs-1] 		  allocated_ovc;
+   output [0:num_vcs-1] 			     allocated_ovc;
+   wire [0:num_vcs-1] 				     allocated_ovc;
    
    // credit availability if no VC has been assigned yet
-   output free_unallocated;
-   wire 			  free_unallocated;
+   output 					     free_unallocated;
+   wire 					     free_unallocated;
    
    // credit availability if a VC has been assigned
-   output free_allocated;
-   wire 			  free_allocated;
+   output 					     free_allocated;
+   wire 					     free_allocated;
    
    // internal error condition detected
-   output [0:6] errors;
-   wire [0:6] 			  errors;
+   output [0:6] 				     errors;
+   wire [0:6] 					     errors;
    
    // performance counter events
    // (note: only valid if perf_ctr_enable=1)
-   output [0:7] events;
-   wire [0:7] 			  events;
+   output [0:7] 				     events;
+   wire [0:7] 					     events;
    
    
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   wire 			  flit_valid;
+   wire 					     flit_valid;
    
-   wire 			  alloc_active;
+   wire 					     alloc_active;
    assign alloc_active = flit_valid;
    
-   wire 			  flit_sent;
+   wire 					     flit_sent;
    
-   wire 			  packet_done;
+   wire 					     packet_done;
    assign packet_done = flit_sent & flit_tail;
    
-   wire 			  vc_allocated_s, vc_allocated_q;
+   wire 					     vc_allocated_s, 
+						     vc_allocated_q;
    assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
    c_dff
      #(.width(1),
@@ -372,42 +373,18 @@ module vcr_ivc_ctrl
    
    assign allocated = vc_allocated_q;
    
-   wire [0:num_vcs_per_class-1]   vc_gnt_ocvc;
-   wire [0:num_vcs_per_class-1]   vc_allocated_ocvc_q;
+   wire [0:num_vcs_per_class-1] 		     vc_allocated_ocvc_s,
+ 						     vc_allocated_ocvc_q;
+   assign vc_allocated_ocvc_s
+     = vc_allocated_q ? vc_allocated_ocvc_q : vc_gnt_ocvc;
+   
+   wire [0:num_vcs_per_class-1] allocated_ocvc;
    
    generate
       
       if(num_vcs_per_class > 1)
 	begin
 	   
-	   wire [0:num_vcs_per_class-1]   vc_gnt_unchanged_ocvc;
-	   assign vc_gnt_unchanged_ocvc
-	     = vc_gnt_ovc[packet_class*num_vcs_per_class:
-			  (packet_class+1)*num_vcs_per_class-1];
-	   
-	   if(resource_class == (num_resource_classes - 1))
-	     begin
-		
-		assign vc_gnt_ocvc = vc_gnt_unchanged_ocvc;
-		
-	     end
-	   else
-	     begin
-		
-		wire [0:num_vcs_per_class-1] vc_gnt_changed_ocvc;
-		assign vc_gnt_changed_ocvc
-		  = vc_gnt_ovc[(packet_class+1)*num_vcs_per_class:
-			       (packet_class+2)*num_vcs_per_class-1];
-		
-		// only one of the two will have a bit set, so we just OR them
-		assign vc_gnt_ocvc
-		  = vc_gnt_changed_ocvc | vc_gnt_unchanged_ocvc;
-		
-	     end
-	   
-	   wire [0:num_vcs_per_class-1]      vc_allocated_ocvc_s;
-	   assign vc_allocated_ocvc_s
-	     = vc_allocated_q ? vc_allocated_ocvc_q : vc_gnt_ocvc;
 	   c_dff
 	     #(.width(num_vcs_per_class),
 	       .reset_type(reset_type))
@@ -428,9 +405,15 @@ module vcr_ivc_ctrl
 	end
       
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	assign flit_sent = sw_gnt_nonspec;
+	begin
+	   assign flit_sent = sw_gnt_nonspec;
+	   assign allocated_ocvc = vc_allocated_ocvc_q;
+	end
       else
-	assign flit_sent = (vc_gnt & sw_gnt_spec) | sw_gnt_nonspec;
+	begin
+	   assign flit_sent = (vc_gnt & sw_gnt_spec) | sw_gnt_nonspec;
+	   assign allocated_ocvc = vc_allocated_ocvc_s;
+	end
       
    endgenerate
    
@@ -439,10 +422,8 @@ module vcr_ivc_ctrl
        .out_width(num_vcs),
        .offset(packet_class*num_vcs_per_class))
    allocated_ovc_alg
-     (.data_in({{num_vcs_per_class{~inc_rc}} & 
-		vc_allocated_ocvc_q,
-		{num_vcs_per_class{inc_rc}} & 
-		vc_allocated_ocvc_q}),
+     (.data_in({{num_vcs_per_class{~inc_rc}} & allocated_ocvc,
+		{num_vcs_per_class{inc_rc}} & allocated_ocvc}),
       .dest_in({num_vcs{1'b0}}),
       .data_out(allocated_ovc));
    
@@ -498,6 +479,7 @@ module vcr_ivc_ctrl
 	     assign sel_orc = 'd1;
 	   else
 	     begin
+		
 		c_align
 		  #(.in_width(2),
 		    .out_width(num_resource_classes),
@@ -506,6 +488,7 @@ module vcr_ivc_ctrl
 		  (.data_in({~hop_inc_rc, hop_inc_rc}),
 		   .dest_in({num_resource_classes{1'b0}}),
 		   .data_out(sel_orc));
+		
 	     end
 	   
 	   wire [0:router_addr_width-1] next_router_address;
@@ -610,7 +593,7 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire fbc_almost_empty;
+   wire 				   fbc_almost_empty;
    
    generate
       
@@ -693,10 +676,10 @@ module vcr_ivc_ctrl
 	   
 	   assign flit_head = fbc_empty ? flit_head_in : head_q;
 	   
-	   wire 		     tail_in;
+	   wire tail_in;
 	   assign tail_in = flit_valid_in & flit_tail_in;
 	   
-	   wire 		     tail_valid_s, tail_valid_q;
+	   wire tail_valid_s, tail_valid_q;
 	   assign tail_valid_s
 	     = (tail_valid_q | tail_in) & ~(flit_sent & flit_tail);
 	   c_dff
@@ -721,13 +704,13 @@ module vcr_ivc_ctrl
    // header buffer
    //---------------------------------------------------------------------------
    
-   wire 			   hdff_push;
+   wire 	hdff_push;
    assign hdff_push = flit_valid_in & flit_head_in;
    
-   wire 			   hdff_pop;
+   wire 	hdff_pop;
    assign hdff_pop = flit_sent & flit_tail;
    
-   wire 			   hdff_empty;
+   wire 	hdff_empty;
    wire [0:hop_route_info_width-1] hdff_hop_route_info;
    wire 			   error_hdff_underflow;
    wire 			   error_hdff_overflow;
@@ -817,10 +800,10 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   wire 				  header_valid;
+   wire 				   header_valid;
    assign header_valid = ~hdff_empty | flit_valid_in;
    
-   wire 				  error_no_header;
+   wire 				   error_no_header;
    assign error_no_header = flit_valid & ~header_valid;
    
    
@@ -828,19 +811,19 @@ module vcr_ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 		  hdff_route_port;
+   wire [0:port_idx_width-1] 		   hdff_route_port;
    assign hdff_route_port = hdff_hop_route_info[0:port_idx_width-1];
    
    assign route_port = hdff_empty ? hop_route_port : hdff_route_port;
    
-   wire [0:num_ports-1] 		  hdff_route_op;
+   wire [0:num_ports-1] 		   hdff_route_op;
    c_decode
      #(.num_ports(num_ports))
    hdff_route_op_dec
      (.data_in(hdff_route_port),
       .data_out(hdff_route_op));
    
-   wire [0:num_ports-1] 		  route_unmasked_op;
+   wire [0:num_ports-1] 		   route_unmasked_op;
    assign route_unmasked_op = hdff_empty ? hop_route_op : hdff_route_op;
    
    generate
@@ -878,7 +861,7 @@ module vcr_ivc_ctrl
       .route_out_op(route_op),
       .error(pf_error));
    
-   wire 				  error_invalid_port;
+   wire 	error_invalid_port;
    assign error_invalid_port = header_valid & pf_error;
    
    
@@ -886,7 +869,7 @@ module vcr_ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire 		cred_track_active;
+   wire 	cred_track_active;
    assign cred_track_active = flit_valid | vc_allocated_q;
    
    wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
@@ -1125,16 +1108,16 @@ module vcr_ivc_ctrl
    // flit buffer control
    //---------------------------------------------------------------------------
    
-   wire 		       fbc_push;
+   wire 				       fbc_push;
    assign fbc_push = flit_valid_in;
    
-   wire 		       fbc_pop;
+   wire 				       fbc_pop;
    assign fbc_pop = flit_sent;
    
-   wire [0:1] 		       fbc_errors;
-   wire [0:fbf_addr_width-1]   fbc_peek_addr;
-   wire 		       fbc_almost_full;
-   wire 		       fbc_full;
+   wire [0:1] 				       fbc_errors;
+   wire [0:fbf_addr_width-1] 		       fbc_peek_addr;
+   wire 				       fbc_almost_full;
+   wire 				       fbc_full;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .offset(fbc_min_addr),
@@ -1155,10 +1138,10 @@ module vcr_ivc_ctrl
       .full(fbc_full),
       .errors(fbc_errors));
    
-   wire 		       error_fbc_underflow;
+   wire 				       error_fbc_underflow;
    assign error_fbc_underflow = fbc_errors[0];
    
-   wire 		       error_fbc_overflow;
+   wire 				       error_fbc_overflow;
    assign error_fbc_overflow = fbc_errors[1];
    
    assign flit_valid = flit_valid_in | ~fbc_empty;
@@ -1170,7 +1153,7 @@ module vcr_ivc_ctrl
    
    // synopsys translate_off
    
-   integer 		       i;
+   integer 				       i;
    
    always @(posedge clk)
      begin
@@ -1219,17 +1202,17 @@ module vcr_ivc_ctrl
       if(perf_ctr_enable > 0)
 	begin
 	   
-	   wire 		       ev_no_flit;
+	   wire ev_no_flit;
 	   assign ev_no_flit = header_valid & ~flit_valid;
 	   
-	   wire 		       ev_flit_ready;
+	   wire ev_flit_ready;
 	   assign ev_flit_ready = header_valid & flit_valid;
 	   
-	   wire 		       ev_flit_stalled_vc;
+	   wire ev_flit_stalled_vc;
 	   assign ev_flit_stalled_vc
 	     = header_valid & flit_valid & ~vc_allocated_q & ~vc_gnt;
 	   
-	   wire 		       ev_flit_stalled_sw;
+	   wire ev_flit_stalled_sw;
 	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	     assign ev_flit_stalled_sw
 	       = header_valid & flit_valid & vc_allocated_q & ~sw_gnt_nonspec;
@@ -1239,11 +1222,11 @@ module vcr_ivc_ctrl
 		 (vc_allocated_q & ~sw_gnt_nonspec) | 
 		 (vc_gnt & ~sw_gnt_spec);
 	   
-	   wire 		       ev_spec_attempted;
+	   wire ev_spec_attempted;
 	   assign ev_spec_attempted
 	     = header_valid & flit_valid & ~vc_allocated_q;
 	   
-	   wire 		       ev_spec_failed;
+	   wire ev_spec_failed;
 	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	     assign ev_spec_failed = 1'b0;
 	   else
@@ -1251,13 +1234,13 @@ module vcr_ivc_ctrl
 	       = header_valid & flit_valid & ~vc_allocated_q & 
 		 ~vc_gnt & sw_gnt_spec;
 	   
-	   wire 		       ev_flit_sent;
+	   wire ev_flit_sent;
 	   assign ev_flit_sent = flit_sent;
 	   
-	   wire 		       ev_flit_sent_spec;
+	   wire ev_flit_sent_spec;
 	   assign ev_flit_sent_spec = flit_sent & ~vc_allocated_q;
 	   
-	   wire [0:7] 		       events_s, events_q;
+	   wire [0:7] events_s, events_q;
 	   assign events_s = {ev_no_flit,
 			      ev_flit_ready,
 			      ev_flit_stalled_vc,

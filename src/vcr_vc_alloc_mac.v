@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC allocator
 module vcr_vc_alloc_mac
   (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
-   req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ovc, gnt_op_ovc, gnt_op_ovc_ip, 
+   req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, 
    gnt_op_ovc_ivc);
    
 `include "c_functions.v"
@@ -77,37 +77,37 @@ module vcr_vc_alloc_mac
    input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
    // transition to next resource class
-   input [0:num_ports*num_vcs-1] inc_rc_ip_ivc;
+   input [0:num_ports*num_vcs-1] 		inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
-   input [0:num_ports*num_vcs-1] elig_op_ovc;
+   input [0:num_ports*num_vcs-1] 		elig_op_ovc;
    
    // request VC allocation
-   input [0:num_ports*num_vcs-1] req_ip_ivc;
+   input [0:num_ports*num_vcs-1] 		req_ip_ivc;
    
    // VC allocation requested (to output controller)
-   output [0:num_ports*num_vcs-1] req_op_ovc;
-   wire [0:num_ports*num_vcs-1] req_op_ovc;
+   output [0:num_ports*num_vcs-1] 		req_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		req_op_ovc;
    
    // VC allocation successful (to input controller)
-   output [0:num_ports*num_vcs-1] gnt_ip_ivc;
-   wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
+   output [0:num_ports*num_vcs-1] 		gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		gnt_ip_ivc;
    
    // granted output VC (to input controller)
-   output [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
-   wire [0:num_ports*num_vcs*num_vcs-1] gnt_ip_ivc_ovc;
+   output [0:num_ports*num_vcs*num_vcs_per_class-1] gnt_ip_ivc_ocvc;
+   wire [0:num_ports*num_vcs*num_vcs_per_class-1]   gnt_ip_ivc_ocvc;
    
    // output VC was granted (to output controller)
-   output [0:num_ports*num_vcs-1] gnt_op_ovc;
-   wire [0:num_ports*num_vcs-1] 	gnt_op_ovc;
+   output [0:num_ports*num_vcs-1] 		    gnt_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		    gnt_op_ovc;
    
    // input port that each output VC was granted to (to output controller)
-   output [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
-   wire [0:num_ports*num_vcs*num_ports-1] gnt_op_ovc_ip;
+   output [0:num_ports*num_vcs*num_ports-1] 	    gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_ports-1] 	    gnt_op_ovc_ip;
    
    // input VC that each output VC was granted to (to output controller)
-   output [0:num_ports*num_vcs*num_vcs-1] gnt_op_ovc_ivc;
-   wire [0:num_ports*num_vcs*num_vcs-1]   gnt_op_ovc_ivc;
+   output [0:num_ports*num_vcs*num_vcs-1] 	    gnt_op_ovc_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	    gnt_op_ovc_ivc;
    
    generate
       
@@ -129,7 +129,7 @@ module vcr_vc_alloc_mac
 	      .req_ip_ivc(req_ip_ivc),
 	      .req_op_ovc(req_op_ovc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
-	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .gnt_ip_ivc_ocvc(gnt_ip_ivc_ocvc),
 	      .gnt_op_ovc(gnt_op_ovc),
 	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
 	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
@@ -152,7 +152,7 @@ module vcr_vc_alloc_mac
 	      .req_ip_ivc(req_ip_ivc),
 	      .req_op_ovc(req_op_ovc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
-	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .gnt_ip_ivc_ocvc(gnt_ip_ivc_ocvc),
 	      .gnt_op_ovc(gnt_op_ovc),
 	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
 	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
@@ -176,7 +176,7 @@ module vcr_vc_alloc_mac
 	      .req_ip_ivc(req_ip_ivc),
 	      .req_op_ovc(req_op_ovc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
-	      .gnt_ip_ivc_ovc(gnt_ip_ivc_ovc),
+	      .gnt_ip_ivc_ocvc(gnt_ip_ivc_ocvc),
 	      .gnt_op_ovc(gnt_op_ovc),
 	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
 	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
