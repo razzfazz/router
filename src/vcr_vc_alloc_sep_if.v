@@ -178,10 +178,14 @@ module vcr_vc_alloc_sep_if
 						port_idx_width-1];
 			  
 			  wire 			    inc_rc;
-			  assign inc_rc
-			    = inc_rc_ip_ivc[((ip*num_message_classes+mc)*
-					     num_resource_classes+irc)*
-					    num_vcs_per_class+icvc];
+			  
+			  if(irc == (num_resource_classes - 1))
+			    assign inc_rc = 1'b0;
+			  else
+			    assign inc_rc
+			      = inc_rc_ip_ivc[((ip*num_message_classes+mc)*
+					       num_resource_classes+irc)*
+					      num_vcs_per_class+icvc];
 			  
 			  wire [0:num_vcs-1] 	    elig_ovc;
 			  assign elig_ovc
@@ -259,14 +263,8 @@ module vcr_vc_alloc_sep_if
 				    // to the output stage if there was a 
 				    // requests.
 				    if(orc == irc)
-				      begin
-					 if(irc == (num_resource_classes - 1))
-					   assign req_unqual_ocvc
-					     = {num_vcs_per_class{1'b1}};
-					 else
-					   assign req_unqual_ocvc
-					     = {num_vcs_per_class{~inc_rc}};
-				      end
+				      assign req_unqual_ocvc
+					= {num_vcs_per_class{~inc_rc}};
 				    else if (orc == (irc + 1))
 				      assign req_unqual_ocvc
 					= {num_vcs_per_class{inc_rc}};
