@@ -878,34 +878,34 @@ module vcr_top
    // error reporting
    //---------------------------------------------------------------------------
    
+   // synopsys translate_off
+   
+   integer 					      i;
+   
+   always @(posedge clk)
+     begin
+	
+	for(i = 0; i < num_ports; i = i + 1)
+	  begin
+	     if(ipc_error_ip[i])
+	       $display({"ERROR: Router error detected at input port %d in ",
+			 "module %m."}, i);
+	  end
+	
+	for(i = 0; i < num_ports; i = i + 1)
+	  begin
+	     if(opc_error_op[i])
+	       $display({"ERROR: Router error detected at output port %d in ",
+			 "module %m."}, i);
+	  end
+	
+     end
+   // synopsys translate_on
+   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
-	   
-	   // synopsys translate_off
-	   
-	   integer 			  i;
-	   
-	   always @(posedge clk)
-	     begin
-
-		for(i = 0; i < num_ports; i = i + 1)
-		  begin
-		     if(ipc_error_ip[i])
-		       $display({"ERROR: Router error detected at input ", 
-				 "port %d in module %m."}, i);
-		  end
-		
-		for(i = 0; i < num_ports; i = i + 1)
-		  begin
-		     if(opc_error_op[i])
-		       $display({"ERROR: Router error detected at output ", 
-				 "port %d in module %m."}, i);
-		  end
-		
-	     end
-	   // synopsys translate_on
 	   
 	   wire [0:num_ports+num_ports-1] errors_s, errors_q;
 	   assign errors_s = {ipc_error_ip, opc_error_op};
