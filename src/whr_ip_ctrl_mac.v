@@ -193,57 +193,57 @@ module whr_ip_ctrl_mac
    input [0:router_addr_width-1] router_address;
    
    // incoming flit control signals
-   input [0:flit_ctrl_width-1] flit_ctrl_in;
+   input [0:flit_ctrl_width-1] 	 flit_ctrl_in;
    
    // incoming flit data
-   input [0:flit_data_width-1] flit_data_in;
+   input [0:flit_data_width-1] 	 flit_data_in;
    
    // request for output port
-   output [0:num_ports-1] req_op;
-   wire [0:num_ports-1]        req_op;
+   output [0:num_ports-1] 	 req_op;
+   wire [0:num_ports-1] 	 req_op;
    
    // current flit is head flit
-   output req_head;
-   wire 		       req_head;
+   output 			 req_head;
+   wire 			 req_head;
    
    // current flit is tail flit
-   output req_tail;
-   wire 		       req_tail;
+   output 			 req_tail;
+   wire 			 req_tail;
    
    // output port granted
-   input [0:num_ports-1] gnt_op;
+   input [0:num_ports-1] 	 gnt_op;
    
    // crossbar enable signal
-   output xbr_active;
-   wire 		       xbr_active;
+   output 			 xbr_active;
+   wire 			 xbr_active;
    
    // outgoing flit data
-   output [0:flit_data_width-1] flit_data_out;
-   wire [0:flit_data_width-1] 	  flit_data_out;
+   output [0:flit_data_width-1]  flit_data_out;
+   wire [0:flit_data_width-1] 	 flit_data_out;
    
    // outgoing flow control signals
-   output [0:flow_ctrl_width-1] flow_ctrl_out;
-   wire [0:flow_ctrl_width-1] 	  flow_ctrl_out;
+   output [0:flow_ctrl_width-1]  flow_ctrl_out;
+   wire [0:flow_ctrl_width-1] 	 flow_ctrl_out;
    
    // internal error condition detected
-   output error;
-   wire 			  error;
+   output 			 error;
+   wire 			 error;
    
    
    //---------------------------------------------------------------------------
    // input stage
    //---------------------------------------------------------------------------
    
-   wire 			  flit_valid_in;
-   wire 			  fbc_empty;
+   wire 			 flit_valid_in;
+   wire 			 fbc_empty;
    
-   wire 			  flit_valid;
+   wire 			 flit_valid;
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
-   wire 			  fbc_almost_full;
-   wire 			  flit_valid_out;
+   wire 			 fbc_almost_full;
+   wire 			 flit_valid_out;
    
-   wire 			  hold_input_enable;
+   wire 			 hold_input_enable;
    
    generate
       
@@ -590,20 +590,28 @@ module whr_ip_ctrl_mac
    // header buffer
    //---------------------------------------------------------------------------
    
+   wire 			     head_received;
+   assign head_received = flit_valid_thru & flit_head_in;
+   
+   wire 			     tail_sent;
+   assign tail_sent = flit_valid_out & flit_tail_out;
+   
+   wire 			     hdr_valid;
+   wire 			     hdff_empty;
+   
    wire 			     hdff_push;
-   assign hdff_push = flit_valid_thru & flit_head_in;
+   assign hdff_push = head_received & hdr_valid & (~tail_sent | ~hdff_empty);
    
    wire 			     hdff_pop;
-   assign hdff_pop = flit_valid_out & flit_tail_out;
+   assign hdff_pop = tail_sent & ~hdff_empty;
    
-   wire 			     hdff_empty;
    wire [0:hop_route_info_width-1]   hdff_hop_route_info;
    wire 			     error_hdff_underflow;
    wire 			     error_hdff_overflow;
    
    generate
       
-      if(num_header_buffers > 1)
+      if(num_header_buffers > 2)
 	begin
 	   
 	   wire [0:hop_route_info_width-1] hdff_write_data;
@@ -616,7 +624,7 @@ module whr_ip_ctrl_mac
 	   wire [0:hop_route_info_width-1] hdff_peek_data;
 	   wire [0:1] 			   hdff_errors;
 	   c_fifo
-	     #(.depth(num_header_buffers),
+	     #(.depth(num_header_buffers - 1),
 	       .width(hop_route_info_width),
 	       .fifo_type(header_fifo_type),
 	       .reset_type(reset_type))
@@ -641,7 +649,7 @@ module whr_ip_ctrl_mac
 	   assign error_hdff_overflow = hdff_errors[1];
 	   
 	end
-      else
+      else if(num_header_buffers > 1)
 	begin
 	   
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
@@ -680,13 +688,63 @@ module whr_ip_ctrl_mac
 	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push & ~hdff_pop;
 	   
 	end
+      else
+	begin
+	   
+	   assign hdff_empty = 1'b1;
+	   assign hdff_hop_route_info = {hop_route_info_width{1'b0}};
+	   assign error_hdff_underflow = 1'b0;
+	   assign error_hdff_overflow = 1'b0;
+	   
+	end
       
    endgenerate
    
-   wire 				  header_valid;
-   assign header_valid = ~hdff_empty | flit_valid_in;
    
-   wire 				  error_no_header;
+   //---------------------------------------------------------------------------
+   // head register
+   //---------------------------------------------------------------------------
+   
+   wire hdr_valid_s, hdr_valid_q;
+   assign hdr_valid_s = hdr_valid_q ?
+			(~tail_sent | ~hdff_empty | head_received) : 
+			(head_received & ~tail_sent);
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   hdf_validq
+     (.clk(clk),
+      .reset(reset),
+      .active(flags_active),
+      .d(hdr_valid_s),
+      .q(hdr_valid_q));
+   
+   assign hdr_valid = hdr_valid_q;
+   
+   wire [0:hop_route_info_width-1] hop_route_info_muxed;
+   assign hop_route_info_muxed
+     = hdff_empty ? hop_route_info : hdff_hop_route_info;
+   
+   wire [0:hop_route_info_width-1] hdr_hop_route_info_s, hdr_hop_route_info_q;
+   assign hdr_hop_route_info_s
+     = (~hdr_valid | tail_sent) ? hop_route_info_muxed : hdr_hop_route_info_q;
+   c_dff
+     #(.width(hop_route_info_width),
+       .reset_type(reset_type))
+   hdr_hop_route_infoq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(flags_active),
+      .d(hdr_hop_route_info_s),
+      .q(hdr_hop_route_info_q));
+   
+   wire [0:hop_route_info_width-1] hdr_hop_route_info;
+   assign hdr_hop_route_info = hdr_hop_route_info_q;
+   
+   wire 			   header_valid;
+   assign header_valid = hdr_valid | flit_valid_in;
+   
+   wire 			   error_no_header;
    assign error_no_header = flit_valid & ~header_valid;
    
    
@@ -694,21 +752,21 @@ module whr_ip_ctrl_mac
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 		  hdff_route_port;
-   assign hdff_route_port = hdff_hop_route_info[0:port_idx_width-1];
+   wire [0:port_idx_width-1] 	   hdr_route_port;
+   assign hdr_route_port = hdr_hop_route_info[0:port_idx_width-1];
    
-   wire [0:num_ports-1] 		  hdff_route_op;
+   wire [0:num_ports-1] 	   hdr_route_op;
    c_decode
      #(.num_ports(num_ports))
-   hdff_route_op_dec
-     (.data_in(hdff_route_port),
-      .data_out(hdff_route_op));
+   hdr_route_op_dec
+     (.data_in(hdr_route_port),
+      .data_out(hdr_route_op));
    
-   wire [0:num_ports-1] 		  route_unmasked_op;
-   assign route_unmasked_op = hdff_empty ? hop_route_op : hdff_route_op;
+   wire [0:num_ports-1] 	   route_unmasked_op;
+   assign route_unmasked_op = hdr_valid ? hdr_route_op : hop_route_op;
    
-   wire [0:num_ports-1] 		  route_op;
-   wire 				  pf_error;
+   wire [0:num_ports-1] 	   route_op;
+   wire 			   pf_error;
    rtr_port_filter
      #(.num_resource_classes(1),
        .num_ports(num_ports),
@@ -727,7 +785,7 @@ module whr_ip_ctrl_mac
       .route_out_op(route_op),
       .error(pf_error));
    
-   wire 				  error_invalid_port;
+   wire 			   error_invalid_port;
    assign error_invalid_port = header_valid & pf_error;
    
    
@@ -735,15 +793,15 @@ module whr_ip_ctrl_mac
    // flit buffer control
    //---------------------------------------------------------------------------
    
-   wire 				  fbc_push;
+   wire 			   fbc_push;
    assign fbc_push = flit_valid_thru;
    
-   wire 				  fbc_pop;
+   wire 			   fbc_pop;
    assign fbc_pop = flit_valid_out;
    
-   wire [0:fbf_addr_width-1] 		  fbc_peek_addr;
-   wire 				  fbc_full;
-   wire [0:1] 				  fbc_errors;
+   wire [0:fbf_addr_width-1] 	   fbc_peek_addr;
+   wire 			   fbc_full;
+   wire [0:1] 			   fbc_errors;
    c_fifo_ctrl
      #(.addr_width(fbf_addr_width),
        .depth(fbf_depth),
@@ -763,10 +821,10 @@ module whr_ip_ctrl_mac
       .full(fbc_full),
       .errors(fbc_errors));
    
-   wire 		     error_fbc_underflow;
+   wire 			   error_fbc_underflow;
    assign error_fbc_underflow = fbc_errors[0];
    
-   wire 		     error_fbc_overflow;
+   wire 			   error_fbc_overflow;
    assign error_fbc_overflow = fbc_errors[1];
    
    
@@ -777,15 +835,15 @@ module whr_ip_ctrl_mac
    
    // multiplex in updated lookahead routingo info for head flits
    
-   wire [0:flit_data_width-1] fbf_write_data;
+   wire [0:flit_data_width-1] 	   fbf_write_data;
    assign fbf_write_data[0:header_info_width-1]
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in_q[header_info_width:flit_data_width-1];
    
-   wire 		      fbf_write_enable;
-   wire [0:fbf_addr_width-1]  fbf_read_addr;
-   wire [0:flit_data_width-1] fbf_read_data;
+   wire 			   fbf_write_enable;
+   wire [0:fbf_addr_width-1] 	   fbf_read_addr;
+   wire [0:flit_data_width-1] 	   fbf_read_data;
    
    generate
       

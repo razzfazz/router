@@ -704,20 +704,28 @@ module vcr_ivc_ctrl
    // header buffer
    //---------------------------------------------------------------------------
    
+   wire 	head_received;
+   assign head_received = flit_valid_in & flit_head_in;
+   
+   wire 	tail_sent;
+   assign tail_sent = flit_sent & flit_tail;
+   
+   wire 	hdr_valid;
+   wire 	hdff_empty;
+   
    wire 	hdff_push;
-   assign hdff_push = flit_valid_in & flit_head_in;
+   assign hdff_push = head_received & hdr_valid & (~tail_sent | ~hdff_empty);
    
    wire 	hdff_pop;
-   assign hdff_pop = flit_sent & flit_tail;
+   assign hdff_pop = tail_sent & ~hdff_empty;
    
-   wire 	hdff_empty;
    wire [0:hop_route_info_width-1] hdff_hop_route_info;
    wire 			   error_hdff_underflow;
    wire 			   error_hdff_overflow;
    
    generate
       
-      if(num_header_buffers > 1)
+      if(num_header_buffers > 2)
 	begin
 	   
 	   wire [0:hop_route_info_width-1] hdff_write_data;
@@ -730,7 +738,7 @@ module vcr_ivc_ctrl
 	   wire [0:hop_route_info_width-1] hdff_peek_data;
 	   wire [0:1] 			   hdff_errors;
 	   c_fifo
-	     #(.depth(num_header_buffers),
+	     #(.depth(num_header_buffers - 1),
 	       .width(hop_route_info_width),
 	       .fifo_type(header_fifo_type),
 	       .reset_type(reset_type))
@@ -755,7 +763,7 @@ module vcr_ivc_ctrl
 	   assign error_hdff_overflow = hdff_errors[1];
 	   
 	end
-      else
+      else if(num_header_buffers > 1)
 	begin
 	   
 	   wire route_active;
@@ -797,13 +805,63 @@ module vcr_ivc_ctrl
 	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push & ~hdff_pop;
 	   
 	end
+      else
+	begin
+	   
+	   assign hdff_empty = 1'b1;
+	   assign hdff_hop_route_info = {hop_route_info_width{1'b0}};
+	   assign error_hdff_underflow = 1'b0;
+	   assign error_hdff_overflow = 1'b0;
+	   
+	end
       
    endgenerate
    
-   wire 				   header_valid;
-   assign header_valid = ~hdff_empty | flit_valid_in;
    
-   wire 				   error_no_header;
+   //---------------------------------------------------------------------------
+   // head register
+   //---------------------------------------------------------------------------
+   
+   wire hdr_valid_s, hdr_valid_q;
+   assign hdr_valid_s = hdr_valid_q ?
+			(~tail_sent | ~hdff_empty | head_received) : 
+			(head_received & ~tail_sent);
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   hdf_validq
+     (.clk(clk),
+      .reset(reset),
+      .active(alloc_active),
+      .d(hdr_valid_s),
+      .q(hdr_valid_q));
+   
+   assign hdr_valid = hdr_valid_q;
+   
+   wire [0:hop_route_info_width-1] hop_route_info_muxed;
+   assign hop_route_info_muxed
+     = hdff_empty ? hop_route_info : hdff_hop_route_info;
+   
+   wire [0:hop_route_info_width-1] hdr_hop_route_info_s, hdr_hop_route_info_q;
+   assign hdr_hop_route_info_s
+     = (~hdr_valid | tail_sent) ? hop_route_info_muxed : hdr_hop_route_info_q;
+   c_dff
+     #(.width(hop_route_info_width),
+       .reset_type(reset_type))
+   hdr_hop_route_infoq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(hdr_hop_route_info_s),
+      .q(hdr_hop_route_info_q));
+   
+   wire [0:hop_route_info_width-1] hdr_hop_route_info;
+   assign hdr_hop_route_info = hdr_hop_route_info_q;
+   
+   wire 			   header_valid;
+   assign header_valid = hdr_valid | flit_valid_in;
+   
+   wire 			   error_no_header;
    assign error_no_header = flit_valid & ~header_valid;
    
    
@@ -811,20 +869,20 @@ module vcr_ivc_ctrl
    // routing logic
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 		   hdff_route_port;
-   assign hdff_route_port = hdff_hop_route_info[0:port_idx_width-1];
+   wire [0:port_idx_width-1] 	   hdr_route_port;
+   assign hdr_route_port = hdr_hop_route_info[0:port_idx_width-1];
    
-   assign route_port = hdff_empty ? hop_route_port : hdff_route_port;
+   assign route_port = hdr_valid ? hdr_route_port : hop_route_port;
    
-   wire [0:num_ports-1] 		   hdff_route_op;
+   wire [0:num_ports-1] 	   hdr_route_op;
    c_decode
      #(.num_ports(num_ports))
-   hdff_route_op_dec
-     (.data_in(hdff_route_port),
-      .data_out(hdff_route_op));
+   hdr_route_op_dec
+     (.data_in(hdr_route_port),
+      .data_out(hdr_route_op));
    
-   wire [0:num_ports-1] 		   route_unmasked_op;
-   assign route_unmasked_op = hdff_empty ? hop_route_op : hdff_route_op;
+   wire [0:num_ports-1] 	   route_unmasked_op;
+   assign route_unmasked_op = hdr_valid ? hdr_route_op : hop_route_op;
    
    generate
       
@@ -833,10 +891,10 @@ module vcr_ivc_ctrl
       else
 	begin
 	   
-	   wire hdff_inc_rc;
-	   assign hdff_inc_rc = hdff_hop_route_info[port_idx_width];
+	   wire hdr_inc_rc;
+	   assign hdr_inc_rc = hdr_hop_route_info[port_idx_width];
 	   
-	   assign inc_rc = hdff_empty ? hop_inc_rc : hdff_inc_rc;
+	   assign inc_rc = hdr_valid ? hdr_inc_rc : hop_inc_rc;
 	   
 	end
       
