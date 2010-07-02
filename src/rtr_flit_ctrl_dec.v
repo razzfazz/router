@@ -97,23 +97,22 @@ module rtr_flit_ctrl_dec
    // header information associated with current flit
    input [0:header_info_width-1] header_info_in;
    
-   // flit valid indicators for each VC
-   output flit_valid_out;
-   wire flit_valid_out;
+   // flit valid indicator
+   output 			 flit_valid_out;
+   wire 			 flit_valid_out;
    
    // flit is head flit
-   output flit_head_out;
-   wire flit_head_out;
-
+   output 			 flit_head_out;
+   wire 			 flit_head_out;
+   
    // flit is tail flit
-   output flit_tail_out;
-   wire flit_tail_out;
+   output 			 flit_tail_out;
+   wire 			 flit_tail_out;
    
    // indicate which VC the current flit (if any) belongs to
-   output [0:num_vcs-1] sel_out_ivc;
-   wire [0:num_vcs-1] sel_out_ivc;
-   
-   
+   output [0:num_vcs-1] 	 sel_out_ivc;
+   wire [0:num_vcs-1] 		 sel_out_ivc;
+      
    generate
       
       case(packet_format)
