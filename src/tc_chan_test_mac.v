@@ -33,19 +33,9 @@ module tc_chan_test_mac
   (clk, reset, cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, 
    cfg_read_data, cfg_done, xmit_cal, xmit_data, recv_cal, recv_data, error);
    
-// register address declarations
-`define CFG_ADDR_CTRL            0
-`define CFG_ADDR_STATUS          1
-`define CFG_ADDR_ERRORS          2
-`define CFG_ADDR_TEST_DURATION   3
-`define CFG_ADDR_WARMUP_DURATION 4
-`define CFG_ADDR_CAL_INTERVAL    5
-`define CFG_ADDR_CAL_DURATION    6
-`define CFG_ADDR_PATTERN_ADDR    7
-`define CFG_ADDR_PATTERN_DATA    8
-   
 `include "c_functions.v"
 `include "c_constants.v"
+`include "tc_constants.v"
    
    // number of bits in address that are considered base address
    parameter cfg_node_addr_width = 10;
@@ -183,39 +173,39 @@ module tc_chan_test_mac
    
    wire 			 ifc_sel_ctrl;
    assign ifc_sel_ctrl
-     =  ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTRL);
+     =  ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_CTRL);
    
    wire 			 ifc_sel_status;
    assign ifc_sel_status
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_STATUS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_STATUS);
    
    wire 			 ifc_sel_errors;
    assign ifc_sel_errors
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_ERRORS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_ERRORS);
    
    wire 			 ifc_sel_test_duration;
    assign ifc_sel_test_duration
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_TEST_DURATION);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_TEST_DURATION);
    
    wire 			 ifc_sel_warmup_duration;
    assign ifc_sel_warmup_duration
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_WARMUP_DURATION);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_WARMUP_DURATION);
    
    wire 			 ifc_sel_cal_interval;
    assign ifc_sel_cal_interval
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CAL_INTERVAL);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_CAL_INTERVAL);
    
    wire 			 ifc_sel_cal_duration;
    assign ifc_sel_cal_duration
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CAL_DURATION);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_CAL_DURATION);
    
    wire 			 ifc_sel_pattern_addr;
    assign ifc_sel_pattern_addr
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_PATTERN_ADDR);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_PATTERN_ADDR);
    
    wire 			 ifc_sel_pattern_data;
    assign ifc_sel_pattern_data
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_PATTERN_DATA);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTST_PATTERN_DATA);
    
    wire [0:cfg_data_width-1] 	 ifc_read_data_status;
    wire [0:cfg_data_width-1] 	 ifc_read_data_errors;

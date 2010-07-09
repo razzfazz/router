@@ -37,6 +37,7 @@ module testbench
 `include "c_constants.v"
 `include "rtr_constants.v"
 `include "vcr_constants.v"
+`include "tc_constants.v"
 `include "parameters.v"
    
    parameter Tclk = 4;
@@ -500,7 +501,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd0;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd0;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NCTL_CTRL;
       io_write_data = 'd0;
       io_write_data[0] = 1'b1;
       io_write_data[1] = 1'b1;
@@ -518,7 +519,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd1;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd3;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_LFSR_SEED;
       for(i = 0; i < cfg_data_width; i = i + 1)
 	io_write_data[i] = $dist_uniform(seed, 0, 1);
       while(!io_done)
@@ -532,7 +533,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd2;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd3;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_LFSR_SEED;
       for(i = 0; i < cfg_data_width; i = i + 1)
 	io_write_data[i] = $dist_uniform(seed, 0, 1);
       while(!io_done)
@@ -549,7 +550,8 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd4;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	= `CFG_ADDR_NODE_NUM_PACKETS;
       io_write_data = 'd0;
       io_write_data[0:num_packets_width-1] = 'd1024;
       while(!io_done)
@@ -566,7 +568,8 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd5;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	= `CFG_ADDR_NODE_ARRIVAL_THRESH;
       io_write_data = 'd0;
       io_write_data[0:arrival_rv_width-1] = 'd16384;
       while(!io_done)
@@ -583,7 +586,8 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd6;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	= `CFG_ADDR_NODE_PLENGTH_THRESHS;
       io_write_data = 'd0;
       io_write_data[0:plength_idx_rv_width-1] = 'd8;
       while(!io_done)
@@ -600,7 +604,8 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd7;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	= `CFG_ADDR_NODE_PLENGTH_VALS;
       io_write_data = 'd0;
       io_write_data[0:payload_length_width-1] = 'd0;
       io_write_data[payload_length_width:2*payload_length_width-1] = 'd4;
@@ -618,7 +623,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd8;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_MC_THRESHS;
       io_write_data = 'd0;
       io_write_data[0:mc_idx_rv_width-1] = 'd10;
       while(!io_done)
@@ -635,7 +640,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd9;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_RC_THRESHS;
       io_write_data = 'd0;
       io_write_data[0:rc_idx_rv_width-1] = 'd12;
       while(!io_done)
@@ -652,7 +657,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd0;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
       io_write_data = 'd0;
       io_write_data[0] = 'd1;
       io_write_data[1] = 'd0;
@@ -673,7 +678,8 @@ module testbench
 	   
 	   io_read = 1'b1;
 	   io_addr[0:cfg_node_addr_width-1] = 'd3;
-	   io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd1;
+	   io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	     = `CFG_ADDR_NODE_STATUS;
 	   io_write_data = 'd0;
 	   while(!io_done)
 	     #(Tclk);
@@ -693,7 +699,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd0;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
       io_write_data = 'd0;
       while(!io_done)
 	#(Tclk);
@@ -709,7 +715,8 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd4;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	= `CFG_ADDR_NODE_NUM_PACKETS;
       io_write_data = 'd0;
       io_write_data[0:num_packets_width-1] = 'd1024;
       while(!io_done)
@@ -725,7 +732,7 @@ module testbench
       // restart experiment in loopback mode
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd0;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
       io_write_data = 'd0;
       io_write_data[0] = 'd1;
       io_write_data[1] = 'd1;
@@ -746,7 +753,8 @@ module testbench
 	   
 	   io_read = 1'b1;
 	   io_addr[0:cfg_node_addr_width-1] = 'd3;
-	   io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd1;
+	   io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	     = `CFG_ADDR_NODE_STATUS;
 	   io_write_data = 'd0;
 	   while(!io_done)
 	     #(Tclk);
@@ -766,7 +774,7 @@ module testbench
       
       io_write = 1'b1;
       io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = 'd0;
+      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
       io_write_data = 'd0;
       while(!io_done)
 	#(Tclk);

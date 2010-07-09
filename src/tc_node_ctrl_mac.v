@@ -34,11 +34,8 @@ module tc_node_ctrl_mac
    cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, 
    cfg_done, node_ctrl, node_status);
    
-// register address declarations
-`define CFG_ADDR_NODE_CTRL   0
-`define CFG_ADDR_NODE_STATUS 1
-
 `include "c_constants.v"
+`include "tc_constants.v"
    
    // number of bits in address that are considered base address
    parameter cfg_node_addr_width = 10;
@@ -321,11 +318,11 @@ module tc_node_ctrl_mac
    
    wire 			 cfg_sel_node_ctrl;
    assign cfg_sel_node_ctrl
-     = cfg_sel_node && (cfg_reg_addr_q == `CFG_ADDR_NODE_CTRL);
+     = cfg_sel_node && (cfg_reg_addr_q == `CFG_ADDR_NCTL_CTRL);
    
    wire 			 cfg_sel_node_status;
    assign cfg_sel_node_status
-     = cfg_sel_node && (cfg_reg_addr_q == `CFG_ADDR_NODE_STATUS);
+     = cfg_sel_node && (cfg_reg_addr_q == `CFG_ADDR_NCTL_STATUS);
    
    wire [0:cfg_data_width-1] 	 cfg_read_data_node_status;
    

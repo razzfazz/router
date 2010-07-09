@@ -34,21 +34,10 @@ module tc_node_mac
    flit_ctrl_in, flit_data_in, flow_ctrl_out, cfg_node_addrs, cfg_req, 
    cfg_write, cfg_addr, cfg_write_data, cfg_read_data, cfg_done, error);
    
-// register address declarations
-`define CFG_ADDR_CTRL            0
-`define CFG_ADDR_STATUS          1
-`define CFG_ADDR_FLIT_SIG        2
-`define CFG_ADDR_LFSR_SEED       3
-`define CFG_ADDR_NUM_PACKETS     4
-`define CFG_ADDR_ARRIVAL_THRESH  5
-`define CFG_ADDR_PLENGTH_THRESHS 6
-`define CFG_ADDR_PLENGTH_VALS    7
-`define CFG_ADDR_MC_THRESHS      8
-`define CFG_ADDR_RC_THRESHS      9
-   
 `include "c_functions.v"
 `include "c_constants.v"
 `include "rtr_constants.v"
+`include "tc_constants.v"
    
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
@@ -352,43 +341,43 @@ module tc_node_mac
    
    wire 			 ifc_sel_ctrl;
    assign ifc_sel_ctrl
-     =  ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_CTRL);
+     =  ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_CTRL);
    
    wire 			 ifc_sel_status;
    assign ifc_sel_status
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_STATUS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_STATUS);
    
    wire 			 ifc_sel_flit_sig;
    assign ifc_sel_flit_sig
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_FLIT_SIG);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_FLIT_SIG);
    
    wire 			 ifc_sel_lfsr_seed;
    assign ifc_sel_lfsr_seed
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_LFSR_SEED);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_LFSR_SEED);
    
    wire 			 ifc_sel_num_packets;
    assign ifc_sel_num_packets
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NUM_PACKETS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_NUM_PACKETS);
    
    wire 			 ifc_sel_arrival_thresh;
    assign ifc_sel_arrival_thresh
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_ARRIVAL_THRESH);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_ARRIVAL_THRESH);
    
    wire 			 ifc_sel_plength_threshs;
    assign ifc_sel_plength_threshs
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_PLENGTH_THRESHS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_PLENGTH_THRESHS);
    
    wire 			 ifc_sel_plength_vals;
    assign ifc_sel_plength_vals
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_PLENGTH_VALS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_PLENGTH_VALS);
    
    wire 			 ifc_sel_mc_threshs;
    assign ifc_sel_mc_threshs
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_MC_THRESHS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_MC_THRESHS);
    
    wire 			 ifc_sel_rc_threshs;
    assign ifc_sel_rc_threshs
-     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_RC_THRESHS);
+     = ifc_sel_node && (ifc_reg_addr == `CFG_ADDR_NODE_RC_THRESHS);
    
    wire [0:cfg_data_width-1] 	 ifc_read_data_status;
    wire [0:cfg_data_width-1] 	 ifc_read_data_flit_sig;
