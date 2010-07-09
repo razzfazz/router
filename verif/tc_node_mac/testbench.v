@@ -36,7 +36,6 @@ module testbench
 `include "c_functions.v"
 `include "c_constants.v"
 `include "rtr_constants.v"
-`include "vcr_constants.v"
 `include "tc_constants.v"
 `include "parameters.v"
    
