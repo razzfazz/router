@@ -458,15 +458,7 @@ module testbench
    begin
       
       dut0_address = 'd0;
-      if(num_nodes_per_router > 1)
-	begin
-	   dut1_address[0:router_addr_width-1] = 'd0;
-	   dut1_address[router_addr_width:addr_width-1] = 'd1;
-	end
-      else
-	begin
-	   dut1_address[0:router_addr_width-1] = 'd1;
-	end
+      dut1_address = 'd1;
       
       reset = 1'b0;
       clk_en = 1'b0;
