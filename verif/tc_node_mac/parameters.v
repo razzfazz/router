@@ -90,6 +90,9 @@ parameter track_vcs_at_output = 1;
 // such turns)
 parameter restrict_turns = 0;
 
+// enable lookahead routing
+parameter lookahead_routing = 1;
+
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_DOR;
 
@@ -102,14 +105,24 @@ parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 // select implementation variant for header FIFO
 parameter header_fifo_type = `FIFO_TYPE_SHIFTING;
 
+// use input register as part of the flit buffer (wormhole router only)
+parameter input_stage_can_hold = 0;
+
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+
+// use explicit pipeline register between flit buffer and crossbar?
+parameter explicit_pipeline_register = 0;
 
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 
 // select which arbiter type to use for VC allocator
 parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+
+// select whether VCs must have credits available in order to be considered for
+// VC allocation
+parameter vc_alloc_requires_credit = 0;
 
 // select implementation variant for switch allocator
 parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
