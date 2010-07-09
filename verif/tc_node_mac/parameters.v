@@ -66,24 +66,11 @@ parameter max_payload_length = 4;
 // minimum payload length (in flits)
 parameter min_payload_length = 0;
 
-// select router implementation
-parameter router_type = `ROUTER_TYPE_VC;
-
 // width of flit payload data
 parameter flit_data_width = 32;
 
-// enable performance counter
-parameter perf_ctr_enable = 1;
-
-// width of each counter
-parameter perf_ctr_width = 32;
-
 // include error checking logic
 parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
-
-// select whether to set a packet's outgoing VC ID at the input or output 
-// controller
-parameter track_vcs_at_output = 1;
 
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
@@ -98,45 +85,5 @@ parameter routing_type = `ROUTING_TYPE_DOR;
 
 // select order of dimension traversal
 parameter dim_order = `DIM_ORDER_ASCENDING;
-
-// select method for credit signaling from output to input controller
-parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
-
-// select implementation variant for header FIFO
-parameter header_fifo_type = `FIFO_TYPE_SHIFTING;
-
-// use input register as part of the flit buffer (wormhole router only)
-parameter input_stage_can_hold = 0;
-
-// select implementation variant for flit buffer register file
-parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
-
-// use explicit pipeline register between flit buffer and crossbar?
-parameter explicit_pipeline_register = 0;
-
-// select implementation variant for VC allocator
-parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
-
-// select which arbiter type to use for VC allocator
-parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-
-// select whether VCs must have credits available in order to be considered for
-// VC allocation
-parameter vc_alloc_requires_credit = 0;
-
-// select implementation variant for switch allocator
-parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
-
-// select which arbiter type to use for switch allocator
-parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-
-// select speculation type for switch allocator
-parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
-
-// select implementation variant for control crossbar
-parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
-
-// select implementation variant for data crossbar
-parameter data_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
 parameter reset_type = `RESET_TYPE_ASYNC;  
