@@ -31,8 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `default_nettype none
 
 module packet_source
-  (clk, reset, router_address, flit_ctrl, flit_data, flow_ctrl, run, out_flits, 
-   error);
+  (clk, reset, router_address, flit_ctrl, flit_data, flow_ctrl, run, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -210,20 +209,17 @@ module packet_source
    
    input [0:router_addr_width-1] router_address;
    
-   output [0:flit_ctrl_width-1] flit_ctrl;
-   wire [0:flit_ctrl_width-1] flit_ctrl;
+   output [0:flit_ctrl_width-1]  flit_ctrl;
+   wire [0:flit_ctrl_width-1] 	 flit_ctrl;
    
-   output [0:flit_data_width-1] flit_data;
-   wire [0:flit_data_width-1] flit_data;
+   output [0:flit_data_width-1]  flit_data;
+   wire [0:flit_data_width-1] 	 flit_data;
    
-   input [0:flow_ctrl_width-1] flow_ctrl;
+   input [0:flow_ctrl_width-1] 	 flow_ctrl;
    
-   input run;
+   input 			 run;
    
-   output [0:packet_count_width-1] out_flits;
-   wire [0:packet_count_width-1] out_flits;
-   
-   output error;
+   output 			 error;
    wire 			 error;
    
    
@@ -249,8 +245,8 @@ module packet_source
       if(max_packet_count >= 0)
 	begin
 	   
-	   wire [0:packet_count_width-1] waiting_packet_count_s,
-					 waiting_packet_count_q;
+	   wire [0:packet_count_width-1] waiting_packet_count_s;
+	   wire [0:packet_count_width-1] waiting_packet_count_q;
 	   assign waiting_packet_count_s
 	     = waiting_packet_count_q - packet_ready;
 	   c_dff
@@ -268,16 +264,15 @@ module packet_source
 	   
 	end
       else
-	begin
-	   assign waiting_packet_count_zero = 1'b0;
-	end
+	assign waiting_packet_count_zero = 1'b0;
       
    endgenerate
    
-   wire 			  packet_sent;
+   wire 				 packet_sent;
    
-   wire 			  ready_packet_count_zero;
-   wire [0:packet_count_width-1]  ready_packet_count_s, ready_packet_count_q;
+   wire 				 ready_packet_count_zero;
+   wire [0:packet_count_width-1] 	 ready_packet_count_s;
+   wire [0:packet_count_width-1] 	 ready_packet_count_q;
    assign ready_packet_count_s
      = run ?
        ready_packet_count_q - (packet_sent & ~ready_packet_count_zero) + 
@@ -295,10 +290,10 @@ module packet_source
    
    assign ready_packet_count_zero = ~|ready_packet_count_q;
    
-   wire 			  flit_sent;
+   wire 				 flit_sent;
    
-   wire 			  flit_head;
-   wire 			  flit_tail;
+   wire 				 flit_head;
+   wire 				 flit_tail;
    
    assign flit_ctrl[1+vc_idx_width+0] = flit_head;
    
@@ -311,18 +306,18 @@ module packet_source
       
    endgenerate
    
-   wire 			  flit_kill;
+   wire flit_kill;
    
-   wire [0:num_vcs-1] 		  free_ovc;
-   wire [0:num_vcs-1] 		  head_free_ovc;
+   wire [0:num_vcs-1] free_ovc;
+   wire [0:num_vcs-1] head_free_ovc;
    
-   wire [0:num_vcs*2-1] 	  errors_hct_ovc;
-   wire [0:num_vcs*2-1] 	  errors_cred_ovc;
+   wire [0:num_vcs*2-1] errors_hct_ovc;
+   wire [0:num_vcs*2-1] errors_cred_ovc;
    
-   wire 			  free;
-   wire 			  head_free;
+   wire 		free;
+   wire 		head_free;
    
-   genvar 			  ovc;
+   genvar 		ovc;
    
    generate
       
@@ -337,7 +332,7 @@ module packet_source
 	   
 	   if(num_vcs > 1)
 	     begin
-
+		
 		wire [0:vc_idx_width-1] cred_vc;
 		assign cred_vc = flow_ctrl[1:1+vc_idx_width-1];
 		
@@ -413,7 +408,7 @@ module packet_source
 		pop_ptr_incr
 		  (.data_in(pop_ptr_q),
 		   .data_out(pop_ptr_next));
-
+		
 		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
 		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
 		c_dff
@@ -437,7 +432,7 @@ module packet_source
 	     end
 	   else
 	     begin
-
+		
 		// if we can only have one packet per buffer, we can accept the
 		// next one once the buffer has been emptied
 		assign head_credit = credit &&
@@ -445,12 +440,12 @@ module packet_source
 		
 	     end
 	   
-	   wire 			    head_debit;
+	   wire head_debit;
 	   assign head_debit = debit & flit_head;
 	   
 	   // track header credits using stock credit tracker module
-	   wire 			    head_free;
-	   wire [0:1] 			    errors_hct;
+	   wire head_free;
+	   wire [0:1] errors_hct;
 	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
 	       .reset_type(reset_type))
@@ -513,14 +508,14 @@ module packet_source
       
    endgenerate
    
-   wire 			       flit_valid_q;
+   wire flit_valid_q;
    assign flit_sent = flit_valid_q & free & (head_free | ~flit_head);
    
    assign flit_ctrl[0] = flit_sent & ~flit_kill;
    
    assign packet_sent = flit_tail & flit_sent;
    
-   wire 			       flit_valid_s;
+   wire flit_valid_s;
    assign flit_valid_s
      = (flit_valid_q & ~packet_sent) | ~ready_packet_count_zero;
    c_dff
@@ -533,7 +528,7 @@ module packet_source
       .d(flit_valid_s),
       .q(flit_valid_q));
    
-   reg [0:flit_data_width-1] 	       data_q;
+   reg [0:flit_data_width-1] data_q;
    always @(posedge clk, posedge reset)
      begin
 	if(reset | flit_sent)
@@ -589,15 +584,15 @@ module packet_source
       .input_b({num_message_classes{1'b1}}),
       .result(sel_irc));
    
-   wire [0:header_info_width-1]    header_info;
+   wire [0:header_info_width-1] 		       header_info;
    
    generate
       
       if(lookahead_routing)
 	begin
 	   
-	   wire [0:num_ports-1] 			       route_op;
-	   wire 					       inc_rc;
+	   wire [0:num_ports-1] route_op;
+	   wire 		inc_rc;
 	   rtr_routing_logic
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -615,14 +610,14 @@ module packet_source
 	      .route_op(route_op),
 	      .inc_rc(inc_rc));
 	   
-	   wire [0:port_idx_width-1] 			       route_port;
+	   wire [0:port_idx_width-1] route_port;
 	   c_encode
 	     #(.num_ports(num_ports))
 	   route_port_enc
 	     (.data_in(route_op),
 	      .data_out(route_port));
 	   
-	   wire [0:la_route_info_width-1] 		       la_route_info;
+	   wire [0:la_route_info_width-1] la_route_info;
 	   assign la_route_info[0:port_idx_width-1] = route_port;
 	   
 	   if(num_resource_classes > 1)
@@ -634,11 +629,11 @@ module packet_source
       
    endgenerate
    
-   wire [0:num_resource_classes*router_addr_width-1]   route_info_addresses;
+   wire [0:num_resource_classes*router_addr_width-1] route_info_addresses;
    assign route_info_addresses
      = route_info[0:num_resource_classes*router_addr_width-1];
    
-   wire [0:router_addr_width-1] 		       rc_dest;
+   wire [0:router_addr_width-1] 		     rc_dest;
    c_select_1ofn
      #(.num_ports(num_resource_classes),
        .width(router_addr_width))
@@ -647,10 +642,10 @@ module packet_source
       .data_in(route_info_addresses),
       .data_out(rc_dest));
    
-   wire [0:addr_width-1] 			       source_address;
+   wire [0:addr_width-1] 			     source_address;
    assign source_address[0:router_addr_width-1] = router_address;
    
-   wire [0:router_addr_width-1] 		       curr_dest_addr;
+   wire [0:router_addr_width-1] 		     curr_dest_addr;
    
    generate
       
@@ -752,10 +747,10 @@ module packet_source
       
    endgenerate
    
-   reg [0:router_addr_width-1] 	   random_router_address;
+   reg [0:router_addr_width-1] random_router_address;
    
-   integer 			   offset;
-   integer 			   d;
+   integer 		       offset;
+   integer 		       d;
    
    generate
       
@@ -771,7 +766,7 @@ module packet_source
 	   
 	   assign source_address[router_addr_width:addr_width-1] = node_address;
 	   
-	   reg [0:node_addr_width-1]   random_node_address;
+	   reg [0:node_addr_width-1]  random_node_address;
 	   
 	   always @(posedge clk, posedge reset)
 	     begin
@@ -978,19 +973,5 @@ module packet_source
 	    = data_q[header_info_width:flit_data_width-1];
    
    assign error = |errors_hct_ovc | |errors_cred_ovc;
-   
-   wire [0:packet_count_width-1] out_flits_s, out_flits_q;
-   assign out_flits_s = out_flits_q + flit_sent;
-   c_dff
-     #(.width(packet_count_width),
-       .reset_type(reset_type))
-   out_flitsq
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .d(out_flits_s),
-      .q(out_flits_q));
-   
-   assign out_flits = out_flits_s;
    
 endmodule

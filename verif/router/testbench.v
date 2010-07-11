@@ -130,8 +130,8 @@ module testbench
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
    
-   reg 		    reset;
-   reg 		    clk;
+   reg clk;
+   reg reset;
    
    wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
    wire [0:num_ports*flit_data_width-1] flit_data_in_ip;
@@ -145,17 +145,17 @@ module testbench
    wire [0:num_ports-1] 		flit_valid_out_op;
    wire [0:num_ports-1] 		cred_valid_in_op;
    
-   wire [0:num_ports-1] 		ps_error_ip;
+   wire [0:num_ports-1] 		   ps_error_ip;
    
-   wire 				rtr_error;
+   wire 				   rtr_error;
    
-   reg [0:router_addr_width-1] 		router_address;
+   reg [0:router_addr_width-1] 		   router_address;
    
-   reg 					run;
+   reg 					   run;
    
    generate
       
-      genvar 				ip;
+      genvar 				   ip;
       
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
@@ -165,11 +165,11 @@ module testbench
 		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
 				       (ip+1)*flit_ctrl_width-1]
-			 = {flit_ctrl_width{1'b0}};
+		  = {flit_ctrl_width{1'b0}};
 		assign flit_valid_in_ip[ip] = 1'b0;
 		assign flit_data_in_ip[ip*flit_data_width:
 				       (ip+1)*flit_data_width-1]
-			 = {flit_data_width{1'b0}};
+		  = {flit_data_width{1'b0}};
 		
 		wire [0:flow_ctrl_width-1] flow_ctrl_out;
 		assign flow_ctrl_out
@@ -193,8 +193,6 @@ module testbench
 		
 		wire [0:flit_ctrl_width-1] flit_ctrl;
 		wire [0:flit_data_width-1] flit_data;
-		
-		wire [0:packet_count_width-1] ps_out_flits;
 		
 		wire 			      ps_error;
 		packet_source
@@ -229,16 +227,15 @@ module testbench
 		   .flit_data(flit_data),
 		   .flow_ctrl(flow_ctrl),
 		   .run(run),
-		   .out_flits(ps_out_flits),
 		   .error(ps_error));
 		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
 				       (ip+1)*flit_ctrl_width-1]
-			 = flit_ctrl;
+		  = flit_ctrl;
 		assign flit_valid_in_ip[ip] = flit_ctrl[0];
 		assign flit_data_in_ip[ip*flit_data_width:
 				       (ip+1)*flit_data_width-1]
-			 =  flit_data;
+		  =  flit_data;
 		assign ps_error_ip[ip] = ps_error;
 		
 	     end
