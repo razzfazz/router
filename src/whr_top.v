@@ -396,30 +396,6 @@ module whr_top
    // error reporting
    //---------------------------------------------------------------------------
    
-   // synopsys translate_off
-   
-   integer 				  i;
-   
-   always @(posedge clk)
-     begin
-	
-	for(i = 0; i < num_ports; i = i + 1)
-	  begin
-	     if(ipc_error_ip[i])
-	       $display({"ERROR: Router error detected at input port %d in ",
-			 "module %m."}, i);
-	  end
-	
-	for(i = 0; i < num_ports; i = i + 1)
-	  begin
-	     if(opc_error_op[i])
-	       $display({"ERROR: Router error detected at output port %d in ",
-			 "module %m."}, i);
-	  end
-	
-     end
-   // synopsys translate_on
-   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
