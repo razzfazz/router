@@ -358,12 +358,8 @@ module testbench
 	   integer 		      seed = initial_seed + num_ports + op;
 	   
 	   reg 			      consume;
-	   initial
-	   begin
-	      consume <= $dist_uniform(seed, 0, 99) < consume_rate;
-	   end
 	   
-	   always @(posedge clk)
+	   always @(posedge clk, posedge reset)
 	     begin
 		consume <= $dist_uniform(seed, 0, 99) < consume_rate;
 	     end
