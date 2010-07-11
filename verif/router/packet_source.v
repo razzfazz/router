@@ -28,8 +28,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-`default_nettype none
-
 module packet_source
   (clk, reset, router_address, flit_ctrl, flit_data, flow_ctrl, run, error);
    
