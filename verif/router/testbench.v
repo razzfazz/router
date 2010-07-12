@@ -184,17 +184,30 @@ module testbench
 	   else
 	     begin
 		
-		wire [0:flow_ctrl_width-1] flow_ctrl;
-		assign flow_ctrl
+		wire [0:flow_ctrl_width-1] flow_ctrl_out;
+		assign flow_ctrl_out
 		  = flow_ctrl_out_ip[ip*flow_ctrl_width:
 				     (ip+1)*flow_ctrl_width-1];
 		
-		assign cred_valid_out_ip[ip] = flow_ctrl[0];
+		assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
+		
+		wire [0:flow_ctrl_width-1] flow_ctrl_dly;
+		c_shift_reg
+		  #(.width(flow_ctrl_width),
+		    .depth(channel_latency),
+		    .reset_type(reset_type))
+		flow_ctrl_dly_sr
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .data_in(flow_ctrl_out),
+		   .data_out(flow_ctrl_dly));
 		
 		wire [0:flit_ctrl_width-1] flit_ctrl;
 		wire [0:flit_data_width-1] flit_data;
 		
-		wire 			      ps_error;
+		wire 			   ps_error;
+		
 		packet_source
 		  #(.initial_seed(initial_seed+ip),
 		    .max_packet_count(max_packet_count),
@@ -225,17 +238,44 @@ module testbench
 		   .router_address(router_address),
 		   .flit_ctrl(flit_ctrl),
 		   .flit_data(flit_data),
-		   .flow_ctrl(flow_ctrl),
+		   .flow_ctrl(flow_ctrl_dly),
 		   .run(run),
 		   .error(ps_error));
 		
+		wire [0:flit_ctrl_width-1]    flit_ctrl_dly;
+		c_shift_reg
+		  #(.width(flit_ctrl_width),
+		    .depth(channel_latency),
+		    .reset_type(reset_type))
+		flit_ctrl_dly_sr
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .data_in(flit_ctrl),
+		   .data_out(flit_ctrl_dly));
+		
 		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
 				       (ip+1)*flit_ctrl_width-1]
-		  = flit_ctrl;
-		assign flit_valid_in_ip[ip] = flit_ctrl[0];
+		  = flit_ctrl_dly;
+		
+		assign flit_valid_in_ip[ip] = flit_ctrl_dly[0];
+		
+		wire [0:flit_data_width-1]    flit_data_dly;
+		c_shift_reg
+		  #(.width(flit_data_width),
+		    .depth(channel_latency),
+		    .reset_type(reset_type))
+		flit_data_dly_sr
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .data_in(flit_data),
+		   .data_out(flit_data_dly));
+							   
 		assign flit_data_in_ip[ip*flit_data_width:
 				       (ip+1)*flit_data_width-1]
-		  =  flit_data;
+		  =  flit_data_dly;
+		
 		assign ps_error_ip[ip] = ps_error;
 		
 	     end
