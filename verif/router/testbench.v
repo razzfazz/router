@@ -145,17 +145,15 @@ module testbench
    wire [0:num_ports-1] 		flit_valid_out_op;
    wire [0:num_ports-1] 		cred_valid_in_op;
    
-   wire [0:num_ports-1] 		   ps_error_ip;
+   wire [0:num_ports-1] 		ps_error_ip;
    
-   wire 				   rtr_error;
+   reg [0:router_addr_width-1] 		router_address;
    
-   reg [0:router_addr_width-1] 		   router_address;
+   reg 					run;
    
-   reg 					   run;
-   
-   generate
+   genvar 				ip;
       
-      genvar 				   ip;
+   generate
       
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
@@ -242,6 +240,8 @@ module testbench
 		   .run(run),
 		   .error(ps_error));
 		
+		assign ps_error_ip[ip] = ps_error;
+		
 		wire [0:flit_ctrl_width-1]    flit_ctrl_dly;
 		c_shift_reg
 		  #(.width(flit_ctrl_width),
@@ -276,12 +276,13 @@ module testbench
 				       (ip+1)*flit_data_width-1]
 		  =  flit_data_dly;
 		
-		assign ps_error_ip[ip] = ps_error;
-		
 	     end
 	end
       
    endgenerate
+   
+   
+   wire 				      rtr_error;
    
    router_wrap
      #(.topology(topology),
@@ -331,6 +332,7 @@ module testbench
       .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(rtr_error));
    
+   
    wire 				      rchk_error;
    
    router_checker
@@ -362,11 +364,11 @@ module testbench
       .error(rchk_error));
    
    
-   wire [0:num_ports-1] 		      buffer_error_op;
+   wire [0:num_ports-1] 		      fs_error_op;
+   
+   genvar 				      op;
    
    generate
-      
-      genvar 				      op;
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
@@ -389,137 +391,27 @@ module testbench
 	      .data_in(flit_ctrl_out),
 	      .data_out(flit_ctrl_dly));
 	   
-	   wire 		      flit_valid_dly;
-	   assign flit_valid_dly = flit_ctrl_dly[0];
+	   wire [0:flow_ctrl_width-1] flow_ctrl;
 	   
-	   integer 		      seed = initial_seed + num_ports + op;
+	   wire 		      fs_error;
 	   
-	   reg 			      consume;
-	   
-	   always @(posedge clk, posedge reset)
-	     begin
-		consume <= $dist_uniform(seed, 0, 99) < consume_rate;
-	     end
-	   
-	   wire [0:flow_ctrl_width-1] flow_ctrl_s;
-	   
-	   wire [0:num_vcs-1] 	      buffer_empty_vc;
-	   
-	   wire [0:num_vcs-1] 	      buffer_push_vc;
-	   wire [0:num_vcs-1] 	      buffer_pop_vc;
-	   
-	   if(num_vcs > 1)
-	     begin
-		
-		wire [0:vc_idx_width-1] flit_vc_dly;
-		assign flit_vc_dly = flit_ctrl_dly[1:1+vc_idx_width-1];
-		
-		wire [0:num_vcs-1] 	sel_vc;
-		c_decode
-		  #(.num_ports(num_vcs))
-		sel_vc_in_dec
-		  (.data_in(flit_vc_dly),
-		   .data_out(sel_vc));
-		
-		assign buffer_push_vc = {num_vcs{flit_valid_dly}} & sel_vc;
-		
-		wire [0:num_vcs-1] 	req_vc;
-		assign req_vc = ~buffer_empty_vc;
-		
-		wire 			update;
-		assign update = ~&buffer_empty_vc & consume;
-		
-		wire [0:num_vcs-1] 	gnt_vc;
-		c_rr_arbiter
-		  #(.num_ports(num_vcs),
-		    .reset_type(reset_type))
-		buffer_sel_vc_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .update(update),
-		   .active(1'b1),
-		   .req(req_vc),
-		   .gnt(gnt_vc));
-		
-		assign buffer_pop_vc = {num_vcs{consume}} & gnt_vc;
-		
-		wire [0:vc_idx_width-1] flit_vc_out;
-		c_encode
-		  #(.num_ports(num_vcs))
-		flit_vc_out_enc
-		  (.data_in(gnt_vc),
-		   .data_out(flit_vc_out));
-		
-		assign flow_ctrl_s[0] = update;
-		assign flow_ctrl_s[1:1+vc_idx_width-1] = flit_vc_out;
-		
-	     end
-	   else
-	     begin
-		assign buffer_push_vc = flit_valid_dly;
-		assign buffer_pop_vc = ~buffer_empty_vc & consume;
-		assign flow_ctrl_s = buffer_pop_vc;
-	     end
-	   
-	   wire [0:num_vcs-1]       buffer_error_vc;
-	   
-	   genvar 		    vc;
-	   
-	   for(vc = 0; vc < num_vcs; vc = vc + 1)
-	     begin:vcs
-		
-		wire buffer_push;
-		assign buffer_push = buffer_push_vc[vc];
-		
-		wire buffer_pop;
-		assign buffer_pop = buffer_pop_vc[vc];
-		
-		wire [0:flit_buffer_idx_width-1] buffer_write_addr;
-		wire [0:flit_buffer_idx_width-1] buffer_read_addr;		
-		wire [0:flit_buffer_idx_width-1] buffer_peek_addr;		
-		wire buffer_almost_empty;
-		wire buffer_empty;
-		wire buffer_almost_full;
-		wire buffer_full;
-		wire [0:1] buffer_errors;
-		c_fifo_ctrl
-		  #(.addr_width(flit_buffer_idx_width),
-		    .depth(num_flit_buffers),
-		    .reset_type(reset_type))
-		buffer
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .push(buffer_push),
-		   .pop(buffer_pop),
-		   .write_addr(buffer_write_addr),
-		   .read_addr(buffer_read_addr),
-		   .peek_addr(buffer_peek_addr),
-		   .almost_empty(buffer_almost_empty),
-		   .empty(buffer_empty),
-		   .almost_full(buffer_almost_full),
-		   .full(buffer_full),
-		   .errors(buffer_errors));
-		
-		assign buffer_empty_vc[vc] = buffer_empty;
-		assign buffer_error_vc[vc] = |buffer_errors;
-		
-	     end
-	   
-	   assign buffer_error_op[op] = |buffer_error_vc;
-	   
-	   wire [0:flow_ctrl_width-1] flow_ctrl_q;
-	   c_dff
-	     #(.width(flow_ctrl_width),
+	   flit_sink
+	     #(.initial_seed(initial_seed + num_ports + op),
+	       .consume_rate(consume_rate),
+	       .num_flit_buffers(num_flit_buffers),
+	       .num_vcs(num_vcs),
+	       .packet_format(packet_format),
 	       .reset_type(reset_type))
-	   flow_ctrlq
+	   fs
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(1'b1),
-	      .d(flow_ctrl_s),
-	      .q(flow_ctrl_q));
+	      .flit_ctrl(flit_ctrl_dly),
+	      .flow_ctrl(flow_ctrl),
+	      .error(fs_error));
 	   
-	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
+	   assign fs_error_op[op] = fs_error;
+	   
+	   wire [0:flow_ctrl_width-1] flow_ctrl_dly;
 	   c_shift_reg
 	     #(.width(flow_ctrl_width),
 	       .depth(channel_latency),
@@ -528,19 +420,20 @@ module testbench
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
-	      .data_in(flow_ctrl_q),
-	      .data_out(flow_ctrl_in));
+	      .data_in(flow_ctrl),
+	      .data_out(flow_ctrl_dly));
 	   
 	   assign flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1]
-		    = flow_ctrl_in;
-	   assign cred_valid_in_op[op] = flow_ctrl_in[0];
+		    = flow_ctrl_dly;
+	   
+	   assign cred_valid_in_op[op] = flow_ctrl_dly[0];
 	   
 	end
       
    endgenerate
    
    wire [0:2] tb_errors;
-   assign tb_errors = {|ps_error_ip, |buffer_error_op, rchk_error};
+   assign tb_errors = {|ps_error_ip, |fs_error_op, rchk_error};
    
    wire       tb_error;
    assign tb_error = |tb_errors;

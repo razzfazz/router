@@ -1,0 +1,217 @@
+// $Id$
+
+/*
+Copyright (c) 2007-2009, Trustees of The Leland Stanford Junior University
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this 
+list of conditions and the following disclaimer in the documentation and/or 
+other materials provided with the distribution.
+Neither the name of the Stanford University nor the names of its contributors 
+may be used to endorse or promote products derived from this software without 
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+module flit_sink
+  (clk, reset, flit_ctrl, flow_ctrl, error);
+   
+`include "c_functions.v"
+`include "c_constants.v"
+`include "rtr_constants.v"
+   
+   parameter initial_seed = 0;
+   
+   // flit consumption rate (percentage of cycles)
+   parameter consume_rate = 50;
+   
+   // flit buffer entries per VC
+   parameter num_flit_buffers = 8;
+   
+   // number of VCs
+   parameter num_vcs = 8;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // width of flit control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width = 1 + vc_idx_width;
+   
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   input clk;
+   input reset;
+   
+   input [0:flit_ctrl_width-1] flit_ctrl;
+   
+   output [0:flow_ctrl_width-1] flow_ctrl;
+   wire [0:flow_ctrl_width-1] 	flow_ctrl;
+   
+   output 			error;
+   wire 			error;
+   
+   integer 			seed = initial_seed;
+   
+   wire 			flit_valid;
+   assign flit_valid = flit_ctrl[0];
+   
+   reg 				consume;
+   
+   always @(posedge clk, posedge reset)
+     begin
+	consume <= $dist_uniform(seed, 0, 99) < consume_rate;
+     end
+   
+   wire [0:flow_ctrl_width-1] flow_ctrl_s;
+   
+   wire [0:num_vcs-1] 	      buffer_empty_ivc;
+   
+   wire [0:num_vcs-1] 	      buffer_push_ivc;
+   wire [0:num_vcs-1] 	      buffer_pop_ivc;
+   
+   wire [0:num_vcs-1] 	      buffer_error_ivc;
+   
+   generate
+      
+      if(num_vcs > 1)
+	begin
+	   
+	   wire [0:vc_idx_width-1] flit_vc;
+	   assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
+	   
+	   wire [0:num_vcs-1] 	   sel_ivc;
+	   c_decode
+	     #(.num_ports(num_vcs))
+	   sel_ivc_in_dec
+	     (.data_in(flit_vc),
+	      .data_out(sel_ivc));
+	   
+	   assign buffer_push_ivc = {num_vcs{flit_valid}} & sel_ivc;
+	   
+	   wire [0:num_vcs-1] 	   req_ivc;
+	   assign req_ivc = ~buffer_empty_ivc;
+	   
+	   wire 		   update;
+	   assign update = ~&buffer_empty_ivc & consume;
+	   
+	   wire [0:num_vcs-1] 	   gnt_ivc;
+	   c_rr_arbiter
+	     #(.num_ports(num_vcs),
+	       .reset_type(reset_type))
+	   buffer_sel_ivc_arb
+	     (.clk(clk),
+	      .reset(reset),
+	      .update(update),
+	      .active(1'b1),
+	      .req(req_ivc),
+	      .gnt(gnt_ivc));
+	   
+	   assign buffer_pop_ivc = {num_vcs{consume}} & gnt_ivc;
+	   
+	   wire [0:vc_idx_width-1] flit_vc_out;
+	   c_encode
+	     #(.num_ports(num_vcs))
+	   flit_vc_out_enc
+	     (.data_in(gnt_ivc),
+	      .data_out(flit_vc_out));
+	   
+	   assign flow_ctrl_s[0] = update;
+	   assign flow_ctrl_s[1:1+vc_idx_width-1] = flit_vc_out;
+	   
+	end
+      else
+	begin
+	   assign buffer_push_ivc = flit_valid;
+	   assign buffer_pop_ivc = ~buffer_empty_ivc & consume;
+	   assign flow_ctrl_s = buffer_pop_ivc;
+	end
+      
+      genvar 		    ivc;
+      
+      for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	begin:ivcs
+	   
+	   wire buffer_push;
+	   assign buffer_push = buffer_push_ivc[ivc];
+	   
+	   wire buffer_pop;
+	   assign buffer_pop = buffer_pop_ivc[ivc];
+	   
+	   wire [0:flit_buffer_idx_width-1] buffer_write_addr;
+	   wire [0:flit_buffer_idx_width-1] buffer_read_addr;		
+	   wire [0:flit_buffer_idx_width-1] buffer_peek_addr;		
+	   wire 			    buffer_almost_empty;
+	   wire 			    buffer_empty;
+	   wire 			    buffer_almost_full;
+	   wire 			    buffer_full;
+	   wire [0:1] 			    buffer_errors;
+	   c_fifo_ctrl
+	     #(.addr_width(flit_buffer_idx_width),
+	       .depth(num_flit_buffers),
+	       .reset_type(reset_type))
+	   buffer
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .push(buffer_push),
+	      .pop(buffer_pop),
+	      .write_addr(buffer_write_addr),
+	      .read_addr(buffer_read_addr),
+	      .peek_addr(buffer_peek_addr),
+	      .almost_empty(buffer_almost_empty),
+	      .empty(buffer_empty),
+	      .almost_full(buffer_almost_full),
+	      .full(buffer_full),
+	      .errors(buffer_errors));
+	   
+	   assign buffer_empty_ivc[ivc] = buffer_empty;
+	   assign buffer_error_ivc[ivc] = |buffer_errors;
+	   
+	end
+      
+   endgenerate
+   
+   assign error = |buffer_error_ivc;
+   
+   wire [0:flow_ctrl_width-1] 		    flow_ctrl_q;
+   c_dff
+     #(.width(flow_ctrl_width),
+       .reset_type(reset_type))
+   flow_ctrlq
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(flow_ctrl_s),
+      .q(flow_ctrl_q));
+   
+   assign flow_ctrl = flow_ctrl_q;
+   
+endmodule
