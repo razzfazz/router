@@ -938,44 +938,22 @@ module vcr_op_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
+   // synopsys translate_off
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_unmatched)
+	  $display("ERROR: Unmatched flit in module %m.");
+	
+     end
+   
+   // synopsys translate_on
+   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
-	   
-	   // synopsys translate_off
-	   
-	   integer i;
-	   
-	   always @(posedge clk)
-	     begin
-		
-		if(error_unmatched)
-		  $display("ERROR: Unmatched flit in module %m.");
-		
-		for(i = 0; i < num_vcs; i = i + 1)
-		  begin
-		     
-		     if(ovcc_errors_ovc[i*4])
-		       $display({"ERROR: Credit tracker underflow in module ",
-				 "%m."});
-		     
-		     if(ovcc_errors_ovc[i*4+1])
-		       $display({"ERROR: Credit tracker overflow in module ", 
-				 "%m."});
-		     
-		     if(ovcc_errors_ovc[i*4+2])
-		       $display({"ERROR: Head credit tracker underflow in ", 
-				 "module %m."});
-		     
-		     if(ovcc_errors_ovc[i*4+3])
-		       $display({"ERROR: Head credit tracker overflow in ", 
-				 "module %m."});
-		     
-		  end
-		
-	     end
-	   // synopsys translate_on
 	   
 	   wire [0:1+num_vcs*4-1] errors_s, errors_q;
 	   assign errors_s = {error_unmatched, ovcc_errors_ovc};
