@@ -118,6 +118,22 @@ module testbench
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
+   // width required to select individual port
+   localparam port_idx_width = clogb(num_ports);
+   
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = lookahead_routing ? 
+       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
+       0;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = num_resource_classes * router_addr_width + node_addr_width;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -126,6 +142,9 @@ module testbench
        (1 + vc_idx_width + 1) : 
        -1;
    
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
@@ -133,14 +152,12 @@ module testbench
    reg clk;
    reg reset;
    
-   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
-   wire [0:num_ports*flit_data_width-1] flit_data_in_ip;
+   wire [0:num_ports*channel_width-1] channel_in_ip;
    wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
    wire [0:num_ports-1] 		flit_valid_in_ip;
    wire [0:num_ports-1] 		cred_valid_out_ip;
    
-   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
+   wire [0:num_ports*channel_width-1] 	channel_out_op;
    wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
    wire [0:num_ports-1] 		flit_valid_out_op;
    wire [0:num_ports-1] 		cred_valid_in_op;
@@ -161,13 +178,9 @@ module testbench
 	   if(inject_node_ports_only && (ip < (num_ports-num_nodes_per_router)))
 	     begin
 		
-		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
-				       (ip+1)*flit_ctrl_width-1]
-		  = {flit_ctrl_width{1'b0}};
+		assign channel_in_ip[ip*channel_width:(ip+1)*channel_width-1]
+		  = {channel_width{1'b0}};
 		assign flit_valid_in_ip[ip] = 1'b0;
-		assign flit_data_in_ip[ip*flit_data_width:
-				       (ip+1)*flit_data_width-1]
-		  = {flit_data_width{1'b0}};
 		
 		wire [0:flow_ctrl_width-1] flow_ctrl_out;
 		assign flow_ctrl_out
@@ -201,8 +214,8 @@ module testbench
 		   .data_in(flow_ctrl_out),
 		   .data_out(flow_ctrl_dly));
 		
-		wire [0:flit_ctrl_width-1] flit_ctrl;
-		wire [0:flit_data_width-1] flit_data;
+		wire [0:channel_width-1]   channel;
+		wire 			   flit_valid;
 		
 		wire 			   ps_error;
 		
@@ -234,47 +247,42 @@ module testbench
 		  (.clk(clk),
 		   .reset(reset),
 		   .router_address(router_address),
-		   .flit_ctrl(flit_ctrl),
-		   .flit_data(flit_data),
+		   .channel(channel),
+		   .flit_valid(flit_valid),
 		   .flow_ctrl(flow_ctrl_dly),
 		   .run(run),
 		   .error(ps_error));
 		
 		assign ps_error_ip[ip] = ps_error;
 		
-		wire [0:flit_ctrl_width-1]    flit_ctrl_dly;
+		wire [0:channel_width-1]    channel_dly;
 		c_shift_reg
-		  #(.width(flit_ctrl_width),
+		  #(.width(channel_width),
 		    .depth(channel_latency),
 		    .reset_type(reset_type))
-		flit_ctrl_dly_sr
+		channel_dly_sr
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(1'b1),
-		   .data_in(flit_ctrl),
-		   .data_out(flit_ctrl_dly));
+		   .data_in(channel),
+		   .data_out(channel_dly));
 		
-		assign flit_ctrl_in_ip[ip*flit_ctrl_width:
-				       (ip+1)*flit_ctrl_width-1]
-		  = flit_ctrl_dly;
+		assign channel_in_ip[ip*channel_width:(ip+1)*channel_width-1]
+		  = channel_dly;
 		
-		assign flit_valid_in_ip[ip] = flit_ctrl_dly[0];
-		
-		wire [0:flit_data_width-1]    flit_data_dly;
+		wire 			    flit_valid_dly;
 		c_shift_reg
-		  #(.width(flit_data_width),
+		  #(.width(1),
 		    .depth(channel_latency),
 		    .reset_type(reset_type))
-		flit_data_dly_sr
+		flit_valid_dly_sr
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(1'b1),
-		   .data_in(flit_data),
-		   .data_out(flit_data_dly));
-							   
-		assign flit_data_in_ip[ip*flit_data_width:
-				       (ip+1)*flit_data_width-1]
-		  =  flit_data_dly;
+		   .data_in(flit_valid),
+		   .data_out(flit_valid_dly));
+		
+		assign flit_valid_in_ip[ip] = flit_valid_dly;
 		
 	     end
 	end
@@ -282,7 +290,7 @@ module testbench
    endgenerate
    
    
-   wire 				      rtr_error;
+   wire 				    rtr_error;
    
    router_wrap
      #(.topology(topology),
@@ -324,11 +332,9 @@ module testbench
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .flit_ctrl_in_ip(flit_ctrl_in_ip),
-      .flit_data_in_ip(flit_data_in_ip),
+      .channel_in_ip(channel_in_ip),
       .flow_ctrl_out_ip(flow_ctrl_out_ip),
-      .flit_ctrl_out_op(flit_ctrl_out_op),
-      .flit_data_out_op(flit_data_out_op),
+      .channel_out_op(channel_out_op),
       .flow_ctrl_in_op(flow_ctrl_in_op),
       .error(rtr_error));
    
@@ -357,10 +363,8 @@ module testbench
      (.clk(clk),
       .reset(reset),
       .router_address(router_address),
-      .flit_ctrl_in_ip(flit_ctrl_in_ip),
-      .flit_data_in_ip(flit_data_in_ip),
-      .flit_ctrl_out_op(flit_ctrl_out_op),
-      .flit_data_out_op(flit_data_out_op),
+      .channel_in_ip(channel_in_ip),
+      .channel_out_op(channel_out_op),
       .error(rchk_error));
    
    
@@ -373,23 +377,26 @@ module testbench
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
+	   wire [0:channel_width-1] channel_out;
+	   assign channel_out = channel_out_op[op*channel_width:
+					       (op+1)*channel_width-1];
+	   
 	   wire [0:flit_ctrl_width-1] flit_ctrl_out;
-	   assign flit_ctrl_out = flit_ctrl_out_op[op*flit_ctrl_width:
-						   (op+1)*flit_ctrl_width-1];
+	   assign flit_ctrl_out = channel_out[0:flit_ctrl_width-1];
 	   
 	   assign flit_valid_out_op[op] = flit_ctrl_out[0];
 	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl_dly;
+	   wire [0:channel_width-1] channel_dly;
 	   c_shift_reg
-	     #(.width(flit_ctrl_width),
+	     #(.width(channel_width),
 	       .depth(channel_latency),
 	       .reset_type(reset_type))
-	   flit_ctrl_dly_sr
+	   channel_dly_sr
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
-	      .data_in(flit_ctrl_out),
-	      .data_out(flit_ctrl_dly));
+	      .data_in(channel_out),
+	      .data_out(channel_dly));
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl;
 	   
@@ -401,11 +408,16 @@ module testbench
 	       .num_flit_buffers(num_flit_buffers),
 	       .num_vcs(num_vcs),
 	       .packet_format(packet_format),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
+	       .la_route_info_width(la_route_info_width),
+	       .route_info_width(route_info_width),
+	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   fs
 	     (.clk(clk),
 	      .reset(reset),
-	      .flit_ctrl(flit_ctrl_dly),
+	      .channel(channel_dly),
 	      .flow_ctrl(flow_ctrl),
 	      .error(fs_error));
 	   

@@ -32,9 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // top-level module for wormhole router
 module whr_top
-  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
-   flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
-   error);
+  (clk, reset, router_address, channel_in_ip, flow_ctrl_out_ip, channel_out_op, 
+   flow_ctrl_in_op, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -62,6 +61,9 @@ module whr_top
    // number of nodes per router (a.k.a. concentration factor)
    parameter num_nodes_per_router = 1;
    
+   // width required to select individual node at current router
+   localparam node_addr_width = clogb(num_nodes_per_router);
+   
    // connectivity within each dimension
    parameter connectivity = `CONNECTIVITY_LINE;
    
@@ -81,6 +83,15 @@ module whr_top
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
+   // width required for routing information for a single hop
+   localparam hop_route_info_width = port_idx_width;
+   
+   // width of global addresses
+   localparam addr_width = router_addr_width + node_addr_width;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width = addr_width;
+   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -92,6 +103,10 @@ module whr_top
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
    
+   // number of bits required to represent all possible payload sizes
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -102,6 +117,9 @@ module whr_top
    
    // width of flit payload data
    parameter flit_data_width = 64;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1;
@@ -122,6 +140,10 @@ module whr_top
    
    // enable lookahead routing
    parameter lookahead_routing = 1;
+   
+   // width required for lookahead routing information
+   localparam la_route_info_width
+     = lookahead_routing ? hop_route_info_width : 0;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
@@ -155,50 +177,43 @@ module whr_top
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // control signals for each incoming flit
-   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
-   
-   // flit data for each incoming flit
-   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
+   // incoming channels
+   input [0:num_ports*channel_width-1] channel_in_ip;
    
    // outgoing flow control signals
    output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
-   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1]   flow_ctrl_out_ip;
    
-   // control signals for each outgoing flit
-   output [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   
-   // flit data for each outgoing flit
-   output [0:num_ports*flit_data_width-1] flit_data_out_op;
-   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
+   // outgoing channels
+   output [0:num_ports*channel_width-1]   channel_out_op;
+   wire [0:num_ports*channel_width-1] 	  channel_out_op;
    
    // incoming flow control signals
-   input [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
+   input [0:num_ports*flow_ctrl_width-1]  flow_ctrl_in_op;
    
    // internal error condition detected
-   output error;
-   wire 				error;
+   output 				  error;
+   wire 				  error;
    
    
    //---------------------------------------------------------------------------
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	req_ip_op;
-   wire [0:num_ports-1] 		req_head_ip;
-   wire [0:num_ports-1] 		req_tail_ip;
-   wire [0:num_ports*num_ports-1] 	gnt_ip_op;
+   wire [0:num_ports*num_ports-1] 	  req_ip_op;
+   wire [0:num_ports-1] 		  req_head_ip;
+   wire [0:num_ports-1] 		  req_tail_ip;
+   wire [0:num_ports*num_ports-1] 	  gnt_ip_op;
    
-   wire [0:num_ports-1] 		xbr_active_ip;
+   wire [0:num_ports-1] 		  xbr_active_ip;
    
-   wire [0:num_ports*flit_data_width-1] xbr_data_in_ip;
+   wire [0:num_ports*flit_data_width-1]   xbr_data_in_ip;
    
-   wire [0:num_ports-1] 		ipc_error_ip;
+   wire [0:num_ports-1] 		  ipc_error_ip;
    
    generate
       
-      genvar 				    ip;
+      genvar 				  ip;
       
       for (ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
@@ -208,21 +223,17 @@ module whr_top
 	   // input controller
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl_in;
-	   assign flit_ctrl_in
-	     = flit_ctrl_in_ip[ip*flit_ctrl_width:(ip+1)*flit_ctrl_width-1];
+	   wire [0:channel_width-1] channel_in;
+	   assign channel_in
+	     = channel_in_ip[ip*channel_width:(ip+1)*channel_width-1];
 	   
-	   wire [0:flit_data_width-1] flit_data_in;
-	   assign flit_data_in
-	     = flit_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1];
-	   
-	   wire [0:num_ports-1]       gnt_op;
+	   wire [0:num_ports-1]     gnt_op;
 	   assign gnt_op = gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
-	   wire [0:num_ports-1]       req_op;
-	   wire                       req_head;
-	   wire                       req_tail;
-	   wire 		      xbr_active;
+	   wire [0:num_ports-1]     req_op;
+	   wire 		    req_head;
+	   wire 		    req_tail;
+	   wire 		    xbr_active;
 	   wire [0:flit_data_width-1] flit_data_out;
 	   wire [0:flow_ctrl_width-1] flow_ctrl_out;
 	   wire 		      ipc_error;
@@ -254,8 +265,7 @@ module whr_top
 	     (.clk(clk),
 	      .reset(reset),
 	      .router_address(router_address),
-	      .flit_ctrl_in(flit_ctrl_in),
-	      .flit_data_in(flit_data_in),
+	      .channel_in(channel_in),
 	      .req_op(req_op),
 	      .req_head(req_head),
 	      .req_tail(req_tail),
@@ -331,22 +341,21 @@ module whr_top
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire [0:flit_data_width-1] 	  flit_data_in;
+	   wire [0:flit_data_width-1] flit_data_in;
 	   assign flit_data_in
 	     = xbr_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1];
 	   
-	   wire [0:flow_ctrl_width-1] 	  flow_ctrl_in;
+	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire [0:num_ports-1] 	  req_ip;
+	   wire [0:num_ports-1]       req_ip;
 	   assign req_ip = req_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire [0:num_ports-1] 	  gnt_ip;
-	   wire [0:num_ports-1] 	  xbr_ctrl_ip;
-	   wire [0:flit_ctrl_width-1] 	  flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	  flit_data_out;
-	   wire 			  opc_error;
+	   wire [0:num_ports-1]       gnt_ip;
+	   wire [0:num_ports-1]       xbr_ctrl_ip;
+	   wire [0:channel_width-1]   channel_out;
+	   wire 		      opc_error;
 	   whr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -372,18 +381,15 @@ module whr_top
 	      .gnt_ip(gnt_ip),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
 	      .flit_data_in(flit_data_in),
-	      .flit_ctrl_out(flit_ctrl_out),
-	      .flit_data_out(flit_data_out),
+	      .channel_out(channel_out),
 	      .error(opc_error));
 	   
 	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
 	   
 	   assign xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1] = xbr_ctrl_ip;
 	   
-	   assign flit_ctrl_out_op[op*flit_ctrl_width:(op+1)*flit_ctrl_width-1]
-		    = flit_ctrl_out;
-	   assign flit_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1]
-		    = flit_data_out;
+	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
+		    = channel_out;
 	   
 	   assign opc_error_op[op] = opc_error;
 	   

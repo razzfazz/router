@@ -32,9 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // top-level module for virtual channel router
 module vcr_top
-  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
-   flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
-   error);
+  (clk, reset, router_address, channel_in_ip, flow_ctrl_out_ip, channel_out_op, 
+   flow_ctrl_in_op, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -120,6 +119,9 @@ module vcr_top
    
    // width of flit payload data
    parameter flit_data_width = 64;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
@@ -273,42 +275,35 @@ module vcr_top
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // control signals for each incoming flit
-   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
-   
-   // flit data for each incoming flit
-   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
+   // incoming channels
+   input [0:num_ports*channel_width-1] channel_in_ip;
    
    // outgoing flow control signals
    output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
-   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1]   flow_ctrl_out_ip;
    
-   // control signals for each outgoing flit
-   output [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   
-   // flit data for each outgoing flit
-   output [0:num_ports*flit_data_width-1] flit_data_out_op;
-   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
+   // outgoing channels
+   output [0:num_ports*channel_width-1]   channel_out_op;
+   wire [0:num_ports*channel_width-1] 	  channel_out_op;
    
    // incoming flow control signals
-   input [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
+   input [0:num_ports*flow_ctrl_width-1]  flow_ctrl_in_op;
    
    // internal error condition detected
-   output error;
-   wire 				error;
+   output 				  error;
+   wire 				  error;
    
    
    //---------------------------------------------------------------------------
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs*port_idx_width-1] 	    route_port_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		    inc_rc_ip_ivc;
+   wire [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	       inc_rc_ip_ivc;
    
-   wire [0:num_ports*num_vcs-1] 		    vc_req_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		    vc_gnt_ip_ivc;
-   wire [0:num_ports*num_vcs*num_vcs_per_class-1]   vc_gnt_ip_ivc_ocvc;
+   wire [0:num_ports*num_vcs-1] 	       vc_req_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	       vc_gnt_ip_ivc;
+   wire [0:num_ports*num_vcs*num_vcs_per_class-1] vc_gnt_ip_ivc_ocvc;
    
    wire [0:num_ports*num_ports*sw_alloc_opc_out_width-1] sw_alloc_opc_out_ip_op;
    wire [0:num_ports*num_ports*sw_alloc_ipc_out_width-1] sw_alloc_ipc_out_ip_op;
@@ -338,9 +333,9 @@ module vcr_top
 	   
 	   wire [0:num_ports*sw_alloc_ipc_out_width-1] sw_alloc_ipc_out_op;
 	   
-	   wire [0:num_ports*sw_alloc_ipc_in_width-1] sw_alloc_ipc_in_op;
+	   wire [0:num_ports*sw_alloc_ipc_in_width-1]  sw_alloc_ipc_in_op;
 	   
-	   genvar op;
+	   genvar 				       op;
 	   
 	   for(op = 0; op < num_ports; op = op + 1)
 	     begin:ops
@@ -473,15 +468,11 @@ module vcr_top
 	   // input controller
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl_in;
-	   assign flit_ctrl_in
-	     = flit_ctrl_in_ip[ip*flit_ctrl_width:(ip+1)*flit_ctrl_width-1];
+	   wire [0:channel_width-1] channel_in;
+	   assign channel_in
+	     = channel_in_ip[ip*channel_width:(ip+1)*channel_width-1];
 	   
-	   wire [0:flit_data_width-1] flit_data_in;
-	   assign flit_data_in
-	     = flit_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1];
-	   
-	   wire [0:num_vcs-1] 	      vc_gnt_ivc;
+	   wire [0:num_vcs-1] 	    vc_gnt_ivc;
 	   assign vc_gnt_ivc = vc_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs*num_vcs_per_class-1] vc_gnt_ivc_ocvc;
@@ -535,8 +526,7 @@ module vcr_top
 	     (.clk(clk),
 	      .reset(reset),
 	      .router_address(router_address),
-	      .flit_ctrl_in(flit_ctrl_in),
-	      .flit_data_in(flit_data_in),
+	      .channel_in(channel_in),
 	      .route_port_ivc(route_port_ivc),
 	      .inc_rc_ivc(inc_rc_ivc),
 	      .vc_req_ivc(vc_req_ivc),
@@ -586,12 +576,12 @@ module vcr_top
    // virtual channel allocator
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs-1] 		       elig_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		elig_op_ovc;
    
-   wire [0:num_ports*num_vcs-1] 		       vc_req_op_ovc;
-   wire [0:num_ports*num_vcs-1] 		       vc_gnt_op_ovc;
-   wire [0:num_ports*num_vcs*num_ports-1] 	       vc_gnt_op_ovc_ip;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	       vc_gnt_op_ovc_ivc;
+   wire [0:num_ports*num_vcs-1] 		vc_req_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		vc_gnt_op_ovc;
+   wire [0:num_ports*num_vcs*num_ports-1] 	vc_gnt_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	vc_gnt_op_ovc_ivc;
    vcr_vc_alloc_mac
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
@@ -817,10 +807,9 @@ module vcr_top
 	   assign vc_gnt_ovc_ivc
 	     = vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:(op+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:flit_ctrl_width-1] 		      flit_ctrl_out;
-	   wire [0:flit_data_width-1] 		      flit_data_out;
-	   wire [0:num_vcs-1] 			      elig_ovc;
-	   wire 				      opc_error;
+	   wire [0:channel_width-1] 	channel_out;
+	   wire [0:num_vcs-1] 		elig_ovc;
+	   wire 			opc_error;
 	   vcr_op_ctrl_mac
 	     #(.num_flit_buffers(num_flit_buffers),
 	       .num_header_buffers(num_header_buffers),
@@ -855,15 +844,12 @@ module vcr_top
 	      .sw_alloc_out_ip(sw_alloc_opc_out_ip),
 	      .int_flit_ctrl_in(int_flit_ctrl_in),
 	      .flit_data_in(flit_data_in),
-	      .flit_ctrl_out(flit_ctrl_out),
-	      .flit_data_out(flit_data_out),
+	      .channel_out(channel_out),
 	      .elig_ovc(elig_ovc),
 	      .error(opc_error));
 	   
-	   assign flit_ctrl_out_op[op*flit_ctrl_width:(op+1)*flit_ctrl_width-1]
-		    = flit_ctrl_out;
-	   assign flit_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1]
-		    = flit_data_out;
+	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
+		    = channel_out;
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
 	   

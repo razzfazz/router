@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input port controller
 module whr_ip_ctrl_mac
-  (clk, reset, router_address, flit_ctrl_in, flit_data_in, req_op, req_head, 
-   req_tail, gnt_op, xbr_active, flit_data_out, flow_ctrl_out, error);
+  (clk, reset, router_address, channel_in, req_op, req_head, req_tail, gnt_op, 
+   xbr_active, flit_data_out, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -124,6 +124,9 @@ module whr_ip_ctrl_mac
    // width of flit payload data
    parameter flit_data_width = 64;
    
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    // width of flow control signals
    localparam flow_ctrl_width = 1;
    
@@ -192,11 +195,8 @@ module whr_ip_ctrl_mac
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // incoming flit control signals
-   input [0:flit_ctrl_width-1] 	 flit_ctrl_in;
-   
-   // incoming flit data
-   input [0:flit_data_width-1] 	 flit_data_in;
+   // incoming channel
+   input [0:channel_width-1] 	 channel_in;
    
    // request for output port
    output [0:num_ports-1] 	 req_op;
@@ -287,96 +287,36 @@ module whr_ip_ctrl_mac
    wire 	hold_input_stage_b;
    assign hold_input_stage_b = ~(flit_valid_in & hold_input_enable);
    
-   wire 	input_stage_active;
-   assign input_stage_active = hold_input_stage_b;
+   wire 	chi_active;
+   assign chi_active = hold_input_stage_b;
    
-   wire [0:flit_ctrl_width-1] 	  flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = flit_ctrl_in;
-	   
-   wire [0:flit_data_width-1] 	  flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = flit_data_in;
-   
-   generate
-	   
-      case(packet_format)
-	
-	`PACKET_FORMAT_HEAD_TAIL,
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     
-	     wire flit_valid_in_s, flit_valid_in_q;
-	     assign flit_valid_in_s = flit_ctrl_in_s[0];
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type))
-	     flit_valid_inq
-	       (.clk(clk),
-		.reset(reset),
-		.active(input_stage_active),
-		.d(flit_valid_in_s),
-		.q(flit_valid_in_q));
-	     
-	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
-	     
-	     c_dff
-	       #(.width(flit_ctrl_width-1),
-		 .reset_type(reset_type))
-	     flit_ctrl_inq
-	       (.clk(clk),
-		.reset(1'b0),
-		.active(input_stage_active),
-		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
-		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
-	     
-	  end
-	
-      endcase
-      
-   endgenerate
-   
-   c_dff
-     #(.width(flit_data_width),
-       .reset_type(reset_type))
-   flit_data_inq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(input_stage_active),
-      .d(flit_data_in_s),
-      .q(flit_data_in_q));
-   
-   // extract header information from header data
-   wire [0:header_info_width-1] header_info_in;
-   assign header_info_in = flit_data_in_q[0:header_info_width-1];
-   
-   
-   //---------------------------------------------------------------------------
-   // decode control signals
-   //---------------------------------------------------------------------------
-   
-   wire 			buffer_in_active;
-   assign buffer_in_active = flit_valid_thru;
-   
-   wire 			flit_head_in;   
-   wire 			flit_tail_in;
-   wire 			sel_in_ivc;
-   rtr_flit_ctrl_dec
+   wire 	flit_head_in;
+   wire 	flit_tail_in;
+   wire [0:flit_data_width-1] flit_data_in;
+   wire 		      sel_in_ivc;
+   rtr_channel_input
      #(.num_vcs(1),
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .la_route_info_width(la_route_info_width),
        .route_info_width(route_info_width),
+       .flit_data_width(flit_data_width),
        .reset_type(reset_type))
-   fcdec
+   chi
      (.clk(clk),
       .reset(reset),
-      .active(buffer_in_active),
-      .flit_ctrl_in(flit_ctrl_in_q),
-      .header_info_in(header_info_in),
+      .active(chi_active),
+      .channel_in(channel_in),
       .flit_valid_out(flit_valid_in),
       .flit_head_out(flit_head_in),
       .flit_tail_out(flit_tail_in),
+      .flit_data_out(flit_data_in),
       .sel_out_ivc(sel_in_ivc));
+   
+   // extract header information from header data
+   wire [0:header_info_width-1] header_info_in;
+   assign header_info_in = flit_data_in[0:header_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -444,8 +384,8 @@ module whr_ip_ctrl_mac
 	      .inc_rc(next_inc_rc));
 	   
 	   wire [0:port_idx_width-1] 	  next_route_port;
-	c_encode
-	  #(.num_ports(num_ports))
+	   c_encode
+	     #(.num_ports(num_ports))
 	   next_route_port_enc
 	     (.data_in(next_route_op),
 	      .data_out(next_route_port));
@@ -497,23 +437,26 @@ module whr_ip_ctrl_mac
    // generate head and tail indicators
    //---------------------------------------------------------------------------
 
-   wire 				    buffer_out_active;
+   wire 	buffer_in_active;
+   assign buffer_in_active = flit_valid_thru;
+   
+   wire 	buffer_out_active;
    assign buffer_out_active = ~fbc_empty;
    
-   wire 				    flags_active;
+   wire 	flags_active;
    assign flags_active = flit_valid;
    
-   wire                                     gnt;
+   wire 	gnt;
    assign gnt = |gnt_op;
    
    assign flit_valid_out = gnt;
    
-   wire 				    fbc_almost_empty;
-   wire [0:fbf_addr_width-1] 		    fbc_write_addr;
-   wire [0:fbf_addr_width-1] 		    fbc_read_addr;
+   wire 	fbc_almost_empty;
+   wire [0:fbf_addr_width-1] fbc_write_addr;
+   wire [0:fbf_addr_width-1] fbc_read_addr;
    
-   wire 				    flit_head_out;
-   wire 				    flit_tail_out;
+   wire 		     flit_head_out;
+   wire 		     flit_tail_out;
    
    generate
       
@@ -839,7 +782,7 @@ module whr_ip_ctrl_mac
    assign fbf_write_data[0:header_info_width-1]
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
-     = flit_data_in_q[header_info_width:flit_data_width-1];
+     = flit_data_in[header_info_width:flit_data_width-1];
    
    wire 			   fbf_write_enable;
    wire [0:fbf_addr_width-1] 	   fbf_read_addr;
@@ -946,6 +889,8 @@ module whr_ip_ctrl_mac
    // generate outgoing credits
    //---------------------------------------------------------------------------
    
+   // FIXME: The following should be in a separate module!
+   
    // NOTE: Because we need to clear it in the cycle after a credit has been 
    // transmitted, this register currently cannot be included in any of the 
    // other clock gating domains. If we could change this to send credits 
@@ -973,7 +918,7 @@ module whr_ip_ctrl_mac
       .active(cred_active),
       .d(cred_valid_s),
       .q(cred_valid_q));
-
+   
    assign cred_valid = cred_valid_q;
    
    assign flow_ctrl_out[0] = cred_valid;

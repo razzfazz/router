@@ -1,22 +1,22 @@
 # Begin_DVE_Session_Save_Info
 # DVE full session
-# Saved on Wed Oct 28 14:06:33 2009
+# Saved on Fri Jul 9 17:21:20 2010
 # Designs open: 1
 #   Sim: simv
 # Toplevel windows open: 2
 # 	TopLevel.1
 # 	TopLevel.2
 #   Source.1: testbench
-#   Wave.1: 15 signals
+#   Wave.1: 13 signals
 #   Group count = 1
-#   Group Group1 signal count = 15
+#   Group Group1 signal count = 13
 # End_DVE_Session_Save_Info
 
-# DVE version: C-2009.06_Full64
-# DVE build date: May 19 2009 21:20:39
+# DVE version: D-2009.12_Full64
+# DVE build date: Nov 13 2009 21:53:53
 
 
-#<Session mode="Full" path="/home/dub/work/router/trunk/verif/tc_node_mac/iolist.tcl" type="Debug">
+#<Session mode="Full" path="/home/dub/router/verif/tc_node_mac/iolist.tcl" type="Debug">
 
 gui_set_loading_session_type Post
 gui_continuetime_set
@@ -50,6 +50,7 @@ gui_close_window -type Local
 gui_close_window -type Watch
 gui_close_window -type Grading
 gui_close_window -type Group
+gui_close_window -type Transaction
 
 
 
@@ -69,7 +70,7 @@ if {![gui_exist_window -window TopLevel.1]} {
 } else { 
     set TopLevel.1 TopLevel.1
 }
-gui_show_window -window ${TopLevel.1} -show_state normal -rect {{457 449} {1570 1103}}
+gui_show_window -window ${TopLevel.1} -show_state normal -rect {{457 471} {1569 1124}}
 
 # ToolBar settings
 gui_set_toolbar_attributes -toolbar {TimeOperations} -dock_state top
@@ -109,17 +110,17 @@ gui_show_toolbar -toolbar {Zoom And Pan History}
 # End ToolBar settings
 
 # Docked window settings
-set HSPane.1 [gui_create_window -type HSPane -parent ${TopLevel.1} -dock_state left -dock_on_new_line true -dock_extent 551]
+set HSPane.1 [gui_create_window -type HSPane -parent ${TopLevel.1} -dock_state left -dock_on_new_line true -dock_extent 550]
 set Hier.1 [gui_share_window -id ${HSPane.1} -type Hier]
-gui_set_window_pref_key -window ${HSPane.1} -key dock_width -value_type integer -value 551
+gui_set_window_pref_key -window ${HSPane.1} -key dock_width -value_type integer -value 550
 gui_set_window_pref_key -window ${HSPane.1} -key dock_height -value_type integer -value 556
 gui_set_window_pref_key -window ${HSPane.1} -key dock_offset -value_type integer -value 0
-gui_update_layout -id ${HSPane.1} {{left 0} {top 0} {width 550} {height 290} {show_state normal} {dock_state left} {dock_on_new_line true} {child_hier_colhier 416} {child_hier_coltype 149} {child_hier_col1 0} {child_hier_col2 1}}
-set Console.1 [gui_create_window -type Console -parent ${TopLevel.1} -dock_state bottom -dock_on_new_line true -dock_extent 266]
+gui_update_layout -id ${HSPane.1} {{left 0} {top 0} {width 549} {height 266} {show_state normal} {dock_state left} {dock_on_new_line true} {child_hier_colhier 416} {child_hier_coltype 149} {child_hier_col1 0} {child_hier_col2 1}}
+set Console.1 [gui_create_window -type Console -parent ${TopLevel.1} -dock_state bottom -dock_on_new_line true -dock_extent 265]
 gui_set_window_pref_key -window ${Console.1} -key dock_width -value_type integer -value 1114
-gui_set_window_pref_key -window ${Console.1} -key dock_height -value_type integer -value 266
+gui_set_window_pref_key -window ${Console.1} -key dock_height -value_type integer -value 265
 gui_set_window_pref_key -window ${Console.1} -key dock_offset -value_type integer -value 0
-gui_update_layout -id ${Console.1} {{left 0} {top 0} {width 1113} {height 265} {show_state normal} {dock_state bottom} {dock_on_new_line true}}
+gui_update_layout -id ${Console.1} {{left 0} {top 0} {width 1112} {height 264} {show_state normal} {dock_state bottom} {dock_on_new_line true}}
 #### Start - Readjusting docked view's offset / size
 set dockAreaList { top left right bottom }
 foreach dockArea $dockAreaList {
@@ -165,7 +166,7 @@ if {![gui_exist_window -window TopLevel.2]} {
 } else { 
     set TopLevel.2 TopLevel.2
 }
-gui_show_window -window ${TopLevel.2} -show_state normal -rect {{61 150} {1598 1185}}
+gui_show_window -window ${TopLevel.2} -show_state normal -rect {{61 172} {1597 1206}}
 
 # ToolBar settings
 gui_set_toolbar_attributes -toolbar {TimeOperations} -dock_state top
@@ -210,7 +211,7 @@ gui_sync_global -id ${TopLevel.2} -option true
 # MDI window settings
 set Wave.1 [gui_create_window -type {Wave}  -parent ${TopLevel.2}]
 gui_show_window -window ${Wave.1} -show_state maximized
-gui_update_layout -id ${Wave.1} {{show_state maximized} {dock_state undocked} {dock_on_new_line false} {child_wave_left 446} {child_wave_right 1086} {child_wave_colname 221} {child_wave_colvalue 221} {child_wave_col1 0} {child_wave_col2 1}}
+gui_update_layout -id ${Wave.1} {{show_state maximized} {dock_state undocked} {dock_on_new_line false} {child_wave_left 446} {child_wave_right 1085} {child_wave_colname 221} {child_wave_colvalue 221} {child_wave_col1 0} {child_wave_col2 1}}
 
 # End MDI window settings
 
@@ -257,9 +258,10 @@ gui_set_time_units 1ns
 # Global: Signal Compare
 
 # Global: Signal Groups
+
 set {Group1} {Group1}
 gui_sg_create ${Group1}
-gui_sg_addsignal -group ${Group1} { {testbench.clk} {testbench.reset} {testbench.dut0_flit_ctrl} {testbench.dut0_flit_data} {testbench.dut0_flow_ctrl} {testbench.dut1_flit_ctrl} {testbench.dut1_flit_data} {testbench.dut1_flow_ctrl} {testbench.cfg_req} {testbench.cfg_write} {testbench.cfg_addr} {testbench.cfg_write_data} {testbench.cfg_read_data} {testbench.cfg_done} {testbench.error} }
+gui_sg_addsignal -group ${Group1} { {testbench.clk} {testbench.reset} {testbench.dut0_channel} {testbench.dut0_flow_ctrl} {testbench.dut1_channel} {testbench.dut1_flow_ctrl} {testbench.cfg_req} {testbench.cfg_write} {testbench.cfg_addr} {testbench.cfg_write_data} {testbench.cfg_read_data} {testbench.cfg_done} {testbench.error} }
 
 # Global: Highlighting
 
@@ -290,18 +292,19 @@ gui_list_set_filter -id ${Hier.1} -list { {Package 1} {All 1} {Process 1} {Unnam
 gui_list_set_filter -id ${Hier.1} -text {*}
 gui_hier_list_init -id ${Hier.1}
 gui_change_design -id ${Hier.1} -design Sim
-catch {gui_list_expand -id ${Hier.1} testbench}
-catch {gui_list_select -id ${Hier.1} {testbench.dut1}}
-gui_view_scroll -id ${Hier.1} -vertical -set 21
+catch {gui_list_select -id ${Hier.1} {testbench}}
+gui_view_scroll -id ${Hier.1} -vertical -set 0
 gui_view_scroll -id ${Hier.1} -horizontal -set 0
 
 # Data 'Data.1'
 gui_list_set_filter -id ${Data.1} -list { {Buffer 1} {Input 1} {Others 1} {Linkage 1} {Output 1} {Parameter 1} {All 1} {Aggregate 1} {Event 1} {Assertion 1} {Constant 1} {Interface 1} {Signal 1} {$unit 1} {Inout 1} {Variable 1} }
-gui_list_set_filter -id ${Data.1} -text {discard_packet}
-gui_list_show_data -id ${Data.1} {testbench.dut1}
+gui_list_set_filter -id ${Data.1} -text {*}
+gui_list_show_data -id ${Data.1} {testbench}
+gui_show_window -window ${Data.1}
+catch { gui_list_select -id ${Data.1} {testbench.dut1_channel }}
 gui_view_scroll -id ${Data.1} -vertical -set 0
 gui_view_scroll -id ${Data.1} -horizontal -set 0
-gui_view_scroll -id ${Hier.1} -vertical -set 21
+gui_view_scroll -id ${Hier.1} -vertical -set 0
 gui_view_scroll -id ${Hier.1} -horizontal -set 0
 
 # Source 'Source.1'
@@ -324,8 +327,7 @@ gui_wv_zoom_timerange -id ${Wave.1} 11771 11873
 gui_list_set_filter -id ${Wave.1} -list { {Buffer 1} {Input 1} {Others 1} {Linkage 1} {Output 1} {Parameter 1} {All 1} {Aggregate 1} {Event 1} {Assertion 1} {Constant 1} {Interface 1} {Signal 1} {$unit 1} {Inout 1} {Variable 1} }
 gui_list_set_filter -id ${Wave.1} -text {*}
 gui_list_add_group -id ${Wave.1} -after {New Group} {{Group1}}
-gui_list_expand -id ${Wave.1} testbench.dut0_flit_ctrl
-gui_list_set_insertion_bar  -id ${Wave.1} -group {New Group} -position in
+gui_list_set_insertion_bar  -id ${Wave.1} -group {Group1} -item {testbench.dut1_channel[0:35]} -position below
 gui_seek_criteria -id ${Wave.1} {Any Edge}
 
 
@@ -345,7 +347,7 @@ gui_view_scroll -id ${Wave.1} -vertical -set 0
 # DVE Active view and window setting: 
 
 gui_set_active_window -window ${DLPane.1}
-gui_set_active_window -window ${Console.1}
+gui_set_active_window -window ${DLPane.1}
 gui_set_active_window -window ${Wave.1}
 gui_set_active_window -window ${Wave.1}
 # Restore toplevel window zorder

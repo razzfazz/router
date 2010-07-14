@@ -29,8 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 module router_checker
-  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
-   flit_ctrl_out_op, flit_data_out_op, error);
+  (clk, reset, router_address, channel_in_ip, channel_out_op, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -131,6 +130,9 @@ module router_checker
    // width of flit payload data
    parameter flit_data_width = 64;
    
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
@@ -168,26 +170,21 @@ module router_checker
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // control signals for each incoming flit
-   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
+   // incoming channels
+   input [0:num_ports*channel_width-1] channel_in_ip;
    
-   // flit data for each incoming flit
-   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
-   
-   // control signals for each outgoing flit
-   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   
-   // flit data for each outgoing flit
-   input [0:num_ports*flit_data_width-1] flit_data_out_op;
+   // outgoing channels
+   input [0:num_ports*channel_width-1] channel_out_op;
    
    // error indicator
-   output error;
-   wire error;
+   output 			       error;
+   wire 			       error;
    
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
    
    wire [0:num_ports*num_vcs-1] 	  ref_valid_ip_ivc;
-   wire [0:num_ports*num_vcs*flit_ctrl_width-1] ref_ctrl_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  ref_head_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  ref_tail_ip_ivc;
    wire [0:num_ports*num_vcs*flit_data_width-1] ref_data_ip_ivc;
    wire [0:num_ports*num_vcs*port_idx_width-1] 	ref_port_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	ref_vcs_ip_ivc;
@@ -205,38 +202,33 @@ module router_checker
 	   // extract signals for this input port
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl;
-	   assign flit_ctrl
-	     = flit_ctrl_in_ip[ip*flit_ctrl_width:(ip+1)*flit_ctrl_width-1];
-	   
-	   wire [0:flit_data_width-1] flit_data;
-	   assign flit_data
-	     = flit_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1];
-	   
-	   wire [0:header_info_width-1]  header_info_in;
-	   assign header_info_in = flit_data[0:header_info_width-1];
+	   wire [0:channel_width-1] channel_in;
+	   assign channel_in
+	     = channel_in_ip[ip*channel_width:(ip+1)*channel_width-1];
 	   
 	   wire 			  flit_valid;
 	   wire 			  flit_head;
 	   wire 			  flit_tail;
+	   wire [0:flit_data_width-1] 	  flit_data;
 	   wire [0:num_vcs-1] 		  sel_ivc;
-	   rtr_flit_ctrl_dec
+	   rtr_channel_input
 	     #(.num_vcs(num_vcs),
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .la_route_info_width(la_route_info_width),
 	       .route_info_width(route_info_width),
+	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
-	   fcdec
+	   chi
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
-	      .flit_ctrl_in(flit_ctrl),
-	      .header_info_in(header_info_in),
+	      .channel_in(channel_in),
 	      .flit_valid_out(flit_valid),
 	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
+	      .flit_data_out(flit_data),
 	      .sel_out_ivc(sel_ivc));
 	   
 	   
@@ -290,6 +282,9 @@ module router_checker
 	   
 	   
 	   // compute destination port
+	   
+	   wire [0:header_info_width-1] 		       header_info_in;
+	   assign header_info_in = flit_data[0:header_info_width-1];
 	   
 	   wire [0:route_info_width-1] 			       route_info;
 	   assign route_info = header_info_in[la_route_info_width:
@@ -464,51 +459,45 @@ module router_checker
 		
 		// generate FIFO input data
 		
-		wire [0:(flit_ctrl_width+flit_data_width+port_idx_width+
-			 num_vcs)-1] data_in;
-		assign data_in[0:flit_ctrl_width-1] = flit_ctrl;
-		assign data_in[flit_ctrl_width:
-			       flit_ctrl_width+header_info_width-1]
+		wire [0:(flit_data_width+2+port_idx_width+num_vcs)-1] data_in;
+		assign data_in[0:header_info_width-1]
 		  = flit_head ? header_info_out : header_info_in;
-		assign data_in[flit_ctrl_width+header_info_width:
-			       flit_ctrl_width+flit_data_width-1]
+		assign data_in[header_info_width:flit_data_width-1]
 		  = flit_data[header_info_width:flit_data_width-1];
-		assign data_in[flit_ctrl_width+flit_data_width:
-			       flit_ctrl_width+flit_data_width+port_idx_width-1]
+		assign data_in[flit_data_width] = flit_head;
+		assign data_in[flit_data_width+1] = flit_tail;
+		assign data_in[flit_data_width+2:
+			       flit_data_width+2+port_idx_width-1]
 		  = dest_port_s;
-		assign data_in[flit_ctrl_width+flit_data_width+port_idx_width:
-			       flit_ctrl_width+flit_data_width+port_idx_width+
-			       num_vcs-1]
+		assign data_in[flit_data_width+2+port_idx_width:
+			       flit_data_width+2+port_idx_width+num_vcs-1]
 		  = dest_ovc_s;
 		
 		
 		// generate FIFO control signals
 		
-		wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
-		      num_vcs-1] data_out;
+		wire [0:flit_data_width+2+port_idx_width+num_vcs-1] data_out;
 		
-		wire 		 push;
+		wire push;
 		assign push = flit_valid & sel;
 		
-		wire 		 match;
+		wire match;
 		
-		wire 		 pop;
+		wire pop;
 		assign pop = match;
 		
-		wire 		 fifo_almost_full;
-		wire 		 fifo_full;
-		wire 		 fifo_almost_empty;
-		wire 		 fifo_empty;
-		wire [0:1] 	 fifo_errors;
-		wire [0:flit_ctrl_width+flit_data_width+port_idx_width+
-		      num_vcs-1] fifo_peek_data;
+		wire fifo_almost_full;
+		wire fifo_full;
+		wire fifo_almost_empty;
+		wire fifo_empty;
+		wire [0:1] fifo_errors;
+		wire [0:flit_data_width+2+port_idx_width+num_vcs-1] fifo_pdata;
 		
 		// instantiate the FIFO
 		
 		c_fifo
 		  #(.depth(num_flit_buffers),
-		    .width(flit_ctrl_width+flit_data_width+port_idx_width+
-			   num_vcs),
+		    .width(flit_data_width+2+port_idx_width+num_vcs),
 		    .reset_type(reset_type))
 		ref_fifo
 		  (.clk(clk),
@@ -521,7 +510,7 @@ module router_checker
 		   .almost_empty(fifo_almost_empty),
 		   .empty(fifo_empty),
 		   .read_data(data_out),
-		   .peek_data(fifo_peek_data),
+		   .peek_data(fifo_pdata),
 		   .pop(pop),
 		   .errors(fifo_errors));
 		
@@ -530,73 +519,71 @@ module router_checker
 		
 		// generate reference bit patterns
 		
-		wire [0:flit_ctrl_width-1] ref_ctrl;
-		assign ref_ctrl = data_out[0:flit_ctrl_width-1];
-		
 		wire [0:flit_data_width-1] ref_data;
-		assign ref_data
-		  = data_out[flit_ctrl_width:
-			     flit_ctrl_width+flit_data_width-1];
+		assign ref_data = data_out[0:flit_data_width-1];
+		
+		wire 			   ref_head;
+		assign ref_head = data_out[flit_data_width];
+		
+		wire 			   ref_tail;
+		assign ref_tail = data_out[flit_data_width+1];
 		
 		wire [0:port_idx_width-1]  ref_port;
-		assign ref_port
-		  = data_out[flit_ctrl_width+flit_data_width:
-			     flit_ctrl_width+flit_data_width+
-			     port_idx_width-1];
+		assign ref_port = data_out[flit_data_width+2:
+					   flit_data_width+2+port_idx_width-1];
 		
-		wire [0:num_vcs-1] 	   ref_ovc;
-		assign ref_ovc
-		  = data_out[flit_ctrl_width+flit_data_width+
-			     port_idx_width:
-			     flit_ctrl_width+flit_data_width+
-			     port_idx_width+num_vcs-1];
+		wire [0:num_vcs-1] 	   ref_sel_ovc;
+		assign ref_sel_ovc = data_out[flit_data_width+2+port_idx_width:
+					      flit_data_width+2+port_idx_width+
+					      num_vcs-1];
 		
 		
 		// extract observed bit patterns
 		
-		wire [0:flit_ctrl_width-1] check_ctrl;
-		assign check_ctrl
-		  = flit_ctrl_out_op[ref_port*flit_ctrl_width +:
-				     flit_ctrl_width];
+		wire [0:channel_width-1]   check_channel;
+		assign check_channel
+		  = channel_out_op[ref_port*channel_width +: channel_width];
 		
+		wire 			   check_valid;
+		wire 			   check_head;
+		wire 			   check_tail;
 		wire [0:flit_data_width-1] check_data;
-		assign check_data
-		  = flit_data_out_op[ref_port*flit_data_width +: 
-				     flit_data_width];
-		
-		// when comparing control bits, ignore the VC ID field as the 
-		// packet may change VCs inside the router (proper VC checking 
-		// is performed separately below) 
-		wire 			   match_ctrl;
-		if(flit_ctrl_width > (1 + vc_idx_width))
-		  assign match_ctrl = (ref_ctrl[0] == check_ctrl[0]) &&
-				      (ref_ctrl[1+vc_idx_width:
-						flit_ctrl_width-1] ==
-				       check_ctrl[1+vc_idx_width:
-						  flit_ctrl_width-1]);
-		else
-		  assign match_ctrl = (ref_ctrl[0] == check_ctrl[0]);
+		wire [0:num_vcs-1] 	   check_sel_ivc;
+		rtr_channel_input
+		  #(.num_vcs(num_vcs),
+		    .packet_format(packet_format),
+		    .max_payload_length(max_payload_length),
+		    .min_payload_length(min_payload_length),
+		    .la_route_info_width(la_route_info_width),
+		    .route_info_width(route_info_width),
+		    .flit_data_width(flit_data_width),
+		    .reset_type(reset_type))
+		chi
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .channel_in(check_channel),
+		   .flit_valid_out(check_valid),
+		   .flit_head_out(check_head),
+		   .flit_tail_out(check_tail),
+		   .flit_data_out(check_data),
+		   .sel_out_ivc(check_sel_ivc));
 		
 		wire 			     match_data;
 		assign match_data = (ref_data == check_data);
 		
-		// check VC mapping
+		wire 			     match_head;
+		assign match_head = (ref_head == check_head);
+		
+		wire 			     match_tail;
+		assign match_tail = (ref_tail == check_tail);
+		
 		wire 			     match_vcs;
-		if(num_vcs > 1)
-		  begin
-		     
-		     wire [0:vc_idx_width-1] check_vc;
-		     assign check_vc = check_ctrl[1:1+vc_idx_width-1];
-		     
-		     assign match_vcs = ref_ovc[check_vc];
-		     
-		  end
-		else
-		  assign match_vcs = ref_ovc[0];
+		assign match_vcs = |(ref_sel_ovc & check_sel_ivc);
 		
 		// check only if output is active and FIFO contains data
-		assign match = check_ctrl[0] & ~fifo_empty & 
-			       match_ctrl & match_data & match_vcs;
+		assign match = check_valid & ~fifo_empty & 
+			       match_head & match_tail & match_data & match_vcs;
 		
 		
 		// indicate which port matched
@@ -617,9 +604,8 @@ module router_checker
 		
 		// determine head-of-line expected flits for each VC
 		assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~fifo_empty;
-		assign ref_ctrl_ip_ivc[(ip*num_vcs+ivc)*flit_ctrl_width:
-				       (ip*num_vcs+ivc+1)*flit_ctrl_width-1]
-			 = ref_ctrl;
+		assign ref_head_ip_ivc[ip*num_vcs+ivc] = ref_head;
+		assign ref_tail_ip_ivc[ip*num_vcs+ivc] = ref_tail;
 		assign ref_data_ip_ivc[(ip*num_vcs+ivc)*flit_data_width:
 				       (ip*num_vcs+ivc+1)*flit_data_width-1]
 			 = ref_data;
@@ -628,7 +614,7 @@ module router_checker
 			 = ref_port;
 		assign ref_vcs_ip_ivc[(ip*num_vcs+ivc)*num_vcs:
 				      (ip*num_vcs+ivc+1)*num_vcs-1]
-			 = ref_ovc;
+			 = ref_sel_ovc;
 		
 	     end
 	   
@@ -684,39 +670,8 @@ module router_checker
    
    wire [0:num_ports-1] 	   flit_valid_out_op;
    
-   wire [0:num_ports-1] 	   x_error_op;
-   
-   genvar 			   op;
-   
-   generate
-      
-      for(op = 0; op < num_ports; op = op + 1)
-	begin:ops
-	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl_out;
-	   assign flit_ctrl_out = flit_ctrl_out_op[op*flit_ctrl_width:
-						   (op+1)*flit_ctrl_width-1];
-	   
-	   wire 		      flit_valid_out;
-	   assign flit_valid_out = flit_ctrl_out[0];
-	   
-	   assign flit_valid_out_op[op] = flit_valid_out;
-	   
-	   wire [0:flit_data_width-1] flit_data_out;
-	   assign flit_data_out = flit_data_out_op[op*flit_data_width +: 
-						   flit_data_width];
-	   
-	   assign x_error_op[op]
-		    = (flit_valid_out === 1'bx) ||
-		      ((flit_valid_out === 1'b1) &&
-		       (^{flit_ctrl_out, flit_data_out} === 1'bx));
-	   
-	end
-      
-   endgenerate
-   
    // summary signal indicating if any input VC matched the flit at each output
-   wire [0:num_ports-1] 	      match_op;
+   wire [0:num_ports-1] 	   match_op;
    c_binary_op
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports),
@@ -726,55 +681,105 @@ module router_checker
       .data_out(match_op));
    
    // unmatched flits indicate something went wrong
-   wire [0:num_ports-1] 	      check_error_op;
+   wire [0:num_ports-1] 	   check_error_op;
    assign check_error_op = (flit_valid_out_op & ~match_op);
-
-   // synopsys translate_off
    
-   integer 			      port;
-   integer 			      x;
+   wire [0:num_ports-1] 	   x_error_op;
    
-   always @(posedge clk)
-     begin
-	for(port = 0; port < num_ports; port = port + 1)
-	  begin
-	     if(check_error_op[port])
-	       begin
-		  $display("check error: op=%d, cyc=%d", port, $time);
-		  $display("ctrl=%b, data=%x",
-			   flit_ctrl_out_op[port*flit_ctrl_width +: 
-					    flit_ctrl_width],
-			   flit_data_out_op[port*flit_data_width +: 
-					    flit_data_width]);
-		  $display("expected flits:");
-		  for(x = 0; x < num_ports*num_vcs; x = x + 1)
-		    begin
-		       if(ref_valid_ip_ivc[x])
-			 $display("ip=%d,ivc=%d,ctrl=%b,data=%x,op=%d,vcs=%b",
-				  x / num_vcs, x % num_vcs,
-				  ref_ctrl_ip_ivc[x*flit_ctrl_width +: 
-						  flit_ctrl_width],
-				  ref_data_ip_ivc[x*flit_data_width +: 
-						  flit_data_width],
-				  ref_port_ip_ivc[x*port_idx_width +: 
-						  port_idx_width],
-				  ref_vcs_ip_ivc[x*num_vcs +: num_vcs]);
-		    end
-	       end
-	     if(x_error_op[port])
-	       begin
-		  $display("X value error: op=%d, cyc=%d", port, $time);
-		  $display("ctrl=%b, data=%x",
-			   flit_ctrl_out_op[port*flit_ctrl_width +:
-					    flit_ctrl_width],
-			   flit_data_out_op[port*flit_data_width +: 
-					    flit_data_width]);
-	       end
-	  end
-     end
-   // synopsys translate_on
+   genvar 			   op;
    
    generate
+      
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
+	   
+	   wire [0:channel_width-1] channel_out;
+	   assign channel_out
+	     = channel_out_op[op*channel_width:(op+1)*channel_width-1];
+	   
+	   wire 		    flit_valid_out;
+	   wire 		    flit_head_out;
+	   wire 		    flit_tail_out;
+	   wire [0:flit_data_width-1] flit_data_out;
+	   wire [0:num_vcs-1] 	      sel_out_ivc;
+	   rtr_channel_input
+	     #(.num_vcs(num_vcs),
+	       .packet_format(packet_format),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
+	       .la_route_info_width(la_route_info_width),
+	       .route_info_width(route_info_width),
+	       .flit_data_width(flit_data_width),
+	       .reset_type(reset_type))
+	   chi
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .channel_in(channel_out),
+	      .flit_valid_out(flit_valid_out),
+	      .flit_head_out(flit_head_out),
+	      .flit_tail_out(flit_tail_out),
+	      .flit_data_out(flit_data_out),
+	      .sel_out_ivc(sel_out_ivc));
+	   
+	   assign flit_valid_out_op[op] = flit_valid_out;
+	   
+	   wire 			x_error;
+	   assign x_error
+	     = (flit_valid_out === 1'bx) ||
+	       ((flit_valid_out === 1'b1) &&
+		((flit_head_out === 1'bx) ||
+		 (flit_tail_out === 1'bx) ||
+		 (^flit_data_out === 1'bx) ||
+		 (^sel_out_ivc === 1'bx)));
+
+	   assign x_error_op[op] = x_error;
+	   
+	   // synopsys translate_off
+	   
+	   integer 			x;
+	   
+	   always @(posedge clk)
+	     begin
+		if(check_error_op[op])
+		  begin
+		     $display("check error: op=%d, cyc=%d", op, $time);
+		     $display("head=%b, tail=%b, vcs=%b, data=%x",
+			      flit_head_out,
+			      flit_tail_out,
+			      sel_out_ivc,
+			      flit_data_out);
+		     $display("expected flits:");
+		     for(x = 0; x < num_ports*num_vcs; x = x + 1)
+		       begin
+			  if(ref_valid_ip_ivc[x])
+			    $display({"ip=%d,ivc=%d,head=%b,tail=%b,data=%x,",
+				      "op=%d,vcs=%b"},
+				     x / num_vcs, x % num_vcs,
+				     ref_head_ip_ivc[x],
+				     ref_tail_ip_ivc[x],
+				     ref_data_ip_ivc[x*flit_data_width +: 
+						     flit_data_width],
+				     ref_port_ip_ivc[x*port_idx_width +: 
+						     port_idx_width],
+				     ref_vcs_ip_ivc[x*num_vcs +: num_vcs]);
+		       end
+		  end
+		if(x_error)
+		  begin
+		     $display("X value error: op=%d, cyc=%d", op, $time);
+		     $display("valid=%b, head=%b, tail=%b, vcs=%b, data=%x",
+			      flit_valid_out,
+			      flit_head_out,
+			      flit_tail_out,
+			      sel_out_ivc,
+			      flit_data_out);
+		  end
+	     end
+	   
+	   // synopsys translate_on
+   
+	end
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin

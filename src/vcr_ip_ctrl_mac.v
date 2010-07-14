@@ -32,10 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input port controller
 module vcr_ip_ctrl_mac
-  (clk, reset, router_address, flit_ctrl_in, flit_data_in, route_port_ivc, 
-   inc_rc_ivc, vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_alloc_out_op, 
-   sw_alloc_in_op, xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, 
-   error);
+  (clk, reset, router_address, channel_in, route_port_ivc, inc_rc_ivc, 
+   vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_alloc_out_op, sw_alloc_in_op, 
+   xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -142,6 +141,9 @@ module vcr_ip_ctrl_mac
    
    // width of flit payload data
    parameter flit_data_width = 64;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
@@ -279,11 +281,8 @@ module vcr_ip_ctrl_mac
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // incoming flit control signals
-   input [0:flit_ctrl_width-1] 	 flit_ctrl_in;
-   
-   // incoming flit data
-   input [0:flit_data_width-1] 	 flit_data_in;
+   // incoming channel
+   input [0:channel_width-1] 	 channel_in;
    
    // destination port
    output [0:num_vcs*port_idx_width-1] route_port_ivc;
@@ -462,72 +461,42 @@ module vcr_ip_ctrl_mac
    wire input_stage_active;
    assign input_stage_active = 1'b1;
    
-   wire [0:flit_ctrl_width-1] flit_ctrl_in_s, flit_ctrl_in_q;
-   assign flit_ctrl_in_s = flit_ctrl_in;
-   
-   generate
-      
-      case(packet_format)
-	
-	`PACKET_FORMAT_HEAD_TAIL,
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     
-	     wire flit_valid_in_s, flit_valid_in_q;
-	     assign flit_valid_in_s = flit_ctrl_in_s[0];
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type))
-	     flit_valid_inq
-	       (.clk(clk),
-		.reset(reset),
-		.active(input_stage_active),
-		.d(flit_valid_in_s),
-		.q(flit_valid_in_q));
-	     
-	     assign flit_ctrl_in_q[0] = flit_valid_in_q;
-	     
-	     c_dff
-	       #(.width(flit_ctrl_width-1),
-		 .reset_type(reset_type))
-	     flit_ctrl_inq
-	       (.clk(clk),
-		.reset(1'b0),
-		.active(input_stage_active),
-		.d(flit_ctrl_in_s[1:flit_ctrl_width-1]),
-		.q(flit_ctrl_in_q[1:flit_ctrl_width-1]));
-	     
-	  end
-	
-      endcase
-      
-   endgenerate
-   
-   wire [0:flit_data_width-1] flit_data_in_s, flit_data_in_q;
-   assign flit_data_in_s = flit_data_in;
-   c_dff
-     #(.width(flit_data_width),
+   wire flit_valid_in;
+   wire flit_head_in;
+   wire flit_tail_in;
+   wire [0:flit_data_width-1] flit_data_in;
+   wire [0:num_vcs-1] 	      sel_in_ivc;
+   rtr_channel_input
+     #(.num_vcs(num_vcs),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .la_route_info_width(la_route_info_width),
+       .route_info_width(route_info_width),
+       .flit_data_width(flit_data_width),
        .reset_type(reset_type))
-   flit_data_inq
+   chi
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(input_stage_active),
-      .d(flit_data_in_s),
-      .q(flit_data_in_q));
+      .channel_in(channel_in),
+      .flit_valid_out(flit_valid_in),
+      .flit_head_out(flit_head_in),
+      .flit_tail_out(flit_tail_in),
+      .flit_data_out(flit_data_in),
+      .sel_out_ivc(sel_in_ivc));
    
    
    //---------------------------------------------------------------------------
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire 		      flit_valid_in;
-   
    wire 		      buffer_in_active;
    assign buffer_in_active = flit_valid_in;
    
    // extract header information from header data
    wire [0:header_info_width-1] header_info_in;
-   assign header_info_in = flit_data_in_q[0:header_info_width-1];
+   assign header_info_in = flit_data_in[0:header_info_width-1];
    
    // non-speculative switch allocator requests
    wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
@@ -540,28 +509,6 @@ module vcr_ip_ctrl_mac
    
    // speculative switch allocator grants
    wire [0:num_vcs-1] 		sw_gnt_spec_ivc;
-   
-   wire 			flit_head_in;
-   wire 			flit_tail_in;
-   wire [0:num_vcs-1] 		sel_in_ivc;
-   rtr_flit_ctrl_dec
-     #(.num_vcs(num_vcs),
-       .packet_format(packet_format),
-       .max_payload_length(max_payload_length),
-       .min_payload_length(min_payload_length),
-       .la_route_info_width(la_route_info_width),
-       .route_info_width(route_info_width),
-       .reset_type(reset_type))
-   fcdec
-     (.clk(clk),
-      .reset(reset),
-      .active(buffer_in_active),
-      .flit_ctrl_in(flit_ctrl_in_q),
-      .header_info_in(header_info_in),
-      .flit_valid_out(flit_valid_in),
-      .flit_head_out(flit_head_in),
-      .flit_tail_out(flit_tail_in),
-      .sel_out_ivc(sel_in_ivc));
    
    wire [0:num_vcs-1] 		flit_valid_in_ivc;
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & sel_in_ivc;
@@ -1086,7 +1033,7 @@ module vcr_ip_ctrl_mac
    assign fbf_write_data[0:header_info_width-1]
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
-     = flit_data_in_q[header_info_width:flit_data_width-1];
+     = flit_data_in[header_info_width:flit_data_width-1];
    
    wire [0:fbf_addr_width-1] 	fbc_write_addr;
    wire [0:fbf_addr_width-1] 	fbc_read_addr;
@@ -1099,12 +1046,13 @@ module vcr_ip_ctrl_mac
       if(num_vcs > 1)
 	begin
 	   
-	   wire [0:vc_idx_width-1] flit_vc_in_q;
-	   assign flit_vc_in_q = flit_ctrl_in_q[1:1+vc_idx_width-1];
-	   
-	   assign fbc_write_addr
-	     = fbc_write_addr_ivc[flit_vc_in_q*fbf_addr_width +:
-				  fbf_addr_width];
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(fbf_addr_width))
+	   fbc_write_addr_sel
+	     (.select(sel_in_ivc),
+	      .data_in(fbc_write_addr_ivc),
+	      .data_out(fbc_write_addr));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_vcs),
@@ -1360,6 +1308,8 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // generate outgoing credits
    //---------------------------------------------------------------------------
+   
+   // FIXME: The following should be in a separate module!
    
    // NOTE: See the comment near the definition of cred_validq for notes on
    // clock gating this register.

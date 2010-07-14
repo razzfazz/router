@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_req_ovc, vc_gnt_ovc, vc_gnt_ovc_ip, 
    vc_gnt_ovc_ivc, sw_alloc_in_ip, sw_alloc_out_ip, int_flit_ctrl_in, 
-   flit_data_in, flit_ctrl_out, flit_data_out, elig_ovc, error);
+   flit_data_in, channel_out, elig_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -103,6 +103,9 @@ module vcr_op_ctrl_mac
    
    // width of flit payload data
    parameter flit_data_width = 64;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
@@ -188,45 +191,41 @@ module vcr_op_ctrl_mac
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
    // output VC was requested by an input VC
-   input [0:num_vcs-1] vc_req_ovc;
+   input [0:num_vcs-1] 	       vc_req_ovc;
    
    // output VC was granted to an input VC
-   input [0:num_vcs-1] vc_gnt_ovc;
+   input [0:num_vcs-1] 	       vc_gnt_ovc;
    
    // input port that each output VC was granted to
    input [0:num_vcs*num_ports-1] vc_gnt_ovc_ip;
    
    // input VC that each output VC was granted to
-   input [0:num_vcs*num_vcs-1] vc_gnt_ovc_ivc;
+   input [0:num_vcs*num_vcs-1] 	 vc_gnt_ovc_ivc;
    
    // incoming allocator control signals
    input [0:num_ports*sw_alloc_in_width-1] sw_alloc_in_ip;
    
    // outgoing allocator control signals
    output [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_ip;
-   wire [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_ip;
+   wire [0:num_ports*sw_alloc_out_width-1]   sw_alloc_out_ip;
    
    // incoming flit control signals
-   input [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
+   input [0:int_flit_ctrl_width-1] 	     int_flit_ctrl_in;
    
    // incoming flit data
-   input [0:flit_data_width-1] flit_data_in;
+   input [0:flit_data_width-1] 		     flit_data_in;
    
    // outgoing flit control signals
-   output [0:flit_ctrl_width-1] flit_ctrl_out;
-   wire [0:flit_ctrl_width-1] flit_ctrl_out;
-   
-   // outgoing flit data
-   output [0:flit_data_width-1] flit_data_out;
-   wire [0:flit_data_width-1] flit_data_out;
+   output [0:channel_width-1] 		     channel_out;
+   wire [0:channel_width-1] 		     channel_out;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
-   output [0:num_vcs-1] elig_ovc;
-   wire [0:num_vcs-1] 	      elig_ovc;
+   output [0:num_vcs-1] 		     elig_ovc;
+   wire [0:num_vcs-1] 			     elig_ovc;
    
    // internal error condition detected
-   output error;
-   wire 		      error;
+   output 				     error;
+   wire 				     error;
    
    
    //---------------------------------------------------------------------------
@@ -235,42 +234,42 @@ module vcr_op_ctrl_mac
    
    // non-speculative switch allocation requests to output-side arbitration 
    // stage / wavefront block
-   wire [0:num_ports-1]       sw_oreq_nonspec_ip;
+   wire [0:num_ports-1] 		     sw_oreq_nonspec_ip;
    
    // any non-speculative requests for this output port?
-   wire 		      sw_oreq_nonspec;
+   wire 				     sw_oreq_nonspec;
    assign sw_oreq_nonspec = |sw_oreq_nonspec_ip;
    
    // speculative switch allocation requests to output-side arbitration stage or
    // wavefront block
-   wire [0:num_ports-1]       sw_oreq_spec_ip;
+   wire [0:num_ports-1] 		     sw_oreq_spec_ip;
    
    // any speculative requests for this output port?
-   wire 		      sw_oreq_spec;
+   wire 				     sw_oreq_spec;
    assign sw_oreq_spec = |sw_oreq_spec_ip;
    
    // non-speculative switch allocation grants from output-side arbitration 
    // stage / wavefront block
-   wire [0:num_ports-1]       sw_ognt_nonspec_ip;
+   wire [0:num_ports-1] 		     sw_ognt_nonspec_ip;
    
    // speculative switch allocation grants from output-side arbitration stage or
    // wavefront block
-   wire [0:num_ports-1]       sw_ognt_spec_ip;
+   wire [0:num_ports-1] 		     sw_ognt_spec_ip;
    
    // gobal non-speculative switch allocation grants
-   wire [0:num_ports-1]       sw_gnt_nonspec_ip;
+   wire [0:num_ports-1] 		     sw_gnt_nonspec_ip;
    
    // global speculative switch allocation grants
-   wire [0:num_ports-1]       sw_gnt_spec_ip;
+   wire [0:num_ports-1] 		     sw_gnt_spec_ip;
    
    // internal flow control signalling from output controller to input 
    // controllers
-   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:num_vcs*int_flow_ctrl_width-1]    int_flow_ctrl_ovc;
    
    // global grant signal
-   wire [0:num_ports-1] 		  sw_gnt_ip;
+   wire [0:num_ports-1] 		     sw_gnt_ip;
    
-   genvar 				  ip;
+   genvar 				     ip;
    
    generate
       
@@ -371,6 +370,8 @@ module vcr_op_ctrl_mac
    //---------------------------------------------------------------------------
    // input staging
    //---------------------------------------------------------------------------
+   
+   // FIXME: The following should be in a separate module!
    
    // NOTE: Because we need to be ready to receive credits at any time unless 
    // we know for sure that no more credits are outstanding, this register 
@@ -714,10 +715,10 @@ module vcr_op_ctrl_mac
       .d(sw_gnt_s),
       .q(sw_gnt_q));
    
-   wire [0:num_ports-1] 		  sw_gnt_ip_s;
+   wire [0:num_ports-1] sw_gnt_ip_s;
    assign sw_gnt_ip_s = sw_gnt_ip;
    
-   wire [0:num_ports-1] 		  sw_gnt_ip_q;
+   wire [0:num_ports-1] sw_gnt_ip_q;
    c_dff
      #(.width(num_ports),
        .reset_type(reset_type))
@@ -732,27 +733,30 @@ module vcr_op_ctrl_mac
    //---------------------------------------------------------------------------
    // output VC control logic
    //---------------------------------------------------------------------------
-
-   wire 				  flit_valid_in;
+   
+   wire 		flit_valid_in;
    assign flit_valid_in = int_flit_ctrl_in[0] & sw_gnt_q;
    
-   wire 				  flit_tail_in;
+   wire 		flit_head_in;
+   assign flit_head_in = int_flit_ctrl_in[1+vc_idx_width];
+   
+   wire 		flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
    
-   wire 				  cred_valid;
+   wire 		cred_valid;
    assign cred_valid = flow_ctrl_q[0];
    
-   wire [0:num_vcs-1] 			  match_ovc;
+   wire [0:num_vcs-1] 	match_ovc;
    
-   wire 				  error_unmatched;
+   wire 		error_unmatched;
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
-   wire [0:num_vcs-1] 			  next_cred_ovc;
-   wire [0:num_vcs*4-1] 		  ovcc_errors_ovc;
+   wire [0:num_vcs-1] 	next_cred_ovc;
+   wire [0:num_vcs*4-1] ovcc_errors_ovc;
    
    generate
       
-      genvar 				  ovc;
+      genvar 		ovc;
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
@@ -825,13 +829,10 @@ module vcr_op_ctrl_mac
    // output staging
    //---------------------------------------------------------------------------
    
-   wire 		      flit_out_active;
+   wire 				  flit_out_active;
    assign flit_out_active = sw_gnt_q;
    
-   wire [0:flit_ctrl_width-1] flit_ctrl_s, flit_ctrl_q;   
-   assign flit_ctrl_s[0] = flit_valid_in;
-   assign flit_ctrl_s[1+vc_idx_width:flit_ctrl_width-1]
-	    = int_flit_ctrl_in[1+vc_idx_width:flit_ctrl_width-1];
+   wire [0:num_vcs-1] 			  sel_in_ovc;
    
    generate
       
@@ -839,99 +840,42 @@ module vcr_op_ctrl_mac
 	begin
 	   
 	   if(track_vcs_at_output)
+	     assign sel_in_ovc = match_ovc;
+	   else
 	     begin
 		
-		wire [0:vc_idx_width-1] match_ovc_enc;
-		c_encode
-		  #(.num_ports(num_vcs))
-		match_ovc_enc_enc
-		  (.data_in(match_ovc),
-		   .data_out(match_ovc_enc));
+		wire [0:vc_idx_width-1] flit_vc_in;
+		assign flit_vc_in = int_flit_ctrl_in[1:1+vc_idx_width-1];
 		
-		assign flit_ctrl_s[1:1+vc_idx_width-1]
-			 = sw_gnt_q ? 
-			   match_ovc_enc : 
-			   flit_ctrl_q[1:1+vc_idx_width-1];
+		c_decode
+		  #(.num_ports(num_vcs))
+		sel_in_ovc_dec
+		  (.data_in(flit_vc_in),
+		   .data_out(sel_in_ovc));
 		
 	     end
-	   else
-	     assign flit_ctrl_s[1:1+vc_idx_width-1]
-		      = sw_gnt_q ? 
-			int_flit_ctrl_in[1:1+vc_idx_width-1] :
-			flit_ctrl_q[1:1+vc_idx_width-1];
 	   
 	end
-      
-      case(packet_format)
-	
-	`PACKET_FORMAT_HEAD_TAIL,
-	`PACKET_FORMAT_EXPLICIT_LENGTH:
-	  begin
-	     
-	     wire flit_valid_q;
-	     
-	     // NOTE: Because we need to clear it in the cycle after a flit has 
-	     // been transmitted, this register currently cannot be included in 
-	     // any of the other clock gating domains. If we could change this 
-	     // to send flits downstream using edge-based signaling (i.e., 
-	     // transitions), it could be included in the clock gating domain 
-	     // controlled by flit_out_active.
-	     // Alternatively, we could include the flit_ctrl_q[0] term in 
-	     // flit_out_active; this would allow us to include flit_validq in 
-	     // the gating domain at the cost of some unnecessary activity. As 
-	     // synthesis will probably not create a clock gating domain for 
-	     // just this register, it currently will most likely end up being 
-	     // free-running, so this may be a good tradeoff.
-	     
-	     wire flit_valid_out_active;
-	     assign flit_valid_out_active = sw_gnt_q | flit_valid_q;
-	     
-	     wire flit_valid_s;
-	     assign flit_valid_s = flit_ctrl_s[0];
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type))
-	     flit_validq
-	       (.clk(clk),
-		.reset(reset),
-		.active(flit_valid_out_active),
-		.d(flit_valid_s),
-		.q(flit_valid_q));
-	     
-	     assign flit_ctrl_q[0] = flit_valid_q;
-	     
-	     c_dff
-	       #(.width(flit_ctrl_width-1),
-		 .offset(1),
-		 .reset_type(reset_type))
-	     flit_ctrlq
-	       (.clk(clk),
-		.reset(1'b0),
-		.active(flit_out_active),
-		.d(flit_ctrl_s[1:flit_ctrl_width-1]),
-		.q(flit_ctrl_q[1:flit_ctrl_width-1]));
-	     
-	  end
-	
-      endcase
+      else
+	assign sel_in_ovc = 1'b1;
       
    endgenerate
    
-   assign flit_ctrl_out = flit_ctrl_q;
-   
-   wire [0:flit_data_width-1] 		  flit_data_s, flit_data_q;
-   assign flit_data_s = sw_gnt_q ? flit_data_in : flit_data_q;
-   c_dff
-     #(.width(flit_data_width),
+   rtr_channel_output
+     #(.num_vcs(num_vcs),
+       .packet_format(packet_format),
+       .flit_data_width(flit_data_width),
        .reset_type(reset_type))
-   flit_dataq
+   cho
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(flit_out_active),
-      .d(flit_data_s),
-      .q(flit_data_q));
-   
-   assign flit_data_out = flit_data_q;
+      .flit_valid_in(flit_valid_in),
+      .flit_head_in(flit_head_in),
+      .flit_tail_in(flit_tail_in),
+      .flit_data_in(flit_data_in),
+      .sel_in_ovc(sel_in_ovc),
+      .channel_out(channel_out));
    
    
    //---------------------------------------------------------------------------

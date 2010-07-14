@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 module flit_sink
-  (clk, reset, flit_ctrl, flow_ctrl, error);
+  (clk, reset, channel, flow_ctrl, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -52,6 +52,32 @@ module flit_sink
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // maximum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter min_payload_length = 1;
+   
+   // number of bits required to represent all possible payload sizes
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+   
+   // width required for lookahead routing information
+   parameter la_route_info_width = 4;
+   
+   // total number of bits required for storing routing information
+   parameter route_info_width = 10;
+   
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -59,6 +85,12 @@ module flit_sink
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (1 + vc_idx_width + 1) : 
        -1;
+   
+   // width of flit payload data
+   parameter flit_data_width = 64;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
@@ -70,7 +102,7 @@ module flit_sink
    input clk;
    input reset;
    
-   input [0:flit_ctrl_width-1] flit_ctrl;
+   input [0:channel_width-1] channel;
    
    output [0:flow_ctrl_width-1] flow_ctrl;
    wire [0:flow_ctrl_width-1] 	flow_ctrl;
@@ -81,7 +113,29 @@ module flit_sink
    integer 			seed = initial_seed;
    
    wire 			flit_valid;
-   assign flit_valid = flit_ctrl[0];
+   wire 			flit_head;
+   wire 			flit_tail;
+   wire [0:flit_data_width-1] 	flit_data;
+   wire [0:num_vcs-1] 		sel_ivc;
+   rtr_channel_input
+     #(.num_vcs(num_vcs),
+       .packet_format(packet_format),
+       .max_payload_length(max_payload_length),
+       .min_payload_length(min_payload_length),
+       .la_route_info_width(la_route_info_width),
+       .route_info_width(route_info_width),
+       .flit_data_width(flit_data_width),
+       .reset_type(reset_type))
+   chi
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .channel_in(channel),
+      .flit_valid_out(flit_valid),
+      .flit_head_out(flit_head),
+      .flit_tail_out(flit_tail),
+      .flit_data_out(flit_data),
+      .sel_out_ivc(sel_ivc));
    
    reg 				consume;
    
@@ -90,51 +144,41 @@ module flit_sink
 	consume <= $dist_uniform(seed, 0, 99) < consume_rate;
      end
    
-   wire [0:flow_ctrl_width-1] flow_ctrl_s;
+   wire [0:num_vcs-1] 		buffer_empty_ivc;
    
-   wire [0:num_vcs-1] 	      buffer_empty_ivc;
+   wire 			update;
+   assign update = ~&buffer_empty_ivc & consume;
    
-   wire [0:num_vcs-1] 	      buffer_push_ivc;
-   wire [0:num_vcs-1] 	      buffer_pop_ivc;
+   wire [0:num_vcs-1] 		req_ivc;
+   assign req_ivc = ~buffer_empty_ivc;
    
-   wire [0:num_vcs-1] 	      buffer_error_ivc;
+   wire [0:num_vcs-1] 		gnt_ivc;
+   c_rr_arbiter
+     #(.num_ports(num_vcs),
+       .reset_type(reset_type))
+   buffer_sel_ivc_arb
+     (.clk(clk),
+      .reset(reset),
+      .update(update),
+      .active(1'b1),
+      .req(req_ivc),
+      .gnt(gnt_ivc));
+   
+   wire [0:num_vcs-1] 		buffer_push_ivc;
+   assign buffer_push_ivc = {num_vcs{flit_valid}} & sel_ivc;
+   
+   wire [0:num_vcs-1] 		buffer_pop_ivc;
+   assign buffer_pop_ivc = {num_vcs{consume}} & gnt_ivc;
+   
+   wire [0:num_vcs-1] 		buffer_error_ivc;
+   
+   wire [0:flow_ctrl_width-1] 	flow_ctrl_s;
+   assign flow_ctrl_s[0] = update;
    
    generate
       
       if(num_vcs > 1)
 	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc;
-	   assign flit_vc = flit_ctrl[1:1+vc_idx_width-1];
-	   
-	   wire [0:num_vcs-1] 	   sel_ivc;
-	   c_decode
-	     #(.num_ports(num_vcs))
-	   sel_ivc_in_dec
-	     (.data_in(flit_vc),
-	      .data_out(sel_ivc));
-	   
-	   assign buffer_push_ivc = {num_vcs{flit_valid}} & sel_ivc;
-	   
-	   wire [0:num_vcs-1] 	   req_ivc;
-	   assign req_ivc = ~buffer_empty_ivc;
-	   
-	   wire 		   update;
-	   assign update = ~&buffer_empty_ivc & consume;
-	   
-	   wire [0:num_vcs-1] 	   gnt_ivc;
-	   c_rr_arbiter
-	     #(.num_ports(num_vcs),
-	       .reset_type(reset_type))
-	   buffer_sel_ivc_arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .update(update),
-	      .active(1'b1),
-	      .req(req_ivc),
-	      .gnt(gnt_ivc));
-	   
-	   assign buffer_pop_ivc = {num_vcs{consume}} & gnt_ivc;
 	   
 	   wire [0:vc_idx_width-1] flit_vc_out;
 	   c_encode
@@ -143,15 +187,8 @@ module flit_sink
 	     (.data_in(gnt_ivc),
 	      .data_out(flit_vc_out));
 	   
-	   assign flow_ctrl_s[0] = update;
 	   assign flow_ctrl_s[1:1+vc_idx_width-1] = flit_vc_out;
 	   
-	end
-      else
-	begin
-	   assign buffer_push_ivc = flit_valid;
-	   assign buffer_pop_ivc = ~buffer_empty_ivc & consume;
-	   assign flow_ctrl_s = buffer_pop_ivc;
 	end
       
       genvar 		    ivc;
@@ -177,7 +214,7 @@ module flit_sink
 	     #(.addr_width(flit_buffer_idx_width),
 	       .depth(num_flit_buffers),
 	       .reset_type(reset_type))
-	   buffer
+	   fctl
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),

@@ -100,6 +100,9 @@ module tc_router_wrap
        (1 + vc_idx_width + 1) : 
        -1;
    
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
@@ -171,39 +174,39 @@ module tc_router_wrap
    input [0:io_node_addr_width-1] io_node_addr_base;
    
    // write request indicator from chip controller
-   input io_write;
+   input 			  io_write;
    
    // read request indicator from chip controller
-   input io_read;
+   input 			  io_read;
    
    // register address
-   input [0:io_addr_width-1] io_addr;
+   input [0:io_addr_width-1] 	  io_addr;
    
    // input data
-   input [0:io_data_width-1] io_write_data;
+   input [0:io_data_width-1] 	  io_write_data;
    
    // result data to chip controller
-   output [0:io_data_width-1] io_read_data;
-   wire [0:io_data_width-1] io_read_data;
+   output [0:io_data_width-1] 	  io_read_data;
+   wire [0:io_data_width-1] 	  io_read_data;
    
    // completion indicator to chip controller
-   output io_done;
-   wire 		    io_done;
+   output 			  io_done;
+   wire 			  io_done;
    
    // summary error indicator
-   output error;
-   wire 		    error;
+   output 			  error;
+   wire 			  error;
    
-   wire [0:router_addr_width-1] router_address;
+   wire [0:router_addr_width-1]   router_address;
    
-   genvar 			dim;
+   genvar 			  dim;
    
    generate
       
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
 	   assign router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1]
-		    = num_routers_per_dim / 2;
+	     = num_routers_per_dim / 2;
 	end
       
    endgenerate
@@ -273,12 +276,10 @@ module tc_router_wrap
    wire 			  rtr_clk;
    assign rtr_clk = clk & rtr_clk_en;
    
-   wire [0:num_ports*flit_ctrl_width-1] node_rtr_flit_ctrl_p;
-   wire [0:num_ports*flit_data_width-1] node_rtr_flit_data_p;
+   wire [0:num_ports*channel_width-1] node_rtr_channel_p;
    wire [0:num_ports*flow_ctrl_width-1] node_rtr_flow_ctrl_p;
    
-   wire [0:num_ports*flit_ctrl_width-1] rtr_node_flit_ctrl_p;
-   wire [0:num_ports*flit_data_width-1] rtr_node_flit_data_p;
+   wire [0:num_ports*channel_width-1] 	rtr_node_channel_p;
    wire [0:num_ports*flow_ctrl_width-1] rtr_node_flow_ctrl_p;
    
    wire [0:num_ports*cfg_data_width-1] 	cfg_read_data_p;
@@ -293,16 +294,10 @@ module tc_router_wrap
       for(port = 0; port < num_ports; port = port + 1)
 	begin:ports
 	   
-	   wire [0:flit_ctrl_width-1] flit_ctrl_in;
-	   assign flit_ctrl_in
-	     = rtr_node_flit_ctrl_p[port*flit_ctrl_width:
-				    (port+1)*flit_ctrl_width-1];
+	   wire [0:channel_width-1] channel_in;
+	   assign channel_in
+	     = rtr_node_channel_p[port*channel_width:(port+1)*channel_width-1];
 	   
-	   wire [0:flit_data_width-1] flit_data_in;
-	   assign flit_data_in
-	     = rtr_node_flit_data_p[port*flit_data_width:
-				    (port+1)*flit_data_width-1];
-
 	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
 	   assign flow_ctrl_in
 	     = rtr_node_flow_ctrl_p[port*flow_ctrl_width:
@@ -315,8 +310,7 @@ module tc_router_wrap
 				      2*cfg_node_addr_width-1]
 		    = io_node_addr_base + num_ports + 1;
 	   
-	   wire [0:flit_ctrl_width-1] 	    flit_ctrl_out;
-	   wire [0:flit_data_width-1] 	    flit_data_out;
+	   wire [0:channel_width-1] 	    channel_out;
 	   wire [0:flow_ctrl_width-1] 	    flow_ctrl_out;
 	   
 	   wire [0:cfg_data_width-1] 	    cfg_read_data;
@@ -369,11 +363,9 @@ module tc_router_wrap
 		  (.clk(node_clk),
 		   .reset(node_reset),
 		   .address(address),
-		   .flit_ctrl_out(flit_ctrl_out),
-		   .flit_data_out(flit_data_out),
+		   .channel_out(channel_out),
 		   .flow_ctrl_in(flow_ctrl_in),
-		   .flit_ctrl_in(flit_ctrl_in),
-		   .flit_data_in(flit_data_in),
+		   .channel_in(channel_in),
 		   .flow_ctrl_out(flow_ctrl_out),
 		   .cfg_node_addrs(node_cfg_node_addrs),
 		   .cfg_req(cfg_req),
@@ -388,8 +380,10 @@ module tc_router_wrap
 	   else
 	     begin
 		
-		assign flit_ctrl_out = {flit_ctrl_width{1'b0}};
-		assign flit_data_out = {flit_data_width{1'b0}};
+		assign channel_out = {channel_width{1'b0}};
+		
+		wire [0:flit_ctrl_width-1] flit_ctrl_in;
+		assign flit_ctrl_in = channel_in[0:flit_ctrl_width-1];
 		
 		wire [0:flit_ctrl_width-1] flit_ctrl_dly;
 		c_shift_reg
@@ -412,12 +406,9 @@ module tc_router_wrap
 		
 	     end
 	   
-	   assign node_rtr_flit_ctrl_p[port*flit_ctrl_width:
-				       (port+1)*flit_ctrl_width-1]
-		    = flit_ctrl_out;
-	   assign node_rtr_flit_data_p[port*flit_data_width:
-				       (port+1)*flit_data_width-1]
-		    = flit_data_out;
+	   assign node_rtr_channel_p[port*channel_width:
+				     (port+1)*channel_width-1]
+		    = channel_out;
 	   assign node_rtr_flow_ctrl_p[port*flow_ctrl_width:
 				       (port+1)*flow_ctrl_width-1]
 		    = flow_ctrl_out;
@@ -474,11 +465,9 @@ module tc_router_wrap
      (.clk(rtr_clk),
       .reset(rtr_reset),
       .router_address(router_address),
-      .flit_ctrl_in_ip(node_rtr_flit_ctrl_p),
-      .flit_data_in_ip(node_rtr_flit_data_p),
+      .channel_in_ip(node_rtr_channel_p),
       .flow_ctrl_out_ip(rtr_node_flow_ctrl_p),
-      .flit_ctrl_out_op(rtr_node_flit_ctrl_p),
-      .flit_data_out_op(rtr_node_flit_data_p),
+      .channel_out_op(rtr_node_channel_p),
       .flow_ctrl_in_op(node_rtr_flow_ctrl_p),
       .error(rtr_error));
    

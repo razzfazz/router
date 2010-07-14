@@ -30,10 +30,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// flit control signal decoding logic
-module rtr_flit_ctrl_dec
-  (clk, reset, active, flit_ctrl_in, header_info_in, flit_valid_out, 
-   flit_head_out, flit_tail_out, sel_out_ivc);
+// channel interface (receive side)
+module rtr_channel_input
+  (clk, reset, active, channel_in, flit_valid_out, flit_head_out, flit_tail_out,
+   flit_data_out, sel_out_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -85,34 +85,65 @@ module rtr_flit_ctrl_dec
        (1 + vc_idx_width + 1) : 
        -1;
    
+   // width of flit payload data
+   parameter flit_data_width = 64;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
    input active;
    
-   // incoming flit control signals
-   input [0:flit_ctrl_width-1] flit_ctrl_in;
-   
-   // header information associated with current flit
-   input [0:header_info_width-1] header_info_in;
+   // incoming channel data
+   input [0:channel_width-1] channel_in;
    
    // flit valid indicator
-   output 			 flit_valid_out;
-   wire 			 flit_valid_out;
+   output 		     flit_valid_out;
+   wire 		     flit_valid_out;
    
    // flit is head flit
-   output 			 flit_head_out;
-   wire 			 flit_head_out;
+   output 		     flit_head_out;
+   wire 		     flit_head_out;
    
    // flit is tail flit
-   output 			 flit_tail_out;
-   wire 			 flit_tail_out;
+   output 		     flit_tail_out;
+   wire 		     flit_tail_out;
+   
+   // payload data
+   output [0:flit_data_width-1] flit_data_out;
+   wire [0:flit_data_width-1] 	flit_data_out;
    
    // indicate which VC the current flit (if any) belongs to
-   output [0:num_vcs-1] 	 sel_out_ivc;
-   wire [0:num_vcs-1] 		 sel_out_ivc;
-      
+   output [0:num_vcs-1] 	  sel_out_ivc;
+   wire [0:num_vcs-1] 		  sel_out_ivc;
+   
+   wire [0:flit_ctrl_width-1] 	  flit_ctrl_in;
+   assign flit_ctrl_in = channel_in[0:flit_ctrl_width-1];
+   
+   wire [0:flit_data_width-1] 	  flit_data_in;
+   assign flit_data_in
+     = channel_in[flit_ctrl_width:flit_ctrl_width+flit_data_width-1];
+   
+   wire [0:flit_data_width-1] 	  flit_data_s, flit_data_q;
+   assign flit_data_s = flit_data_in;
+   c_dff
+     #(.width(flit_data_width),
+       .reset_type(reset_type))
+   flit_dataq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(active),
+      .d(flit_data_s),
+      .q(flit_data_q));
+   
+   assign flit_data_out = flit_data_q;
+   
+   wire [0:header_info_width-1]   header_info_q;
+   assign header_info_q = flit_data_q[0:header_info_width-1];
+   
    generate
       
       case(packet_format)
@@ -121,32 +152,64 @@ module rtr_flit_ctrl_dec
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
-	     assign flit_valid_out = flit_ctrl_in[0];
+	     wire [0:flit_ctrl_width-1] flit_ctrl_s, flit_ctrl_q;
+	     assign flit_ctrl_s = flit_ctrl_in;
+	     
+	     wire 			flit_valid_s, flit_valid_q;
+	     assign flit_valid_s = flit_ctrl_s[0];
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type))
+	     flit_validq
+	       (.clk(clk),
+		.reset(reset),
+		.active(active),
+		.d(flit_valid_s),
+		.q(flit_valid_q));
+	     
+	     assign flit_ctrl_q[0] = flit_valid_q;
+	     
+	     assign flit_valid_out = flit_valid_q;
+	     
+	     if(flit_ctrl_width > 1)
+	       begin
+		  
+		  c_dff
+		  #(.width(flit_ctrl_width - 1),
+		    .reset_type(reset_type))
+		  flit_ctrlq
+		    (.clk(clk),
+		     .reset(1'b0),
+		     .active(active),
+		     .d(flit_ctrl_s[1:flit_ctrl_width-1]),
+		     .q(flit_ctrl_q[1:flit_ctrl_width-1]));
+		  
+	       end
 	     
 	     if(num_vcs > 1)
 	       begin
 		  
-		  wire [0:vc_idx_width-1] flit_vc_in;
-		  assign flit_vc_in = flit_ctrl_in[1:1+vc_idx_width-1];
+		  wire [0:vc_idx_width-1] flit_vc_q;
+		  assign flit_vc_q = flit_ctrl_q[1:1+vc_idx_width-1];
 		  
 		  c_decode
 		    #(.num_ports(num_vcs))
 		  sel_out_ivc_dec
-		    (.data_in(flit_vc_in),
+		    (.data_in(flit_vc_q),
 		     .data_out(sel_out_ivc));
 		  
 	       end
 	     else
 	       assign sel_out_ivc = 1'b1;
 	     
-	     assign flit_head_out = flit_ctrl_in[1+vc_idx_width+0];
+	     assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
 	     
 	     case(packet_format)
 	       
 	       `PACKET_FORMAT_HEAD_TAIL:
 		 begin
 		    
-		    assign flit_tail_out = flit_ctrl_in[1+vc_idx_width+1];
+		    assign flit_tail_out = flit_ctrl_q[1+vc_idx_width+1];
 		    
 		 end
 	       
@@ -185,8 +248,8 @@ module rtr_flit_ctrl_dec
 			 
 			 if(max_payload_length > min_payload_length)
 			   assign has_payload
-			     = header_info_in[la_route_info_width+
-					      route_info_width];
+			     = header_info_q[la_route_info_width+
+					     route_info_width];
 			 else if(max_payload_length == min_payload_length)
 			   assign has_payload = 1'b1;
 			 
@@ -247,11 +310,11 @@ module rtr_flit_ctrl_dec
 				   wire [0:payload_length_width-1] 
 				     payload_length;
 				   assign payload_length
-				     = header_info_in[la_route_info_width+
-						      route_info_width:
-						      la_route_info_width+
-						      route_info_width+
-						      payload_length_width-1];
+				     = header_info_q[la_route_info_width+
+						     route_info_width:
+						     la_route_info_width+
+						     route_info_width+
+						     payload_length_width-1];
 				   
 				   assign flit_ctr_next
 				     = (min_payload_length - 1) + 

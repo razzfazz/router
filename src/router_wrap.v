@@ -33,9 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // wrapper around router component (configures router parameters based on
 // selected network topology, etc.)
 module router_wrap
-  (clk, reset, router_address, flit_ctrl_in_ip, flit_data_in_ip, 
-   flow_ctrl_out_ip, flit_ctrl_out_op, flit_data_out_op, flow_ctrl_in_op, 
-   error);
+  (clk, reset, router_address, channel_in_ip, flow_ctrl_out_ip, channel_out_op, 
+   flow_ctrl_in_op, error);
    
 `include "c_functions.v"   
 `include "c_constants.v"
@@ -96,6 +95,9 @@ module router_wrap
        (1 + vc_idx_width + 1) : 
        -1;
    
+   // width of channel
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
@@ -106,30 +108,23 @@ module router_wrap
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // control signals for each incoming flit
-   input [0:num_ports*flit_ctrl_width-1] flit_ctrl_in_ip;
-   
-   // flit data for each incoming flit
-   input [0:num_ports*flit_data_width-1] flit_data_in_ip;
+   // incoming channels
+   input [0:num_ports*channel_width-1] channel_in_ip;
    
    // outgoing flow control signals
    output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
-   wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1]   flow_ctrl_out_ip;
    
-   // control signals for each outgoing flit
-   output [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   wire [0:num_ports*flit_ctrl_width-1] flit_ctrl_out_op;
-   
-   // flit data for each outgoing flit
-   output [0:num_ports*flit_data_width-1] flit_data_out_op;
-   wire [0:num_ports*flit_data_width-1] flit_data_out_op;
+   // outgoing channels
+   output [0:num_ports*channel_width-1]   channel_out_op;
+   wire [0:num_ports*channel_width-1] 	  channel_out_op;
    
    // incoming flow control signals
-   input [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
+   input [0:num_ports*flow_ctrl_width-1]  flow_ctrl_in_op;
    
    // internal error condition detected
-   output error;
-   wire 				error;
+   output 				  error;
+   wire 				  error;
    
    generate
       
@@ -167,11 +162,9 @@ module router_wrap
 	       (.clk(clk),
 		.reset(reset),
 		.router_address(router_address),
-		.flit_ctrl_in_ip(flit_ctrl_in_ip),
-		.flit_data_in_ip(flit_data_in_ip),
+		.channel_in_ip(channel_in_ip),
 		.flow_ctrl_out_ip(flow_ctrl_out_ip),
-		.flit_ctrl_out_op(flit_ctrl_out_op),
-		.flit_data_out_op(flit_data_out_op),
+		.channel_out_op(channel_out_op),
 		.flow_ctrl_in_op(flow_ctrl_in_op),
 		.error(error));
 	     
@@ -219,11 +212,9 @@ module router_wrap
 	       (.clk(clk),
 		.reset(reset),
 		.router_address(router_address),
-		.flit_ctrl_in_ip(flit_ctrl_in_ip),
-		.flit_data_in_ip(flit_data_in_ip),
+		.channel_in_ip(channel_in_ip),
 		.flow_ctrl_out_ip(flow_ctrl_out_ip),
-		.flit_ctrl_out_op(flit_ctrl_out_op),
-		.flit_data_out_op(flit_data_out_op),
+		.channel_out_op(channel_out_op),
 		.flow_ctrl_in_op(flow_ctrl_in_op),
 		.error(error));
 	     

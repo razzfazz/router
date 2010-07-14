@@ -128,6 +128,9 @@ module testbench
        (1 + vc_idx_width + 1) : 
        -1;
    
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
@@ -183,11 +186,11 @@ module testbench
    // channel latency in cycles
    parameter channel_latency = 1;
    
-   reg 		    reset;
-   reg 		    clk;
+   reg reset;
+   reg clk;
    
-   reg 		    io_write;
-   reg 		    io_read;
+   reg io_write;
+   reg io_read;
    reg [0:cfg_addr_width-1] io_addr;
    reg [0:cfg_data_width-1] io_write_data;
    wire [0:cfg_data_width-1] io_read_data;
@@ -232,15 +235,13 @@ module testbench
       .node_ctrl(node_ctrl),
       .node_status(node_status));
    
-   wire [0:flit_ctrl_width-1] dut0_flit_ctrl;
-   wire [0:flit_data_width-1] dut0_flit_data;
-   wire [0:flow_ctrl_width-1] dut0_flow_ctrl;
+   wire [0:channel_width-1] 	   dut0_channel;
+   wire [0:flow_ctrl_width-1] 	   dut0_flow_ctrl;
    
-   wire [0:flit_ctrl_width-1] dut1_flit_ctrl_dly;
-   wire [0:flit_data_width-1] dut1_flit_data_dly;
-   wire [0:flow_ctrl_width-1] dut1_flow_ctrl_dly;
+   wire [0:channel_width-1] 	   dut1_channel_dly;
+   wire [0:flow_ctrl_width-1] 	   dut1_flow_ctrl_dly;
    
-   reg [0:addr_width-1]       dut0_address;
+   reg [0:addr_width-1] 	   dut0_address;
    reg [0:2*cfg_node_addr_width-1] dut0_cfg_node_addrs;
    wire [0:cfg_data_width-1] 	   dut0_cfg_read_data;
    wire 			   dut0_cfg_done;
@@ -282,11 +283,9 @@ module testbench
      (.clk(clk),
       .reset(reset),
       .address(dut0_address),
-      .flit_ctrl_out(dut0_flit_ctrl),
-      .flit_data_out(dut0_flit_data),
+      .channel_out(dut0_channel),
       .flow_ctrl_in(dut1_flow_ctrl_dly),
-      .flit_ctrl_in(dut1_flit_ctrl_dly),
-      .flit_data_in(dut1_flit_data_dly),
+      .channel_in(dut1_channel_dly),
       .flow_ctrl_out(dut0_flow_ctrl),
       .cfg_node_addrs(dut0_cfg_node_addrs),
       .cfg_req(cfg_req),
@@ -297,29 +296,17 @@ module testbench
       .cfg_done(dut0_cfg_done),
       .error(dut0_error));
    
-   wire [0:flit_ctrl_width-1] 	   dut1_flit_ctrl;
+   wire [0:channel_width-1] 	   dut1_channel;
    c_shift_reg
-     #(.width(flit_ctrl_width),
+     #(.width(channel_width),
        .depth(channel_latency),
        .reset_type(reset_type))
-   dut1_flit_ctrl_dly_sr
+   dut1_channel_dly_sr
      (.clk(clk),
       .reset(reset),
       .active(1'b1),
-      .data_in(dut1_flit_ctrl),
-      .data_out(dut1_flit_ctrl_dly));
-   
-   wire [0:flit_data_width-1] 	   dut1_flit_data;
-   c_shift_reg
-     #(.width(flit_data_width),
-       .depth(channel_latency),
-       .reset_type(reset_type))
-   dut1_flit_data_dly_sr
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .data_in(dut1_flit_data),
-      .data_out(dut1_flit_data_dly));
+      .data_in(dut1_channel),
+      .data_out(dut1_channel_dly));
    
    wire [0:flow_ctrl_width-1] 	   dut1_flow_ctrl;
    c_shift_reg
@@ -333,29 +320,17 @@ module testbench
       .data_in(dut1_flow_ctrl),
       .data_out(dut1_flow_ctrl_dly));
    
-   wire [0:flit_ctrl_width-1] 	   dut0_flit_ctrl_dly;
+   wire [0:channel_width-1] 	   dut0_channel_dly;
    c_shift_reg
-     #(.width(flit_ctrl_width),
+     #(.width(channel_width),
        .depth(channel_latency),
        .reset_type(reset_type))
-   dut0_flit_ctrl_dly_sr
+   dut0_channel_dly_sr
      (.clk(clk),
       .reset(reset),
       .active(1'b1),
-      .data_in(dut0_flit_ctrl),
-      .data_out(dut0_flit_ctrl_dly));
-   
-   wire [0:flit_data_width-1] 	   dut0_flit_data_dly;
-   c_shift_reg
-     #(.width(flit_data_width),
-       .depth(channel_latency),
-       .reset_type(reset_type))
-   dut0_flit_data_dly_sr
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .data_in(dut0_flit_data),
-      .data_out(dut0_flit_data_dly));
+      .data_in(dut0_channel),
+      .data_out(dut0_channel_dly));
    
    wire [0:flow_ctrl_width-1] 	   dut0_flow_ctrl_dly;
    c_shift_reg
@@ -410,11 +385,9 @@ module testbench
      (.clk(clk),
       .reset(reset),
       .address(dut1_address),
-      .flit_ctrl_out(dut1_flit_ctrl),
-      .flit_data_out(dut1_flit_data),
+      .channel_out(dut1_channel),
       .flow_ctrl_in(dut0_flow_ctrl_dly),
-      .flit_ctrl_in(dut0_flit_ctrl_dly),
-      .flit_data_in(dut0_flit_data_dly),
+      .channel_in(dut0_channel_dly),
       .flow_ctrl_out(dut1_flow_ctrl),
       .cfg_node_addrs(dut1_cfg_node_addrs),
       .cfg_req(cfg_req),
@@ -434,12 +407,12 @@ module testbench
    reg 				   clk_en;
    
    always
-   begin
-      clk <= clk_en;
-      #(Tclk/2);
-      clk <= 1'b0;
-      #(Tclk/2);
-   end
+     begin
+	clk <= clk_en;
+	#(Tclk/2);
+	clk <= 1'b0;
+	#(Tclk/2);
+     end
    
    always @(posedge clk)
      begin
@@ -455,339 +428,334 @@ module testbench
    integer seed = initial_seed;
    
    initial
-   begin
-      
-      dut0_address = 'd0;
-      dut1_address = 'd1;
-      
-      reset = 1'b0;
-      clk_en = 1'b0;
-      
-      #(Tclk);
-      
-      #(Tclk/4);
-      
-      reset = 1'b1;
-      ctrl_cfg_node_addrs[0:cfg_node_addr_width-1]
-	= 'd0;
-      dut0_cfg_node_addrs[0:cfg_node_addr_width-1]
-	= 'd1;
-      dut0_cfg_node_addrs[cfg_node_addr_width:2*cfg_node_addr_width-1]
-	= 'd3;
-      dut1_cfg_node_addrs[0:cfg_node_addr_width-1]
-	= 'd2;
-      dut1_cfg_node_addrs[cfg_node_addr_width:2*cfg_node_addr_width-1]
-	= 'd3;
-      io_write = 1'b0;
-      io_read = 1'b0;
-      io_addr = 'b0;
-      io_write_data = 'b0;
-      node_status = 'b0;
-      done = 1'b0;
-      
-      #(Tclk);
-      
-      reset = 1'b0;
-      
-      #(Tclk);
-      
-      clk_en = 1'b1;
-      
-      #(Tclk);
-      
-      
-      // disable reset (i.e., enable reset_b) and enable clocks
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd0;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NCTL_CTRL;
-      io_write_data = 'd0;
-      io_write_data[0] = 1'b1;
-      io_write_data[1] = 1'b1;
-      while(!io_done)
+     begin
+	
+	dut0_address = 'd0;
+	dut1_address = 'd1;
+	
+	reset = 1'b0;
+	clk_en = 1'b0;
+	
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	
+	#(Tclk/4);
+	
+	reset = 1'b1;
+	ctrl_cfg_node_addrs[0:cfg_node_addr_width-1] = 'd0;
+	dut0_cfg_node_addrs[0:cfg_node_addr_width-1] = 'd1;
+	dut0_cfg_node_addrs[cfg_node_addr_width:2*cfg_node_addr_width-1] = 'd3;
+	dut1_cfg_node_addrs[0:cfg_node_addr_width-1] = 'd2;
+	dut1_cfg_node_addrs[cfg_node_addr_width:2*cfg_node_addr_width-1] = 'd3;
+	io_write = 1'b0;
+	io_read = 1'b0;
+	io_addr = 'b0;
+	io_write_data = 'b0;
+	node_status = 'b0;
+	done = 1'b0;
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set LFSR seeds
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd1;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_LFSR_SEED;
-      for(i = 0; i < cfg_data_width; i = i + 1)
-	io_write_data[i] = $dist_uniform(seed, 0, 1);
-      while(!io_done)
+	
+	reset = 1'b0;
+	
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	
+	clk_en = 1'b1;
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd2;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_LFSR_SEED;
-      for(i = 0; i < cfg_data_width; i = i + 1)
-	io_write_data[i] = $dist_uniform(seed, 0, 1);
-      while(!io_done)
+	
+	
+	// disable reset (i.e., enable reset_b) and enable clocks
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd0;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NCTL_CTRL;
+	io_write_data = 'd0;
+	io_write_data[0] = 1'b1;
+	io_write_data[1] = 1'b1;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set number of packets
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	= `CFG_ADDR_NODE_NUM_PACKETS;
-      io_write_data = 'd0;
-      io_write_data[0:num_packets_width-1] = 'd1024;
-      while(!io_done)
+	
+	
+	// set LFSR seeds
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd1;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_LFSR_SEED;
+	for(i = 0; i < cfg_data_width; i = i + 1)
+	  io_write_data[i] = $dist_uniform(seed, 0, 1);
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set arrival rate threshold
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	= `CFG_ADDR_NODE_ARRIVAL_THRESH;
-      io_write_data = 'd0;
-      io_write_data[0:arrival_rv_width-1] = 'd16384;
-      while(!io_done)
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd2;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_LFSR_SEED;
+	for(i = 0; i < cfg_data_width; i = i + 1)
+	  io_write_data[i] = $dist_uniform(seed, 0, 1);
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set packet length selection threshold
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	= `CFG_ADDR_NODE_PLENGTH_THRESHS;
-      io_write_data = 'd0;
-      io_write_data[0:plength_idx_rv_width-1] = 'd8;
-      while(!io_done)
+	
+	
+	// set number of packets
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	  = `CFG_ADDR_NODE_NUM_PACKETS;
+	io_write_data = 'd0;
+	io_write_data[0:num_packets_width-1] = 'd1024;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set packet length values
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	= `CFG_ADDR_NODE_PLENGTH_VALS;
-      io_write_data = 'd0;
-      io_write_data[0:payload_length_width-1] = 'd0;
-      io_write_data[payload_length_width:2*payload_length_width-1] = 'd4;
-      while(!io_done)
+	
+	
+	// set arrival rate threshold
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	  = `CFG_ADDR_NODE_ARRIVAL_THRESH;
+	io_write_data = 'd0;
+	io_write_data[0:arrival_rv_width-1] = 'd16384;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set message class selection thresholds
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_MC_THRESHS;
-      io_write_data = 'd0;
-      io_write_data[0:mc_idx_rv_width-1] = 'd10;
-      while(!io_done)
+	
+	
+	// set packet length selection threshold
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	  = `CFG_ADDR_NODE_PLENGTH_THRESHS;
+	io_write_data = 'd0;
+	io_write_data[0:plength_idx_rv_width-1] = 'd8;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // set resource class selection thresholds
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_RC_THRESHS;
-      io_write_data = 'd0;
-      io_write_data[0:rc_idx_rv_width-1] = 'd12;
-      while(!io_done)
+	
+	
+	// set packet length values
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	  = `CFG_ADDR_NODE_PLENGTH_VALS;
+	io_write_data = 'd0;
+	io_write_data[0:payload_length_width-1] = 'd0;
+	io_write_data[payload_length_width:2*payload_length_width-1] = 'd4;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      #(10*Tclk);
-      
-      
-      // start experiment
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
-      io_write_data = 'd0;
-      io_write_data[0] = 'd1;
-      io_write_data[1] = 'd0;
-      while(!io_done)
+	
+	
+	// set message class selection thresholds
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_MC_THRESHS;
+	io_write_data = 'd0;
+	io_write_data[0:mc_idx_rv_width-1] = 'd10;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
 	#(Tclk);
-      
-      
-      // wait for experiment to finish
-      
-      while(!done)
-	begin
-	   
-	   #(10*Tclk);
-	   
-	   io_read = 1'b1;
-	   io_addr[0:cfg_node_addr_width-1] = 'd3;
-	   io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	     = `CFG_ADDR_NODE_STATUS;
-	   io_write_data = 'd0;
-	   while(!io_done)
+	
+	
+	// set resource class selection thresholds
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_RC_THRESHS;
+	io_write_data = 'd0;
+	io_write_data[0:rc_idx_rv_width-1] = 'd12;
+	while(!io_done)
+	  #(Tclk);
+	#(Tclk);
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
+	#(10*Tclk);
+	
+	
+	// start experiment
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
+	io_write_data = 'd0;
+	io_write_data[0] = 'd1;
+	io_write_data[1] = 'd0;
+	while(!io_done)
+	  #(Tclk);
+	#(Tclk);
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
+	
+	// wait for experiment to finish
+	
+	while(!done)
+	  begin
+	     
+	     #(10*Tclk);
+	     
+	     io_read = 1'b1;
+	     io_addr[0:cfg_node_addr_width-1] = 'd3;
+	     io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	       = `CFG_ADDR_NODE_STATUS;
+	     io_write_data = 'd0;
+	     while(!io_done)
+	       #(Tclk);
+	     done = ~io_read_data[0];
 	     #(Tclk);
-	   done = ~io_read_data[0];
-	   #(Tclk);
-	   io_read = 1'b0;
-	   while(io_done)
+	     io_read = 1'b0;
+	     while(io_done)
+	       #(Tclk);
+	     
+	  end
+	done = 1'b0;
+	
+	#(Tclk);
+	
+	
+	// disable nodes
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
+	io_write_data = 'd0;
+	while(!io_done)
+	  #(Tclk);
+	#(Tclk);
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
+	#(Tclk);
+	
+	
+	// reset number of packets
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	  = `CFG_ADDR_NODE_NUM_PACKETS;
+	io_write_data = 'd0;
+	io_write_data[0:num_packets_width-1] = 'd1024;
+	while(!io_done)
+	  #(Tclk);
+	#(Tclk);
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
+	#(10*Tclk);
+	
+	
+	// restart experiment in loopback mode
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
+	io_write_data = 'd0;
+	io_write_data[0] = 'd1;
+	io_write_data[1] = 'd1;
+	while(!io_done)
+	  #(Tclk);
+	#(Tclk);
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
+	
+	// wait for experiment to finish
+	
+	while(!done)
+	  begin
+	     
+	     #(10*Tclk);
+	     
+	     io_read = 1'b1;
+	     io_addr[0:cfg_node_addr_width-1] = 'd3;
+	     io_addr[cfg_node_addr_width:cfg_addr_width-1]
+	       = `CFG_ADDR_NODE_STATUS;
+	     io_write_data = 'd0;
+	     while(!io_done)
+	       #(Tclk);
+	     done = ~io_read_data[0];
 	     #(Tclk);
-	   
-	end
-      done = 1'b0;
-      
-      #(Tclk);
-      
-      
-      // disable nodes
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
-      io_write_data = 'd0;
-      while(!io_done)
+	     io_read = 1'b0;
+	     while(io_done)
+	       #(Tclk);
+	     
+	  end
+	done = 1'b0;
+	
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
+	
+	
+	// disable nodes
+	
+	io_write = 1'b1;
+	io_addr[0:cfg_node_addr_width-1] = 'd3;
+	io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
+	io_write_data = 'd0;
+	while(!io_done)
+	  #(Tclk);
 	#(Tclk);
-      
-      #(Tclk);
-      
-      
-      // reset number of packets
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	= `CFG_ADDR_NODE_NUM_PACKETS;
-      io_write_data = 'd0;
-      io_write_data[0:num_packets_width-1] = 'd1024;
-      while(!io_done)
+	io_write = 1'b0;
+	while(io_done)
+	  #(Tclk);
+	
+	#(3*Tclk/4);
+	
 	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
-	#(Tclk);
-      
-      #(10*Tclk);
-      
-      
-      // restart experiment in loopback mode
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
-      io_write_data = 'd0;
-      io_write_data[0] = 'd1;
-      io_write_data[1] = 'd1;
-      while(!io_done)
-	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
-	#(Tclk);
-      
-      
-      // wait for experiment to finish
-      
-      while(!done)
-	begin
-	   
-	   #(10*Tclk);
-	   
-	   io_read = 1'b1;
-	   io_addr[0:cfg_node_addr_width-1] = 'd3;
-	   io_addr[cfg_node_addr_width:cfg_addr_width-1]
-	     = `CFG_ADDR_NODE_STATUS;
-	   io_write_data = 'd0;
-	   while(!io_done)
-	     #(Tclk);
-	   done = ~io_read_data[0];
-	   #(Tclk);
-	   io_read = 1'b0;
-	   while(io_done)
-	     #(Tclk);
-	   
-	end
-      done = 1'b0;
-      
-      #(Tclk);
-      
-      
-      // disable nodes
-      
-      io_write = 1'b1;
-      io_addr[0:cfg_node_addr_width-1] = 'd3;
-      io_addr[cfg_node_addr_width:cfg_addr_width-1] = `CFG_ADDR_NODE_CTRL;
-      io_write_data = 'd0;
-      while(!io_done)
-	#(Tclk);
-      #(Tclk);
-      io_write = 1'b0;
-      while(io_done)
-	#(Tclk);
-      
-      #(3*Tclk/4);
-      
-      #(Tclk);
-      
-      $finish;
-      
-   end
+	
+	$finish;
+	
+     end
    
 endmodule
