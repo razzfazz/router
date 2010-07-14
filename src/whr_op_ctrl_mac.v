@@ -164,14 +164,6 @@ module whr_op_ctrl_mac
    
    // FIXME: The following should be in a separate module!
    
-   // NOTE: Because we need to be ready to receive credits at any time unless 
-   // we know for sure that no more credits are outstanding, this register 
-   // cannot be included in any of the other clock gating domains. As a single 
-   // register, it will most likely end up being free-running; this could
-   // be avoided by including the flow_ctrl_active term in one of the other 
-   // clock gating domains, allowing cred_validq to be gated at the cost of 
-   // slightly increased activity in the domain.
-   
    wire [0:flow_ctrl_width-1]  flow_ctrl_s, flow_ctrl_q;
    assign flow_ctrl_s = flow_ctrl_in;
    
