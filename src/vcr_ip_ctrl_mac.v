@@ -573,17 +573,15 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*header_info_width-1] header_info_ivc;
    wire [0:num_vcs*fbf_addr_width-1] 	fbc_write_addr_ivc;
    wire [0:num_vcs*fbf_addr_width-1] 	fbc_read_addr_ivc;
-   wire [0:num_vcs*flit_buffer_idx_width-1] fbc_write_offset_ivc;
-   wire [0:num_vcs*flit_buffer_idx_width-1] fbc_read_offset_ivc;
-   wire [0:num_vcs-1] 			    fbc_empty_ivc;
-   wire [0:num_vcs-1] 			    allocated_ivc;
-   wire [0:num_vcs*num_vcs-1] 		    allocated_ivc_ovc;
-   wire [0:num_vcs-1] 			    free_unallocated_ivc;
-   wire [0:num_vcs-1] 			    free_allocated_ivc;
-   wire [0:num_vcs*7-1] 		    ivcc_errors_ivc;
-   wire [0:num_vcs*8-1] 		    events_ivc;
+   wire [0:num_vcs-1] 			fbc_empty_ivc;
+   wire [0:num_vcs-1] 			allocated_ivc;
+   wire [0:num_vcs*num_vcs-1] 		allocated_ivc_ovc;
+   wire [0:num_vcs-1] 			free_unallocated_ivc;
+   wire [0:num_vcs-1] 			free_allocated_ivc;
+   wire [0:num_vcs*7-1] 		ivcc_errors_ivc;
+   wire [0:num_vcs*8-1] 		events_ivc;
    
-   genvar 				    ivc;
+   genvar 				ivc;
    
    generate
       
@@ -707,14 +705,6 @@ module vcr_ip_ctrl_mac
 	   assign fbc_read_addr_ivc[ivc*fbf_addr_width:
 				    (ivc+1)*fbf_addr_width-1]
 	     = fbc_read_addr;
-	   assign fbc_write_offset_ivc[ivc*flit_buffer_idx_width:
-				       (ivc+1)*flit_buffer_idx_width-1]
-	     = fbc_write_addr[fbf_addr_width-flit_buffer_idx_width:
-			      fbf_addr_width-1];
-	   assign fbc_read_offset_ivc[ivc*flit_buffer_idx_width:
-				      (ivc+1)*flit_buffer_idx_width-1]
-	     = fbc_read_addr[fbf_addr_width-flit_buffer_idx_width:
-			     fbf_addr_width-1];
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
@@ -1112,57 +1102,17 @@ module vcr_ip_ctrl_mac
 	   wire [0:vc_idx_width-1] flit_vc_in_q;
 	   assign flit_vc_in_q = flit_ctrl_in_q[1:1+vc_idx_width-1];
 	   
-	   // use optimized version for power-of-two buffer sizes
-	   if(num_flit_buffers == (1 << flit_buffer_idx_width))
-	     begin
-		
-		wire [0:flit_buffer_idx_width-1] fbc_write_offset;
-		assign fbc_write_offset
-		  = fbc_write_offset_ivc[flit_vc_in_q*flit_buffer_idx_width +:
-					 flit_buffer_idx_width];
-		
-		wire [0:vc_idx_width-1] 	 fbc_write_base;
-		assign fbc_write_base = flit_vc_in_q;
-		
-		assign fbc_write_addr = {fbc_write_base, fbc_write_offset};
-		
-		wire [0:flit_buffer_idx_width-1] fbc_read_offset;
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_buffer_idx_width))
-		fbc_read_offset_sel
-		  (.select(vc_sel_ivc),
-		   .data_in(fbc_read_offset_ivc),
-		   .data_out(fbc_read_offset));
-		
-		wire [0:vc_idx_width-1] 	 fbc_read_base;
-		c_encode
-		  #(.num_ports(num_vcs))
-		fbc_read_base_enc
-		  (.data_in(vc_sel_ivc),
-		   .data_out(fbc_read_base));
-		
-		assign fbc_read_addr = {fbc_read_base, fbc_read_offset};
-		
-	     end
+	   assign fbc_write_addr
+	     = fbc_write_addr_ivc[flit_vc_in_q*fbf_addr_width +:
+				  fbf_addr_width];
 	   
-	   // in the general case, mux in the full address
-	   else
-	     begin
-		
-		assign fbc_write_addr
-		  = fbc_write_addr_ivc[flit_vc_in_q*fbf_addr_width +:
-				       fbf_addr_width];
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(fbf_addr_width))
-		fbc_read_addr_sel
-		  (.select(vc_sel_ivc),
-		   .data_in(fbc_read_addr_ivc),
-		   .data_out(fbc_read_addr));
-		
-	     end
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(fbf_addr_width))
+	   fbc_read_addr_sel
+	     (.select(vc_sel_ivc),
+	      .data_in(fbc_read_addr_ivc),
+	      .data_out(fbc_read_addr));
 	   
 	end
       
