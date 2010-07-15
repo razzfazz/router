@@ -167,10 +167,10 @@ module whr_op_ctrl_mac
    wire [0:flow_ctrl_width-1]  flow_ctrl_s, flow_ctrl_q;
    assign flow_ctrl_s = flow_ctrl_in;
    
-   wire 		       cred_count_all;
+   wire 		       ct_empty;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = ~cred_count_all;
+   assign flow_ctrl_active = ~ct_empty;
    
    wire 		       cred_valid_s, cred_valid_q;
    assign cred_valid_s = flow_ctrl_s[0];
@@ -514,47 +514,36 @@ module whr_op_ctrl_mac
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 					 credit_b;
-   assign credit_b = ~credit;
-   
-   wire [0:cred_count_width-1] 			 cred_count_debit;
-   assign cred_count_debit = cred_count_q - credit_b;
-   
-   wire [0:cred_count_width-1] 			 cred_count_nodebit;
-   assign cred_count_nodebit = cred_count_q + credit;
-   
    wire 					 debit;
    assign debit = gnt;
    
-   wire [0:cred_count_width-1] 			 cred_count_s;   
-   assign cred_count_s = debit ? cred_count_debit : cred_count_nodebit;
-   c_dff
-     #(.width(cred_count_width),
-       .reset_type(reset_type),
-       .reset_value(num_flit_buffers))
-   cred_countq
+   wire 					 ct_free;
+   wire [0:1] 					 ct_errors;
+   c_credit_tracker
+     #(.num_credits(num_flit_buffers),
+       .reset_type(reset_type))
+   ct
      (.clk(clk),
       .reset(reset),
       .active(cred_active),
-      .d(cred_count_s),
-      .q(cred_count_q));
-   
-   wire 					 cred_count_zero;
-   assign cred_count_zero = ~|cred_count_q;
+      .credit(credit),
+      .debit(debit),
+      .free(ct_free),
+      .empty(ct_empty),
+      .errors(ct_errors));
    
    wire 					 error_ct_underflow;
-   assign error_ct_underflow = cred_count_zero & debit & ~credit;
-   
-   assign cred_count_all = (cred_count_q == num_flit_buffers);
+   assign error_ct_underflow = ct_errors[0];
    
    wire 					 error_ct_overflow;
-   assign error_ct_overflow = cred_count_all & credit;
+   assign error_ct_overflow = ct_errors[1];
    
    // NOTE: For the wormhole router, the credit check can be performed at the 
    // allocator (here, arbiter) output; thus, the follwoing computation can be
    // performed in parallel with arbitration, so we don't need an additional
    // register stage as in the general VC case.
-   assign free = |cred_count_q | credit;
+   
+   assign free = ct_free | credit;
    
    
    //---------------------------------------------------------------------------
