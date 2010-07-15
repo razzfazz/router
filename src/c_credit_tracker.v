@@ -65,9 +65,11 @@ module c_credit_tracker
    output [0:1] errors;
    wire [0:1] errors;
    
-   wire set_cred, reset_cred;
-   wire cred_s, cred_q;
-   assign cred_s = set_cred | (cred_q & ~reset_cred);
+   wire       cred_debit;
+   wire       cred_nodebit;
+   
+   wire       cred_s, cred_q;
+   assign cred_s = debit ? cred_debit : cred_nodebit;
    c_dff
      #(.width(1),
        .reset_type(reset_type),
@@ -81,12 +83,6 @@ module c_credit_tracker
    
    assign free = cred_q;
    
-   wire incr;
-   assign incr = credit & ~debit;
-
-   wire decr;
-   assign decr = debit & ~credit;
-
    wire error_underflow;
    wire error_overflow;
    wire [0:true_idx_width-1] true_count;
@@ -97,15 +93,16 @@ module c_credit_tracker
       if(num_credits == 1)
 	begin
 	   
-	   assign set_cred = incr;
-	   assign reset_cred = decr;
-
-	   assign error_underflow = ~cred_q & debit;
-	   assign error_overflow = cred_q & credit;
+	   assign cred_debit = cred_q & credit;
+	   assign cred_nodebit = cred_q | credit;
+	   
+	   assign error_underflow = debit & ~credit & ~cred_q;
+	   assign error_overflow = credit & ~debit & cred_q;
+	   
 	   assign true_count = cred_q;
 	   
 	end
-
+      
       // if we have more than one credit, we need an extra counter to keep track
       else
 	begin
@@ -114,17 +111,20 @@ module c_credit_tracker
 	   wire 		       cred_count_zero;
 	   assign cred_count_zero = ~|cred_count_q;
 	   
-	   wire 		       incr_count;
-	   assign incr_count = incr & ~(~cred_q & cred_count_zero);
-	   
 	   wire 		       decr_count;
-	   assign decr_count = decr & ~(cred_q & cred_count_zero);
+	   assign decr_count = ~credit & (~cred_q | ~cred_count_zero);
+	   
+	   wire [0:credit_idx_width-1] cred_count_debit;
+	   assign cred_count_debit = cred_count_q - decr_count;
+	   
+	   wire 		       incr_count;
+	   assign incr_count = credit & (cred_q | ~cred_count_zero);
+	   
+	   wire [0:credit_idx_width-1] cred_count_nodebit;
+	   assign cred_count_nodebit = cred_count_q + incr_count;
 	   
 	   wire [0:credit_idx_width-1] cred_count_s;
-	   assign cred_count_s
-	     = (incr | decr) ?
-	       ((cred_count_q - decr_count) + incr_count) :
-	       cred_count_q;
+	   assign cred_count_s = debit ? cred_count_debit : cred_count_nodebit;
 	   c_dff
 	     #(.width(credit_idx_width),
 	       .reset_type(reset_type),
@@ -136,13 +136,15 @@ module c_credit_tracker
 	      .d(cred_count_s),
 	      .q(cred_count_q));
 	   
-	   assign set_cred = incr & ~cred_q & cred_count_zero;
-	   assign reset_cred = decr & cred_q & cred_count_zero;
+	   assign cred_debit = ~cred_count_zero | (cred_q & credit);
+	   assign cred_nodebit = cred_q | credit;
 	   
-	   assign error_underflow
-	     = !cred_q && (cred_count_q == 0) && debit;
-	   assign error_overflow
-	     = cred_q && (cred_count_q == (num_credits - 1)) && credit;
+	   wire 		       cred_count_max;
+	   assign cred_count_max = (cred_count_q == (num_credits - 1));
+	   
+	   assign error_underflow = debit & ~credit & ~cred_q & cred_count_zero;
+	   assign error_overflow = credit & ~debit & cred_count_max;
+	   
 	   assign true_count = cred_count_q + cred_q;
 	   
 	end
