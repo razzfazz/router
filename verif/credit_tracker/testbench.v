@@ -18,7 +18,7 @@ module testbench
    wire debit;
    wire credit;
    wire free;
-   wire free_early;
+   wire empty;
    wire [0:1] errors;
    
    c_credit_tracker
@@ -31,6 +31,7 @@ module testbench
       .debit(debit),
       .credit(credit),
       .free(free),
+      .empty(empty),
       .errors(errors));
    
    always

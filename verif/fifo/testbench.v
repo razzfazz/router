@@ -48,6 +48,7 @@ module testbench
       .errors(ffc_errors));
    
    wire free;
+   wire empty;
    wire [0:1] ct_errors;
    
    c_credit_tracker
@@ -60,6 +61,7 @@ module testbench
       .debit(push),
       .credit(pop),
       .free(free),
+      .empty(empty),
       .errors(ct_errors));
 
    reg [0:data_width-1] write_data;

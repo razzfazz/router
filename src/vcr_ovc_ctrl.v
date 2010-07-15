@@ -458,6 +458,7 @@ module vcr_ovc_ctrl
 	   assign head_debit = vc_gnt;
 	   
 	   // track header credits using stock credit tracker module
+	   wire 				 hct_empty;
 	   wire [0:1] 				 hct_errors;
 	   c_credit_tracker
 	     #(.num_credits(num_header_buffers),
@@ -469,6 +470,7 @@ module vcr_ovc_ctrl
 	      .credit(head_credit),
 	      .debit(head_debit),
 	      .free(head_free),
+	      .empty(hct_empty),
 	      .errors(hct_errors));
 	   
 	   assign error_hct_underflow = hct_errors[0];

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module for tracking available credit in a buffer
 module c_credit_tracker
-  (clk, reset, active, debit, credit, free, errors);
+  (clk, reset, active, debit, credit, free, empty, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -60,6 +60,10 @@ module c_credit_tracker
    // at least one credit available?
    output free;
    wire free;
+   
+   // all credits available?
+   output empty;
+   wire empty;
    
    // internal error condition encountered
    output [0:1] errors;
@@ -100,6 +104,8 @@ module c_credit_tracker
 	   assign error_overflow = credit & ~debit & cred_q;
 	   
 	   assign true_count = cred_q;
+	   
+	   assign empty = cred_q;
 	   
 	end
       
@@ -146,6 +152,8 @@ module c_credit_tracker
 	   assign error_overflow = credit & ~debit & cred_count_max;
 	   
 	   assign true_count = cred_count_q + cred_q;
+	   
+	   assign empty = cred_count_max;
 	   
 	end
       
