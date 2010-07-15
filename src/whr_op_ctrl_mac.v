@@ -393,7 +393,7 @@ module whr_op_ctrl_mac
 	     begin
 		
 		wire flags_active;
-		assign flags_active = flit_valid_in | cred_valid;
+		assign flags_active = flit_valid_in;
 		
 		// if we can only have one packet per buffer, we can accept the 
 		// next one once the buffer has been completely drained after 
@@ -404,8 +404,9 @@ module whr_op_ctrl_mac
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
 		wire tail_sent_s, tail_sent_q;
-		assign tail_sent_s = (tail_sent_q & ~last_credit_received) | 
-				     (flit_valid_in & flit_tail_in);
+		assign tail_sent_s
+		  = (tail_sent_q & ~(flit_valid_in & flit_head_in)) | 
+		    (flit_valid_in & flit_tail_in);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
