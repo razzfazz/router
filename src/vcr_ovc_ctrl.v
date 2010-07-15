@@ -365,9 +365,6 @@ module vcr_ovc_ctrl
 	   // if only a subset of the flit buffer entries can be headers, we 
 	   // need to keep track of how many such slots are left
 	   
-	   wire head_debit;
-	   assign head_debit = vc_gnt;
-	   
 	   wire head_credit;
 	   
 	   if(num_header_buffers == 1)
@@ -381,11 +378,7 @@ module vcr_ovc_ctrl
 		assign last_credit_received
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
-		wire tail_sent_q;
-		
-		assign head_credit = tail_sent_q & last_credit_received;
-		
-		wire tail_sent_s;
+		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s = ((tail_sent_q & ~last_credit_received) | 
 				      (flit_valid_qual & flit_tail));
 		c_dff
@@ -398,23 +391,7 @@ module vcr_ovc_ctrl
 		   .d(tail_sent_s),
 		   .q(tail_sent_q));
 		
-		wire head_free_s, head_free_q;
-		assign head_free_s = (head_free_q & ~head_debit) | head_credit;
-		c_dff
-		  #(.width(1),
-		    .reset_type(reset_type),
-		    .reset_value(1'b1))
-		head_freeq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(flags_active),
-		   .d(head_free_s),
-		   .q(head_free_q));
-		
-		assign head_free = head_free_q;
-		
-		assign error_hct_underflow = head_debit & ~head_free_q;
-		assign error_hct_overflow = head_credit & head_free_q;
+		assign head_credit = tail_sent_q & last_credit_received;
 		
 	     end
 	   else
@@ -474,25 +451,28 @@ module vcr_ovc_ctrl
 		assign tail = tail_queue[pop_ptr_q];
 		
 		assign head_credit = credit & tail;		
-		
-		// track header credits using stock credit tracker module
-		wire [0:1] 			 hct_errors;
-		c_credit_tracker
-		  #(.num_credits(num_header_buffers),
-		    .reset_type(reset_type))
-		hct
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(flags_active),
-		   .credit(head_credit),
-		   .debit(head_debit),
-		   .free(head_free),
-		   .errors(hct_errors));
-		
-		assign error_hct_underflow = hct_errors[0];
-		assign error_hct_overflow = hct_errors[1];
-		
+
 	     end
+	   
+	   wire 				 head_debit;
+	   assign head_debit = vc_gnt;
+	   
+	   // track header credits using stock credit tracker module
+	   wire [0:1] 				 hct_errors;
+	   c_credit_tracker
+	     #(.num_credits(num_header_buffers),
+	       .reset_type(reset_type))
+	   hct
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(flags_active),
+	      .credit(head_credit),
+	      .debit(head_debit),
+	      .free(head_free),
+	      .errors(hct_errors));
+	   
+	   assign error_hct_underflow = hct_errors[0];
+	   assign error_hct_overflow = hct_errors[1];
 	   
 	end
       
