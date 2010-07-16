@@ -45,8 +45,12 @@ module c_credit_tracker
    // width required to select an individual credit
    localparam credit_idx_width = clogb(num_credits);
    
+   // synopsys translate_off
+   
    // width required to represent full range of credit count (0..num_credits)
    localparam true_idx_width = clogb(num_credits+1);
+   
+   // synopsys translate_on
    
    
    input clk;
@@ -89,7 +93,12 @@ module c_credit_tracker
    
    wire error_underflow;
    wire error_overflow;
+   
+   // synopsys translate_off
+   
    wire [0:true_idx_width-1] true_count;
+   
+   // synopsys translate_on
    
    generate
       
@@ -151,13 +160,18 @@ module c_credit_tracker
 	   assign error_underflow = debit & ~credit & ~cred_q;
 	   assign error_overflow = credit & ~debit & cred_count_max;
 	   
+	   assign empty = cred_count_max;
+	   
+	   // synopsys translate_off
+	   
 	   assign true_count = cred_count_q + cred_q;
 	   
-	   assign empty = cred_count_max;
+	   // synopsys translate_on
 	   
 	end
       
       // synopsys translate_off
+      
       if(num_credits == 0)
 	begin
 	   initial
@@ -167,6 +181,7 @@ module c_credit_tracker
 	      $stop;
 	   end
 	end
+      
       // synopsys translate_on
       
    endgenerate
