@@ -156,9 +156,6 @@ module whr_ip_ctrl_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
-   
    // use input register as part of the flit buffer
    parameter input_stage_can_hold = 0;
    
@@ -569,7 +566,7 @@ module whr_ip_ctrl_mac
 	   c_fifo
 	     #(.depth(num_header_buffers - 1),
 	       .width(hop_route_info_width),
-	       .fifo_type(header_fifo_type),
+	       .fifo_type(`FIFO_TYPE_INDEXED),
 	       .reset_type(reset_type))
 	   hdff
 	     (.clk(clk),

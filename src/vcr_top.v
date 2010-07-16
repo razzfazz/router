@@ -172,9 +172,6 @@ module vcr_top
        1 :
        -1;
    
-   // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
-   
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -509,7 +506,6 @@ module vcr_top
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),
-	       .header_fifo_type(header_fifo_type),
 	       .fbf_regfile_type(fbf_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_type(vc_alloc_type),

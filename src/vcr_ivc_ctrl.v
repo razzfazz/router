@@ -192,9 +192,6 @@ module vcr_ivc_ctrl
        1 :
        -1;
    
-   // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
-   
    // select implementation variant for VC allocator
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
@@ -740,7 +737,7 @@ module vcr_ivc_ctrl
 	   c_fifo
 	     #(.depth(num_header_buffers - 1),
 	       .width(hop_route_info_width),
-	       .fifo_type(header_fifo_type),
+	       .fifo_type(`FIFO_TYPE_INDEXED),
 	       .reset_type(reset_type))
 	   hdff
 	     (.clk(clk),

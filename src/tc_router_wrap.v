@@ -449,7 +449,6 @@ module tc_router_wrap
        .routing_type(routing_type),
        .dim_order(dim_order),
        .int_flow_ctrl_type(int_flow_ctrl_type),
-       .header_fifo_type(header_fifo_type),
        .input_stage_can_hold(input_stage_can_hold),
        .fbf_regfile_type(fbf_regfile_type),
        .vc_alloc_type(vc_alloc_type),

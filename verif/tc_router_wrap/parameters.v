@@ -102,9 +102,6 @@ parameter dim_order = `DIM_ORDER_ASCENDING;
 // select method for credit signaling from output to input controller
 parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 
-// select implementation variant for header FIFO
-parameter header_fifo_type = `FIFO_TYPE_SHIFTING;
-
 // use input register as part of the flit buffer (wormhole router only)
 parameter input_stage_can_hold = 0;
 

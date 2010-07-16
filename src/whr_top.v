@@ -151,9 +151,6 @@ module whr_top
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
-   
    // use input register as part of the flit buffer
    parameter input_stage_can_hold = 0;
    
@@ -252,7 +249,6 @@ module whr_top
 	       .lookahead_routing(lookahead_routing),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
-	       .header_fifo_type(header_fifo_type),
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fbf_regfile_type(fbf_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),

@@ -99,9 +99,6 @@ parameter dim_order = `DIM_ORDER_ASCENDING;
 // select method for credit signaling from output to input controller
 parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 
-// select implementation variant for header FIFO
-parameter header_fifo_type = `FIFO_TYPE_SHIFTING;
-
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
 

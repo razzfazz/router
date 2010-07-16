@@ -197,9 +197,6 @@ module vcr_ip_ctrl_mac
        1 :
        -1;
    
-   // select implementation variant for header FIFO
-   parameter header_fifo_type = `FIFO_TYPE_INDEXED;
-   
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -592,7 +589,6 @@ module vcr_ip_ctrl_mac
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .cred_level_width(cred_level_width),
-	       .header_fifo_type(header_fifo_type),
 	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
