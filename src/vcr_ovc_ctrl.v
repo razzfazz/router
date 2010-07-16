@@ -401,61 +401,38 @@ module vcr_ovc_ctrl
 	   else
 	     begin
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
-		c_incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		push_ptr_incr
-		  (.data_in(push_ptr_q),
-		   .data_out(push_ptr_next));
+		wire tff_write_data;
+		assign tff_write_data = flit_tail;
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s
-		  = flit_valid_qual ? push_ptr_next : push_ptr_q;
-		c_dff
-		  #(.width(flit_buffer_idx_width),
+		wire tff_almost_full;
+		wire tff_full;
+		wire tff_almost_empty;
+		wire tff_empty;
+		wire tff_read_data;
+		wire tff_peek_data;
+		wire [0:1] tff_errors;
+		c_fifo
+		  #(.depth(num_flit_buffers),
+		    .width(1),
+		    .fifo_type(`FIFO_TYPE_INDEXED),
 		    .reset_type(reset_type))
-		push_ptrq
+		tff
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(flags_active),
-		   .d(push_ptr_s),
-		   .q(push_ptr_q));
+		   .almost_full(tff_almost_full),
+		   .full(tff_full),
+		   .write_data(tff_write_data),
+		   .push(flit_valid_qual),
+		   .almost_empty(tff_almost_empty),
+		   .empty(tff_empty),
+		   .read_data(tff_read_data),
+		   .pop(credit),
+		   .peek_data(tff_peek_data),
+		   .errors(tff_errors));
 		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
-		c_incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		pop_ptr_incr
-		  (.data_in(pop_ptr_q),
-		   .data_out(pop_ptr_next));
+		assign head_credit = credit & tff_read_data;		
 		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
-		c_dff
-		  #(.width(flit_buffer_idx_width),
-		    .reset_type(reset_type))
-		pop_ptrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(flags_active),
-		   .d(pop_ptr_s),
-		   .q(pop_ptr_q));
-		
-		reg [0:num_flit_buffers-1] 	 tail_queue;
-		
-		always @(posedge clk)
-		  if(flags_active)
-		    if(flit_valid_qual)
-		      tail_queue[push_ptr_q] <= flit_tail;
-		
-		wire 				 tail;
-		assign tail = tail_queue[pop_ptr_q];
-		
-		assign head_credit = credit & tail;		
-
 	     end
 	   
 	   wire 				 head_debit;

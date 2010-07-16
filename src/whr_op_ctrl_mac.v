@@ -423,64 +423,37 @@ module whr_op_ctrl_mac
 	   else
 	     begin
 		
-		wire push_active;
-		assign push_active = flit_valid_in;
+		wire tff_write_data;
+		assign tff_write_data = |(gnt_unqual_ip & req_tail_ip);
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr_next, push_ptr_q;
-		c_incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		push_ptr_incr
-		  (.data_in(push_ptr_q),
-		   .data_out(push_ptr_next));
-		
-		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s = push_ptr_next;
-		c_dff
-		  #(.width(flit_buffer_idx_width),
+		wire tff_almost_full;
+		wire tff_full;
+		wire tff_almost_empty;
+		wire tff_empty;
+		wire tff_read_data;
+		wire tff_peek_data;
+		wire [0:1] tff_errors;
+		c_fifo
+		  #(.depth(num_flit_buffers),
+		    .width(1),
+		    .fifo_type(`FIFO_TYPE_INDEXED),
 		    .reset_type(reset_type))
-		push_ptrq
+		tff
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(push_active),
-		   .d(push_ptr_s),
-		   .q(push_ptr_q));
+		   .active(cred_active),
+		   .almost_full(tff_almost_full),
+		   .full(tff_full),
+		   .write_data(tff_write_data),
+		   .push(gnt),
+		   .almost_empty(tff_almost_empty),
+		   .empty(tff_empty),
+		   .read_data(tff_read_data),
+		   .pop(cred_valid),
+		   .peek_data(tff_peek_data),
+		   .errors(tff_errors));
 		
-		wire 				 pop_active;
-		assign pop_active = cred_valid;
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_next, pop_ptr_q;
-		c_incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		pop_ptr_incr
-		  (.data_in(pop_ptr_q),
-		   .data_out(pop_ptr_next));
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = pop_ptr_next;
-		c_dff
-		  #(.width(flit_buffer_idx_width),
-		    .reset_type(reset_type))
-		pop_ptrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(pop_active),
-		   .d(pop_ptr_s),
-		   .q(pop_ptr_q));
-		
-		reg [0:num_flit_buffers-1] 	 tail_queue;
-		
-		always @(posedge clk)
-		  if(push_active)
-		    tail_queue[push_ptr_q] <= flit_tail_in;
-		
-		wire 				 tail;
-		assign tail = tail_queue[pop_ptr_q];
-		
-		assign head_credit = credit & tail;
+		assign head_credit = credit & tff_read_data;
 		
 	     end
 	   
