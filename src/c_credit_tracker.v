@@ -148,7 +148,7 @@ module c_credit_tracker
 	   wire 		       cred_count_max;
 	   assign cred_count_max = (cred_count_q == (num_credits - 1));
 	   
-	   assign error_underflow = debit & ~credit & ~cred_q & cred_count_zero;
+	   assign error_underflow = debit & ~credit & ~cred_q;
 	   assign error_overflow = credit & ~debit & cred_count_max;
 	   
 	   assign true_count = cred_count_q + cred_q;
