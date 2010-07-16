@@ -213,6 +213,9 @@ module vcr_ovc_ctrl
    wire 			  flit_valid;
    assign flit_valid = int_flit_ctrl[0] & sw_gnt_q;
    
+   wire 			  flit_head;
+   assign flit_head = int_flit_ctrl[1+vc_idx_width];
+   
    wire 			  flit_tail;
    assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
    
@@ -379,8 +382,9 @@ module vcr_ovc_ctrl
 		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
 		
 		wire tail_sent_s, tail_sent_q;
-		assign tail_sent_s = ((tail_sent_q & ~last_credit_received) | 
-				      (flit_valid_qual & flit_tail));
+		assign tail_sent_s
+		  = ((tail_sent_q & ~(flit_valid_qual & flit_head)) | 
+		     (flit_valid_qual & flit_tail));
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
