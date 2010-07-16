@@ -119,7 +119,7 @@ module c_credit_tracker
 	end
       
       // if we have more than one credit, we need an extra counter to keep track
-      else
+      else if(num_credits > 1)
 	begin
 	   
 	   wire [0:credit_idx_width-1] cred_count_q;
@@ -172,7 +172,7 @@ module c_credit_tracker
       
       // synopsys translate_off
       
-      if(num_credits == 0)
+      else
 	begin
 	   initial
 	   begin
