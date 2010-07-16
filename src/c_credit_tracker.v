@@ -118,13 +118,13 @@ module c_credit_tracker
 	   assign cred_count_zero = ~|cred_count_q;
 	   
 	   wire 		       decr_count;
-	   assign decr_count = ~credit & (~cred_q | ~cred_count_zero);
+	   assign decr_count = ~credit & ~cred_count_zero;
 	   
 	   wire [0:credit_idx_width-1] cred_count_debit;
 	   assign cred_count_debit = cred_count_q - decr_count;
 	   
 	   wire 		       incr_count;
-	   assign incr_count = credit & (cred_q | ~cred_count_zero);
+	   assign incr_count = credit & cred_q;
 	   
 	   wire [0:credit_idx_width-1] cred_count_nodebit;
 	   assign cred_count_nodebit = cred_count_q + incr_count;
