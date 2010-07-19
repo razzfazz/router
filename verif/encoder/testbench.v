@@ -1,3 +1,5 @@
+`default_nettype none
+
 module testbench
   #(parameter num_ports = 8,
     parameter num_tests = 1000,

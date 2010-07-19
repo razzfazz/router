@@ -1,3 +1,5 @@
+`default_nettype none
+
 module testbench
   #(parameter num_ports = 4,
     parameter width = 8,

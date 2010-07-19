@@ -1,3 +1,5 @@
+`default_nettype none
+
 module testbench
   #(parameter width = 4,
     parameter min_value = 4,
