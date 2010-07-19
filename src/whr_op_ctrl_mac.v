@@ -46,9 +46,6 @@ module whr_op_ctrl_mac
    // width required to select a buffer
    localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    
-   // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_flit_buffers+1);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
@@ -167,10 +164,10 @@ module whr_op_ctrl_mac
    wire [0:flow_ctrl_width-1]  flow_ctrl_s, flow_ctrl_q;
    assign flow_ctrl_s = flow_ctrl_in;
    
-   wire 		       cred_count_all;
+   wire 		       ft_empty;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = ~cred_count_all;
+   assign flow_ctrl_active = ~ft_empty;
    
    wire 		       cred_valid_s, cred_valid_q;
    assign cred_valid_s = flow_ctrl_s[0];
@@ -222,13 +219,13 @@ module whr_op_ctrl_mac
       .req(req_int_ip),
       .gnt(gnt_int_ip));
    
-   wire 		       head_free;
+   wire 		       hft_free;
    
    wire [0:num_ports-1]        new_gnt_ip;
-   assign new_gnt_ip = gnt_int_ip & {num_ports{head_free}};
+   assign new_gnt_ip = gnt_int_ip & {num_ports{hft_free}};
    
    wire 		       new_gnt;
-   assign new_gnt = gnt_int & head_free;
+   assign new_gnt = gnt_int & hft_free;
    
    wire 		       allocated_q;
    
@@ -253,12 +250,12 @@ module whr_op_ctrl_mac
    wire 		       held_gnt;
    assign held_gnt = |held_gnt_ip;
    
-   wire 		       free;
+   wire 		       ft_free;
    
    wire 		       allocated_s;
    assign allocated_s = allocated_q ?
-			(~|(held_gnt_ip & req_tail_ip) | ~free) :
-			(|(gnt_int_ip & ~req_tail_ip) & head_free & free);
+			(~|(held_gnt_ip & req_tail_ip) | ~ft_free) :
+			(|(gnt_int_ip & ~req_tail_ip) & hft_free & ft_free);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -279,10 +276,11 @@ module whr_op_ctrl_mac
    wire 		       gnt_unqual;
    assign gnt_unqual = allocated_q ? held_gnt : new_gnt;
    
-   assign gnt_ip = (allocated_q ? held_gnt_ip : new_gnt_ip) & {num_ports{free}};
+   assign gnt_ip
+     = (allocated_q ? held_gnt_ip : new_gnt_ip) & {num_ports{ft_free}};
    
    wire 		       gnt;
-   assign gnt = gnt_unqual & free;
+   assign gnt = gnt_unqual & ft_free;
    
    
    //---------------------------------------------------------------------------
@@ -363,7 +361,7 @@ module whr_op_ctrl_mac
    wire 		       credit;
    assign credit = cred_valid;
    
-   wire [0:cred_count_width-1] cred_count_q;
+   wire 		       ft_almost_empty;
    wire 		       error_hft_underflow;
    wire 		       error_hft_overflow;
    
@@ -375,7 +373,7 @@ module whr_op_ctrl_mac
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
 	   // on the normal credit tracking mechanism
-	   assign head_free = 1'b1;
+	   assign hft_free = 1'b1;
 	   
 	   assign error_hft_underflow = 1'b0;
 	   assign error_hft_overflow = 1'b0;
@@ -400,8 +398,7 @@ module whr_op_ctrl_mac
 		// the tail has been sent
 		
 		wire last_credit_received;
-		assign last_credit_received
-		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
+		assign last_credit_received = ft_almost_empty & credit;
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
@@ -458,7 +455,7 @@ module whr_op_ctrl_mac
 	     end
 	   
 	   wire 				 head_debit;
-	   assign head_debit = ~allocated_q & new_gnt & free;
+	   assign head_debit = ~allocated_q & new_gnt & ft_free;
 	   
 	   // track header credits using stock FIFO tracker module
 	   wire 				 hft_almost_empty;
@@ -481,7 +478,7 @@ module whr_op_ctrl_mac
 	      .full(hft_full),
 	      .errors(hft_errors));
 	   
-	   assign head_free = ~hft_full;
+	   assign hft_free = ~hft_full | head_credit;
 	   
 	   assign error_hft_underflow = hft_errors[0];
 	   assign error_hft_overflow = hft_errors[1];
@@ -495,47 +492,39 @@ module whr_op_ctrl_mac
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 					 credit_b;
-   assign credit_b = ~credit;
-   
-   wire [0:cred_count_width-1] 			 cred_count_debit;
-   assign cred_count_debit = cred_count_q - credit_b;
-   
-   wire [0:cred_count_width-1] 			 cred_count_nodebit;
-   assign cred_count_nodebit = cred_count_q + credit;
-   
    wire 					 debit;
    assign debit = gnt;
    
-   wire [0:cred_count_width-1] 			 cred_count_s;   
-   assign cred_count_s = debit ? cred_count_debit : cred_count_nodebit;
-   c_dff
-     #(.width(cred_count_width),
-       .reset_type(reset_type),
-       .reset_value(num_flit_buffers))
-   cred_countq
+   wire 					 ft_almost_full;
+   wire 					 ft_full;
+   wire [0:1] 					 ft_errors;
+   c_fifo_tracker
+     #(.depth(num_flit_buffers),
+       .reset_type(reset_type))
+   ft
      (.clk(clk),
       .reset(reset),
       .active(cred_active),
-      .d(cred_count_s),
-      .q(cred_count_q));
+      .push(debit),
+      .pop(credit),
+      .almost_empty(ft_almost_empty),
+      .empty(ft_empty),
+      .almost_full(ft_almost_full),
+      .full(ft_full),
+      .errors(ft_errors));
    
-   wire 					 cred_count_zero;
-   assign cred_count_zero = ~|cred_count_q;
+   wire 					 error_ft_underflow;
+   assign error_ft_underflow = ft_errors[0];
    
-   wire 					 error_ct_underflow;
-   assign error_ct_underflow = cred_count_zero & debit & ~credit;
-   
-   assign cred_count_all = (cred_count_q == num_flit_buffers);
-   
-   wire 					 error_ct_overflow;
-   assign error_ct_overflow = cred_count_all & credit;
+   wire 					 error_ft_overflow;
+   assign error_ft_overflow = ft_errors[1];
    
    // NOTE: For the wormhole router, the credit check can be performed at the 
-   // allocator (here, arbiter) output; thus, the follwoing computation can be
+   // allocator (here, arbiter) output; thus, the following computation can be
    // performed in parallel with arbitration, so we don't need an additional
    // register stage as in the general VC case.
-   assign free = |cred_count_q | credit;
+   
+   assign ft_free = ~ft_full | credit;
    
    
    //---------------------------------------------------------------------------
@@ -575,10 +564,10 @@ module whr_op_ctrl_mac
 	   always @(posedge clk)
 	     begin
 		
-		if(error_ct_underflow)
+		if(error_ft_underflow)
 		  $display("ERROR: Credit tracker underflow in module %m.");
 		
-		if(error_ct_overflow)
+		if(error_ft_overflow)
 		  $display("ERROR: Credit tracker overflow in module %m.");
 		
 		if(error_hft_underflow)
@@ -592,8 +581,8 @@ module whr_op_ctrl_mac
 	   // synopsys translate_on
 	   
 	   wire [0:3] errors_s, errors_q;
-	   assign errors_s = {error_ct_underflow,
-			      error_ct_overflow,
+	   assign errors_s = {error_ft_underflow,
+			      error_ft_overflow,
 			      error_hft_underflow,
 			      error_hft_overflow};
 	   c_err_rpt
