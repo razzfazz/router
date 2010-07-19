@@ -316,8 +316,8 @@ module packet_source
    wire [0:num_vcs-1] 			 free_ovc;
    wire [0:num_vcs-1] 			 head_free_ovc;
    
-   wire [0:num_vcs*2-1] 		 errors_hct_ovc;
-   wire [0:num_vcs*2-1] 		 errors_cred_ovc;
+   wire [0:num_vcs*2-1] 		 hft_errors_ovc;
+   wire [0:num_vcs*2-1] 		 cred_errors_ovc;
    
    wire 				 free;
    assign free = |(sel_ovc & free_ovc);
@@ -355,7 +355,7 @@ module packet_source
 		assign debit = flit_sent & ~flit_kill;
 	     end
 	   
-	   wire head_credit;
+	   wire hft_credit;
 	   wire [0:cred_count_width-1] cred_count_s;
 	   
 	   if(num_header_buffers > 1)
@@ -432,7 +432,7 @@ module packet_source
 		  (.data_in(pop_ptr_q),
 		   .data_out(pop_mask));
 		
-		assign head_credit = |(tail_queue_q & pop_mask) & credit;
+		assign hft_credit = |(tail_queue_q & pop_mask) & credit;
 		
 	     end
 	   else
@@ -440,33 +440,40 @@ module packet_source
 		
 		// if we can only have one packet per buffer, we can accept the
 		// next one once the buffer has been emptied
-		assign head_credit = credit &&
-				     (cred_count_s == num_flit_buffers);
+		assign hft_credit = credit &&
+				    (cred_count_s == num_flit_buffers);
 		
 	     end
 	   
-	   wire head_debit;
-	   assign head_debit = debit & flit_head;
+	   wire hft_debit;
+	   assign hft_debit = debit & flit_head;
 	   
 	   // track header credits using stock credit tracker module
-	   wire head_free;
-	   wire head_empty;
-	   wire [0:1] errors_hct;
-	   c_credit_tracker
-	     #(.num_credits(num_header_buffers),
+	   wire hft_almost_full;
+	   wire hft_full;
+	   wire hft_almost_empty;
+	   wire hft_empty;
+	   wire [0:1] hft_errors;
+	   c_fifo_tracker
+	     #(.depth(num_header_buffers),
 	       .reset_type(reset_type))
-	   hct
+	   hft
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
-	      .credit(head_credit),
-	      .debit(head_debit),
-	      .free(head_free),
-	      .empty(head_empty),
-	      .errors(errors_hct));
-
+	      .push(hft_debit),
+	      .pop(hft_credit),
+	      .almost_full(hft_almost_full),
+	      .full(hft_full),
+	      .almost_empty(hft_almost_empty),
+	      .empty(hft_empty),
+	      .errors(hft_errors));
+	   
+	   wire       head_free;
+	   assign head_free = ~hft_full;
+	   
 	   assign head_free_ovc[ovc] = head_free;
-	   assign errors_hct_ovc[ovc*2:(ovc+1)*2-1] = errors_hct;
+	   assign hft_errors_ovc[ovc*2:(ovc+1)*2-1] = hft_errors;
 	   
 	   wire [0:cred_count_width-1] cred_count_q;
 	   assign cred_count_s = cred_count_q + credit - debit;
@@ -490,10 +497,10 @@ module packet_source
 	   wire 		       error_cred_underflow;
 	   assign error_cred_underflow = (cred_count_q == 0) && debit;
 	   
-	   wire [0:1] 		       errors_cred;
-	   assign errors_cred = {error_cred_overflow, error_cred_underflow};
+	   wire [0:1] 		       cred_errors;
+	   assign cred_errors = {error_cred_overflow, error_cred_underflow};
 	   
-	   assign errors_cred_ovc[ovc*2:(ovc+1)*2-1] = errors_cred;
+	   assign cred_errors_ovc[ovc*2:(ovc+1)*2-1] = cred_errors;
 	   
 	end
       
@@ -957,6 +964,6 @@ module packet_source
       
    endgenerate
    
-   assign error = |errors_hct_ovc | |errors_cred_ovc;
+   assign error = |hft_errors_ovc | |cred_errors_ovc;
    
 endmodule

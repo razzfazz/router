@@ -364,8 +364,8 @@ module whr_op_ctrl_mac
    assign credit = cred_valid;
    
    wire [0:cred_count_width-1] cred_count_q;
-   wire 		       error_hct_underflow;
-   wire 		       error_hct_overflow;
+   wire 		       error_hft_underflow;
+   wire 		       error_hft_overflow;
    
    generate
       
@@ -377,8 +377,8 @@ module whr_op_ctrl_mac
 	   // on the normal credit tracking mechanism
 	   assign head_free = 1'b1;
 	   
-	   assign error_hct_underflow = 1'b0;
-	   assign error_hct_overflow = 1'b0;
+	   assign error_hft_underflow = 1'b0;
+	   assign error_hft_overflow = 1'b0;
 	   
 	end
       else
@@ -460,24 +460,31 @@ module whr_op_ctrl_mac
 	   wire 				 head_debit;
 	   assign head_debit = ~allocated_q & new_gnt & free;
 	   
-	   // track header credits using stock credit tracker module
-	   wire 				 hct_empty;
-	   wire [0:1] 				 hct_errors;
-	   c_credit_tracker
-	     #(.num_credits(num_header_buffers),
+	   // track header credits using stock FIFO tracker module
+	   wire 				 hft_almost_empty;
+	   wire 				 hft_empty;
+	   wire 				 hft_almost_full;
+	   wire 				 hft_full;
+	   wire [0:1] 				 hft_errors;
+	   c_fifo_tracker
+	     #(.depth(num_header_buffers),
 	       .reset_type(reset_type))
-	   hct
+	   hft
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(cred_active),
-	      .credit(head_credit),
-	      .debit(head_debit),
-	      .free(head_free),
-	      .empty(hct_empty),
-	      .errors(hct_errors));
+	      .push(head_debit),
+	      .pop(head_credit),
+	      .almost_empty(hft_almost_empty),
+	      .empty(hft_empty),
+	      .almost_full(hft_almost_full),
+	      .full(hft_full),
+	      .errors(hft_errors));
 	   
-	   assign error_hct_underflow = hct_errors[0];
-	   assign error_hct_overflow = hct_errors[1];
+	   assign head_free = ~hft_full;
+	   
+	   assign error_hft_underflow = hft_errors[0];
+	   assign error_hft_overflow = hft_errors[1];
 	   
 	end
       
@@ -574,11 +581,11 @@ module whr_op_ctrl_mac
 		if(error_ct_overflow)
 		  $display("ERROR: Credit tracker overflow in module %m.");
 		
-		if(error_hct_underflow)
+		if(error_hft_underflow)
 		  $display({"ERROR: Head credit tracker underflow in module ",
 			    "%."});
 		
-		if(error_hct_overflow)
+		if(error_hft_overflow)
 		  $display("ERROR: Head credit tracker overflow in module %m.");
 		
 	     end
@@ -587,8 +594,8 @@ module whr_op_ctrl_mac
 	   wire [0:3] errors_s, errors_q;
 	   assign errors_s = {error_ct_underflow,
 			      error_ct_overflow,
-			      error_hct_underflow,
-			      error_hct_overflow};
+			      error_hft_underflow,
+			      error_hft_overflow};
 	   c_err_rpt
 	     #(.num_errors(4),
 	       .capture_mode(error_capture_mode),
