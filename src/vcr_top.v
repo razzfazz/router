@@ -156,20 +156,13 @@ module vcr_top
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
-   // number of bits to be used for credit level reporting
-   // (note: must be less than or equal to cred_count_width as given below)
-   // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_LEVEL)
-   localparam cred_level_width = 2;
-   
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ?
-       cred_level_width :
-       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ?
-       1 :
+     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
+       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
        -1;
    
    // select implementation variant for flit buffer register file
@@ -505,7 +498,6 @@ module vcr_top
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .cred_level_width(cred_level_width),
 	       .fbf_regfile_type(fbf_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_type(vc_alloc_type),
@@ -821,7 +813,6 @@ module vcr_top
 	       .error_capture_mode(error_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .cred_level_width(cred_level_width),
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),

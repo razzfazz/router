@@ -1147,7 +1147,6 @@ module tc_node_mac
 	       .vc_id(ovc),
 	       .track_vcs_at_output(0),
 	       .int_flow_ctrl_type(`INT_FLOW_CTRL_TYPE_LEVEL),
-	       .cred_level_width(1),
 	       .reset_type(reset_type))
 	   ovcc
 	     (.clk(clk),

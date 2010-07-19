@@ -120,20 +120,13 @@ module vcr_ovc_ctrl
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
-   // number of bits to be used for credit level reporting
-   // (note: must be less than or equal to cred_count_width as given below)
-   // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_LEVEL)
-   parameter cred_level_width = 2;
-   
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
-     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ?
-       cred_level_width :
-       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ?
-       1 :
+     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
+       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
        -1;
    
    // width for full range of credit count ([0:num_credits])
@@ -149,10 +142,8 @@ module vcr_ovc_ctrl
      = vc_alloc_requires_credit ? (num_flit_buffers - 1) : num_flit_buffers;
    
    // capped reset value for credit level
-   localparam [0:cred_level_width-1] free_reset_value
-     = (cred_count_width > cred_level_width) ? 
-       ((1 << cred_level_width) - 1) : 
-       num_flit_buffers;
+   localparam [0:1] free_reset_value
+     = (cred_count_width > 2) ? 2'b11 : num_flit_buffers;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -530,32 +521,24 @@ module vcr_ovc_ctrl
 	     // eligible for allocation in the current cycle, and thus cannot 
 	     // be assigned to another input VC.
 	     
-	     if(cred_count_width > cred_level_width)
+	     if(cred_count_width > 2)
 	       begin
 		  
 		  wire limit_cred_level;
 		  assign limit_cred_level
-		    = |cred_count_plus_credit[0:
-					      cred_count_width-
-					      cred_level_width-1];
+		    = |cred_count_plus_credit[0:(cred_count_width-2)-1];
 		  
 		  assign int_flow_ctrl
-		    = {cred_level_width{limit_cred_level}} | 
-		      cred_count_plus_credit[cred_count_width-cred_level_width:
+		    = {2{limit_cred_level}} | 
+		      cred_count_plus_credit[(cred_count_width-2):
 					     cred_count_width-1];
 		  
 	       end
-	     else if(cred_count_width == cred_level_width)
+	     else if(cred_count_width == 2)
 	       assign int_flow_ctrl
 		 = cred_count_plus_credit[0:cred_count_width-1];
-	     else
-	       begin
-		  assign int_flow_ctrl[0:cred_level_width-cred_count_width-1]
-			   = {(cred_level_width-cred_count_width){1'b0}};
-		  assign int_flow_ctrl[cred_level_width-cred_count_width:
-				       cred_level_width-1]
-			   = cred_count_plus_credit;
-	       end
+	     else if(cred_count_width == 1)
+	       assign int_flow_ctrl = {1'b0, cred_count_plus_credit};
 	     
 	  end
 	
