@@ -49,23 +49,6 @@ module testbench
       .full(full),
       .errors(ffc_errors));
    
-   wire free;
-   wire empty;
-   wire [0:1] ct_errors;
-   
-   c_credit_tracker
-     #(.num_credits(num_buffers),
-       .reset_type(reset_type))
-   ct
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .debit(push),
-      .credit(pop),
-      .free(free),
-      .empty(empty),
-      .errors(ct_errors));
-
    reg [0:data_width-1] write_data;
    wire [0:data_width-1] read_data;
 
@@ -96,7 +79,7 @@ module testbench
    reg drain;
    reg flag_in, flag_out;
 
-   assign push = ~reset & flag_in & free;
+   assign push = ~reset & flag_in & ~full;
    assign pop = ~reset & flag_out & ~empty;
    
    integer seed = initial_seed;
