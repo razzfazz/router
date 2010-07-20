@@ -63,17 +63,16 @@ module c_regfile
    input [0:addr_width-1] write_address;
    
    // data to be written
-   input [0:width-1] write_data;
+   input [0:width-1] 	  write_data;
    
-   // entry to read out
+   // entries to read out
    input [0:num_read_ports*addr_width-1] read_address;
    
-   // contents of entry selected by read_address
-   output [0:num_read_ports*width-1] read_data;
-   wire [0:num_read_ports*width-1] read_data;
+   // contents of entries selected by read_address
+   output [0:num_read_ports*width-1] 	 read_data;
+   wire [0:num_read_ports*width-1] 	 read_data;
    
-   genvar 	    level;
-   genvar 	    read_port;
+   genvar 				 read_port;
    
    generate
       
@@ -82,7 +81,7 @@ module c_regfile
 	`REGFILE_TYPE_FF_2D, `REGFILE_TYPE_LAT_2D:
 	  begin
 	     
-	     reg [0:width-1] storage [0:depth-1];
+	     reg [0:width-1] storage_2d [0:depth-1];
 	     
 	     case(regfile_type)
 	       
@@ -90,20 +89,20 @@ module c_regfile
 		 always @(posedge clk)
 		   if(active)
 		     if(write_enable)
-		       storage[write_address] <= write_data;
+		       storage_2d[write_address] <= write_data;
 	       
 	       `REGFILE_TYPE_LAT_2D:
 		 always @(clk, active, write_enable, write_address, write_data)
 		   if(~clk)
 		     if(active)
 		       if(write_enable)
-			 storage[write_address] <= write_data;
+			 storage_2d[write_address] <= write_data;
 	       
 	     endcase
 	     
 	     for(read_port = 0; read_port < num_read_ports; 
 		 read_port = read_port + 1)
-	       begin:read_ports
+	       begin:read_ports_2d
 		  
 		  wire [0:addr_width-1] port_read_address;
 		  assign port_read_address
@@ -111,7 +110,7 @@ module c_regfile
 				   (read_port+1)*addr_width-1];
 		  
 		  wire [0:width-1] 	port_read_data;
-		  assign port_read_data = storage[port_read_address];
+		  assign port_read_data = storage_2d[port_read_address];
 		  
 		  assign read_data[read_port*width:(read_port+1)*width-1]
 			   = port_read_data;
@@ -120,49 +119,16 @@ module c_regfile
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX:
-	  begin
-	     
-	     wire [0:depth*width-1] read_data_lvl;
-	     
-	     for(level = 0; level < depth; level = level + 1)
-	       begin:mux_levels
-		  
-		  wire write;
-		  assign write = write_enable && (write_address == level);
-		  
-		  reg [0:width-1] storage;
-		  
-		  case(regfile_type)
-		    
-		    `REGFILE_TYPE_FF_1D_MUX:
-		      always @(posedge clk)
-			if(active)
-			  if(write)
-			    storage <= write_data;
-		    
-		    `REGFILE_TYPE_LAT_1D_MUX:
-		      always @(clk, active, write, write_data)
-			if(~clk)
-			  if(active)
-			    if(write)
-			      storage <= write_data;
-		    
-		  endcase
-		  
-		  assign read_data_lvl[level*width:(level+1)*width-1] = storage;
-		  
-	       end
-	     
-	     assign read_data = read_data_lvl[read_address*width +: width];
-	     
-	  end
-	
+	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX,
 	`REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
 	  begin
 	     
+	     wire [0:depth*width-1] storage_1d;
+	     
+	     genvar level;
+	     
 	     for(level = 0; level < depth; level = level + 1)
-	       begin:tristate_levels
+	       begin:levels
 		  
 		  wire write;
 		  assign write = write_enable && (write_address == level);
@@ -171,13 +137,13 @@ module c_regfile
 		  
 		  case(regfile_type)
 		    
-		    `REGFILE_TYPE_FF_1D_TRISTATE:
+		    `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_TRISTATE:
 		      always @(posedge clk)
 			if(active)
 			  if(write)
 			    storage <= write_data;
 		    
-		    `REGFILE_TYPE_LAT_1D_TRISTATE:
+		    `REGFILE_TYPE_LAT_1D_MUX, `REGFILE_TYPE_LAT_1D_TRISTATE:
 		      always @(clk, active, write, write_data)
 			if(~clk)
 			  if(active)
@@ -186,30 +152,60 @@ module c_regfile
 		    
 		  endcase
 		  
-		  for(read_port = 0; read_port < num_read_ports;
-		      read_port = read_port + 1)
-		    begin:read_ports
-		       
-		       wire [0:addr_width-1] port_read_address;
-		       assign port_read_address
-			 = read_address[read_port*addr_width:
-					(read_port+1)*addr_width-1];
-		       
-		       wire read;
-		       assign read = (port_read_address == level);
-		       
-		       wire [0:width-1] port_read_data;
-		       assign port_read_data = read ? storage : {width{1'bz}};
-		       
-		       assign read_data[read_port*width:(read_port+1)*width-1]
-				= port_read_data;
-		       
-		    end
-		  
+		  assign storage_1d[level*width:(level+1)*width-1] = storage;
+
 	       end
 	     
-	  end
+	     for(read_port = 0; read_port < num_read_ports; 
+		 read_port = read_port + 1)
+	       begin:read_ports_1d
+		  
+		  wire [0:addr_width-1] port_read_address;
+		  assign port_read_address
+		    = read_address[read_port*addr_width:
+				   (read_port+1)*addr_width-1];
+		  
+		  wire [0:width-1] 	port_read_data;
+		  
+		  case(regfile_type)
+		    
+		    `REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
+		      begin
+			 
+			 wire [0:depth-1] port_read_sel;
+			 c_decode
+			   #(.num_ports(depth))
+			 port_read_sel_dec
+			   (.data_in(port_read_address),
+			    .data_out(port_read_sel));
+			 
+			 c_select_1ofn
+			   #(.num_ports(depth),
+			     .width(width))
+			 port_read_data_sel
+			   (.select(port_read_sel),
+			    .data_in(storage_1d),
+			    .data_out(port_read_data));
+			 
+		      end
+		    
+		    `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX:
+		      begin
+			 
+			 assign port_read_data
+			   = storage_1d[port_read_address*width +: width];
+			 
+		      end
+		    
+		  endcase
+		  
+		  assign read_data[read_port*width:(read_port+1)*width-1]
+		    = port_read_data;
+		  
+	       end
 	
+	  end
+
 	`REGFILE_TYPE_FF_DW, `REGFILE_TYPE_LAT_DW:
 	  begin
 	     
