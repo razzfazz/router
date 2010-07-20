@@ -125,7 +125,7 @@ module vcr_sw_alloc_ip
 	      .gnt(gnt_ivc));
 	   
 	   // propagate winning VC's request to the appropriate output
-	   c_select_1ofn
+	   c_select_mofn
 	     #(.width(num_ports),
 	       .num_ports(num_vcs))
 	   req_out_op_sel
@@ -238,7 +238,7 @@ module vcr_sw_alloc_ip
 		// since multiple ports may have been granted in the output 
 		// stage, we must select the winning one in order to drive the 
 		// crossbar control signals
-		c_select_1ofn
+		c_select_mofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
 		gnt_op_sel
