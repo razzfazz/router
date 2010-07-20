@@ -47,24 +47,23 @@ module c_select_1ofn
    input [0:num_ports*width-1] data_in;
    
    // result
-   output [0:width-1] data_out;
-   wire [0:width-1] data_out;
+   output [0:width-1] 	       data_out;
+   wire [0:width-1] 	       data_out;
+   
+   genvar 		       p;
    
    generate
       
-      genvar 	    i;
-      for(i = 0; i < width; i = i + 1)
-	begin:width_loop
+      for(p = 0; p < num_ports; p = p + 1)
+	begin:ports
 	   
-	   wire [0:num_ports-1] port_bits;
+	   wire sel;
+	   assign sel = select[p];
 	   
-	   genvar 		j;
-	   for(j = 0; j < num_ports; j = j + 1)
-	     begin:ports_loop
-		assign port_bits[j] = data_in[i+j*width] & select[j];
-	     end
+	   wire [0:width-1] data;
+	   assign data = data_in[p*width:(p+1)*width-1];
 	   
-	   assign data_out[i] = |port_bits;
+	   assign data_out = sel ? data : {width{1'bz}};
 	   
 	end
       
