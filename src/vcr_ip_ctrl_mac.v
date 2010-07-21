@@ -193,7 +193,7 @@ module vcr_ip_ctrl_mac
    // number of entries in flit buffer
    localparam fbf_depth = num_vcs*num_flit_buffers;
    
-   // required address size for flit buffer
+   // required address width for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
    // use explicit pipeline register between flit buffer and crossbar?

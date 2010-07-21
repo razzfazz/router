@@ -212,10 +212,10 @@ module vcr_ivc_ctrl
    // packet class to which this VC belongs
    localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
    
-   // required address size for flit buffer
+   // required address width for flit buffer
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
    
-   // requierd address size for a single VC's buffer
+   // required address size for a single VC's buffer
    localparam fbc_addr_width = clogb(num_flit_buffers);
    
    // additional address bits to add to addresses from FIFO controller

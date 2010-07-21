@@ -43,9 +43,6 @@ module whr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
-   // width required to select a buffer
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    

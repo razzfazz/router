@@ -160,7 +160,7 @@ module whr_ip_ctrl_mac
    localparam fbf_depth
      = input_stage_can_hold ? (num_flit_buffers - 1) : num_flit_buffers;
    
-   // required address size for flit buffer
+   // required address width for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
    
    // select implementation variant for flit buffer register file
