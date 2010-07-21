@@ -95,8 +95,6 @@ module flit_sink
    // width of flow control signals
    localparam flow_ctrl_width = 1 + vc_idx_width;
    
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -202,27 +200,20 @@ module flit_sink
 	   wire buffer_pop;
 	   assign buffer_pop = buffer_pop_ivc[ivc];
 	   
-	   wire [0:flit_buffer_idx_width-1] buffer_write_addr;
-	   wire [0:flit_buffer_idx_width-1] buffer_read_addr;		
-	   wire [0:flit_buffer_idx_width-1] buffer_peek_addr;		
 	   wire 			    buffer_almost_empty;
 	   wire 			    buffer_empty;
 	   wire 			    buffer_almost_full;
 	   wire 			    buffer_full;
 	   wire [0:1] 			    buffer_errors;
-	   c_fifo_ctrl
-	     #(.addr_width(flit_buffer_idx_width),
-	       .depth(num_flit_buffers),
+	   c_fifo_tracker
+	     #(.depth(num_flit_buffers),
 	       .reset_type(reset_type))
-	   fctl
+	   ft
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
 	      .push(buffer_push),
 	      .pop(buffer_pop),
-	      .write_addr(buffer_write_addr),
-	      .read_addr(buffer_read_addr),
-	      .peek_addr(buffer_peek_addr),
 	      .almost_empty(buffer_almost_empty),
 	      .empty(buffer_empty),
 	      .almost_full(buffer_almost_full),
