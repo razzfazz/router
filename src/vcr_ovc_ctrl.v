@@ -41,10 +41,10 @@ module vcr_ovc_ctrl
 `include "vcr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of traffic classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -121,7 +121,7 @@ module vcr_ovc_ctrl
    parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // required address width for tail flit FIFO
-   localparam tff_addr_width = clogb(num_flit_buffers);
+   localparam tff_addr_width = clogb(num_flits_per_vc);
    
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
@@ -133,20 +133,20 @@ module vcr_ovc_ctrl
        -1;
    
    // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_flit_buffers + 1);
+   localparam cred_count_width = clogb(num_flits_per_vc + 1);
    
    // width of counter for credits waiting to be sent to input controller
    localparam cred_hold_width = vc_alloc_requires_credit ? 
-				clogb(num_flit_buffers) : 
+				clogb(num_flits_per_vc) : 
 				cred_count_width;
    
    // initial value for credit hold counter
    localparam [0:cred_hold_width-1] cred_hold_reset_value
-     = vc_alloc_requires_credit ? (num_flit_buffers - 1) : num_flit_buffers;
+     = vc_alloc_requires_credit ? (num_flits_per_vc - 1) : num_flits_per_vc;
    
    // capped reset value for credit level
    localparam [0:1] free_reset_value
-     = (cred_count_width > 2) ? 2'b11 : num_flit_buffers;
+     = (cred_count_width > 2) ? 2'b11 : num_flits_per_vc;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -344,7 +344,7 @@ module vcr_ovc_ctrl
    
    generate
       
-      if(num_header_buffers == num_flit_buffers)
+      if(num_packets_per_vc == num_flits_per_vc)
 	begin
 	   
 	   // if every flit buffer entry can be a head flit, we don't need 
@@ -364,7 +364,7 @@ module vcr_ovc_ctrl
 	   
 	   wire head_credit;
 	   
-	   if(num_header_buffers == 1)
+	   if(num_packets_per_vc == 1)
 	     begin
 		
 		// if we can only have one packet per buffer, we can accept the 
@@ -373,7 +373,7 @@ module vcr_ovc_ctrl
 		
 		wire last_credit_received;
 		assign last_credit_received
-		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
+		  = (cred_count_q == (num_flits_per_vc - 1)) && credit;
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
@@ -403,7 +403,7 @@ module vcr_ovc_ctrl
 		wire 			  tfc_empty;
 		wire [0:1] 		  tfc_errors;
 		c_fifo_ctrl
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .reset_type(reset_type))
 		tfc
 		  (.clk(clk),
@@ -424,7 +424,7 @@ module vcr_ovc_ctrl
 		
 		wire 			  tff_read_data;
 		c_regfile
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .width(1),
 		    .regfile_type(tff_regfile_type))
 		tff
@@ -451,7 +451,7 @@ module vcr_ovc_ctrl
 	   wire 				 hft_full;
 	   wire [0:1] 				 hft_errors;
 	   c_fifo_tracker
-	     #(.depth(num_header_buffers),
+	     #(.depth(num_packets_per_vc),
 	       .reset_type(reset_type))
 	   hft
 	     (.clk(clk),
@@ -490,7 +490,7 @@ module vcr_ovc_ctrl
    c_dff
      #(.width(cred_count_width),
        .reset_type(reset_type),
-       .reset_value(num_flit_buffers))
+       .reset_value(num_flits_per_vc))
    cred_countq
      (.clk(clk),
       .reset(reset),
@@ -505,7 +505,7 @@ module vcr_ovc_ctrl
    assign error_ct_underflow = cred_count_zero & debit;
    
    wire 					 cred_count_all;
-   assign cred_count_all = (cred_count_q == num_flit_buffers);
+   assign cred_count_all = (cred_count_q == num_flits_per_vc);
    
    wire 					 error_ct_overflow;
    assign error_ct_overflow = cred_count_all & credit;

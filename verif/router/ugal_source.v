@@ -45,7 +45,7 @@ module ugal_source(/*autoarg*/
    parameter ugal_threshold 	     = 3;
    
    // flit bufwfer entries per VC
-   parameter num_flit_buffers 	     = 8;
+   parameter num_flits_per_vc 	     = 8;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes     = 1;
@@ -131,7 +131,7 @@ module ugal_source(/*autoarg*/
    //destination address
    input [0:addr_width-1] route_info;
    
-   localparam credit_count_width  = clogb(num_vcs*num_flit_buffers)+1;
+   localparam credit_count_width  = clogb(num_vcs*num_flits_per_vc)+1;
    //credit count from the ugal_sniffer
    input [0:(num_ports-num_nodes_per_router)*credit_count_width-1] credit_count;
    

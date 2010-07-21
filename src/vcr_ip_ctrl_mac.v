@@ -42,10 +42,10 @@ module vcr_ip_ctrl_mac
 `include "vcr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -188,7 +188,7 @@ module vcr_ip_ctrl_mac
        -1;
    
    // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flit_buffers;
+   localparam fbf_depth = num_vcs*num_flits_per_vc;
    
    // required address width for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
@@ -563,8 +563,8 @@ module vcr_ip_ctrl_mac
 	   wire [0:6] 			ivcc_errors;
 	   wire [0:7] 			events;
 	   vcr_ivc_ctrl
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),

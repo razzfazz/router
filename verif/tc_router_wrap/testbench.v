@@ -212,8 +212,8 @@ module testbench
    
    tc_router_wrap
      #(.topology(topology),
-       .num_flit_buffers(num_flit_buffers),
-       .num_header_buffers(num_header_buffers),
+       .num_flits_per_vc(num_flits_per_vc),
+       .num_packets_per_vc(num_packets_per_vc),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),

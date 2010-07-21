@@ -41,10 +41,10 @@ module vcr_top
 `include "vcr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -485,8 +485,8 @@ module vcr_top
 	   wire [0:flow_ctrl_width-1] 		flow_ctrl_out;
 	   wire 				ipc_error;
 	   vcr_ip_ctrl_mac
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
@@ -806,8 +806,8 @@ module vcr_top
 	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire 			opc_error;
 	   vcr_op_ctrl_mac
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),

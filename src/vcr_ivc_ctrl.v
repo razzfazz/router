@@ -45,14 +45,14 @@ module vcr_ivc_ctrl
 `include "vcr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // width of credit hold register
    // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_PUSH)
-   localparam cred_hold_width = clogb(num_flit_buffers);
+   localparam cred_hold_width = clogb(num_flits_per_vc);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -196,7 +196,7 @@ module vcr_ivc_ctrl
    parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
    // required address width for header data FIFO
-   localparam hdff_addr_width = clogb(num_header_buffers - 1);
+   localparam hdff_addr_width = clogb(num_packets_per_vc - 1);
    
    // select implementation variant for header data FIFO register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -219,16 +219,16 @@ module vcr_ivc_ctrl
    localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
    
    // required address width for flit buffer
-   localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
+   localparam fbf_addr_width = clogb(num_vcs*num_flits_per_vc);
    
    // required address size for a single VC's buffer
-   localparam fbc_addr_width = clogb(num_flit_buffers);
+   localparam fbc_addr_width = clogb(num_flits_per_vc);
    
    // additional address bits to add to addresses from FIFO controller
    localparam fbc_extra_addr_width = fbf_addr_width - fbc_addr_width;
    
    // index of leftmost entry in shared flit buffer
-   localparam fbc_min_addr = vc_id * num_flit_buffers;
+   localparam fbc_min_addr = vc_id * num_flits_per_vc;
    
    // ID of current input port
    parameter port_id = 0;
@@ -599,19 +599,19 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(num_header_buffers > 1)
+      if(num_packets_per_vc > 1)
 	begin
 	   
 	   // keep track of location(s) of head and tail flits in flit buffer
-	   wire [0:num_flit_buffers-1] head_queue;
-	   wire [0:num_flit_buffers-1] tail_queue;
+	   wire [0:num_flits_per_vc-1] head_queue;
+	   wire [0:num_flits_per_vc-1] tail_queue;
 	   
-	   wire [0:num_flit_buffers-1] write_sel;
-	   wire [0:num_flit_buffers-1] read_sel;
+	   wire [0:num_flits_per_vc-1] write_sel;
+	   wire [0:num_flits_per_vc-1] read_sel;
 	   
 	   genvar 		       idx;
 	   
-	   for(idx = 0; idx < num_flit_buffers; idx = idx + 1)
+	   for(idx = 0; idx < num_flits_per_vc; idx = idx + 1)
 	     begin:idxs
 		
 		assign write_sel[idx]
@@ -637,7 +637,7 @@ module vcr_ivc_ctrl
 	   
 	   wire head_queue_muxed;
 	   c_select_1ofn
-	     #(.num_ports(num_flit_buffers),
+	     #(.num_ports(num_flits_per_vc),
 	       .width(1))
 	   head_queue_muxed_sel
 	     (.select(read_sel),
@@ -648,7 +648,7 @@ module vcr_ivc_ctrl
 	   
 	   wire tail_queue_muxed;
 	   c_select_1ofn
-	     #(.num_ports(num_flit_buffers),
+	     #(.num_ports(num_flits_per_vc),
 	       .width(1))
 	   tail_queue_muxed_sel
 	     (.select(read_sel),
@@ -727,7 +727,7 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(num_header_buffers > 2)
+      if(num_packets_per_vc > 2)
 	begin
 	   
 	   wire [0:hdff_addr_width-1] hdfc_write_addr;
@@ -737,7 +737,7 @@ module vcr_ivc_ctrl
 	   wire 		      hdfc_almost_empty;
 	   wire [0:1] 		      hdfc_errors;
 	   c_fifo_ctrl
-	     #(.depth(num_header_buffers - 1),
+	     #(.depth(num_packets_per_vc - 1),
 	       .reset_type(reset_type))
 	   hdfc
 	     (.clk(clk),
@@ -761,7 +761,7 @@ module vcr_ivc_ctrl
 	   
 	   wire [0:hop_route_info_width-1] hdff_read_data;
 	   c_regfile
-	     #(.depth(num_header_buffers - 1),
+	     #(.depth(num_packets_per_vc - 1),
 	       .width(hop_route_info_width),
 	       .regfile_type(hdff_regfile_type))
 	   hdff
@@ -777,7 +777,7 @@ module vcr_ivc_ctrl
 	   assign hdff_hop_route_info = hdff_read_data;
 	   
 	end
-      else if(num_header_buffers == 2)
+      else if(num_packets_per_vc == 2)
 	begin
 	   
 	   wire route_active;
@@ -819,7 +819,7 @@ module vcr_ivc_ctrl
 	   assign error_hdfc_overflow = ~hdfc_empty_q & hdfc_push & ~hdfc_pop;
 	   
 	end
-      else if(num_header_buffers == 1)
+      else if(num_packets_per_vc == 1)
 	begin
 	   
 	   assign hdfc_empty = 1'b1;
@@ -1148,7 +1148,7 @@ module vcr_ivc_ctrl
 		.q(cred_hold_q));
 	     
 	     assign error_ct_overflow
-	       = vc_allocated_q && (cred_hold_q == num_flit_buffers-1) &&
+	       = vc_allocated_q && (cred_hold_q == num_flits_per_vc-1) &&
 		 incr_cred_hold;
 	     
 	  end
@@ -1190,7 +1190,7 @@ module vcr_ivc_ctrl
    wire 				       fbc_almost_full;
    wire 				       fbc_full;
    c_fifo_ctrl
-     #(.depth(num_flit_buffers),
+     #(.depth(num_flits_per_vc),
        .extra_addr_width(fbc_extra_addr_width),
        .offset(fbc_min_addr),
        .reset_type(reset_type))

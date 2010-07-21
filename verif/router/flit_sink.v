@@ -41,7 +41,7 @@ module flit_sink
    parameter consume_rate = 50;
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // number of VCs
    parameter num_vcs = 8;
@@ -206,7 +206,7 @@ module flit_sink
 	   wire 			    buffer_full;
 	   wire [0:1] 			    buffer_errors;
 	   c_fifo_tracker
-	     #(.depth(num_flit_buffers),
+	     #(.depth(num_flits_per_vc),
 	       .reset_type(reset_type))
 	   ft
 	     (.clk(clk),

@@ -41,10 +41,10 @@ module whr_op_ctrl_mac
 `include "whr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -110,7 +110,7 @@ module whr_op_ctrl_mac
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // required address width for tail FIFO
-   localparam tff_addr_width = clogb(num_flit_buffers);
+   localparam tff_addr_width = clogb(num_flits_per_vc);
    
    // select implementation variant for tail FIFO register file
    parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -370,7 +370,7 @@ module whr_op_ctrl_mac
    
    generate
       
-      if(num_header_buffers == num_flit_buffers)
+      if(num_packets_per_vc == num_flits_per_vc)
 	begin
 	   
 	   // if every flit buffer entry can be a head flit, we don't need 
@@ -390,7 +390,7 @@ module whr_op_ctrl_mac
 	   
 	   wire head_credit;
 	   
-	   if(num_header_buffers == 1)
+	   if(num_packets_per_vc == 1)
 	     begin
 		
 		wire flags_active;
@@ -431,7 +431,7 @@ module whr_op_ctrl_mac
 		wire 			  tfc_empty;
 		wire [0:1] 		  tfc_errors;
 		c_fifo_ctrl
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .reset_type(reset_type))
 		tfc
 		  (.clk(clk),
@@ -452,7 +452,7 @@ module whr_op_ctrl_mac
 		
 		wire 			  tff_read_data;
 		c_regfile
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .regfile_type(tff_regfile_type))
 		tff
 		  (.clk(clk),
@@ -478,7 +478,7 @@ module whr_op_ctrl_mac
 	   wire 				 hft_full;
 	   wire [0:1] 				 hft_errors;
 	   c_fifo_tracker
-	     #(.depth(num_header_buffers),
+	     #(.depth(num_packets_per_vc),
 	       .reset_type(reset_type))
 	   hft
 	     (.clk(clk),
@@ -513,7 +513,7 @@ module whr_op_ctrl_mac
    wire 					 ft_full;
    wire [0:1] 					 ft_errors;
    c_fifo_tracker
-     #(.depth(num_flit_buffers),
+     #(.depth(num_flits_per_vc),
        .reset_type(reset_type))
    ft
      (.clk(clk),

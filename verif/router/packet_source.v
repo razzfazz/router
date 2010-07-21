@@ -54,13 +54,13 @@ module packet_source
    parameter topology = `TOPOLOGY_FBFLY;
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // number of bits required for flit buffer addresses
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   localparam flit_buffer_idx_width = clogb(num_flits_per_vc);
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -358,7 +358,7 @@ module packet_source
 	   wire hft_credit;
 	   wire ft_almost_empty;
 	   
-	   if(num_header_buffers == 1)
+	   if(num_packets_per_vc == 1)
 	     begin
 		
 		// if we can only have one packet per buffer, we can accept the 
@@ -396,7 +396,7 @@ module packet_source
 		wire 				 tff_empty;
 		wire [0:1] 			 tff_errors;
 		c_fifo_ctrl
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .reset_type(reset_type))
 		tff
 		  (.clk(clk),
@@ -417,7 +417,7 @@ module packet_source
 		
 		wire 				 trf_read_data;
 		c_regfile
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .width(1),
 		    .num_read_ports(1),
 		    .regfile_type(`REGFILE_TYPE_FF_2D))
@@ -444,7 +444,7 @@ module packet_source
 	   wire hft_empty;
 	   wire [0:1] hft_errors;
 	   c_fifo_tracker
-	     #(.depth(num_header_buffers),
+	     #(.depth(num_packets_per_vc),
 	       .reset_type(reset_type))
 	   hft
 	     (.clk(clk),
@@ -469,7 +469,7 @@ module packet_source
 	   wire       ft_empty;
 	   wire [0:1] ft_errors;
 	   c_fifo_tracker
-	     #(.depth(num_flit_buffers),
+	     #(.depth(num_flits_per_vc),
 	       .reset_type(reset_type))
 	   ft
 	     (.clk(clk),

@@ -34,10 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
-parameter num_flit_buffers = 8;
+parameter num_flits_per_vc = 8;
 
 // maximum number of packets that can be in a given VC buffer simultaneously
-parameter num_header_buffers = 4;
+parameter num_packets_per_vc = 4;
 
 // number of message classes (e.g. request, reply)
 parameter num_message_classes = 1;

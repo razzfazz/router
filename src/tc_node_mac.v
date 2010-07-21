@@ -41,10 +41,10 @@ module tc_node_mac
 `include "tc_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -1137,8 +1137,8 @@ module tc_node_mac
 	   wire [0:3] ovcc_errors;
 	   
 	   vcr_ovc_ctrl
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),

@@ -41,10 +41,10 @@ module whr_top
 `include "whr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -241,8 +241,8 @@ module whr_top
 	   wire [0:flow_ctrl_width-1] flow_ctrl_out;
 	   wire 		      ipc_error;
 	   whr_ip_ctrl_mac
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
@@ -360,8 +360,8 @@ module whr_top
 	   wire [0:channel_width-1]   channel_out;
 	   wire 		      opc_error;
 	   whr_op_ctrl_mac
-	     #(.num_flit_buffers(num_flit_buffers),
-	       .num_header_buffers(num_header_buffers),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),

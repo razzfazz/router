@@ -37,10 +37,10 @@ module router_checker
 `include "vcr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // number of bits required for flit buffer addresses
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   localparam flit_buffer_idx_width = clogb(num_flits_per_vc);
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -478,7 +478,7 @@ module router_checker
 		wire [0:flit_buffer_idx_width-1] rfc_write_addr;
 		wire [0:flit_buffer_idx_width-1] rfc_read_addr;
 		c_fifo_ctrl
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .reset_type(reset_type))
 		rfc
 		  (.clk(clk),
@@ -512,7 +512,7 @@ module router_checker
 		
 		wire [0:(flit_data_width+2+port_idx_width+num_vcs)-1] data_out;
 		c_regfile
-		  #(.depth(num_flit_buffers),
+		  #(.depth(num_flits_per_vc),
 		    .width(flit_data_width+2+port_idx_width+num_vcs),
 		    .num_read_ports(1),
 		    .regfile_type(`REGFILE_TYPE_FF_2D))

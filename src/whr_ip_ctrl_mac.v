@@ -41,10 +41,10 @@ module whr_ip_ctrl_mac
 `include "whr_constants.v"
    
    // flit buffer entries per VC
-   parameter num_flit_buffers = 8;
+   parameter num_flits_per_vc = 8;
    
    // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_header_buffers = 4;
+   parameter num_packets_per_vc = 4;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -158,7 +158,7 @@ module whr_ip_ctrl_mac
    
    // number of entries in flit buffer
    localparam fbf_depth
-     = input_stage_can_hold ? (num_flit_buffers - 1) : num_flit_buffers;
+     = input_stage_can_hold ? (num_flits_per_vc - 1) : num_flits_per_vc;
    
    // required address width for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
@@ -167,7 +167,7 @@ module whr_ip_ctrl_mac
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // required address width for header data FIFO
-   localparam hdff_addr_width = clogb(num_flit_buffers);
+   localparam hdff_addr_width = clogb(num_flits_per_vc);
    
    // select implementation variant for header data FIFO register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -460,7 +460,7 @@ module whr_ip_ctrl_mac
    
    generate
       
-      if(num_header_buffers > 1)
+      if(num_packets_per_vc > 1)
 	begin
 	   
 	   // keep track of location(s) of head and tail flits in flit buffer
@@ -554,7 +554,7 @@ module whr_ip_ctrl_mac
    
    generate
       
-      if(num_header_buffers > 2)
+      if(num_packets_per_vc > 2)
 	begin
 	   
 	   wire [0:hdff_addr_width-1] hdfc_write_addr;
@@ -564,7 +564,7 @@ module whr_ip_ctrl_mac
 	   wire 		      hdfc_almost_empty;
 	   wire [0:1] 		      hdfc_errors;
 	   c_fifo_ctrl
-	     #(.depth(num_header_buffers - 1),
+	     #(.depth(num_packets_per_vc - 1),
 	       .reset_type(reset_type))
 	   hdfc
 	     (.clk(clk),
@@ -588,7 +588,7 @@ module whr_ip_ctrl_mac
 	   
 	   wire [0:hop_route_info_width-1] hdff_read_data;
 	   c_regfile
-	     #(.depth(num_header_buffers - 1),
+	     #(.depth(num_packets_per_vc - 1),
 	       .width(hop_route_info_width),
 	       .regfile_type(hdff_regfile_type))
 	   hdff
@@ -604,7 +604,7 @@ module whr_ip_ctrl_mac
 	   assign hdff_hop_route_info = hdff_read_data;
 	   
 	end
-      else if(num_header_buffers == 2)
+      else if(num_packets_per_vc == 2)
 	begin
 	   
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
@@ -643,7 +643,7 @@ module whr_ip_ctrl_mac
 	   assign error_hdfc_overflow = ~hdfc_empty_q & hdfc_push & ~hdfc_pop;
 	   
 	end
-      else if(num_header_buffers == 1)
+      else if(num_packets_per_vc == 1)
 	begin
 	   
 	   assign hdfc_empty = 1'b1;
