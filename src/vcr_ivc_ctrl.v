@@ -215,6 +215,12 @@ module vcr_ivc_ctrl
    // required address size for flit buffer
    localparam fbf_addr_width = clogb(num_vcs*num_flit_buffers);
    
+   // requierd address size for a single VC's buffer
+   localparam fbc_addr_width = clogb(num_flit_buffers);
+   
+   // additional address bits to add to addresses from FIFO controller
+   localparam fbc_extra_addr_width = fbf_addr_width - fbc_addr_width;
+   
    // index of leftmost entry in shared flit buffer
    localparam fbc_min_addr = vc_id * num_flit_buffers;
    
@@ -1164,9 +1170,9 @@ module vcr_ivc_ctrl
    wire 				       fbc_almost_full;
    wire 				       fbc_full;
    c_fifo_ctrl
-     #(.addr_width(fbf_addr_width),
+     #(.depth(num_flit_buffers),
+       .extra_addr_width(fbc_extra_addr_width),
        .offset(fbc_min_addr),
-       .depth(num_flit_buffers),
        .reset_type(reset_type))
    fbc
      (.clk(clk),

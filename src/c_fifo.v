@@ -210,9 +210,7 @@ module c_fifo
 	     
 	     wire [0:rw_ptr_width-1] write_ptr, read_ptr;
 	     c_fifo_ctrl
-	       #(.addr_width(rw_ptr_width),
-		 .offset(0),
-		 .depth(depth),
+	       #(.depth(depth),
 		 .reset_type(reset_type))
 	     ctrl
 	       (.clk(clk),

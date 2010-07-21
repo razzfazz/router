@@ -35,16 +35,20 @@ module c_fifo_ctrl
   (clk, reset, active, push, pop, write_addr, read_addr, almost_empty, empty, 
    almost_full, full, errors);
    
+`include "c_functions.v"
 `include "c_constants.v"
-   
-   // address width
-   parameter addr_width = 3;
-   
-   // starting address (i.e., address of leftmost entry)
-   parameter offset = 0;
    
    // number of entries in FIFO
    parameter depth = 8;
+   
+   // add additional address bits
+   parameter extra_addr_width = 0;
+   
+   // address width
+   localparam addr_width = clogb(depth) + extra_addr_width;
+   
+   // starting address (i.e., address of leftmost entry)
+   parameter offset = 0;
    
    // minimum (leftmost) address
    localparam [0:addr_width-1] min_value = offset;

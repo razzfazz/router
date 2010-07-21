@@ -737,8 +737,7 @@ module whr_ip_ctrl_mac
    wire 			   fbc_full;
    wire [0:1] 			   fbc_errors;
    c_fifo_ctrl
-     #(.addr_width(fbf_addr_width),
-       .depth(fbf_depth),
+     #(.depth(fbf_depth),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
