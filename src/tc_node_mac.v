@@ -1148,6 +1148,7 @@ module tc_node_mac
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
 	       .vc_id(ovc),
+	       .vc_alloc_requires_credit(1),
 	       .track_vcs_at_output(0),
 	       .int_flow_ctrl_type(`INT_FLOW_CTRL_TYPE_LEVEL),
 	       .tff_regfile_type(tff_regfile_type),
