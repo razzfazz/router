@@ -70,9 +70,6 @@ module testbench
    parameter packet_length_mode = 0;
    
    
-   // width required to select individual buffer slot
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
-   
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
    
