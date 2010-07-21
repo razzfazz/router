@@ -1133,7 +1133,7 @@ module tc_node_mac
 	   wire match;
 	   wire elig;
 	   wire empty;
-	   wire int_flow_ctrl;
+	   wire [0:1] int_flow_ctrl;
 	   wire [0:3] ovcc_errors;
 	   
 	   vcr_ovc_ctrl
@@ -1170,7 +1170,7 @@ module tc_node_mac
 	      .errors(ovcc_errors));
 	   
 	   wire       free;
-	   assign free = int_flow_ctrl;
+	   assign free = |int_flow_ctrl;
 	   
 	   assign elig_ovc[ovc] = elig;
 	   assign empty_ovc[ovc] = empty;
