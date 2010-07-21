@@ -8,6 +8,7 @@ module testbench
    
    parameter num_buffers = 8;
    parameter data_width = 16;
+   parameter regfile_type = `REGFILE_TYPE_FF_2D;
    parameter reset_type = `RESET_TYPE_ASYNC;
    parameter Tclk = 2;
    parameter runtime = 1000;
@@ -73,13 +74,15 @@ module testbench
 
    c_regfile
      #(.width(data_width),
-       .depth(num_buffers))
+       .depth(num_buffers),
+       .regfile_type(regfile_type))
    rf
      (.clk(clk),
       .active(1'b1),
       .write_enable(push),
       .write_address(write_addr),
       .write_data(write_data),
+      .read_enable(pop),
       .read_address(read_addr),
       .read_data(read_data));
    

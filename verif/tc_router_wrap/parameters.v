@@ -108,6 +108,12 @@ parameter input_stage_can_hold = 0;
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
 
+// select implementation variant for flit buffer register file
+parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+
+// select implementation variant for tail FIFO register file
+parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 

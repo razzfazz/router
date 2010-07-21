@@ -117,6 +117,12 @@ module vcr_ovc_ctrl
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
+   // select implementation variant for tail flit FIFO
+   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // required address width for tail flit FIFO
+   localparam tff_addr_width = clogb(num_flit_buffers);
+   
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
@@ -389,33 +395,47 @@ module vcr_ovc_ctrl
 	   else
 	     begin
 		
-		wire tff_write_data;
-		assign tff_write_data = flit_tail;
-		
-		wire tff_almost_full;
-		wire tff_full;
-		wire tff_almost_empty;
-		wire tff_empty;
-		wire tff_read_data;
-		wire [0:1] tff_errors;
-		c_fifo
+		wire [0:tff_addr_width-1] tfc_write_addr;
+		wire [0:tff_addr_width-1] tfc_read_addr;
+		wire 			  tfc_almost_full;
+		wire 			  tfc_full;
+		wire 			  tfc_almost_empty;
+		wire 			  tfc_empty;
+		wire [0:1] 		  tfc_errors;
+		c_fifo_ctrl
 		  #(.depth(num_flit_buffers),
-		    .width(1),
-		    .fifo_type(`FIFO_TYPE_INDEXED),
 		    .reset_type(reset_type))
-		tff
+		tfc
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(flags_active),
-		   .almost_full(tff_almost_full),
-		   .full(tff_full),
-		   .write_data(tff_write_data),
 		   .push(flit_valid_qual),
-		   .almost_empty(tff_almost_empty),
-		   .empty(tff_empty),
-		   .read_data(tff_read_data),
 		   .pop(credit),
-		   .errors(tff_errors));
+		   .write_addr(tfc_write_addr),
+		   .read_addr(tfc_read_addr),
+		   .almost_empty(tfc_almost_empty),
+		   .empty(tfc_empty),
+		   .almost_full(tfc_almost_full),
+		   .full(tfc_full),
+		   .errors(tfc_errors));
+		
+		wire 			  tff_write_data;
+		assign tff_write_data = flit_tail;
+		
+		wire 			  tff_read_data;
+		c_regfile
+		  #(.depth(num_flit_buffers),
+		    .width(1),
+		    .regfile_type(tff_regfile_type))
+		tff
+		  (.clk(clk),
+		   .active(flags_active),
+		   .write_enable(flit_valid_qual),
+		   .write_address(tfc_write_addr),
+		   .write_data(tff_write_data),
+		   .read_enable(credit),
+		   .read_address(tfc_read_addr),
+		   .read_data(tff_read_data));
 		
 		assign head_credit = credit & tff_read_data;		
 		

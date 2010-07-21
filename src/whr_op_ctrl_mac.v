@@ -109,6 +109,12 @@ module whr_op_ctrl_mac
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
+   // required address width for tail FIFO
+   localparam tff_addr_width = clogb(num_flit_buffers);
+   
+   // select implementation variant for tail FIFO register file
+   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
@@ -417,33 +423,46 @@ module whr_op_ctrl_mac
 	   else
 	     begin
 		
-		wire tff_write_data;
-		assign tff_write_data = |(gnt_unqual_ip & req_tail_ip);
-		
-		wire tff_almost_full;
-		wire tff_full;
-		wire tff_almost_empty;
-		wire tff_empty;
-		wire tff_read_data;
-		wire [0:1] tff_errors;
-		c_fifo
+		wire [0:tff_addr_width-1] tfc_write_addr;
+		wire [0:tff_addr_width-1] tfc_read_addr;
+		wire 			  tfc_almost_full;
+		wire 			  tfc_full;
+		wire 			  tfc_almost_empty;
+		wire 			  tfc_empty;
+		wire [0:1] 		  tfc_errors;
+		c_fifo_ctrl
 		  #(.depth(num_flit_buffers),
-		    .width(1),
-		    .fifo_type(`FIFO_TYPE_INDEXED),
 		    .reset_type(reset_type))
-		tff
+		tfc
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(cred_active),
-		   .almost_full(tff_almost_full),
-		   .full(tff_full),
-		   .write_data(tff_write_data),
 		   .push(gnt),
-		   .almost_empty(tff_almost_empty),
-		   .empty(tff_empty),
-		   .read_data(tff_read_data),
 		   .pop(cred_valid),
-		   .errors(tff_errors));
+		   .write_addr(tfc_write_addr),
+		   .read_addr(tfc_read_addr),
+		   .almost_empty(tfc_almost_empty),
+		   .empty(tfc_empty),
+		   .almost_full(tfc_almost_full),
+		   .full(tfc_full),
+		   .errors(tfc_errors));
+		
+		wire 			  tff_write_data;
+		assign tff_write_data = |(gnt_unqual_ip & req_tail_ip);
+		
+		wire 			  tff_read_data;
+		c_regfile
+		  #(.depth(num_flit_buffers),
+		    .regfile_type(tff_regfile_type))
+		tff
+		  (.clk(clk),
+		   .active(cred_active),
+		   .write_enable(gnt),
+		   .write_address(tfc_write_addr),
+		   .write_data(tff_write_data),
+		   .read_enable(cred_valid),
+		   .read_address(tfc_read_addr),
+		   .read_data(tff_read_data));
 		
 		assign head_credit = credit & tff_read_data;
 		

@@ -187,14 +187,17 @@ module vcr_ip_ctrl_mac
        (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
        -1;
    
-   // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // number of entries in flit buffer
    localparam fbf_depth = num_vcs*num_flit_buffers;
    
    // required address width for flit buffer
    localparam fbf_addr_width = clogb(fbf_depth);
+   
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select implementation variant for header data FIFO register file
+   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -581,6 +584,7 @@ module vcr_ip_ctrl_mac
 	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .hdff_regfile_type(hdff_regfile_type),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .vc_id(ivc),
 	       .port_id(port_id),
@@ -1023,6 +1027,7 @@ module vcr_ip_ctrl_mac
    wire [0:fbf_addr_width-1] 	fbc_write_addr;
    wire [0:fbf_addr_width-1] 	fbc_read_addr;
    wire 			fbf_write_enable;
+   wire 			fbf_read_enable;
    wire [0:fbf_addr_width-1] 	fbf_read_addr;
    wire [0:flit_data_width-1] 	fbf_read_data;
    
@@ -1064,6 +1069,8 @@ module vcr_ip_ctrl_mac
 	   
 	   assign fbf_write_enable = flit_valid_in & ~(fbf_bypass & flit_sent);
 	   
+	   assign fbf_read_enable = flit_sent;
+	   
 	   assign fbf_read_addr = fbc_read_addr;
 	   
 	   wire [0:flit_data_width-1] flit_data_muxed;
@@ -1088,6 +1095,20 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   assign fbf_write_enable = flit_valid_in;
+	   
+	   wire fbf_read_enable_s, fbf_read_enable_q;
+	   assign fbf_read_enable_s = flit_sent;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   fbf_read_enableq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(alloc_active),
+	      .d(fbf_read_enable_s),
+	      .q(fbf_read_enable_q));
+	   
+	   assign fbf_read_enable = fbf_read_enable_q;
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = flit_sent ? fbc_read_addr : fbf_read_addr_q;
@@ -1122,6 +1143,7 @@ module vcr_ip_ctrl_mac
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
+      .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));
    

@@ -129,19 +129,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 //------------------------------------------------------------------------------
-// FIFO implementation variants
-//------------------------------------------------------------------------------
-
-// shift register with moving write pointer, fixed read pointer
-`define FIFO_TYPE_SHIFTING 0
-
-// set of registers with moving read and write pointer
-`define FIFO_TYPE_INDEXED  1
-
-`define FIFO_TYPE_LAST `FIFO_TYPE_INDEXED
-
-
-//------------------------------------------------------------------------------
 // directions of rotation
 //------------------------------------------------------------------------------
 

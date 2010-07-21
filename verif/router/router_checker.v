@@ -39,6 +39,9 @@ module router_checker
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
+   // number of bits required for flit buffer addresses
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -189,7 +192,7 @@ module router_checker
    wire [0:num_ports*num_vcs*port_idx_width-1] 	ref_port_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	ref_vcs_ip_ivc;
    
-   wire [0:num_ports-1] 			fifo_errors_ip;
+   wire [0:num_ports-1] 			rfc_errors_ip;
    
    genvar 					ip;
    
@@ -414,9 +417,9 @@ module router_checker
 	   // candidate VCs in per-VC FIFOs
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs*2-1] 	fifo_errors_ivc;
+	   wire [0:num_vcs*2-1] 	       rfc_errors_ivc;
 	   
-	   genvar 			ivc;
+	   genvar 			       ivc;
 	   
 	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	     begin:ivcs
@@ -427,7 +430,7 @@ module router_checker
 		
 		// save destination port for subsequent body and tail flits
 		
-		wire [0:port_idx_width-1] 	dest_port_s, dest_port_q;
+		wire [0:port_idx_width-1] dest_port_s, dest_port_q;
 		assign dest_port_s
 		  = (flit_valid & flit_head & sel) ? route_port : dest_port_q;
 		c_dff
@@ -443,7 +446,7 @@ module router_checker
 		
 		// save candidate VCs for subsequent body and tail flits
 		
-		wire [0:num_vcs-1] 		dest_ovc_s, dest_ovc_q;
+		wire [0:num_vcs-1] 	  dest_ovc_s, dest_ovc_q;
 		assign dest_ovc_s
 		  = (flit_valid & flit_head & sel) ? route_ovc : dest_ovc_q;
 		c_dff
@@ -457,7 +460,41 @@ module router_checker
 		   .q(dest_ovc_q));
 		
 		
-		// generate FIFO input data
+		// reference FIFO
+		
+		wire 			  push;
+		assign push = flit_valid & sel;
+		
+		wire 			  match;
+		
+		wire 			  pop;
+		assign pop = match;
+		
+		wire 			  rfc_almost_full;
+		wire 			  rfc_full;
+		wire 			  rfc_almost_empty;
+		wire 			  rfc_empty;
+		wire [0:1] 		  rfc_errors;
+		wire [0:flit_buffer_idx_width-1] rfc_write_addr;
+		wire [0:flit_buffer_idx_width-1] rfc_read_addr;
+		c_fifo_ctrl
+		  #(.depth(num_flit_buffers),
+		    .reset_type(reset_type))
+		rfc
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .push(push),
+		   .pop(pop),
+		   .write_addr(rfc_write_addr),
+		   .read_addr(rfc_read_addr),
+		   .almost_empty(rfc_almost_empty),
+		   .empty(rfc_empty),
+		   .almost_full(rfc_almost_full),
+		   .full(rfc_full),
+		   .errors(rfc_errors));
+		
+		assign rfc_errors_ivc[ivc*2:(ivc+1)*2-1] = rfc_errors;
 		
 		wire [0:(flit_data_width+2+port_idx_width+num_vcs)-1] data_in;
 		assign data_in[0:header_info_width-1]
@@ -473,47 +510,21 @@ module router_checker
 			       flit_data_width+2+port_idx_width+num_vcs-1]
 		  = dest_ovc_s;
 		
-		
-		// generate FIFO control signals
-		
-		wire [0:flit_data_width+2+port_idx_width+num_vcs-1] data_out;
-		
-		wire push;
-		assign push = flit_valid & sel;
-		
-		wire match;
-		
-		wire pop;
-		assign pop = match;
-		
-		
-		// instantiate the FIFO
-		
-		wire fifo_almost_full;
-		wire fifo_full;
-		wire fifo_almost_empty;
-		wire fifo_empty;
-		wire [0:1] fifo_errors;
-		
-		c_fifo
+		wire [0:(flit_data_width+2+port_idx_width+num_vcs)-1] data_out;
+		c_regfile
 		  #(.depth(num_flit_buffers),
 		    .width(flit_data_width+2+port_idx_width+num_vcs),
-		    .reset_type(reset_type))
-		ref_fifo
+		    .num_read_ports(1),
+		    .regfile_type(`REGFILE_TYPE_FF_2D))
+		rff
 		  (.clk(clk),
-		   .reset(reset),
 		   .active(1'b1),
-		   .almost_full(fifo_almost_full),
-		   .full(fifo_full),
+		   .write_enable(push),
+		   .write_address(rfc_write_addr),
 		   .write_data(data_in),
-		   .push(push),
-		   .almost_empty(fifo_almost_empty),
-		   .empty(fifo_empty),
-		   .read_data(data_out),
-		   .pop(pop),
-		   .errors(fifo_errors));
-		
-		assign fifo_errors_ivc[ivc*2:(ivc+1)*2-1] = fifo_errors;
+		   .read_enable(pop),
+		   .read_address(rfc_read_addr),
+		   .read_data(data_out));
 		
 		
 		// generate reference bit patterns
@@ -581,7 +592,7 @@ module router_checker
 		assign match_vcs = |(ref_sel_ovc & check_sel_ivc);
 		
 		// check only if output is active and FIFO contains data
-		assign match = check_valid & ~fifo_empty & 
+		assign match = check_valid & ~rfc_empty & 
 			       match_head & match_tail & match_data & match_vcs;
 		
 		
@@ -602,7 +613,7 @@ module router_checker
 			 = match_op;
 		
 		// determine head-of-line expected flits for each VC
-		assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~fifo_empty;
+		assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~rfc_empty;
 		assign ref_head_ip_ivc[ip*num_vcs+ivc] = ref_head;
 		assign ref_tail_ip_ivc[ip*num_vcs+ivc] = ref_tail;
 		assign ref_data_ip_ivc[(ip*num_vcs+ivc)*flit_data_width:
@@ -630,11 +641,11 @@ module router_checker
 		     for(i = 0; i < num_vcs; i = i + 1)
 		       begin
 			  
-			  if(fifo_errors_ivc[i*2])
+			  if(rfc_errors_ivc[i*2])
 			    $display({"ERROR: Reference FIFO underflow at ", 
 				      "port %d, VC %d."}, ip, i);
 			  
-			  if(fifo_errors_ivc[i*2+1])
+			  if(rfc_errors_ivc[i*2+1])
 			    $display({"ERROR: Reference FIFO overflow at ", 
 				      "port %d, VC %d."}, ip, i);
 			  
@@ -644,7 +655,7 @@ module router_checker
 		// synopsys translate_on
 		
 		wire [0:num_vcs*2-1] errors_s, errors_q;
-		assign errors_s = fifo_errors_ivc;
+		assign errors_s = rfc_errors_ivc;
 		c_err_rpt
 		  #(.num_errors(num_vcs*2),
 		    .capture_mode(error_capture_mode),
@@ -656,11 +667,11 @@ module router_checker
 		   .errors_in(errors_s),
 		   .errors_out(errors_q));
 		
-		assign fifo_errors_ip[ip] = |errors_q;
+		assign rfc_errors_ip[ip] = |errors_q;
 		
 	     end
 	   else
-	     assign fifo_errors_ip[ip] = 1'b0;
+	     assign rfc_errors_ip[ip] = 1'b0;
 	   
 	   
 	end
@@ -792,7 +803,7 @@ module router_checker
 		
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
-		     if(fifo_errors_ip[i])
+		     if(rfc_errors_ip[i])
 		       $display({"ERROR: Reference FIFO error detected at ", 
 				 "input port %d."}, i);
 		  end
@@ -801,7 +812,7 @@ module router_checker
 	   // synopsys translate_on
 	   
 	   wire [0:3*num_ports-1] errors_s, errors_q;
-	   assign errors_s = {fifo_errors_ip, check_error_op, x_error_op};
+	   assign errors_s = {rfc_errors_ip, check_error_op, x_error_op};
 	   c_err_rpt
 	     #(.num_errors(3*num_ports),
 	       .capture_mode(error_capture_mode),

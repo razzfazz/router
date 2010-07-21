@@ -166,6 +166,12 @@ module whr_ip_ctrl_mac
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // required address width for header data FIFO
+   localparam hdff_addr_width = clogb(num_flit_buffers);
+   
+   // select implementation variant for header data FIFO register file
+   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -534,63 +540,77 @@ module whr_ip_ctrl_mac
    assign tail_sent = flit_valid_out & flit_tail_out;
    
    wire 			     hdr_valid;
-   wire 			     hdff_empty;
+   wire 			     hdfc_empty;
    
-   wire 			     hdff_push;
-   assign hdff_push = head_received & hdr_valid & (~tail_sent | ~hdff_empty);
+   wire 			     hdfc_push;
+   assign hdfc_push = head_received & hdr_valid & (~tail_sent | ~hdfc_empty);
    
-   wire 			     hdff_pop;
-   assign hdff_pop = tail_sent & ~hdff_empty;
+   wire 			     hdfc_pop;
+   assign hdfc_pop = tail_sent & ~hdfc_empty;
    
    wire [0:hop_route_info_width-1]   hdff_hop_route_info;
-   wire 			     error_hdff_underflow;
-   wire 			     error_hdff_overflow;
+   wire 			     error_hdfc_underflow;
+   wire 			     error_hdfc_overflow;
    
    generate
       
       if(num_header_buffers > 2)
 	begin
 	   
-	   wire [0:hop_route_info_width-1] hdff_write_data;
-	   assign hdff_write_data = hop_route_info;
-	   
-	   wire 			   hdff_almost_full;
-	   wire 			   hdff_full;
-	   wire 			   hdff_almost_empty;
-	   wire [0:hop_route_info_width-1] hdff_read_data;
-	   wire [0:1] 			   hdff_errors;
-	   c_fifo
+	   wire [0:hdff_addr_width-1] hdfc_write_addr;
+	   wire [0:hdff_addr_width-1] hdfc_read_addr;
+	   wire 		      hdfc_almost_full;
+	   wire 		      hdfc_full;
+	   wire 		      hdfc_almost_empty;
+	   wire [0:1] 		      hdfc_errors;
+	   c_fifo_ctrl
 	     #(.depth(num_header_buffers - 1),
-	       .width(hop_route_info_width),
-	       .fifo_type(`FIFO_TYPE_INDEXED),
 	       .reset_type(reset_type))
-	   hdff
+	   hdfc
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(flags_active),
-	      .almost_full(hdff_almost_full),
-	      .full(hdff_full),
+	      .push(hdfc_push),
+	      .pop(hdfc_pop),
+	      .write_addr(hdfc_write_addr),
+	      .read_addr(hdfc_read_addr),
+	      .almost_empty(hdfc_almost_empty),
+	      .empty(hdfc_empty),
+	      .almost_full(hdfc_almost_full),
+	      .full(hdfc_full),
+	      .errors(hdfc_errors));
+	   
+	   assign error_hdfc_underflow = hdfc_errors[0];
+	   assign error_hdfc_overflow = hdfc_errors[1];
+	   
+	   wire [0:hop_route_info_width-1] hdff_write_data;
+	   assign hdff_write_data = hop_route_info;
+	   
+	   wire [0:hop_route_info_width-1] hdff_read_data;
+	   c_regfile
+	     #(.depth(num_header_buffers - 1),
+	       .width(hop_route_info_width),
+	       .regfile_type(hdff_regfile_type))
+	   hdff
+	     (.clk(clk),
+	      .active(flags_active),
+	      .write_enable(hdfc_push),
+	      .write_address(hdfc_write_addr),
 	      .write_data(hdff_write_data),
-	      .push(hdff_push),
-	      .empty(hdff_empty),
-	      .almost_empty(hdff_almost_empty),
-	      .read_data(hdff_read_data),
-	      .pop(hdff_pop),
-	      .errors(hdff_errors));
+	      .read_enable(hdfc_pop),
+	      .read_address(hdfc_read_addr),
+	      .read_data(hdff_read_data));
 	   
 	   assign hdff_hop_route_info = hdff_read_data;
 	   
-	   assign error_hdff_underflow = hdff_errors[0];
-	   assign error_hdff_overflow = hdff_errors[1];
-	   
 	end
-      else if(num_header_buffers > 1)
+      else if(num_header_buffers == 2)
 	begin
 	   
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_q;
 	   assign hdff_hop_route_info_s
-	     = hdff_push ? hop_route_info : hdff_hop_route_info_q;
+	     = hdfc_push ? hop_route_info : hdff_hop_route_info_q;
 	   c_dff
 	     #(.width(hop_route_info_width),
 	       .reset_type(reset_type))
@@ -603,33 +623,33 @@ module whr_ip_ctrl_mac
 	   
 	   assign hdff_hop_route_info = hdff_hop_route_info_q;
 	   
-	   wire 		     hdff_empty_s, hdff_empty_q;
-	   assign hdff_empty_s = (hdff_empty_q | (hdff_pop & ~hdff_push)) & 
-				 ~(hdff_push & ~hdff_pop);
+	   wire 		     hdfc_empty_s, hdfc_empty_q;
+	   assign hdfc_empty_s = (hdfc_empty_q | (hdfc_pop & ~hdfc_push)) & 
+				 ~(hdfc_push & ~hdfc_pop);
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
 	       .reset_type(reset_type))
-	   hdff_emptyq
+	   hdfc_emptyq
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(flags_active),
-	      .d(hdff_empty_s),
-	      .q(hdff_empty_q));
+	      .d(hdfc_empty_s),
+	      .q(hdfc_empty_q));
 	   
-	   assign hdff_empty = hdff_empty_q;
+	   assign hdfc_empty = hdfc_empty_q;
 	   
-	   assign error_hdff_underflow = hdff_empty_q & hdff_pop & ~hdff_push;
-	   assign error_hdff_overflow = ~hdff_empty_q & hdff_push & ~hdff_pop;
+	   assign error_hdfc_underflow = hdfc_empty_q & hdfc_pop & ~hdfc_push;
+	   assign error_hdfc_overflow = ~hdfc_empty_q & hdfc_push & ~hdfc_pop;
 	   
 	end
-      else
+      else if(num_header_buffers == 1)
 	begin
 	   
-	   assign hdff_empty = 1'b1;
+	   assign hdfc_empty = 1'b1;
+	   assign error_hdfc_underflow = 1'b0;
+	   assign error_hdfc_overflow = 1'b0;
 	   assign hdff_hop_route_info = {hop_route_info_width{1'b0}};
-	   assign error_hdff_underflow = 1'b0;
-	   assign error_hdff_overflow = 1'b0;
 	   
 	end
       
@@ -642,7 +662,7 @@ module whr_ip_ctrl_mac
    
    wire hdr_valid_s, hdr_valid_q;
    assign hdr_valid_s = hdr_valid_q ?
-			(~tail_sent | ~hdff_empty | head_received) : 
+			(~tail_sent | ~hdfc_empty | head_received) : 
 			(head_received & ~tail_sent);
    c_dff
      #(.width(1),
@@ -658,7 +678,7 @@ module whr_ip_ctrl_mac
    
    wire [0:hop_route_info_width-1] hop_route_info_muxed;
    assign hop_route_info_muxed
-     = hdff_empty ? hop_route_info : hdff_hop_route_info;
+     = hdfc_empty ? hop_route_info : hdff_hop_route_info;
    
    wire [0:hop_route_info_width-1] hdr_hop_route_info_s, hdr_hop_route_info_q;
    assign hdr_hop_route_info_s
@@ -774,6 +794,7 @@ module whr_ip_ctrl_mac
      = flit_data_in[header_info_width:flit_data_width-1];
    
    wire 			   fbf_write_enable;
+   wire 			   fbf_read_enable;
    wire [0:fbf_addr_width-1] 	   fbf_read_addr;
    wire [0:flit_data_width-1] 	   fbf_read_data;
    
@@ -787,6 +808,8 @@ module whr_ip_ctrl_mac
 	   
 	   assign fbf_write_enable
 	     = flit_valid_thru & ~(fbf_bypass & flit_valid_out);
+	   
+	   assign fbf_read_enable = flit_valid_out;
 	   
 	   assign fbf_read_addr = fbc_read_addr;
 	   
@@ -819,6 +842,20 @@ module whr_ip_ctrl_mac
 	   // cycle such as to line up the flit data read from the buffer with 
 	   // the crossbar control signals.
 	   
+	   wire fbf_read_enable_s, fbf_read_enable_q;
+	   assign fbf_read_enable_s = flit_valid_out;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   fbf_read_enableq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(flags_active),
+	      .d(fbf_read_enable_s),
+	      .q(fbf_read_enable_q));
+	   
+	   assign fbf_read_enable = fbf_read_enable_q;
+	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s
 	     = flit_valid_out ? fbc_read_addr : fbf_read_addr_q;
@@ -850,6 +887,7 @@ module whr_ip_ctrl_mac
       .write_enable(fbf_write_enable),
       .write_address(fbc_write_addr),
       .write_data(fbf_write_data),
+      .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));
    
@@ -927,10 +965,10 @@ module whr_ip_ctrl_mac
 	if(error_fbc_overflow)
 	  $display("ERROR: Flit buffer controller overflow in module %m.");
 	
-	if(error_hdff_underflow)
+	if(error_hdfc_underflow)
 	  $display("ERROR: Head FIFO underflow in module %m.");
 	
-	if(error_hdff_overflow)
+	if(error_hdfc_overflow)
 	  $display("ERROR: Head FIFO overflow in module %m.");
 	
 	if(error_no_header)
@@ -951,8 +989,8 @@ module whr_ip_ctrl_mac
 	   wire [0:5] errors_s, errors_q;
 	   assign errors_s = {error_fbc_underflow,
 			      error_fbc_overflow,
-			      error_hdff_underflow,
-			      error_hdff_overflow,
+			      error_hdfc_underflow,
+			      error_hdfc_overflow,
 			      error_no_header,
 			      error_invalid_port};
 	   c_err_rpt

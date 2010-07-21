@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic register file
 module c_regfile
-  (clk, active, write_enable, write_address, write_data, read_address, 
-   read_data);
+  (clk, active, write_enable, write_address, write_data, read_enable, 
+   read_address, read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -65,12 +65,17 @@ module c_regfile
    // data to be written
    input [0:width-1] 	  write_data;
    
+   // if high, read from entries selected by read_address
+   input [0:num_read_ports-1] read_enable;
+   
    // entries to read out
    input [0:num_read_ports*addr_width-1] read_address;
    
    // contents of entries selected by read_address
    output [0:num_read_ports*width-1] 	 read_data;
    wire [0:num_read_ports*width-1] 	 read_data;
+   
+   wire [0:num_read_ports*width-1] 	 cell_data;
    
    genvar 				 read_port;
    
@@ -109,11 +114,11 @@ module c_regfile
 		    = read_address[read_port*addr_width:
 				   (read_port+1)*addr_width-1];
 		  
-		  wire [0:width-1] 	port_read_data;
-		  assign port_read_data = storage_2d[port_read_address];
+		  wire [0:width-1] 	port_cell_data;
+		  assign port_cell_data = storage_2d[port_read_address];
 		  
-		  assign read_data[read_port*width:(read_port+1)*width-1]
-			   = port_read_data;
+		  assign cell_data[read_port*width:(read_port+1)*width-1]
+		    = port_cell_data;
 		  
 	       end
 	     
@@ -153,7 +158,7 @@ module c_regfile
 		  endcase
 		  
 		  assign storage_1d[level*width:(level+1)*width-1] = storage;
-
+		  
 	       end
 	     
 	     for(read_port = 0; read_port < num_read_ports; 
@@ -165,7 +170,7 @@ module c_regfile
 		    = read_address[read_port*addr_width:
 				   (read_port+1)*addr_width-1];
 		  
-		  wire [0:width-1] 	port_read_data;
+		  wire [0:width-1] 	port_cell_data;
 		  
 		  case(regfile_type)
 		    
@@ -182,30 +187,30 @@ module c_regfile
 			 c_select_1ofn
 			   #(.num_ports(depth),
 			     .width(width))
-			 port_read_data_sel
+			 port_cell_data_sel
 			   (.select(port_read_sel),
 			    .data_in(storage_1d),
-			    .data_out(port_read_data));
+			    .data_out(port_cell_data));
 			 
 		      end
 		    
 		    `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX:
 		      begin
 			 
-			 assign port_read_data
+			 assign port_cell_data
 			   = storage_1d[port_read_address*width +: width];
 			 
 		      end
 		    
 		  endcase
-		  
-		  assign read_data[read_port*width:(read_port+1)*width-1]
-		    = port_read_data;
+
+		  assign cell_data[read_port*width:(read_port+1)*width-1]
+		    = cell_data;
 		  
 	       end
-	
+	     
 	  end
-
+	
 	`REGFILE_TYPE_FF_DW, `REGFILE_TYPE_LAT_DW:
 	  begin
 	     
@@ -233,7 +238,7 @@ module c_regfile
 			      .rd_addr(read_address),
 			      .wr_addr(write_address),
 			      .data_in(write_data),
-			      .data_out(read_data));
+			      .data_out(cell_data));
 			end
 		      
 		      `REGFILE_TYPE_LAT_DW:
@@ -248,11 +253,11 @@ module c_regfile
 			      .rd_addr(read_address),
 			      .wr_addr(write_address),
 			      .data_in(write_data),
-			      .data_out(read_data));
+			      .data_out(cell_data));
 			end
 		      
 		    endcase
-
+		    
 		 end
 	       
 	       2:
@@ -266,8 +271,8 @@ module c_regfile
 		    assign read_address_2
 		      = read_address[addr_width:2*addr_width-1];
 		    
-		    wire [0:width-1] 	  read_data_1;
-		    wire [0:width-1] 	  read_data_2;
+		    wire [0:width-1] 	  cell_data_1;
+		    wire [0:width-1] 	  cell_data_2;
 		    
 		    case(regfile_type)
 		      
@@ -286,8 +291,8 @@ module c_regfile
 			      .rd2_addr(read_address_2),
 			      .wr_addr(write_address),
 			      .data_in(write_data),
-			      .data_rd1_out(read_data_1),
-			      .data_rd2_out(read_data_2));
+			      .data_rd1_out(cell_data_1),
+			      .data_rd2_out(cell_data_2));
 			end
 		      
 		      `REGFILE_TYPE_LAT_DW:
@@ -303,13 +308,13 @@ module c_regfile
 			      .rd2_addr(read_address_2),
 			      .wr_addr(write_address),
 			      .data_in(write_data),
-			      .data_rd1_out(read_data_1),
-			      .data_rd2_out(read_data_2));
+			      .data_rd1_out(cell_data_1),
+			      .data_rd2_out(cell_data_2));
 			end
 		      
 		    endcase
 		    
-		    assign read_data = {read_data_1, read_data_2};
+		    assign cell_data = {cell_data_1, cell_data_2};
 		    
 		 end
 	       
@@ -334,21 +339,67 @@ module c_regfile
 	
       endcase
       
+      for(read_port = 0; read_port < num_read_ports; read_port = read_port + 1)
+	begin:read_ports
+	   
+	   wire [0:width-1] port_cell_data;
+	   assign port_cell_data
+	     = cell_data[read_port*width:(read_port+1)*width-1];
+	   
+	   wire [0:width-1] port_read_data;
+	   
+	   case(regfile_type)
+	     
+	     `REGFILE_TYPE_FF_2D, `REGFILE_TYPE_FF_1D_TRISTATE,
+	     `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_DW:
+	       begin
+		  
+		  assign port_read_data = port_cell_data;
+		  
+	       end
+	     
+	     `REGFILE_TYPE_LAT_2D, `REGFILE_TYPE_LAT_1D_TRISTATE,
+	     `REGFILE_TYPE_LAT_1D_MUX, `REGFILE_TYPE_LAT_DW:
+	       begin
+		  
+		  wire port_read_enable;
+		  assign port_read_enable = read_enable[read_port];
+		  
+		  reg [0:width-1] port_buffered_data;
+		  always @(clk, active, port_read_enable, port_cell_data)
+		    if(clk)
+		      if(active)
+			if(port_read_enable)
+			  port_buffered_data <= port_cell_data;
+		  
+		  assign port_read_data = port_buffered_data;
+		  
+	       end
+	     
+	   endcase
+	   
+	   assign read_data[read_port*width:(read_port+1)*width-1]
+	     = port_read_data;
+	   
+	end
+      
       
       //----------------------------------------------------------------------
       // check parameter validity
       //----------------------------------------------------------------------
       
       // synopsys translate_off
+      
       if(depth < 2)
-      begin
-	 initial
-	 begin
-	    $display({"ERROR: The register file module requires a depth of ", 
-		      "two or more entries."});
-	    $stop;
+	begin
+	   initial
+	     begin
+		$display({"ERROR: The register file module requires a depth ", 
+			  "of two or more entries."});
+		$stop;
 	     end
-      end
+	end
+      
       // synopsys translate_on
       
    endgenerate

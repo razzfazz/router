@@ -56,6 +56,9 @@ module packet_source
    // flit buffer entries per VC
    parameter num_flit_buffers = 8;
    
+   // number of bits required for flit buffer addresses
+   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_header_buffers = 4;
    
@@ -384,35 +387,51 @@ module packet_source
 	   else
 	     begin
 		
-		wire tff_write_data;
-		assign tff_write_data = flit_tail;
-		
-		wire tff_almost_full;
-		wire tff_full;
-		wire tff_almost_empty;
-		wire tff_empty;
-		wire tff_read_data;
-		wire [0:1] tff_errors;
-		c_fifo
+		wire [0:flit_buffer_idx_width-1] tff_write_addr;
+		wire [0:flit_buffer_idx_width-1] tff_read_addr;
+		wire [0:flit_buffer_idx_width-1] tff_peek_addr;
+		wire 				 tff_almost_full;
+		wire 				 tff_full;
+		wire 				 tff_almost_empty;
+		wire 				 tff_empty;
+		wire [0:1] 			 tff_errors;
+		c_fifo_ctrl
 		  #(.depth(num_flit_buffers),
-		    .width(1),
-		    .fifo_type(`FIFO_TYPE_INDEXED),
 		    .reset_type(reset_type))
 		tff
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(1'b1),
-		   .almost_full(tff_almost_full),
-		   .full(tff_full),
-		   .write_data(tff_write_data),
 		   .push(debit),
+		   .pop(credit),
+		   .write_addr(tff_write_addr),
+		   .read_addr(tff_read_addr),
 		   .almost_empty(tff_almost_empty),
 		   .empty(tff_empty),
-		   .read_data(tff_read_data),
-		   .pop(credit),
+		   .almost_full(tff_almost_full),
+		   .full(tff_full),
 		   .errors(tff_errors));
 		
-		assign hft_credit = credit & tff_read_data;
+		wire 				 trf_write_data;
+		assign trf_write_data = flit_tail;
+		
+		wire 				 trf_read_data;
+		c_regfile
+		  #(.depth(num_flit_buffers),
+		    .width(1),
+		    .num_read_ports(1),
+		    .regfile_type(`REGFILE_TYPE_FF_2D))
+		trf
+		  (.clk(clk),
+		   .active(1'b1),
+		   .write_enable(debit),
+		   .write_address(tff_write_addr),
+		   .write_data(trf_write_data),
+		   .read_enable(credit),
+		   .read_address(tff_read_addr),
+		   .read_data(trf_read_data));
+		
+		assign hft_credit = credit & trf_read_data;
 		
 	     end
 	   

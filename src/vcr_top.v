@@ -168,6 +168,12 @@ module vcr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select implementation variant for flit buffer register file
+   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select implementation variant for tail FIFO register file
+   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -499,6 +505,7 @@ module vcr_top
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .fbf_regfile_type(fbf_regfile_type),
+	       .hdff_regfile_type(hdff_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
@@ -813,6 +820,7 @@ module vcr_top
 	       .error_capture_mode(error_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
+	       .tff_regfile_type(tff_regfile_type),
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),

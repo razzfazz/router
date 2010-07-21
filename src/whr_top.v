@@ -157,6 +157,12 @@ module whr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select implementation variant for header data FIFO register file
+   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select implementation variant for tail FIFO register file
+   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -251,6 +257,7 @@ module whr_top
 	       .dim_order(dim_order),
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fbf_regfile_type(fbf_regfile_type),
+	       .hdff_regfile_type(hdff_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .perf_ctr_width(perf_ctr_width),
@@ -364,6 +371,7 @@ module whr_top
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
 	       .arbiter_type(arbiter_type),
+	       .tff_regfile_type(tff_regfile_type),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(op),
 	       .reset_type(reset_type))
