@@ -451,6 +451,7 @@ module tc_router_wrap
        .int_flow_ctrl_type(int_flow_ctrl_type),
        .input_stage_can_hold(input_stage_can_hold),
        .fbf_regfile_type(fbf_regfile_type),
+       .explicit_pipeline_register(explicit_pipeline_register),
        .vc_alloc_type(vc_alloc_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .vc_alloc_requires_credit(vc_alloc_requires_credit),
