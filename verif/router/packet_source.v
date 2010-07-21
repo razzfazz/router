@@ -200,8 +200,6 @@ module packet_source
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
-   localparam cred_count_width = clogb(num_flit_buffers+1);
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -316,7 +314,7 @@ module packet_source
    wire [0:num_vcs-1] 			 head_free_ovc;
    
    wire [0:num_vcs*2-1] 		 hft_errors_ovc;
-   wire [0:num_vcs*2-1] 		 cred_errors_ovc;
+   wire [0:num_vcs*2-1] 		 ft_errors_ovc;
    
    wire 				 free;
    assign free = |(sel_ovc & free_ovc);
@@ -355,7 +353,7 @@ module packet_source
 	     end
 	   
 	   wire hft_credit;
-	   wire [0:cred_count_width-1] cred_count_q;
+	   wire ft_almost_empty;
 	   
 	   if(num_header_buffers == 1)
 	     begin
@@ -365,8 +363,7 @@ module packet_source
 		// the tail has been sent
 		
 		wire last_credit_received;
-		assign last_credit_received
-		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
+		assign last_credit_received = ft_almost_empty & credit;
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s = ((tail_sent_q & ~(debit & flit_head)) | 
@@ -424,7 +421,6 @@ module packet_source
 	   wire hft_debit;
 	   assign hft_debit = debit & flit_head;
 	   
-	   // track header credits using stock credit tracker module
 	   wire hft_almost_full;
 	   wire hft_full;
 	   wire hft_almost_empty;
@@ -451,32 +447,28 @@ module packet_source
 	   assign head_free_ovc[ovc] = head_free;
 	   assign hft_errors_ovc[ovc*2:(ovc+1)*2-1] = hft_errors;
 	   
-	   wire [0:cred_count_width-1] cred_count_s;
-	   assign cred_count_s = cred_count_q + credit - debit;
-	   c_dff
-	     #(.width(cred_count_width),
-	       .reset_value(num_flit_buffers),
+	   wire       ft_almost_full;
+	   wire       ft_full;
+	   wire       ft_empty;
+	   wire [0:1] ft_errors;
+	   c_fifo_tracker
+	     #(.depth(num_flit_buffers),
 	       .reset_type(reset_type))
-	   cred_countq
+	   ft
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
-	      .d(cred_count_s),
-	      .q(cred_count_q));
+	      .push(debit),
+	      .pop(credit),
+	      .almost_full(ft_almost_full),
+	      .full(ft_full),
+	      .almost_empty(ft_almost_empty),
+	      .empty(ft_empty),
+	      .errors(ft_errors));
 	   
-	   assign free_ovc[ovc] = |cred_count_q;
+	   assign free_ovc[ovc] = ~ft_full;
 	   
-	   wire 		       error_cred_overflow;
-	   assign error_cred_overflow
-	     = (cred_count_q == num_flit_buffers) && credit;
-	   
-	   wire 		       error_cred_underflow;
-	   assign error_cred_underflow = (cred_count_q == 0) && debit;
-	   
-	   wire [0:1] 		       cred_errors;
-	   assign cred_errors = {error_cred_overflow, error_cred_underflow};
-	   
-	   assign cred_errors_ovc[ovc*2:(ovc+1)*2-1] = cred_errors;
+	   assign ft_errors_ovc[ovc*2:(ovc+1)*2-1] = ft_errors;
 	   
 	end
       
@@ -940,6 +932,6 @@ module packet_source
       
    endgenerate
    
-   assign error = |hft_errors_ovc | |cred_errors_ovc;
+   assign error = |hft_errors_ovc | |ft_errors_ovc;
    
 endmodule
