@@ -200,7 +200,6 @@ module packet_source
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
-   localparam flit_buffer_idx_width = clogb(num_flit_buffers);
    localparam cred_count_width = clogb(num_flit_buffers+1);
    
    parameter reset_type = `RESET_TYPE_ASYNC;
