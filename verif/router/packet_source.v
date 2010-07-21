@@ -356,92 +356,69 @@ module packet_source
 	     end
 	   
 	   wire hft_credit;
-	   wire [0:cred_count_width-1] cred_count_s;
+	   wire [0:cred_count_width-1] cred_count_q;
 	   
-	   if(num_header_buffers > 1)
+	   if(num_header_buffers == 1)
 	     begin
 		
-		wire [0:num_flit_buffers-1] push_mask;
-		wire [0:num_flit_buffers-1] pop_mask;
+		// if we can only have one packet per buffer, we can accept the 
+		// next one once the buffer has been completely drained after 
+		// the tail has been sent
 		
-		wire [0:num_flit_buffers-1] tail_queue_s, tail_queue_q;
-		assign tail_queue_s
-		  = (tail_queue_q & ~({num_flit_buffers{credit}} & pop_mask)) |
-		    ({num_flit_buffers{debit & flit_tail}} & push_mask);
+		wire last_credit_received;
+		assign last_credit_received
+		  = (cred_count_q == (num_flit_buffers - 1)) && credit;
+		
+		wire tail_sent_s, tail_sent_q;
+		assign tail_sent_s = ((tail_sent_q & ~(debit & flit_head)) | 
+				      (debit & flit_tail));
 		c_dff
-		  #(.width(num_flit_buffers),
+		  #(.width(1),
 		    .reset_type(reset_type))
-		tail_queueq
+		tail_sentq
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(1'b1),
-		   .d(tail_queue_s),
-		   .q(tail_queue_q));
+		   .d(tail_sent_s),
+		   .q(tail_sent_q));
 		
-		wire [0:flit_buffer_idx_width-1] push_ptr_q, push_ptr_next;
-		c_incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		push_ptr_incr
-		  (.data_in(push_ptr_q),
-		   .data_out(push_ptr_next));
-		
-		wire [0:flit_buffer_idx_width-1] push_ptr_s;
-		assign push_ptr_s = debit ? push_ptr_next : push_ptr_q;
-		c_dff
-		  #(.width(flit_buffer_idx_width),
-		    .reset_type(reset_type))
-		push_ptrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .d(push_ptr_s),
-		   .q(push_ptr_q));
-		
-		c_decode
-		  #(.num_ports(num_flit_buffers))
-		push_mask_dec
-		  (.data_in(push_ptr_q),
-		   .data_out(push_mask));
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_q, pop_ptr_next;
-		c_incr
-		  #(.width(flit_buffer_idx_width),
-		    .min_value(0),
-		    .max_value(num_flit_buffers-1))
-		pop_ptr_incr
-		  (.data_in(pop_ptr_q),
-		   .data_out(pop_ptr_next));
-		
-		wire [0:flit_buffer_idx_width-1] pop_ptr_s;
-		assign pop_ptr_s = credit ? pop_ptr_next : pop_ptr_q;
-		c_dff
-		  #(.width(flit_buffer_idx_width),
-		    .reset_type(reset_type))
-		pop_ptrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .d(pop_ptr_s),
-		   .q(pop_ptr_q));
-		
-		c_decode
-		  #(.num_ports(num_flit_buffers))
-		pop_mask_dec
-		  (.data_in(pop_ptr_q),
-		   .data_out(pop_mask));
-		
-		assign hft_credit = |(tail_queue_q & pop_mask) & credit;
+		assign hft_credit = tail_sent_q & last_credit_received;
 		
 	     end
 	   else
 	     begin
 		
-		// if we can only have one packet per buffer, we can accept the
-		// next one once the buffer has been emptied
-		assign hft_credit = credit &&
-				    (cred_count_s == num_flit_buffers);
+		wire tff_write_data;
+		assign tff_write_data = flit_tail;
+		
+		wire tff_almost_full;
+		wire tff_full;
+		wire tff_almost_empty;
+		wire tff_empty;
+		wire tff_read_data;
+		wire tff_peek_data;
+		wire [0:1] tff_errors;
+		c_fifo
+		  #(.depth(num_flit_buffers),
+		    .width(1),
+		    .fifo_type(`FIFO_TYPE_INDEXED),
+		    .reset_type(reset_type))
+		tff
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(1'b1),
+		   .almost_full(tff_almost_full),
+		   .full(tff_full),
+		   .write_data(tff_write_data),
+		   .push(debit),
+		   .almost_empty(tff_almost_empty),
+		   .empty(tff_empty),
+		   .read_data(tff_read_data),
+		   .pop(credit),
+		   .peek_data(tff_peek_data),
+		   .errors(tff_errors));
+		
+		assign hft_credit = credit & tff_read_data;
 		
 	     end
 	   
@@ -475,7 +452,7 @@ module packet_source
 	   assign head_free_ovc[ovc] = head_free;
 	   assign hft_errors_ovc[ovc*2:(ovc+1)*2-1] = hft_errors;
 	   
-	   wire [0:cred_count_width-1] cred_count_q;
+	   wire [0:cred_count_width-1] cred_count_s;
 	   assign cred_count_s = cred_count_q + credit - debit;
 	   c_dff
 	     #(.width(cred_count_width),
