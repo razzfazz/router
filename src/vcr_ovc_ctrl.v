@@ -400,7 +400,6 @@ module vcr_ovc_ctrl
 		wire tff_almost_empty;
 		wire tff_empty;
 		wire tff_read_data;
-		wire tff_peek_data;
 		wire [0:1] tff_errors;
 		c_fifo
 		  #(.depth(num_flit_buffers),
@@ -419,7 +418,6 @@ module vcr_ovc_ctrl
 		   .empty(tff_empty),
 		   .read_data(tff_read_data),
 		   .pop(credit),
-		   .peek_data(tff_peek_data),
 		   .errors(tff_errors));
 		
 		assign head_credit = credit & tff_read_data;		

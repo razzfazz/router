@@ -486,14 +486,14 @@ module router_checker
 		wire pop;
 		assign pop = match;
 		
+		
+		// instantiate the FIFO
+		
 		wire fifo_almost_full;
 		wire fifo_full;
 		wire fifo_almost_empty;
 		wire fifo_empty;
 		wire [0:1] fifo_errors;
-		wire [0:flit_data_width+2+port_idx_width+num_vcs-1] fifo_pdata;
-		
-		// instantiate the FIFO
 		
 		c_fifo
 		  #(.depth(num_flit_buffers),
@@ -510,7 +510,6 @@ module router_checker
 		   .almost_empty(fifo_almost_empty),
 		   .empty(fifo_empty),
 		   .read_data(data_out),
-		   .peek_data(fifo_pdata),
 		   .pop(pop),
 		   .errors(fifo_errors));
 		

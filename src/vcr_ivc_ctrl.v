@@ -725,7 +725,6 @@ module vcr_ivc_ctrl
 	   wire 			   hdff_full;
 	   wire 			   hdff_almost_empty;
 	   wire [0:hop_route_info_width-1] hdff_read_data;
-	   wire [0:hop_route_info_width-1] hdff_peek_data;
 	   wire [0:1] 			   hdff_errors;
 	   c_fifo
 	     #(.depth(num_header_buffers - 1),
@@ -744,7 +743,6 @@ module vcr_ivc_ctrl
 	      .empty(hdff_empty),
 	      .read_data(hdff_read_data),
 	      .pop(hdff_pop),
-	      .peek_data(hdff_peek_data),
 	      .errors(hdff_errors));
 	   
 	   assign hdff_hop_route_info = hdff_read_data;
@@ -1163,7 +1161,6 @@ module vcr_ivc_ctrl
    assign fbc_pop = flit_sent;
    
    wire [0:1] 				       fbc_errors;
-   wire [0:fbf_addr_width-1] 		       fbc_peek_addr;
    wire 				       fbc_almost_full;
    wire 				       fbc_full;
    c_fifo_ctrl
@@ -1179,7 +1176,6 @@ module vcr_ivc_ctrl
       .pop(fbc_pop),
       .write_addr(fbc_write_addr),
       .read_addr(fbc_read_addr),
-      .peek_addr(fbc_peek_addr),
       .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
       .almost_full(fbc_almost_full),

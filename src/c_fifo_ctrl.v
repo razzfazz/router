@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // simple FIFO controller
 module c_fifo_ctrl
-  (clk, reset, active, push, pop, write_addr, read_addr, peek_addr, 
-   almost_empty, empty, almost_full, full, errors);
+  (clk, reset, active, push, pop, write_addr, read_addr, almost_empty, empty, 
+   almost_full, full, errors);
    
 `include "c_constants.v"
    
@@ -71,10 +71,6 @@ module c_fifo_ctrl
    // address to read current output element from
    output [0:addr_width-1] read_addr;
    wire [0:addr_width-1] read_addr;
-   
-   // address to read next output element from
-   output [0:addr_width-1] peek_addr;
-   wire [0:addr_width-1] peek_addr;
    
    // buffer nearly empty (1 used slot remaining) indication
    output almost_empty;
@@ -119,7 +115,6 @@ module c_fifo_ctrl
       .q(read_ptr_q));
    
    assign read_addr = read_ptr_q;
-   assign peek_addr = read_ptr_next;
    
    wire [0:addr_width-1] write_ptr_next, write_ptr_q;
    c_incr

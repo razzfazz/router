@@ -24,7 +24,6 @@ module testbench
    wire pop;
    wire [0:addr_width-1] write_addr;
    wire [0:addr_width-1] read_addr;
-   wire [0:addr_width-1] peek_addr;
    wire 		 fc_almost_empty;
    wire 		 fc_empty;
    wire 		 fc_almost_full;
@@ -42,7 +41,6 @@ module testbench
       .pop(pop),
       .write_addr(write_addr),
       .read_addr(read_addr),
-      .peek_addr(peek_addr),
       .almost_empty(fc_almost_empty),
       .empty(fc_empty),
       .almost_full(fc_almost_full),

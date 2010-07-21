@@ -392,7 +392,6 @@ module packet_source
 		wire tff_almost_empty;
 		wire tff_empty;
 		wire tff_read_data;
-		wire tff_peek_data;
 		wire [0:1] tff_errors;
 		c_fifo
 		  #(.depth(num_flit_buffers),
@@ -411,7 +410,6 @@ module packet_source
 		   .empty(tff_empty),
 		   .read_data(tff_read_data),
 		   .pop(credit),
-		   .peek_data(tff_peek_data),
 		   .errors(tff_errors));
 		
 		assign hft_credit = credit & tff_read_data;

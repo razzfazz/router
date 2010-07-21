@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // generic FIFO buffer built from registers
 module c_fifo
   (clk, reset, active, almost_full, full, write_data, push, almost_empty, empty,
-   read_data, peek_data, pop, errors);
+   read_data, pop, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -87,10 +87,6 @@ module c_fifo
    // output data (head element)
    output [0:width-1] read_data;
    wire [0:width-1] read_data;
-   
-   // output data (next element)
-   output [0:width-1] peek_data;
-   wire [0:width-1] peek_data;
    
    // remove head element from shift register
    input pop;
@@ -198,7 +194,6 @@ module c_fifo
 	       end
 	     
 	     assign read_data = data[depth*width:(depth+1)*width-1];
-	     assign peek_data = data[(depth-1)*width:depth*width-1];
 	     
 	     wire 		   error_underflow;
 	     assign error_underflow = empty & pop & ~push;
@@ -213,7 +208,7 @@ module c_fifo
 	`FIFO_TYPE_INDEXED:
 	  begin
 	     
-	     wire [0:rw_ptr_width-1] write_ptr, read_ptr, peek_ptr;
+	     wire [0:rw_ptr_width-1] write_ptr, read_ptr;
 	     c_fifo_ctrl
 	       #(.addr_width(rw_ptr_width),
 		 .offset(0),
@@ -227,7 +222,6 @@ module c_fifo
 		.pop(pop),
 		.write_addr(write_ptr),
 		.read_addr(read_ptr),
-		.peek_addr(peek_ptr),
 		.almost_empty(almost_empty),
 		.empty(empty),
 		.almost_full(almost_full),
@@ -242,7 +236,6 @@ module c_fifo
 		   storage[write_ptr] <= write_data;
 	     
 	     assign read_data = storage[read_ptr];
-	     assign peek_data = storage[peek_ptr];
 	     
 	  end
 	
