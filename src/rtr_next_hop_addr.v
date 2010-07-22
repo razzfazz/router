@@ -81,9 +81,6 @@ module rtr_next_hop_addr
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // current resource class
-   parameter resource_class = 0;
-   
    // current router's address
    input [0:router_addr_width-1] router_address;
    
