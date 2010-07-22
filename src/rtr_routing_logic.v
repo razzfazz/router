@@ -257,13 +257,6 @@ module rtr_routing_logic
 			   `CONNECTIVITY_RING:
 			     begin
 				
-			 	// multiply by 2
-				wire [0:dim_addr_width]   dim_addr_diff_x2;
-				assign dim_addr_diff_x2 = {dim_addr_diff, 1'b0};
-				
-				wire [0:dim_addr_width]   dim_count;
-				assign dim_count = num_routers_per_dim;
-				
 				// In cases where the destination is equally far
 				// away in both possible directions, we need
 				// some kind of tie breaker to avoid load 
@@ -274,11 +267,14 @@ module rtr_routing_logic
 				assign tie_break
 				  = router_address[router_addr_width-1];
 				
+			 	// multiply by 2 and add tiebreaker
+				wire [0:dim_addr_width]   dim_addr_diff_x2;
+				assign dim_addr_diff_x2
+				  = {dim_addr_diff, tie_break};
+				
 				wire 			  route_down;
 				assign route_down
-				  = (dim_addr_diff_x2 > dim_count) ||
-				    ((dim_addr_diff_x2 == dim_count) &&
-				     (tie_break));
+				  = (dim_addr_diff_x2 > num_routers_per_dim);
 				
 				assign port_dec = {route_down, ~route_down};
 				
