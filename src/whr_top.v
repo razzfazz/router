@@ -83,9 +83,6 @@ module whr_top
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // width required for routing information for a single hop
-   localparam hop_route_info_width = port_idx_width;
-   
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
@@ -140,10 +137,6 @@ module whr_top
    
    // enable lookahead routing
    parameter lookahead_routing = 1;
-   
-   // width required for lookahead routing information
-   localparam la_route_info_width
-     = lookahead_routing ? hop_route_info_width : 0;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_DOR;
