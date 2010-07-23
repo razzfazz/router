@@ -261,18 +261,21 @@ module rtr_routing_logic
 				// away in both possible directions, we need
 				// some kind of tie breaker to avoid load 
 				// imbalance; one simple solution is to break 
-				// the tie based on whether the current router's
-				// address is even or odd.
-				wire 			  tie_break;
+				// the tie based on the current router's
+				// address.
+				// NOTE: This can create load balance when using
+				// concentration, as all nodes sharing a router 
+				// will pick the same direction.
+				wire tie_break;
 				assign tie_break
-				  = router_address[router_addr_width-1];
+				  = curr_dim_addr[dim_addr_width-1];
 				
 			 	// multiply by 2 and add tiebreaker
-				wire [0:dim_addr_width]   dim_addr_diff_x2;
+				wire [0:dim_addr_width] dim_addr_diff_x2;
 				assign dim_addr_diff_x2
 				  = {dim_addr_diff, tie_break};
 				
-				wire 			  route_down;
+				wire 			route_down;
 				assign route_down
 				  = (dim_addr_diff_x2 > num_routers_per_dim);
 				
