@@ -352,16 +352,13 @@ module whr_ip_ctrl_mac
 	   
 	   wire [0:router_addr_width-1]   next_router_address;
 	   rtr_next_hop_addr
-	     #(.num_resource_classes(1),
-	       .num_routers_per_dim(num_routers_per_dim),
+	     #(.num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
 	       .connectivity(connectivity))
 	   nha
 	     (.router_address(router_address),
 	      .route_port(hop_route_port),
-	      .sel_rc(1'b1),
-	      .route_info(route_info_in),
 	      .next_router_address(next_router_address));
 	   
 	   wire [0:num_ports-1] 	  next_route_op;

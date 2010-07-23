@@ -32,13 +32,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // lookahead routing logic for VC router
 module rtr_next_hop_addr
-  (router_address, route_port, sel_rc, route_info, next_router_address);
+  (router_address, route_port, next_router_address);
    
 `include "c_functions.v"
 `include "c_constants.v"
-   
-   // nuber of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -54,13 +51,6 @@ module rtr_next_hop_addr
    
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 1;
-   
-   // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
-   
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
    
    // connectivity within each dimension
    parameter connectivity = `CONNECTIVITY_LINE;
@@ -84,40 +74,12 @@ module rtr_next_hop_addr
    // current router's address
    input [0:router_addr_width-1] router_address;
    
-   // current resource class
-   input [0:num_resource_classes-1] sel_rc;
-   
-   // routing data
-   input [0:route_info_width-1] route_info;
-   
    // port on which the packet will leave the current router
-   input [0:port_idx_width-1] route_port;
+   input [0:port_idx_width-1] 	 route_port;
    
    // lookahead routing information for next router
    output [0:router_addr_width-1] next_router_address;
-   wire [0:router_addr_width-1] next_router_address;
-   
-   // all router addresses (intermediate + final)
-   wire [0:num_resource_classes*router_addr_width-1] route_info_addresses;
-   assign route_info_addresses
-     = route_info[0:num_resource_classes*router_addr_width-1];
-   
-   // address of destination router for current resource class
-   wire [0:router_addr_width-1]   dest_router_address;
-   c_select_1ofn
-     #(.num_ports(num_resource_classes),
-       .width(router_addr_width))
-   dest_router_address_sel
-     (.select(sel_rc),
-      .data_in(route_info_addresses),
-      .data_out(dest_router_address));
-   
-   wire [0:num_ports-1] 	  route_op;
-   c_decode
-     #(.num_ports(num_ports))
-   route_op_dec
-     (.data_in(route_port),
-      .data_out(route_op));
+   wire [0:router_addr_width-1]   next_router_address;
    
    generate
       
@@ -126,46 +88,15 @@ module rtr_next_hop_addr
       for(dim = 0; dim < num_dimensions; dim = dim + 1)
 	begin:dims
 	   
-	   wire [0:dim_addr_width-1] dest_dim_addr;
-	   assign dest_dim_addr
-	     = dest_router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
-	   
            wire [0:dim_addr_width-1] curr_dim_addr;
            assign curr_dim_addr
              = router_address[dim*dim_addr_width:(dim+1)*dim_addr_width-1];
            
 	   wire [0:dim_addr_width-1] next_dim_addr;
 	   
-	   assign next_router_address[dim*dim_addr_width:
-				      (dim+1)*dim_addr_width-1]
-	     = next_dim_addr;
-	   
 	   case(connectivity)
 	     
-	     `CONNECTIVITY_LINE:
-	       begin
-		  
-		  wire route_down;
-		  assign route_down = route_op[dim*2];
-		  
-		  wire route_up;
-		  assign route_up = route_op[dim*2+1];
-		  
-		  // Assemble a delta value for the address segment 
-		  // corresponding to the current dimension; the delta can have 
-		  // the values -1 (i.e., all ones in two's complement), 0 or 1.
-		  
-		  wire [0:dim_addr_width-1] addr_delta;
-		  if(dim_addr_width > 1)
-		    assign addr_delta[0:dim_addr_width-2]
-		      = {(dim_addr_width-1){route_down}};
-		  assign addr_delta[dim_addr_width-1] = route_down | route_up;
-		  
-		  assign next_dim_addr = curr_dim_addr + addr_delta;
-		  
-	       end
-	     
-	     `CONNECTIVITY_RING:
+	     `CONNECTIVITY_LINE, `CONNECTIVITY_RING:
 	       begin
 		  
 		  wire [0:dim_addr_width-1] dim_addr_plus1;
@@ -188,44 +119,57 @@ module rtr_next_hop_addr
 		  
 		  // The first port in each dimension connects to smaller 
 		  // neighbors, while the second one connects to larger ones.
-		  // Thus, interpreted as a two-bit value, we get 0 if neither
-		  // of the ports is selected, 1 if the second port is selected
-		  // (route up) and 2 if the first port is selected (route 
-		  // down); the value 3 is a don't-care, as route_op is the
-		  // output of a decoder, so at most one of the bits can be set.
 		  
-		  wire [0:1] 		    route_sel;
-		  assign route_sel = route_op[dim*2:(dim+1)*2-1];
+		  wire route_down;
+		  assign route_down = (route_port == dim*2);
 		  
-		  wire [0:3*dim_addr_width-1] next_dim_addrs;
-		  assign next_dim_addrs
-		    = {curr_dim_addr, dim_addr_plus1, dim_addr_minus1};
+		  wire route_up;
+		  assign route_up = (route_port == dim*2+1);
 		  
-		  assign next_dim_addr
-		    = next_dim_addrs[route_sel*dim_addr_width +: 
-				     dim_addr_width];
+		  assign next_dim_addr = route_down ? dim_addr_minus1 :
+					 route_up ? dim_addr_plus1 : 
+					 curr_dim_addr;
 		  
 	       end
 	     
 	     `CONNECTIVITY_FULL:
 	       begin
 		  
-		  // With full connectivity, if one of the ports in a given
-		  // dimension is selected, the corresponding part of the 
-		  // address will be changed to the respective part of the 
-		  // destination address when going to the next hop.
+		  wire route_dim;
+		  assign route_dim
+		    = (route_port >= dim*num_neighbors_per_dim) &&
+		      (route_port < (dim+1)*num_neighbors_per_dim);
 		  
-		  wire route_dest;
-		  assign route_dest
-		    = |route_op[dim*num_neighbors_per_dim:
-				(dim+1)*num_neighbors_per_dim-1];
+		  wire [0:port_idx_width-1] port_offset;
+		  assign port_offset = route_port - dim*num_neighbors_per_dim;
+		  
+		  wire [0:dim_addr_width-1] dim_addr_offset;
+		  assign dim_addr_offset
+		    = port_offset[port_idx_width-dim_addr_width:
+				  port_idx_width-1];
+		  
+		  wire [0:dim_addr_width-1] dim_addr_thresh;
+		  assign dim_addr_thresh = num_routers_per_dim - curr_dim_addr;
+		  
+		  wire 			    wrap;
+		  assign wrap = (dim_addr_offset >= dim_addr_thresh);
+		  
+		  wire [0:dim_addr_width-1] next_dim_addr_nowrap;
+		  assign next_dim_addr_nowrap = curr_dim_addr + dim_addr_offset;
+		  
+		  wire [0:dim_addr_width-1] next_dim_addr_wrap;
+		  assign next_dim_addr_wrap = dim_addr_offset - dim_addr_thresh;
 		  
 		  assign next_dim_addr
-		    = route_dest ? dest_dim_addr : curr_dim_addr;
+		    = wrap ? next_dim_addr_wrap : next_dim_addr_nowrap;
 		  
 	       end
 	     
 	   endcase
+	   
+	   assign next_router_address[dim*dim_addr_width:
+				      (dim+1)*dim_addr_width-1]
+	     = next_dim_addr;
 	   
 	end
       
