@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator
 module vcr_vc_alloc_mac
-  (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
+  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, 
    gnt_op_ovc_ivc);
    
@@ -59,9 +59,6 @@ module vcr_vc_alloc_mac
    // number of input and output ports on switch
    parameter num_ports = 5;
    
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    // select implementation variant for VC allocator
    parameter allocator_type = `VC_ALLOC_TYPE_SEP_IF;
    
@@ -74,24 +71,24 @@ module vcr_vc_alloc_mac
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
    // transition to next resource class
-   input [0:num_ports*num_vcs-1] 		inc_rc_ip_ivc;
+   input [0:num_ports*num_vcs-1] 	   inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
-   input [0:num_ports*num_vcs-1] 		elig_op_ovc;
+   input [0:num_ports*num_vcs-1] 	   elig_op_ovc;
    
    // request VC allocation
-   input [0:num_ports*num_vcs-1] 		req_ip_ivc;
+   input [0:num_ports*num_vcs-1] 	   req_ip_ivc;
    
    // VC allocation requested (to output controller)
-   output [0:num_ports*num_vcs-1] 		req_op_ovc;
-   wire [0:num_ports*num_vcs-1] 		req_op_ovc;
+   output [0:num_ports*num_vcs-1] 	   req_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	   req_op_ovc;
    
    // VC allocation successful (to input controller)
-   output [0:num_ports*num_vcs-1] 		gnt_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		gnt_ip_ivc;
+   output [0:num_ports*num_vcs-1] 	   gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   gnt_ip_ivc;
    
    // granted output VC (to input controller)
    output [0:num_ports*num_vcs*num_vcs_per_class-1] gnt_ip_ivc_ocvc;
@@ -123,7 +120,7 @@ module vcr_vc_alloc_mac
 	   core_sep_if
 	     (.clk(clk),
 	      .reset(reset),
-	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(req_ip_ivc),
@@ -146,7 +143,7 @@ module vcr_vc_alloc_mac
 	   core_sep_of
 	     (.clk(clk),
 	      .reset(reset),
-	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(req_ip_ivc),
@@ -170,7 +167,7 @@ module vcr_vc_alloc_mac
 	   core_wf
 	     (.clk(clk),
 	      .reset(reset),
-	      .route_port_ip_ivc(route_port_ip_ivc),
+	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .inc_rc_ip_ivc(inc_rc_ip_ivc),
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(req_ip_ivc),

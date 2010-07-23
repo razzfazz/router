@@ -95,9 +95,6 @@ module vcr_top
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -294,11 +291,11 @@ module vcr_top
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	       inc_rc_ip_ivc;
+   wire [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
+   wire [0:num_ports*num_vcs-1] 	  inc_rc_ip_ivc;
    
-   wire [0:num_ports*num_vcs-1] 	       vc_req_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	       vc_gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  vc_req_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	  vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs_per_class-1] vc_gnt_ip_ivc_ocvc;
    
    wire [0:num_ports*num_ports*sw_alloc_opc_out_width-1] sw_alloc_opc_out_ip_op;
@@ -476,7 +473,7 @@ module vcr_top
 	     = vc_gnt_ip_ivc_ocvc[ip*num_vcs*num_vcs_per_class:
 				  (ip+1)*num_vcs*num_vcs_per_class-1];
 	   
-	   wire [0:num_vcs*port_idx_width-1] 	route_port_ivc;
+	   wire [0:num_vcs*num_ports-1] 	route_ivc_op;
 	   wire [0:num_vcs-1] 			inc_rc_ivc;
 	   wire [0:num_vcs-1] 			vc_req_ivc;
 	   wire 				xbr_active;
@@ -522,7 +519,7 @@ module vcr_top
 	      .reset(reset),
 	      .router_address(router_address),
 	      .channel_in(channel_in),
-	      .route_port_ivc(route_port_ivc),
+	      .route_ivc_op(route_ivc_op),
 	      .inc_rc_ivc(inc_rc_ivc),
 	      .vc_req_ivc(vc_req_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
@@ -535,9 +532,9 @@ module vcr_top
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
-	   assign route_port_ip_ivc[ip*num_vcs*port_idx_width:
-				    (ip+1)*num_vcs*port_idx_width-1]
-		    = route_port_ivc;
+	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
+				  (ip+1)*num_vcs*num_ports-1]
+		    = route_ivc_op;
 	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = inc_rc_ivc;
 	   
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
@@ -588,7 +585,7 @@ module vcr_top
    vca
      (.clk(clk),
       .reset(reset),
-      .route_port_ip_ivc(route_port_ip_ivc),
+      .route_ip_ivc_op(route_ip_ivc_op),
       .inc_rc_ip_ivc(inc_rc_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),

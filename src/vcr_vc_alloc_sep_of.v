@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // VC allocator variant using separable output-first allocation
 module vcr_vc_alloc_sep_of
-  (clk, reset, route_port_ip_ivc, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
+  (clk, reset, route_ip_ivc_op, inc_rc_ip_ivc, elig_op_ovc, req_ip_ivc, 
    req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, 
    gnt_op_ovc_ivc);
    
@@ -59,9 +59,6 @@ module vcr_vc_alloc_sep_of
    // number of input and output ports on switch
    parameter num_ports = 5;
    
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -71,24 +68,24 @@ module vcr_vc_alloc_sep_of
    input reset;
    
    // destination port selects
-   input [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
+   input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
    // transition to next resource class
-   input [0:num_ports*num_vcs-1] 		inc_rc_ip_ivc;
+   input [0:num_ports*num_vcs-1] 	   inc_rc_ip_ivc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
-   input [0:num_ports*num_vcs-1] 		elig_op_ovc;
+   input [0:num_ports*num_vcs-1] 	   elig_op_ovc;
    
    // request VC allocation
-   input [0:num_ports*num_vcs-1] 		req_ip_ivc;
+   input [0:num_ports*num_vcs-1] 	   req_ip_ivc;
    
    // VC allocation requested (to output controller)
-   output [0:num_ports*num_vcs-1] 		req_op_ovc;
-   wire [0:num_ports*num_vcs-1] 		req_op_ovc;
+   output [0:num_ports*num_vcs-1] 	   req_op_ovc;
+   wire [0:num_ports*num_vcs-1] 	   req_op_ovc;
    
    // VC allocation successful (to input controller)
-   output [0:num_ports*num_vcs-1] 		gnt_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		gnt_ip_ivc;
+   output [0:num_ports*num_vcs-1] 	   gnt_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   gnt_ip_ivc;
    
    // granted output VC (to input controller)
    output [0:num_ports*num_vcs*num_vcs_per_class-1] gnt_ip_ivc_ocvc;
@@ -168,18 +165,18 @@ module vcr_vc_alloc_sep_of
 			  wire req;
 			  assign req = req_irc_icvc[irc*num_vcs_per_class+icvc];
 			  
-			  wire [0:port_idx_width-1] route_port;
-			  assign route_port
-			    = route_port_ip_ivc[(((ip*num_message_classes+mc)*
-						  num_resource_classes+irc)*
-						 num_vcs_per_class+icvc)*
-						port_idx_width:
-						(((ip*num_message_classes+mc)*
-						  num_resource_classes+irc)*
-						 num_vcs_per_class+icvc+1)*
-						port_idx_width-1];
+			  wire [0:num_ports-1] route_op;
+			  assign route_op
+			    = route_ip_ivc_op[(((ip*num_message_classes+mc)*
+						num_resource_classes+irc)*
+					       num_vcs_per_class+icvc)*
+					      num_ports:
+					      (((ip*num_message_classes+mc)*
+						num_resource_classes+irc)*
+					       num_vcs_per_class+icvc+1)*
+					      num_ports-1];
 			  
-			  wire 			    inc_rc;
+			  wire 		       inc_rc;
 			  
 			  if(irc == (num_resource_classes - 1))
 			    assign inc_rc = 1'b0;
@@ -189,21 +186,17 @@ module vcr_vc_alloc_sep_of
 					       num_resource_classes+irc)*
 					      num_vcs_per_class+icvc];
 			  
-			  wire [0:num_ports-1] 	    route_op;
-			  
 			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] req_out_op_orc_ocvc;
 			  
-			  genvar 		    op;
+			  genvar 		     op;
 			  
 			  for(op = 0; op < num_ports; op = op + 1)
 			    begin:ops
 			       
 			       wire route;
-			       assign route = (route_port == op);
+			       assign route = route_op[op];
 			       
-			       assign route_op[op] = route;
-
 			       wire [0:num_resource_classes*num_vcs_per_class-1]
 				 req_out_orc_ocvc;
 			       

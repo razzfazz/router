@@ -33,11 +33,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, int_flow_ctrl_op_ovc, route_op, route_port, inc_rc, vc_req, 
-   vc_gnt, vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, 
-   sw_gnt_spec, flit_sent_prev, flit_head, flit_tail, header_info_out,
-   fbc_write_addr, fbc_read_addr, fbc_empty, allocated, allocated_ovc, 
-   free_unallocated, free_allocated, errors, events);
+   header_info_in, int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, 
+   vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
+   flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_write_addr, 
+   fbc_read_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
+   free_allocated, errors, events);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -260,10 +260,6 @@ module vcr_ivc_ctrl
    // destination port (1-hot)
    output [0:num_ports-1] 			     route_op;
    wire [0:num_ports-1] 			     route_op;
-   
-   // destination port (encoded)
-   output [0:port_idx_width-1] 			     route_port;
-   wire [0:port_idx_width-1] 			     route_port;
    
    // transition to next resource class
    output 					     inc_rc;
@@ -882,8 +878,6 @@ module vcr_ivc_ctrl
    
    wire [0:port_idx_width-1] 	   hdr_route_port;
    assign hdr_route_port = hdr_hop_route_info[0:port_idx_width-1];
-   
-   assign route_port = hdr_valid ? hdr_route_port : hop_route_port;
    
    wire [0:num_ports-1] 	   hdr_route_op;
    c_decode
