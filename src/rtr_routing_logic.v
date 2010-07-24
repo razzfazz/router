@@ -156,7 +156,13 @@ module rtr_routing_logic
 		    = router_address[dim*dim_addr_width:
 				     (dim+1)*dim_addr_width-1];
 		  
-		  assign dim_addr_match[dim] = (dest_dim_addr == curr_dim_addr);
+		  wire 			    curr_gt_dest;
+		  assign curr_gt_dest = (curr_dim_addr > dest_dim_addr);
+		  
+		  wire 			    curr_lt_dest;
+		  assign curr_lt_dest = (curr_dim_addr < dest_dim_addr);
+		  
+		  assign dim_addr_match[dim] = ~(curr_gt_dest | curr_lt_dest);
 		  
 		  wire 			    dim_sel;
 		  
@@ -219,13 +225,7 @@ module rtr_routing_logic
 		    
 		  endcase
 		  
-		  wire 	      curr_gt_dest;
-		  assign curr_gt_dest = (curr_dim_addr > dest_dim_addr);
-		  
-		  wire 	      curr_lt_dest;
-		  assign curr_lt_dest = (curr_dim_addr < dest_dim_addr);
-		  
-		  wire [0:num_neighbors_per_dim-1] port_dec;
+		  wire [0:num_neighbors_per_dim-1] 		 port_dec;
 		  
 		  case(connectivity)
 		    
