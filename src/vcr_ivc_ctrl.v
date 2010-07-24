@@ -514,7 +514,7 @@ module vcr_ivc_ctrl
 	   rtl
 	     (.router_address(next_router_address),
 	      .sel_mc(sel_mc),
-	      .sel_rc(sel_orc),
+	      .sel_irc(sel_orc),
 	      .route_info(route_info_in),
 	      .route_op(next_route_op),
 	      .inc_rc(next_inc_rc));
@@ -560,7 +560,7 @@ module vcr_ivc_ctrl
 	   rtl
 	     (.router_address(router_address),
 	      .sel_mc(sel_mc),
-	      .sel_rc(sel_irc),
+	      .sel_irc(sel_irc),
 	      .route_info(route_info_in),
 	      .route_op(hop_route_op),
 	      .inc_rc(hop_inc_rc));

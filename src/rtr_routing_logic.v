@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for VC router
 module rtr_routing_logic
-  (router_address, sel_mc, sel_rc, route_info, route_op, inc_rc);
+  (router_address, sel_mc, sel_irc, route_info, route_op, inc_rc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -100,7 +100,7 @@ module rtr_routing_logic
    input [0:num_message_classes-1] sel_mc;
    
    // select current resource class
-   input [0:num_resource_classes-1] sel_rc;
+   input [0:num_resource_classes-1] sel_irc;
    
    // routing data
    input [0:route_info_width-1] route_info;
@@ -125,7 +125,7 @@ module rtr_routing_logic
      #(.width(router_addr_width),
        .num_ports(num_resource_classes))
    dest_router_address_sel
-     (.select(sel_rc),
+     (.select(sel_irc),
       .data_in(route_info_addresses),
       .data_out(dest_router_address));
    
@@ -133,7 +133,7 @@ module rtr_routing_logic
    assign reached_dest = (router_address == dest_router_address);
    
    wire 					     final_rc;
-   assign final_rc = sel_rc[num_resource_classes-1];
+   assign final_rc = sel_irc[num_resource_classes-1];
    
    assign inc_rc = reached_dest & ~final_rc;
    

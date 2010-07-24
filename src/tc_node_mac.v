@@ -1403,7 +1403,7 @@ module tc_node_mac
 	   rtl
 	     (.router_address(router_address),
 	      .sel_mc(sel_mc_rv),
-	      .sel_rc(sel_orc_rv),
+	      .sel_irc(sel_orc_rv),
 	      .route_info(route_info_rv),
 	      .route_op(route_op_rv),
 	      .inc_rc(inc_rc_rv));

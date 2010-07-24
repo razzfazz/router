@@ -308,7 +308,7 @@ module router_checker
 	   rtl
 	     (.router_address(router_address),
 	      .sel_mc(sel_mc),
-	      .sel_rc(sel_irc),
+	      .sel_irc(sel_irc),
 	      .route_info(route_info),
 	      .route_op(route_op),
 	      .inc_rc(inc_rc));
@@ -383,7 +383,7 @@ module router_checker
 		nrtl
 		  (.router_address(next_router_address),
 		   .sel_mc(sel_mc),
-		   .sel_rc(sel_orc),
+		   .sel_irc(sel_orc),
 		   .route_info(route_info),
 		   .route_op(next_route_op),
 		   .inc_rc(next_inc_rc));

@@ -591,7 +591,7 @@ module packet_source
 	   rtl
 	     (.router_address(router_address),
 	      .sel_mc(sel_mc),
-	      .sel_rc(sel_orc),
+	      .sel_irc(sel_orc),
 	      .route_info(route_info),
 	      .route_op(route_op),
 	      .inc_rc(inc_rc));

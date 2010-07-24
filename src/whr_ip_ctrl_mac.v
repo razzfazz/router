@@ -375,7 +375,7 @@ module whr_ip_ctrl_mac
 	   rtl
 	     (.router_address(next_router_address),
 	      .sel_mc(1'b1),
-	      .sel_rc(1'b1),
+	      .sel_irc(1'b1),
 	      .route_info(route_info_in),
 	      .route_op(next_route_op),
 	      .inc_rc(next_inc_rc));
@@ -409,7 +409,7 @@ module whr_ip_ctrl_mac
 	   rtl
 	     (.router_address(router_address),
 	      .sel_mc(1'b1),
-	      .sel_rc(1'b1),
+	      .sel_irc(1'b1),
 	      .route_info(route_info_in),
 	      .route_op(hop_route_op),
 	      .inc_rc(inc_rc));
