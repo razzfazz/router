@@ -129,22 +129,14 @@ module rtr_routing_logic
       .data_in(route_info_addresses),
       .data_out(dest_router_address));
    
-   wire 					     reached_dest;
-   assign reached_dest = (router_address == dest_router_address);
-   
-   wire 					     final_rc;
-   assign final_rc = sel_irc[num_resource_classes-1];
-   
-   assign inc_rc = reached_dest & ~final_rc;
-   
-   wire [0:num_dimensions-1] 			     dim_addr_match;
-   
    generate
       
       case(routing_type)
 	
 	`ROUTING_TYPE_DOR:
 	  begin
+	     
+	     wire [0:num_dimensions-1] dim_addr_match;
 	     
 	     genvar dim;
 	     
@@ -355,8 +347,20 @@ module rtr_routing_logic
 	
       endcase
       
-      wire 						      eject;
-      assign eject = &dim_addr_match & final_rc;
+   endgenerate
+   
+   wire 							 reached_dest;
+   assign reached_dest = (router_address == dest_router_address);
+   
+   wire 							 final_rc;
+   assign final_rc = sel_irc[num_resource_classes-1];
+   
+   assign inc_rc = reached_dest & ~final_rc;
+   
+   wire 							 eject;
+   assign eject = reached_dest & final_rc;
+   
+   generate
       
       if(num_nodes_per_router > 1)
 	begin
