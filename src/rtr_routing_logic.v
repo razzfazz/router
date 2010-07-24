@@ -156,13 +156,17 @@ module rtr_routing_logic
 		    = router_address[dim*dim_addr_width:
 				     (dim+1)*dim_addr_width-1];
 		  
-		  wire 			    curr_gt_dest;
-		  assign curr_gt_dest = (curr_dim_addr > dest_dim_addr);
+		  wire 			    dest_lt_curr;
+		  wire [0:dim_addr_width-1] dest_minus_curr;
+		  assign {dest_lt_curr, dest_minus_curr}
+		    = dest_dim_addr - curr_dim_addr;
 		  
 		  wire 			    curr_lt_dest;
-		  assign curr_lt_dest = (curr_dim_addr < dest_dim_addr);
+		  wire [0:dim_addr_width-1] curr_minus_dest;
+		  assign {curr_lt_dest, curr_minus_dest}
+		    = curr_dim_addr - dest_dim_addr;
 		  
-		  assign dim_addr_match[dim] = ~(curr_gt_dest | curr_lt_dest);
+		  assign dim_addr_match[dim] = ~(dest_lt_curr | curr_lt_dest);
 		  
 		  wire 			    dim_sel;
 		  
@@ -232,116 +236,91 @@ module rtr_routing_logic
 		    `CONNECTIVITY_LINE:
 		      begin
 			 
-			 assign port_dec = {curr_gt_dest, curr_lt_dest};
+			 assign port_dec = {dest_lt_curr, curr_lt_dest};
 			 
 		      end
 		    
-		    `CONNECTIVITY_RING, `CONNECTIVITY_FULL:
+		    `CONNECTIVITY_RING:
 		      begin
 			 
-			 // compute distance in upwards direction
-			 wire [0:dim_addr_width-1] dim_addr_diff_up;
-			 assign dim_addr_diff_up
-			   = dest_dim_addr - curr_dim_addr;
+			 // In cases where the destination is equally far away 
+			 // in either direction, we need some kind of tie 
+			 // breaker to avoid load imbalance; one simple 
+			 // solution is to break the tie based on whether the 
+			 // current router's address is even or odd.
+			 // NOTE: This can create load balance when using
+			 // concentration, as all nodes sharing a router will 
+			 // pick the same direction.
+			 wire tie_break;
+			 assign tie_break = curr_dim_addr[dim_addr_width-1];
 			 
-			 // compute distance in downwards direction
-			 wire [0:dim_addr_width-1] dim_addr_diff_down;
-			 assign dim_addr_diff_down
-			   = curr_dim_addr - dest_dim_addr;
+			 // multiply by 2 and add tiebreaker
 			 
-			 case(connectivity)
-			   
-			   `CONNECTIVITY_RING:
-			     begin
-				
-				// In cases where the destination is equally far
-				// away in either direction, we need some kind 
-				// of tie breaker to avoid load imbalance; one 
-				// simple solution is to break the tie based on 
-				// whether the current router's address is even 
-				// or odd.
-				// NOTE: This can create load balance when using
-				// concentration, as all nodes sharing a router 
-				// will pick the same direction.
-				wire tie_break;
-				assign tie_break
-				  = curr_dim_addr[dim_addr_width-1];
-				
-			 	// multiply by 2 and add tiebreaker
-				
-				wire [0:dim_addr_width] dim_addr_diff_up_x2;
-				assign dim_addr_diff_up_x2
-				  = {dim_addr_diff_up, tie_break};
-				
-				wire [0:dim_addr_width] dim_addr_diff_down_x2;
-				assign dim_addr_diff_down_x2
-				  = {dim_addr_diff_down, ~tie_break};
-				
-				wire 			route_down;
-				assign route_down
-				  = (curr_lt_dest && 
-				     (dim_addr_diff_up_x2 > 
-				      num_routers_per_dim)) ||
-				    (curr_gt_dest && 
-				     (dim_addr_diff_down_x2 <= 
-				      num_routers_per_dim));
-				
-				wire 			route_up;
-				assign route_up
-				  = (curr_lt_dest && 
-				     (dim_addr_diff_up_x2 <= 
-				      num_routers_per_dim)) ||
-				    (curr_gt_dest && 
-				     (dim_addr_diff_down_x2 > 
-				      num_routers_per_dim));
-				
-				assign port_dec = {route_down, route_up};
-				
-			     end
-			   
-			   `CONNECTIVITY_FULL:
-			     begin
-				
-				wire [0:num_routers_per_dim-1] port_sel_up;
-				c_decode
-				  #(.num_ports(num_routers_per_dim))
-				port_sel_up_dec
-				  (.data_in(dim_addr_diff_up),
-				   .data_out(port_sel_up));
-				
-				wire [0:num_routers_per_dim-1] port_sel_down_r;
-				c_decode
-				  #(.num_ports(num_routers_per_dim))
-				port_sel_down_r_dec
-				  (.data_in(dim_addr_diff_down),
-				   .data_out(port_sel_down_r));
-				
-				wire [0:num_routers_per_dim-1] port_sel_down;
-				c_reverse
-				  #(.width(num_routers_per_dim))
-				port_sel_down_rev
-				  (.data_in(port_sel_down_r),
-				   .data_out(port_sel_down));
-				
-				wire [0:num_neighbors_per_dim-1] port_dec_up;
-				assign port_dec_up
-				  = port_sel_up[1:num_routers_per_dim-1];
-				
-				wire [0:num_neighbors_per_dim-1] port_dec_down;
-				assign port_dec_down
-				  = port_sel_down[0:num_routers_per_dim-2];
-				
-				c_select_mofn
-				  #(.num_ports(2),
-				    .width(num_neighbors_per_dim))
-				port_dec_sel
-				  (.select({curr_gt_dest, curr_lt_dest}),
-				   .data_in({port_dec_down, port_dec_up}),
-				   .data_out(port_dec));
-				
-			     end
-			   
-			 endcase
+			 wire [0:dim_addr_width] dest_minus_curr_x2;
+			 assign dest_minus_curr_x2
+			   = {dest_minus_curr, tie_break};
+			 
+			 wire [0:dim_addr_width] curr_minus_dest_x2;
+			 assign curr_minus_dest_x2
+			   = {curr_minus_dest, ~tie_break};
+			 
+			 wire 			 route_down;
+			 assign route_down
+			   = (curr_lt_dest && 
+			      (dest_minus_curr_x2 > num_routers_per_dim)) ||
+			     (dest_lt_curr && 
+			      (curr_minus_dest_x2 <= num_routers_per_dim));
+			 
+			 wire 			 route_up;
+			 assign route_up
+			   = (curr_lt_dest && 
+			      (dest_minus_curr_x2 <= num_routers_per_dim)) ||
+			     (dest_lt_curr && 
+			      (curr_minus_dest_x2 > num_routers_per_dim));
+			 
+			 assign port_dec = {route_down, route_up};
+			 
+		      end
+		    
+		    `CONNECTIVITY_FULL:
+		      begin
+			 
+			 wire [0:num_routers_per_dim-1] port_sel_up;
+			 c_decode
+			   #(.num_ports(num_routers_per_dim))
+			 port_sel_up_dec
+			   (.data_in(dest_minus_curr),
+			    .data_out(port_sel_up));
+			 
+			 wire [0:num_routers_per_dim-1] port_sel_down_rev;
+			 c_decode
+			   #(.num_ports(num_routers_per_dim))
+			 port_sel_down_rev_dec
+			   (.data_in(curr_minus_dest),
+			    .data_out(port_sel_down_rev));
+			 
+			 wire [0:num_routers_per_dim-1] port_sel_down;
+			 c_reverse
+			   #(.width(num_routers_per_dim))
+			 port_sel_down_revr
+			   (.data_in(port_sel_down_rev),
+			    .data_out(port_sel_down));
+			 
+			 wire [0:num_neighbors_per_dim-1] port_dec_up;
+			 assign port_dec_up
+			   = port_sel_up[1:num_routers_per_dim-1];
+			 
+			 wire [0:num_neighbors_per_dim-1] port_dec_down;
+			 assign port_dec_down
+			   = port_sel_down[0:num_routers_per_dim-2];
+			 
+			 c_select_mofn
+			   #(.num_ports(2),
+			     .width(num_neighbors_per_dim))
+			 port_dec_sel
+			   (.select({dest_lt_curr, curr_lt_dest}),
+			    .data_in({port_dec_down, port_dec_up}),
+			    .data_out(port_dec));
 			 
 		      end
 		    
