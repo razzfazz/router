@@ -688,7 +688,7 @@ module tc_node_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_message_classes-1] 		      sel_mc_rv;
-   wire [0:num_resource_classes-1] 		      sel_rc_rv;
+   wire [0:num_resource_classes-1] 		      sel_orc_rv;
    
    wire [0:num_packet_classes-1] 		      sel_opc_rv;
    c_mat_mult
@@ -697,7 +697,7 @@ module tc_node_mac
        .dim3_width(num_resource_classes))
    sel_opc_rv_mmult
      (.input_a(sel_mc_rv),
-      .input_b(sel_rc_rv),
+      .input_b(sel_orc_rv),
       .result(sel_opc_rv));
    
    wire 					      vc_alloc_q;
@@ -883,33 +883,33 @@ module tc_node_mac
 	     = packet_rvs_q[mc_idx_rv_width:
 			    (mc_idx_rv_width+rc_idx_rv_width)-1];
 	   
-	   wire [0:num_resource_classes-1] sel_rc_rv_unmasked;
+	   wire [0:num_resource_classes-1] sel_orc_rv_unmasked;
 	   
 	   genvar 			   rc;
 	   
 	   for(rc = 0; rc < (num_resource_classes - 1); rc = rc + 1)
 	     begin:rcs
 		
-		assign sel_rc_rv_unmasked[rc]
+		assign sel_orc_rv_unmasked[rc]
 			 = (rc_idx_rv <
 			    rc_threshs_q[rc*rc_idx_rv_width:
 					 (rc+1)*rc_idx_rv_width-1]);
 		
 	     end
 	   
-	   assign sel_rc_rv_unmasked[num_resource_classes-1] = 1'b1;
+	   assign sel_orc_rv_unmasked[num_resource_classes-1] = 1'b1;
 	   
 	   c_fp_arbiter
 	     #(.num_ports(num_resource_classes))
-	   sel_rc_rv_arb
-	     (.req(sel_rc_rv_unmasked),
-	      .gnt(sel_rc_rv));
+	   sel_orc_rv_arb
+	     (.req(sel_orc_rv_unmasked),
+	      .gnt(sel_orc_rv));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_resource_classes),
 	       .width(1))
 	   elig_sel
-	     (.select(sel_rc_rv),
+	     (.select(sel_orc_rv),
 	      .data_in(elig_orc),
 	      .data_out(elig));
 	   
@@ -917,7 +917,7 @@ module tc_node_mac
 	     #(.num_ports(num_resource_classes),
 	       .width(num_vcs_per_class))
 	   next_elig_ocvc_sel
-	     (.select(sel_rc_rv),
+	     (.select(sel_orc_rv),
 	      .data_in(next_elig_orc_ocvc),
 	      .data_out(next_elig_ocvc));
 	   
@@ -925,14 +925,14 @@ module tc_node_mac
 	     #(.num_ports(num_resource_classes),
 	       .width(num_vcs_per_class))
 	   free_ocvc_sel
-	     (.select(sel_rc_rv),
+	     (.select(sel_orc_rv),
 	      .data_in(free_orc_ocvc),
 	      .data_out(free_ocvc));
 	   
 	end
       else
 	begin
-	   assign sel_rc_rv = 1'b1;
+	   assign sel_orc_rv = 1'b1;
 	   assign elig = elig_orc;
 	   assign next_elig_ocvc = next_elig_orc_ocvc;
 	   assign free_ocvc = free_orc_ocvc;
@@ -1281,13 +1281,13 @@ module tc_node_mac
 				num_resource_classes*router_addr_width-1]
 		    = dest_addr_rv[0:router_addr_width-1];
 	   
-	   genvar 					     rc;
+	   genvar 					     orc;
 	   
-	   for(rc = 0; rc < (num_resource_classes - 1); rc = rc + 1)
-	     begin:rcs
+	   for(orc = 0; orc < (num_resource_classes - 1); orc = orc + 1)
+	     begin:orcs
 		
-		wire rc_active;
-		assign rc_active = sel_rc_rv[rc];
+		wire orc_active;
+		assign orc_active = sel_orc_rv[orc];
 		
 		// as with the final destination, we generate two candidates
 		wire [0:router_addr_width-1] rand_addr_1_rv;
@@ -1299,10 +1299,10 @@ module tc_node_mac
 		     assign rand_addr_1_rv[dim*dim_addr_width:
 					   (dim+1)*dim_addr_width-1]
 			      = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
-					     rc*router_addr_width+
+					     orc*router_addr_width+
 					     dim*dim_addr_width:
 					     mc_idx_rv_width+rc_idx_rv_width+
-					     rc*router_addr_width+
+					     orc*router_addr_width+
 					     (dim+1)*dim_addr_width-1] %
 				num_routers_per_dim;
 		     
@@ -1315,17 +1315,18 @@ module tc_node_mac
 		assign rand_addr_2_rv[(num_dimensions-1)*dim_addr_width:
 				      num_dimensions*dim_addr_width-1]
 			 = (packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
-					 rc*router_addr_width+
+					 orc*router_addr_width+
 					 (num_dimensions-1)*dim_addr_width:
 					 mc_idx_rv_width+rc_idx_rv_width+
-					 rc*router_addr_width+
+					 orc*router_addr_width+
 					 num_dimensions*dim_addr_width-1] + 1) %
 			   num_routers_per_dim;
 		
 		// get the intermediate address for the next resource class
 		wire [0:router_addr_width-1] next_addr_rv;
-		assign next_addr_rv = intm_addr_rvs[(rc+1)*router_addr_width:
-						    (rc+2)*router_addr_width-1];
+		assign next_addr_rv
+		  = intm_addr_rvs[(orc+1)*router_addr_width:
+				  (orc+2)*router_addr_width-1];
 		
 		//--------------------------------------------------------------
 		// NOTE:
@@ -1355,12 +1356,12 @@ module tc_node_mac
 		assign intm_addr_rv
 		  = first_addr_match ? rand_addr_2_rv : rand_addr_1_rv;
 		
-		assign intm_addr_rvs[rc*router_addr_width:
-				     (rc+1)*router_addr_width-1]
+		assign intm_addr_rvs[orc*router_addr_width:
+				     (orc+1)*router_addr_width-1]
 			 = intm_addr_rv;
 		
-		assign route_info_rv[rc*router_addr_width:
-				     (rc+1)*router_addr_width-1]
+		assign route_info_rv[orc*router_addr_width:
+				     (orc+1)*router_addr_width-1]
 			 = intm_addr_rv;
 		
 	     end
@@ -1380,39 +1381,39 @@ module tc_node_mac
    // generate random lookahead routing info
    //---------------------------------------------------------------------------
    
-   wire [0:router_addr_width-1] 	     router_address;
-   assign router_address = address[0:router_addr_width-1];
-   
-   wire [0:num_ports-1] 		     route_op_rv;
-   wire 				     inc_rc_rv;
-   rtr_routing_logic
-     #(.num_message_classes(num_message_classes),
-       .num_resource_classes(num_resource_classes),
-       .num_routers_per_dim(num_routers_per_dim),
-       .num_dimensions(num_dimensions),
-       .num_nodes_per_router(num_nodes_per_router),
-       .connectivity(connectivity),
-       .routing_type(routing_type),
-       .dim_order(dim_order))
-   rtl
-     (.router_address(router_address),
-      .sel_mc(sel_mc_rv),
-      .sel_rc(sel_rc_rv),
-      .route_info(route_info_rv),
-      .route_op(route_op_rv),
-      .inc_rc(inc_rc_rv));
-   
-   wire [0:port_idx_width-1] 		     route_port_rv;
-   c_encode
-     #(.num_ports(num_ports))
-   route_port_rv_enc
-     (.data_in(route_op_rv),
-      .data_out(route_port_rv));
-   
    generate
       
       if(lookahead_routing)
 	begin
+	   
+	   wire [0:router_addr_width-1] router_address;
+	   assign router_address = address[0:router_addr_width-1];
+	   
+	   wire [0:num_ports-1] 	route_op_rv;
+	   wire 			inc_rc_rv;
+	   rtr_routing_logic
+	     #(.num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order))
+	   rtl
+	     (.router_address(router_address),
+	      .sel_mc(sel_mc_rv),
+	      .sel_rc(sel_orc_rv),
+	      .route_info(route_info_rv),
+	      .route_op(route_op_rv),
+	      .inc_rc(inc_rc_rv));
+	   
+	   wire [0:port_idx_width-1] 	route_port_rv;
+	   c_encode
+	     #(.num_ports(num_ports))
+	   route_port_rv_enc
+	     (.data_in(route_op_rv),
+	      .data_out(route_port_rv));
 	   
 	   wire [0:la_route_info_width-1] la_route_info_rv;
 	   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
