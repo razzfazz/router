@@ -68,6 +68,9 @@ module packet_source
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
+   // width required to select individual resource class
+   localparam resource_class_idx_width = clogb(num_resource_classes);
+   
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
    
@@ -173,9 +176,7 @@ module packet_source
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = lookahead_routing ? 
-       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
-       0;
+     = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
    
    // total number of bits required for storing header information
    localparam header_info_width
@@ -578,7 +579,7 @@ module packet_source
 	begin
 	   
 	   wire [0:num_ports-1] route_op;
-	   wire 		inc_rc;
+	   wire [0:num_resource_classes-1] route_orc;
 	   rtr_routing_logic
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -594,20 +595,33 @@ module packet_source
 	      .sel_irc(sel_orc),
 	      .route_info(route_info),
 	      .route_op(route_op),
-	      .inc_rc(inc_rc));
+	      .route_orc(route_orc));
 	   
-	   wire [0:port_idx_width-1] route_port;
+	   wire [0:port_idx_width-1] 	   route_port;
 	   c_encode
 	     #(.num_ports(num_ports))
 	   route_port_enc
 	     (.data_in(route_op),
 	      .data_out(route_port));
 	   
-	   wire [0:la_route_info_width-1] la_route_info;
+	   wire [0:la_route_info_width-1]  la_route_info;
 	   assign la_route_info[0:port_idx_width-1] = route_port;
 	   
 	   if(num_resource_classes > 1)
-	     assign la_route_info[port_idx_width] = inc_rc;
+	     begin
+		
+		wire [0:resource_class_idx_width-1] route_rcsel;
+		c_encode
+		  #(.num_ports(num_resource_classes))
+		route_rcsel_enc
+		  (.data_in(route_orc),
+		   .data_out(route_rcsel));
+		
+		assign la_route_info[port_idx_width:
+				     port_idx_width+resource_class_idx_width-1]
+		  = route_rcsel;
+		
+	     end
 	   
 	   assign header_info[0:la_route_info_width-1] = la_route_info;
 	   

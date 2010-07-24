@@ -144,7 +144,7 @@ module ugal_source(/*autoarg*/
    localparam [0:num_resource_classes-1] sel_irc
      = (1 << (num_resource_classes - 1 - 1));
    wire [0:num_ports-1] min_route_unmasked;
-   wire 			       inc_rc;
+   wire [0:num_resource_classes-1] route_orc;
     rtr_routing_logic
       #(.num_resource_classes(num_resource_classes),
 	.num_routers_per_dim(num_routers_per_dim),
@@ -157,17 +157,17 @@ module ugal_source(/*autoarg*/
     min_routing
       (.router_address(src_router_address),
        .sel_mc('d1),
-       .sel_rc(sel_irc),
+       .sel_irc(sel_irc),
        .route_info({src_router_address,route_info}),
        .route_op(min_route_unmasked),
-       .inc_rc(inc_rc));
+       .route_orc(route_orc));
 
    //normal routing on nonmin route
    localparam [0:num_resource_classes-1] sel_irc_nonmin
      = (1 << (num_resource_classes - 1 - 0));
 
    wire [0:num_ports-1] nonmin_route_unmasked;
-   wire 			       inc_rc_nonmin;
+   wire [0:num_resource_classes-1] route_orc_nonmin;
    rtr_routing_logic
       #(.num_resource_classes(num_resource_classes),
 	.num_routers_per_dim(num_routers_per_dim),
@@ -180,14 +180,14 @@ module ugal_source(/*autoarg*/
     nonmin_routing
       (.router_address(src_router_address),
        .sel_mc('d1),
-       .sel_rc(sel_irc_nonmin),
+       .sel_irc(sel_irc_nonmin),
        .route_info({intm_router_address,route_info}),
        .route_op(nonmin_route_unmasked),
-       .inc_rc(inc_rc_nonmin));
+       .route_orc(route_orc_nonmin));
 
 
    wire [0:credit_count_width-1] min_count;
-   wire [0:credit_count_width-1]nonmin_count;
+   wire [0:credit_count_width-1] nonmin_count;
 
    //select the credit count for min/nonmin ports
    c_select_1ofn

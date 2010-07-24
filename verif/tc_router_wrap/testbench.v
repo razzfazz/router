@@ -42,6 +42,9 @@ module testbench
    
    parameter Tclk = 4;
    
+   // width required to select individual resource class
+   localparam resource_class_idx_width = clogb(num_resource_classes);
+   
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
    
@@ -98,9 +101,7 @@ module testbench
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = lookahead_routing ? 
-       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
-       0;
+     = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
    
    // total number of bits required for storing routing information
    localparam route_info_width
