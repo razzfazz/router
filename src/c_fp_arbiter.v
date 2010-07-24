@@ -39,36 +39,51 @@ module c_fp_arbiter
    // number of input ports
    parameter num_ports = 32;
    
+   // perform arbitration in descending direction (i.e., right-to-left)
+   parameter descending = 0;
+   
    // vector of requests
    input [0:num_ports-1] req;
    
    // vector of grants
    output [0:num_ports-1] gnt;
-   wire [0:num_ports-1] gnt;
+   wire [0:num_ports-1]   gnt;
    
    generate
       
       if(num_ports > 1)
 	begin
-	   
-	   // reversed request vector
-	   wire [0:num_ports-1] req_rev;
-	   c_reverse
-	     #(.width(num_ports))
-	   req_rev_revr
-	     (.data_in(req),
-	      .data_out(req_rev));
-	   
-	   // This finds the first non-zero bit from the right (which is why we 
-	   // reverse the request vector in the first place).
-	   wire [0:num_ports-1] gnt_rev;
-	   assign gnt_rev = req_rev & -req_rev;
-	   
-	   c_reverse
-	     #(.width(num_ports))
-	   gnt_revr
-	     (.data_in(gnt_rev),
-	      .data_out(gnt));
+
+	   if(descending)
+	     begin
+		
+		// This finds the first non-zero bit from the right.
+		assign gnt = req & -req;
+		
+	     end
+	   else
+	     begin
+		
+		// If we're interested in finding the finds non-zero bit from 
+		// the left, we must reverse the request and grant vectors.
+		
+		wire [0:num_ports-1] req_rev;
+		c_reverse
+		  #(.width(num_ports))
+		req_rev_revr
+		  (.data_in(req),
+		   .data_out(req_rev));
+		
+		wire [0:num_ports-1] gnt_rev;
+		assign gnt_rev = req_rev & -req_rev;
+		
+		c_reverse
+		  #(.width(num_ports))
+		gnt_revr
+		  (.data_in(gnt_rev),
+		   .data_out(gnt));
+		
+	     end
 	   
 	end
       else
