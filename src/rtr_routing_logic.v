@@ -40,6 +40,9 @@ module rtr_routing_logic
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
+   // width required to select individual message class
+   localparam message_class_idx_width = clogb(num_message_classes);
+   
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
@@ -179,17 +182,24 @@ module rtr_routing_logic
 		    `DIM_ORDER_BY_CLASS:
 		      begin
 			 
-			 wire [0:num_message_classes-1] shuffled_mcs;
-			 c_interleaver
-			   #(.width(num_message_classes),
-			     .num_blocks(num_message_classes/2))
-			 shuffled_mcs_intl
-			   (.data_in(sel_mc),
-			    .data_out(shuffled_mcs));
-			 
 			 wire mc_even;
-			 assign mc_even
-			   = |shuffled_mcs[0:(num_message_classes/2)-1];
+			 
+			 if(num_message_classes == 1)
+			   assign mc_even = 1'b1;
+			 else if(num_message_classes > 1)
+			   begin
+			      
+			      wire [0:message_class_idx_width-1] mcsel;
+			      c_encode
+				#(.num_ports(num_message_classes))
+			      mcsel_enc
+				(.data_in(sel_mc),
+				 .data_out(mcsel));
+			      
+			      assign mc_even
+				= ~mcsel[message_class_idx_width-1];
+			      
+			   end
 			 
 			 if(num_dimensions == 1)
 			   assign dim_sel = 1'b1;
