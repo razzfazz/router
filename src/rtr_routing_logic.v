@@ -287,7 +287,7 @@ module rtr_routing_logic
 				      num_routers_per_dim));
 				
 				wire 			route_up;
-				assign route_down
+				assign route_up
 				  = (curr_lt_dest && 
 				     (dim_addr_diff_up_x2 <= 
 				      num_routers_per_dim)) ||
