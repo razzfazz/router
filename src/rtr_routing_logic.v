@@ -362,7 +362,9 @@ module rtr_routing_logic
    
    generate
       
-      if(num_nodes_per_router > 1)
+      if(num_nodes_per_router == 1)
+	assign route_op[num_ports-1] = eject;
+      else if(num_nodes_per_router > 1)
 	begin
 	   
 	   wire [0:node_addr_width-1] dest_node_address;
@@ -380,8 +382,6 @@ module rtr_routing_logic
 		    = node_sel & {num_nodes_per_router{eject}};
 	   
 	end
-      else
-	assign route_op[num_ports-1] = eject;
       
    endgenerate
    
