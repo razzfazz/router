@@ -145,16 +145,33 @@ module rtr_port_filter
 		
 	     end
 	   
-	   // only packets in the highest resource class can go to the 
-	   // injection/ejection ports; also, a packet coming in on an 
-	   // injection/ejection port should never exit the router on the same 
-	   // injection/ejection port
-	   else if((op >= (num_ports - num_nodes_per_router)) &&
-		   ((resource_class < (num_resource_classes - 1)) ||
-		    (op == port_id)))
+	   // injection/ejection ports
+	   else if(op >= (num_ports - num_nodes_per_router))
 	     begin
-		assign route_restricted_op[op] = 1'b0;
-		assign error_op[op] = route_in_op[op];
+		
+		// a packet coming in on an injection/ejection port should 
+		// never exit the router on the same port
+		if(op == port_id)
+		  begin
+		     assign route_restricted_op[op] = 1'b0;
+		     assign error_op[op] = route_in_op[op];
+		  end
+		
+		// only packets in the highest resource class can go to the 
+		// injection/ejection ports; 
+		else if(resource_class < (num_resource_classes - 1))
+		  begin
+		     assign route_restricted_op[op] = 1'b0;
+		     assign error_op[op] = route_in_op[op];
+		  end
+		
+		// remaining injection/ejection port requests are valid
+		else
+		  begin
+		     assign route_restricted_op[op] = route_in_op[op];
+		     assign error_op[op] = 1'b0;
+		  end
+		
 	     end
 	   
 	   // remaining port requests are valid
