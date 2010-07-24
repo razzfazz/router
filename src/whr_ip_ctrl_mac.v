@@ -167,7 +167,7 @@ module whr_ip_ctrl_mac
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // required address width for header data FIFO
-   localparam hdff_addr_width = clogb(num_flits_per_vc);
+   localparam hdff_addr_width = clogb(num_packets_per_vc - 1);
    
    // select implementation variant for header data FIFO register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;

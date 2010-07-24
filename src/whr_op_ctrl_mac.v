@@ -453,6 +453,7 @@ module whr_op_ctrl_mac
 		wire 			  tff_read_data;
 		c_regfile
 		  #(.depth(num_flits_per_vc),
+		    .width(1),
 		    .regfile_type(tff_regfile_type))
 		tff
 		  (.clk(clk),
