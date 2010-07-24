@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // module to filter output port requests based on turn restrictions
 module rtr_port_filter
-  (route_in_op, inc_rc, route_out_op, error);
+  (route_in_op, route_in_orc, route_out_op, error);
    
 `include "c_constants.v"
    
@@ -73,10 +73,9 @@ module rtr_port_filter
    
    // unmasked output port
    input [0:num_ports-1] route_in_op;
-
-   // if we have reached our destination for the current resource class, 
-   // increment the resource class (unless it's already the highest)
-   input inc_rc;
+   
+   // select outgoing resource class
+   input [0:num_resource_classes-1] route_in_orc;
    
    // filtered output port
    output [0:num_ports-1] route_out_op;
@@ -128,7 +127,10 @@ module rtr_port_filter
 		else
 		  begin
 		     
-		     // we could mask this by inc_rc; however, the goal of port 
+		     wire chg_rc;
+		     assign chg_rc = ~route_in_orc[resource_class];
+		     
+		     // we could mask this by chg_rc; however, the goal of port 
 		     // filtering is to allow synthesis to take advantage of
 		     // turn restrictions in optimizing the design, so from this
 		     // point of view, masking here would be counterproductive;
@@ -137,41 +139,21 @@ module rtr_port_filter
 		     // forever; consequently, we save the gate and don't mask 
 		     // here
 		     assign route_restricted_op[op]
-			      = route_in_op[op] /* & inc_rc*/;
+			      = route_in_op[op] /* & chg_rc*/;
 		     
-		     assign error_op[op] = route_in_op[op] & ~inc_rc;
+		     assign error_op[op] = route_in_op[op] & ~chg_rc;
 		     
 		  end
 		
 	     end
 	   
-	   // injection/ejection ports
-	   else if(op >= (num_ports - num_nodes_per_router))
+	   // a packet coming in on an injection/ejection port should never 
+	   // exit the router on the same port
+	   else if((op >= (num_ports - num_nodes_per_router)) &&
+		   (op == port_id))
 	     begin
-		
-		// a packet coming in on an injection/ejection port should 
-		// never exit the router on the same port
-		if(op == port_id)
-		  begin
-		     assign route_restricted_op[op] = 1'b0;
-		     assign error_op[op] = route_in_op[op];
-		  end
-		
-		// only packets in the highest resource class can go to the 
-		// injection/ejection ports; 
-		else if(resource_class < (num_resource_classes - 1))
-		  begin
-		     assign route_restricted_op[op] = 1'b0;
-		     assign error_op[op] = route_in_op[op];
-		  end
-		
-		// remaining injection/ejection port requests are valid
-		else
-		  begin
-		     assign route_restricted_op[op] = route_in_op[op];
-		     assign error_op[op] = 1'b0;
-		  end
-		
+		assign route_restricted_op[op] = 1'b0;
+		assign error_op[op] = route_in_op[op];
 	     end
 	   
 	   // remaining port requests are valid

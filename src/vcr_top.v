@@ -292,11 +292,11 @@ module vcr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
-   wire [0:num_ports*num_vcs-1] 	  inc_rc_ip_ivc;
+   wire [0:num_ports*num_vcs*num_resource_classes-1] route_ip_ivc_orc;
    
-   wire [0:num_ports*num_vcs-1] 	  vc_req_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	  vc_gnt_ip_ivc;
-   wire [0:num_ports*num_vcs*num_vcs_per_class-1] vc_gnt_ip_ivc_ocvc;
+   wire [0:num_ports*num_vcs-1] 		     vc_req_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		     vc_gnt_ip_ivc;
+   wire [0:num_ports*num_vcs*num_vcs_per_class-1]    vc_gnt_ip_ivc_ocvc;
    
    wire [0:num_ports*num_ports*sw_alloc_opc_out_width-1] sw_alloc_opc_out_ip_op;
    wire [0:num_ports*num_ports*sw_alloc_ipc_out_width-1] sw_alloc_ipc_out_ip_op;
@@ -474,7 +474,7 @@ module vcr_top
 				  (ip+1)*num_vcs*num_vcs_per_class-1];
 	   
 	   wire [0:num_vcs*num_ports-1] 	route_ivc_op;
-	   wire [0:num_vcs-1] 			inc_rc_ivc;
+	   wire [0:num_vcs*num_resource_classes-1] route_ivc_orc;
 	   wire [0:num_vcs-1] 			vc_req_ivc;
 	   wire 				xbr_active;
 	   wire [0:int_flit_ctrl_width-1] 	int_flit_ctrl_out;
@@ -520,7 +520,7 @@ module vcr_top
 	      .router_address(router_address),
 	      .channel_in(channel_in),
 	      .route_ivc_op(route_ivc_op),
-	      .inc_rc_ivc(inc_rc_ivc),
+	      .route_ivc_orc(route_ivc_orc),
 	      .vc_req_ivc(vc_req_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ocvc(vc_gnt_ivc_ocvc),
@@ -534,8 +534,10 @@ module vcr_top
 	   
 	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
 				  (ip+1)*num_vcs*num_ports-1]
-		    = route_ivc_op;
-	   assign inc_rc_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = inc_rc_ivc;
+	     = route_ivc_op;
+	   assign route_ip_ivc_orc[ip*num_vcs*num_resource_classes:
+				   (ip+1)*num_vcs*num_resource_classes-1]
+	     = route_ivc_orc;
 	   
 	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
 	   
@@ -543,19 +545,19 @@ module vcr_top
 					 sw_alloc_ipc_out_width:
 					 (ip+1)*num_ports*
 					 sw_alloc_ipc_out_width-1]
-		    = sw_alloc_ipc_out_op;
+	     = sw_alloc_ipc_out_op;
 	   
 	   assign xbr_active_ip[ip] = xbr_active;
 	   
 	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
 				 (ip+1)*int_flit_ctrl_width-1]
-		    = int_flit_ctrl_out;
+	     = int_flit_ctrl_out;
 	   assign xbd_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
-		    = flit_data_out;
+	     = flit_data_out;
 	   
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
 				   (ip+1)*flow_ctrl_width-1]
-		    = flow_ctrl_out;
+	     = flow_ctrl_out;
 	   
 	   assign ipc_error_ip[ip] = ipc_error;
 	   
@@ -586,7 +588,7 @@ module vcr_top
      (.clk(clk),
       .reset(reset),
       .route_ip_ivc_op(route_ip_ivc_op),
-      .inc_rc_ip_ivc(inc_rc_ip_ivc),
+      .route_ip_ivc_orc(route_ip_ivc_orc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),
       .req_op_ovc(vc_req_op_ovc),

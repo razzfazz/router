@@ -52,6 +52,9 @@ module tc_node_mac
    // number of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
+   // width required to select individual resource class
+   localparam resource_class_idx_width = clogb(num_resource_classes);
+   
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
    
@@ -163,9 +166,7 @@ module tc_node_mac
    
    // width required for lookahead routing information
    localparam la_route_info_width
-     = lookahead_routing ? 
-       (port_idx_width + ((num_resource_classes > 1) ? 1 : 0)) : 
-       0;
+     = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
@@ -1390,7 +1391,7 @@ module tc_node_mac
 	   assign router_address = address[0:router_addr_width-1];
 	   
 	   wire [0:num_ports-1] 	route_op_rv;
-	   wire 			inc_rc_rv;
+	   wire [0:num_resource_classes-1] route_orc_rv;
 	   rtr_routing_logic
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -1406,20 +1407,34 @@ module tc_node_mac
 	      .sel_irc(sel_orc_rv),
 	      .route_info(route_info_rv),
 	      .route_op(route_op_rv),
-	      .inc_rc(inc_rc_rv));
+	      .route_orc(route_orc_rv));
 	   
-	   wire [0:port_idx_width-1] 	route_port_rv;
+	   wire [0:port_idx_width-1] 	   route_port_rv;
 	   c_encode
 	     #(.num_ports(num_ports))
 	   route_port_rv_enc
 	     (.data_in(route_op_rv),
 	      .data_out(route_port_rv));
 	   
-	   wire [0:la_route_info_width-1] la_route_info_rv;
+	   wire [0:la_route_info_width-1]  la_route_info_rv;
 	   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
 	   
 	   if(num_resource_classes > 1)
-	     assign la_route_info_rv[port_idx_width] = inc_rc_rv;
+	     begin
+		
+		wire [0:resource_class_idx_width-1] route_rcsel_rv;
+		c_encoder
+		  #(.num_ports(num_resource_classes))
+		route_rcsel_rv_enc
+		  (.data_in(route_orc_rv),
+		   .data_out(route_rcsel_rv));
+		
+		assign la_route_info_rv[port_idx_width:
+					port_idx_width+
+					resource_class_idx_width-1]
+		  = route_rcsel_rv;
+		
+	     end
 	   
 	   assign header_info_out[0:la_route_info_width-1]
 	     = la_route_info_rv;
@@ -1834,7 +1849,7 @@ module tc_node_mac
    // credit return path
    //---------------------------------------------------------------------------
    
-   // FIXME: this should be a separate module
+   // FIXME: This should be in a separate module!
    
    wire 			   cred_valid_out_s, cred_valid_out_q;
    assign cred_valid_out_s = flit_valid_in;

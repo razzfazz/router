@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // input VC controller
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, int_flow_ctrl_op_ovc, route_op, inc_rc, vc_req, vc_gnt, 
+   header_info_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
    flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_write_addr, 
    fbc_read_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
@@ -59,6 +59,9 @@ module vcr_ivc_ctrl
    
    // number of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
+   
+   // width required to select individual resource class
+   localparam resource_class_idx_width = clogb(num_resource_classes);
    
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
@@ -101,8 +104,7 @@ module vcr_ivc_ctrl
    localparam port_idx_width = clogb(num_ports);
    
    // width required for routing information for a single hop
-   localparam hop_route_info_width
-     = (port_idx_width + ((num_resource_classes > 1) ? 1 : 0));
+   localparam hop_route_info_width = port_idx_width + resource_class_idx_width;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -261,9 +263,9 @@ module vcr_ivc_ctrl
    output [0:num_ports-1] 			     route_op;
    wire [0:num_ports-1] 			     route_op;
    
-   // transition to next resource class
-   output 					     inc_rc;
-   wire 					     inc_rc;
+   // select next resource class
+   output [0:num_resource_classes-1] 		     route_orc;
+   wire [0:num_resource_classes-1] 		     route_orc;
    
    // request VC allocation
    output 					     vc_req;
@@ -415,13 +417,24 @@ module vcr_ivc_ctrl
       
    endgenerate
    
+   wire [0:num_resource_classes*num_vcs_per_class-1] allocated_orc_ocvc;
+   c_mat_mult
+     #(.dim1_width(num_resource_classes),
+       .dim2_width(1),
+       .dim3_width(num_vcs_per_class),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
+   allocated_orc_ocvc_mmult
+     (.input_a(route_orc),
+      .input_b(allocated_ocvc),
+      .result(allocated_orc_ocvc));
+   
    c_align
-     #(.in_width(2*num_vcs_per_class),
+     #(.in_width(num_resource_classes*num_vcs_per_class),
        .out_width(num_vcs),
-       .offset(packet_class*num_vcs_per_class))
+       .offset(message_class*num_resource_classes*num_vcs_per_class))
    allocated_ovc_alg
-     (.data_in({{num_vcs_per_class{~inc_rc}} & allocated_ocvc,
-		{num_vcs_per_class{inc_rc}} & allocated_ocvc}),
+     (.data_in(allocated_orc_ocvc),
       .dest_in({num_vcs{1'b0}}),
       .data_out(allocated_ovc));
    
@@ -448,7 +461,7 @@ module vcr_ivc_ctrl
    wire [0:hop_route_info_width-1] hop_route_info;
    wire [0:num_ports-1] 	   hop_route_op;
    wire [0:port_idx_width-1] 	   hop_route_port;
-   wire 			   hop_inc_rc;
+   wire [0:num_resource_classes-1] hop_route_orc;
    
    generate
       
@@ -468,25 +481,21 @@ module vcr_ivc_ctrl
 	      .data_out(hop_route_op));
 	   
 	   if(resource_class == (num_resource_classes - 1))
-	     assign hop_inc_rc = 1'b0;
-	   else
-	     assign hop_inc_rc = la_route_info_in[port_idx_width];
-	   
-	   wire [0:num_resource_classes-1] sel_orc;
-	   if(resource_class == (num_resource_classes - 1))
-	     assign sel_orc = 'd1;
+	     assign hop_route_orc = 'd1;
 	   else
 	     begin
 		
-		c_align
-		  #(.in_width(2),
-		    .out_width(num_resource_classes),
-		    .offset(resource_class))
-		sel_orc_align
-		  (.data_in({~hop_inc_rc, hop_inc_rc}),
-		   .dest_in({num_resource_classes{1'b0}}),
-		   .data_out(sel_orc));
+		wire [0:resource_class_idx_width-1] hop_route_rcsel;
+		assign hop_route_rcsel
+		  = la_route_info_in[port_idx_width:
+				     port_idx_width+resource_class_idx_width-1];
 		
+		c_decode
+		  #(.num_ports(num_resource_classes))
+		hop_route_orc_dec
+		  (.data_in(hop_route_rcsel),
+		   .data_out(hop_route_orc));
+
 	     end
 	   
 	   wire [0:router_addr_width-1] next_router_address;
@@ -501,7 +510,7 @@ module vcr_ivc_ctrl
 	      .next_router_address(next_router_address));
 	   
 	   wire [0:num_ports-1] 	next_route_op;
-	   wire 			next_inc_rc;
+	   wire [0:num_resource_classes-1] next_route_orc;
 	   rtr_routing_logic
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -514,12 +523,12 @@ module vcr_ivc_ctrl
 	   rtl
 	     (.router_address(next_router_address),
 	      .sel_mc(sel_mc),
-	      .sel_irc(sel_orc),
+	      .sel_irc(hop_route_orc),
 	      .route_info(route_info_in),
 	      .route_op(next_route_op),
-	      .inc_rc(next_inc_rc));
+	      .route_orc(next_route_orc));
 	   
-	   wire [0:port_idx_width-1] 	next_route_port;
+	   wire [0:port_idx_width-1] 	   next_route_port;
 	   c_encode
 	     #(.num_ports(num_ports))
 	   next_route_port_enc
@@ -530,7 +539,21 @@ module vcr_ivc_ctrl
 	   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
 	   
 	   if(num_resource_classes > 1)
-	     assign la_route_info_out[port_idx_width] = next_inc_rc;
+	     begin
+		
+		wire [0:resource_class_idx_width-1] next_route_rcsel;
+		c_encode
+		  #(.num_ports(num_resource_classes))
+		next_route_rcsel_enc
+		  (.data_in(next_route_orc),
+		   .data_out(next_route_rcsel));
+		
+		assign la_route_info_out[port_idx_width:
+					 port_idx_width+
+					 resource_class_idx_width-1]
+		  = next_route_rcsel;
+		
+	     end
 	   
 	   assign header_info_out[0:la_route_info_width-1] = la_route_info_out;
 	   
@@ -563,7 +586,7 @@ module vcr_ivc_ctrl
 	      .sel_irc(sel_irc),
 	      .route_info(route_info_in),
 	      .route_op(hop_route_op),
-	      .inc_rc(hop_inc_rc));
+	      .route_orc(hop_route_orc));
 	   
 	   c_encode
 	     #(.num_ports(num_ports))
@@ -574,7 +597,20 @@ module vcr_ivc_ctrl
 	   assign hop_route_info[0:port_idx_width-1] = hop_route_port;
 	   
 	   if(num_resource_classes > 1)
-	     assign hop_route_info[port_idx_width] = hop_inc_rc;
+	     begin
+		
+		wire [0:resource_class_idx_width-1] hop_route_rcsel;
+		c_encode
+		  #(.num_ports(num_resource_classes))
+		hop_route_rcsel_enc
+		  (.data_in(hop_route_orc),
+		   .data_out(hop_route_rcsel));
+		
+		assign hop_route_info[port_idx_width:
+				      port_idx_width+resource_class_idx_width-1]
+		  = hop_route_rcsel;
+		
+	     end
 	   
 	end
       
@@ -892,14 +928,23 @@ module vcr_ivc_ctrl
    generate
       
       if(resource_class == (num_resource_classes - 1))
-	assign inc_rc = 1'b0;
+	assign route_orc = 'd1;
       else
 	begin
 	   
-	   wire hdr_inc_rc;
-	   assign hdr_inc_rc = hdr_hop_route_info[port_idx_width];
+	   wire hdr_route_rcsel;
+	   assign hdr_route_rcsel
+	     = hdr_hop_route_info[port_idx_width:
+				  port_idx_width+resource_class_idx_width-1];
 	   
-	   assign inc_rc = hdr_valid ? hdr_inc_rc : hop_inc_rc;
+	   wire [0:num_resource_classes-1] hdr_route_orc;
+	   c_decode
+	     #(.num_ports(num_resource_classes))
+	   hdr_route_orc_dec
+	     (.data_in(hdr_route_rcsel),
+	      .data_out(hdr_route_orc));
+	   
+	   assign route_orc = hdr_valid ? hdr_route_orc : hop_route_orc;
 	   
 	end
       
@@ -920,7 +965,7 @@ module vcr_ivc_ctrl
        .resource_class(resource_class))
    route_op_pf
      (.route_in_op(route_unmasked_op),
-      .inc_rc(inc_rc),
+      .route_in_orc(route_orc),
       .route_out_op(route_op),
       .error(pf_error));
    
@@ -944,7 +989,27 @@ module vcr_ivc_ctrl
       .data_in(int_flow_ctrl_op_ovc),
       .data_out(int_flow_ctrl_ovc));
    
-   wire 				  error_ct_overflow;
+   wire [0:num_resource_classes*num_vcs_per_class*
+	 int_flow_ctrl_width-1] 	  int_flow_ctrl_orc_ocvc;
+   assign int_flow_ctrl_orc_ocvc = int_flow_ctrl_ovc[message_class*
+						     num_resource_classes*
+						     num_vcs_per_class*
+						     int_flow_ctrl_width:
+						     (message_class+1)*
+						     num_resource_classes*
+						     num_vcs_per_class*
+						     int_flow_ctrl_width-1];
+   
+   wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
+   c_select_1ofn
+     #(.num_ports(num_resource_classes),
+       .width(num_vcs_per_class*int_flow_ctrl_width))
+   int_flow_ctrl_ocvc_sel
+     (.select(route_orc),
+      .data_in(int_flow_ctrl_orc_ocvc),
+      .data_out(int_flow_ctrl_ocvc));
+   
+   wire 					    error_ct_overflow;
    
    generate
       
@@ -956,37 +1021,16 @@ module vcr_ivc_ctrl
 	`INT_FLOW_CTRL_TYPE_LEVEL:
 	  begin
 	     
-	     // credit status for the case where we do not change resource class
-	     wire [0:num_vcs_per_class*2-1] free_unchanged_ocvc;
-	     assign free_unchanged_ocvc
-	       = int_flow_ctrl_ovc[packet_class*num_vcs_per_class*2:
-				   (packet_class+1)*num_vcs_per_class*2-1];
-	     
 	     wire [0:num_vcs_per_class*2-1] free_ocvc;
+	     assign free_ocvc = int_flow_ctrl_ocvc;
 	     
-	     if(resource_class == (num_resource_classes - 1))
-	       assign free_ocvc = free_unchanged_ocvc;
-	     else
-	       begin
-		  
-		  // credit status in case we change resource class
-		  wire [0:num_vcs_per_class*2-1] free_changed_ocvc;
-		  assign free_changed_ocvc
-		    = int_flow_ctrl_ovc[(packet_class+1)*num_vcs_per_class*2:
-					(packet_class+2)*num_vcs_per_class*2-1];
-		  
-		  assign free_ocvc
-		    = inc_rc ? free_changed_ocvc : free_unchanged_ocvc;
-		  
-	       end
-	     
-	     wire [0:1] 			 flit_sent_count;
+	     wire [0:1] 		    flit_sent_count;
 	     assign flit_sent_count = flit_sent_prev + flit_sent;
 	     
-	     wire [0:num_vcs_per_class-1] 	 next_free_ocvc;
-	     wire [0:num_vcs_per_class-1] 	 free_unallocated_ocvc;
+	     wire [0:num_vcs_per_class-1]   next_free_ocvc;
+	     wire [0:num_vcs_per_class-1]   free_unallocated_ocvc;
 	     
-	     genvar 				 ocvc;
+	     genvar 			    ocvc;
 	     
 	     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
 	       begin:ocvcs
@@ -1048,41 +1092,18 @@ module vcr_ivc_ctrl
 	`INT_FLOW_CTRL_TYPE_PUSH:
 	  begin
 	     
-	     // credit indicator for the case where we do not change the 
-	     // resource class
-	     wire [0:num_vcs_per_class-1] cred_unchanged_ocvc;
-	     assign cred_unchanged_ocvc
-	       = int_flow_ctrl_ovc[packet_class*num_vcs_per_class:
-				   (packet_class+1)*num_vcs_per_class-1];
-	     
 	     wire [0:num_vcs_per_class-1] cred_ocvc;
+	     assign cred_ocvc = int_flow_ctrl_ocvc;
 	     
-	     if(resource_class == (num_resource_classes - 1))
-	       assign cred_ocvc = cred_unchanged_ocvc;
-	     else
-	       begin
-		  
-		  // credit status for the case where the resource class changes
-		  wire [0:num_vcs_per_class-1] cred_changed_ocvc;
-		  assign cred_changed_ocvc
-		    = int_flow_ctrl_ovc[(packet_class+1)*num_vcs_per_class:
-					(packet_class+2)*num_vcs_per_class-1];
-		  
-		  assign cred_ocvc = inc_rc ?
-				     cred_changed_ocvc :
-				     cred_unchanged_ocvc;
-		  
-	       end
-	     
-	     wire 			       cred_allocated;
+	     wire 			  cred_allocated;
 	     assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc_q);
 	     
-	     wire 			       cred_unallocated;
+	     wire 			  cred_unallocated;
 	     assign cred_unallocated = |(cred_ocvc & vc_gnt_ocvc);
 	     
-	     wire [0:cred_hold_width-1]        cred_hold_q;
+	     wire [0:cred_hold_width-1]   cred_hold_q;
 	     
-	     wire 			       has_cred_s, has_cred_q;
+	     wire 			  has_cred_s, has_cred_q;
 	     if(vc_alloc_requires_credit)
 	       assign has_cred_s 
 		 = vc_allocated_q ? 
@@ -1109,21 +1130,21 @@ module vcr_ivc_ctrl
 	     
 	     assign free_unallocated = cred_unallocated;
 	     
-	     wire 			       incr_cred_hold;
+	     wire 			  incr_cred_hold;
 	     assign incr_cred_hold
 	       = cred_allocated & ~sw_gnt_nonspec & has_cred_q;
 	     
-	     wire 			       decr_cred_hold;
+	     wire 			  decr_cred_hold;
 	     assign decr_cred_hold
 	       = ~cred_allocated & sw_gnt_nonspec & |cred_hold_q;
 	     
-	     wire [0:cred_hold_width-1]        cred_hold_new;
+	     wire [0:cred_hold_width-1]   cred_hold_new;
 	     if(vc_alloc_requires_credit)
 	       assign cred_hold_new = ~sw_gnt_spec & cred_unallocated;
 	     else
 	       assign cred_hold_new = {cred_hold_width{1'b0}};
 	     
-	     wire [0:cred_hold_width-1]        cred_hold_s;
+	     wire [0:cred_hold_width-1]   cred_hold_s;
 	     assign cred_hold_s
 	       = vc_allocated_q ?
 		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :

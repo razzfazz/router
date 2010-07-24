@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // routing logic for VC router
 module rtr_routing_logic
-  (router_address, sel_mc, sel_irc, route_info, route_op, inc_rc);
+  (router_address, sel_mc, sel_irc, route_info, route_op, route_orc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -115,10 +115,9 @@ module rtr_routing_logic
    output [0:num_ports-1] 	    route_op;
    wire [0:num_ports-1] 	    route_op;
    
-   // if we have reached our destination for the current resource class, 
-   // increment the resource class (unless it's already the highest)
-   output 			    inc_rc;
-   wire 			    inc_rc;
+   // select outgoing resource class
+   output [0:num_resource_classes-1] route_orc;
+   wire [0:num_resource_classes-1]   route_orc;
    
    // all router addresses (intermediate + final)
    wire [0:num_resource_classes*router_addr_width-1] dest_router_addr_irc;
@@ -362,16 +361,19 @@ module rtr_routing_logic
       
    endgenerate
    
-   wire 						       final_rc;
-   assign final_rc = sel_irc[num_resource_classes-1];
-   
    wire [0:num_network_ports-1] 			       route_onp;
+   c_select_1ofn
+     #(.num_ports(num_resource_classes),
+       .width(num_network_ports))
+   route_onp_sel
+     (.select(sel_irc),
+      .data_in(route_irc_onp),
+      .data_out(route_onp));
    
    assign route_op[0:num_network_ports-1] = route_onp;
    
-   wire 						       reached_dest;
-   
-   assign inc_rc = reached_dest & ~final_rc;
+   wire 						       final_rc;
+   assign final_rc = sel_irc[num_resource_classes-1];
    
    wire 						       eject;
    assign eject = reached_dest_irc[num_resource_classes-1] & final_rc;
@@ -379,28 +381,18 @@ module rtr_routing_logic
    generate
       
       if(num_resource_classes == 1)
-	begin
-	   assign route_onp = route_irc_onp;
-	   assign reached_dest = reached_dest_irc;
-	end
-      else if(num_resource_classes > 1)
+	assign route_orc = 1'b1;
+      else
 	begin
 	   
-	   c_select_1ofn
-	     #(.num_ports(num_resource_classes),
-	       .width(num_network_ports))
-	   route_onp_sel
-	     (.select(sel_irc),
-	      .data_in(route_irc_onp),
-	      .data_out(route_onp));
+	   wire reached_dest;
+	   assign reached_dest = |(sel_irc & reached_dest_irc);
 	   
-	   c_select_1ofn
-	     #(.num_ports(num_resource_classes),
-	       .width(1))
-	   reached_dest_sel
-	     (.select(sel_irc),
-	      .data_in(reached_dest_irc),
-	      .data_out(reached_dest));
+	   wire inc_rc;
+	   assign inc_rc = reached_dest & ~final_rc;
+	   
+	   assign route_orc
+	     = inc_rc ? {1'b0, sel_irc[0:num_resource_classes-2]} : sel_irc;
 	   
 	end
       

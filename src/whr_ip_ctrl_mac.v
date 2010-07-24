@@ -362,7 +362,7 @@ module whr_ip_ctrl_mac
 	      .next_router_address(next_router_address));
 	   
 	   wire [0:num_ports-1] 	  next_route_op;
-	   wire 			  next_inc_rc;
+	   wire 			  next_route_orc;
 	   rtr_routing_logic
 	     #(.num_message_classes(1),
 	       .num_resource_classes(1),
@@ -378,7 +378,7 @@ module whr_ip_ctrl_mac
 	      .sel_irc(1'b1),
 	      .route_info(route_info_in),
 	      .route_op(next_route_op),
-	      .inc_rc(next_inc_rc));
+	      .route_orc(next_route_orc));
 	   
 	   wire [0:port_idx_width-1] 	  next_route_port;
 	   c_encode
@@ -396,7 +396,7 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   
-	   wire inc_rc;
+	   wire route_orc;
 	   rtr_routing_logic
 	     #(.num_message_classes(1),
 	       .num_resource_classes(1),
@@ -412,7 +412,7 @@ module whr_ip_ctrl_mac
 	      .sel_irc(1'b1),
 	      .route_info(route_info_in),
 	      .route_op(hop_route_op),
-	      .inc_rc(inc_rc));
+	      .route_orc(route_orc));
 	   
 	   c_encode
 	     #(.num_ports(num_ports))
@@ -733,7 +733,7 @@ module whr_ip_ctrl_mac
        .resource_class(0))
    pf
      (.route_in_op(route_unmasked_op),
-      .inc_rc(1'b0),
+      .route_in_orc(1'b1),
       .route_out_op(route_op),
       .error(pf_error));
    

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // input port controller
 module vcr_ip_ctrl_mac
-  (clk, reset, router_address, channel_in, route_ivc_op, inc_rc_ivc, 
+  (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
    vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_alloc_out_op, sw_alloc_in_op, 
    xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
    
@@ -52,6 +52,9 @@ module vcr_ip_ctrl_mac
    
    // number of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
+   
+   // width required to select individual resource class
+   localparam resource_class_idx_width = clogb(num_resource_classes);
    
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
@@ -106,8 +109,7 @@ module vcr_ip_ctrl_mac
    localparam port_idx_width = clogb(num_ports);
    
    // width required for routing information for a single hop
-   localparam hop_route_info_width
-     = (port_idx_width + ((num_resource_classes > 1) ? 1 : 0));
+   localparam hop_route_info_width = port_idx_width + resource_class_idx_width;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -278,19 +280,19 @@ module vcr_ip_ctrl_mac
    output [0:num_vcs*num_ports-1] route_ivc_op;
    wire [0:num_vcs*num_ports-1]   route_ivc_op;
    
-   // transition to next resource class
-   output [0:num_vcs-1] 	  inc_rc_ivc;
-   wire [0:num_vcs-1] 		  inc_rc_ivc;
+   // select next resource class
+   output [0:num_vcs*num_resource_classes-1] route_ivc_orc;
+   wire [0:num_vcs*num_resource_classes-1]   route_ivc_orc;
    
    // request VC allocation
-   output [0:num_vcs-1] 	  vc_req_ivc;
-   wire [0:num_vcs-1] 		  vc_req_ivc;
+   output [0:num_vcs-1] 		     vc_req_ivc;
+   wire [0:num_vcs-1] 			     vc_req_ivc;
    
    // VC allocation successful
-   input [0:num_vcs-1] 		  vc_gnt_ivc;
+   input [0:num_vcs-1] 			     vc_gnt_ivc;
    
    // granted output VC
-   input [0:num_vcs*num_vcs_per_class-1] vc_gnt_ivc_ocvc;
+   input [0:num_vcs*num_vcs_per_class-1]     vc_gnt_ivc_ocvc;
    
    // outgoing allocator contorl signals
    output [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_op;
@@ -544,22 +546,22 @@ module vcr_ip_ctrl_mac
 	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
 	   
 	   wire [0:num_ports-1] 	route_op;
-	   wire 			inc_rc;
-	   wire 			vc_req;
-	   wire 			sw_req_nonspec;
-	   wire 			sw_req_spec;	   
-	   wire 			flit_head;
-	   wire 			flit_tail;
-	   wire [0:header_info_width-1] header_info_out;
-	   wire [0:fbf_addr_width-1] 	fbc_write_addr;
-	   wire [0:fbf_addr_width-1] 	fbc_read_addr;
-	   wire 			fbc_empty;
-	   wire 			allocated;
-	   wire [0:num_vcs-1] 		allocated_ovc;
-	   wire 			free_unallocated;
-	   wire 			free_allocated;
-	   wire [0:6] 			ivcc_errors;
-	   wire [0:7] 			events;
+	   wire [0:num_resource_classes-1] route_orc;
+	   wire 			   vc_req;
+	   wire 			   sw_req_nonspec;
+	   wire 			   sw_req_spec;	   
+	   wire 			   flit_head;
+	   wire 			   flit_tail;
+	   wire [0:header_info_width-1]    header_info_out;
+	   wire [0:fbf_addr_width-1] 	   fbc_write_addr;
+	   wire [0:fbf_addr_width-1] 	   fbc_read_addr;
+	   wire 			   fbc_empty;
+	   wire 			   allocated;
+	   wire [0:num_vcs-1] 		   allocated_ovc;
+	   wire 			   free_unallocated;
+	   wire 			   free_allocated;
+	   wire [0:6] 			   ivcc_errors;
+	   wire [0:7] 			   events;
 	   vcr_ivc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
@@ -597,7 +599,7 @@ module vcr_ip_ctrl_mac
 	      .header_info_in(header_info_in),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_op(route_op),
-	      .inc_rc(inc_rc),
+	      .route_orc(route_orc),
 	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ocvc(vc_gnt_ocvc),
@@ -620,8 +622,10 @@ module vcr_ip_ctrl_mac
 	      .events(events));
 	   
 	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
-		    = route_op;
-	   assign inc_rc_ivc[ivc] = inc_rc;
+	     = route_op;
+	   assign route_ivc_orc[ivc*num_resource_classes:
+				(ivc+1)*num_resource_classes-1]
+	     = route_orc;
 	   assign vc_req_ivc[ivc] = vc_req;
 	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
 	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
