@@ -187,7 +187,7 @@ module rtr_routing_logic
 			 else
 			   assign dim_sel
 			     = &dim_addr_match[dim+1:num_dimensions-1];
-		    end
+		      end
 		    
 		    `DIM_ORDER_BY_CLASS:
 		      begin
