@@ -181,12 +181,6 @@ module whr_ip_ctrl_mac
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
-   // enable performance counter
-   parameter perf_ctr_enable = 1;
-   
-   // width of each counter
-   parameter perf_ctr_width = 32;
-   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
@@ -1027,62 +1021,6 @@ module whr_ip_ctrl_mac
 	end
       else
 	assign error = 1'b0;
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // instrumentation / performance counters
-   //---------------------------------------------------------------------------
-   
-   generate
-      
-      if(perf_ctr_enable > 0)
-	begin
-	   
-	   wire 		       ev_no_flit;
-	   assign ev_no_flit = header_valid & ~flit_valid;
-	   
-	   wire 		       ev_flit_stalled_sw;
-	   assign ev_flit_stalled_sw = header_valid & flit_valid & ~gnt;
-	   
-	   wire 		       ev_flit_sent;
-	   assign ev_flit_sent = flit_valid_out;
-	   
-	   wire [0:2] 		       events_s, events_q;
-	   assign events_s = {ev_no_flit,
-			      ev_flit_stalled_sw,
-			      ev_flit_sent};
-	   c_dff
-	     #(.width(3),
-	       .reset_type(reset_type))
-	   eventsq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .d(events_s),
-	      .q(events_q));
-	   
-	   genvar 		       ctr;
-	   
-	   for(ctr = 0; ctr < 3; ctr = ctr + 1)
-	     begin:ctrs
-		
-		wire [0:perf_ctr_width-1] ctr_s, ctr_q;
-		assign ctr_s = ctr_q + events_q[ctr];
-		c_dff
-		  #(.width(perf_ctr_width),
-		    .reset_type(reset_type))
-		ctrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .d(ctr_s),
-		   .q(ctr_q));
-		
-	     end
-	   
-	end
       
    endgenerate
    

@@ -253,12 +253,6 @@ module vcr_ip_ctrl_mac
        (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
        -1;
    
-   // enable performance counter
-   parameter perf_ctr_enable = 1;
-   
-   // width of each counter
-   parameter perf_ctr_width = 32;
-   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
@@ -520,7 +514,6 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 			free_unallocated_ivc;
    wire [0:num_vcs-1] 			free_allocated_ivc;
    wire [0:num_vcs*7-1] 		ivcc_errors_ivc;
-   wire [0:num_vcs*8-1] 		events_ivc;
    
    genvar 				ivc;
    
@@ -564,7 +557,6 @@ module vcr_ip_ctrl_mac
 	   wire 			   free_unallocated;
 	   wire 			   free_allocated;
 	   wire [0:6] 			   ivcc_errors;
-	   wire [0:7] 			   events;
 	   vcr_ivc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
@@ -589,7 +581,6 @@ module vcr_ip_ctrl_mac
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
-	       .perf_ctr_enable(perf_ctr_enable),
 	       .vc_id(ivc),
 	       .port_id(port_id),
 	       .reset_type(reset_type))
@@ -622,8 +613,7 @@ module vcr_ip_ctrl_mac
 	      .allocated_ovc(allocated_ovc),
 	      .free_unallocated(free_unallocated),
 	      .free_allocated(free_allocated),
-	      .errors(ivcc_errors),
-	      .events(events));
+	      .errors(ivcc_errors));
 	   
 	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 	     = route_op;
@@ -651,7 +641,6 @@ module vcr_ip_ctrl_mac
 	   assign free_unallocated_ivc[ivc] = free_unallocated;
 	   assign free_allocated_ivc[ivc] = free_allocated;
 	   assign ivcc_errors_ivc[ivc*7:(ivc+1)*7-1] = ivcc_errors;
-	   assign events_ivc[ivc*8:(ivc+1)*8-1] = events;
 	   
 	end
       
@@ -1368,58 +1357,6 @@ module vcr_ip_ctrl_mac
 	      .q(cred_vc_q));
 	   
 	   assign flow_ctrl_out[1:1+vc_idx_width-1] = cred_vc_q;
-	   
-	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // performance counters
-   //---------------------------------------------------------------------------
-   
-   generate
-      
-      if(perf_ctr_enable > 0)
-	begin
-	   
-	   wire [0:8*num_vcs-1] events;
-	   c_interleave
-	     #(.width(num_vcs*8),
-	       .num_blocks(num_vcs))
-	   events_intl
-	     (.data_in(events_ivc),
-	      .data_out(events));
-	   
-	   genvar 		ctr;
-	   
-	   for(ctr = 0; ctr < 8; ctr = ctr + 1)
-	     begin:ctrs
-		
-		wire [0:num_vcs-1] ctr_events;
-		assign ctr_events = events[ctr*num_vcs:(ctr+1)*num_vcs-1];
-		
-		wire [0:event_width-1] ctr_sum;
-		c_add_nto1
-		  #(.num_ports(num_vcs),
-		    .width(1))
-		ctr_sum_add
-		  (.data_in(ctr_events),
-		   .data_out(ctr_sum));
-		
-		wire [0:perf_ctr_width-1] ctr_s, ctr_q;
-		assign ctr_s = ctr_q + ctr_sum;
-		c_dff
-		  #(.width(perf_ctr_width),
-		    .reset_type(reset_type))
-		ctrq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .d(ctr_s),
-		   .q(ctr_q));
-		
-	     end
 	   
 	end
       

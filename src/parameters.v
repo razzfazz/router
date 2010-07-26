@@ -72,12 +72,6 @@ parameter router_type = `ROUTER_TYPE_VC;
 // width of flit payload data
 parameter flit_data_width = 32;
 
-// enable performance counter
-parameter perf_ctr_enable = 0;
-
-// width of each counter
-parameter perf_ctr_width = 32;
-
 // configure error checking logic
 parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 

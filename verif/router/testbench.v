@@ -305,8 +305,6 @@ module testbench
        .min_payload_length(min_payload_length),
        .router_type(router_type),
        .flit_data_width(flit_data_width),
-       .perf_ctr_enable(perf_ctr_enable),
-       .perf_ctr_width(perf_ctr_width),
        .error_capture_mode(error_capture_mode),
        .track_vcs_at_output(track_vcs_at_output),
        .restrict_turns(restrict_turns),

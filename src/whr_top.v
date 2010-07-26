@@ -121,12 +121,6 @@ module whr_top
    // width of flow control signals
    localparam flow_ctrl_width = 1;
    
-   // enable performance counter
-   parameter perf_ctr_enable = 1;
-   
-   // width of each counter
-   parameter perf_ctr_width = 32;
-   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
@@ -256,8 +250,6 @@ module whr_top
 	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
-	       .perf_ctr_enable(perf_ctr_enable),
-	       .perf_ctr_width(perf_ctr_width),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
 	       .reset_type(reset_type))

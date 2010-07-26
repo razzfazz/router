@@ -37,7 +37,7 @@ module vcr_ivc_ctrl
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
    flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_push_addr, 
    fbc_pop_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
-   free_allocated, errors, events);
+   free_allocated, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -209,9 +209,6 @@ module vcr_ivc_ctrl
    // select implementation variant for header data FIFO register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // enable performance counter
-   parameter perf_ctr_enable = 1;
-   
    // ID of current input VC
    parameter vc_id = 0;
    
@@ -343,11 +340,6 @@ module vcr_ivc_ctrl
    // internal error condition detected
    output [0:6] 				     errors;
    wire [0:6] 					     errors;
-   
-   // performance counter events
-   // (note: only valid if perf_ctr_enable=1)
-   output [0:7] 				     events;
-   wire [0:7] 					     events;
    
    
    //---------------------------------------------------------------------------
@@ -1255,79 +1247,5 @@ module vcr_ivc_ctrl
 		    error_no_header,
 		    error_ct_overflow,
 		    error_invalid_port};
-   
-   
-   //---------------------------------------------------------------------------
-   // instrumentation
-   //---------------------------------------------------------------------------
-   
-   generate
-      
-      if(perf_ctr_enable > 0)
-	begin
-	   
-	   wire ev_no_flit;
-	   assign ev_no_flit = header_valid & ~flit_valid;
-	   
-	   wire ev_flit_ready;
-	   assign ev_flit_ready = header_valid & flit_valid;
-	   
-	   wire ev_flit_stalled_vc;
-	   assign ev_flit_stalled_vc
-	     = header_valid & flit_valid & ~vc_allocated_q & ~vc_gnt;
-	   
-	   wire ev_flit_stalled_sw;
-	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	     assign ev_flit_stalled_sw
-	       = header_valid & flit_valid & vc_allocated_q & ~sw_gnt_nonspec;
-	   else
-	     assign ev_flit_stalled_sw
-	       = header_valid & flit_valid & 
-		 (vc_allocated_q & ~sw_gnt_nonspec) | 
-		 (vc_gnt & ~sw_gnt_spec);
-	   
-	   wire ev_spec_attempted;
-	   assign ev_spec_attempted
-	     = header_valid & flit_valid & ~vc_allocated_q;
-	   
-	   wire ev_spec_failed;
-	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	     assign ev_spec_failed = 1'b0;
-	   else
-	     assign ev_spec_failed
-	       = header_valid & flit_valid & ~vc_allocated_q & 
-		 ~vc_gnt & sw_gnt_spec;
-	   
-	   wire ev_flit_sent;
-	   assign ev_flit_sent = flit_sent;
-	   
-	   wire ev_flit_sent_spec;
-	   assign ev_flit_sent_spec = flit_sent & ~vc_allocated_q;
-	   
-	   wire [0:7] events_s, events_q;
-	   assign events_s = {ev_no_flit,
-			      ev_flit_ready,
-			      ev_flit_stalled_vc,
-			      ev_flit_stalled_sw,
-			      ev_spec_attempted,
-			      ev_spec_failed,
-			      ev_flit_sent,
-			      ev_flit_sent_spec};
-	   c_dff
-	     #(.width(8),
-	       .reset_type(reset_type))
-	   eventsq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .d(events_s),
-	      .q(events_q));
-	   assign events = events_q;
-	   
-	end
-      else
-	assign events = 8'd0;
-      
-   endgenerate
    
 endmodule
