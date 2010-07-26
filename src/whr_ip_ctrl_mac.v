@@ -677,10 +677,9 @@ module whr_ip_ctrl_mac
    assign hop_route_info_muxed
      = hdfc_empty ? hop_route_info : hdff_hop_route_info;
    
-   // NOTE: If the head register is currently empty, it will be reloaded from 
-   // the next incoming flit (which will be a head flit).
    wire 			   hdr_capture;
-   assign hdr_capture = (~hdr_valid & flit_valid_in) | tail_sent;
+   assign hdr_capture = (~hdr_valid & flit_valid_in) | 
+			(tail_sent & (~hdfc_empty | flit_valid_in));
    
    wire [0:hop_route_info_width-1] hdr_hop_route_info_s, hdr_hop_route_info_q;
    assign hdr_hop_route_info_s
