@@ -677,9 +677,12 @@ module whr_ip_ctrl_mac
    assign hop_route_info_muxed
      = hdfc_empty ? hop_route_info : hdff_hop_route_info;
    
+   wire 			   hdr_capture;
+   assign hdr_capture = (~hdr_valid & flit_valid) | tail_sent;
+   
    wire [0:hop_route_info_width-1] hdr_hop_route_info_s, hdr_hop_route_info_q;
    assign hdr_hop_route_info_s
-     = (~hdr_valid | tail_sent) ? hop_route_info_muxed : hdr_hop_route_info_q;
+     = hdr_capture ? hop_route_info_muxed : hdr_hop_route_info_q;
    c_dff
      #(.width(hop_route_info_width),
        .reset_type(reset_type))
