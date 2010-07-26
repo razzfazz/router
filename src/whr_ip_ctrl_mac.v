@@ -660,7 +660,7 @@ module whr_ip_ctrl_mac
    wire hdr_valid_s, hdr_valid_q;
    assign hdr_valid_s = hdr_valid_q ?
 			(~tail_sent | ~hdfc_empty | head_received) : 
-			(head_received & ~tail_sent);
+			(flit_valid_in & ~tail_sent);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
