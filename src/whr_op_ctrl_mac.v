@@ -461,10 +461,11 @@ module whr_op_ctrl_mac
 		    .regfile_type(tff_regfile_type))
 		tff
 		  (.clk(clk),
-		   .active(arb_active),
+		   .write_active(arb_active),
 		   .write_enable(gnt),
 		   .write_address(tfc_push_addr),
 		   .write_data(tff_push_data),
+		   .read_active(cred_active),
 		   .read_enable(cred_valid),
 		   .read_address(tfc_pop_addr),
 		   .read_data(tff_pop_data));

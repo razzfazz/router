@@ -695,10 +695,11 @@ module vcr_ivc_ctrl
 		    .regfile_type(htff_regfile_type))
 		htff
 		  (.clk(clk),
-		   .active(buffer_active),
+		   .write_active(buffer_active),
 		   .write_enable(htfc_push),
 		   .write_address(htfc_push_addr),
 		   .write_data(htff_push_data),
+		   .read_active(alloc_active),
 		   .read_enable(htfc_pop),
 		   .read_address(htfc_pop_addr),
 		   .read_data(htff_pop_data));
@@ -889,10 +890,11 @@ module vcr_ivc_ctrl
 	       .regfile_type(hdff_regfile_type))
 	   hdff
 	     (.clk(clk),
-	      .active(buffer_active),
+	      .write_active(buffer_active),
 	      .write_enable(hdfc_push),
 	      .write_address(hdfc_push_addr),
 	      .write_data(hdff_push_data),
+	      .read_active(alloc_active),
 	      .read_enable(hdfc_pop),
 	      .read_address(hdfc_pop_addr),
 	      .read_data(hdff_pop_data));

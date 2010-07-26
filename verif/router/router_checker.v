@@ -531,10 +531,11 @@ module router_checker
 		    .regfile_type(`REGFILE_TYPE_FF_2D))
 		rff
 		  (.clk(clk),
-		   .active(1'b1),
+		   .write_active(1'b1),
 		   .write_enable(push),
 		   .write_address(rfc_push_addr),
 		   .write_data(data_in),
+		   .read_active(1'b1),
 		   .read_enable(pop),
 		   .read_address(rfc_pop_addr),
 		   .read_data(data_out));

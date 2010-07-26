@@ -32,8 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // generic register file
 module c_regfile
-  (clk, active, write_enable, write_address, write_data, read_enable, 
-   read_address, read_data);
+  (clk, write_active, write_enable, write_address, write_data, read_active, 
+   read_enable, read_address, read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -54,7 +54,8 @@ module c_regfile
    localparam addr_width = clogb(depth);
    
    input clk;
-   input active;
+   
+   input write_active;
    
    // if high, write to entry selected by write_address
    input write_enable;
@@ -64,6 +65,8 @@ module c_regfile
    
    // data to be written
    input [0:width-1] 	  write_data;
+   
+   input [0:num_read_ports-1] read_active;
    
    // if high, read from entries selected by read_address
    input [0:num_read_ports-1] read_enable;
@@ -92,14 +95,15 @@ module c_regfile
 	       
 	       `REGFILE_TYPE_FF_2D:
 		 always @(posedge clk)
-		   if(active)
+		   if(write_active)
 		     if(write_enable)
 		       storage_2d[write_address] <= write_data;
 	       
 	       `REGFILE_TYPE_LAT_2D:
-		 always @(clk, active, write_enable, write_address, write_data)
+		 always @(clk, write_active, write_enable, write_address, 
+			  write_data)
 		   if(~clk)
-		     if(active)
+		     if(write_active)
 		       if(write_enable)
 			 storage_2d[write_address] <= write_data;
 	       
@@ -144,14 +148,14 @@ module c_regfile
 		    
 		    `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_TRISTATE:
 		      always @(posedge clk)
-			if(active)
+			if(write_active)
 			  if(write)
 			    storage <= write_data;
 		    
 		    `REGFILE_TYPE_LAT_1D_MUX, `REGFILE_TYPE_LAT_1D_TRISTATE:
-		      always @(clk, active, write, write_data)
+		      always @(clk, write_active, write, write_data)
 			if(~clk)
-			  if(active)
+			  if(write_active)
 			    if(write)
 			      storage <= write_data;
 		    
@@ -362,13 +366,16 @@ module c_regfile
 	     `REGFILE_TYPE_LAT_1D_MUX, `REGFILE_TYPE_LAT_DW:
 	       begin
 		  
+		  wire port_read_active;
+		  assign port_read_active = read_active[read_port];
+		  
 		  wire port_read_enable;
 		  assign port_read_enable = read_enable[read_port];
 		  
 		  reg [0:width-1] port_buffered_data;
-		  always @(clk, active, port_read_enable, port_cell_data)
+		  always @(clk, read_active, port_read_enable, port_cell_data)
 		    if(clk)
-		      if(active)
+		      if(port_read_active)
 			if(port_read_enable)
 			  port_buffered_data <= port_cell_data;
 		  

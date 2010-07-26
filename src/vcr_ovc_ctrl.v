@@ -433,10 +433,11 @@ module vcr_ovc_ctrl
 		    .regfile_type(tff_regfile_type))
 		tff
 		  (.clk(clk),
-		   .active(alloc_active),
+		   .write_active(alloc_active),
 		   .write_enable(flit_valid_qual),
 		   .write_address(tfc_push_addr),
 		   .write_data(tff_push_data),
+		   .read_active(cred_active),
 		   .read_enable(credit),
 		   .read_address(tfc_pop_addr),
 		   .read_data(tff_pop_data));

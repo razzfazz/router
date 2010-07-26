@@ -1030,6 +1030,7 @@ module vcr_ip_ctrl_mac
    wire [0:fbf_addr_width-1] 	fbc_push_addr;
    wire [0:fbf_addr_width-1] 	fbc_pop_addr;
    wire 			fbf_write_enable;
+   wire 			fbf_read_active;
    wire 			fbf_read_enable;
    wire [0:fbf_addr_width-1] 	fbf_read_addr;
    wire [0:flit_data_width-1] 	fbf_read_data;
@@ -1072,6 +1073,8 @@ module vcr_ip_ctrl_mac
 	   
 	   assign fbf_write_enable = flit_valid_in & ~(fbf_bypass & flit_sent);
 	   
+	   assign fbf_read_active = alloc_active;
+	   
 	   assign fbf_read_enable = flit_sent;
 	   
 	   assign fbf_read_addr = fbc_pop_addr;
@@ -1111,6 +1114,7 @@ module vcr_ip_ctrl_mac
 	      .d(fbf_read_enable_s),
 	      .q(fbf_read_enable_q));
 	   
+	   assign fbf_read_active = fbf_read_enable_q;
 	   assign fbf_read_enable = fbf_read_enable_q;
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
@@ -1135,17 +1139,18 @@ module vcr_ip_ctrl_mac
    
    wire [0:fbf_addr_width-1] 	     fbf_write_addr;
    assign fbf_write_addr = fbc_push_addr;
-
+   
    c_regfile
      #(.depth(fbf_depth),
        .width(flit_data_width),
        .regfile_type(fbf_regfile_type))
    fbf
      (.clk(clk),
-      .active(buffer_active),
+      .write_active(buffer_active),
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
+      .read_active(fbf_read_active),
       .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));

@@ -518,10 +518,11 @@ module whr_ip_ctrl_mac
 		    .regfile_type(htff_regfile_type))
 		htff
 		  (.clk(clk),
-		   .active(buffer_active),
+		   .write_active(buffer_active),
 		   .write_enable(htfc_push),
 		   .write_address(htfc_push_addr),
 		   .write_data(htff_push_data),
+		   .read_active(flags_active),
 		   .read_enable(htfc_pop),
 		   .read_address(htfc_pop_addr),
 		   .read_data(htff_pop_data));
@@ -712,10 +713,11 @@ module whr_ip_ctrl_mac
 	       .regfile_type(hdff_regfile_type))
 	   hdff
 	     (.clk(clk),
-	      .active(buffer_active),
+	      .write_active(buffer_active),
 	      .write_enable(hdfc_push),
 	      .write_address(hdfc_push_addr),
 	      .write_data(hdff_push_data),
+	      .read_active(flags_active),
 	      .read_enable(hdfc_pop),
 	      .read_address(hdfc_pop_addr),
 	      .read_data(hdff_pop_data));
@@ -916,8 +918,9 @@ module whr_ip_ctrl_mac
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in[header_info_width:flit_data_width-1];
-   
+
    wire 			   fbf_write_enable;
+   wire 			   fbf_read_active;
    wire 			   fbf_read_enable;
    wire [0:fbf_addr_width-1] 	   fbf_read_addr;
    wire [0:flit_data_width-1] 	   fbf_read_data;
@@ -932,6 +935,8 @@ module whr_ip_ctrl_mac
 	   
 	   assign fbf_write_enable
 	     = flit_valid_thru & ~(fbf_bypass & flit_valid_out);
+	   
+	   assign fbf_read_active = flags_active;
 	   
 	   assign fbf_read_enable = flit_valid_out;
 	   
@@ -978,6 +983,7 @@ module whr_ip_ctrl_mac
 	      .d(fbf_read_enable_s),
 	      .q(fbf_read_enable_q));
 	   
+	   assign fbf_read_active = fbf_read_enable_q;
 	   assign fbf_read_enable = fbf_read_enable_q;
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
@@ -1010,10 +1016,11 @@ module whr_ip_ctrl_mac
        .regfile_type(fbf_regfile_type))
    fbf
      (.clk(clk),
-      .active(buffer_active),
+      .write_active(buffer_active),
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
+      .read_active(fbf_read_active),
       .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));

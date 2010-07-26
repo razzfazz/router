@@ -425,10 +425,11 @@ module packet_source
 		    .regfile_type(`REGFILE_TYPE_FF_2D))
 		trf
 		  (.clk(clk),
-		   .active(1'b1),
+		   .write_active(1'b1),
 		   .write_enable(debit),
 		   .write_address(tff_push_addr),
 		   .write_data(trf_push_data),
+		   .read_active(1'b1),
 		   .read_enable(credit),
 		   .read_address(tff_pop_addr),
 		   .read_data(trf_pop_data));

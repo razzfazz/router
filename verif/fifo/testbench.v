@@ -79,10 +79,11 @@ module testbench
        .regfile_type(regfile_type))
    rf
      (.clk(clk),
-      .active(1'b1),
+      .write_active(1'b1),
       .write_enable(push),
       .write_address(push_addr),
       .write_data(push_data),
+      .read_active(1'b1),
       .read_enable(pop),
       .read_address(pop_addr),
       .read_data(pop_data));
