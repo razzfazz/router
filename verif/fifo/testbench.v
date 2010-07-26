@@ -23,31 +23,33 @@ module testbench
    
    wire push;
    wire pop;
-   wire [0:addr_width-1] push_addr;
-   wire [0:addr_width-1] pop_addr;
-   wire 		 fc_almost_empty;
-   wire 		 fc_empty;
-   wire 		 fc_almost_full;
-   wire 		 fc_full;
-   wire [0:1] 		 fc_errors;
+   reg [0:data_width-1] push_data;
+   wire [0:data_width-1] pop_data;
+   wire 		 ff_almost_empty;
+   wire 		 ff_empty;
+   wire 		 ff_almost_full;
+   wire 		 ff_full;
+   wire [0:1] 		 ff_errors;
    
-   c_fifo_ctrl
+   c_fifo
      #(.depth(num_buffers),
+       .width(data_width),
+       .regfile_type(regfile_type),
        .reset_type(reset_type))
-   fc
+   ff
      (.clk(clk),
       .reset(reset),
       .push_active(1'b1),
       .pop_active(1'b1),
       .push(push),
       .pop(pop),
-      .push_addr(push_addr),
-      .pop_addr(pop_addr),
-      .almost_empty(fc_almost_empty),
-      .empty(fc_empty),
-      .almost_full(fc_almost_full),
-      .full(fc_full),
-      .errors(fc_errors));
+      .push_data(push_data),
+      .pop_data(pop_data),
+      .almost_empty(ff_almost_empty),
+      .empty(ff_empty),
+      .almost_full(ff_almost_full),
+      .full(ff_full),
+      .errors(ff_errors));
    
    wire 		 ft_almost_empty;
    wire 		 ft_empty;
@@ -69,24 +71,6 @@ module testbench
       .almost_full(ft_almost_full),
       .full(ft_full),
       .errors(ft_errors));
-
-   reg [0:data_width-1] push_data;
-   wire [0:data_width-1] pop_data;
-
-   c_regfile
-     #(.width(data_width),
-       .depth(num_buffers),
-       .regfile_type(regfile_type))
-   rf
-     (.clk(clk),
-      .write_active(1'b1),
-      .write_enable(push),
-      .write_address(push_addr),
-      .write_data(push_data),
-      .read_active(1'b1),
-      .read_enable(pop),
-      .read_address(pop_addr),
-      .read_data(pop_data));
    
    always
    begin
@@ -103,8 +87,8 @@ module testbench
    reg drain;
    reg flag_in, flag_out;
 
-   assign push = ~reset & flag_in & ~fc_full;
-   assign pop = ~reset & flag_out & ~fc_empty;
+   assign push = ~reset & flag_in & ~ff_full;
+   assign pop = ~reset & flag_out & ~ff_empty;
    
    integer seed = initial_seed;
 
@@ -118,16 +102,16 @@ module testbench
    always @(negedge clk)
      begin
 	if(push)
-	  $display($time, " WRITE: %x=%x.", push_addr, push_data);
+	  $display($time, " WRITE: %x.", push_data);
 	if(pop)
-	  $display($time, " READ:  %x=%x.", pop_addr, pop_data);
+	  $display($time, " READ:  %x.", pop_data);
 	if(pop & (^pop_data === 1'bx))
 	  $display($time, " ERROR: read X value");
-	if((fc_almost_empty ^ ft_almost_empty) |
-	   (fc_empty ^ ft_empty) |
-	   (fc_almost_full ^ ft_almost_full) |
-	   (fc_full ^ ft_full))
-	  $display($time, " ERROR: c_fifo_ctrl and c_fifo_tracker mismatch");
+	if((ff_almost_empty ^ ft_almost_empty) |
+	   (ff_empty ^ ft_empty) |
+	   (ff_almost_full ^ ft_almost_full) |
+	   (ff_full ^ ft_full))
+	  $display($time, " ERROR: c_fifo and c_fifo_tracker mismatch");
      end
    
    initial
@@ -143,7 +127,7 @@ module testbench
 
       drain = 1'b1;
 
-      while(!fc_empty)
+      while(!ff_empty)
 	#(Tclk);
       
       $finish;

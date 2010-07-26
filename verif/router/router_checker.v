@@ -193,7 +193,7 @@ module router_checker
    wire [0:num_ports*num_vcs*port_idx_width-1] 	ref_port_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	ref_vcs_ip_ivc;
    
-   wire [0:num_ports-1] 			rfc_errors_ip;
+   wire [0:num_ports-1] 			rff_errors_ip;
    
    genvar 					ip;
    
@@ -429,7 +429,7 @@ module router_checker
 	   // candidate VCs in per-VC FIFOs
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs*2-1] 	       rfc_errors_ivc;
+	   wire [0:num_vcs*2-1] 	       rff_errors_ivc;
 	   
 	   genvar 			       ivc;
 	   
@@ -482,84 +482,70 @@ module router_checker
 		wire 			  pop;
 		assign pop = match;
 		
-		wire 			  rfc_almost_full;
-		wire 			  rfc_full;
-		wire 			  rfc_almost_empty;
-		wire 			  rfc_empty;
-		wire [0:1] 		  rfc_errors;
-		wire [0:flit_buffer_idx_width-1] rfc_push_addr;
-		wire [0:flit_buffer_idx_width-1] rfc_pop_addr;
-		c_fifo_ctrl
+		wire [0:(flit_data_width+2+
+			 port_idx_width+num_vcs)-1] rff_push_data;
+		assign rff_push_data[0:header_info_width-1]
+		  = flit_head ? header_info_out : header_info_in;
+		assign rff_push_data[header_info_width:flit_data_width-1]
+		  = flit_data[header_info_width:flit_data_width-1];
+		assign rff_push_data[flit_data_width] = flit_head;
+		assign rff_push_data[flit_data_width+1] = flit_tail;
+		assign rff_push_data[flit_data_width+2:
+				     flit_data_width+2+port_idx_width-1]
+		  = dest_port_s;
+		assign rff_push_data[flit_data_width+2+port_idx_width:
+				     flit_data_width+2+port_idx_width+num_vcs-1]
+		  = dest_ovc_s;
+		
+		wire [0:(flit_data_width+2+
+			 port_idx_width+num_vcs)-1] rff_pop_data;
+		wire 				    rff_almost_full;
+		wire 				    rff_full;
+		wire 				    rff_almost_empty;
+		wire 				    rff_empty;
+		wire [0:1] 			    rff_errors;
+		c_fifo
 		  #(.depth(num_flits_per_vc),
+		    .width(flit_data_width+2+port_idx_width+num_vcs),
 		    .reset_type(reset_type))
-		rfc
+		rff
 		  (.clk(clk),
 		   .reset(reset),
 		   .push_active(1'b1),
 		   .pop_active(1'b1),
 		   .push(push),
 		   .pop(pop),
-		   .push_addr(rfc_push_addr),
-		   .pop_addr(rfc_pop_addr),
-		   .almost_empty(rfc_almost_empty),
-		   .empty(rfc_empty),
-		   .almost_full(rfc_almost_full),
-		   .full(rfc_full),
-		   .errors(rfc_errors));
+		   .push_data(rff_push_data),
+		   .pop_data(rff_pop_data),
+		   .almost_empty(rff_almost_empty),
+		   .empty(rff_empty),
+		   .almost_full(rff_almost_full),
+		   .full(rff_full),
+		   .errors(rff_errors));
 		
-		assign rfc_errors_ivc[ivc*2:(ivc+1)*2-1] = rfc_errors;
-		
-		wire [0:(flit_data_width+2+port_idx_width+num_vcs)-1] data_in;
-		assign data_in[0:header_info_width-1]
-		  = flit_head ? header_info_out : header_info_in;
-		assign data_in[header_info_width:flit_data_width-1]
-		  = flit_data[header_info_width:flit_data_width-1];
-		assign data_in[flit_data_width] = flit_head;
-		assign data_in[flit_data_width+1] = flit_tail;
-		assign data_in[flit_data_width+2:
-			       flit_data_width+2+port_idx_width-1]
-		  = dest_port_s;
-		assign data_in[flit_data_width+2+port_idx_width:
-			       flit_data_width+2+port_idx_width+num_vcs-1]
-		  = dest_ovc_s;
-		
-		wire [0:(flit_data_width+2+port_idx_width+num_vcs)-1] data_out;
-		c_regfile
-		  #(.depth(num_flits_per_vc),
-		    .width(flit_data_width+2+port_idx_width+num_vcs),
-		    .num_read_ports(1),
-		    .regfile_type(`REGFILE_TYPE_FF_2D))
-		rff
-		  (.clk(clk),
-		   .write_active(1'b1),
-		   .write_enable(push),
-		   .write_address(rfc_push_addr),
-		   .write_data(data_in),
-		   .read_active(1'b1),
-		   .read_enable(pop),
-		   .read_address(rfc_pop_addr),
-		   .read_data(data_out));
+		assign rff_errors_ivc[ivc*2:(ivc+1)*2-1] = rff_errors;
 		
 		
 		// generate reference bit patterns
 		
 		wire [0:flit_data_width-1] ref_data;
-		assign ref_data = data_out[0:flit_data_width-1];
+		assign ref_data = rff_pop_data[0:flit_data_width-1];
 		
 		wire 			   ref_head;
-		assign ref_head = data_out[flit_data_width];
+		assign ref_head = rff_pop_data[flit_data_width];
 		
 		wire 			   ref_tail;
-		assign ref_tail = data_out[flit_data_width+1];
+		assign ref_tail = rff_pop_data[flit_data_width+1];
 		
 		wire [0:port_idx_width-1]  ref_port;
-		assign ref_port = data_out[flit_data_width+2:
-					   flit_data_width+2+port_idx_width-1];
+		assign ref_port
+		  = rff_pop_data[flit_data_width+2:
+				 flit_data_width+2+port_idx_width-1];
 		
 		wire [0:num_vcs-1] 	   ref_sel_ovc;
-		assign ref_sel_ovc = data_out[flit_data_width+2+port_idx_width:
-					      flit_data_width+2+port_idx_width+
-					      num_vcs-1];
+		assign ref_sel_ovc
+		  = rff_pop_data[flit_data_width+2+port_idx_width:
+				 flit_data_width+2+port_idx_width+num_vcs-1];
 		
 		
 		// extract observed bit patterns
@@ -606,7 +592,7 @@ module router_checker
 		assign match_vcs = |(ref_sel_ovc & check_sel_ivc);
 		
 		// check only if output is active and FIFO contains data
-		assign match = check_valid & ~rfc_empty & 
+		assign match = check_valid & ~rff_empty & 
 			       match_head & match_tail & match_data & match_vcs;
 		
 		
@@ -627,7 +613,7 @@ module router_checker
 			 = match_op;
 		
 		// determine head-of-line expected flits for each VC
-		assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~rfc_empty;
+		assign ref_valid_ip_ivc[ip*num_vcs+ivc] = ~rff_empty;
 		assign ref_head_ip_ivc[ip*num_vcs+ivc] = ref_head;
 		assign ref_tail_ip_ivc[ip*num_vcs+ivc] = ref_tail;
 		assign ref_data_ip_ivc[(ip*num_vcs+ivc)*flit_data_width:
@@ -655,11 +641,11 @@ module router_checker
 		     for(i = 0; i < num_vcs; i = i + 1)
 		       begin
 			  
-			  if(rfc_errors_ivc[i*2])
+			  if(rff_errors_ivc[i*2])
 			    $display({"ERROR: Reference FIFO underflow at ", 
 				      "port %d, VC %d."}, ip, i);
 			  
-			  if(rfc_errors_ivc[i*2+1])
+			  if(rff_errors_ivc[i*2+1])
 			    $display({"ERROR: Reference FIFO overflow at ", 
 				      "port %d, VC %d."}, ip, i);
 			  
@@ -669,7 +655,7 @@ module router_checker
 		// synopsys translate_on
 		
 		wire [0:num_vcs*2-1] errors_s, errors_q;
-		assign errors_s = rfc_errors_ivc;
+		assign errors_s = rff_errors_ivc;
 		c_err_rpt
 		  #(.num_errors(num_vcs*2),
 		    .capture_mode(error_capture_mode),
@@ -681,11 +667,11 @@ module router_checker
 		   .errors_in(errors_s),
 		   .errors_out(errors_q));
 		
-		assign rfc_errors_ip[ip] = |errors_q;
+		assign rff_errors_ip[ip] = |errors_q;
 		
 	     end
 	   else
-	     assign rfc_errors_ip[ip] = 1'b0;
+	     assign rff_errors_ip[ip] = 1'b0;
 	   
 	   
 	end
@@ -817,7 +803,7 @@ module router_checker
 		
 		for(i = 0; i < num_ports; i = i + 1)
 		  begin
-		     if(rfc_errors_ip[i])
+		     if(rff_errors_ip[i])
 		       $display({"ERROR: Reference FIFO error detected at ", 
 				 "input port %d."}, i);
 		  end
@@ -826,7 +812,7 @@ module router_checker
 	   // synopsys translate_on
 	   
 	   wire [0:3*num_ports-1] errors_s, errors_q;
-	   assign errors_s = {rfc_errors_ip, check_error_op, x_error_op};
+	   assign errors_s = {rff_errors_ip, check_error_op, x_error_op};
 	   c_err_rpt
 	     #(.num_errors(3*num_ports),
 	       .capture_mode(error_capture_mode),

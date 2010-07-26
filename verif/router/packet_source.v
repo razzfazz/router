@@ -388,16 +388,18 @@ module packet_source
 	   else
 	     begin
 		
-		wire [0:flit_buffer_idx_width-1] tff_push_addr;
-		wire [0:flit_buffer_idx_width-1] tff_pop_addr;
-		wire [0:flit_buffer_idx_width-1] tff_peek_addr;
-		wire 				 tff_almost_full;
-		wire 				 tff_full;
-		wire 				 tff_almost_empty;
-		wire 				 tff_empty;
-		wire [0:1] 			 tff_errors;
-		c_fifo_ctrl
+		wire tff_push_data;
+		assign tff_push_data = flit_tail;
+		
+		wire tff_pop_data;
+		wire tff_almost_full;
+		wire tff_full;
+		wire tff_almost_empty;
+		wire tff_empty;
+		wire [0:1] tff_errors;
+		c_fifo
 		  #(.depth(num_flits_per_vc),
+		    .width(1),
 		    .reset_type(reset_type))
 		tff
 		  (.clk(clk),
@@ -406,35 +408,15 @@ module packet_source
 		   .pop_active(1'b1),
 		   .push(debit),
 		   .pop(credit),
-		   .push_addr(tff_push_addr),
-		   .pop_addr(tff_pop_addr),
+		   .push_data(tff_push_data),
+		   .pop_data(tff_pop_data),
 		   .almost_empty(tff_almost_empty),
 		   .empty(tff_empty),
 		   .almost_full(tff_almost_full),
 		   .full(tff_full),
 		   .errors(tff_errors));
 		
-		wire 				 trf_push_data;
-		assign trf_push_data = flit_tail;
-		
-		wire 				 trf_pop_data;
-		c_regfile
-		  #(.depth(num_flits_per_vc),
-		    .width(1),
-		    .num_read_ports(1),
-		    .regfile_type(`REGFILE_TYPE_FF_2D))
-		trf
-		  (.clk(clk),
-		   .write_active(1'b1),
-		   .write_enable(debit),
-		   .write_address(tff_push_addr),
-		   .write_data(trf_push_data),
-		   .read_active(1'b1),
-		   .read_enable(credit),
-		   .read_address(tff_pop_addr),
-		   .read_data(trf_pop_data));
-		
-		assign hft_credit = credit & trf_pop_data;
+		assign hft_credit = credit & tff_pop_data;
 		
 	     end
 	   

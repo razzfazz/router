@@ -359,7 +359,7 @@ module vcr_ovc_ctrl
 	   assign error_hft_overflow = 1'b0;
 	   
 	end
-      else
+      else if(num_packets_per_vc < num_flits_per_vc)
 	begin
 	   
 	   // if only a subset of the flit buffer entries can be headers, we 
@@ -395,52 +395,37 @@ module vcr_ovc_ctrl
 		assign head_credit = tail_sent_q & last_credit_received;
 		
 	     end
-	   else
+	   else if(num_packets_per_vc > 1)
 	     begin
 		
-		wire [0:tff_addr_width-1] tfc_push_addr;
-		wire [0:tff_addr_width-1] tfc_pop_addr;
-		wire 			  tfc_almost_full;
-		wire 			  tfc_full;
-		wire 			  tfc_almost_empty;
-		wire 			  tfc_empty;
-		wire [0:1] 		  tfc_errors;
-		c_fifo_ctrl
+		wire 			  tff_push_data;
+		assign tff_push_data = flit_tail;
+		
+		wire 			  tff_pop_data;
+		wire 			  tff_almost_full;
+		wire 			  tff_full;
+		wire 			  tff_almost_empty;
+		wire 			  tff_empty;
+		wire [0:1] 		  tff_errors;
+		c_fifo
 		  #(.depth(num_flits_per_vc),
+		    .width(1),
+		    .regfile_type(tff_regfile_type),
 		    .reset_type(reset_type))
-		tfc
+		tff
 		  (.clk(clk),
 		   .reset(reset),
 		   .push_active(alloc_active),
 		   .pop_active(cred_active),
 		   .push(flit_valid_qual),
 		   .pop(credit),
-		   .push_addr(tfc_push_addr),
-		   .pop_addr(tfc_pop_addr),
-		   .almost_empty(tfc_almost_empty),
-		   .empty(tfc_empty),
-		   .almost_full(tfc_almost_full),
-		   .full(tfc_full),
-		   .errors(tfc_errors));
-		
-		wire 			  tff_push_data;
-		assign tff_push_data = flit_tail;
-		
-		wire 			  tff_pop_data;
-		c_regfile
-		  #(.depth(num_flits_per_vc),
-		    .width(1),
-		    .regfile_type(tff_regfile_type))
-		tff
-		  (.clk(clk),
-		   .write_active(alloc_active),
-		   .write_enable(flit_valid_qual),
-		   .write_address(tfc_push_addr),
-		   .write_data(tff_push_data),
-		   .read_active(cred_active),
-		   .read_enable(credit),
-		   .read_address(tfc_pop_addr),
-		   .read_data(tff_pop_data));
+		   .push_data(tff_push_data),
+		   .pop_data(tff_pop_data),
+		   .almost_empty(tff_almost_empty),
+		   .empty(tff_empty),
+		   .almost_full(tff_almost_full),
+		   .full(tff_full),
+		   .errors(tff_errors));
 		
 		assign head_credit = credit & tff_pop_data;		
 		

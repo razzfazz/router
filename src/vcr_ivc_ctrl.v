@@ -640,123 +640,61 @@ module vcr_ivc_ctrl
       if(num_packets_per_vc > 1)
 	begin
 	   
-	   wire htfc_empty;
+	   wire htff_empty;
 	   
-	   wire htfc_push;
-	   assign htfc_push
-	     = flit_valid_in & ~fbc_empty & (~flit_sent | ~htfc_empty);
+	   wire htff_push;
+	   assign htff_push
+	     = flit_valid_in & ~fbc_empty & (~flit_sent | ~htff_empty);
 	   
-	   wire htfc_pop;
-	   assign htfc_pop = flit_sent & ~htfc_empty;
+	   wire htff_pop;
+	   assign htff_pop = flit_sent & ~htff_empty;
 	   
-	   wire htff_flit_head;
-	   wire htff_flit_tail;
-	   wire error_htfc_underflow;
-	   wire error_htfc_overflow;
+	   wire [0:1] htff_push_data;
+	   assign htff_push_data[0] = flit_head_in;
+	   assign htff_push_data[1] = flit_tail_in;
 	   
-	   if(num_flits_per_vc > 2)
-	     begin
-		
-		wire [0:htff_addr_width-1] htfc_push_addr;
-		wire [0:htff_addr_width-1] htfc_pop_addr;
-		wire 			   htfc_almost_full;
-		wire 			   htfc_full;
-		wire 			   htfc_almost_empty;
-		wire [0:1] 		   htfc_errors;
-		c_fifo_ctrl
-		  #(.depth(num_flits_per_vc - 1),
-		    .reset_type(reset_type))
-		htfc
-		  (.clk(clk),
-		   .reset(reset),
-		   .push_active(buffer_active),
-		   .pop_active(alloc_active),
-		   .push(htfc_push),
-		   .pop(htfc_pop),
-		   .push_addr(htfc_push_addr),
-		   .pop_addr(htfc_pop_addr),
-		   .almost_empty(htfc_almost_empty),
-		   .empty(htfc_empty),
-		   .almost_full(htfc_almost_full),
-		   .full(htfc_full),
-		   .errors(htfc_errors));
-		
-		assign error_htfc_underflow = htfc_errors[0];
-		assign error_htfc_overflow = htfc_errors[1];
-		
-		wire [0:1] 		   htff_push_data;
-		assign htff_push_data[0] = flit_head_in;
-		assign htff_push_data[1] = flit_tail_in;
-		
-		wire [0:1] 		   htff_pop_data;
-		c_regfile
-		  #(.depth(num_flits_per_vc - 1),
-		    .width(2),
-		    .regfile_type(htff_regfile_type))
-		htff
-		  (.clk(clk),
-		   .write_active(buffer_active),
-		   .write_enable(htfc_push),
-		   .write_address(htfc_push_addr),
-		   .write_data(htff_push_data),
-		   .read_active(alloc_active),
-		   .read_enable(htfc_pop),
-		   .read_address(htfc_pop_addr),
-		   .read_data(htff_pop_data));
-		
-		assign htff_flit_head = htff_pop_data[0];
-		assign htff_flit_tail = htff_pop_data[1];
-		
-	     end
-	   else if(num_flits_per_vc == 2)
-	     begin
-		
-		wire [0:1] htff_data_s, htff_data_q;
-		assign htff_data_s[0]
-		  = flit_valid_in ? flit_head_in : htff_data_q[0];
-		assign htff_data_s[1]
-		  = flit_valid_in ? flit_tail_in : htff_data_q[1];
-		c_dff
-		  #(.width(2),
-		    .reset_type(reset_type))
-		htff_dataq
-		  (.clk(clk),
-		   .reset(1'b0),
-		   .active(buffer_active),
-		   .d(htff_data_s),
-		   .q(htff_data_q));
-		
-		assign htff_flit_head = htff_data_q[0];
-		assign htff_flit_tail = htff_data_q[1];
-		
-		wire       htfc_empty_s, htfc_empty_q;
-		assign htfc_empty_s = (htfc_empty_q | (htfc_pop & ~htfc_push)) &
-				      ~(htfc_push & ~htfc_pop);
-		c_dff
-		  #(.width(1),
-		    .reset_value(1'b1),
-		    .reset_type(reset_type))
-		htfc_emptyq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(htfc_empty_s),
-		   .q(htfc_empty_q));
-		
-		assign htfc_empty = htfc_empty_q;
-		
-		assign error_htfc_underflow
-		  = htfc_empty_q & ~htfc_push & htfc_pop;
-		assign error_htfc_overflow
-		  = ~htfc_empty_q & htfc_push & ~htfc_pop;
-		
-	     end
+	   wire [0:1] htff_pop_data;
+	   wire       htff_almost_full;
+	   wire       htff_full;
+	   wire       htff_almost_empty;
+	   wire [0:1] htff_errors;
+	   c_fifo
+	     #(.depth(num_flits_per_vc - 1),
+	       .width(2),
+	       .regfile_type(htff_regfile_type),
+	       .reset_type(reset_type))
+	   htff
+	     (.clk(clk),
+	      .reset(reset),
+	      .push_active(buffer_active),
+	      .pop_active(alloc_active),
+	      .push(htff_push),
+	      .pop(htff_pop),
+	      .push_data(htff_push_data),
+	      .pop_data(htff_pop_data),
+	      .almost_empty(htff_almost_empty),
+	      .empty(htff_empty),
+	      .almost_full(htff_almost_full),
+	      .full(htff_full),
+	      .errors(htff_errors));
+	   
+	   wire       htff_flit_head;
+	   assign htff_flit_head = htff_pop_data[0];
+	   
+	   wire       htff_flit_tail;
+	   assign htff_flit_tail = htff_pop_data[1];
+	   
+	   wire       error_htff_underflow;
+	   assign error_htff_underflow = htff_errors[0];
+	   
+	   wire       error_htff_overflow;
+	   assign error_htff_overflow = htff_errors[1];
 	   
 	   wire flit_head_muxed;
-	   assign flit_head_muxed = htfc_empty ? flit_head_in : htff_flit_head;
+	   assign flit_head_muxed = htff_empty ? flit_head_in : htff_flit_head;
 	   
 	   wire flit_tail_muxed;
-	   assign flit_tail_muxed = htfc_empty ? flit_tail_in : htff_flit_tail;
+	   assign flit_tail_muxed = htff_empty ? flit_tail_in : htff_flit_tail;
 	   
 	   wire [0:1] flit_flags_muxed;
 	   assign flit_flags_muxed[0] = flit_head_muxed;
@@ -836,118 +774,64 @@ module vcr_ivc_ctrl
    assign tail_sent = flit_sent & flit_tail;
    
    wire 	hdr_valid;
-   wire 	hdfc_empty;
+   wire 	hdff_empty;
    
-   wire 	hdfc_push;
-   assign hdfc_push = head_received & hdr_valid & (~tail_sent | ~hdfc_empty);
+   wire 	hdff_push;
+   assign hdff_push = head_received & hdr_valid & (~tail_sent | ~hdff_empty);
    
-   wire 	hdfc_pop;
-   assign hdfc_pop = tail_sent & ~hdfc_empty;
+   wire 	hdff_pop;
+   assign hdff_pop = tail_sent & ~hdff_empty;
    
    wire [0:hop_route_info_width-1] hdff_hop_route_info;
-   wire 			   error_hdfc_underflow;
-   wire 			   error_hdfc_overflow;
+   wire 			   error_hdff_underflow;
+   wire 			   error_hdff_overflow;
    
    generate
       
-      if(num_packets_per_vc > 2)
+      if(num_packets_per_vc > 1)
 	begin
-	   
-	   wire [0:hdff_addr_width-1] hdfc_push_addr;
-	   wire [0:hdff_addr_width-1] hdfc_pop_addr;
-	   wire 		      hdfc_almost_full;
-	   wire 		      hdfc_full;
-	   wire 		      hdfc_almost_empty;
-	   wire [0:1] 		      hdfc_errors;
-	   c_fifo_ctrl
-	     #(.depth(num_packets_per_vc - 1),
-	       .reset_type(reset_type))
-	   hdfc
-	     (.clk(clk),
-	      .reset(reset),
-	      .push_active(buffer_active),
-	      .pop_active(alloc_active),
-	      .push(hdfc_push),
-	      .pop(hdfc_pop),
-	      .push_addr(hdfc_push_addr),
-	      .pop_addr(hdfc_pop_addr),
-	      .almost_empty(hdfc_almost_empty),
-	      .empty(hdfc_empty),
-	      .almost_full(hdfc_almost_full),
-	      .full(hdfc_full),
-	      .errors(hdfc_errors));
-	   
-	   assign error_hdfc_underflow = hdfc_errors[0];
-	   assign error_hdfc_overflow = hdfc_errors[1];
 	   
 	   wire [0:hop_route_info_width-1] hdff_push_data;
 	   assign hdff_push_data = hop_route_info;
 	   
 	   wire [0:hop_route_info_width-1] hdff_pop_data;
-	   c_regfile
+	   wire 			   hdff_almost_full;
+	   wire 			   hdff_full;
+	   wire 			   hdff_almost_empty;
+	   wire [0:1] 			   hdff_errors;
+	   c_fifo
 	     #(.depth(num_packets_per_vc - 1),
 	       .width(hop_route_info_width),
-	       .regfile_type(hdff_regfile_type))
+	       .regfile_type(hdff_regfile_type),
+	       .reset_type(reset_type))
 	   hdff
 	     (.clk(clk),
-	      .write_active(buffer_active),
-	      .write_enable(hdfc_push),
-	      .write_address(hdfc_push_addr),
-	      .write_data(hdff_push_data),
-	      .read_active(alloc_active),
-	      .read_enable(hdfc_pop),
-	      .read_address(hdfc_pop_addr),
-	      .read_data(hdff_pop_data));
+	      .reset(reset),
+	      .push_active(buffer_active),
+	      .pop_active(alloc_active),
+	      .push(hdff_push),
+	      .pop(hdff_pop),
+	      .push_data(hdff_push_data),
+	      .pop_data(hdff_pop_data),
+	      .almost_empty(hdff_almost_empty),
+	      .empty(hdff_empty),
+	      .almost_full(hdff_almost_full),
+	      .full(hdff_full),
+	      .errors(hdff_errors));
 	   
 	   assign hdff_hop_route_info = hdff_pop_data;
 	   
-	end
-      else if(num_packets_per_vc == 2)
-	begin
-	   
-	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
-	   wire [0:hop_route_info_width-1] hdff_hop_route_info_q;
-	   assign hdff_hop_route_info_s
-	     = hdfc_push ? hop_route_info : hdff_hop_route_info_q;
-	   c_dff
-	     #(.width(hop_route_info_width),
-	       .reset_type(reset_type))
-	   hdff_hop_route_infoq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(buffer_active),
-	      .d(hdff_hop_route_info_s),
-	      .q(hdff_hop_route_info_q));
-	   
-	   assign hdff_hop_route_info = hdff_hop_route_info_q;
-	   
-	   wire 			   hdfc_empty_s, hdfc_empty_q;
-	   assign hdfc_empty_s = (hdfc_empty_q | (hdfc_pop & ~hdfc_push)) &
-				 ~(hdfc_push & ~hdfc_pop);
-	   c_dff
-	     #(.width(1),
-	       .reset_value(1'b1),
-	       .reset_type(reset_type))
-	   hdfc_emptyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(alloc_active),
-	      .d(hdfc_empty_s),
-	      .q(hdfc_empty_q));
-	   
-	   assign hdfc_empty = hdfc_empty_q;
-	   
-	   assign error_hdfc_underflow = hdfc_empty_q & ~hdfc_push & hdfc_pop;
-	   assign error_hdfc_overflow = ~hdfc_empty_q & hdfc_push & ~hdfc_pop;
+	   assign error_hdff_underflow = hdff_errors[0];
+	   assign error_hdff_overflow = hdff_errors[1];
 	   
 	end
       else if(num_packets_per_vc == 1)
 	begin
 	   
-	   assign hdfc_empty = 1'b1;
-	   assign error_hdfc_underflow = 1'b0;
-	   assign error_hdfc_overflow = 1'b0;
+	   assign hdff_empty = 1'b1;
 	   assign hdff_hop_route_info = {hop_route_info_width{1'b0}};
+	   assign error_hdff_underflow = 1'b0;
+	   assign error_hdff_overflow = 1'b0;
 	   
 	end
       
@@ -960,7 +844,7 @@ module vcr_ivc_ctrl
    
    wire hdr_valid_s, hdr_valid_q;
    assign hdr_valid_s = hdr_valid_q ?
-			(~tail_sent | ~hdfc_empty | head_received) : 
+			(~tail_sent | ~hdff_empty | head_received) : 
 			(flit_valid_in & ~tail_sent);
    c_dff
      #(.width(1),
@@ -976,11 +860,11 @@ module vcr_ivc_ctrl
    
    wire [0:hop_route_info_width-1] hop_route_info_muxed;
    assign hop_route_info_muxed
-     = hdfc_empty ? hop_route_info : hdff_hop_route_info;
+     = hdff_empty ? hop_route_info : hdff_hop_route_info;
    
    wire 			   hdr_capture;
    assign hdr_capture = (~hdr_valid & flit_valid_in) | 
-			(tail_sent & (~hdfc_empty | flit_valid_in));
+			(tail_sent & (~hdff_empty | flit_valid_in));
    
    wire [0:hop_route_info_width-1] hdr_hop_route_info_s, hdr_hop_route_info_q;
    assign hdr_hop_route_info_s
@@ -1344,10 +1228,10 @@ module vcr_ivc_ctrl
 	if(error_fbc_overflow)
 	  $display("ERROR: Flit buffer overflow in module %m.");
 	
-	if(error_hdfc_underflow)
+	if(error_hdff_underflow)
 	  $display("ERROR: Head FIFO underflow in module %m.");
 	
-	if(error_hdfc_overflow)
+	if(error_hdff_overflow)
 	  $display("ERROR: Head FIFO overflow in module %m.");
 	
 	if(error_no_header)
@@ -1366,8 +1250,8 @@ module vcr_ivc_ctrl
    
    assign errors = {error_fbc_underflow,
 		    error_fbc_overflow,
-		    error_hdfc_underflow,
-		    error_hdfc_overflow,
+		    error_hdff_underflow,
+		    error_hdff_overflow,
 		    error_no_header,
 		    error_ct_overflow,
 		    error_invalid_port};
