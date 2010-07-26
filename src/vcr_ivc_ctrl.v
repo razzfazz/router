@@ -815,7 +815,7 @@ module vcr_ivc_ctrl
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_q;
 	   assign hdff_hop_route_info_s
-	     = flit_head_in ? hop_route_info : hdff_hop_route_info_q;
+	     = hdfc_push ? hop_route_info : hdff_hop_route_info_q;
 	   c_dff
 	     #(.width(hop_route_info_width),
 	       .reset_type(reset_type))
