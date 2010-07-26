@@ -388,8 +388,8 @@ module packet_source
 	   else
 	     begin
 		
-		wire [0:flit_buffer_idx_width-1] tff_write_addr;
-		wire [0:flit_buffer_idx_width-1] tff_read_addr;
+		wire [0:flit_buffer_idx_width-1] tff_push_addr;
+		wire [0:flit_buffer_idx_width-1] tff_pop_addr;
 		wire [0:flit_buffer_idx_width-1] tff_peek_addr;
 		wire 				 tff_almost_full;
 		wire 				 tff_full;
@@ -402,21 +402,22 @@ module packet_source
 		tff
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(1'b1),
+		   .push_active(1'b1),
+		   .pop_active(1'b1),
 		   .push(debit),
 		   .pop(credit),
-		   .write_addr(tff_write_addr),
-		   .read_addr(tff_read_addr),
+		   .push_addr(tff_push_addr),
+		   .pop_addr(tff_pop_addr),
 		   .almost_empty(tff_almost_empty),
 		   .empty(tff_empty),
 		   .almost_full(tff_almost_full),
 		   .full(tff_full),
 		   .errors(tff_errors));
 		
-		wire 				 trf_write_data;
-		assign trf_write_data = flit_tail;
+		wire 				 trf_push_data;
+		assign trf_push_data = flit_tail;
 		
-		wire 				 trf_read_data;
+		wire 				 trf_pop_data;
 		c_regfile
 		  #(.depth(num_flits_per_vc),
 		    .width(1),
@@ -426,13 +427,13 @@ module packet_source
 		  (.clk(clk),
 		   .active(1'b1),
 		   .write_enable(debit),
-		   .write_address(tff_write_addr),
-		   .write_data(trf_write_data),
+		   .write_address(tff_push_addr),
+		   .write_data(trf_push_data),
 		   .read_enable(credit),
-		   .read_address(tff_read_addr),
-		   .read_data(trf_read_data));
+		   .read_address(tff_pop_addr),
+		   .read_data(trf_pop_data));
 		
-		assign hft_credit = credit & trf_read_data;
+		assign hft_credit = credit & trf_pop_data;
 		
 	     end
 	   

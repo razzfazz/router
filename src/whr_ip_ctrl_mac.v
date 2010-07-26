@@ -440,11 +440,8 @@ module whr_ip_ctrl_mac
    // generate head and tail indicators
    //---------------------------------------------------------------------------
 
-   wire 	buffer_in_active;
-   assign buffer_in_active = flit_valid_thru;
-   
-   wire 	buffer_out_active;
-   assign buffer_out_active = ~fbc_empty;
+   wire 	buffer_active;
+   assign buffer_active = flit_valid_thru;
    
    wire 	flags_active;
    assign flags_active = flit_valid;
@@ -455,8 +452,8 @@ module whr_ip_ctrl_mac
    assign flit_valid_out = gnt;
    
    wire 	fbc_almost_empty;
-   wire [0:fbf_addr_width-1] fbc_write_addr;
-   wire [0:fbf_addr_width-1] fbc_read_addr;
+   wire [0:fbf_addr_width-1] fbc_push_addr;
+   wire [0:fbf_addr_width-1] fbc_pop_addr;
    
    wire 		     flit_head_out;
    wire 		     flit_tail_out;
@@ -483,8 +480,8 @@ module whr_ip_ctrl_mac
 	   if(num_flits_per_vc > 2)
 	     begin
 		
-		wire [0:htff_addr_width-1] htfc_write_addr;
-		wire [0:htff_addr_width-1] htfc_read_addr;
+		wire [0:htff_addr_width-1] htfc_push_addr;
+		wire [0:htff_addr_width-1] htfc_pop_addr;
 		wire 			   htfc_almost_full;
 		wire 			   htfc_full;
 		wire 			   htfc_almost_empty;
@@ -495,11 +492,12 @@ module whr_ip_ctrl_mac
 		htfc
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(flags_active),
+		   .push_active(buffer_active),
+		   .pop_active(flags_active),
 		   .push(htfc_push),
 		   .pop(htfc_pop),
-		   .write_addr(htfc_write_addr),
-		   .read_addr(htfc_read_addr),
+		   .push_addr(htfc_push_addr),
+		   .pop_addr(htfc_pop_addr),
 		   .almost_empty(htfc_almost_empty),
 		   .empty(htfc_empty),
 		   .almost_full(htfc_almost_full),
@@ -509,27 +507,27 @@ module whr_ip_ctrl_mac
 		assign error_htfc_underflow = htfc_errors[0];
 		assign error_htfc_overflow = htfc_errors[1];
 		
-		wire [0:1] 		   htff_write_data;
-		assign htff_write_data[0] = flit_head_in;
-		assign htff_write_data[1] = flit_tail_in;
+		wire [0:1] 		   htff_push_data;
+		assign htff_push_data[0] = flit_head_in;
+		assign htff_push_data[1] = flit_tail_in;
 		
-		wire [0:1] 		   htff_read_data;
+		wire [0:1] 		   htff_pop_data;
 		c_regfile
 		  #(.depth(num_flits_per_vc - 1),
 		    .width(2),
 		    .regfile_type(htff_regfile_type))
 		htff
 		  (.clk(clk),
-		   .active(buffer_in_active),
+		   .active(buffer_active),
 		   .write_enable(htfc_push),
-		   .write_address(htfc_write_addr),
-		   .write_data(htff_write_data),
+		   .write_address(htfc_push_addr),
+		   .write_data(htff_push_data),
 		   .read_enable(htfc_pop),
-		   .read_address(htfc_read_addr),
-		   .read_data(htff_read_data));
+		   .read_address(htfc_pop_addr),
+		   .read_data(htff_pop_data));
 		
-		assign htff_flit_head = htff_read_data[0];
-		assign htff_flit_tail = htff_read_data[1];
+		assign htff_flit_head = htff_pop_data[0];
+		assign htff_flit_tail = htff_pop_data[1];
 		
 	     end
 	   else if(num_flits_per_vc == 2)
@@ -546,7 +544,7 @@ module whr_ip_ctrl_mac
 		htff_dataq
 		  (.clk(clk),
 		   .reset(1'b0),
-		   .active(buffer_in_active),
+		   .active(buffer_active),
 		   .d(htff_data_s),
 		   .q(htff_data_q));
 		
@@ -677,8 +675,8 @@ module whr_ip_ctrl_mac
       if(num_packets_per_vc > 2)
 	begin
 	   
-	   wire [0:hdff_addr_width-1] hdfc_write_addr;
-	   wire [0:hdff_addr_width-1] hdfc_read_addr;
+	   wire [0:hdff_addr_width-1] hdfc_push_addr;
+	   wire [0:hdff_addr_width-1] hdfc_pop_addr;
 	   wire 		      hdfc_almost_full;
 	   wire 		      hdfc_full;
 	   wire 		      hdfc_almost_empty;
@@ -689,11 +687,12 @@ module whr_ip_ctrl_mac
 	   hdfc
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(flags_active),
+	      .push_active(buffer_active),
+	      .pop_active(flags_active),
 	      .push(hdfc_push),
 	      .pop(hdfc_pop),
-	      .write_addr(hdfc_write_addr),
-	      .read_addr(hdfc_read_addr),
+	      .push_addr(hdfc_push_addr),
+	      .pop_addr(hdfc_pop_addr),
 	      .almost_empty(hdfc_almost_empty),
 	      .empty(hdfc_empty),
 	      .almost_full(hdfc_almost_full),
@@ -703,25 +702,25 @@ module whr_ip_ctrl_mac
 	   assign error_hdfc_underflow = hdfc_errors[0];
 	   assign error_hdfc_overflow = hdfc_errors[1];
 	   
-	   wire [0:hop_route_info_width-1] hdff_write_data;
-	   assign hdff_write_data = hop_route_info;
+	   wire [0:hop_route_info_width-1] hdff_push_data;
+	   assign hdff_push_data = hop_route_info;
 	   
-	   wire [0:hop_route_info_width-1] hdff_read_data;
+	   wire [0:hop_route_info_width-1] hdff_pop_data;
 	   c_regfile
 	     #(.depth(num_packets_per_vc - 1),
 	       .width(hop_route_info_width),
 	       .regfile_type(hdff_regfile_type))
 	   hdff
 	     (.clk(clk),
-	      .active(flags_active),
+	      .active(buffer_active),
 	      .write_enable(hdfc_push),
-	      .write_address(hdfc_write_addr),
-	      .write_data(hdff_write_data),
+	      .write_address(hdfc_push_addr),
+	      .write_data(hdff_push_data),
 	      .read_enable(hdfc_pop),
-	      .read_address(hdfc_read_addr),
-	      .read_data(hdff_read_data));
+	      .read_address(hdfc_pop_addr),
+	      .read_data(hdff_pop_data));
 	   
-	   assign hdff_hop_route_info = hdff_read_data;
+	   assign hdff_hop_route_info = hdff_pop_data;
 	   
 	end
       else if(num_packets_per_vc == 2)
@@ -737,7 +736,7 @@ module whr_ip_ctrl_mac
 	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(buffer_in_active),
+	      .active(buffer_active),
 	      .d(hdff_hop_route_info_s),
 	      .q(hdff_hop_route_info_q));
 	   
@@ -886,11 +885,12 @@ module whr_ip_ctrl_mac
    fbc
      (.clk(clk),
       .reset(reset),
-      .active(flags_active),
+      .push_active(buffer_active),
+      .pop_active(flags_active),
       .push(fbc_push),
       .pop(fbc_pop),
-      .write_addr(fbc_write_addr),
-      .read_addr(fbc_read_addr),
+      .push_addr(fbc_push_addr),
+      .pop_addr(fbc_pop_addr),
       .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
       .almost_full(fbc_almost_full),
@@ -935,7 +935,7 @@ module whr_ip_ctrl_mac
 	   
 	   assign fbf_read_enable = flit_valid_out;
 	   
-	   assign fbf_read_addr = fbc_read_addr;
+	   assign fbf_read_addr = fbc_pop_addr;
 	   
 	   wire [0:flit_data_width-1] flit_data_muxed;
 	   assign flit_data_muxed = fbf_bypass ? fbf_write_data : fbf_read_data;
@@ -982,7 +982,7 @@ module whr_ip_ctrl_mac
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s
-	     = flit_valid_out ? fbc_read_addr : fbf_read_addr_q;
+	     = flit_valid_out ? fbc_pop_addr : fbf_read_addr_q;
 	   c_dff
 	     #(.width(fbf_addr_width),
 	       .reset_type(reset_type))
@@ -1001,15 +1001,18 @@ module whr_ip_ctrl_mac
       
    endgenerate
    
+   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
+   assign fbf_write_addr = fbc_push_addr;
+   
    c_regfile
      #(.depth(fbf_depth),
        .width(flit_data_width),
        .regfile_type(fbf_regfile_type))
    fbf
      (.clk(clk),
-      .active(buffer_in_active),
+      .active(buffer_active),
       .write_enable(fbf_write_enable),
-      .write_address(fbc_write_addr),
+      .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
       .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
@@ -1046,8 +1049,8 @@ module whr_ip_ctrl_mac
    // transmitted, this register currently cannot be included in any of the 
    // other clock gating domains. If we could change this to send credits 
    // upstream using edge-based signaling (i.e., transitions), it could be 
-   // included in the clock gating domain controlled by buffer_out_active.
-   // Alternatively, we could include the cred_valid term in buffer_out_active; 
+   // included in the clock gating domain controlled by flags_active.
+   // Alternatively, we could include the cred_valid term in flags_active; 
    // this would allow us to include cred_validq in the gating domain at the 
    // cost of some unnecessary activity. As synthesis will probably not create 
    // a clock gating domain for just this register, it currently will most 

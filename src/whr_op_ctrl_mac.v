@@ -359,7 +359,10 @@ module whr_op_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 		       cred_active;
-   assign cred_active = arb_active | cred_valid;
+   assign cred_active = cred_valid;
+   
+   wire 		       track_active;
+   assign track_active = arb_active | cred_active;
    
    wire 		       credit;
    assign credit = cred_valid;
@@ -423,8 +426,8 @@ module whr_op_ctrl_mac
 	   else
 	     begin
 		
-		wire [0:tff_addr_width-1] tfc_write_addr;
-		wire [0:tff_addr_width-1] tfc_read_addr;
+		wire [0:tff_addr_width-1] tfc_push_addr;
+		wire [0:tff_addr_width-1] tfc_pop_addr;
 		wire 			  tfc_almost_full;
 		wire 			  tfc_full;
 		wire 			  tfc_almost_empty;
@@ -436,36 +439,37 @@ module whr_op_ctrl_mac
 		tfc
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(cred_active),
+		   .push_active(arb_active),
+		   .pop_active(cred_active),
 		   .push(gnt),
 		   .pop(cred_valid),
-		   .write_addr(tfc_write_addr),
-		   .read_addr(tfc_read_addr),
+		   .push_addr(tfc_push_addr),
+		   .pop_addr(tfc_pop_addr),
 		   .almost_empty(tfc_almost_empty),
 		   .empty(tfc_empty),
 		   .almost_full(tfc_almost_full),
 		   .full(tfc_full),
 		   .errors(tfc_errors));
 		
-		wire 			  tff_write_data;
-		assign tff_write_data = |(gnt_unqual_ip & req_tail_ip);
+		wire 			  tff_push_data;
+		assign tff_push_data = |(gnt_unqual_ip & req_tail_ip);
 		
-		wire 			  tff_read_data;
+		wire 			  tff_pop_data;
 		c_regfile
 		  #(.depth(num_flits_per_vc),
 		    .width(1),
 		    .regfile_type(tff_regfile_type))
 		tff
 		  (.clk(clk),
-		   .active(cred_active),
+		   .active(arb_active),
 		   .write_enable(gnt),
-		   .write_address(tfc_write_addr),
-		   .write_data(tff_write_data),
+		   .write_address(tfc_push_addr),
+		   .write_data(tff_push_data),
 		   .read_enable(cred_valid),
-		   .read_address(tfc_read_addr),
-		   .read_data(tff_read_data));
+		   .read_address(tfc_pop_addr),
+		   .read_data(tff_pop_data));
 		
-		assign head_credit = credit & tff_read_data;
+		assign head_credit = credit & tff_pop_data;
 		
 	     end
 	   
@@ -484,7 +488,7 @@ module whr_op_ctrl_mac
 	   hft
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(cred_active),
+	      .active(track_active),
 	      .push(head_debit),
 	      .pop(head_credit),
 	      .almost_empty(hft_almost_empty),
@@ -519,7 +523,7 @@ module whr_op_ctrl_mac
    ft
      (.clk(clk),
       .reset(reset),
-      .active(cred_active),
+      .active(track_active),
       .push(debit),
       .pop(credit),
       .almost_empty(ft_almost_empty),

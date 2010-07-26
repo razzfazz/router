@@ -486,8 +486,8 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire 		      buffer_in_active;
-   assign buffer_in_active = flit_valid_in;
+   wire 		      buffer_active;
+   assign buffer_active = flit_valid_in;
    
    // extract header information from header data
    wire [0:header_info_width-1] header_info_in;
@@ -512,8 +512,8 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 		flit_head_ivc;
    wire [0:num_vcs-1] 		flit_tail_ivc;
    wire [0:num_vcs*header_info_width-1] header_info_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 	fbc_write_addr_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 	fbc_read_addr_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 	fbc_push_addr_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 	fbc_pop_addr_ivc;
    wire [0:num_vcs-1] 			fbc_empty_ivc;
    wire [0:num_vcs-1] 			allocated_ivc;
    wire [0:num_vcs*num_vcs-1] 		allocated_ivc_ovc;
@@ -556,8 +556,8 @@ module vcr_ip_ctrl_mac
 	   wire 			   flit_head;
 	   wire 			   flit_tail;
 	   wire [0:header_info_width-1]    header_info_out;
-	   wire [0:fbf_addr_width-1] 	   fbc_write_addr;
-	   wire [0:fbf_addr_width-1] 	   fbc_read_addr;
+	   wire [0:fbf_addr_width-1] 	   fbc_push_addr;
+	   wire [0:fbf_addr_width-1] 	   fbc_pop_addr;
 	   wire 			   fbc_empty;
 	   wire 			   allocated;
 	   wire [0:num_vcs-1] 		   allocated_ovc;
@@ -615,8 +615,8 @@ module vcr_ip_ctrl_mac
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .header_info_out(header_info_out),
-	      .fbc_write_addr(fbc_write_addr),
-	      .fbc_read_addr(fbc_read_addr),
+	      .fbc_push_addr(fbc_push_addr),
+	      .fbc_pop_addr(fbc_pop_addr),
 	      .fbc_empty(fbc_empty),
 	      .allocated(allocated),
 	      .allocated_ovc(allocated_ovc),
@@ -638,12 +638,12 @@ module vcr_ip_ctrl_mac
 	   assign header_info_ivc[ivc*header_info_width:
 				  (ivc+1)*header_info_width-1]
 	     = header_info_out;
-	   assign fbc_write_addr_ivc[ivc*fbf_addr_width:
+	   assign fbc_push_addr_ivc[ivc*fbf_addr_width:
 				     (ivc+1)*fbf_addr_width-1]
-	     = fbc_write_addr;
-	   assign fbc_read_addr_ivc[ivc*fbf_addr_width:
+	     = fbc_push_addr;
+	   assign fbc_pop_addr_ivc[ivc*fbf_addr_width:
 				    (ivc+1)*fbf_addr_width-1]
-	     = fbc_read_addr;
+	     = fbc_pop_addr;
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
@@ -1027,8 +1027,8 @@ module vcr_ip_ctrl_mac
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in[header_info_width:flit_data_width-1];
    
-   wire [0:fbf_addr_width-1] 	fbc_write_addr;
-   wire [0:fbf_addr_width-1] 	fbc_read_addr;
+   wire [0:fbf_addr_width-1] 	fbc_push_addr;
+   wire [0:fbf_addr_width-1] 	fbc_pop_addr;
    wire 			fbf_write_enable;
    wire 			fbf_read_enable;
    wire [0:fbf_addr_width-1] 	fbf_read_addr;
@@ -1042,26 +1042,26 @@ module vcr_ip_ctrl_mac
 	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(fbf_addr_width))
-	   fbc_write_addr_sel
+	   fbc_push_addr_sel
 	     (.select(sel_in_ivc),
-	      .data_in(fbc_write_addr_ivc),
-	      .data_out(fbc_write_addr));
+	      .data_in(fbc_push_addr_ivc),
+	      .data_out(fbc_push_addr));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(fbf_addr_width))
-	   fbc_read_addr_sel
+	   fbc_pop_addr_sel
 	     (.select(vc_sel_ivc),
-	      .data_in(fbc_read_addr_ivc),
-	      .data_out(fbc_read_addr));
+	      .data_in(fbc_pop_addr_ivc),
+	      .data_out(fbc_pop_addr));
 	   
 	end
       
       // if we only have a single VC, just use the address as is
       else
 	begin
-	   assign fbc_write_addr = fbc_write_addr_ivc;
-	   assign fbc_read_addr = fbc_read_addr_ivc;
+	   assign fbc_push_addr = fbc_push_addr_ivc;
+	   assign fbc_pop_addr = fbc_pop_addr_ivc;
 	end
       
       if(explicit_pipeline_register)
@@ -1074,7 +1074,7 @@ module vcr_ip_ctrl_mac
 	   
 	   assign fbf_read_enable = flit_sent;
 	   
-	   assign fbf_read_addr = fbc_read_addr;
+	   assign fbf_read_addr = fbc_pop_addr;
 	   
 	   wire [0:flit_data_width-1] flit_data_muxed;
 	   assign flit_data_muxed = fbf_bypass ? fbf_write_data : fbf_read_data;
@@ -1114,7 +1114,7 @@ module vcr_ip_ctrl_mac
 	   assign fbf_read_enable = fbf_read_enable_q;
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s = flit_sent ? fbc_read_addr : fbf_read_addr_q;
+	   assign fbf_read_addr_s = flit_sent ? fbc_pop_addr : fbf_read_addr_q;
 	   c_dff
 	     #(.width(fbf_addr_width),
 	       .reset_type(reset_type))
@@ -1134,7 +1134,7 @@ module vcr_ip_ctrl_mac
    endgenerate
    
    wire [0:fbf_addr_width-1] 	     fbf_write_addr;
-   assign fbf_write_addr = fbc_write_addr;
+   assign fbf_write_addr = fbc_push_addr;
 
    c_regfile
      #(.depth(fbf_depth),
@@ -1142,7 +1142,7 @@ module vcr_ip_ctrl_mac
        .regfile_type(fbf_regfile_type))
    fbf
      (.clk(clk),
-      .active(buffer_in_active),
+      .active(buffer_active),
       .write_enable(fbf_write_enable),
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),

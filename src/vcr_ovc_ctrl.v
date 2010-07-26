@@ -245,8 +245,8 @@ module vcr_ovc_ctrl
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
    
-   wire 			   vc_alloc_active;
-   assign vc_alloc_active = vc_req | sw_gnt_q;
+   wire 			   alloc_active;
+   assign alloc_active = vc_req | sw_gnt_q;
    
    wire 			   allocated_q;
    
@@ -261,7 +261,7 @@ module vcr_ovc_ctrl
    allocatedq
      (.clk(clk),
       .reset(reset),
-      .active(vc_alloc_active),
+      .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
    
@@ -287,7 +287,7 @@ module vcr_ovc_ctrl
 		allocated_ipq
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(vc_alloc_active),
+		   .active(alloc_active),
 		   .d(allocated_ip_s),
 		   .q(allocated_ip_q));
 		
@@ -306,7 +306,7 @@ module vcr_ovc_ctrl
 		allocated_vcq
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(vc_alloc_active),
+		   .active(alloc_active),
 		   .d(allocated_vc_s),
 		   .q(allocated_vc_q));
 		
@@ -334,8 +334,11 @@ module vcr_ovc_ctrl
    // track number of packets that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
+   wire 				cred_active;
+   assign cred_active = cred_valid;
+   
    wire 				flags_active;
-   assign flags_active = vc_req | sw_gnt_q | cred_valid;
+   assign flags_active = alloc_active | cred_active;
    
    wire [0:cred_count_width-1] 		cred_count_q;
    wire 				head_free;
@@ -385,7 +388,7 @@ module vcr_ovc_ctrl
 		tail_sentq
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(flags_active),
+		   .active(alloc_active),
 		   .d(tail_sent_s),
 		   .q(tail_sent_q));
 		
@@ -395,8 +398,8 @@ module vcr_ovc_ctrl
 	   else
 	     begin
 		
-		wire [0:tff_addr_width-1] tfc_write_addr;
-		wire [0:tff_addr_width-1] tfc_read_addr;
+		wire [0:tff_addr_width-1] tfc_push_addr;
+		wire [0:tff_addr_width-1] tfc_pop_addr;
 		wire 			  tfc_almost_full;
 		wire 			  tfc_full;
 		wire 			  tfc_almost_empty;
@@ -408,36 +411,37 @@ module vcr_ovc_ctrl
 		tfc
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(flags_active),
+		   .push_active(alloc_active),
+		   .pop_active(cred_active),
 		   .push(flit_valid_qual),
 		   .pop(credit),
-		   .write_addr(tfc_write_addr),
-		   .read_addr(tfc_read_addr),
+		   .push_addr(tfc_push_addr),
+		   .pop_addr(tfc_pop_addr),
 		   .almost_empty(tfc_almost_empty),
 		   .empty(tfc_empty),
 		   .almost_full(tfc_almost_full),
 		   .full(tfc_full),
 		   .errors(tfc_errors));
 		
-		wire 			  tff_write_data;
-		assign tff_write_data = flit_tail;
+		wire 			  tff_push_data;
+		assign tff_push_data = flit_tail;
 		
-		wire 			  tff_read_data;
+		wire 			  tff_pop_data;
 		c_regfile
 		  #(.depth(num_flits_per_vc),
 		    .width(1),
 		    .regfile_type(tff_regfile_type))
 		tff
 		  (.clk(clk),
-		   .active(flags_active),
+		   .active(alloc_active),
 		   .write_enable(flit_valid_qual),
-		   .write_address(tfc_write_addr),
-		   .write_data(tff_write_data),
+		   .write_address(tfc_push_addr),
+		   .write_data(tff_push_data),
 		   .read_enable(credit),
-		   .read_address(tfc_read_addr),
-		   .read_data(tff_read_data));
+		   .read_address(tfc_pop_addr),
+		   .read_data(tff_pop_data));
 		
-		assign head_credit = credit & tff_read_data;		
+		assign head_credit = credit & tff_pop_data;		
 		
 	     end
 	   

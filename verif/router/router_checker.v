@@ -487,19 +487,20 @@ module router_checker
 		wire 			  rfc_almost_empty;
 		wire 			  rfc_empty;
 		wire [0:1] 		  rfc_errors;
-		wire [0:flit_buffer_idx_width-1] rfc_write_addr;
-		wire [0:flit_buffer_idx_width-1] rfc_read_addr;
+		wire [0:flit_buffer_idx_width-1] rfc_push_addr;
+		wire [0:flit_buffer_idx_width-1] rfc_pop_addr;
 		c_fifo_ctrl
 		  #(.depth(num_flits_per_vc),
 		    .reset_type(reset_type))
 		rfc
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(1'b1),
+		   .push_active(1'b1),
+		   .pop_active(1'b1),
 		   .push(push),
 		   .pop(pop),
-		   .write_addr(rfc_write_addr),
-		   .read_addr(rfc_read_addr),
+		   .push_addr(rfc_push_addr),
+		   .pop_addr(rfc_pop_addr),
 		   .almost_empty(rfc_almost_empty),
 		   .empty(rfc_empty),
 		   .almost_full(rfc_almost_full),
@@ -532,10 +533,10 @@ module router_checker
 		  (.clk(clk),
 		   .active(1'b1),
 		   .write_enable(push),
-		   .write_address(rfc_write_addr),
+		   .write_address(rfc_push_addr),
 		   .write_data(data_in),
 		   .read_enable(pop),
-		   .read_address(rfc_read_addr),
+		   .read_address(rfc_pop_addr),
 		   .read_data(data_out));
 		
 		

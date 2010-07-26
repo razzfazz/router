@@ -35,8 +35,8 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_write_addr, 
-   fbc_read_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
+   flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_push_addr, 
+   fbc_pop_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
    free_allocated, errors, events);
    
 `include "c_functions.v"
@@ -313,12 +313,12 @@ module vcr_ivc_ctrl
    wire [0:header_info_width-1] 		     header_info_out;
    
    // write pointer for shared flit buffer
-   output [0:fbf_addr_width-1] 			     fbc_write_addr;
-   wire [0:fbf_addr_width-1] 			     fbc_write_addr;
+   output [0:fbf_addr_width-1] 			     fbc_push_addr;
+   wire [0:fbf_addr_width-1] 			     fbc_push_addr;
    
    // read pointer for shared flit buffer
-   output [0:fbf_addr_width-1] 			     fbc_read_addr;
-   wire [0:fbf_addr_width-1] 			     fbc_read_addr;
+   output [0:fbf_addr_width-1] 			     fbc_pop_addr;
+   wire [0:fbf_addr_width-1] 			     fbc_pop_addr;
    
    // flit buffer does not have any valid entries
    output 					     fbc_empty;
@@ -630,8 +630,8 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 					    buffer_in_active;
-   assign buffer_in_active = flit_valid_in;
+   wire 					    buffer_active;
+   assign buffer_active = flit_valid_in;
    
    wire 					    fbc_almost_empty;
    
@@ -657,8 +657,8 @@ module vcr_ivc_ctrl
 	   if(num_flits_per_vc > 2)
 	     begin
 		
-		wire [0:htff_addr_width-1] htfc_write_addr;
-		wire [0:htff_addr_width-1] htfc_read_addr;
+		wire [0:htff_addr_width-1] htfc_push_addr;
+		wire [0:htff_addr_width-1] htfc_pop_addr;
 		wire 			   htfc_almost_full;
 		wire 			   htfc_full;
 		wire 			   htfc_almost_empty;
@@ -669,11 +669,12 @@ module vcr_ivc_ctrl
 		htfc
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(alloc_active),
+		   .push_active(buffer_active),
+		   .pop_active(alloc_active),
 		   .push(htfc_push),
 		   .pop(htfc_pop),
-		   .write_addr(htfc_write_addr),
-		   .read_addr(htfc_read_addr),
+		   .push_addr(htfc_push_addr),
+		   .pop_addr(htfc_pop_addr),
 		   .almost_empty(htfc_almost_empty),
 		   .empty(htfc_empty),
 		   .almost_full(htfc_almost_full),
@@ -683,27 +684,27 @@ module vcr_ivc_ctrl
 		assign error_htfc_underflow = htfc_errors[0];
 		assign error_htfc_overflow = htfc_errors[1];
 		
-		wire [0:1] 		   htff_write_data;
-		assign htff_write_data[0] = flit_head_in;
-		assign htff_write_data[1] = flit_tail_in;
+		wire [0:1] 		   htff_push_data;
+		assign htff_push_data[0] = flit_head_in;
+		assign htff_push_data[1] = flit_tail_in;
 		
-		wire [0:1] 		   htff_read_data;
+		wire [0:1] 		   htff_pop_data;
 		c_regfile
 		  #(.depth(num_flits_per_vc - 1),
 		    .width(2),
 		    .regfile_type(htff_regfile_type))
 		htff
 		  (.clk(clk),
-		   .active(buffer_in_active),
+		   .active(buffer_active),
 		   .write_enable(htfc_push),
-		   .write_address(htfc_write_addr),
-		   .write_data(htff_write_data),
+		   .write_address(htfc_push_addr),
+		   .write_data(htff_push_data),
 		   .read_enable(htfc_pop),
-		   .read_address(htfc_read_addr),
-		   .read_data(htff_read_data));
+		   .read_address(htfc_pop_addr),
+		   .read_data(htff_pop_data));
 		
-		assign htff_flit_head = htff_read_data[0];
-		assign htff_flit_tail = htff_read_data[1];
+		assign htff_flit_head = htff_pop_data[0];
+		assign htff_flit_tail = htff_pop_data[1];
 		
 	     end
 	   else if(num_flits_per_vc == 2)
@@ -720,7 +721,7 @@ module vcr_ivc_ctrl
 		htff_dataq
 		  (.clk(clk),
 		   .reset(1'b0),
-		   .active(buffer_in_active),
+		   .active(buffer_active),
 		   .d(htff_data_s),
 		   .q(htff_data_q));
 		
@@ -851,8 +852,8 @@ module vcr_ivc_ctrl
       if(num_packets_per_vc > 2)
 	begin
 	   
-	   wire [0:hdff_addr_width-1] hdfc_write_addr;
-	   wire [0:hdff_addr_width-1] hdfc_read_addr;
+	   wire [0:hdff_addr_width-1] hdfc_push_addr;
+	   wire [0:hdff_addr_width-1] hdfc_pop_addr;
 	   wire 		      hdfc_almost_full;
 	   wire 		      hdfc_full;
 	   wire 		      hdfc_almost_empty;
@@ -863,11 +864,12 @@ module vcr_ivc_ctrl
 	   hdfc
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(alloc_active),
+	      .push_active(buffer_active),
+	      .pop_active(alloc_active),
 	      .push(hdfc_push),
 	      .pop(hdfc_pop),
-	      .write_addr(hdfc_write_addr),
-	      .read_addr(hdfc_read_addr),
+	      .push_addr(hdfc_push_addr),
+	      .pop_addr(hdfc_pop_addr),
 	      .almost_empty(hdfc_almost_empty),
 	      .empty(hdfc_empty),
 	      .almost_full(hdfc_almost_full),
@@ -877,25 +879,25 @@ module vcr_ivc_ctrl
 	   assign error_hdfc_underflow = hdfc_errors[0];
 	   assign error_hdfc_overflow = hdfc_errors[1];
 	   
-	   wire [0:hop_route_info_width-1] hdff_write_data;
-	   assign hdff_write_data = hop_route_info;
+	   wire [0:hop_route_info_width-1] hdff_push_data;
+	   assign hdff_push_data = hop_route_info;
 	   
-	   wire [0:hop_route_info_width-1] hdff_read_data;
+	   wire [0:hop_route_info_width-1] hdff_pop_data;
 	   c_regfile
 	     #(.depth(num_packets_per_vc - 1),
 	       .width(hop_route_info_width),
 	       .regfile_type(hdff_regfile_type))
 	   hdff
 	     (.clk(clk),
-	      .active(alloc_active),
+	      .active(buffer_active),
 	      .write_enable(hdfc_push),
-	      .write_address(hdfc_write_addr),
-	      .write_data(hdff_write_data),
+	      .write_address(hdfc_push_addr),
+	      .write_data(hdff_push_data),
 	      .read_enable(hdfc_pop),
-	      .read_address(hdfc_read_addr),
-	      .read_data(hdff_read_data));
+	      .read_address(hdfc_pop_addr),
+	      .read_data(hdff_pop_data));
 	   
-	   assign hdff_hop_route_info = hdff_read_data;
+	   assign hdff_hop_route_info = hdff_pop_data;
 	   
 	end
       else if(num_packets_per_vc == 2)
@@ -911,7 +913,7 @@ module vcr_ivc_ctrl
 	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(buffer_in_active),
+	      .active(buffer_active),
 	      .d(hdff_hop_route_info_s),
 	      .q(hdff_hop_route_info_q));
 	   
@@ -1302,11 +1304,12 @@ module vcr_ivc_ctrl
    fbc
      (.clk(clk),
       .reset(reset),
-      .active(alloc_active),
+      .push_active(buffer_active),
+      .pop_active(alloc_active),
       .push(fbc_push),
       .pop(fbc_pop),
-      .write_addr(fbc_write_addr),
-      .read_addr(fbc_read_addr),
+      .push_addr(fbc_push_addr),
+      .pop_addr(fbc_pop_addr),
       .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
       .almost_full(fbc_almost_full),
