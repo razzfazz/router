@@ -198,6 +198,9 @@ module vcr_ip_ctrl_mac
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select implementation variant for head/tail register file
+   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // select implementation variant for header data FIFO register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -584,6 +587,7 @@ module vcr_ip_ctrl_mac
 	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
 	       .perf_ctr_enable(perf_ctr_enable),
 	       .vc_id(ivc),

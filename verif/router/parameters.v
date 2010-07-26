@@ -108,6 +108,9 @@ parameter input_stage_can_hold = 1;
 // select implementation variant for flit buffer register file
 parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
 
+// select implementation variant for head/tail register file
+parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+
 // select implementation variant for flit buffer register file
 parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
 

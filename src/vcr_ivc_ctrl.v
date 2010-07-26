@@ -197,6 +197,12 @@ module vcr_ivc_ctrl
    // select speculation type for switch allocator
    parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
    
+   // required address width for head/tail FIFO
+   localparam htff_addr_width = clogb(num_flits_per_vc - 1);
+   
+   // select implementation variant for head/tail FIFO register file
+   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // required address width for header data FIFO
    localparam hdff_addr_width = clogb(num_packets_per_vc - 1);
    
@@ -624,67 +630,153 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 				   fbc_almost_empty;
+   wire 					    buffer_in_active;
+   assign buffer_in_active = flit_valid_in;
+   
+   wire 					    fbc_almost_empty;
    
    generate
       
       if(num_packets_per_vc > 1)
 	begin
 	   
-	   // keep track of location(s) of head and tail flits in flit buffer
-	   wire [0:num_flits_per_vc-1] head_queue;
-	   wire [0:num_flits_per_vc-1] tail_queue;
+	   wire htfc_empty;
 	   
-	   wire [0:num_flits_per_vc-1] write_sel;
-	   wire [0:num_flits_per_vc-1] read_sel;
+	   wire htfc_push;
+	   assign htfc_push
+	     = flit_valid_in & ~fbc_empty & (~flit_sent | ~htfc_empty);
 	   
-	   genvar 		       idx;
+	   wire htfc_pop;
+	   assign htfc_pop = flit_sent & ~htfc_empty;
 	   
-	   for(idx = 0; idx < num_flits_per_vc; idx = idx + 1)
-	     begin:idxs
+	   wire htff_flit_head;
+	   wire htff_flit_tail;
+	   wire error_htfc_underflow;
+	   wire error_htfc_overflow;
+	   
+	   if(num_flits_per_vc > 2)
+	     begin
 		
-		assign write_sel[idx]
-			 = (fbc_write_addr == (fbc_min_addr + idx));
-		assign read_sel[idx]
-			 = (fbc_read_addr == (fbc_min_addr + idx));
+		wire [0:htff_addr_width-1] htfc_write_addr;
+		wire [0:htff_addr_width-1] htfc_read_addr;
+		wire 			   htfc_almost_full;
+		wire 			   htfc_full;
+		wire 			   htfc_almost_empty;
+		wire [0:1] 		   htfc_errors;
+		c_fifo_ctrl
+		  #(.depth(num_flits_per_vc - 1),
+		    .reset_type(reset_type))
+		htfc
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(alloc_active),
+		   .push(htfc_push),
+		   .pop(htfc_pop),
+		   .write_addr(htfc_write_addr),
+		   .read_addr(htfc_read_addr),
+		   .almost_empty(htfc_almost_empty),
+		   .empty(htfc_empty),
+		   .almost_full(htfc_almost_full),
+		   .full(htfc_full),
+		   .errors(htfc_errors));
 		
-		wire capture;
-		assign capture = flit_valid_in & write_sel[idx];
+		assign error_htfc_underflow = htfc_errors[0];
+		assign error_htfc_overflow = htfc_errors[1];
 		
-		reg  head_q, tail_q;
-		always @(posedge clk)
-		  if(capture)
-		    begin
-		       head_q <= flit_head_in;
-		       tail_q <= flit_tail_in;
-		    end
+		wire [0:1] 		   htff_write_data;
+		assign htff_write_data[0] = flit_head_in;
+		assign htff_write_data[1] = flit_tail_in;
 		
-		assign head_queue[idx] = head_q;
-		assign tail_queue[idx] = tail_q;
+		wire [0:1] 		   htff_read_data;
+		c_regfile
+		  #(.depth(num_flits_per_vc - 1),
+		    .width(2),
+		    .regfile_type(htff_regfile_type))
+		htff
+		  (.clk(clk),
+		   .active(buffer_in_active),
+		   .write_enable(htfc_push),
+		   .write_address(htfc_write_addr),
+		   .write_data(htff_write_data),
+		   .read_enable(htfc_pop),
+		   .read_address(htfc_read_addr),
+		   .read_data(htff_read_data));
+		
+		assign htff_flit_head = htff_read_data[0];
+		assign htff_flit_tail = htff_read_data[1];
+		
+	     end
+	   else if(num_flits_per_vc == 2)
+	     begin
+		
+		wire [0:1] htff_data_s, htff_data_q;
+		assign htff_data_s[0]
+		  = flit_valid_in ? flit_head_in : htff_data_q[0];
+		assign htff_data_s[1]
+		  = flit_valid_in ? flit_tail_in : htff_data_q[1];
+		c_dff
+		  #(.width(2),
+		    .reset_type(reset_type))
+		htff_dataq
+		  (.clk(clk),
+		   .reset(1'b0),
+		   .active(buffer_in_active),
+		   .d(htff_data_s),
+		   .q(htff_data_q));
+		
+		assign htff_flit_head = htff_data_q[0];
+		assign htff_flit_tail = htff_data_q[1];
+		
+		wire       htfc_empty_s, htfc_empty_q;
+		assign htfc_empty_s = (htfc_empty_q | (htfc_pop & ~htfc_push)) &
+				      ~(htfc_push & ~htfc_pop);
+		c_dff
+		  #(.width(1),
+		    .reset_value(1'b1),
+		    .reset_type(reset_type))
+		htfc_emptyq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(alloc_active),
+		   .d(htfc_empty_s),
+		   .q(htfc_empty_q));
+		
+		assign htfc_empty = htfc_empty_q;
+		
+		assign error_htfc_underflow
+		  = htfc_empty_q & ~htfc_push & htfc_pop;
+		assign error_htfc_overflow
+		  = ~htfc_empty_q & htfc_push & ~htfc_pop;
 		
 	     end
 	   
-	   wire head_queue_muxed;
-	   c_select_1ofn
-	     #(.num_ports(num_flits_per_vc),
-	       .width(1))
-	   head_queue_muxed_sel
-	     (.select(read_sel),
-	      .data_in(head_queue),
-	      .data_out(head_queue_muxed));
+	   wire flit_head_muxed;
+	   assign flit_head_muxed = htfc_empty ? flit_head_in : htff_flit_head;
 	   
-	   assign flit_head = fbc_empty ? flit_head_in : head_queue_muxed;
+	   wire flit_tail_muxed;
+	   assign flit_tail_muxed = htfc_empty ? flit_tail_in : htff_flit_tail;
 	   
-	   wire tail_queue_muxed;
-	   c_select_1ofn
-	     #(.num_ports(num_flits_per_vc),
-	       .width(1))
-	   tail_queue_muxed_sel
-	     (.select(read_sel),
-	      .data_in(tail_queue),
-	      .data_out(tail_queue_muxed));
+	   wire [0:1] flit_flags_muxed;
+	   assign flit_flags_muxed[0] = flit_head_muxed;
+	   assign flit_flags_muxed[1] = flit_tail_muxed;
 	   
-	   assign flit_tail = fbc_empty ? flit_tail_in : tail_queue_muxed;
+	   wire       htr_capture;
+	   assign htr_capture = (fbc_empty & flit_valid_in) | flit_sent;
+	   
+	   wire [0:1] htr_data_s, htr_data_q;
+	   assign htr_data_s = htr_capture ? flit_flags_muxed : htr_data_q;
+	   c_dff
+	     #(.width(2),
+	       .reset_type(reset_type))
+	   htr_dataq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(alloc_active),
+	      .d(htr_data_s),
+	      .q(htr_data_q));
+	   
+	   assign flit_head = fbc_empty ? flit_head_in : htr_data_q[0];
+	   assign flit_tail = fbc_empty ? flit_tail_in : htr_data_q[1];
 	   
 	end
       else
@@ -809,9 +901,6 @@ module vcr_ivc_ctrl
       else if(num_packets_per_vc == 2)
 	begin
 	   
-	   wire route_active;
-	   assign route_active = flit_valid_in;
-	   
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_s;
 	   wire [0:hop_route_info_width-1] hdff_hop_route_info_q;
 	   assign hdff_hop_route_info_s
@@ -822,7 +911,7 @@ module vcr_ivc_ctrl
 	   hdff_hop_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(route_active),
+	      .active(buffer_in_active),
 	      .d(hdff_hop_route_info_s),
 	      .q(hdff_hop_route_info_q));
 	   

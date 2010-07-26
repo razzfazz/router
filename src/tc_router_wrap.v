@@ -452,6 +452,7 @@ module tc_router_wrap
        .int_flow_ctrl_type(int_flow_ctrl_type),
        .input_stage_can_hold(input_stage_can_hold),
        .fbf_regfile_type(fbf_regfile_type),
+       .htff_regfile_type(htff_regfile_type),
        .hdff_regfile_type(hdff_regfile_type),
        .tff_regfile_type(tff_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),

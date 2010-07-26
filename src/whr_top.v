@@ -150,6 +150,9 @@ module whr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select implementation variant for head/tail FIFO register file
+   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // select implementation variant for header data FIFO register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -250,6 +253,7 @@ module whr_top
 	       .dim_order(dim_order),
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fbf_regfile_type(fbf_regfile_type),
+	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .perf_ctr_enable(perf_ctr_enable),

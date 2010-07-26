@@ -165,6 +165,9 @@ module vcr_top
    // select implementation variant for flit buffer register file
    parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select implementation variant for head/tail register file
+   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
    // select implementation variant for flit buffer register file
    parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -502,6 +505,7 @@ module vcr_top
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .fbf_regfile_type(fbf_regfile_type),
+	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_type(vc_alloc_type),
