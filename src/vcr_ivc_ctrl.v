@@ -913,7 +913,7 @@ module vcr_ivc_ctrl
       else
 	begin
 	   
-	   wire hdr_route_rcsel;
+	   wire [0:resource_class_idx_width-1] hdr_route_rcsel;
 	   assign hdr_route_rcsel
 	     = hdr_hop_route_info[port_idx_width:
 				  port_idx_width+resource_class_idx_width-1];
