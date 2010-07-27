@@ -999,7 +999,7 @@ module tc_node_mac
    wire flit_head_in;
    wire flit_tail_in;
    wire [0:flit_data_width-1] flit_data_in;
-   wire [0:num_vcs-1] 		sel_in_ivc;
+   wire [0:num_vcs-1] 	      flit_sel_in_ivc;
    rtr_channel_input
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -1018,12 +1018,12 @@ module tc_node_mac
       .flit_head_out(flit_head_in),
       .flit_tail_out(flit_tail_in),
       .flit_data_out(flit_data_in),
-      .sel_out_ivc(sel_in_ivc));
+      .flit_sel_out_ivc(flit_sel_in_ivc));
    
-   wire 			flit_valid_out;
-   wire 			flit_head_out;
-   wire 			flit_tail_out;
-   wire [0:flit_data_width-1] 	flit_data_out;
+   wire 		      flit_valid_out;
+   wire 		      flit_head_out;
+   wire 		      flit_tail_out;
+   wire [0:flit_data_width-1] flit_data_out;
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -1037,7 +1037,7 @@ module tc_node_mac
       .flit_head_in(flit_head_out),
       .flit_tail_in(flit_tail_out),
       .flit_data_in(flit_data_out),
-      .sel_in_ovc(sel_ovc),
+      .flit_sel_in_ovc(sel_ovc),
       .channel_out(channel_out));
    
    
@@ -1874,7 +1874,7 @@ module tc_node_mac
 	   c_encode
 	     #(.num_ports(num_vcs))
 	   flit_vc_in_enc
-	     (.data_in(sel_in_ivc),
+	     (.data_in(flit_sel_in_ivc),
 	      .data_out(flit_vc_in));
 	   
 	   wire [0:vc_idx_width-1] flit_vc_in_s, flit_vc_in_q;

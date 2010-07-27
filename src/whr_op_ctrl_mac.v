@@ -552,7 +552,7 @@ module whr_op_ctrl_mac
       .flit_head_in(flit_head_in),
       .flit_tail_in(flit_tail_in),
       .flit_data_in(flit_data_in),
-      .sel_in_ovc(1'b1),
+      .flit_sel_in_ovc(1'b1),
       .channel_out(channel_out));
    
    

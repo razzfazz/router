@@ -454,7 +454,7 @@ module vcr_ip_ctrl_mac
    wire flit_head_in;
    wire flit_tail_in;
    wire [0:flit_data_width-1] flit_data_in;
-   wire [0:num_vcs-1] 	      sel_in_ivc;
+   wire [0:num_vcs-1] 	      flit_sel_in_ivc;
    rtr_channel_input
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -473,7 +473,7 @@ module vcr_ip_ctrl_mac
       .flit_head_out(flit_head_in),
       .flit_tail_out(flit_tail_in),
       .flit_data_out(flit_data_in),
-      .sel_out_ivc(sel_in_ivc));
+      .flit_sel_out_ivc(flit_sel_in_ivc));
    
    
    //---------------------------------------------------------------------------
@@ -500,7 +500,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 		sw_gnt_spec_ivc;
    
    wire [0:num_vcs-1] 		flit_valid_in_ivc;
-   assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & sel_in_ivc;
+   assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
    wire [0:num_vcs-1] 		flit_sent_prev_ivc;
    wire [0:num_vcs-1] 		flit_head_ivc;
@@ -1006,7 +1006,7 @@ module vcr_ip_ctrl_mac
      #(.num_ports(num_vcs),
        .width(header_info_width))
    header_info_out_sel
-     (.select(sel_in_ivc),
+     (.select(flit_sel_in_ivc),
       .data_in(header_info_ivc),
       .data_out(header_info_out));
    
@@ -1033,7 +1033,7 @@ module vcr_ip_ctrl_mac
 	     #(.num_ports(num_vcs),
 	       .width(fbf_addr_width))
 	   fbc_push_addr_sel
-	     (.select(sel_in_ivc),
+	     (.select(flit_sel_in_ivc),
 	      .data_in(fbc_push_addr_ivc),
 	      .data_out(fbc_push_addr));
 	   

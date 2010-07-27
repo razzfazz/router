@@ -820,7 +820,7 @@ module vcr_op_ctrl_mac
    wire 				  flit_out_active;
    assign flit_out_active = sw_gnt_q;
    
-   wire [0:num_vcs-1] 			  sel_in_ovc;
+   wire [0:num_vcs-1] 			  flit_sel_in_ovc;
    
    generate
       
@@ -828,7 +828,7 @@ module vcr_op_ctrl_mac
 	begin
 	   
 	   if(track_vcs_at_output)
-	     assign sel_in_ovc = match_ovc;
+	     assign flit_sel_in_ovc = match_ovc;
 	   else
 	     begin
 		
@@ -837,15 +837,15 @@ module vcr_op_ctrl_mac
 		
 		c_decode
 		  #(.num_ports(num_vcs))
-		sel_in_ovc_dec
+		flit_sel_in_ovc_dec
 		  (.data_in(flit_vc_in),
-		   .data_out(sel_in_ovc));
+		   .data_out(flit_sel_in_ovc));
 		
 	     end
 	   
 	end
       else
-	assign sel_in_ovc = 1'b1;
+	assign flit_sel_in_ovc = 1'b1;
       
    endgenerate
    
@@ -862,7 +862,7 @@ module vcr_op_ctrl_mac
       .flit_head_in(flit_head_in),
       .flit_tail_in(flit_tail_in),
       .flit_data_in(flit_data_in),
-      .sel_in_ovc(sel_in_ovc),
+      .flit_sel_in_ovc(flit_sel_in_ovc),
       .channel_out(channel_out));
    
    

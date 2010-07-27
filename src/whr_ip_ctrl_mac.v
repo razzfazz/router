@@ -293,7 +293,7 @@ module whr_ip_ctrl_mac
    wire 	flit_head_in;
    wire 	flit_tail_in;
    wire [0:flit_data_width-1] flit_data_in;
-   wire 		      sel_in_ivc;
+   wire 		      flit_sel_in_ivc;
    rtr_channel_input
      #(.num_vcs(1),
        .packet_format(packet_format),
@@ -312,7 +312,7 @@ module whr_ip_ctrl_mac
       .flit_head_out(flit_head_in),
       .flit_tail_out(flit_tail_in),
       .flit_data_out(flit_data_in),
-      .sel_out_ivc(sel_in_ivc));
+      .flit_sel_out_ivc(flit_sel_in_ivc));
    
    // extract header information from header data
    wire [0:header_info_width-1] header_info_in;

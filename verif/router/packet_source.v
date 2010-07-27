@@ -308,7 +308,7 @@ module packet_source
       .flit_head_in(flit_head),
       .flit_tail_in(flit_tail),
       .flit_data_in(flit_data),
-      .sel_in_ovc(sel_ovc),
+      .flit_sel_in_ovc(sel_ovc),
       .channel_out(channel));
    
    wire 				 flit_sent;

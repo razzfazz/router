@@ -114,7 +114,7 @@ module flit_sink
    wire 			flit_head;
    wire 			flit_tail;
    wire [0:flit_data_width-1] 	flit_data;
-   wire [0:num_vcs-1] 		sel_ivc;
+   wire [0:num_vcs-1] 		flit_sel_ivc;
    rtr_channel_input
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -133,7 +133,7 @@ module flit_sink
       .flit_head_out(flit_head),
       .flit_tail_out(flit_tail),
       .flit_data_out(flit_data),
-      .sel_out_ivc(sel_ivc));
+      .flit_sel_out_ivc(flit_sel_ivc));
    
    reg 				consume;
    
@@ -154,7 +154,7 @@ module flit_sink
    c_rr_arbiter
      #(.num_ports(num_vcs),
        .reset_type(reset_type))
-   buffer_sel_ivc_arb
+   gnt_ivc_arb
      (.clk(clk),
       .reset(reset),
       .update(update),
@@ -163,7 +163,7 @@ module flit_sink
       .gnt(gnt_ivc));
    
    wire [0:num_vcs-1] 		buffer_push_ivc;
-   assign buffer_push_ivc = {num_vcs{flit_valid}} & sel_ivc;
+   assign buffer_push_ivc = {num_vcs{flit_valid}} & flit_sel_ivc;
    
    wire [0:num_vcs-1] 		buffer_pop_ivc;
    assign buffer_pop_ivc = {num_vcs{consume}} & gnt_ivc;

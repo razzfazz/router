@@ -233,7 +233,7 @@ module router_checker
 	      .flit_head_out(flit_head),
 	      .flit_tail_out(flit_tail),
 	      .flit_data_out(flit_data),
-	      .sel_out_ivc(sel_ivc));
+	      .flit_sel_out_ivc(sel_ivc));
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -577,7 +577,7 @@ module router_checker
 		   .flit_head_out(check_head),
 		   .flit_tail_out(check_tail),
 		   .flit_data_out(check_data),
-		   .sel_out_ivc(check_sel_ivc));
+		   .flit_sel_out_ivc(check_sel_ivc));
 		
 		wire 			     match_data;
 		assign match_data = (ref_data == check_data);
@@ -711,7 +711,7 @@ module router_checker
 	   wire 		    flit_head_out;
 	   wire 		    flit_tail_out;
 	   wire [0:flit_data_width-1] flit_data_out;
-	   wire [0:num_vcs-1] 	      sel_out_ivc;
+	   wire [0:num_vcs-1] 	      flit_sel_out_ivc;
 	   rtr_channel_input
 	     #(.num_vcs(num_vcs),
 	       .packet_format(packet_format),
@@ -730,7 +730,7 @@ module router_checker
 	      .flit_head_out(flit_head_out),
 	      .flit_tail_out(flit_tail_out),
 	      .flit_data_out(flit_data_out),
-	      .sel_out_ivc(sel_out_ivc));
+	      .flit_sel_out_ivc(flit_sel_out_ivc));
 	   
 	   assign flit_valid_out_op[op] = flit_valid_out;
 	   
@@ -741,7 +741,7 @@ module router_checker
 		((flit_head_out === 1'bx) ||
 		 (flit_tail_out === 1'bx) ||
 		 (^flit_data_out === 1'bx) ||
-		 (^sel_out_ivc === 1'bx)));
+		 (^flit_sel_out_ivc === 1'bx)));
 
 	   assign x_error_op[op] = x_error;
 	   
@@ -757,7 +757,7 @@ module router_checker
 		     $display("head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_head_out,
 			      flit_tail_out,
-			      sel_out_ivc,
+			      flit_sel_out_ivc,
 			      flit_data_out);
 		     $display("expected flits:");
 		     for(x = 0; x < num_ports*num_vcs; x = x + 1)
@@ -782,7 +782,7 @@ module router_checker
 			      flit_valid_out,
 			      flit_head_out,
 			      flit_tail_out,
-			      sel_out_ivc,
+			      flit_sel_out_ivc,
 			      flit_data_out);
 		  end
 	     end

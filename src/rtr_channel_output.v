@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // channel interface (send side)
 module rtr_channel_output
   (clk, reset, active, flit_valid_in, flit_head_in, flit_tail_in, flit_data_in, 
-   sel_in_ovc, channel_out);
+   flit_sel_in_ovc, channel_out);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -81,7 +81,7 @@ module rtr_channel_output
    input [0:flit_data_width-1] flit_data_in;
    
    // indicate which VC the current flit (if any) belongs to
-   input [0:num_vcs-1] 	       sel_in_ovc;
+   input [0:num_vcs-1] 	       flit_sel_in_ovc;
    
    // outgoing flit control signals
    output [0:channel_width-1]  channel_out;
@@ -176,7 +176,7 @@ module rtr_channel_output
 		  c_encode
 		    #(.num_ports(num_vcs))
 		  flit_vc_dec
-		    (.data_in(sel_in_ovc),
+		    (.data_in(flit_sel_in_ovc),
 		     .data_out(flit_vc));
 		  
 		  assign flit_ctrl_s[1:1+vc_idx_width-1] = flit_vc;

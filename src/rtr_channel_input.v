@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // channel interface (receive side)
 module rtr_channel_input
   (clk, reset, active, channel_in, flit_valid_out, flit_head_out, flit_tail_out,
-   flit_data_out, sel_out_ivc);
+   flit_data_out, flit_sel_out_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -117,8 +117,8 @@ module rtr_channel_input
    wire [0:flit_data_width-1] 	flit_data_out;
    
    // indicate which VC the current flit (if any) belongs to
-   output [0:num_vcs-1] 	  sel_out_ivc;
-   wire [0:num_vcs-1] 		  sel_out_ivc;
+   output [0:num_vcs-1] 	  flit_sel_out_ivc;
+   wire [0:num_vcs-1] 		  flit_sel_out_ivc;
    
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in;
    assign flit_ctrl_in = channel_in[0:flit_ctrl_width-1];
@@ -194,13 +194,13 @@ module rtr_channel_input
 		  
 		  c_decode
 		    #(.num_ports(num_vcs))
-		  sel_out_ivc_dec
+		  flit_sel_out_ivc_dec
 		    (.data_in(flit_vc_q),
-		     .data_out(sel_out_ivc));
+		     .data_out(flit_sel_out_ivc));
 		  
 	       end
 	     else
-	       assign sel_out_ivc = 1'b1;
+	       assign flit_sel_out_ivc = 1'b1;
 	     
 	     assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
 	     
@@ -287,7 +287,7 @@ module rtr_channel_input
 			      wire [0:flit_ctr_width-1] flit_ctr_next;
 			      wire [0:flit_ctr_width-1] flit_ctr_s, flit_ctr_q;
 			      assign flit_ctr_s
-				= (flit_valid_out & sel_out_ivc[ivc]) ? 
+				= (flit_valid_out & flit_sel_out_ivc[ivc]) ? 
 				  (flit_head_out ? 
 				   flit_ctr_next : 
 				   (flit_ctr_q - 1'b1)) : 
@@ -360,7 +360,7 @@ module rtr_channel_input
 			   end
 			 
 			 assign flit_tail_out
-			   = |(sel_out_ivc & flit_tail_out_ivc);
+			   = |(flit_sel_out_ivc & flit_tail_out_ivc);
 			 
 		      end
 		    
