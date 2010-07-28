@@ -1423,7 +1423,7 @@ module tc_node_mac
 	     begin
 		
 		wire [0:resource_class_idx_width-1] route_rcsel_rv;
-		c_encoder
+		c_encode
 		  #(.num_ports(num_resource_classes))
 		route_rcsel_rv_enc
 		  (.data_in(route_orc_rv),
