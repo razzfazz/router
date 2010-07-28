@@ -693,7 +693,8 @@ module vcr_ivc_ctrl
 	   assign flit_flags_muxed[1] = flit_tail_muxed;
 	   
 	   wire       htr_capture;
-	   assign htr_capture = (fbc_empty & flit_valid_in) | flit_sent;
+	   assign htr_capture = (fbc_empty & flit_valid_in) | 
+				(flit_sent & (~htff_empty | flit_valid_in));
 	   
 	   wire [0:1] htr_data_s, htr_data_q;
 	   assign htr_data_s = htr_capture ? flit_flags_muxed : htr_data_q;
