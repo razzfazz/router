@@ -340,7 +340,7 @@ module vcr_ovc_ctrl
    wire 				flags_active;
    assign flags_active = alloc_active | cred_active;
    
-   wire [0:cred_count_width-1] 		cred_count_q;
+   wire 				ft_almost_empty;
    wire 				head_free;
    wire 				error_hft_underflow;
    wire 				error_hft_overflow;
@@ -375,8 +375,7 @@ module vcr_ovc_ctrl
 		// the tail has been sent
 		
 		wire last_credit_received;
-		assign last_credit_received
-		  = (cred_count_q == (num_flits_per_vc - 1)) && credit;
+		assign last_credit_received = ft_almost_empty & credit;
 		
 		wire tail_sent_s, tail_sent_q;
 		assign tail_sent_s
@@ -468,7 +467,9 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
-
+   
+   wire [0:cred_count_width-1] 			 cred_count_q;
+   
    wire [0:cred_count_width-1] 			 cred_count_plus_credit;
    assign cred_count_plus_credit = cred_count_q + credit;
    
@@ -488,19 +489,24 @@ module vcr_ovc_ctrl
       .d(cred_count_s),
       .q(cred_count_q));
    
-   wire 					 cred_count_zero;
-   assign cred_count_zero = ~|cred_count_q;
+   wire 					 ft_almost_full;
+   assign ft_almost_full = (cred_count_q == 1);
+   
+   wire 					 ft_full;
+   assign ft_full = ~|cred_count_q;
    
    wire 					 error_ct_underflow;
-   assign error_ct_underflow = cred_count_zero & debit;
+   assign error_ct_underflow = ft_full & debit;
    
-   wire 					 cred_count_all;
-   assign cred_count_all = (cred_count_q == num_flits_per_vc);
+   assign ft_almost_empty = (cred_count_q == (num_flits_per_vc - 1));
+   
+   wire 					 ft_empty;
+   assign ft_empty = (cred_count_q == num_flits_per_vc);
    
    wire 					 error_ct_overflow;
-   assign error_ct_overflow = cred_count_all & credit;
+   assign error_ct_overflow = ft_empty & credit;
    
-   assign empty = cred_count_all;
+   assign empty = ft_empty;
    
    
    //---------------------------------------------------------------------------
@@ -625,18 +631,13 @@ module vcr_ovc_ctrl
 	   //  b) ... we currently have at least two credits available. In this 
 	   //     case, even if there is a debit and no credit, we will still 
 	   //     have at least one credit left.
-	   //  c) ... we currently have an odd number of credits available, and 
-	   //     did not just receive a debit. For odd numbers greater than 
-	   //     one, we will always have credit left, and in case we have one 
-	   //     credit left, we will still have at least one left if no debit 
-	   //     occurs.
+	   //  c) ... we currently have a single credit available, and did not 
+	   //     just receive a debit.
 	   // This only leaves out the case where we are not receiving a credit,
 	   // do not currently have two or more credits and either have no 
 	   // credits left or have a single credit left and receive a debit.
 	   wire cred_s, cred_q;
-	   assign cred_s = credit | 
-			   |cred_count_q[0:cred_count_width-2] | 
-			   (cred_count_q[cred_count_width-1] & ~debit);
+	   assign cred_s = credit | (~ft_full & (~ft_almost_full | ~debit));
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
