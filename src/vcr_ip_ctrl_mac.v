@@ -261,9 +261,6 @@ module vcr_ip_ctrl_mac
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
-   // width of sum of event signals from all VCs
-   localparam event_width = clogb(num_vcs + 1);
-   
    // ID of current input port
    parameter port_id = 0;
    
