@@ -508,24 +508,8 @@ module vcr_ovc_ctrl
 	     // eligible for allocation in the current cycle, and thus cannot 
 	     // be assigned to another input VC.
 	     
-	     if(cred_count_width > 2)
-	       begin
-		  
-		  wire limit_cred_level;
-		  assign limit_cred_level
-		    = |cred_count_plus_credit[0:(cred_count_width-2)-1];
-		  
-		  assign int_flow_ctrl
-		    = {2{limit_cred_level}} | 
-		      cred_count_plus_credit[(cred_count_width-2):
-					     cred_count_width-1];
-		  
-	       end
-	     else if(cred_count_width == 2)
-	       assign int_flow_ctrl
-		 = cred_count_plus_credit[0:cred_count_width-1];
-	     else if(cred_count_width == 1)
-	       assign int_flow_ctrl = {1'b0, cred_count_plus_credit};
+	     assign int_flow_ctrl[0] = ~ft_full & (~ft_almost_full | credit);
+	     assign int_flow_ctrl[1] = ft_almost_full | (ft_full & credit);
 	     
 	  end
 	
