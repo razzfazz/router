@@ -142,10 +142,6 @@ module vcr_ovc_ctrl
    localparam [0:cred_hold_width-1] cred_hold_reset_value
      = vc_alloc_requires_credit ? (num_flits_per_vc - 1) : num_flits_per_vc;
    
-   // capped reset value for credit level
-   localparam [0:1] free_reset_value
-     = (cred_count_width > 2) ? 2'b11 : num_flits_per_vc;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
