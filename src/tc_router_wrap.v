@@ -92,6 +92,11 @@ module tc_router_wrap
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -102,9 +107,6 @@ module tc_router_wrap
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
@@ -163,9 +165,6 @@ module tc_router_wrap
    
    // number of node status signals to accept
    localparam node_status_width = 1 + num_ports;
-   
-   // delay before credits are returned
-   parameter credit_delay = 1;
    
    input clk;
    input reset;
@@ -339,6 +338,7 @@ module tc_router_wrap
 		    .num_nodes_per_router(num_nodes_per_router),
 		    .connectivity(connectivity),
 		    .packet_format(packet_format),
+		    .flow_ctrl_type(flow_ctrl_type),
 		    .max_payload_length(max_payload_length),
 		    .min_payload_length(min_payload_length),
 		    .flit_data_width(flit_data_width),
@@ -386,19 +386,7 @@ module tc_router_wrap
 		wire [0:flit_ctrl_width-1] flit_ctrl_in;
 		assign flit_ctrl_in = channel_in[0:flit_ctrl_width-1];
 		
-		wire [0:flit_ctrl_width-1] flit_ctrl_dly;
-		c_shift_reg
-		  #(.width(flit_ctrl_width),
-		    .depth(credit_delay),
-		    .reset_type(reset_type))
-		flit_ctrl_dly_sr
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .data_in(flit_ctrl_in),
-		   .data_out(flit_ctrl_dly));
-		
-		assign flow_ctrl_out = flit_ctrl_dly[0:flow_ctrl_width-1];
+		assign flow_ctrl_out = flit_ctrl_in[0:flow_ctrl_width-1];
 		
 		assign cfg_read_data = {cfg_data_width{1'b0}};
 		assign cfg_done = 1'b0;
@@ -437,6 +425,7 @@ module tc_router_wrap
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .packet_format(packet_format),
+       .flow_ctrl_type(flow_ctrl_type),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),

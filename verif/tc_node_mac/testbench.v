@@ -121,6 +121,11 @@ module testbench
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
    
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -131,9 +136,6 @@ module testbench
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
@@ -260,6 +262,7 @@ module testbench
        .num_nodes_per_router(num_nodes_per_router),
        .connectivity(connectivity),
        .packet_format(packet_format),
+       .flow_ctrl_type(flow_ctrl_type),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
@@ -364,6 +367,7 @@ module testbench
        .num_nodes_per_router(num_nodes_per_router),
        .connectivity(connectivity),
        .packet_format(packet_format),
+       .flow_ctrl_type(flow_ctrl_type),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),

@@ -60,6 +60,9 @@ parameter num_nodes_per_router = 4;
 // select packet format
 parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
 
+// select type of flow control
+parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+
 // maximum payload length (in flits)
 parameter max_payload_length = 4;
 

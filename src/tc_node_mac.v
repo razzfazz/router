@@ -113,6 +113,14 @@ module tc_node_mac
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -148,9 +156,6 @@ module tc_node_mac
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // include error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -1045,43 +1050,22 @@ module tc_node_mac
    // flow control interface
    //---------------------------------------------------------------------------
    
-   // FIXME: This should be in a separate module!
-   
-   wire [0:flow_ctrl_width-1] flow_ctrl_in_s, flow_ctrl_in_q;
-   assign flow_ctrl_in_s = flow_ctrl_muxed;
-   
-   wire 		      cred_valid_in_s, cred_valid_in_q;
-   assign cred_valid_in_s = flow_ctrl_in_s[0];
-   c_dff
-     #(.width(1),
+   wire 		      cred_valid_in;
+   wire [0:num_vcs-1] 	      cred_sel_in_ovc;
+   rtr_flow_ctrl_input
+     #(.num_vcs(num_vcs),
+       .flow_ctrl_type(flow_ctrl_type),
        .reset_type(reset_type))
-   cred_valid_inq
+   fci
      (.clk(clk),
       .reset(reset),
       .active(active_q),
-      .d(cred_valid_in_s),
-      .q(cred_valid_in_q));
+      .flow_ctrl_in(flow_ctrl_muxed),
+      .fc_event_valid_out(cred_valid_in),
+      .fc_event_sel_out_ovc(cred_sel_in_ovc));
    
-   assign flow_ctrl_in_q[0] = cred_valid_in_q;
-   
-   generate
-      
-      if(flow_ctrl_width > 1)
-	begin
-	   
-	   c_dff
-	     #(.width(flow_ctrl_width-1),
-	       .reset_type(reset_type))
-	   flow_ctrl_inq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(active_q),
-	      .d(flow_ctrl_in_s[1:flow_ctrl_width-1]),
-	      .q(flow_ctrl_in_q[1:flow_ctrl_width-1]));
-	   
-	end
-      
-   endgenerate
+   wire [0:num_vcs-1] 	      cred_valid_in_ovc;
+   assign cred_valid_in_ovc = {num_vcs{cred_valid_in}} & cred_sel_in_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -1131,6 +1115,9 @@ module tc_node_mac
 	   wire vc_gnt;
 	   assign vc_gnt = vc_req & next_elig;
 	   
+	   wire cred_valid_in;
+	   assign cred_valid_in = cred_valid_in_ovc[ovc];
+	   
 	   wire match;
 	   wire elig;
 	   wire empty;
@@ -1157,7 +1144,7 @@ module tc_node_mac
 	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      .flow_ctrl(flow_ctrl_in_q),
+	      .fc_event_valid(cred_valid_in),
 	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ip({num_ports{1'b0}}),
@@ -1849,51 +1836,17 @@ module tc_node_mac
    // credit return path
    //---------------------------------------------------------------------------
    
-   // FIXME: This should be in a separate module!
-   
-   wire 			   cred_valid_out_s, cred_valid_out_q;
-   assign cred_valid_out_s = flit_valid_in;
-   c_dff
-     #(.width(1),
+   rtr_flow_ctrl_output
+     #(.num_vcs(num_vcs),
+       .flow_ctrl_type(flow_ctrl_type),
        .reset_type(reset_type))
-   cred_valid_outq
+   fco
      (.clk(clk),
       .reset(reset),
       .active(active_q),
-      .d(cred_valid_out_s),
-      .q(cred_valid_out_q));
-   
-   assign flow_ctrl_out[0] = cred_valid_out_q;
-   
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc_in;
-	   c_encode
-	     #(.num_ports(num_vcs))
-	   flit_vc_in_enc
-	     (.data_in(flit_sel_in_ivc),
-	      .data_out(flit_vc_in));
-	   
-	   wire [0:vc_idx_width-1] flit_vc_in_s, flit_vc_in_q;
-	   assign flit_vc_in_s = flit_vc_in;
-	   c_dff
-	     #(.width(vc_idx_width),
-	       .reset_type(reset_type))
-	   flit_vc_inq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(active_q),
-	      .d(flit_vc_in_s),
-	      .q(flit_vc_in_q));
-	   
-	   assign flow_ctrl_out[1:1+vc_idx_width-1] = flit_vc_in_q;
-	   
-	end
-      
-   endgenerate
+      .fc_event_valid_in(flit_valid_in),
+      .fc_event_sel_in_ivc(flit_sel_in_ivc),
+      .flow_ctrl_out(flow_ctrl_out));
    
    
    //---------------------------------------------------------------------------

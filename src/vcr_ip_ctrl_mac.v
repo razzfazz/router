@@ -114,6 +114,14 @@ module vcr_ip_ctrl_mac
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -143,9 +151,6 @@ module vcr_ip_ctrl_mac
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select whether to set a packet's outgoing VC ID at the input or output 
    // controller
@@ -1150,17 +1155,16 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    // NOTE: Because we need to clear it in the cycle after a flit / credit has 
-   // been transmitted, this register and the cred_valid_q register further 
-   // down cannot be included in any of the other clock gating domains. If we 
-   // could change things such that flits and credits are transmitted using 
-   // edge-based signaling (i.e., transitions), they could be included in the 
-   // clock gating domain controlled by alloc_active.
+   // been transmitted, this register cannot be included in any of the other 
+   // clock gating domains. If we could change things such that flits are 
+   // transmitted using edge-based signaling (i.e., transitions), they could be 
+   // included in the clock gating domain controlled by alloc_active.
    // Alternatively, we could include the flit_valid_out_q term in alloc_active;
-   // this would allow us to include cred_validq and flit_valid_outq in the 
-   // gating domain at the cost of some unnecessary activity. As synthesis will 
-   // probably not create a clock gating domain for just these two registers, 
-   // they currently will most likely end up being free-running, so this may be 
-   // a reasonable tradeoff.
+   // this would allow us to include flit_valid_outq in the gating domain at 
+   // the cost of some unnecessary activity. As synthesis will probably not 
+   // create a clock gating domain for just these two registers, they currently 
+   // will most likely end up being free-running, so this may be a reasonable 
+   // tradeoff.
    
    wire 			     flit_valid_out_q;
    
@@ -1310,57 +1314,20 @@ module vcr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // generate outgoing credits
+   // generate outgoing flow control signals
    //---------------------------------------------------------------------------
    
-   // FIXME: The following should be in a separate module!
-   
-   // NOTE: See the comment near the definition of cred_validq for notes on
-   // clock gating this register.
-   
-   wire 					  cred_valid_s, cred_valid_q;
-   assign cred_valid_s = flit_sent;
-   c_dff
-     #(.width(1),
+   rtr_flow_ctrl_output
+     #(.num_vcs(num_vcs),
+       .flow_ctrl_type(flow_ctrl_type),
        .reset_type(reset_type))
-   cred_validq
+   fco
      (.clk(clk),
       .reset(reset),
-      .active(valid_out_active),
-      .d(cred_valid_s),
-      .q(cred_valid_q));
-   
-   assign flow_ctrl_out[0] = cred_valid_q;
-   
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] cred_vc;
-	   c_encode
-	     #(.num_ports(num_vcs))
-	   cred_vc_enc
-	     (.data_in(vc_sel_ivc),
-	      .data_out(cred_vc));
-	   
-	   wire [0:vc_idx_width-1] cred_vc_s, cred_vc_q;
-	   assign cred_vc_s = cred_vc;
-	   c_dff
-	     #(.width(vc_idx_width),
-	       .reset_type(reset_type))
-	   cred_vcq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(cred_vc_s),
-	      .q(cred_vc_q));
-	   
-	   assign flow_ctrl_out[1:1+vc_idx_width-1] = cred_vc_q;
-	   
-	end
-      
-   endgenerate
+      .active(alloc_active),
+      .fc_event_valid_in(flit_sent),
+      .fc_event_sel_in_ivc(vc_sel_ivc),
+      .flow_ctrl_out(flow_ctrl_out));
    
    
    //---------------------------------------------------------------------------

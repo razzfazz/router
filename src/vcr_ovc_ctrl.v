@@ -32,8 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // output port controller (tracks state of buffers in downstream router)
 module vcr_ovc_ctrl
-  (clk, reset, flow_ctrl, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, sw_gnt_q, 
-   sw_gnt_ip_q, int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
+  (clk, reset, fc_event_valid, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
+   sw_gnt_q, sw_gnt_ip_q, int_flit_ctrl, match, elig, empty, int_flow_ctrl, 
+   errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -100,9 +101,6 @@ module vcr_ovc_ctrl
        (1 + vc_idx_width + 1) : 
        -1;
    
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
-   
    // ID of current input VC
    parameter vc_id = 0;
    
@@ -153,8 +151,8 @@ module vcr_ovc_ctrl
    input clk;
    input reset;
    
-   // incoming flow control signals
-   input [0:flow_ctrl_width-1] flow_ctrl;
+   // incoming flow control event
+   input fc_event_valid;
    
    // output VC was requested by an input VC
    input vc_req;
@@ -213,26 +211,8 @@ module vcr_ovc_ctrl
    wire 			  flit_tail;
    assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
    
-   wire 			  cred_valid;
-   assign cred_valid = flow_ctrl[0];
-   
    wire 			  credit;
-   
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] cred_vc;
-	   assign cred_vc = flow_ctrl[1:1+vc_idx_width-1];
-	   
-	   assign credit = cred_valid && (cred_vc == vc_id);
-	   
-	end
-      else
-	assign credit = cred_valid;
-      
-   endgenerate
+   assign credit = fc_event_valid;
    
    wire 			   flit_valid_qual;
    assign flit_valid_qual = flit_valid & match;
@@ -335,7 +315,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 				cred_active;
-   assign cred_active = cred_valid;
+   assign cred_active = credit;
    
    wire 				flags_active;
    assign flags_active = alloc_active | cred_active;

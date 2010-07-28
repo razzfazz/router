@@ -92,6 +92,14 @@ module whr_ip_ctrl_mac
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? 1 :
+       -1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -123,9 +131,6 @@ module whr_ip_ctrl_mac
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1;
    
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
@@ -928,39 +933,20 @@ module whr_ip_ctrl_mac
    // generate outgoing credits
    //---------------------------------------------------------------------------
    
-   // FIXME: The following should be in a separate module!
+   wire 			     flow_ctrl_active;
+   assign flow_ctrl_active = flit_valid;
    
-   // NOTE: Because we need to clear it in the cycle after a credit has been 
-   // transmitted, this register currently cannot be included in any of the 
-   // other clock gating domains. If we could change this to send credits 
-   // upstream using edge-based signaling (i.e., transitions), it could be 
-   // included in the clock gating domain controlled by flags_active.
-   // Alternatively, we could include the cred_valid term in flags_active; 
-   // this would allow us to include cred_validq in the gating domain at the 
-   // cost of some unnecessary activity. As synthesis will probably not create 
-   // a clock gating domain for just this register, it currently will most 
-   // likely end up being free-running, so this may be a good tradeoff.
-   
-   wire 			  cred_valid;
-   
-   wire 			  cred_active;
-   assign cred_active = flit_valid | cred_valid;
-   
-   wire 			  cred_valid_s, cred_valid_q;
-   assign cred_valid_s = flit_valid_out;
-   c_dff
-     #(.width(1),
+   rtr_flow_ctrl_output
+     #(.num_vcs(1),
+       .flow_ctrl_type(flow_ctrl_type),
        .reset_type(reset_type))
-   cred_validq
+   fco
      (.clk(clk),
       .reset(reset),
-      .active(cred_active),
-      .d(cred_valid_s),
-      .q(cred_valid_q));
-   
-   assign cred_valid = cred_valid_q;
-   
-   assign flow_ctrl_out[0] = cred_valid;
+      .active(flow_ctrl_active),
+      .fc_event_valid_in(flit_valid_out),
+      .fc_event_sel_in_ivc(1'b1),
+      .flow_ctrl_out(flow_ctrl_out));
    
    
    //---------------------------------------------------------------------------

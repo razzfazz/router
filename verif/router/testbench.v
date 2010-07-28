@@ -132,6 +132,11 @@ module testbench
    localparam route_info_width
      = num_resource_classes * router_addr_width + node_addr_width;
    
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -142,9 +147,6 @@ module testbench
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    
    reg clk;
@@ -225,6 +227,7 @@ module testbench
 		    .num_dimensions(num_dimensions),
 		    .num_nodes_per_router(num_nodes_per_router),
 		    .packet_format(packet_format),
+		    .flow_ctrl_type(flow_ctrl_type),
 		    .max_payload_length(max_payload_length),
 		    .min_payload_length(min_payload_length),
 		    .flit_data_width(flit_data_width),
@@ -293,6 +296,7 @@ module testbench
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .packet_format(packet_format),
+       .flow_ctrl_type(flow_ctrl_type),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
@@ -399,6 +403,7 @@ module testbench
 	       .num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
 	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .la_route_info_width(la_route_info_width),

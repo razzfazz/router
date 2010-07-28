@@ -93,6 +93,14 @@ module vcr_op_ctrl_mac
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -106,9 +114,6 @@ module vcr_op_ctrl_mac
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -367,48 +372,27 @@ module vcr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   // FIXME: The following should be in a separate module!
-   
-   wire [0:flow_ctrl_width-1] 		  flow_ctrl_s, flow_ctrl_q;
-   assign flow_ctrl_s = flow_ctrl_in;
-   
    wire [0:num_vcs-1] 			  empty_ovc;
    
    wire 				  flow_ctrl_active;
    assign flow_ctrl_active = ~&empty_ovc;
    
-   wire 				  cred_valid_s, cred_valid_q;
-   assign cred_valid_s = flow_ctrl_s[0];
-   c_dff
-     #(.width(1),
+   wire 				  cred_valid;
+   wire [0:num_vcs-1] 			  cred_sel_ovc;
+   rtr_flow_ctrl_input
+     #(.num_vcs(num_vcs),
+       .flow_ctrl_type(flow_ctrl_type),
        .reset_type(reset_type))
-   cred_validq
+   fci
      (.clk(clk),
       .reset(reset),
       .active(flow_ctrl_active),
-      .d(cred_valid_s),
-      .q(cred_valid_q));
+      .flow_ctrl_in(flow_ctrl_in),
+      .fc_event_valid_out(cred_valid),
+      .fc_event_sel_out_ovc(cred_sel_ovc));
    
-   assign flow_ctrl_q[0] = cred_valid_q;
-
-   generate
-      
-      if(flow_ctrl_width > 1)
-	begin
-	   
-	   c_dff
-	     #(.width(flow_ctrl_width-1),
-	       .reset_type(reset_type))
-	   flow_ctrlq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(flow_ctrl_active),
-	      .d(flow_ctrl_s[1:flow_ctrl_width-1]),
-	      .q(flow_ctrl_q[1:flow_ctrl_width-1]));
-	   
-	end
-      
-   endgenerate
+   wire [0:num_vcs-1] 			  cred_valid_ovc;
+   assign cred_valid_ovc = {num_vcs{cred_valid}} & cred_sel_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -731,9 +715,6 @@ module vcr_op_ctrl_mac
    wire 		flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
    
-   wire 		cred_valid;
-   assign cred_valid = flow_ctrl_q[0];
-   
    wire [0:num_vcs-1] 	match_ovc;
    
    wire 		error_unmatched;
@@ -761,6 +742,9 @@ module vcr_op_ctrl_mac
 	   wire [0:num_vcs-1] 	vc_gnt_ivc;
 	   assign vc_gnt_ivc = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
 	   
+	   wire 		cred_valid;
+	   assign cred_valid = cred_valid_ovc[ovc];
+	   
 	   wire 		match;
 	   wire 		elig;
 	   wire 		empty;
@@ -786,7 +770,7 @@ module vcr_op_ctrl_mac
 	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      .flow_ctrl(flow_ctrl_q),
+	      .fc_event_valid(cred_valid),
 	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ip(vc_gnt_ip),

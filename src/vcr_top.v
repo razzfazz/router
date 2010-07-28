@@ -98,6 +98,14 @@ module vcr_top
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -119,9 +127,6 @@ module vcr_top
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -489,6 +494,7 @@ module vcr_top
 	       .num_nodes_per_router(num_nodes_per_router),
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
@@ -811,6 +817,7 @@ module vcr_top
 	       .num_nodes_per_router(num_nodes_per_router),
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),

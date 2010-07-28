@@ -102,6 +102,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define DIM_ORDER_BY_CLASS   2
 
 `define DIM_ORDER_LAST `DIM_ORDER_BY_CLASS
+
+
 //------------------------------------------------------------------------------
 // packet formats
 //------------------------------------------------------------------------------
@@ -113,6 +115,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define PACKET_FORMAT_EXPLICIT_LENGTH 1
 
 `define PACKET_FORMAT_LAST `PACKET_FORMAT_EXPLICIT_LENGTH
+
+
+//------------------------------------------------------------------------------
+// flow control types
+//------------------------------------------------------------------------------
+
+// credit-based flow control
+`define FLOW_CTRL_TYPE_CREDIT 0
+
+`define FLOW_CTRL_TYPE_LAST `FLOW_CTRL_TYPE_CREDIT
 
 
 `endif

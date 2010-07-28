@@ -87,6 +87,11 @@ module router_wrap
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -97,9 +102,6 @@ module router_wrap
    
    // width of channel
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    
    input clk;
@@ -141,6 +143,7 @@ module router_wrap
 		 .num_nodes_per_router(num_nodes_per_router),
 		 .connectivity(connectivity),
 		 .packet_format(packet_format),
+		 .flow_ctrl_type(flow_ctrl_type),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
 		 .flit_data_width(flit_data_width),
@@ -184,6 +187,7 @@ module router_wrap
 		 .num_nodes_per_router(num_nodes_per_router),
 		 .connectivity(connectivity),
 		 .packet_format(packet_format),
+		 .flow_ctrl_type(flow_ctrl_type),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
 		 .flit_data_width(flit_data_width),

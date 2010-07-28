@@ -139,9 +139,6 @@ module router_checker
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
-   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    

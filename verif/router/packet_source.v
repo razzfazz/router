@@ -144,6 +144,14 @@ module packet_source
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // maximum payload length (in flits)
    parameter max_payload_length = 4;
    
@@ -167,9 +175,6 @@ module packet_source
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // enable lookahead routing
    parameter lookahead_routing = 1;
@@ -311,6 +316,23 @@ module packet_source
       .flit_sel_in_ovc(sel_ovc),
       .channel_out(channel));
    
+   wire 				 cred_valid;
+   wire [0:num_vcs-1] 			 cred_sel_ovc;
+   rtr_flow_ctrl_input
+     #(.num_vcs(num_vcs),
+       .flow_ctrl_type(flow_ctrl_type),
+       .reset_type(reset_type))
+   fci
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .flow_ctrl_in(flow_ctrl),
+      .fc_event_valid_out(cred_valid),
+      .fc_event_sel_out_ovc(cred_sel_ovc));
+   
+   wire [0:num_vcs-1] 			 credit_ovc;
+   assign credit_ovc = {num_vcs{cred_valid}} & cred_sel_ovc;
+   
    wire 				 flit_sent;
    wire 				 flit_kill;
    
@@ -333,28 +355,11 @@ module packet_source
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire cred_valid;
-	   assign cred_valid = flow_ctrl[0];
-	   
 	   wire credit;
-	   wire debit;
+	   assign credit = credit_ovc[ovc];
 	   
-	   if(num_vcs > 1)
-	     begin
-		
-		wire [0:vc_idx_width-1] cred_vc;
-		assign cred_vc = flow_ctrl[1:1+vc_idx_width-1];
-		
-		assign credit = cred_valid && (cred_vc == ovc);
-		
-		assign debit = flit_sent & sel_ovc[ovc] & ~flit_kill;
-		
-	     end
-	   else
-	     begin
-		assign credit = cred_valid;
-		assign debit = flit_sent & ~flit_kill;
-	     end
+	   wire debit;
+	   assign debit = flit_sent & sel_ovc[ovc] & ~flit_kill;
 	   
 	   wire hft_credit;
 	   wire ft_almost_empty;

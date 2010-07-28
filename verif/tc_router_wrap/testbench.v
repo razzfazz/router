@@ -122,6 +122,11 @@ module testbench
    // width of counter for remaining flits
    localparam flit_ctr_width = clogb(max_payload_length);
    
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -129,9 +134,6 @@ module testbench
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (1 + vc_idx_width + 1) : 
        -1;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
@@ -222,6 +224,7 @@ module testbench
        .num_dimensions(num_dimensions),
        .num_nodes_per_router(num_nodes_per_router),
        .packet_format(packet_format),
+       .flow_ctrl_type(flow_ctrl_type),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),

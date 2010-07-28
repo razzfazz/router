@@ -52,6 +52,14 @@ module flit_sink
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -91,9 +99,6 @@ module flit_sink
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1 + vc_idx_width;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -170,24 +175,19 @@ module flit_sink
    
    wire [0:num_vcs-1] 		buffer_error_ivc;
    
-   wire [0:flow_ctrl_width-1] 	flow_ctrl_s;
-   assign flow_ctrl_s[0] = update;
+   rtr_flow_ctrl_output
+     #(.num_vcs(num_vcs),
+       .flow_ctrl_type(flow_ctrl_type),
+       .reset_type(reset_type))
+   fco
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .fc_event_valid_in(update),
+      .fc_event_sel_in_ivc(gnt_ivc),
+      .flow_ctrl_out(flow_ctrl));
    
    generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc_out;
-	   c_encode
-	     #(.num_ports(num_vcs))
-	   flit_vc_out_enc
-	     (.data_in(gnt_ivc),
-	      .data_out(flit_vc_out));
-	   
-	   assign flow_ctrl_s[1:1+vc_idx_width-1] = flit_vc_out;
-	   
-	end
       
       genvar 		    ivc;
       
@@ -228,18 +228,5 @@ module flit_sink
    endgenerate
    
    assign error = |buffer_error_ivc;
-   
-   wire [0:flow_ctrl_width-1] 		    flow_ctrl_q;
-   c_dff
-     #(.width(flow_ctrl_width),
-       .reset_type(reset_type))
-   flow_ctrlq
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .d(flow_ctrl_s),
-      .q(flow_ctrl_q));
-   
-   assign flow_ctrl = flow_ctrl_q;
    
 endmodule

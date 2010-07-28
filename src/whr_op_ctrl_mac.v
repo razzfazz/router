@@ -74,6 +74,14 @@ module whr_op_ctrl_mac
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? 1 :
+       -1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -102,9 +110,6 @@ module whr_op_ctrl_mac
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
-   
-   // width of flow control signals
-   localparam flow_ctrl_width = 1;
    
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -162,32 +167,24 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   // FIXME: The following should be in a separate module!
-   
-   wire [0:flow_ctrl_width-1]  flow_ctrl_s, flow_ctrl_q;
-   assign flow_ctrl_s = flow_ctrl_in;
-   
    wire 		       ft_empty;
    
    wire 		       flow_ctrl_active;
    assign flow_ctrl_active = ~ft_empty;
    
-   wire 		       cred_valid_s, cred_valid_q;
-   assign cred_valid_s = flow_ctrl_s[0];
-   c_dff
-     #(.width(1),
+   wire 		       cred_valid;
+   wire 		       cred_sel_ovc;
+   rtr_flow_ctrl_input
+     #(.num_vcs(1),
+       .flow_ctrl_type(flow_ctrl_type),
        .reset_type(reset_type))
-   cred_validq
+   fci
      (.clk(clk),
       .reset(reset),
       .active(flow_ctrl_active),
-      .d(cred_valid_s),
-      .q(cred_valid_q));
-   
-   assign flow_ctrl_q[0] = cred_valid_q;
-   
-   wire 		       cred_valid;
-   assign cred_valid = flow_ctrl_q[0];
+      .flow_ctrl_in(flow_ctrl_in),
+      .fc_event_valid_out(cred_valid),
+      .fc_event_sel_out_ovc(cred_sel_ovc));
    
    
    //---------------------------------------------------------------------------
@@ -446,7 +443,7 @@ module whr_op_ctrl_mac
 		   .push_active(arb_active),
 		   .pop_active(cred_active),
 		   .push(gnt),
-		   .pop(cred_valid),
+		   .pop(credit),
 		   .push_data(tff_push_data),
 		   .pop_data(tff_pop_data),
 		   .almost_empty(tff_almost_empty),
