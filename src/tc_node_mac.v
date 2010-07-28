@@ -1058,7 +1058,7 @@ module tc_node_mac
    cred_valid_inq
      (.clk(clk),
       .reset(reset),
-      .active(1'b1),
+      .active(active_q),
       .d(cred_valid_in_s),
       .q(cred_valid_in_q));
    
@@ -1075,7 +1075,7 @@ module tc_node_mac
 	   flow_ctrl_inq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(1'b1),
+	      .active(active_q),
 	      .d(flow_ctrl_in_s[1:flow_ctrl_width-1]),
 	      .q(flow_ctrl_in_q[1:flow_ctrl_width-1]));
 	   
@@ -1859,7 +1859,7 @@ module tc_node_mac
    cred_valid_outq
      (.clk(clk),
       .reset(reset),
-      .active(1'b1),
+      .active(active_q),
       .d(cred_valid_out_s),
       .q(cred_valid_out_q));
    
@@ -1885,7 +1885,7 @@ module tc_node_mac
 	   flit_vc_inq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(1'b1),
+	      .active(active_q),
 	      .d(flit_vc_in_s),
 	      .q(flit_vc_in_q));
 	   
