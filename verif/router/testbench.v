@@ -173,6 +173,12 @@ module testbench
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
+	   wire [0:flow_ctrl_width-1] flow_ctrl_out;
+	   assign flow_ctrl_out = flow_ctrl_out_ip[ip*flow_ctrl_width:
+						   (ip+1)*flow_ctrl_width-1];
+	   
+	   assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
+	   
 	   if(inject_node_ports_only && (ip < (num_ports-num_nodes_per_router)))
 	     begin
 		
@@ -180,25 +186,11 @@ module testbench
 		  = {channel_width{1'b0}};
 		assign flit_valid_in_ip[ip] = 1'b0;
 		
-		wire [0:flow_ctrl_width-1] flow_ctrl_out;
-		assign flow_ctrl_out
-		  = flow_ctrl_out_ip[ip*flow_ctrl_width:
-				     (ip+1)*flow_ctrl_width-1];
-		
-		assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
-		
 		assign ps_error_ip[ip] = 1'b0;
 		
 	     end
 	   else
 	     begin
-		
-		wire [0:flow_ctrl_width-1] flow_ctrl_out;
-		assign flow_ctrl_out
-		  = flow_ctrl_out_ip[ip*flow_ctrl_width:
-				     (ip+1)*flow_ctrl_width-1];
-		
-		assign cred_valid_out_ip[ip] = flow_ctrl_out[0];
 		
 		wire [0:flow_ctrl_width-1] flow_ctrl_dly;
 		c_shift_reg
