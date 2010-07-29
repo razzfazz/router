@@ -41,7 +41,7 @@ module c_prio_sel
    parameter prio_width = 4;
    
    // priority values
-   input [0:num_ports*prio_width-1] port_prios;
+   input [0:num_ports*prio_width-1] prioritiess;
    
    // vector representing maximum priority ports
    output [0:num_ports-1] select;
