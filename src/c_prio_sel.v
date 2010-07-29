@@ -34,20 +34,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_prio_sel
   (priorities, select);
    
+`include "c_functions.v"
+   
    // number of input ports
    parameter num_ports = 32;
    
+   // number of priority levels
+   parameter num_priorities = 16;
+   
    // width of priority fields
-   parameter prio_width = 4;
+   localparam prio_width = clogb(num_priorities);
    
    // priority values
-   input [0:num_ports*prio_width-1] prioritiess;
+   input [0:num_ports*prio_width-1] priorities;
    
    // vector representing maximum priority ports
-   output [0:num_ports-1] select;
-   wire [0:num_ports-1] select;
+   output [0:num_ports-1] 	    select;
+   wire [0:num_ports-1] 	    select;
    
-   wire [0:prio_width-1] 	   prio_some_set;
+   wire [0:prio_width-1] 	    prio_some_set;
    c_binary_op
      #(.num_ports(num_ports),
        .width(prio_width),
@@ -56,7 +61,7 @@ module c_prio_sel
      (.data_in(priorities),
       .data_out(prio_some_set));
    
-   wire [0:prio_width-1] 	   prio_some_unset;
+   wire [0:prio_width-1] 	    prio_some_unset;
    c_binary_op
      #(.num_ports(num_ports),
        .width(prio_width),
@@ -66,10 +71,10 @@ module c_prio_sel
       .data_out(prio_some_unset));
    
    // find bit positions that are not identical for all ports
-   wire [0:prio_width-1] 	   prio_diffs;
+   wire [0:prio_width-1] 	    prio_diffs;
    assign prio_diffs = prio_some_set & prio_some_unset;
    
-   wire [0:prio_width-1] 	   first_prio_diff;
+   wire [0:prio_width-1] 	    first_prio_diff;
    c_fp_arbiter
      #(.num_ports(prio_width))
    first_prio_diff_arb
@@ -77,7 +82,7 @@ module c_prio_sel
       .gnt(first_prio_diff));
    
    // for each priority bit, list all ports that have this bit set
-   wire [0:prio_width*num_ports-1] prio_ports
+   wire [0:prio_width*num_ports-1]  prio_ports;
    c_interleave
      #(.width(num_ports*prio_width),
        .num_blocks(num_ports))
@@ -86,7 +91,7 @@ module c_prio_sel
       .data_out(prio_ports));
    
    // select all those ports who have the first differing bit set
-   wire [0:num_ports-1] 	   max_ports;
+   wire [0:num_ports-1] 	    max_ports;
    c_select_1ofn
      #(.num_ports(prio_width),
        .width(num_ports))
@@ -96,7 +101,7 @@ module c_prio_sel
       .data_out(max_ports));
    
    // check if all inputs have the same priority
-   wire 			   all_same_prio;
+   wire 			    all_same_prio;
    assign all_same_prio = ~|prio_diffs;
    
    // if so, we must override the result
