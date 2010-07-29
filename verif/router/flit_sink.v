@@ -43,6 +43,9 @@ module flit_sink
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   
    // number of VCs
    parameter num_vcs = 8;
    
@@ -204,6 +207,7 @@ module flit_sink
 	   wire 			    buffer_empty;
 	   wire 			    buffer_almost_full;
 	   wire 			    buffer_full;
+	   wire [0:flit_count_width-1] 	    buffer_free;
 	   wire [0:1] 			    buffer_errors;
 	   c_fifo_tracker
 	     #(.depth(num_flits_per_vc),
@@ -218,6 +222,7 @@ module flit_sink
 	      .empty(buffer_empty),
 	      .almost_full(buffer_almost_full),
 	      .full(buffer_full),
+	      .free(buffer_free),
 	      .errors(buffer_errors));
 	   
 	   assign buffer_empty_ivc[ivc] = buffer_empty;

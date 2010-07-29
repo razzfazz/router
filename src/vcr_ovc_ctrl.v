@@ -44,8 +44,14 @@ module vcr_ovc_ctrl
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_packets_per_vc = 4;
+   
+   // width required to express number of packets in a VC
+   localparam packet_count_width = clogb(num_packets_per_vc + 1);
    
    // number of traffic classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -317,7 +323,7 @@ module vcr_ovc_ctrl
    assign flags_active = alloc_active | cred_active;
    
    wire 				ft_almost_empty;
-   wire 				head_free;
+   wire 				head_full;
    wire 				error_hft_underflow;
    wire 				error_hft_overflow;
    
@@ -329,7 +335,7 @@ module vcr_ovc_ctrl
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
 	   // on the normal credit tracking mechanism
-	   assign head_free = 1'b1;
+	   assign head_full = 1'b0;
 	   
 	   assign error_hft_underflow = 1'b0;
 	   assign error_hft_overflow = 1'b0;
@@ -414,6 +420,7 @@ module vcr_ovc_ctrl
 	   wire 				 hft_empty;
 	   wire 				 hft_almost_full;
 	   wire 				 hft_full;
+	   wire [0:packet_count_width-1] 	 hft_free;
 	   wire [0:1] 				 hft_errors;
 	   c_fifo_tracker
 	     #(.depth(num_packets_per_vc),
@@ -428,9 +435,10 @@ module vcr_ovc_ctrl
 	      .empty(hft_empty),
 	      .almost_full(hft_almost_full),
 	      .full(hft_full),
+	      .free(hft_free),
 	      .errors(hft_errors));
 	   
-	   assign head_free = ~hft_full;
+	   assign head_full = hft_full;
 	   
 	   assign error_hft_underflow = hft_errors[0];
 	   assign error_hft_overflow = hft_errors[1];
@@ -644,11 +652,11 @@ module vcr_ovc_ctrl
 	      .d(cred_s),
 	      .q(cred_q));
 	   
-	   assign elig = ~allocated_q & head_free & cred_q;
+	   assign elig = ~allocated_q & ~head_full & cred_q;
 	   
 	end
       else
-	assign elig = ~allocated_q & head_free;
+	assign elig = ~allocated_q & ~head_full;
       
    endgenerate
    

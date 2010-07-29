@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // module for tracking state of a FIFO
 module c_fifo_tracker
   (clk, reset, active, push, pop, almost_empty, empty, almost_full, full, 
-   errors);
+   free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -49,7 +49,7 @@ module c_fifo_tracker
    // synopsys translate_off
    
    // width required to represent full range of credit count (0..depth)
-   localparam true_idx_width = clogb(depth+1);
+   localparam free_width = clogb(depth+1);
    
    // synopsys translate_on
    
@@ -79,14 +79,18 @@ module c_fifo_tracker
    output full;
    wire   full;
    
+   // number of free entries
+   output [0:free_width-1] free;
+   wire [0:free_width-1]   free;
+   
    // internal error condition encountered
-   output [0:1] errors;
-   wire [0:1] 	errors;
+   output [0:1] 	   errors;
+   wire [0:1] 		   errors;
    
-   wire 	full_push;
-   wire 	full_nopush;
+   wire 		   full_push;
+   wire 		   full_nopush;
    
-   wire 	full_s, full_q;
+   wire 		   full_s, full_q;
    assign full_s = push ? full_push : full_nopush;
    c_dff
      #(.width(1),
@@ -100,14 +104,8 @@ module c_fifo_tracker
    
    assign full = full_q;
    
-   wire 	error_underflow;
-   wire 	error_overflow;
-   
-   // synopsys translate_off
-   
-   wire [0:true_idx_width-1] true_free_count;
-   
-   // sypopsys translate_on
+   wire 		   error_underflow;
+   wire 		   error_overflow;
    
    generate
       
@@ -125,11 +123,7 @@ module c_fifo_tracker
 	   assign almost_empty = full_q;
 	   assign empty = ~full_q;
 	   
-	   // synopsys translate_off
-	   
-	   assign true_free_count = ~full_q;
-	   
-	   // synopsys translate_on
+	   assign free = ~full_q;
 	   
 	end
       
@@ -183,12 +177,11 @@ module c_fifo_tracker
 	     assign almost_empty = (free_count_q == (depth - 2));
 	   
 	   assign empty = free_count_max;
-	   
-	   // synopsys translate_on
-	   
-	   assign true_free_count = free_count_q + !full_q;
-	   
-	   // synopsys translate_on
+
+	   if(depth == 2)
+	     assign free = {free_count_q, ~free_count_q & full_q};
+	   else
+	     assign free = free_count_q + !full_q;
 	   
 	end
       

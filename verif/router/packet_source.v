@@ -45,7 +45,7 @@ module packet_source
    parameter packet_rate = 25;
    
    // width of packet count register
-   parameter packet_count_width = 32;
+   parameter packet_count_reg_width = 32;
 
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
@@ -59,8 +59,14 @@ module packet_source
    // number of bits required for flit buffer addresses
    localparam flit_buffer_idx_width = clogb(num_flits_per_vc);
    
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_packets_per_vc = 4;
+   
+   // width required to express number of packets in a VC
+   localparam packet_count_width = clogb(num_packets_per_vc + 1);
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -251,12 +257,12 @@ module packet_source
       if(max_packet_count >= 0)
 	begin
 	   
-	   wire [0:packet_count_width-1] waiting_packet_count_s;
-	   wire [0:packet_count_width-1] waiting_packet_count_q;
+	   wire [0:packet_count_reg_width-1] waiting_packet_count_s;
+	   wire [0:packet_count_reg_width-1] waiting_packet_count_q;
 	   assign waiting_packet_count_s
 	     = waiting_packet_count_q - packet_ready;
 	   c_dff
-	     #(.width(packet_count_width),
+	     #(.width(packet_count_reg_width),
 	       .reset_value(max_packet_count),
 	       .reset_type(reset_type))
 	   waiting_packet_countq
@@ -277,15 +283,15 @@ module packet_source
    wire 				 packet_sent;
    
    wire 				 ready_packet_count_zero;
-   wire [0:packet_count_width-1] 	 ready_packet_count_s;
-   wire [0:packet_count_width-1] 	 ready_packet_count_q;
+   wire [0:packet_count_reg_width-1] 	 ready_packet_count_s;
+   wire [0:packet_count_reg_width-1] 	 ready_packet_count_q;
    assign ready_packet_count_s
      = run ?
        ready_packet_count_q - (packet_sent & ~ready_packet_count_zero) + 
        packet_ready :
-       {packet_count_width{1'b0}};
+       {packet_count_reg_width{1'b0}};
    c_dff
-     #(.width(packet_count_width),
+     #(.width(packet_count_reg_width),
        .reset_type(reset_type))
    ready_packet_countq
      (.clk(clk),
@@ -432,7 +438,8 @@ module packet_source
 	   wire hft_full;
 	   wire hft_almost_empty;
 	   wire hft_empty;
-	   wire [0:1] hft_errors;
+	   wire [0:packet_count_width-1] hft_free;
+	   wire [0:1] 			 hft_errors;
 	   c_fifo_tracker
 	     #(.depth(num_packets_per_vc),
 	       .reset_type(reset_type))
@@ -446,18 +453,20 @@ module packet_source
 	      .full(hft_full),
 	      .almost_empty(hft_almost_empty),
 	      .empty(hft_empty),
+	      .free(hft_free),
 	      .errors(hft_errors));
 	   
-	   wire       head_free;
+	   wire 			 head_free;
 	   assign head_free = ~hft_full;
 	   
 	   assign head_free_ovc[ovc] = head_free;
 	   assign hft_errors_ovc[ovc*2:(ovc+1)*2-1] = hft_errors;
 	   
-	   wire       ft_almost_full;
-	   wire       ft_full;
-	   wire       ft_empty;
-	   wire [0:1] ft_errors;
+	   wire 			 ft_almost_full;
+	   wire 			 ft_full;
+	   wire 			 ft_empty;
+	   wire [0:flit_count_width-1] 	 ft_free;
+	   wire [0:1] 			 ft_errors;
 	   c_fifo_tracker
 	     #(.depth(num_flits_per_vc),
 	       .reset_type(reset_type))
@@ -471,6 +480,7 @@ module packet_source
 	      .full(ft_full),
 	      .almost_empty(ft_almost_empty),
 	      .empty(ft_empty),
+	      .free(ft_free),
 	      .errors(ft_errors));
 	   
 	   assign free_ovc[ovc] = ~ft_full;

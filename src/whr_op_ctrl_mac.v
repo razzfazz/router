@@ -43,8 +43,14 @@ module whr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_packets_per_vc = 4;
+   
+   // width required to express number of packets in a VC
+   localparam packet_count_width = clogb(num_packets_per_vc + 1);
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -219,13 +225,13 @@ module whr_op_ctrl_mac
       .req(req_int_ip),
       .gnt(gnt_int_ip));
    
-   wire 		       hft_free;
+   wire 		       head_full;
    
    wire [0:num_ports-1]        new_gnt_ip;
-   assign new_gnt_ip = gnt_int_ip & {num_ports{hft_free}};
+   assign new_gnt_ip = gnt_int_ip & {num_ports{~head_full}};
    
    wire 		       new_gnt;
-   assign new_gnt = gnt_int & hft_free;
+   assign new_gnt = gnt_int & ~head_full;
    
    wire 		       allocated_q;
    
@@ -250,12 +256,12 @@ module whr_op_ctrl_mac
    wire 		       held_gnt;
    assign held_gnt = |held_gnt_ip;
    
-   wire 		       ft_free;
+   wire 		       full;
    
    wire 		       allocated_s;
    assign allocated_s = allocated_q ?
-			(~|(held_gnt_ip & req_tail_ip) | ~ft_free) :
-			(|(gnt_int_ip & ~req_tail_ip) & hft_free & ft_free);
+			(~|(held_gnt_ip & req_tail_ip) | full) :
+			(|(gnt_int_ip & ~req_tail_ip) & ~head_full & ~full);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -277,10 +283,10 @@ module whr_op_ctrl_mac
    assign gnt_unqual = allocated_q ? held_gnt : new_gnt;
    
    assign gnt_ip
-     = (allocated_q ? held_gnt_ip : new_gnt_ip) & {num_ports{ft_free}};
+     = (allocated_q ? held_gnt_ip : new_gnt_ip) & {num_ports{~full}};
    
    wire 		       gnt;
-   assign gnt = gnt_unqual & ft_free;
+   assign gnt = gnt_unqual & ~full;
    
    
    //---------------------------------------------------------------------------
@@ -376,7 +382,7 @@ module whr_op_ctrl_mac
 	   // if every flit buffer entry can be a head flit, we don't need 
 	   // dedicated credit tracking for headers, and can instead just rely 
 	   // on the normal credit tracking mechanism
-	   assign hft_free = 1'b1;
+	   assign head_full = 1'b0;
 	   
 	   assign error_hft_underflow = 1'b0;
 	   assign error_hft_overflow = 1'b0;
@@ -457,13 +463,14 @@ module whr_op_ctrl_mac
 	     end
 	   
 	   wire 				 head_debit;
-	   assign head_debit = ~allocated_q & new_gnt & ft_free;
+	   assign head_debit = ~allocated_q & new_gnt & ~full;
 	   
 	   // track header credits using stock FIFO tracker module
 	   wire 				 hft_almost_empty;
 	   wire 				 hft_empty;
 	   wire 				 hft_almost_full;
 	   wire 				 hft_full;
+	   wire [0:packet_count_width-1] 	 hft_free;
 	   wire [0:1] 				 hft_errors;
 	   c_fifo_tracker
 	     #(.depth(num_packets_per_vc),
@@ -478,9 +485,10 @@ module whr_op_ctrl_mac
 	      .empty(hft_empty),
 	      .almost_full(hft_almost_full),
 	      .full(hft_full),
+	      .free(hft_free),
 	      .errors(hft_errors));
 	   
-	   assign hft_free = ~hft_full | head_credit;
+	   assign head_full = hft_full & ~head_credit;
 	   
 	   assign error_hft_underflow = hft_errors[0];
 	   assign error_hft_overflow = hft_errors[1];
@@ -499,6 +507,7 @@ module whr_op_ctrl_mac
    
    wire 					 ft_almost_full;
    wire 					 ft_full;
+   wire [0:flit_count_width-1] 			 ft_free;
    wire [0:1] 					 ft_errors;
    c_fifo_tracker
      #(.depth(num_flits_per_vc),
@@ -513,6 +522,7 @@ module whr_op_ctrl_mac
       .empty(ft_empty),
       .almost_full(ft_almost_full),
       .full(ft_full),
+      .free(ft_free),
       .errors(ft_errors));
    
    wire 					 error_ft_underflow;
@@ -526,7 +536,7 @@ module whr_op_ctrl_mac
    // performed in parallel with arbitration, so we don't need an additional
    // register stage as in the general VC case.
    
-   assign ft_free = ~ft_full | credit;
+   assign full = ft_full & ~credit;
    
    
    //---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ module testbench
    parameter initial_seed = 0;
    
    localparam addr_width = clogb(num_buffers);
+   localparam free_width = clogb(num_buffers + 1);
    
    reg clk;
    reg reset;
@@ -55,6 +56,7 @@ module testbench
    wire 		 ft_empty;
    wire 		 ft_almost_full;
    wire 		 ft_full;
+   wire [0:free_width-1] ft_free;
    wire [0:1] 		 ft_errors;
    
    c_fifo_tracker
@@ -70,6 +72,7 @@ module testbench
       .empty(ft_empty),
       .almost_full(ft_almost_full),
       .full(ft_full),
+      .free(ft_free),
       .errors(ft_errors));
    
    always

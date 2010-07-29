@@ -52,7 +52,7 @@ module testbench
    parameter consume_rate = 50;
    
    // width of packet count register
-   parameter packet_count_width = 32;
+   parameter packet_count_reg_width = 32;
    
    // channel latency in cycles
    parameter channel_latency = 1;
@@ -215,7 +215,7 @@ module testbench
 		  #(.initial_seed(initial_seed+ip),
 		    .max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
-		    .packet_count_width(packet_count_width),
+		    .packet_count_reg_width(packet_count_reg_width),
 		    .packet_length_mode(packet_length_mode),
 		    .topology(topology),
 		    .num_flits_per_vc(num_flits_per_vc),
