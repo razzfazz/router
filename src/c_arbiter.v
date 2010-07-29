@@ -57,64 +57,64 @@ module c_arbiter
    
    // grant vector
    output [0:num_ports-1] gnt;
-   wire [0:num_ports-1] gnt;
+   wire [0:num_ports-1]   gnt;
    
    // update port priorities
-   input update;
+   input 		  update;
    
    generate
-
-      if(num_ports > 1)
-	begin
-	   
-	   case(arbiter_type)
-	     `ARBITER_TYPE_ROUND_ROBIN:
-	       begin
-		  
-		  wire [0:num_ports-1] rr_arb_state;
-		  c_rr_arb_logic
-		    #(.num_ports(num_ports))
-		  rr_arb_log
-		    (.state(rr_arb_state),
-		     .req(req),
-		     .gnt(gnt));
-		  
-		  c_rr_arb_state
-		    #(.num_ports(num_ports),
-		      .reset_type(reset_type))
-		  rr_arb_stat
-		    (.clk(clk),
-		     .reset(reset),
-		     .active(active),
-		     .update(update),
-		     .gnt(gnt),
-		     .state(rr_arb_state));
-		  
-	       end
-	     `ARBITER_TYPE_MATRIX:
-	       begin
-		  
-		  wire [0:num_ports*num_ports-1] matrix_arb_state;
-		  c_matrix_arb_logic
-		    #(.num_ports(num_ports))
-		  matrix_arb_log
-		    (.state(matrix_arb_state),
-		     .req(req),
-		     .gnt(gnt));
-		  
-		  c_matrix_arb_state
-		    #(.num_ports(num_ports),
-		      .reset_type(reset_type))
-		  matrix_arb_stat
-		    (.clk(clk),
-		     .reset(reset),
-		     .active(active),
-		     .update(update),
-		     .gnt(gnt),
-		     .state(matrix_arb_state));
-		  
-	       end
-	     `ARBITER_TYPE_DW_FCFS:
+      
+      case(arbiter_type)
+	`ARBITER_TYPE_ROUND_ROBIN:
+	  begin
+	     
+	     wire [0:num_ports-1] rr_arb_state;
+	     c_rr_arb_logic
+	       #(.num_ports(num_ports))
+	     rr_arb_log
+	       (.state(rr_arb_state),
+		.req(req),
+		.gnt(gnt));
+	     
+	     c_rr_arb_state
+	       #(.num_ports(num_ports),
+		 .reset_type(reset_type))
+	     rr_arb_stat
+	       (.clk(clk),
+		.reset(reset),
+		.active(active),
+		.update(update),
+		.gnt(gnt),
+		.state(rr_arb_state));
+	     
+	  end
+	`ARBITER_TYPE_MATRIX:
+	  begin
+	     
+	     wire [0:num_ports*num_ports-1] matrix_arb_state;
+	     c_matrix_arb_logic
+	       #(.num_ports(num_ports))
+	     matrix_arb_log
+	       (.state(matrix_arb_state),
+		.req(req),
+		.gnt(gnt));
+	     
+	     c_matrix_arb_state
+	       #(.num_ports(num_ports),
+		 .reset_type(reset_type))
+	     matrix_arb_stat
+	       (.clk(clk),
+		.reset(reset),
+		.active(active),
+		.update(update),
+		.gnt(gnt),
+		.state(matrix_arb_state));
+	     
+	  end
+	`ARBITER_TYPE_DW_FCFS:
+	  begin
+	     
+	     if(num_ports > 1)
 	       begin
 		  
 		  wire enable;
@@ -153,11 +153,11 @@ module c_arbiter
 		     .grant_index(grant_index));
 		  
 	       end
-	   endcase
-	   
-	end
-      else
-	assign gnt = req;
+	     else
+	       assign gnt = req;
+	     
+	  end
+      endcase
       
    endgenerate
    
