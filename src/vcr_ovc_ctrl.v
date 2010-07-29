@@ -444,16 +444,8 @@ module vcr_ovc_ctrl
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire [0:cred_count_width-1] 			 cred_count_q;
-   
-   wire [0:cred_count_width-1] 			 cred_count_plus_credit;
-   assign cred_count_plus_credit = cred_count_q + credit;
-   
-   wire [0:cred_count_width-1] 			 cred_count_next;
-   assign cred_count_next = cred_count_plus_credit - debit;
-   
-   wire [0:cred_count_width-1] 			 cred_count_s;
-   assign cred_count_s = cred_count_next;
+   wire [0:cred_count_width-1] 			 cred_count_s, cred_count_q;
+   assign cred_count_s = cred_count_q + credit - debit;
    c_dff
      #(.width(cred_count_width),
        .reset_type(reset_type),
@@ -516,14 +508,58 @@ module vcr_ovc_ctrl
 	`INT_FLOW_CTRL_TYPE_PUSH:
 	  begin
 	     
-	     wire [0:cred_hold_width-1]  cred_hold_copy;
+	     wire [0:cred_hold_width-1] cred_hold_copy;
+	     
 	     if(vc_alloc_requires_credit)
-	       assign cred_hold_copy
-		 = cred_count_next[(cred_count_width-cred_hold_width):
-				   cred_count_width-1] - 
-		   |cred_count_next;
+	       begin
+		  
+		  // If the VC is currently full, of if there is only a single 
+		  // credit left in the VC and we don't receive another one in 
+		  // this cycle, we know that there cannot be any credits left 
+		  // for the next cycle.
+		  
+		  wire force_zero;
+		  assign force_zero = ft_full | (ft_almost_full & ~credit);
+		  
+		  // Otherwise we must subtract one from the current credit
+		  // count, and then add 'credit' and subtract 'debit'; note
+		  // that this can potentially cause underflows, so we will
+		  // use 'force_zero' later to mask out such incorrect results.
+		  
+		  wire [0:cred_hold_width-1] cred_hold_base;
+		  assign cred_hold_base = cred_count_q[cred_count_width-
+						       cred_hold_width:
+						       cred_count_width-1];
+		  
+		  // First we adjust the credit count by adding 'credit' and 
+		  // subtracting one.
+		  // (NOTE: -1+x = -(1-x) = -(~x) for single-bit x)
+		  
+		  wire [0:cred_hold_width-1] cred_hold_step1;
+		  assign cred_hold_step1 = cred_hold_base - !credit;
+		  
+		  // Then we subtract the incoming 'debit' signal.
+		  
+		  wire [0:cred_hold_width-1] cred_hold_step2;
+		  assign cred_hold_step2 = cred_hold_step1 - debit;
+		  
+		  // Forcing the result to zero in this case allows us to 
+		  // avoid a potential underflow when unconditionally 
+		  // subtracting the incoming 'debit' signal.
+		  
+		  assign cred_hold_copy
+		    = cred_hold_step2 & {cred_hold_width{~force_zero}};
+		  
+	       end
 	     else
-	       assign cred_hold_copy = cred_count_next;
+	       begin
+		  
+		  wire [0:cred_count_width-1] cred_count_plus_credit;
+		  assign cred_count_plus_credit = cred_count_q + credit;
+		  
+		  assign cred_hold_copy = cred_count_plus_credit - debit;
+		  
+	       end
 	     
 	     if(cred_hold_width >= 2)
 	       begin
