@@ -70,29 +70,49 @@ module c_arbiter
 	   case(arbiter_type)
 	     `ARBITER_TYPE_ROUND_ROBIN:
 	       begin
-		  c_rr_arbiter
+		  
+		  wire [0:num_ports-1] rr_arb_state;
+		  c_rr_arb_logic
+		    #(.num_ports(num_ports))
+		  rr_arb_log
+		    (.state(rr_arb_state),
+		     .req(req),
+		     .gnt(gnt));
+		  
+		  c_rr_arb_state
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type))
-		  rr_arb
+		  rr_arb_stat
 		    (.clk(clk),
 		     .reset(reset),
 		     .active(active),
-		     .req(req),
+		     .update(update),
 		     .gnt(gnt),
-		     .update(update));
+		     .state(rr_arb_state));
+		  
 	       end
 	     `ARBITER_TYPE_MATRIX:
 	       begin
-		  c_matrix_arbiter
+		  
+		  wire [0:num_ports*num_ports-1] matrix_arb_state;
+		  c_matrix_arb_logic
+		    #(.num_ports(num_ports))
+		  matrix_arb_log
+		    (.state(matrix_arb_state),
+		     .req(req),
+		     .gnt(gnt));
+		  
+		  c_matrix_arb_state
 		    #(.num_ports(num_ports),
 		      .reset_type(reset_type))
-		  m_arb
+		  matrix_arb_stat
 		    (.clk(clk),
 		     .reset(reset),
 		     .active(active),
-		     .req(req),
+		     .update(update),
 		     .gnt(gnt),
-		     .update(update));
+		     .state(matrix_arb_state));
+		  
 	       end
 	     `ARBITER_TYPE_DW_FCFS:
 	       begin
