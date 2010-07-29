@@ -136,13 +136,10 @@ module vcr_ovc_ctrl
        (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
        -1;
    
-   // width for full range of credit count ([0:num_credits])
-   localparam cred_count_width = clogb(num_flits_per_vc + 1);
-   
    // width of counter for credits waiting to be sent to input controller
    localparam cred_hold_width = vc_alloc_requires_credit ? 
 				clogb(num_flits_per_vc) : 
-				cred_count_width;
+				flit_count_width;
    
    // initial value for credit hold counter
    localparam [0:cred_hold_width-1] cred_hold_reset_value
@@ -452,37 +449,34 @@ module vcr_ovc_ctrl
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire [0:cred_count_width-1] 			 cred_count_s, cred_count_q;
-   assign cred_count_s = cred_count_q + credit - debit;
-   c_dff
-     #(.width(cred_count_width),
-       .reset_type(reset_type),
-       .reset_value(num_flits_per_vc))
-   cred_countq
+   wire 					 ft_empty;
+   wire 					 ft_almost_full;
+   wire 					 ft_full;
+   wire [0:flit_count_width-1] 			 ft_free;
+   wire [0:1] 					 ft_errors;
+   c_fifo_tracker
+     #(.depth(num_flits_per_vc),
+       .reset_type(reset_type))
+   ft
      (.clk(clk),
       .reset(reset),
       .active(flags_active),
-      .d(cred_count_s),
-      .q(cred_count_q));
-   
-   wire 					 ft_almost_full;
-   assign ft_almost_full = (cred_count_q == 1);
-   
-   wire 					 ft_full;
-   assign ft_full = ~|cred_count_q;
-   
-   wire 					 error_ct_underflow;
-   assign error_ct_underflow = ft_full & debit;
-   
-   assign ft_almost_empty = (cred_count_q == (num_flits_per_vc - 1));
-   
-   wire 					 ft_empty;
-   assign ft_empty = (cred_count_q == num_flits_per_vc);
-   
-   wire 					 error_ct_overflow;
-   assign error_ct_overflow = ft_empty & credit;
+      .push(debit),
+      .pop(credit),
+      .almost_empty(ft_almost_empty),
+      .empty(ft_empty),
+      .almost_full(ft_almost_full),
+      .full(ft_full),
+      .free(ft_free),
+      .errors(ft_errors));
    
    assign empty = ft_empty;
+   
+   wire 					 error_ct_underflow;
+   assign error_ct_underflow = ft_errors[0];
+   
+   wire 					 error_ct_overflow;
+   assign error_ct_overflow = ft_errors[1];
    
    
    //---------------------------------------------------------------------------
@@ -516,6 +510,10 @@ module vcr_ovc_ctrl
 	`INT_FLOW_CTRL_TYPE_PUSH:
 	  begin
 	     
+	     wire [0:cred_hold_width-1] cred_hold_base;
+	     assign cred_hold_base
+	       = ft_free[flit_count_width-cred_hold_width:flit_count_width-1];
+	     
 	     wire [0:cred_hold_width-1] cred_hold_copy;
 	     
 	     if(vc_alloc_requires_credit)
@@ -533,11 +531,6 @@ module vcr_ovc_ctrl
 		  // count, and then add 'credit' and subtract 'debit'; note
 		  // that this can potentially cause underflows, so we will
 		  // use 'force_zero' later to mask out such incorrect results.
-		  
-		  wire [0:cred_hold_width-1] cred_hold_base;
-		  assign cred_hold_base = cred_count_q[cred_count_width-
-						       cred_hold_width:
-						       cred_count_width-1];
 		  
 		  // First we adjust the credit count by adding 'credit' and 
 		  // subtracting one.
@@ -562,10 +555,10 @@ module vcr_ovc_ctrl
 	     else
 	       begin
 		  
-		  wire [0:cred_count_width-1] cred_count_plus_credit;
-		  assign cred_count_plus_credit = cred_count_q + credit;
+		  wire [0:cred_hold_width-1] cred_hold_plus_credit;
+		  assign cred_hold_plus_credit = cred_hold_base + credit;
 		  
-		  assign cred_hold_copy = cred_count_plus_credit - debit;
+		  assign cred_hold_copy = cred_hold_plus_credit - debit;
 		  
 	       end
 	     
