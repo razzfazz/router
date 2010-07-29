@@ -159,8 +159,9 @@ module flit_sink
    assign req_ivc = ~buffer_empty_ivc;
    
    wire [0:num_vcs-1] 		gnt_ivc;
-   c_rr_arbiter
+   c_arbiter
      #(.num_ports(num_vcs),
+       .arbiter_type(`ARBITER_TYPE_MATRIX),
        .reset_type(reset_type))
    gnt_ivc_arb
      (.clk(clk),
