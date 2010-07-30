@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // priority select logic
 module c_prio_sel
-  (priorities, select);
+  (priorities, enable, select);
    
 `include "c_functions.v"
    
@@ -48,26 +48,33 @@ module c_prio_sel
    // priority values
    input [0:num_ports*prio_width-1] priorities;
    
+   // port enable signals
+   input [0:num_ports-1] 	    enable;
+   
    // vector representing maximum priority ports
    output [0:num_ports-1] 	    select;
    wire [0:num_ports-1] 	    select;
    
    wire [0:prio_width-1] 	    prio_some_set;
-   c_binary_op
+   c_select_mofn
      #(.num_ports(num_ports),
        .width(prio_width),
-       .op(`BINARY_OP_OR))
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
    prio_some_set_or
-     (.data_in(priorities),
+     (.select(enable),
+      .data_in(priorities),
       .data_out(prio_some_set));
    
    wire [0:prio_width-1] 	    prio_some_unset;
-   c_binary_op
+   c_select_mofn
      #(.num_ports(num_ports),
        .width(prio_width),
-       .op(`BINARY_OP_NAND))
+       .prod_op(`BINARY_OP_OR),
+       .sum_op(`BINARY_OP_NAND))
    prio_some_unset_nand
-     (.data_in(priorities),
+     (.select(enable),
+      .data_in(priorities),
       .data_out(prio_some_unset));
    
    // find bit positions that are not identical for all ports
