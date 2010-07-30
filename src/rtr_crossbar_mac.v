@@ -30,9 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-// configurable crossbar module for wormhole router
-module whr_crossbar_mac
-  (clk, reset, active_ip, ctrl_op_ip, data_in_ip, data_out_op);
+// configurable crossbar module
+module rtr_crossbar_mac
+  (clk, reset, active_ip, ctrl_in_ip_op, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -53,43 +53,36 @@ module whr_crossbar_mac
    // clock enable signals for crosspoint control registers
    input [0:num_ports-1] active_ip;
    
-   // incoming control signals (request matrix)
-   input [0:num_ports*num_ports-1] ctrl_op_ip;
+   // crosspoint control signals
+   input [0:num_ports*num_ports-1] ctrl_in_ip_op;
    
    // vector of input data
-   input [0:num_ports*width-1] data_in_ip;
+   input [0:num_ports*width-1] 	   data_in_ip;
    
    // vector of output data
-   output [0:num_ports*width-1] data_out_op;
-   wire [0:num_ports*width-1] data_out_op;
+   output [0:num_ports*width-1]    data_out_op;
+   wire [0:num_ports*width-1] 	   data_out_op;
    
-   wire [0:num_ports*num_ports-1] ctrl_ip_op;
-   c_interleave
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   ctrl_ip_op_intl
-     (.data_in(ctrl_op_ip),
-      .data_out(ctrl_ip_op));
-   
-   wire [0:num_ports*num_ports-1] ctrl_ip_op_q;
+   wire [0:num_ports*num_ports-1]  ctrl_ip_op;
    
    generate
       
-      genvar 			  ip;
+      genvar 			   ip;
       
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire [0:num_ports-1] ctrl_op;
-	   assign ctrl_op = ctrl_ip_op[ip*num_ports:(ip+1)*num_ports-1];
+	   // NOTE: We must clear the crossbar control registers after the 
+	   // control signals have been deasserted, so we must keep the 
+	   // registers active for an extra cycle.
 	   
-	   wire 		granted;
+	   wire granted;
 	   
-	   wire 		active;
+	   wire active;
 	   assign active = active_ip[ip] | granted;
 	   
 	   wire [0:num_ports-1] ctrl_op_s, ctrl_op_q;
-	   assign ctrl_op_s = ctrl_op;
+	   assign ctrl_op_s = ctrl_in_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   c_dff
 	     #(.width(num_ports),
 	       .reset_type(reset_type))
@@ -102,7 +95,7 @@ module whr_crossbar_mac
 	   
 	   assign granted = |ctrl_op_q;
 	   
-	   assign ctrl_ip_op_q[ip*num_ports:(ip+1)*num_ports-1] = ctrl_op_q;
+	   assign ctrl_ip_op[ip*num_ports:(ip+1)*num_ports-1] = ctrl_op_q;
 	   
 	end
       
@@ -114,7 +107,7 @@ module whr_crossbar_mac
        .width(width),
        .crossbar_type(crossbar_type))
    xbr
-     (.ctrl_ip_op(ctrl_ip_op_q),
+     (.ctrl_ip_op(ctrl_ip_op),
       .data_in_ip(data_in_ip),
       .data_out_op(data_out_op));
    

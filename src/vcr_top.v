@@ -632,7 +632,7 @@ module vcr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
-   vcr_crossbar_mac
+   rtr_crossbar_mac
      #(.num_ports(num_ports),
        .width(int_flit_ctrl_width),
        .crossbar_type(ctrl_crossbar_type),
@@ -641,12 +641,12 @@ module vcr_top
      (.clk(clk),
       .reset(reset),
       .active_ip(xbr_active_ip),
-      .ctrl_ip_op(xbc_ctrl_ip_op),
+      .ctrl_in_ip_op(xbc_ctrl_ip_op),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
    wire [0:num_ports*flit_data_width-1]     xbd_data_out_op;
-   vcr_crossbar_mac
+   rtr_crossbar_mac
      #(.num_ports(num_ports),
        .width(flit_data_width),
        .crossbar_type(data_crossbar_type),
@@ -655,7 +655,7 @@ module vcr_top
      (.clk(clk),
       .reset(reset),
       .active_ip(xbr_active_ip),
-      .ctrl_ip_op(xbd_ctrl_ip_op),
+      .ctrl_in_ip_op(xbd_ctrl_ip_op),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
    
