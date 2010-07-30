@@ -46,12 +46,8 @@ module c_fifo_tracker
    // width required to select an individual credit
    localparam idx_width = clogb(depth);
    
-   // synopsys translate_off
-   
    // width required to represent full range of credit count (0..depth)
    localparam free_width = clogb(depth+1);
-   
-   // synopsys translate_on
    
    input clk;
    input reset;
