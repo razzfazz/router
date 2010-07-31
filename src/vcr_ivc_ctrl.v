@@ -929,7 +929,8 @@ module vcr_ivc_ctrl
    
    wire [0:1] 				   rfl_errors;
    rtr_route_filter
-     #(.num_resource_classes(num_resource_classes),
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),

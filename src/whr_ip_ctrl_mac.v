@@ -732,7 +732,8 @@ module whr_ip_ctrl_mac
    wire 			   route_orc;
    wire [0:1] 			   rfl_errors;
    rtr_route_filter
-     #(.num_resource_classes(1),
+     #(.num_message_classes(1),
+       .num_resource_classes(1),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),

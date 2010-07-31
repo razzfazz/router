@@ -37,6 +37,9 @@ module rtr_route_filter
    
 `include "c_constants.v"
    
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
@@ -115,18 +118,24 @@ module rtr_route_filter
 			  // however, when they reach the last intermediate
 			  // node, they have reached their destination, and 
 			  // thus cannot turn back
+			  
 			  (((connectivity == `CONNECTIVITY_LINE) || 
-			    (connectivity == `CONNECTIVITY_RING)) && 
+			    (connectivity == `CONNECTIVITY_RING)) &&
+			   
 			   (op == port_id) &&
+			   
 			   (resource_class == (num_resource_classes - 1))) || 
 			  
 			  // likewise, for full connectivity, packets only ever
 			  // take two successive steps in the same dimension
 			  // when an intermediate node is reached; once again,
 			  // this cannot happen in the last resource class
-			  ((connectivity == `CONNECTIVITY_FULL) && 
+			  
+			  ((connectivity == `CONNECTIVITY_FULL) &&
+			   
 			   ((op / num_neighbors_per_dim) == 
 			    (port_id / num_neighbors_per_dim)) &&
+			   
 			   (resource_class == (num_resource_classes - 1))) ||
 			  
 			  // more generally, once a dimension has been visited,
@@ -135,16 +144,24 @@ module rtr_route_filter
 			  // is reached; again, this cannot happen in the last
 			  // resource class; also, this only applies for 
 			  // network (i.e., not injection/ejection) ports
-			  ((((dim_order == `DIM_ORDER_ASCENDING) && 
+			  
+			  (((((dim_order == `DIM_ORDER_ASCENDING) || 
+			      ((dim_order == `DIM_ORDER_BY_CLASS) && 
+			       ((message_class % 2) == 0))) && 
+			     
 			     ((op / num_neighbors_per_dim) < 
 			      (port_id / num_neighbors_per_dim))) || 
-			    ((dim_order == `DIM_ORDER_DESCENDING) && 
+			    
+			    (((dim_order == `DIM_ORDER_DESCENDING) || 
+			      (dim_order == `DIM_ORDER_BY_CLASS) && 
+			      ((message_class % 2) == 1)) && 
+			     
 			     ((op / num_neighbors_per_dim) > 
-			      (port_id / num_neighbors_per_dim)))) &&
-			   (resource_class == (num_resource_classes - 1)) &&
-			   (port_id < (num_ports - num_nodes_per_router)))
-
-			  )
+			      (port_id / num_neighbors_per_dim)))) && 
+			   
+			   (resource_class == (num_resource_classes - 1)) && 
+			   
+			   (port_id < (num_ports - num_nodes_per_router))))
 			 
 			 begin
 			    assign route_out_op[op] = 1'b0;
