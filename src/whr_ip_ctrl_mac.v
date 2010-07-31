@@ -734,6 +734,7 @@ module whr_ip_ctrl_mac
    rtr_route_filter
      #(.num_message_classes(1),
        .num_resource_classes(1),
+       .num_vcs_per_class(1),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),
@@ -742,8 +743,7 @@ module whr_ip_ctrl_mac
        .routing_type(routing_type),
        .dim_order(dim_order),
        .port_id(port_id),
-       .message_class(0),
-       .resource_class(0))
+       .vc_id(0))
    rfl
      (.route_in_op(route_unmasked_op),
       .route_in_orc(1'b1),

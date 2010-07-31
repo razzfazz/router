@@ -931,6 +931,7 @@ module vcr_ivc_ctrl
    rtr_route_filter
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
        .num_nodes_per_router(num_nodes_per_router),
@@ -939,8 +940,7 @@ module vcr_ivc_ctrl
        .routing_type(routing_type),
        .dim_order(dim_order),
        .port_id(port_id),
-       .message_class(message_class),
-       .resource_class(resource_class))
+       .vc_id(vc_id))
    rfl
      (.route_in_op(route_unmasked_op),
       .route_in_orc(route_unmasked_orc),

@@ -43,6 +43,9 @@ module rtr_route_filter
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
+   // number of VCs available for each class
+   parameter num_vcs_per_class = 1;
+   
    // number of input and output ports on router
    parameter num_ports = 5;
    
@@ -66,14 +69,19 @@ module rtr_route_filter
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // ID of current port
+   // ID of current input port
    parameter port_id = 0;
    
+   // ID of current input VC
+   parameter vc_id = 0;
+   
    // current message class
-   parameter message_class = 0;
+   localparam message_class
+     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
    
    // current resource class
-   parameter resource_class = 0;
+   localparam resource_class
+     = (vc_id / num_vcs_per_class) % num_resource_classes;
    
    // raw output port
    input [0:num_ports-1] route_in_op;
