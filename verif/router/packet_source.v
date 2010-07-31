@@ -648,101 +648,119 @@ module packet_source
    
    generate
       
-      if(port_id >= (num_ports - num_nodes_per_router))
-	begin
-	   
-	   assign flit_kill
-	     = (route_info[route_info_width-addr_width:route_info_width-1] ==
-		source_address);
-	   
-	end
-      else if(routing_type == `ROUTING_TYPE_DOR)
-	begin
-	   
-	   case(connectivity)
+      case(routing_type)
+	
+	`ROUTING_TYPE_DOR:
+	  begin
 	     
-	     `CONNECTIVITY_LINE:
-	       begin
-		  
-		  wire flit_kill_base;
-		  assign flit_kill_base
-		    = (((port_id % 2) == 0) && 
-		       (rc_dest[curr_dim*dim_addr_width:
-				(curr_dim+1)*dim_addr_width-1] <
-			router_address[curr_dim*dim_addr_width:
-				       (curr_dim+1)*dim_addr_width-1])) ||
-		      (((port_id % 2) == 1) && 
-		       (rc_dest[curr_dim*dim_addr_width:
-				(curr_dim+1)*dim_addr_width-1] >
-			router_address[curr_dim*dim_addr_width:
-				       (curr_dim+1)*dim_addr_width-1]));
-		       
-		  if((dim_order == `DIM_ORDER_ASCENDING) && 
-		     (curr_dim > 0))
- 		    begin
-		       
-		       assign flit_kill
-			 = (rc_dest[0:curr_dim*dim_addr_width-1] !=
-			    router_address[0:curr_dim*dim_addr_width-1]) ||
-			   flit_kill_base;
-		       
-		    end
-		  else if((dim_order == `DIM_ORDER_DESCENDING) &&
-			  (curr_dim < (num_dimensions - 1)))
-		    begin
-		       
-		       assign flit_kill
-			 = (rc_dest[(curr_dim+1)*dim_addr_width:
-				    router_addr_width-1] !=
-			    router_address[(curr_dim+1)*dim_addr_width:
-					   router_addr_width-1]) ||
-			   flit_kill_base;
-		       
-		    end
-		  else
-		    begin
-		       
-		       assign flit_kill = flit_kill_base;
-		       
-		    end
-		  
-	       end
-	     
-	     `CONNECTIVITY_RING:
-	       begin
-		  
-		  // FIXME: add implementation here!
-		  
-		  // synopsys translate_off
-		  initial
-		  begin
-		     $display({"ERROR: The routing logic module does not yet ", 
-			       "support ring connectivity within each ", 
-			       "dimension."});
-		     $stop;
-		  end
-		  // synopsys translate_on
-		  
-	       end
-	     
-	     `CONNECTIVITY_FULL:
+	     if(port_id >= (num_ports - num_nodes_per_router))
 	       begin
 		  
 		  assign flit_kill
-		    = ((dim_order == `DIM_ORDER_ASCENDING) &&
-		       (rc_dest[0:(curr_dim+1)*dim_addr_width-1] !=
-			router_address[0:(curr_dim+1)*dim_addr_width-1])) ||
-		      ((dim_order == `DIM_ORDER_DESCENDING) &&
-		       (rc_dest[curr_dim*dim_addr_width:
-				router_addr_width-1] !=
-			router_address[curr_dim*dim_addr_width:
-				       router_addr_width-1]));
+		    = (route_info[route_info_width-addr_width:
+				  route_info_width-1] ==
+		       source_address);
+		  
+	       end
+	     else
+	       begin
+		  
+		  case(connectivity)
+		    
+		    `CONNECTIVITY_LINE, `CONNECTIVITY_RING:
+		      begin
+			 
+			 wire flit_kill_base;
+			 if(connectivity == `CONNECTIVITY_LINE)
+			   assign flit_kill_base
+			     = (((port_id % 2) == 0) && 
+				(rc_dest[curr_dim*dim_addr_width:
+					 (curr_dim+1)*dim_addr_width-1] <
+				 router_address[curr_dim*
+						dim_addr_width:
+						(curr_dim+1)*
+						dim_addr_width-1])) ||
+			       (((port_id % 2) == 1) && 
+				(rc_dest[curr_dim*dim_addr_width:
+					 (curr_dim+1)*dim_addr_width-1] >
+				 router_address[curr_dim*
+						dim_addr_width:
+						(curr_dim+1)*
+						dim_addr_width-1]));
+			 else
+			   assign flit_kill_base = 1'b0;
+			 
+			 if((dim_order == `DIM_ORDER_ASCENDING) && 
+			    (curr_dim > 0))
+ 			   begin
+			      
+			      assign flit_kill
+				= (rc_dest[0:curr_dim*dim_addr_width-1] !=
+				   router_address[0:curr_dim*
+						  dim_addr_width-1]) ||
+				  flit_kill_base;
+			      
+			   end
+			 else if((dim_order == `DIM_ORDER_DESCENDING) &&
+				 (curr_dim < (num_dimensions - 1)))
+			   begin
+			      
+			      assign flit_kill
+				= (rc_dest[(curr_dim+1)*dim_addr_width:
+					   router_addr_width-1] !=
+				   router_address[(curr_dim+1)*dim_addr_width:
+						  router_addr_width-1]) ||
+				  flit_kill_base;
+			      
+			   end
+			 else if(dim_order == `DIM_ORDER_BY_CLASS)
+			   begin
+			      
+			      // FIXME: add implementation here!
+			      
+			      // synopsys translate_off
+			      initial
+				begin
+				   $display({"ERROR: The packet source module ",
+					     "does not properly support class-",
+					     "based dimension order traversal ",
+					     "in the flit kill logic yet."});
+				   $stop;
+				end
+			      // synopsys translate_on
+			      
+			   end
+			 else
+			   begin
+			      
+			      assign flit_kill = flit_kill_base;
+			      
+			   end
+			 
+		      end
+		    
+		    `CONNECTIVITY_FULL:
+		      begin
+			 
+			 assign flit_kill
+			   = ((dim_order == `DIM_ORDER_ASCENDING) &&
+			      (rc_dest[0:(curr_dim+1)*dim_addr_width-1] !=
+			       router_address[0:(curr_dim+1)*dim_addr_width-1])) ||
+			     ((dim_order == `DIM_ORDER_DESCENDING) &&
+			      (rc_dest[curr_dim*dim_addr_width:
+				       router_addr_width-1] !=
+			       router_address[curr_dim*dim_addr_width:
+					      router_addr_width-1]));
+			 
+		      end
+		    
+		  endcase
 		  
 	       end
 	     
-	   endcase
-	   
-	end
+	  end
+	
+      endcase
       
    endgenerate
    
