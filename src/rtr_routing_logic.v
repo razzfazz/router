@@ -91,7 +91,7 @@ module rtr_routing_logic
    localparam num_network_ports = num_ports - num_nodes_per_router;
    
    // select routing function type
-   parameter routing_type = `ROUTING_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
@@ -144,7 +144,7 @@ module rtr_routing_logic
 	   
 	   case(routing_type)
 	     
-	     `ROUTING_TYPE_DOR:
+	     `ROUTING_TYPE_PHASED_DOR:
 	       begin
 		  
 		  wire [0:num_dimensions-1] addr_match_d;

@@ -87,7 +87,7 @@ parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
 parameter lookahead_routing = 1;
 
 // select routing function type
-parameter routing_type = `ROUTING_TYPE_DOR;
+parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
 
 // select order of dimension traversal
 parameter dim_order = `DIM_ORDER_ASCENDING;

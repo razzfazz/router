@@ -173,7 +173,7 @@ module vcr_ivc_ctrl
        -1;
    
    // select routing function type
-   parameter routing_type = `ROUTING_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;

@@ -198,7 +198,7 @@ module packet_source
        -1;
    
    // select routing function type
-   parameter routing_type = `ROUTING_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
@@ -650,7 +650,7 @@ module packet_source
       
       case(routing_type)
 	
-	`ROUTING_TYPE_DOR:
+	`ROUTING_TYPE_PHASED_DOR:
 	  begin
 	     
 	     if(port_id >= (num_ports - num_nodes_per_router))

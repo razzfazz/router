@@ -83,9 +83,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //------------------------------------------------------------------------------
 
 // dimension-order routing (using multiple phases if num_resource_classes > 1)
-`define ROUTING_TYPE_DOR 0
+`define ROUTING_TYPE_PHASED_DOR 0
 
-`define ROUTING_TYPE_LAST `ROUTING_TYPE_DOR
+`define ROUTING_TYPE_LAST `ROUTING_TYPE_PHASED_DOR
 
 
 //------------------------------------------------------------------------------

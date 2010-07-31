@@ -57,7 +57,7 @@ module rtr_port_filter
    parameter connectivity = `CONNECTIVITY_LINE;
    
    // select routing function type
-   parameter routing_type = `ROUTING_TYPE_DOR;
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
@@ -104,7 +104,7 @@ module rtr_port_filter
 	   // ports for dimensions that were already traversed can only be used 
 	   // when changing resource classes
 	   if(((op < (num_ports - num_nodes_per_router)) && 
-	       ((routing_type == `ROUTING_TYPE_DOR) && 
+	       ((routing_type == `ROUTING_TYPE_PHASED_DOR) && 
 		((((connectivity == `CONNECTIVITY_LINE) || 
 		   (connectivity == `CONNECTIVITY_RING)) && 
 		  (op == port_id)) || 
