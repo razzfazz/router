@@ -515,7 +515,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*num_vcs-1] 		allocated_ivc_ovc;
    wire [0:num_vcs-1] 			free_unallocated_ivc;
    wire [0:num_vcs-1] 			free_allocated_ivc;
-   wire [0:num_vcs*7-1] 		ivcc_errors_ivc;
+   wire [0:num_vcs*8-1] 		ivcc_errors_ivc;
    
    genvar 				ivc;
    
@@ -558,7 +558,7 @@ module vcr_ip_ctrl_mac
 	   wire [0:num_vcs-1] 		   allocated_ovc;
 	   wire 			   free_unallocated;
 	   wire 			   free_allocated;
-	   wire [0:6] 			   ivcc_errors;
+	   wire [0:7] 			   ivcc_errors;
 	   vcr_ivc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
@@ -642,7 +642,7 @@ module vcr_ip_ctrl_mac
 	     = allocated_ovc;
 	   assign free_unallocated_ivc[ivc] = free_unallocated;
 	   assign free_allocated_ivc[ivc] = free_allocated;
-	   assign ivcc_errors_ivc[ivc*7:(ivc+1)*7-1] = ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*8:(ivc+1)*8-1] = ivcc_errors;
 	   
 	end
       
@@ -1336,10 +1336,10 @@ module vcr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*7-1] errors_s, errors_q;
+	   wire [0:num_vcs*8-1] errors_s, errors_q;
 	   assign errors_s = ivcc_errors_ivc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*7),
+	     #(.num_errors(num_vcs*8),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

@@ -338,8 +338,8 @@ module vcr_ivc_ctrl
    wire 					     free_allocated;
    
    // internal error condition detected
-   output [0:6] 				     errors;
-   wire [0:6] 					     errors;
+   output [0:7] 				     errors;
+   wire [0:7] 					     errors;
    
    
    //---------------------------------------------------------------------------
@@ -899,10 +899,12 @@ module vcr_ivc_ctrl
    wire [0:num_ports-1] 	   route_unmasked_op;
    assign route_unmasked_op = hdr_valid ? hdr_route_op : hop_route_op;
    
+   wire [0:num_resource_classes-1] route_unmasked_orc;
+   
    generate
       
       if(resource_class == (num_resource_classes - 1))
-	assign route_orc = 'd1;
+	assign route_unmasked_orc = 'd1;
       else
 	begin
 	   
@@ -918,14 +920,15 @@ module vcr_ivc_ctrl
 	     (.data_in(hdr_route_rcsel),
 	      .data_out(hdr_route_orc));
 	   
-	   assign route_orc = hdr_valid ? hdr_route_orc : hop_route_orc;
+	   assign route_unmasked_orc
+	     = hdr_valid ? hdr_route_orc : hop_route_orc;
 	   
 	end
       
    endgenerate
    
-   wire 	pf_error;
-   rtr_port_filter
+   wire [0:1] 				   rfl_errors;
+   rtr_route_filter
      #(.num_resource_classes(num_resource_classes),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
@@ -937,14 +940,18 @@ module vcr_ivc_ctrl
        .port_id(port_id),
        .message_class(message_class),
        .resource_class(resource_class))
-   route_op_pf
+   rfl
      (.route_in_op(route_unmasked_op),
-      .route_in_orc(route_orc),
+      .route_in_orc(route_unmasked_orc),
       .route_out_op(route_op),
-      .error(pf_error));
+      .route_out_orc(route_orc),
+      .errors(rfl_errors));
    
    wire 	error_invalid_port;
-   assign error_invalid_port = header_valid & pf_error;
+   assign error_invalid_port = header_valid & rfl_errors[0];
+   
+   wire 	error_invalid_class;
+   assign error_invalid_class = header_valid & rfl_errors[1];
    
    
    //---------------------------------------------------------------------------
@@ -1241,12 +1248,13 @@ module vcr_ivc_ctrl
    
    // synopsys translate_on
    
-   assign errors = {error_fbc_underflow,
-		    error_fbc_overflow,
-		    error_hdff_underflow,
-		    error_hdff_overflow,
-		    error_no_header,
-		    error_ct_overflow,
-		    error_invalid_port};
+   assign errors[0] = error_fbc_underflow;
+   assign errors[1] = error_fbc_overflow;
+   assign errors[2] = error_hdff_underflow;
+   assign errors[3] = error_hdff_overflow;
+   assign errors[4] = error_no_header;
+   assign errors[5] = error_ct_overflow;
+   assign errors[6] = error_invalid_port;
+   assign errors[7] = error_invalid_class;
    
 endmodule

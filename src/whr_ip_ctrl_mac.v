@@ -729,8 +729,9 @@ module whr_ip_ctrl_mac
    assign route_unmasked_op = hdr_valid ? hdr_route_op : hop_route_op;
    
    wire [0:num_ports-1] 	   route_op;
-   wire 			   pf_error;
-   rtr_port_filter
+   wire 			   route_orc;
+   wire [0:1] 			   rfl_errors;
+   rtr_route_filter
      #(.num_resource_classes(1),
        .num_ports(num_ports),
        .num_neighbors_per_dim(num_neighbors_per_dim),
@@ -742,14 +743,18 @@ module whr_ip_ctrl_mac
        .port_id(port_id),
        .message_class(0),
        .resource_class(0))
-   pf
+   rfl
      (.route_in_op(route_unmasked_op),
       .route_in_orc(1'b1),
       .route_out_op(route_op),
-      .error(pf_error));
+      .route_out_orc(route_orc),
+      .errors(rfl_errors));
    
    wire 			   error_invalid_port;
-   assign error_invalid_port = header_valid & pf_error;
+   assign error_invalid_port = header_valid & rfl_errors[0];
+   
+   wire 			   error_invalid_class;
+   assign error_invalid_class = header_valid & rfl_errors[1];
    
    
    //---------------------------------------------------------------------------
@@ -984,15 +989,16 @@ module whr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 
-	   wire [0:5] errors_s, errors_q;
-	   assign errors_s = {error_fbc_underflow,
-			      error_fbc_overflow,
-			      error_hdff_underflow,
-			      error_hdff_overflow,
-			      error_no_header,
-			      error_invalid_port};
+	   wire [0:6] errors_s, errors_q;
+	   assign errors_s[0] = error_fbc_underflow;
+	   assign errors_s[1] = error_fbc_overflow;
+	   assign errors_s[2] = error_hdff_underflow;
+	   assign errors_s[3] = error_hdff_overflow;
+	   assign errors_s[4] = error_no_header;
+	   assign errors_s[5] = error_invalid_port;
+	   assign errors_s[6] = error_invalid_class;
 	   c_err_rpt
-	     #(.num_errors(6),
+	     #(.num_errors(7),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
