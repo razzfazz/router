@@ -28,6 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
+// pseudo-random packet source
+//==============================================================================
+
 module packet_source
   (clk, reset, router_address, channel, flit_valid, flow_ctrl, run, error);
    

@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // output port controller (tracks state of buffers in downstream router)
+//==============================================================================
+
 module whr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, req_ip, req_head_ip, req_tail_ip, gnt_ip,
    xbr_ctrl_ip, flit_data_in, channel_out, error);

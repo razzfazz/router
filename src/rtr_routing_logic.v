@@ -28,20 +28,23 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // routing logic for VC router
+//==============================================================================
+
 module rtr_routing_logic
   (router_address, sel_mc, sel_irc, route_info, route_op, route_orc);
    
 `include "c_functions.v"
 `include "c_constants.v"
    
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
-   
-   // width required to select individual message class
-   localparam message_class_idx_width = clogb(num_message_classes);
    
    // nuber of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
@@ -49,17 +52,36 @@ module rtr_routing_logic
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
-   
    // number of dimensions in network
    parameter num_dimensions = 2;
    
-   // width required to select individual router in network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
-   
    // number of nodes per router (a.k.a. consentration factor)
    parameter num_nodes_per_router = 1;
+   
+   // connectivity within each dimension
+   parameter connectivity = `CONNECTIVITY_LINE;
+   
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
+   
+   // select order of dimension traversal
+   parameter dim_order = `DIM_ORDER_ASCENDING;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // width required to select individual message class
+   localparam message_class_idx_width = clogb(num_message_classes);
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
    
    // width required to select individual node at current router
    localparam node_addr_width = clogb(num_nodes_per_router);
@@ -70,9 +92,6 @@ module rtr_routing_logic
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
-   
-   // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
@@ -90,14 +109,10 @@ module rtr_routing_logic
    // number of network-facing ports on router (i.e., w/o inject/eject ports)
    localparam num_network_ports = num_ports - num_nodes_per_router;
    
-   // select routing function type
-   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
-   // select order of dimension traversal
-   parameter dim_order = `DIM_ORDER_ASCENDING;
-   
-   parameter reset_type = `RESET_TYPE_ASYNC;
-   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
    
    // current router's address
    input [0:router_addr_width-1] router_address;
@@ -118,6 +133,11 @@ module rtr_routing_logic
    // select outgoing resource class
    output [0:num_resource_classes-1] route_orc;
    wire [0:num_resource_classes-1]   route_orc;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    // all router addresses (intermediate + final)
    wire [0:num_resource_classes*router_addr_width-1] dest_router_addr_irc;

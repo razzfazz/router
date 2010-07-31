@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // wrapper around router component, pseudo-nodes and controller
+//==============================================================================
+
 module tc_router_wrap
   (clk, reset, io_node_addr_base, io_write, io_read, io_addr, io_write_data, 
    io_read_data, io_done, error);

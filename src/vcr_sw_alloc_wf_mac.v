@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // wavefront block for switch allocation
+//==============================================================================
+
 module vcr_sw_alloc_wf_mac
   (clk, reset, alloc_in_ip_op, alloc_out_ip_op);
    

@@ -28,7 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // network channel tester
+//==============================================================================
+
 module tc_chan_test_mac
   (clk, reset, cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, 
    cfg_read_data, cfg_done, xmit_cal, xmit_data, recv_cal, recv_data, error);

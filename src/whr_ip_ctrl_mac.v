@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // input port controller
+//==============================================================================
+
 module whr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, req_op, req_head, req_tail, gnt_op, 
    xbr_active, flit_data_out, flow_ctrl_out, error);

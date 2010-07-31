@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // channel interface (receive side)
+//==============================================================================
+
 module rtr_channel_input
   (clk, reset, active, channel_in, flit_valid_out, flit_head_out, flit_tail_out,
    flit_data_out, flit_sel_out_ivc);
@@ -39,11 +40,13 @@ module rtr_channel_input
 `include "c_constants.v"
 `include "rtr_constants.v"
    
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
    // number of VCs
    parameter num_vcs = 4;
-   
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -56,18 +59,31 @@ module rtr_channel_input
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
    
+   // width required for lookahead routing information
+   parameter la_route_info_width = 4;
+   
+   // total number of bits required for storing routing information
+   parameter route_info_width = 10;
+   
+   // width of flit payload data
+   parameter flit_data_width = 64;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
    
    // width of counter for remaining flits
    localparam flit_ctr_width = clogb(max_payload_length);
-   
-   // width required for lookahead routing information
-   parameter la_route_info_width = 4;
-   
-   // total number of bits required for storing routing information
-   parameter route_info_width = 10;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
@@ -85,13 +101,13 @@ module rtr_channel_input
        (1 + vc_idx_width + 1) : 
        -1;
    
-   // width of flit payload data
-   parameter flit_data_width = 64;
-   
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
    
    input clk;
    input reset;
@@ -119,6 +135,11 @@ module rtr_channel_input
    // indicate which VC the current flit (if any) belongs to
    output [0:num_vcs-1] 	  flit_sel_out_ivc;
    wire [0:num_vcs-1] 		  flit_sel_out_ivc;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in;
    assign flit_ctrl_in = channel_in[0:flit_ctrl_width-1];

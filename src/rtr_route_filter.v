@@ -28,14 +28,20 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // module to generate a mask of legal output port and resource class requests 
 // based on routing restrictions
+//==============================================================================
+
 module rtr_route_filter
   (route_in_op, route_in_orc, route_out_op, route_out_orc, errors);
    
 `include "c_constants.v"
+   
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -75,6 +81,11 @@ module rtr_route_filter
    // ID of current input VC
    parameter vc_id = 0;
    
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
    // current message class
    localparam message_class
      = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
@@ -82,6 +93,11 @@ module rtr_route_filter
    // current resource class
    localparam resource_class
      = (vc_id / num_vcs_per_class) % num_resource_classes;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    // raw output port
    input [0:num_ports-1] route_in_op;
@@ -100,6 +116,11 @@ module rtr_route_filter
    // internal error condition detected
    output [0:1] 		     errors;
    wire [0:1] 			     errors;   
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    wire [0:num_ports-1] 	     error_op;
    

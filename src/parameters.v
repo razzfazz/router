@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // router configuration options
+//==============================================================================
 
 // select network topology
 parameter topology = `TOPOLOGY_MESH;

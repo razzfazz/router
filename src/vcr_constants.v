@@ -28,12 +28,15 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// global constant definitions
+//==============================================================================
+// VC router related constant definitions
+//==============================================================================
 
 `ifndef _VCR_CONSTANTS_V_
 `define _VCR_CONSTANTS_V_
 
 `include "c_constants.v"
+
 
 //------------------------------------------------------------------------------
 // credit handling implementation variants

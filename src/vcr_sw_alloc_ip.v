@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // input-side switch allocator logic
+//==============================================================================
+
 module vcr_sw_alloc_ip
   (clk, reset, active, route_ivc_op, req_in_ivc, req_out_op, gnt_in_op, 
    gnt_out_op, gnt_out_ivc, sel_ivc, allow_update);

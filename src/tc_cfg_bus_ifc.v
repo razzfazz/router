@@ -28,7 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // configuration bus interface module
+//==============================================================================
+
 module tc_cfg_bus_ifc
   (clk, reset, cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, 
    cfg_read_data, cfg_done, active, req, write, node_addr_match, reg_addr, 

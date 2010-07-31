@@ -28,13 +28,19 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // configurable crossbar module
+//==============================================================================
+
 module rtr_crossbar_mac
   (clk, reset, active_ip, ctrl_in_ip_op, data_in_ip, data_out_op);
    
 `include "c_constants.v"
+   
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
    
    // number of input/output ports
    parameter num_ports = 5;
@@ -46,7 +52,12 @@ module rtr_crossbar_mac
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
-      
+   
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
+   
    input clk;
    input reset;
    
@@ -62,6 +73,11 @@ module rtr_crossbar_mac
    // vector of output data
    output [0:num_ports*width-1]    data_out_op;
    wire [0:num_ports*width-1] 	   data_out_op;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1]  ctrl_ip_op;
    

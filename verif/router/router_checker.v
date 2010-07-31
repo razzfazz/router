@@ -28,6 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
+// simple reference model for a single router
+//==============================================================================
+
 module router_checker
   (clk, reset, router_address, channel_in_ip, channel_out_op, error);
    

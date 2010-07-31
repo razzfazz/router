@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // channel interface (send side)
+//==============================================================================
+
 module rtr_channel_output
   (clk, reset, active, flit_valid_in, flit_head_in, flit_tail_in, flit_data_in, 
    flit_sel_in_ovc, channel_out);
@@ -39,14 +40,29 @@ module rtr_channel_output
 `include "c_constants.v"
 `include "rtr_constants.v"
    
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
    // number of VCs
    parameter num_vcs = 4;
    
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // width of flit payload data
+   parameter flit_data_width = 64;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -56,13 +72,13 @@ module rtr_channel_output
        (1 + vc_idx_width + 1) : 
        -1;
    
-   // width of flit payload data
-   parameter flit_data_width = 64;
-   
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
    
    input clk;
    input reset;
@@ -86,6 +102,11 @@ module rtr_channel_output
    // outgoing flit control signals
    output [0:channel_width-1]  channel_out;
    wire [0:channel_width-1]    channel_out;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    wire [0:flit_ctrl_width-1]  flit_ctrl_out;
    wire [0:flit_data_width-1]  flit_data_out;

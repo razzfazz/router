@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // constants related to test chip support logic
+//==============================================================================
 
 `ifndef _TC_CONSTANTS_V_
 `define _TC_CONSTANTS_V_
@@ -71,5 +73,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define CFG_ADDR_CTST_CAL_DURATION    6
 `define CFG_ADDR_CTST_PATTERN_ADDR    7
 `define CFG_ADDR_CTST_PATTERN_DATA    8
-   
+
+
 `endif

@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // a rudimentary traffic source that implements UGAL routing
+//==============================================================================
+
 module ugal_source(/*autoarg*/
    // Outputs
    intm_router_address, route_min,

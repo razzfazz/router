@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // output port controller (tracks state of buffers in downstream router)
+//==============================================================================
+
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
    sw_gnt_q, sw_gnt_ip_q, int_flit_ctrl, match, elig, empty, int_flow_ctrl, 

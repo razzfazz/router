@@ -28,7 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // network pseudo-node (combined packet source / sink)
+//==============================================================================
+
 module tc_node_mac
   (clk, reset, address, channel_out, flow_ctrl_in, channel_in, flow_ctrl_out, 
    cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, 

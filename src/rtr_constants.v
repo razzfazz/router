@@ -28,10 +28,13 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// router-related constant definitions
+//==============================================================================
+// router related constant definitions
+//==============================================================================
 
 `ifndef _RTR_CONSTANTS_V_
 `define _RTR_CONSTANTS_V_
+
 
 //------------------------------------------------------------------------------
 // network topologies

@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // flow control interface (send side)
+//==============================================================================
+
 module rtr_flow_ctrl_output
   (clk, reset, active, fc_event_valid_in, fc_event_sel_in_ivc, flow_ctrl_out);
    
@@ -38,21 +39,36 @@ module rtr_flow_ctrl_output
 `include "c_constants.v"
 `include "rtr_constants.v"
    
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
    // number of VCs
    parameter num_vcs = 4;
    
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
-   
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
    
    // width of flow control signals
    localparam flow_ctrl_width
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
        -1;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
    
    input clk;
    input reset;
@@ -67,6 +83,11 @@ module rtr_flow_ctrl_output
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] flow_ctrl_out;
    wire [0:flow_ctrl_width-1] 	flow_ctrl_out;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    generate
       

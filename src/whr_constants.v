@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-// global constant definitions
+//==============================================================================
+// wormhole router related constant definitions
+//==============================================================================
 
 `ifndef _WHR_CONSTANTS_V_
 `define _WHR_CONSTANTS_V_

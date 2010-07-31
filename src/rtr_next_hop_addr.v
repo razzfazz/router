@@ -28,14 +28,20 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
+// module to determine the address of the next hop router
+//==============================================================================
 
-
-// lookahead routing logic for VC router
 module rtr_next_hop_addr
   (router_address, route_port, next_router_address);
    
 `include "c_functions.v"
 `include "c_constants.v"
+   
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -55,6 +61,11 @@ module rtr_next_hop_addr
    // connectivity within each dimension
    parameter connectivity = `CONNECTIVITY_LINE;
    
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
      = ((connectivity == `CONNECTIVITY_LINE) ||
@@ -71,6 +82,11 @@ module rtr_next_hop_addr
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
+   
    // current router's address
    input [0:router_addr_width-1] router_address;
    
@@ -80,6 +96,11 @@ module rtr_next_hop_addr
    // lookahead routing information for next router
    output [0:router_addr_width-1] next_router_address;
    wire [0:router_addr_width-1]   next_router_address;
+   
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
    
    generate
       

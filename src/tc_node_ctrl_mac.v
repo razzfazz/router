@@ -28,7 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // network pseudo-node controller 
+//==============================================================================
+
 module tc_node_ctrl_mac
   (clk, reset, io_write, io_read, io_addr, io_write_data, io_read_data, io_done,
    cfg_node_addrs, cfg_req, cfg_write, cfg_addr, cfg_write_data, cfg_read_data, 

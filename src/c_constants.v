@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // global constant definitions
+//==============================================================================
 
 `ifndef _C_CONSTANTS_V_
 `define _C_CONSTANTS_V_
@@ -173,5 +175,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define BINARY_OP_NOR  3
 `define BINARY_OP_XOR  4
 `define BINARY_OP_XNOR 5
+
+`define BINARY_OP_LAST `BINARY_OP_XNOR
+
 
 `endif
