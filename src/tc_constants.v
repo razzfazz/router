@@ -28,7 +28,16 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+// constants related to test chip support logic
+
+`ifndef _TC_CONSTANTS_V_
+`define _TC_CONSTANTS_V_
+
+
+//------------------------------------------------------------------------------
 // network pseudo-node register address declarations
+//------------------------------------------------------------------------------
+
 `define CFG_ADDR_NODE_CTRL            0
 `define CFG_ADDR_NODE_STATUS          1
 `define CFG_ADDR_NODE_FLIT_SIG        2
@@ -40,11 +49,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define CFG_ADDR_NODE_MC_THRESHS      8
 `define CFG_ADDR_NODE_RC_THRESHS      9
 
+
+//------------------------------------------------------------------------------
 // network pseudo-node controller register address declarations
+//------------------------------------------------------------------------------
+
 `define CFG_ADDR_NCTL_CTRL   0
 `define CFG_ADDR_NCTL_STATUS 1
 
+
+//------------------------------------------------------------------------------
 // network channel tester register address declarations
+//------------------------------------------------------------------------------
+
 `define CFG_ADDR_CTST_CTRL            0
 `define CFG_ADDR_CTST_STATUS          1
 `define CFG_ADDR_CTST_ERRORS          2
@@ -55,3 +72,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define CFG_ADDR_CTST_PATTERN_ADDR    7
 `define CFG_ADDR_CTST_PATTERN_DATA    8
    
+`endif
