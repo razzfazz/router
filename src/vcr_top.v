@@ -605,6 +605,14 @@ module vcr_top
    // crossbars
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
+   c_interleave
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   xbr_ctrl_op_ip_intl
+     (.data_in(xbr_ctrl_ip_op),
+      .data_out(xbr_ctrl_op_ip));
+   
    wire [0:num_ports*int_flit_ctrl_width-1] xbc_data_out_op;
    rtr_crossbar_mac
      #(.num_ports(num_ports),
@@ -615,7 +623,7 @@ module vcr_top
      (.clk(clk),
       .reset(reset),
       .active_ip(xbr_active_ip),
-      .ctrl_in_ip_op(xbr_ctrl_ip_op),
+      .ctrl_in_op_ip(xbr_ctrl_op_ip),
       .data_in_ip(xbc_data_in_ip),
       .data_out_op(xbc_data_out_op));
    
@@ -629,7 +637,7 @@ module vcr_top
      (.clk(clk),
       .reset(reset),
       .active_ip(xbr_active_ip),
-      .ctrl_in_ip_op(xbr_ctrl_ip_op),
+      .ctrl_in_op_ip(xbr_ctrl_op_ip),
       .data_in_ip(xbd_data_in_ip),
       .data_out_op(xbd_data_out_op));
    

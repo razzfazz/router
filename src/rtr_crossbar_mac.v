@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_crossbar_mac
-  (clk, reset, active_ip, ctrl_in_ip_op, data_in_ip, data_out_op);
+  (clk, reset, active_ip, ctrl_in_op_ip, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -65,7 +65,7 @@ module rtr_crossbar_mac
    input [0:num_ports-1] active_ip;
    
    // crosspoint control signals
-   input [0:num_ports*num_ports-1] ctrl_in_ip_op;
+   input [0:num_ports*num_ports-1] ctrl_in_op_ip;
    
    // vector of input data
    input [0:num_ports*width-1] 	   data_in_ip;
@@ -78,6 +78,14 @@ module rtr_crossbar_mac
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_ports-1]  ctrl_in_ip_op;
+   c_interleave
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   ctrl_in_ip_op_intl
+     (.data_in(ctrl_in_op_ip),
+      .data_out(ctrl_in_ip_op));
    
    wire [0:num_ports*num_ports-1]  ctrl_ip_op;
    
