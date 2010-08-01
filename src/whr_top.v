@@ -199,13 +199,14 @@ module whr_top
    // input ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	  req_ip_op;
+   wire [0:num_ports*num_ports-1] 	  route_ip_op;
+   
+   wire [0:num_ports-1] 		  req_ip;
    wire [0:num_ports-1] 		  req_head_ip;
    wire [0:num_ports-1] 		  req_tail_ip;
-   wire [0:num_ports*num_ports-1] 	  gnt_ip_op;
+   wire [0:num_ports-1] 		  gnt_ip;
    
    wire [0:num_ports-1] 		  xbr_active_ip;
-   
    wire [0:num_ports*flit_data_width-1]   xbr_data_in_ip;
    
    wire [0:num_ports-1] 		  ipc_error_ip;
@@ -226,10 +227,11 @@ module whr_top
 	   assign channel_in
 	     = channel_in_ip[ip*channel_width:(ip+1)*channel_width-1];
 	   
-	   wire [0:num_ports-1]     gnt_op;
-	   assign gnt_op = gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1];
+	   wire 		    gnt;
+	   assign gnt = gnt_ip[ip];
 	   
-	   wire [0:num_ports-1]     req_op;
+	   wire [0:num_ports-1]     route_op;
+	   wire 		    req;
 	   wire 		    req_head;
 	   wire 		    req_tail;
 	   wire 		    xbr_active;
@@ -265,16 +267,18 @@ module whr_top
 	      .reset(reset),
 	      .router_address(router_address),
 	      .channel_in(channel_in),
-	      .req_op(req_op),
+	      .route_op(route_op),
+	      .req(req),
 	      .req_head(req_head),
 	      .req_tail(req_tail),
-	      .gnt_op(gnt_op),
+	      .gnt(gnt),
 	      .xbr_active(xbr_active),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
-	   assign req_ip_op[ip*num_ports:(ip+1)*num_ports-1] = req_op;
+	   assign route_ip_op[ip*num_ports:(ip+1)*num_ports-1] = route_op;
+	   assign req_ip[ip] = req;
 	   assign req_head_ip[ip] = req_head;
 	   assign req_tail_ip[ip] = req_tail;
 	   assign xbr_active_ip[ip] = xbr_active;
@@ -291,12 +295,46 @@ module whr_top
    
    
    //---------------------------------------------------------------------------
+   // allocation
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports-1] 	      arb_active_op;
+   
+   wire [0:num_ports-1] 	      gnt_op;
+   wire [0:num_ports-1] 	      gnt_head_op;
+   wire [0:num_ports-1] 	      gnt_tail_op;
+   
+   wire [0:num_ports-1] 	      elig_op;
+   wire [0:num_ports-1] 	      cred_op;
+   
+   wire [0:num_ports*num_ports-1]     xbr_ctrl_op_ip;
+   
+   whr_alloc_mac
+     #(.num_ports(num_ports),
+       .arbiter_type(arbiter_type),
+       .reset_type(reset_type))
+   all
+     (.clk(clk),
+      .reset(reset),
+      .route_ip_op(route_ip_op),
+      .arb_active_op(arb_active_op),
+      .req_ip(req_ip),
+      .req_head_ip(req_head_ip),
+      .req_tail_ip(req_tail_ip),
+      .gnt_ip(gnt_ip),
+      .gnt_op(gnt_op),
+      .gnt_head_op(gnt_head_op),
+      .gnt_tail_op(gnt_tail_op),
+      .xbr_ctrl_op_ip(xbr_ctrl_op_ip),
+      .elig_op(elig_op),
+      .cred_op(cred_op));
+   
+   
+   //---------------------------------------------------------------------------
    // crossbar
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1]           xbr_ctrl_op_ip;
-   
-   wire [0:num_ports*flit_data_width-1]     xbr_data_out_op;
+   wire [0:num_ports*flit_data_width-1] xbr_data_out_op;
    rtr_crossbar_mac
      #(.num_ports(num_ports),
        .width(flit_data_width),
@@ -315,27 +353,11 @@ module whr_top
    // output ports
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] 	req_op_ip;
-   c_interleave
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   req_op_ip_intl
-     (.data_in(req_ip_op),
-      .data_out(req_op_ip));
-   
-   wire [0:num_ports*num_ports-1] 	gnt_op_ip;
-   c_interleave
-     #(.width(num_ports*num_ports),
-       .num_blocks(num_ports))
-   gnt_ip_op_intl
-     (.data_in(gnt_op_ip),
-      .data_out(gnt_ip_op));
-   
-   wire [0:num_ports-1] 	  opc_error_op;
+   wire [0:num_ports-1] 		opc_error_op;
    
    generate
       
-      genvar 			  op;
+      genvar 				op;
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
@@ -348,12 +370,21 @@ module whr_top
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire [0:num_ports-1]       req_ip;
-	   assign req_ip = req_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   wire 		      arb_active;
+	   assign arb_active = arb_active_op[op];
 	   
-	   wire [0:num_ports-1]       gnt_ip;
-	   wire [0:num_ports-1]       xbr_ctrl_ip;
+	   wire 		      gnt;
+	   assign gnt = gnt_op[op];
+	   
+	   wire 		      gnt_head;
+	   assign gnt_head = gnt_head_op[op];
+	   
+	   wire 		      gnt_tail;
+	   assign gnt_tail = gnt_tail_op[op];
+	   
 	   wire [0:channel_width-1]   channel_out;
+	   wire 		      elig;
+	   wire 		      cred;
 	   wire 		      opc_error;
 	   whr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
@@ -367,7 +398,6 @@ module whr_top
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
-	       .arbiter_type(arbiter_type),
 	       .tff_regfile_type(tff_regfile_type),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(op),
@@ -375,22 +405,22 @@ module whr_top
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
+	      .arb_active(arb_active),
 	      .flow_ctrl_in(flow_ctrl_in),
-	      .req_ip(req_ip),
-	      .req_head_ip(req_head_ip),
-	      .req_tail_ip(req_tail_ip),
-	      .gnt_ip(gnt_ip),
-	      .xbr_ctrl_ip(xbr_ctrl_ip),
+	      .gnt(gnt),
+	      .gnt_head(gnt_head),
+	      .gnt_tail(gnt_tail),
 	      .flit_data_in(flit_data_in),
 	      .channel_out(channel_out),
+	      .elig(elig),
+	      .cred(cred),
 	      .error(opc_error));
-	   
-	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
-	   
-	   assign xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1] = xbr_ctrl_ip;
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
+	   
+	   assign elig_op[op] = elig;
+	   assign cred_op[op] = cred;
 	   
 	   assign opc_error_op[op] = opc_error;
 	   

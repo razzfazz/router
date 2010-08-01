@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module whr_ip_ctrl_mac
-  (clk, reset, router_address, channel_in, req_op, req_head, req_tail, gnt_op, 
-   xbr_active, flit_data_out, flow_ctrl_out, error);
+  (clk, reset, router_address, channel_in, route_op, req, req_head, req_tail, 
+   gnt, xbr_active, flit_data_out, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -204,9 +204,13 @@ module whr_ip_ctrl_mac
    // incoming channel
    input [0:channel_width-1] 	 channel_in;
    
-   // request for output port
-   output [0:num_ports-1] 	 req_op;
-   wire [0:num_ports-1] 	 req_op;
+   // destination output port
+   output [0:num_ports-1] 	 route_op;
+   wire [0:num_ports-1] 	 route_op;
+   
+   // request allocation
+   output 			 req;
+   wire 			 req;
    
    // current flit is head flit
    output 			 req_head;
@@ -217,7 +221,7 @@ module whr_ip_ctrl_mac
    wire 			 req_tail;
    
    // output port granted
-   input [0:num_ports-1] 	 gnt_op;
+   input 			 gnt;
    
    // crossbar enable signal
    output 			 xbr_active;
@@ -445,9 +449,6 @@ module whr_ip_ctrl_mac
    
    wire 	flags_active;
    assign flags_active = flit_valid;
-   
-   wire 	gnt;
-   assign gnt = |gnt_op;
    
    assign flit_valid_out = gnt;
    
@@ -729,7 +730,6 @@ module whr_ip_ctrl_mac
    wire [0:num_ports-1] 	   route_unmasked_op;
    assign route_unmasked_op = hdr_valid ? hdr_route_op : hop_route_op;
    
-   wire [0:num_ports-1] 	   route_op;
    wire 			   route_orc;
    wire [0:1] 			   rfl_errors;
    rtr_route_filter
@@ -920,11 +920,7 @@ module whr_ip_ctrl_mac
    // generate control signals to switch allocator
    //---------------------------------------------------------------------------
    
-   wire 			     req;
    assign req = flit_valid;
-   
-   assign req_op = {num_ports{req}} & route_op;
-   
    assign req_head = flit_head_out;
    assign req_tail = flit_tail_out;
    

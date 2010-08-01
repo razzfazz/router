@@ -29,12 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 //==============================================================================
-// output port controller (tracks state of buffers in downstream router)
+// output port controller
 //==============================================================================
 
 module whr_op_ctrl_mac
-  (clk, reset, flow_ctrl_in, req_ip, req_head_ip, req_tail_ip, gnt_ip,
-   xbr_ctrl_ip, flit_data_in, channel_out, error);
+  (clk, reset, arb_active, flow_ctrl_in, gnt, gnt_head, gnt_tail, flit_data_in, 
+   channel_out, elig, cred, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -118,9 +118,6 @@ module whr_op_ctrl_mac
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
    // required address width for tail FIFO
    localparam tff_addr_width = clogb(num_flits_per_vc);
    
@@ -138,25 +135,20 @@ module whr_op_ctrl_mac
    input clk;
    input reset;
    
+   // clock enable for arbitration results
+   input arb_active;
+   
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
-   // requests from input ports
-   input [0:num_ports-1] req_ip;
+   // grant from allocator module
+   input 		       gnt;
    
-   // requests are for head flits
-   input [0:num_ports-1] req_head_ip;
+   // grant is for head flit
+   input 		       gnt_head;
    
-   // requests are for tail flits
-   input [0:num_ports-1] req_tail_ip;
-   
-   // grants to input ports
-   output [0:num_ports-1] gnt_ip;
-   wire [0:num_ports-1]   gnt_ip;
-   
-   // crossbar control signals
-   output [0:num_ports-1] xbr_ctrl_ip;
-   wire [0:num_ports-1]   xbr_ctrl_ip;
+   // grant is for tail flit
+   input 		       gnt_tail;
    
    // incoming flit data
    input [0:flit_data_width-1] flit_data_in;
@@ -164,6 +156,14 @@ module whr_op_ctrl_mac
    // outgoing channel
    output [0:channel_width-1]  channel_out;
    wire [0:channel_width-1]    channel_out;
+   
+   // output can accept a new packet
+   output 		       elig;
+   wire 		       elig;
+   
+   // output can accept a new flit
+   output 		       cred;
+   wire 		       cred;
    
    // internal error condition detected
    output 		       error;
@@ -192,102 +192,6 @@ module whr_op_ctrl_mac
       .flow_ctrl_in(flow_ctrl_in),
       .fc_event_valid_out(cred_valid),
       .fc_event_sel_out_ovc(cred_sel_ovc));
-   
-   
-   //---------------------------------------------------------------------------
-   // arbitration
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_ports-1]        req_int_ip;
-   assign req_int_ip = req_ip;
-   
-   wire 		       gnt_int;
-   assign gnt_int = |req_int_ip;
-   
-   // NOTE: For the wormhole router, credit and eligibility checking happens at
-   // the output controller, so request generation is simple and fast; however,
-   // if clock gating based on requests proves to be timing-critical, we could
-   // just enable all output controllers whenever any input controller has data
-   // available.
-   wire 		       arb_active;
-   assign arb_active = |req_ip;
-   
-   wire 		       update;
-   wire [0:num_ports-1]        gnt_int_ip;
-   c_arbiter
-     #(.num_ports(num_ports),
-       .arbiter_type(arbiter_type),
-       .reset_type(reset_type))
-   gnt_int_ip_arb
-     (.clk(clk),
-      .reset(reset),
-      .active(arb_active),
-      .update(update),
-      .req(req_int_ip),
-      .gnt(gnt_int_ip));
-   
-   wire 		       head_full;
-   
-   wire [0:num_ports-1]        new_gnt_ip;
-   assign new_gnt_ip = gnt_int_ip & {num_ports{~head_full}};
-   
-   wire 		       new_gnt;
-   assign new_gnt = gnt_int & ~head_full;
-   
-   wire 		       allocated_q;
-   
-   wire 		       allocated_ip_active;
-   assign allocated_ip_active = arb_active & ~allocated_q;
-   
-   wire [0:num_ports-1]        allocated_ip_s, allocated_ip_q;
-   assign allocated_ip_s = update ? gnt_int_ip : allocated_ip_q;
-   c_dff
-     #(.width(num_ports),
-       .reset_type(reset_type))
-   allocated_ipq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(allocated_ip_active),
-      .d(allocated_ip_s),
-      .q(allocated_ip_q));
-   
-   wire [0:num_ports-1]        held_gnt_ip;
-   assign held_gnt_ip = req_ip & allocated_ip_q;
-   
-   wire 		       held_gnt;
-   assign held_gnt = |held_gnt_ip;
-   
-   wire 		       full;
-   
-   wire 		       allocated_s;
-   assign allocated_s = allocated_q ?
-			(~|(held_gnt_ip & req_tail_ip) | full) :
-			(|(gnt_int_ip & ~req_tail_ip) & ~head_full & ~full);
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   allocatedq
-     (.clk(clk),
-      .reset(reset),
-      .active(arb_active),
-      .d(allocated_s),
-      .q(allocated_q));
-   
-   assign update = ~allocated_q & new_gnt;
-   
-   wire [0:num_ports-1]        gnt_unqual_ip;
-   assign gnt_unqual_ip = allocated_q ? held_gnt_ip : gnt_int_ip;
-   
-   assign xbr_ctrl_ip = gnt_unqual_ip;
-   
-   wire 		       gnt_unqual;
-   assign gnt_unqual = allocated_q ? held_gnt : new_gnt;
-   
-   assign gnt_ip
-     = (allocated_q ? held_gnt_ip : new_gnt_ip) & {num_ports{~full}};
-   
-   wire 		       gnt;
-   assign gnt = gnt_unqual & ~full;
    
    
    //---------------------------------------------------------------------------
@@ -324,11 +228,8 @@ module whr_op_ctrl_mac
    
    assign flit_valid_in = flit_valid_in_q;
    
-   // when the output port is not allocated, the next flit must be a head flits;
-   // the second term is required to account for cases where the output port 
-   // gets allocated, but no credit is available
    wire 		       flit_head_s, flit_head_q;
-   assign flit_head_s = ~allocated_q | |(held_gnt_ip & req_head_ip);
+   assign flit_head_s = gnt_head;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -343,7 +244,7 @@ module whr_op_ctrl_mac
    assign flit_head_in = flit_head_q;
    
    wire 		       flit_tail_s, flit_tail_q;
-   assign flit_tail_s = |(gnt_unqual_ip & req_tail_ip);
+   assign flit_tail_s = gnt_tail;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -356,6 +257,33 @@ module whr_op_ctrl_mac
    
    wire 		       flit_tail_in;
    assign flit_tail_in = flit_tail_q;
+   
+   
+   //---------------------------------------------------------------------------
+   // track VC allocation state
+   //---------------------------------------------------------------------------
+   
+   wire 		       head_granted;
+   assign head_granted = gnt & gnt_head;
+   
+   wire 		       tail_granted;
+   assign tail_granted = gnt & gnt_tail;
+   
+   wire 		       allocated_s, allocated_q;
+   assign allocated_s = (allocated_q | head_granted) & ~tail_granted;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   allocatedq
+     (.clk(clk),
+      .reset(reset),
+      .active(arb_active),
+      .d(allocated_s),
+      .q(allocated_q));
+   
+   wire 		       head_full;
+   
+   assign elig = ~allocated_q & ~head_full;
    
    
    //---------------------------------------------------------------------------
@@ -464,7 +392,7 @@ module whr_op_ctrl_mac
 	     end
 	   
 	   wire 				 head_debit;
-	   assign head_debit = ~allocated_q & new_gnt & ~full;
+	   assign head_debit = head_granted;
 	   
 	   // track header credits using stock FIFO tracker module
 	   wire 				 hft_almost_empty;
@@ -532,12 +460,10 @@ module whr_op_ctrl_mac
    wire 					 error_ft_overflow;
    assign error_ft_overflow = ft_errors[1];
    
-   // NOTE: For the wormhole router, the credit check can be performed at the 
-   // allocator (here, arbiter) output; thus, the following computation can be
-   // performed in parallel with arbitration, so we don't need an additional
-   // register stage as in the general VC case.
-   
+   wire 					 full;
    assign full = ft_full & ~credit;
+   
+   assign cred = ~full;
    
    
    //---------------------------------------------------------------------------
