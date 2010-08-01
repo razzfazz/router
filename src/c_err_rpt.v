@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // error reporting module
+//==============================================================================
+
 module c_err_rpt
   (clk, reset, active, errors_in, errors_out);
    

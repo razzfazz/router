@@ -28,7 +28,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // global function definitions
+//==============================================================================
 
 // compute ceiling of binary logarithm
 function integer clogb(input integer argument);

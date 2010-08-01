@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // configurable register
+//==============================================================================
+
 module c_dff
   (clk, reset, active, d, q);
    

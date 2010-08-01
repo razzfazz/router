@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic multi-hot select gate
+//==============================================================================
+
 module c_select_mofn
   (select, data_in, data_out);
    

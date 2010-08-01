@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // encoder from one-hot to binary
+//==============================================================================
+
 module c_encode
   (data_in, data_out);
    

@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic fixed-priority arbiter (port 0 has highest priority)
+//==============================================================================
+
 module c_fp_arbiter
   (req, gnt);
    

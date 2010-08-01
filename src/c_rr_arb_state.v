@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic round-robin arbiter state
+//==============================================================================
+
 module c_rr_arb_state
   (clk, reset, active, update, gnt, state);
    

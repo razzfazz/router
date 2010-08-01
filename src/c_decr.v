@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic modulo decrementer (i.e., decrementer with wraparound)
+//==============================================================================
+
 module c_decr
   (data_in, data_out);
    

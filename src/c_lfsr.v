@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic multi-input linear feedback shift register register
+//==============================================================================
+
 module c_lfsr
   (clk, reset, active, load, run, feedback, complete, d, q);
    

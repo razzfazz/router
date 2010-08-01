@@ -28,10 +28,11 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // wavefront allocator variant which rotates inputs and outputs based on 
 // priority
+//==============================================================================
+
 module c_wf_alloc_rot
   (clk, reset, active, req, gnt, update);
    

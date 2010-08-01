@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic feedback multiplier for multi-input LFSRs
+//==============================================================================
+
 module c_fbmult
   (feedback, complete, data_in, data_out);
    

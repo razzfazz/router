@@ -28,10 +28,11 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // module for extracting a set of bits from an input word (result is 
 // concatenation of these bits)
+//==============================================================================
+
 module c_gather
   (data_in, data_out);
    

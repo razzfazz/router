@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // generic FIFO buffer built from registers
+//==============================================================================
+
 module c_fifo
   (clk, reset, push_active, pop_active, push, pop, push_data, pop_data, 
    almost_empty, empty, almost_full, full, errors);

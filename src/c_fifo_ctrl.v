@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // simple FIFO controller
+//==============================================================================
+
 module c_fifo_ctrl
   (clk, reset, push_active, pop_active, push, pop, push_addr, pop_addr, 
    almost_empty, empty, almost_full, full, errors);

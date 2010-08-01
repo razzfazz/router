@@ -28,7 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//==============================================================================
 // configurable crossbar module
+//==============================================================================
+
 module c_crossbar
   (ctrl_ip_op, data_in_ip, data_out_op);
    
