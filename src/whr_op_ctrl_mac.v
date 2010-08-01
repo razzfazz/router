@@ -431,7 +431,7 @@ module whr_op_ctrl_mac
 	     begin
 		
 		wire 			  tff_push_data;
-		assign tff_push_data = |(gnt_unqual_ip & req_tail_ip);
+		assign tff_push_data = flit_tail_in;
 		
 		wire 			  tff_pop_data;
 		wire 			  tff_almost_full;
@@ -447,9 +447,9 @@ module whr_op_ctrl_mac
 		tff
 		  (.clk(clk),
 		   .reset(reset),
-		   .push_active(arb_active),
+		   .push_active(flit_valid_in),
 		   .pop_active(cred_active),
-		   .push(gnt),
+		   .push(flit_valid_in),
 		   .pop(credit),
 		   .push_data(tff_push_data),
 		   .pop_data(tff_pop_data),
