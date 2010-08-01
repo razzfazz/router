@@ -568,30 +568,31 @@ module whr_op_ctrl_mac
    // error checker logic
    //---------------------------------------------------------------------------
    
+   // synopsys translate_off
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_ft_underflow)
+	  $display("ERROR: Credit tracker underflow in module %m.");
+	
+	if(error_ft_overflow)
+	  $display("ERROR: Credit tracker overflow in module %m.");
+	
+	if(error_hft_underflow)
+	  $display("ERROR: Head credit tracker underflow in module %m.");
+	
+	if(error_hft_overflow)
+	  $display("ERROR: Head credit tracker overflow in module %m.");
+	
+     end
+   
+   // synopsys translate_on
+   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
-	   
-	   // synopsys translate_off
-	   always @(posedge clk)
-	     begin
-		
-		if(error_ft_underflow)
-		  $display("ERROR: Credit tracker underflow in module %m.");
-		
-		if(error_ft_overflow)
-		  $display("ERROR: Credit tracker overflow in module %m.");
-		
-		if(error_hft_underflow)
-		  $display({"ERROR: Head credit tracker underflow in module ",
-			    "%."});
-		
-		if(error_hft_overflow)
-		  $display("ERROR: Head credit tracker overflow in module %m.");
-		
-	     end
-	   // synopsys translate_on
 	   
 	   wire [0:3] errors_s, errors_q;
 	   assign errors_s = {error_ft_underflow,
