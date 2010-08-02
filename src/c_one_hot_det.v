@@ -38,20 +38,6 @@ module c_one_hot_det
 `include "c_constants.v"
 `include "c_functions.v"
    
-   // width of input data for given level
-   function integer lvl_width(input integer width, input integer level);
-      begin
-	 lvl_width = width / (1 << level);
-      end
-   endfunction
-   
-   // offset into connection vector for given level
-   function integer lvl_offset(input integer width, input integer level);
-      begin
-	 lvl_offset = 2 * (width - lvl_width(width, level));
-      end
-   endfunction
-
    // width of input vector
    parameter width = 8;
    
@@ -65,8 +51,8 @@ module c_one_hot_det
    input [0:width-1] data;
    
    // one-hot indicator
-   output one_hot;
-   wire one_hot;
+   output 	     one_hot;
+   wire 	     one_hot;
    
    generate
       
@@ -96,15 +82,16 @@ module c_one_hot_det
    	   for(level = 0; level < num_levels; level = level + 1)
 	     begin:levels
 		
-		wire [0:lvl_width(width, level)-1] data;
-		assign data = connections[lvl_offset(width, level):
-					  lvl_offset(width, level)+
-					  lvl_width(width, level)-1];
+		wire [0:(width / (1 << level))-1] data;
+		assign data
+		  = connections[(2 * (width - (width / (1 << level)))):
+				(2 * (width - (width / (1 << level))))+
+				(width / (1 << level))-1];
 		
-		wire [0:lvl_width(width, level+1)-1] both_set;
-		wire [0:lvl_width(width, level+1)-1] any_set;
+		wire [0:(width / (1 << level))-1] both_set;
+		wire [0:(width / (1 << level))-1] any_set;
 		
-		genvar 				     pair;
+		genvar 				  pair;
 		
 		for(pair = 0; pair < (width / (2 << level)); pair = pair + 1)
 		  begin:pairs
@@ -116,10 +103,9 @@ module c_one_hot_det
 		
 		assign multi_hot[level] = |both_set;
 		
-		assign connections[lvl_offset(width, level+1):
-				   lvl_offset(width, level+1)+
-				   lvl_width(width, level+1)-1]
-		= any_set;
+		assign connections[(2 * (width - (width / (1 << level)))):
+				   (2 * (width - (width / (1 << level))))+
+				   (width / (1 << level))-1] = any_set;
 		
 	     end
 	   
