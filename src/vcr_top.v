@@ -248,7 +248,6 @@ module vcr_top
    wire [0:num_ports-1] 			     sw_gnt_spec_ip;
    
    wire [0:num_ports-1] 			     xbr_active_ip;
-   wire [0:num_ports*num_ports-1] 		     xbr_ctrl_ip_op;
    
    wire [0:num_ports*int_flit_ctrl_width-1] 	     xbc_data_in_ip;
    wire [0:num_ports*flit_data_width-1] 	     xbd_data_in_ip;
