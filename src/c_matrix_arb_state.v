@@ -74,39 +74,33 @@ module c_matrix_arb_state
 		
 		genvar col;
 		
-		for(col = 0; col < row; col = col + 1)
+		for(col = 0; col < num_ports; col = col + 1)
 		  begin:cols
 		     
-		     assign prio[row*num_ports+col] = ~prio[col*num_ports+row];
-		     
-		  end
-		
-		// diagonal has all ones
-		assign prio[row*num_ports+row] = 1'b1;
-		
-		// upper triangle has actual registers
-		if(row < num_ports-1)
-		  begin
-		     
-		     wire [(row+1):num_ports-1] prio_s, prio_q;
-		     assign prio_s = update ? 
-				     ((prio_q | gnt[(row+1):num_ports-1]) &
-				      ~{(num_ports-row-1){gnt[row]}}) : 
-				     prio_q;
-		     c_dff
-		       #(.width(num_ports-row-1),
-			 .offset(row+1),
-			 .reset_type(reset_type),
-			 .reset_value({(num_ports-row-1){1'b1}}))
-		     prioq
-		       (.clk(clk),
-			.reset(reset),
-			.active(active),
-			.d(prio_s),
-			.q(prio_q));
-		     
-		     assign prio[row*num_ports+row+1:(row+1)*num_ports-1]
-			      = prio_q;
+		     if(col < row)
+		       assign prio[row*num_ports+col]
+			 = ~prio[col*num_ports+row];
+		     else if(col == row)
+		       assign prio[row*num_ports+col] = 1'b1;
+		     else
+		       begin
+			  wire prio_s, prio_q;
+			  assign prio_s = update ? 
+					  ((prio_q | gnt[col]) & ~gnt[row]) : 
+					  prio_q;
+			  c_dff
+			    #(.width(1),
+			      .reset_type(reset_type),
+			      .reset_value(1'b1))
+			  prioq
+			    (.clk(clk),
+			     .reset(reset),
+			     .active(active),
+			     .d(prio_s),
+			     .q(prio_q));
+			  
+			  assign prio[row*num_ports+col] = prio_q;
+		       end
 		     
 		  end
 		
