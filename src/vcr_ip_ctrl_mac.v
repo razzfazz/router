@@ -34,8 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
-   vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_alloc_out_op, sw_alloc_in_op, 
-   xbr_active, int_flit_ctrl_out, flit_data_out, flow_ctrl_out, error);
+   vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_req_nonspec_ivc, 
+   sw_req_spec_ivc, sw_sel_nonspec_ivc, sw_sel_spec_ivc, sw_gnt_nonspec, 
+   sw_gnt_spec, xbr_active, int_flow_ctrl_op_ovc, int_flit_ctrl_out, 
+   flit_data_out, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -213,48 +215,12 @@ module vcr_ip_ctrl_mac
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // select speculation type
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   
    // select whether VCs must have credits available in order to be considered 
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
-   
-   // select implementation variant for switch allocator
-   parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
-   
-   // select which arbiter type to use for switch allocator
-   parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
-   
-   // number of bits required for request signals
-   localparam sw_alloc_req_width
-     = (sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : (1 + 1);
-   
-   // number of bits required for grant signals
-   localparam sw_alloc_gnt_width = sw_alloc_req_width;
-   
-   // width of outgoing allocator control signals
-   localparam sw_alloc_out_width
-     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ? 
-       sw_alloc_req_width : 
-       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
-       (sw_alloc_req_width + sw_alloc_gnt_width + 
-	((sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0)) : 
-       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
-	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
-       sw_alloc_req_width : 
-       -1;
-   
-   // width of incoming allocator control signals
-   localparam sw_alloc_in_width
-     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ? 
-       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
-       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
-       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) :
-       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
-	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
-       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
-       -1;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -291,172 +257,64 @@ module vcr_ip_ctrl_mac
    // granted output VC
    input [0:num_vcs*num_vcs_per_class-1]     vc_gnt_ivc_ocvc;
    
-   // outgoing allocator contorl signals
-   output [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_op;
-   wire [0:num_ports*sw_alloc_out_width-1]   sw_alloc_out_op;
+   // non-speculative switch allocator requests
+   output [0:num_vcs-1] 		     sw_req_nonspec_ivc;
+   wire [0:num_vcs-1] 			     sw_req_nonspec_ivc;
    
-   // incoming allocator control signals
-   input [0:num_ports*sw_alloc_in_width-1]   sw_alloc_in_op;
+   // speculative switch allocator requests
+   output [0:num_vcs-1] 		     sw_req_spec_ivc;
+   wire [0:num_vcs-1] 			     sw_req_spec_ivc;
+   
+   // select VC for non-speculative switch grant
+   input [0:num_vcs-1] 			     sw_sel_nonspec_ivc;
+   
+   // select VC for speculative switch grant
+   input [0:num_vcs-1] 			     sw_sel_spec_ivc;
+   
+   // non-speculative switch grant
+   input 				     sw_gnt_nonspec;
+   
+   // speculative switch grant
+   input 				     sw_gnt_spec;
    
    // crossbar enable signal
    output 				     xbr_active;
    wire 				     xbr_active;
    
+   // internal flow control signals from output controllers
+   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   
    // outgoing flit control signals
-   output [0:int_flit_ctrl_width-1] 	     int_flit_ctrl_out;
-   wire [0:int_flit_ctrl_width-1] 	     int_flit_ctrl_out;
+   output [0:int_flit_ctrl_width-1] 		     int_flit_ctrl_out;
+   wire [0:int_flit_ctrl_width-1] 		     int_flit_ctrl_out;
    
    // outgoing flit data
-   output [0:flit_data_width-1] 	     flit_data_out;
-   wire [0:flit_data_width-1] 		     flit_data_out;
+   output [0:flit_data_width-1] 		     flit_data_out;
+   wire [0:flit_data_width-1] 			     flit_data_out;
    
    // outgoing flow control signals
-   output [0:flow_ctrl_width-1] 	     flow_ctrl_out;
-   wire [0:flow_ctrl_width-1] 		     flow_ctrl_out;
+   output [0:flow_ctrl_width-1] 		     flow_ctrl_out;
+   wire [0:flow_ctrl_width-1] 			     flow_ctrl_out;
    
    // internal error condition detected
-   output 				     error;
-   wire 				     error;
-   
-   
-   //---------------------------------------------------------------------------
-   // pack / unpack switch allocator control signals
-   //---------------------------------------------------------------------------
-   
-   // non-speculative switch allocation requests to output-side arbitration 
-   // stage / wavefront block
-   wire [0:num_ports-1] 		     sw_oreq_nonspec_op;
-   
-   // speculative switch allocation requests to output-side arbitration stage or
-   // wavefront block
-   wire [0:num_ports-1] 		     sw_oreq_spec_op;
-   
-   // non-speculative switch allocation grants from output-side arbitration 
-   // stage / wavefront block
-   wire [0:num_ports-1] 		     sw_ognt_nonspec_op;
-   
-   // speculative switch allocation grants from output-side arbitration stage or
-   // wavefront block
-   wire [0:num_ports-1] 		     sw_ognt_spec_op;
-   
-   // non-speculative switch allocation grants to output-side arbitration stage 
-   // or wavefront block
-   wire [0:num_ports-1] 		     sw_ignt_nonspec_op;
-   
-   // speculative switch allocation grants to output-side arbitration stage or 
-   // wavefront block
-   wire [0:num_ports-1] 		     sw_ignt_spec_op;
-   
-   // internal flow control signalling from output controller to input 
-   // controllers
-   wire [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
-   
-   genvar 					    op;
-   
-   generate
-      
-      for(op = 0; op < num_ports; op = op + 1)
-	begin:ops
-	   
-	   wire [0:sw_alloc_in_width-1] sw_alloc_in;
-	   assign sw_alloc_in
-	     = sw_alloc_in_op[op*sw_alloc_in_width:
-			      (op+1)*sw_alloc_in_width-1];
-	   
-	   wire [0:sw_alloc_out_width-1] sw_alloc_out;
-	   
-	   assign sw_alloc_out[0] = sw_oreq_nonspec_op[op];
-	   
-	   if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-	     assign sw_alloc_out[1] = sw_oreq_spec_op[op];
-	   
-	   assign sw_ognt_nonspec_op[op] = sw_alloc_in[0];
-	   
-	   if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-	     assign sw_ognt_spec_op[op] = sw_alloc_in[1];
-	   else
-	     assign sw_ognt_spec_op[op] = 1'b0;
-	   
-	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
-	     begin
-		
-		assign int_flow_ctrl_op_ovc[op*num_vcs*
-					    int_flow_ctrl_width:
-					    (op+1)*num_vcs*
-					    int_flow_ctrl_width-1]
-			 = sw_alloc_in[sw_alloc_gnt_width:
-				       sw_alloc_gnt_width+
-				       num_vcs*int_flow_ctrl_width-1];
-		
-	     end
-	   else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
-	     begin
-		
-		assign sw_alloc_out[sw_alloc_req_width]
-			 = sw_ignt_nonspec_op[op];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_alloc_out[sw_alloc_req_width+1]
-			   = sw_ignt_spec_op[op];
-		
-		assign int_flow_ctrl_op_ovc[op*num_vcs*
-					    int_flow_ctrl_width:
-					    (op+1)*num_vcs*
-					    int_flow_ctrl_width-1]
-			 = sw_alloc_in[sw_alloc_gnt_width:
-				       sw_alloc_gnt_width+
-				       num_vcs*int_flow_ctrl_width-1];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  begin
-		     
-		     wire sw_gnt;
-		     assign sw_gnt
-		       = sw_ignt_nonspec_op[op] | sw_ignt_spec_op[op];
-		     
-		     assign sw_alloc_out[sw_alloc_req_width+sw_alloc_gnt_width]
-			      = sw_gnt;
-		     
-		  end
-		
-	     end
-	   else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
-		   (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
-	     begin
-		
-		assign int_flow_ctrl_op_ovc[op*num_vcs*
-					    int_flow_ctrl_width:
-					    (op+1)*num_vcs*
-					    int_flow_ctrl_width-1]
-			 = sw_alloc_in[sw_alloc_gnt_width:
-				       sw_alloc_gnt_width+
-				       num_vcs*int_flow_ctrl_width-1];
-		
-	     end
-	   
-	   assign sw_alloc_out_op[op*sw_alloc_out_width:
-				  (op+1)*sw_alloc_out_width-1]
-		    = sw_alloc_out;
-	   
-	end
-      
-   endgenerate
+   output 					     error;
+   wire 					     error;
    
    
    //---------------------------------------------------------------------------
    // input stage
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] fbc_full_ivc;
+   wire [0:num_vcs-1] 				     fbc_full_ivc;
    
-   wire 	      input_stage_active;
+   wire 					     input_stage_active;
    assign input_stage_active = ~&fbc_full_ivc;
    
-   wire 	      flit_valid_in;
-   wire 	      flit_head_in;
-   wire 	      flit_tail_in;
-   wire [0:flit_data_width-1] flit_data_in;
-   wire [0:num_vcs-1] 	      flit_sel_in_ivc;
+   wire 					     flit_valid_in;
+   wire 					     flit_head_in;
+   wire 					     flit_tail_in;
+   wire [0:flit_data_width-1] 			     flit_data_in;
+   wire [0:num_vcs-1] 				     flit_sel_in_ivc;
    rtr_channel_input
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -479,45 +337,77 @@ module vcr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
+   // switch allocation
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_vcs-1] 				     sw_gnt_nonspec_ivc;
+   assign sw_gnt_nonspec_ivc = {num_vcs{sw_gnt_nonspec}} & sw_sel_nonspec_ivc;
+   
+   wire [0:num_vcs-1] 				     free_spec_ivc;
+   
+   wire [0:num_vcs-1] 				     sw_gnt_spec_ivc;
+   wire [0:num_vcs-1] 				     vc_sel_ivc;
+   
+   wire 					     flit_sent;
+   
+   generate
+      
+      if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+	begin
+	   assign sw_gnt_spec_ivc
+	     = {num_vcs{sw_gnt_spec}} & sw_sel_spec_ivc & free_spec_ivc;
+	   
+	   assign vc_sel_ivc
+	     = sw_gnt_nonspec ? sw_sel_nonspec_ivc : sw_sel_spec_ivc;
+	   
+	   if(vc_alloc_requires_credit)
+	     assign flit_sent
+	       = sw_gnt_nonspec | 
+		 (sw_gnt_spec & (sw_sel_spec_ivc & vc_gnt_ivc));
+	   else
+	     assign flit_sent
+	       = sw_gnt_nonspec | 
+		 (sw_gnt_spec & 
+		  |(sw_sel_spec_ivc & vc_gnt_ivc & free_spec_ivc));
+	end
+      else
+	begin
+	   assign sw_gnt_spec_ivc = {num_vcs{1'b0}};
+	   
+	   assign vc_sel_ivc = sw_sel_nonspec_ivc;
+	   
+	   assign flit_sent = sw_gnt_nonspec;
+	end
+
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire 		      buffer_active;
+   wire 					     buffer_active;
    assign buffer_active = flit_valid_in;
    
    // extract header information from header data
-   wire [0:header_info_width-1] header_info_in;
+   wire [0:header_info_width-1] 		     header_info_in;
    assign header_info_in = flit_data_in[0:header_info_width-1];
    
-   // non-speculative switch allocator requests
-   wire [0:num_vcs-1] 		sw_req_nonspec_ivc;
-   
-   // non-speculative switch allocator grants
-   wire [0:num_vcs-1] 		sw_gnt_nonspec_ivc;
-   
-   // speculative switch allocator requests
-   wire [0:num_vcs-1] 		sw_req_spec_ivc;
-   
-   // speculative switch allocator grants
-   wire [0:num_vcs-1] 		sw_gnt_spec_ivc;
-   
-   wire [0:num_vcs-1] 		flit_valid_in_ivc;
+   wire [0:num_vcs-1] 				     flit_valid_in_ivc;
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
-   wire [0:num_vcs-1] 		flit_sent_prev_ivc;
-   wire [0:num_vcs-1] 		flit_head_ivc;
-   wire [0:num_vcs-1] 		flit_tail_ivc;
-   wire [0:num_vcs*header_info_width-1] header_info_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 	fbc_push_addr_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 	fbc_pop_addr_ivc;
-   wire [0:num_vcs-1] 			fbc_empty_ivc;
-   wire [0:num_vcs-1] 			allocated_ivc;
-   wire [0:num_vcs*num_vcs-1] 		allocated_ivc_ovc;
-   wire [0:num_vcs-1] 			free_unallocated_ivc;
-   wire [0:num_vcs-1] 			free_allocated_ivc;
-   wire [0:num_vcs*8-1] 		ivcc_errors_ivc;
+   wire [0:num_vcs-1] 				     flit_sent_prev_ivc;
+   wire [0:num_vcs-1] 				     flit_head_ivc;
+   wire [0:num_vcs-1] 				     flit_tail_ivc;
+   wire [0:num_vcs*header_info_width-1] 	     header_info_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 		     fbc_push_addr_ivc;
+   wire [0:num_vcs*fbf_addr_width-1] 		     fbc_pop_addr_ivc;
+   wire [0:num_vcs-1] 				     fbc_empty_ivc;
+   wire [0:num_vcs-1] 				     allocated_ivc;
+   wire [0:num_vcs*num_vcs-1] 			     allocated_ivc_ovc;
+   wire [0:num_vcs*8-1] 			     ivcc_errors_ivc;
    
-   genvar 				ivc;
+   genvar 					     ivc;
    
    generate
       
@@ -557,8 +447,7 @@ module vcr_ip_ctrl_mac
 	   wire 			   fbc_full;
 	   wire 			   allocated;
 	   wire [0:num_vcs-1] 		   allocated_ovc;
-	   wire 			   free_unallocated;
-	   wire 			   free_allocated;
+	   wire 			   free_spec;
 	   wire [0:7] 			   ivcc_errors;
 	   vcr_ivc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
@@ -614,8 +503,7 @@ module vcr_ip_ctrl_mac
 	      .fbc_full(fbc_full),
 	      .allocated(allocated),
 	      .allocated_ovc(allocated_ovc),
-	      .free_unallocated(free_unallocated),
-	      .free_allocated(free_allocated),
+	      .free_spec(free_spec),
 	      .errors(ivcc_errors));
 	   
 	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
@@ -642,359 +530,8 @@ module vcr_ip_ctrl_mac
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
 	     = allocated_ovc;
-	   assign free_unallocated_ivc[ivc] = free_unallocated;
-	   assign free_allocated_ivc[ivc] = free_allocated;
+	   assign free_spec_ivc[ivc] = free_spec;
 	   assign ivcc_errors_ivc[ivc*8:(ivc+1)*8-1] = ivcc_errors;
-	   
-	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // switch allocation
-   //---------------------------------------------------------------------------
-   
-   wire 				flit_valid;
-   assign flit_valid = flit_valid_in | ~&fbc_empty_ivc;
-   
-   wire 				alloc_active;
-   assign alloc_active = flit_valid;
-   
-   wire [0:num_vcs-1] 			sw_req_nonspec_qual_ivc;
-   assign sw_req_nonspec_qual_ivc = sw_req_nonspec_ivc & free_allocated_ivc;
-   
-   wire [0:num_vcs-1] 			vc_sel_nonspec_ivc;
-   
-   vcr_sw_alloc_ip
-     #(.num_vcs(num_vcs),
-       .num_ports(num_ports),
-       .allocator_type(sw_alloc_type),
-       .arbiter_type(sw_alloc_arbiter_type),
-       .reset_type(reset_type))
-   swa_nonspec
-     (.clk(clk),
-      .reset(reset),
-      .active(alloc_active),
-      .route_ivc_op(route_ivc_op),
-      .req_in_ivc(sw_req_nonspec_qual_ivc),
-      .req_out_op(sw_oreq_nonspec_op),
-      .gnt_in_op(sw_ognt_nonspec_op),
-      .gnt_out_ivc(sw_gnt_nonspec_ivc),
-      .gnt_out_op(sw_ignt_nonspec_op),
-      .sel_ivc(vc_sel_nonspec_ivc),
-      .allow_update(1'b1));
-   
-   
-   //---------------------------------------------------------------------------
-   // speculative switch allocation support
-   //---------------------------------------------------------------------------
-   
-   // any non-speculative grants?
-   wire 				sw_ognt_nonspec;
-   assign sw_ognt_nonspec = |sw_ognt_nonspec_op;
-   
-   wire [0:num_vcs-1] 			vc_sel_spec_ivc;
-   wire [0:num_vcs-1] 			vc_sel_ivc;
-   wire 				flit_sent;
-   
-   generate
-      
-      if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-	begin
-	   
-	   // any non-speculative requests?
-	   wire sw_req_nonspec;
-	   assign sw_req_nonspec = |sw_req_nonspec_ivc;
-	   
-	   wire [0:num_ports-1] sw_oreq_spec_unqual_op;
-	   wire [0:num_vcs-1] 	sw_gnt_spec_unqual_ivc;
-	   wire [0:num_ports-1] sw_ignt_spec_unqual_op;
-	   wire 		allow_update_spec;
-	   vcr_sw_alloc_ip
-	     #(.num_vcs(num_vcs),
-	       .num_ports(num_ports),
-	       .allocator_type(sw_alloc_type),
-	       .arbiter_type(sw_alloc_arbiter_type),
-	       .reset_type(reset_type))
-	   swa_spec
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(alloc_active),
-	      .route_ivc_op(route_ivc_op),
-	      .req_in_ivc(sw_req_spec_ivc),
-	      .req_out_op(sw_oreq_spec_unqual_op),
-	      .gnt_in_op(sw_ognt_spec_op),
-	      .gnt_out_ivc(sw_gnt_spec_unqual_ivc),
-	      .gnt_out_op(sw_ignt_spec_unqual_op),
-	      .sel_ivc(vc_sel_spec_ivc),
-	      .allow_update(allow_update_spec));
-	   
-	   wire [0:num_vcs-1] 	sw_gnt_spec_qual_ivc;
-	   if(vc_alloc_requires_credit)
-	     assign sw_gnt_spec_qual_ivc = sw_gnt_spec_unqual_ivc;
-	   else
-	     assign sw_gnt_spec_qual_ivc
-	       = sw_gnt_spec_unqual_ivc & free_unallocated_ivc;
-	   
-	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
-	     begin
-		
-		// no additional masking is required for speculative grants
-		assign sw_gnt_spec_ivc = sw_gnt_spec_qual_ivc;
-		assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
-		
-		// updates are masked indirectly via output-side grants
-		assign allow_update_spec = 1'b1;
-		
-		case(sw_alloc_spec_type)
-		  
-		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS,
-		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
-		    begin
-		       
-		       // do not propagate speculative requests if any 
-		       // non-speculative requests were issued by this input's 
-		       // VCs
-		       assign sw_oreq_spec_op = {num_ports{~sw_req_nonspec}} & 
-						sw_oreq_spec_unqual_op;
-		       
-		       // flit buffer read address can be determined early
-		       assign vc_sel_ivc = sw_req_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS,
-		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
-		    begin
-		       
-		       // do not propagate requests if a non-speculative grant 
-		       // was generated for this input
-		       assign sw_oreq_spec_op = {num_ports{~sw_ognt_nonspec}} & 
-						sw_oreq_spec_unqual_op;
-		       
-		       // we only know whether to use non-speculative or 
-		       // speculative flits once the output-side grants are 
-		       // known
-		       assign vc_sel_ivc = sw_ognt_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		    end
-		  
-		endcase
-		
-	     end
-	   else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
-	     begin
-		
-		case(sw_alloc_spec_type)
-		  
-		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
-		    begin
-		       
-		       // propagate all speculative requests
-		       assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
-		       
-		       // suppress speculative grants if any non-speculative 
-		       // requests were issued by this input's VCs
-		       assign sw_gnt_spec_ivc = {num_vcs{~sw_req_nonspec}} & 
-						sw_gnt_spec_qual_ivc;
-		       assign sw_ignt_spec_op = {num_ports{~sw_req_nonspec}} & 
-						sw_ignt_spec_unqual_op;
-		       
-		       // flit buffer read address can be determined early
-		       assign vc_sel_ivc = sw_req_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		       // inhibit updates if non-speculative requests are 
-		       // present
-		       assign allow_update_spec = ~sw_req_nonspec;
-		       
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
-		    begin
-		       
-		       // do not propagate speculative requests if any 
-		       // non-speculative requests were issued by this input's 
-		       // VCs
-		       assign sw_oreq_spec_op = {num_ports{~sw_req_nonspec}} & 
-						sw_oreq_spec_unqual_op;
-		       
-		       // no additional masking is required for speculative 
-		       // grants
-		       assign sw_gnt_spec_ivc = sw_gnt_spec_qual_ivc;
-		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
-		       
-		       // flit buffer read address can be determined early
-		       assign vc_sel_ivc = sw_req_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		       // updates are masked indirectly via output-side grants
-		       assign allow_update_spec = 1'b1;
-		       
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
-		    begin
-		       
-		       // propagate all speculative requests
-		       assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
-		       
-		       // suppress speculative grants if any non-speculative 
-		       // grants were generated for this input
-		       assign sw_gnt_spec_ivc = {num_vcs{~sw_ognt_nonspec}} & 
-						sw_gnt_spec_qual_ivc;
-		       assign sw_ignt_spec_op = {num_ports{~sw_ognt_nonspec}} & 
-						sw_ignt_spec_unqual_op;
-		       
-		       // we only know whether to use non-speculative or 
-		       // speculative flits once the output-side grants are 
-		       // known
-		       assign vc_sel_ivc = sw_ognt_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		       // inhibit updates if non-speculative grants are present
-		       assign allow_update_spec = ~sw_ognt_nonspec;
-		       
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
-		    begin
-		       
-		       // do not propagate requests if a non-speculative grant 
-		       // was generated for this input
-		       assign sw_oreq_spec_op = {num_ports{~sw_ognt_nonspec}} & 
-						sw_oreq_spec_unqual_op;
-		       
-		       // no additional masking requiured for grants
-		       assign sw_gnt_spec_ivc = sw_gnt_spec_qual_ivc;
-		       assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
-		       
-		       // we only know whether to use non-speculative or 
-		       // speculative flits once the output-side grants are 
-		       // known
-		       assign vc_sel_ivc = sw_ognt_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		       // updates are masked indirectly via output-side grants
-		       assign allow_update_spec = 1'b1;
-		       
-		    end
-		  
-		endcase
-		
-	     end
-	   else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
-		   (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
-	     begin
-		
-		// propagate all speculative requests
-		assign sw_oreq_spec_op = sw_oreq_spec_unqual_op;
-		
-		// all masking is done inside the wavefront block, so we can 
-		// just propagate grants
-		assign sw_gnt_spec_ivc = sw_gnt_spec_qual_ivc;
-		assign sw_ignt_spec_op = sw_ignt_spec_unqual_op;
-		
-		case(sw_alloc_spec_type)
-		  
-		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS,
-		  `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS:
-		    begin
-		       
-		       // flit buffer read address can be determined early
-		       assign vc_sel_ivc = sw_req_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		       // inhibit updates if non-speculative requests are 
-		       // present
-		       assign allow_update_spec = ~sw_req_nonspec;
-		       
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS,
-		  `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS:
-		    begin
-		       
-		       // flit buffer read address depends on whether a 
-		       // non-speculative grant was generated
-		       assign vc_sel_ivc = sw_ognt_nonspec ? 
-					   vc_sel_nonspec_ivc : 
-					   vc_sel_spec_ivc;
-		       
-		       // inhibit updates if non-speculative grant was generated
-		       assign allow_update_spec = ~sw_ognt_nonspec;
-		       
-		    end
-		  
-		endcase
-		
-	     end
-	   
-	   // if any output port was granted to this input port 
-	   // non-speculatively, we know that a flit will be sent out
-	   wire flit_sent_nonspec;
-	   assign flit_sent_nonspec = sw_ognt_nonspec;
-	   
-	   // for speculative grants, on the other hand, we must make sure that 
-	   // no misspeculation occurred
-	   wire flit_sent_spec;
-	   
-	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
-	     begin
-		
-		// for the separable input-first case, we can use a shortcut by 
-		// exploiting the fact that the VC select signal is available 
-		// early
-		if(vc_alloc_requires_credit)
-		  assign flit_sent_spec
-		    = |sw_ognt_spec_op & |(vc_gnt_ivc & vc_sel_spec_ivc);
-		else
-		  assign flit_sent_spec
-		    = |sw_ognt_spec_op & 
-		      |(vc_gnt_ivc & vc_sel_spec_ivc & free_unallocated_ivc);
-		
-	     end
-	   else if((sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) || 
-		   ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
-		    (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)))
-	     begin
-		
-		// for separable output-first and wavefront allocation, we don't
-		// know until the end of allocation which input-side VC was 
-		// selected
-		assign flit_sent_spec = |(vc_gnt_ivc & sw_gnt_spec_ivc);
-		
-	     end
-	   
-	   // at most one of the two should ever be active
-	   assign flit_sent = flit_sent_nonspec | flit_sent_spec;
-	   
-	end
-      else
-	begin
-	   
-	   // if speculation is disabled, tie controls signals to zero
-	   assign sw_gnt_spec_ivc = {num_vcs{1'b0}};
-	   assign sw_oreq_spec_op = {num_ports{1'b0}};
-	   assign sw_ignt_spec_op = {num_ports{1'b0}};
-	   
-	   // selector for flit buffer read address
-	   assign vc_sel_spec_ivc = {num_vcs{1'b0}};
-	   assign vc_sel_ivc = vc_sel_nonspec_ivc;
-	   
-	   // in the absence of speculation, if any output port was granted to 
-	   // this input port, we know that a flit will be sent out
-	   assign flit_sent = sw_ognt_nonspec;
 	   
 	end
       
@@ -1019,6 +556,9 @@ module vcr_ip_ctrl_mac
      = flit_head_in ? header_info_out : header_info_in;
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in[header_info_width:flit_data_width-1];
+   
+   wire 			alloc_active;
+   assign alloc_active = flit_valid_in | ~&fbc_empty_ivc;
    
    wire [0:fbf_addr_width-1] 	fbc_push_addr;
    wire [0:fbf_addr_width-1] 	fbc_pop_addr;
@@ -1168,7 +708,7 @@ module vcr_ip_ctrl_mac
    wire 			     flit_valid_out_q;
    
    wire 			     valid_out_active;
-   assign valid_out_active = flit_valid | flit_valid_out_q;
+   assign valid_out_active = alloc_active | flit_valid_out_q;
    
    wire 			     flit_valid_out_s;
    assign flit_valid_out_s = flit_sent;
@@ -1309,7 +849,7 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out_q;
    
-   assign xbr_active = flit_valid;
+   assign xbr_active = alloc_active;
    
    
    //---------------------------------------------------------------------------

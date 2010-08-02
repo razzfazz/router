@@ -37,8 +37,8 @@ module vcr_ivc_ctrl
    header_info_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
    flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_push_addr, 
-   fbc_pop_addr, fbc_empty, fbc_full, allocated, allocated_ovc, 
-   free_unallocated, free_allocated, errors);
+   fbc_pop_addr, fbc_empty, fbc_full, allocated, allocated_ovc, free_spec, 
+   errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -193,7 +193,7 @@ module vcr_ivc_ctrl
    parameter vc_alloc_requires_credit = 0;
    
    // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
    
    // required address width for head/tail FIFO
    localparam htff_addr_width = clogb(num_flits_per_vc - 1);
@@ -332,12 +332,8 @@ module vcr_ivc_ctrl
    wire [0:num_vcs-1] 				     allocated_ovc;
    
    // credit availability if no VC has been assigned yet
-   output 					     free_unallocated;
-   wire 					     free_unallocated;
-   
-   // credit availability if a VC has been assigned
-   output 					     free_allocated;
-   wire 					     free_allocated;
+   output 					     free_spec;
+   wire 					     free_spec;
    
    // internal error condition detected
    output [0:7] 				     errors;
@@ -993,6 +989,8 @@ module vcr_ivc_ctrl
       .data_in(int_flow_ctrl_orc_ocvc),
       .data_out(int_flow_ctrl_ocvc));
    
+   wire 					    free_allocated;
+   
    wire 					    error_ct_overflow;
    
    generate
@@ -1012,7 +1010,7 @@ module vcr_ivc_ctrl
 	     assign flit_sent_count = flit_sent_prev + flit_sent;
 	     
 	     wire [0:num_vcs_per_class-1]   next_free_ocvc;
-	     wire [0:num_vcs_per_class-1]   free_unallocated_ocvc;
+	     wire [0:num_vcs_per_class-1]   free_spec_ocvc;
 	     
 	     genvar 			    ocvc;
 	     
@@ -1040,10 +1038,10 @@ module vcr_ivc_ctrl
 		  // any input VC, so we know that nobody sent a flit to it in 
 		  // the previous cycle.
 		  
-		  wire 	     free_unallocated;
-		  assign free_unallocated = |free;
+		  wire 	     free_spec;
+		  assign free_spec = |free;
 		  
-		  assign free_unallocated_ocvc[ocvc] = free_unallocated;
+		  assign free_spec_ocvc[ocvc] = free_spec;
 		  
 	       end
 	     
@@ -1064,7 +1062,7 @@ module vcr_ivc_ctrl
 	     
 	     assign free_allocated = free_allocated_q;
 	     
-	     assign free_unallocated = |(free_unallocated_ocvc & vc_gnt_ocvc);
+	     assign free_spec = |(free_spec_ocvc & vc_gnt_ocvc);
 	     
 	     assign error_ct_overflow = 1'b0;
 	     
@@ -1112,7 +1110,7 @@ module vcr_ivc_ctrl
 	     
 	     assign free_allocated = has_cred_q;
 	     
-	     assign free_unallocated = cred_unallocated;
+	     assign free_spec = cred_unallocated;
 	     
 	     wire 			  incr_cred_hold;
 	     assign incr_cred_hold
@@ -1158,7 +1156,7 @@ module vcr_ivc_ctrl
    // generate allocator control signals
    //---------------------------------------------------------------------------
    
-   assign sw_req_nonspec = flit_valid & vc_allocated_q;
+   assign sw_req_nonspec = flit_valid & vc_allocated_q & free_allocated;
    
    generate
       

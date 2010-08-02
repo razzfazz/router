@@ -34,8 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_req_ovc, vc_gnt_ovc, vc_gnt_ovc_ip, 
-   vc_gnt_ovc_ivc, sw_alloc_in_ip, sw_alloc_out_ip, int_flit_ctrl_in, 
-   flit_data_in, channel_out, elig_ovc, error);
+   vc_gnt_ovc_ivc, sw_active, sw_gnt_ip, int_flit_ctrl_in, 
+   flit_data_in, channel_out, int_flow_ctrl_ovc, elig_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -142,45 +142,6 @@ module vcr_op_ctrl_mac
        (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
        -1;
    
-   // select implementation variant for switch allocator
-   parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
-   
-   // select which arbiter type to use for switch allocator
-   parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS;
-   
-   // number of bits requires for request signals
-   localparam sw_alloc_req_width
-     = (sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : (1 + 1);
-   
-   // number of bits required for grant signals
-   localparam sw_alloc_gnt_width = sw_alloc_req_width;
-   
-   // width of incoming allocator control signals
-   localparam sw_alloc_in_width
-     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ?
-       sw_alloc_req_width :
-       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
-       (sw_alloc_req_width + sw_alloc_gnt_width) : 
-       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
-	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
-       sw_alloc_gnt_width : 
-       -1;
-   
-   // width of outgoing allocator control signals
-   localparam sw_alloc_out_width
-     = (sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ?
-       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width + 
-	((sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE) ? 1 : 0)) : 
-       (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF) ? 
-       (sw_alloc_gnt_width + num_vcs*int_flow_ctrl_width) : 
-       ((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
-	(sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT)) ? 
-       num_vcs*int_flow_ctrl_width : 
-       -1;
-   
    // ID of current input port
    parameter port_id = 0;
    
@@ -204,182 +165,46 @@ module vcr_op_ctrl_mac
    // input VC that each output VC was granted to
    input [0:num_vcs*num_vcs-1] 	 vc_gnt_ovc_ivc;
    
-   // incoming allocator control signals
-   input [0:num_ports*sw_alloc_in_width-1] sw_alloc_in_ip;
+   // clock enable for switch allocation results
+   input 			 sw_active;
    
-   // outgoing allocator control signals
-   output [0:num_ports*sw_alloc_out_width-1] sw_alloc_out_ip;
-   wire [0:num_ports*sw_alloc_out_width-1]   sw_alloc_out_ip;
+   // was this output granted to an input port?
+   input [0:num_ports-1] 	 sw_gnt_ip;
    
    // incoming flit control signals
-   input [0:int_flit_ctrl_width-1] 	     int_flit_ctrl_in;
+   input [0:int_flit_ctrl_width-1] 	   int_flit_ctrl_in;
    
    // incoming flit data
-   input [0:flit_data_width-1] 		     flit_data_in;
+   input [0:flit_data_width-1] 		   flit_data_in;
    
    // outgoing flit control signals
-   output [0:channel_width-1] 		     channel_out;
-   wire [0:channel_width-1] 		     channel_out;
+   output [0:channel_width-1] 		   channel_out;
+   wire [0:channel_width-1] 		   channel_out;
+   
+   // internal flow control signals to input controllers
+   output [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:num_vcs*int_flow_ctrl_width-1]   int_flow_ctrl_ovc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
-   output [0:num_vcs-1] 		     elig_ovc;
-   wire [0:num_vcs-1] 			     elig_ovc;
+   output [0:num_vcs-1] 		    elig_ovc;
+   wire [0:num_vcs-1] 			    elig_ovc;
    
    // internal error condition detected
-   output 				     error;
-   wire 				     error;
-   
-   
-   //---------------------------------------------------------------------------
-   // pack / unpack switch allocator control signals
-   //---------------------------------------------------------------------------
-   
-   // non-speculative switch allocation requests to output-side arbitration 
-   // stage / wavefront block
-   wire [0:num_ports-1] 		     sw_oreq_nonspec_ip;
-   
-   // any non-speculative requests for this output port?
-   wire 				     sw_oreq_nonspec;
-   assign sw_oreq_nonspec = |sw_oreq_nonspec_ip;
-   
-   // speculative switch allocation requests to output-side arbitration stage or
-   // wavefront block
-   wire [0:num_ports-1] 		     sw_oreq_spec_ip;
-   
-   // any speculative requests for this output port?
-   wire 				     sw_oreq_spec;
-   assign sw_oreq_spec = |sw_oreq_spec_ip;
-   
-   // non-speculative switch allocation grants from output-side arbitration 
-   // stage / wavefront block
-   wire [0:num_ports-1] 		     sw_ognt_nonspec_ip;
-   
-   // speculative switch allocation grants from output-side arbitration stage or
-   // wavefront block
-   wire [0:num_ports-1] 		     sw_ognt_spec_ip;
-   
-   // gobal non-speculative switch allocation grants
-   wire [0:num_ports-1] 		     sw_gnt_nonspec_ip;
-   
-   // global speculative switch allocation grants
-   wire [0:num_ports-1] 		     sw_gnt_spec_ip;
-   
-   // internal flow control signalling from output controller to input 
-   // controllers
-   wire [0:num_vcs*int_flow_ctrl_width-1]    int_flow_ctrl_ovc;
-   
-   // global grant signal
-   wire [0:num_ports-1] 		     sw_gnt_ip;
-   
-   genvar 				     ip;
-   
-   generate
-      
-      for(ip = 0; ip < num_ports; ip = ip + 1)
-	begin:ips
-	   
-	   wire [0:sw_alloc_in_width-1] sw_alloc_in;
-	   assign sw_alloc_in = sw_alloc_in_ip[ip*sw_alloc_in_width:
-					       (ip+1)*sw_alloc_in_width-1];
-	   
-	   wire [0:sw_alloc_out_width-1] sw_alloc_out;
-	   
-	   if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF)
-	     begin
-		
-		assign sw_oreq_nonspec_ip[ip] = sw_alloc_in[0];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_oreq_spec_ip[ip] = sw_alloc_in[1];
-		else
-		  assign sw_oreq_spec_ip[ip] = 1'b0;
-		
-		assign sw_gnt_nonspec_ip[ip] = sw_ognt_nonspec_ip[ip];
-		assign sw_gnt_spec_ip[ip] = sw_ognt_spec_ip[ip];
-		
-		assign sw_alloc_out[0] = sw_ognt_nonspec_ip[ip];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_alloc_out[1] = sw_ognt_spec_ip[ip];
-		
-		assign sw_alloc_out[sw_alloc_gnt_width:
-				    sw_alloc_gnt_width+
-				    num_vcs*int_flow_ctrl_width-1]
-			 = int_flow_ctrl_ovc;
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_alloc_out[sw_alloc_gnt_width+
-				      num_vcs*int_flow_ctrl_width]
-			   = sw_gnt_ip[ip];
-		
-	     end
-	   else if(sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF)
-	     begin
-		
-		assign sw_oreq_nonspec_ip[ip] = sw_alloc_in[0];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_oreq_spec_ip[ip] = sw_alloc_in[1];
-		else
-		  assign sw_oreq_spec_ip[ip] = 1'b0;
-		
-		assign sw_gnt_nonspec_ip[ip] = sw_alloc_in[sw_alloc_req_width];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_gnt_spec_ip[ip] = sw_alloc_in[sw_alloc_req_width+1];
-		else
-		  assign sw_gnt_spec_ip[ip] = 1'b0;
-		
-		assign sw_alloc_out[0] = sw_ognt_nonspec_ip[ip];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_alloc_out[1] = sw_ognt_spec_ip[ip];
-		
-		assign sw_alloc_out[sw_alloc_gnt_width:
-				    sw_alloc_gnt_width+
-				    num_vcs*int_flow_ctrl_width-1]
-			 = int_flow_ctrl_ovc;
-		
-	     end
-	   else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) &&
-		   (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
-	     begin
-		
-		assign sw_oreq_nonspec_ip[ip] = 1'b0;
-		assign sw_oreq_spec_ip[ip] = 1'b0;
-		
-		assign sw_gnt_nonspec_ip[ip] = sw_alloc_in[0];
-		
-		if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-		  assign sw_gnt_spec_ip[ip] = sw_alloc_in[1];
-		else
-		  assign sw_gnt_spec_ip[ip] = 1'b0;
-		
-		assign sw_alloc_out[0:num_vcs*int_flow_ctrl_width-1]
-			 = int_flow_ctrl_ovc;
-		
-	     end
-	   
-	   assign sw_alloc_out_ip[ip*sw_alloc_out_width:
-				  (ip+1)*sw_alloc_out_width-1]
-		    = sw_alloc_out;
-	   
-	end
-      
-   endgenerate
+   output 				    error;
+   wire 				    error;
    
    
    //---------------------------------------------------------------------------
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 			  empty_ovc;
+   wire [0:num_vcs-1] 			    empty_ovc;
    
-   wire 				  flow_ctrl_active;
+   wire 				    flow_ctrl_active;
    assign flow_ctrl_active = ~&empty_ovc;
    
-   wire 				  cred_valid;
-   wire [0:num_vcs-1] 			  cred_sel_ovc;
+   wire 				    cred_valid;
+   wire [0:num_vcs-1] 			    cred_sel_ovc;
    rtr_flow_ctrl_input
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -392,292 +217,18 @@ module vcr_op_ctrl_mac
       .fc_event_valid_out(cred_valid),
       .fc_event_sel_out_ovc(cred_sel_ovc));
    
-   wire [0:num_vcs-1] 			  cred_valid_ovc;
+   wire [0:num_vcs-1] 			    cred_valid_ovc;
    assign cred_valid_ovc = {num_vcs{cred_valid}} & cred_sel_ovc;
    
    
    //---------------------------------------------------------------------------
-   // switch allocation
+   // track switch allocation results
    //---------------------------------------------------------------------------
    
-   generate
-      
-      if((sw_alloc_type == `SW_ALLOC_TYPE_SEP_IF) ||
-	 (sw_alloc_type == `SW_ALLOC_TYPE_SEP_OF))
-	begin
-	   
-	   wire nonspec_arb_active;
-	   assign nonspec_arb_active = sw_oreq_nonspec;
-	   
-	   // any non-speculative grants for this port?
-	   wire sw_gnt_nonspec;
-	   assign sw_gnt_nonspec = |sw_gnt_nonspec_ip;
-	   
-	   // update arbiter priorities
-	   wire update_arb_nonspec;
-	   
-	   case(sw_alloc_type)
-	     
-	     `SW_ALLOC_TYPE_SEP_IF:
-	       begin
-		  
-		  //------------------------------------------------------------
-		  // For the input-first separable allocator, if any requests 
-		  // reach the output stage, they must already have won input-
-		  // side arbitration; consequently, one of them will result in 
-		  // an global grant, and we can thus update arbiter priorities
-		  // whenever we see a request.
-		  //------------------------------------------------------------
-		  
-		  assign update_arb_nonspec = sw_oreq_nonspec;
-		  
-	       end
-	     
-	     `SW_ALLOC_TYPE_SEP_OF:
-	       begin
-		  
-		  //------------------------------------------------------------
-		  // For separable output-first allocation, any grants generated
-		  // by the output stage may subsequently be dropped at the 
-		  // input stage; consequently, we must only update priorities 
-		  // once we know that our grant also won input-side 
-		  // arbitration.
-		  //------------------------------------------------------------
-		  
-		  assign update_arb_nonspec = sw_gnt_nonspec;
-		  
-	       end
-	     
-	   endcase
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // The actual arbitration is identical for the input- and output-
-	   // first cases.
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_ports-1] req_nonspec_ip;
-	   assign req_nonspec_ip = sw_oreq_nonspec_ip;
-	   
-	   wire [0:num_ports-1] gnt_nonspec_ip;
-	   c_arbiter
-	     #(.num_ports(num_ports),
-	       .arbiter_type(sw_alloc_arbiter_type),
-	       .reset_type(reset_type))
-	   gnt_nonspec_ip_arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(nonspec_arb_active),
-	      .update(update_arb_nonspec),
-	      .req(req_nonspec_ip),
-	      .gnt(gnt_nonspec_ip));
-	   
-	   assign sw_ognt_nonspec_ip = gnt_nonspec_ip;
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // speculative switch allocation support
-	   //-------------------------------------------------------------------
-	   
-	   if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-	     begin
-		
-		// arbitrate between speculative requests
-		wire [0:num_ports-1] req_spec_ip;
-		wire [0:num_ports-1] gnt_spec_ip;
-		wire 		     update_arb_spec;
-
-		wire 		     spec_arb_active;
-		assign spec_arb_active = sw_oreq_spec;
-		
-		case(sw_alloc_type)
-		  
-		  `SW_ALLOC_TYPE_SEP_IF:
-		    begin
-		       
-		       //-------------------------------------------------------
-		       // For input-first allocation, any non-speculative 
-		       // requests arriving at the output stage must already 
-		       // have won input-side arbitration, and thus one of them 
-		       // will always be granted; therefore, we can suppress 
-		       // speculative grants and the arbiter state update in 
-		       // this case whenever any non-speculative requests are 
-		       // present. 
-		       // Likewise, the global grants can be formed by 
-		       // combining the non-speculative and speculative output-
-		       // side grants.
-		       //-------------------------------------------------------
-		       
-		       assign update_arb_spec = ~sw_oreq_nonspec & sw_oreq_spec;
-		       
-		       assign sw_ognt_spec_ip
-			 = {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
-		       
-		       assign sw_gnt_ip = sw_ognt_nonspec_ip | sw_ognt_spec_ip;
-		       
-		    end
-		  
-		  `SW_ALLOC_TYPE_SEP_OF:
-		    begin
-		       case(sw_alloc_spec_type)
-			 
-			 `SW_ALLOC_SPEC_TYPE_REQS_MASK_GNTS,
-			 `SW_ALLOC_SPEC_TYPE_REQS_MASK_REQS:
-			   begin
-			      
-			      //------------------------------------------------
-			      // For output-first allocation, on the other hand,
-			      // any given output-side non-speculative grant may
-			      // still fail to win input-side arbitration; 
-			      // however, if we suppress speculative requests 
-			      // based on non-speculative grants, we can still 
-			      // use the same approach as in the input-first 
-			      // case. 
-			      //------------------------------------------------
-			      
-			      assign update_arb_spec
-				= ~sw_oreq_nonspec & sw_oreq_spec;
-			      
-			      assign sw_ognt_spec_ip
-				= {num_ports{~sw_oreq_nonspec}} & gnt_spec_ip;
-			      
-			   end
-			 
-			 `SW_ALLOC_SPEC_TYPE_GNTS_MASK_GNTS,
-			 `SW_ALLOC_SPEC_TYPE_GNTS_MASK_REQS:
-			   begin
-			      
-			      //------------------------------------------------
-			      // For output-first allocation with conflict 
-			      // detection based on non-speculative grants, 
-			      // however, we must check if non-speculative 
-			      // grants also won input-side arbitration before 
-			      // suppressing speculative grants and inhibiting 
-			      // arbiter state updates.
-			      //------------------------------------------------
-			      
-			      assign update_arb_spec
-				= ~sw_gnt_nonspec & |sw_gnt_spec_ip;
-			      
-			      assign sw_ognt_spec_ip
-				= {num_ports{~sw_gnt_nonspec}} & gnt_spec_ip;
-			      
-			   end
-			 
-		       endcase
-		       
-		       //-------------------------------------------------------
-		       // The global grants in this case come from the input-
-		       // side arbitration stage; speculation-related masking is
-		       // performed at the input side.
-		       //-------------------------------------------------------
-		       
-		       assign sw_gnt_ip = sw_gnt_nonspec_ip | sw_gnt_spec_ip;
-		       
-		    end
-		  
-		endcase
-		
-		assign req_spec_ip = sw_oreq_spec_ip;
-		       
-		c_arbiter
-		  #(.num_ports(num_ports),
-		    .arbiter_type(sw_alloc_arbiter_type),
-		    .reset_type(reset_type))
-		gnt_spec_ip_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(spec_arb_active),
-		   .update(update_arb_spec),
-		   .req(req_spec_ip),
-		   .gnt(gnt_spec_ip));
-		
-	     end
-	   else
-	     begin
-		
-		//--------------------------------------------------------------
-		// If speculation is disabled, all speculation-related control
-		// signals are just tied to zero.
-		//--------------------------------------------------------------
-		
-		assign sw_ognt_spec_ip = {num_ports{1'b0}};
-		
-		case(sw_alloc_type)
-		  
-		  `SW_ALLOC_TYPE_SEP_IF:
-		    begin
-		       
-		       //-------------------------------------------------------
-		       // In the separable input-first case, every output-side
-		       // request already succeeded in input-side arbitration, 
-		       // and thus the global grants are just the output-side 
-		       // grants; i.e., we do not need to consider the incoming 
-		       // sw_gnt_*_ip signals.
-		       //-------------------------------------------------------
-		       
-		       assign sw_gnt_ip = sw_ognt_nonspec_ip;
-		       
-		    end
-		  
-		  `SW_ALLOC_TYPE_SEP_OF:
-		    begin
-		       
-		       //-------------------------------------------------------
-		       // In the output-first case, on the other hand, the 
-		       // global grants are generated by the input-side
-		       // arbitration stage.
-		       //-------------------------------------------------------
-		       
-		       assign sw_gnt_ip = sw_gnt_nonspec_ip;
-		       
-		    end
-		  
-		endcase
-		
-	     end
-	   
-	end
-      else if((sw_alloc_type >= `SW_ALLOC_TYPE_WF_BASE) && 
-	      (sw_alloc_type <= `SW_ALLOC_TYPE_WF_LIMIT))
-	begin
-	   
-	   //-------------------------------------------------------------------
-	   // The wavefront allocator does not require any output-side logic. 
-	   // Global grants are generated externally in the wavefront block.
-	   //-------------------------------------------------------------------
-	   
-	   assign sw_ognt_nonspec_ip = {num_ports{1'b0}};
-	   assign sw_ognt_spec_ip = {num_ports{1'b0}};
-	   
-	   if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	     assign sw_gnt_ip = sw_gnt_nonspec_ip;
-	   else
-	     assign sw_gnt_ip = sw_gnt_nonspec_ip | sw_gnt_spec_ip;
-	   
-	end
-      
-   endgenerate
+   wire 				    grant_active;
    
-   wire sw_req;
-   
-   generate
-      
-      if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
-	assign sw_req = sw_oreq_nonspec | sw_oreq_spec;
-      else
-	assign sw_req = sw_oreq_nonspec;
-      
-   endgenerate
-   
-   wire sw_gnt_q;
-   
-   wire grant_active;
-   assign grant_active = sw_req | sw_gnt_q;
-   
-   wire sw_gnt_s;
+   wire 				    sw_gnt_s, sw_gnt_q;
    assign sw_gnt_s = |sw_gnt_ip;
-   
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -688,10 +239,10 @@ module vcr_op_ctrl_mac
       .d(sw_gnt_s),
       .q(sw_gnt_q));
    
-   wire [0:num_ports-1] sw_gnt_ip_s;
-   assign sw_gnt_ip_s = sw_gnt_ip;
+   assign grant_active = sw_active | sw_gnt_q;
    
-   wire [0:num_ports-1] sw_gnt_ip_q;
+   wire [0:num_ports-1] 		    sw_gnt_ip_s, sw_gnt_ip_q;
+   assign sw_gnt_ip_s = sw_gnt_ip;
    c_dff
      #(.width(num_ports),
        .reset_type(reset_type))
@@ -707,26 +258,26 @@ module vcr_op_ctrl_mac
    // output VC control logic
    //---------------------------------------------------------------------------
    
-   wire 		flit_valid_in;
+   wire 				    flit_valid_in;
    assign flit_valid_in = int_flit_ctrl_in[0] & sw_gnt_q;
    
-   wire 		flit_head_in;
+   wire 				    flit_head_in;
    assign flit_head_in = int_flit_ctrl_in[1+vc_idx_width];
    
-   wire 		flit_tail_in;
+   wire 				    flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
    
-   wire [0:num_vcs-1] 	match_ovc;
+   wire [0:num_vcs-1] 			    match_ovc;
    
-   wire 		error_unmatched;
+   wire 				    error_unmatched;
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
-   wire [0:num_vcs-1] 	next_cred_ovc;
-   wire [0:num_vcs*4-1] ovcc_errors_ovc;
+   wire [0:num_vcs-1] 			    next_cred_ovc;
+   wire [0:num_vcs*4-1] 		    ovcc_errors_ovc;
    
    generate
       
-      genvar 		ovc;
+      genvar 				    ovc;
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
