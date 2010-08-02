@@ -450,12 +450,14 @@ module vcr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
-   wire input_stage_active;
-   assign input_stage_active = 1'b1;
+   wire [0:num_vcs-1] fbc_full_ivc;
    
-   wire flit_valid_in;
-   wire flit_head_in;
-   wire flit_tail_in;
+   wire 	      input_stage_active;
+   assign input_stage_active = ~&fbc_full_ivc;
+   
+   wire 	      flit_valid_in;
+   wire 	      flit_head_in;
+   wire 	      flit_tail_in;
    wire [0:flit_data_width-1] flit_data_in;
    wire [0:num_vcs-1] 	      flit_sel_in_ivc;
    rtr_channel_input
@@ -555,6 +557,7 @@ module vcr_ip_ctrl_mac
 	   wire [0:fbf_addr_width-1] 	   fbc_push_addr;
 	   wire [0:fbf_addr_width-1] 	   fbc_pop_addr;
 	   wire 			   fbc_empty;
+	   wire 			   fbc_full;
 	   wire 			   allocated;
 	   wire [0:num_vcs-1] 		   allocated_ovc;
 	   wire 			   free_unallocated;
@@ -612,6 +615,7 @@ module vcr_ip_ctrl_mac
 	      .fbc_push_addr(fbc_push_addr),
 	      .fbc_pop_addr(fbc_pop_addr),
 	      .fbc_empty(fbc_empty),
+	      .fbc_full(fbc_full),
 	      .allocated(allocated),
 	      .allocated_ovc(allocated_ovc),
 	      .free_unallocated(free_unallocated),
@@ -638,6 +642,7 @@ module vcr_ip_ctrl_mac
 				    (ivc+1)*fbf_addr_width-1]
 	     = fbc_pop_addr;
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
+	   assign fbc_full_ivc[ivc] = fbc_full;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
 	     = allocated_ovc;

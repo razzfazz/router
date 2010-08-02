@@ -37,8 +37,8 @@ module vcr_ivc_ctrl
    header_info_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
    flit_sent_prev, flit_head, flit_tail, header_info_out, fbc_push_addr, 
-   fbc_pop_addr, fbc_empty, allocated, allocated_ovc, free_unallocated, 
-   free_allocated, errors);
+   fbc_pop_addr, fbc_empty, fbc_full, allocated, allocated_ovc, 
+   free_unallocated, free_allocated, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -321,6 +321,10 @@ module vcr_ivc_ctrl
    // flit buffer does not have any valid entries
    output 					     fbc_empty;
    wire 					     fbc_empty;
+   
+   // flit buffer is full
+   output 					     fbc_full;
+   wire 					     fbc_full;
    
    // has an output VC been assigned to this input VC?
    output 					     allocated;
@@ -1183,7 +1187,6 @@ module vcr_ivc_ctrl
    
    wire [0:1] 				       fbc_errors;
    wire 				       fbc_almost_full;
-   wire 				       fbc_full;
    c_fifo_ctrl
      #(.depth(num_flits_per_vc),
        .extra_addr_width(fbc_extra_addr_width),
