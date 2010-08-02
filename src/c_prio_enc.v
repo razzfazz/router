@@ -49,7 +49,7 @@ module c_prio_enc
    output [0:width-1] data_out;
    wire [0:width-1] data_out;
 
-   wire [(width+1)*num_ports-1] masks;
+   wire [0:(width+1)*num_ports-1] masks;
    assign masks[0:num_ports-1] = {num_ports{1'b1}};
    
    generate
