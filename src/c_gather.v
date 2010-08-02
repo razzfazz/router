@@ -65,7 +65,6 @@ module c_gather
    
    always @(data_in)
      begin
-	unused = 1'b0;
 	idx2 = 0;
 	for(idx1 = 0; idx1 < in_width; idx1 = idx1 + 1)
 	  if(mask[idx1] == 1'b1)
