@@ -402,7 +402,7 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   
-	   wire route_orc;
+	   wire hop_route_orc;
 	   rtr_routing_logic
 	     #(.num_message_classes(1),
 	       .num_resource_classes(1),
@@ -418,7 +418,7 @@ module whr_ip_ctrl_mac
 	      .sel_irc(1'b1),
 	      .route_info(route_info_in),
 	      .route_op(hop_route_op),
-	      .route_orc(route_orc));
+	      .route_orc(hop_route_orc));
 	   
 	   c_encode
 	     #(.num_ports(num_ports))

@@ -218,7 +218,7 @@ module vcr_sw_alloc_mac
 	   
 	   wire 		active;
 	   assign active
-	     = active_nonspec_op[op] | active_spec_op[op] | |xbr_ctrl_ip;
+	     = active_nonspec_op[op] | active_spec_op[op] | (|xbr_ctrl_ip);
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
 	   assign xbr_ctrl_ip_s = gnt_op_ip[op*num_ports:(op+1)*num_ports-1];

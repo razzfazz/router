@@ -222,7 +222,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			   alloc_active;
-   assign alloc_active = vc_req | |xbr_ctrl_ip;
+   assign alloc_active = vc_req | (|xbr_ctrl_ip);
    
    wire 			   allocated_q;
    

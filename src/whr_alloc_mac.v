@@ -205,7 +205,7 @@ module whr_alloc_mac
 	      .data_out(gnt_tail));
 	   
 	   wire 		xbr_ctrl_active;
-	   assign xbr_ctrl_active = arb_active | |xbr_ctrl_ip;
+	   assign xbr_ctrl_active = arb_active | (|xbr_ctrl_ip);
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
 	   assign xbr_ctrl_ip_s = arb_gnt_ip;

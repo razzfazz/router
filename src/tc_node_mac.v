@@ -494,7 +494,7 @@ module tc_node_mac
    
    wire 					      last_credit_received;
    assign last_credit_received
-     = (~gen_packets & packet_count_zero & ~packet_valid_q & &empty_ovc);
+     = (~gen_packets & packet_count_zero & ~packet_valid_q & (&empty_ovc));
    
    wire 					      running_s, running_q;
    assign running_s = (running_q & ~last_credit_received) | start_q;
