@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
-   sw_gnt_q, sw_gnt_ip_q, int_flit_ctrl, match, elig, empty, int_flow_ctrl, 
-   errors);
+   xbr_ctrl_ip, int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -166,11 +165,8 @@ module vcr_ovc_ctrl
    // input VC that the output VC was granted to
    input [0:num_vcs-1] vc_gnt_ivc;
    
-   // switch allocation produced a grant for this output port
-   input sw_gnt_q;
-   
-   // input port that this output port was granted to during switch allocation
-   input [0:num_ports-1] sw_gnt_ip_q;
+   // was this output granted to an input port?
+   input [0:num_ports-1] xbr_ctrl_ip;
    
    // incoming flit control signals
    input [0:int_flit_ctrl_width-1] int_flit_ctrl;
@@ -203,7 +199,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			  flit_valid;
-   assign flit_valid = int_flit_ctrl[0] & sw_gnt_q;
+   assign flit_valid = int_flit_ctrl[0] & |xbr_ctrl_ip;
    
    wire 			  flit_head;
    assign flit_head = int_flit_ctrl[1+vc_idx_width];
@@ -226,7 +222,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			   alloc_active;
-   assign alloc_active = vc_req | sw_gnt_q;
+   assign alloc_active = vc_req | |xbr_ctrl_ip;
    
    wire 			   allocated_q;
    
@@ -291,7 +287,7 @@ module vcr_ovc_ctrl
 		   .q(allocated_vc_q));
 		
 		assign match = allocated_q &&
-			       |(allocated_ip_q & sw_gnt_ip_q) &&
+			       |(allocated_ip_q & xbr_ctrl_ip) &&
 			       (allocated_vc_q == flit_vc);
 		
 	     end

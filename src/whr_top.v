@@ -206,7 +206,6 @@ module whr_top
    wire [0:num_ports-1] 		  req_tail_ip;
    wire [0:num_ports-1] 		  gnt_ip;
    
-   wire [0:num_ports-1] 		  xbr_active_ip;
    wire [0:num_ports*flit_data_width-1]   xbr_data_in_ip;
    
    wire [0:num_ports-1] 		  ipc_error_ip;
@@ -234,7 +233,6 @@ module whr_top
 	   wire 		    req;
 	   wire 		    req_head;
 	   wire 		    req_tail;
-	   wire 		    xbr_active;
 	   wire [0:flit_data_width-1] flit_data_out;
 	   wire [0:flow_ctrl_width-1] flow_ctrl_out;
 	   wire 		      ipc_error;
@@ -272,7 +270,6 @@ module whr_top
 	      .req_head(req_head),
 	      .req_tail(req_tail),
 	      .gnt(gnt),
-	      .xbr_active(xbr_active),
 	      .flit_data_out(flit_data_out),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
@@ -281,7 +278,6 @@ module whr_top
 	   assign req_ip[ip] = req;
 	   assign req_head_ip[ip] = req_head;
 	   assign req_tail_ip[ip] = req_tail;
-	   assign xbr_active_ip[ip] = xbr_active;
 	   assign xbr_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
 		    = flit_data_out;
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
@@ -338,13 +334,9 @@ module whr_top
    rtr_crossbar_mac
      #(.num_ports(num_ports),
        .width(flit_data_width),
-       .crossbar_type(crossbar_type),
-       .reset_type(reset_type))
+       .crossbar_type(crossbar_type))
    xbr
-     (.clk(clk),
-      .reset(reset),
-      .active_ip(xbr_active_ip),
-      .ctrl_in_op_ip(xbr_ctrl_op_ip),
+     (.ctrl_in_op_ip(xbr_ctrl_op_ip),
       .data_in_ip(xbr_data_in_ip),
       .data_out_op(xbr_data_out_op));
    

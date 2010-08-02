@@ -36,8 +36,8 @@ module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
    vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_req_nonspec_ivc, 
    sw_req_spec_ivc, sw_sel_nonspec_ivc, sw_sel_spec_ivc, sw_gnt_nonspec, 
-   sw_gnt_spec, xbr_active, int_flow_ctrl_op_ovc, int_flit_ctrl_out, 
-   flit_data_out, flow_ctrl_out, error);
+   sw_gnt_spec, int_flow_ctrl_op_ovc, int_flit_ctrl_out, flit_data_out, 
+   flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -276,10 +276,6 @@ module vcr_ip_ctrl_mac
    
    // speculative switch grant
    input 				     sw_gnt_spec;
-   
-   // crossbar enable signal
-   output 				     xbr_active;
-   wire 				     xbr_active;
    
    // internal flow control signals from output controllers
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
@@ -848,8 +844,6 @@ module vcr_ip_ctrl_mac
       .q(flit_tail_out_q));
    
    assign int_flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out_q;
-   
-   assign xbr_active = alloc_active;
    
    
    //---------------------------------------------------------------------------

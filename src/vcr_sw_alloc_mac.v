@@ -33,8 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_sw_alloc_mac
-  (clk, reset, route_ip_ivc_op, active_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip, gnt_op_ip);
+  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip, 
+   xbr_ctrl_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -66,10 +67,6 @@ module vcr_sw_alloc_mac
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
-   // clock enable signals for output controllers
-   output [0:num_ports-1] 		   active_op;
-   wire [0:num_ports-1] 		   active_op;
-   
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] 	   req_nonspec_ip_ivc;
    
@@ -93,8 +90,8 @@ module vcr_sw_alloc_mac
    wire [0:num_ports-1] 		   gnt_spec_ip;
    
    // crossbar control signals
-   output [0:num_ports*num_ports-1] 	   gnt_op_ip;
-   wire [0:num_ports*num_ports-1] 	   gnt_op_ip;
+   output [0:num_ports*num_ports-1] 	   xbr_ctrl_op_ip;
+   wire [0:num_ports*num_ports-1] 	   xbr_ctrl_op_ip;
    
    
    wire [0:num_ports-1] 		   active_nonspec_ip;
@@ -135,14 +132,9 @@ module vcr_sw_alloc_mac
       .data_in(route_ip_ivc_op),
       .data_out(active_spec_op));
    
-   generate
-      
-      if(spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	assign active_op = active_nonspec_op;
-      else
-	assign active_op = active_nonspec_op | active_spec_op;
-      
-   endgenerate
+   wire [0:num_ports*num_ports-1] 	   gnt_op_ip;
+   
+   genvar 				   op;
    
    generate
       
@@ -217,6 +209,33 @@ module vcr_sw_alloc_mac
 	      .gnt_nonspec_ip(gnt_nonspec_ip),
 	      .gnt_spec_ip(gnt_spec_ip),
 	      .gnt_op_ip(gnt_op_ip));
+	end
+      
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
+	   
+	   wire [0:num_ports-1] xbr_ctrl_ip;
+	   
+	   wire 		active;
+	   assign active
+	     = active_nonspec_op[op] | active_spec_op[op] | |xbr_ctrl_ip;
+	   
+	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
+	   assign xbr_ctrl_ip_s = gnt_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   c_dff
+	     #(.width(num_ports),
+	       .reset_type(reset_type))
+	   xbr_ctrl_ipq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(xbr_ctrl_ip_s),
+	      .q(xbr_ctrl_ip_q));
+	   
+	   assign xbr_ctrl_ip = xbr_ctrl_ip_q;
+	   
+	   assign xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1] = xbr_ctrl_ip;
+	   
 	end
       
    endgenerate

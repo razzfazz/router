@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module whr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_op, req, req_head, req_tail, 
-   gnt, xbr_active, flit_data_out, flow_ctrl_out, error);
+   gnt, flit_data_out, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -222,10 +222,6 @@ module whr_ip_ctrl_mac
    
    // output port granted
    input 			 gnt;
-   
-   // crossbar enable signal
-   output 			 xbr_active;
-   wire 			 xbr_active;
    
    // outgoing flit data
    output [0:flit_data_width-1]  flit_data_out;
@@ -923,13 +919,6 @@ module whr_ip_ctrl_mac
    assign req = flit_valid;
    assign req_head = flit_head_out;
    assign req_tail = flit_tail_out;
-   
-   
-   //---------------------------------------------------------------------------
-   // generate control signals to crossbar module
-   //---------------------------------------------------------------------------
-   
-   assign xbr_active = flit_valid;
    
    
    //---------------------------------------------------------------------------

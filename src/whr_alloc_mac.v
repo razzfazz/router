@@ -204,7 +204,22 @@ module whr_alloc_mac
 	      .data_in(req_tail_ip),
 	      .data_out(gnt_tail));
 	   
-	   assign xbr_ctrl_ip = arb_gnt_ip;
+	   wire 		xbr_ctrl_active;
+	   assign xbr_ctrl_active = arb_active | |xbr_ctrl_ip;
+	   
+	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
+	   assign xbr_ctrl_ip_s = arb_gnt_ip;
+	   c_dff
+	     #(.width(num_ports),
+	       .reset_type(reset_type))
+	   xbr_ctrl_ipq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(xbr_ctrl_active),
+	      .d(xbr_ctrl_ip_s),
+	      .q(xbr_ctrl_ip_q));
+	   
+	   assign xbr_ctrl_ip = xbr_ctrl_ip_q;
 	   
 	end
       

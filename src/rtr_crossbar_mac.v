@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_crossbar_mac
-  (clk, reset, active_ip, ctrl_in_op_ip, data_in_ip, data_out_op);
+  (ctrl_in_op_ip, data_in_ip, data_out_op);
    
 `include "c_constants.v"
    
@@ -51,18 +51,10 @@ module rtr_crossbar_mac
    // select implementation variant
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
-   
    
    //---------------------------------------------------------------------------
    // interface
    //---------------------------------------------------------------------------
-   
-   input clk;
-   input reset;
-   
-   // clock enable signals for crosspoint control registers
-   input [0:num_ports-1] active_ip;
    
    // crosspoint control signals
    input [0:num_ports*num_ports-1] ctrl_in_op_ip;
@@ -87,51 +79,13 @@ module rtr_crossbar_mac
      (.data_in(ctrl_in_op_ip),
       .data_out(ctrl_in_ip_op));
    
-   wire [0:num_ports*num_ports-1]  ctrl_ip_op;
-   
-   generate
-      
-      genvar 			   ip;
-      
-      for(ip = 0; ip < num_ports; ip = ip + 1)
-	begin:ips
-	   
-	   // NOTE: We must clear the crossbar control registers after the 
-	   // control signals have been deasserted, so we must keep the 
-	   // registers active for an extra cycle.
-	   
-	   wire granted;
-	   
-	   wire active;
-	   assign active = active_ip[ip] | granted;
-	   
-	   wire [0:num_ports-1] ctrl_op_s, ctrl_op_q;
-	   assign ctrl_op_s = ctrl_in_ip_op[ip*num_ports:(ip+1)*num_ports-1];
-	   c_dff
-	     #(.width(num_ports),
-	       .reset_type(reset_type))
-	   ctrl_opq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(active),
-	      .d(ctrl_op_s),
-	      .q(ctrl_op_q));
-	   
-	   assign granted = |ctrl_op_q;
-	   
-	   assign ctrl_ip_op[ip*num_ports:(ip+1)*num_ports-1] = ctrl_op_q;
-	   
-	end
-      
-   endgenerate
-   
    c_crossbar
      #(.num_in_ports(num_ports),
        .num_out_ports(num_ports),
        .width(width),
        .crossbar_type(crossbar_type))
    xbr
-     (.ctrl_ip_op(ctrl_ip_op),
+     (.ctrl_ip_op(ctrl_in_ip_op),
       .data_in_ip(data_in_ip),
       .data_out_op(data_out_op));
    
