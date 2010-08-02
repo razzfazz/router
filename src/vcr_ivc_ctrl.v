@@ -369,18 +369,21 @@ module vcr_ivc_ctrl
    
    assign allocated = vc_allocated_q;
    
-   wire [0:num_vcs_per_class-1] 		     vc_allocated_ocvc_s,
- 						     vc_allocated_ocvc_q;
-   assign vc_allocated_ocvc_s
-     = vc_allocated_q ? vc_allocated_ocvc_q : vc_gnt_ocvc;
-   
-   wire [0:num_vcs_per_class-1] allocated_ocvc;
+   wire [0:num_vcs_per_class-1] 		     vc_allocated_ocvc;
+   wire [0:num_vcs_per_class-1] 		     vc_allocated_next_ocvc;
+   wire [0:num_vcs_per_class-1] 		     allocated_ocvc;
    
    generate
       
       if(num_vcs_per_class > 1)
 	begin
 	   
+	   assign vc_allocated_next_ocvc
+	     = vc_allocated_q ? vc_allocated_ocvc : vc_gnt_ocvc;
+	   
+	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
+	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
+	   assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
 	   c_dff
 	     #(.width(num_vcs_per_class),
 	       .reset_type(reset_type))
@@ -391,24 +394,24 @@ module vcr_ivc_ctrl
 	      .d(vc_allocated_ocvc_s),
 	      .q(vc_allocated_ocvc_q));
 	   
+	   assign vc_allocated_ocvc = vc_allocated_ocvc_q;
+	   
 	end
       else
 	begin
-	   
-	   assign vc_gnt_ocvc = 1'b1;
-	   assign vc_allocated_ocvc_q = 1'b1;
-	   
+	   assign vc_allocated_next_ocvc = 1'b1;
+	   assign vc_allocated_ocvc = 1'b1;
 	end
       
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
 	   assign flit_sent = sw_gnt_nonspec;
-	   assign allocated_ocvc = vc_allocated_ocvc_q;
+	   assign allocated_ocvc = vc_allocated_ocvc;
 	end
       else
 	begin
 	   assign flit_sent = (vc_gnt & sw_gnt_spec) | sw_gnt_nonspec;
-	   assign allocated_ocvc = vc_allocated_ocvc_s;
+	   assign allocated_ocvc = vc_allocated_next_ocvc;
 	end
       
    endgenerate
@@ -1047,8 +1050,7 @@ module vcr_ivc_ctrl
 	     
 	     wire 	     free_allocated_s, free_allocated_q;
 	     assign free_allocated_s
-	       = |(next_free_ocvc & 
-		   (vc_allocated_q ? vc_allocated_ocvc_q : vc_gnt_ocvc));
+	       = |(next_free_ocvc & vc_allocated_next_ocvc);
 	     c_dff
 	       #(.width(1),
 		 .reset_value(1'b1),
@@ -1062,7 +1064,10 @@ module vcr_ivc_ctrl
 	     
 	     assign free_allocated = free_allocated_q;
 	     
-	     assign free_spec = |(free_spec_ocvc & vc_gnt_ocvc);
+	     if(num_vcs_per_class == 1)
+	       assign free_spec = free_spec_ocvc;
+	     else if(num_vcs_per_class > 1)
+	       assign free_spec = |(free_spec_ocvc & vc_gnt_ocvc);
 	     
 	     assign error_ct_overflow = 1'b0;
 	     
@@ -1078,10 +1083,14 @@ module vcr_ivc_ctrl
 	     assign cred_ocvc = int_flow_ctrl_ocvc;
 	     
 	     wire 			  cred_allocated;
-	     assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc_q);
+	     assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc);
 	     
 	     wire 			  cred_unallocated;
-	     assign cred_unallocated = |(cred_ocvc & vc_gnt_ocvc);
+	     
+	     if(num_vcs_per_class == 1)
+	       assign cred_unallocated = cred_ocvc;
+	     else
+	       assign cred_unallocated = |(cred_ocvc & vc_gnt_ocvc);
 	     
 	     wire [0:cred_hold_width-1]   cred_hold_q;
 	     
