@@ -213,9 +213,6 @@ module vcr_ip_ctrl_mac
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
-   // select implementation variant for VC allocator
-   parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
-   
    // select whether VCs must have credits available in order to be considered 
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
@@ -582,7 +579,6 @@ module vcr_ip_ctrl_mac
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .htff_regfile_type(htff_regfile_type),

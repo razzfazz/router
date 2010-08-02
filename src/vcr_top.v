@@ -482,7 +482,6 @@ module vcr_top
 	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
-	       .vc_alloc_type(vc_alloc_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_type(sw_alloc_type),
 	       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
