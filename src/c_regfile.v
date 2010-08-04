@@ -210,7 +210,7 @@ module c_regfile
 		  endcase
 
 		  assign cell_data[read_port*width:(read_port+1)*width-1]
-		    = cell_data;
+		    = port_cell_data;
 		  
 	       end
 	     
