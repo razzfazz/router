@@ -87,9 +87,6 @@ module whr_top
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // total number of bits required for storing routing information
-   localparam route_info_width = addr_width;
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
