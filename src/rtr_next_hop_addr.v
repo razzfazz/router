@@ -120,24 +120,6 @@ module rtr_next_hop_addr
 	     `CONNECTIVITY_LINE, `CONNECTIVITY_RING:
 	       begin
 		  
-		  wire [0:dim_addr_width-1] dim_addr_plus1;
-		  c_incr
-		    #(.width(dim_addr_width),
-		      .min_value(0),
-		      .max_value(num_routers_per_dim-1))
-		  dim_addr_plus1_incr
-		    (.data_in(curr_dim_addr),
-		     .data_out(dim_addr_plus1));
-		  
-		  wire [0:dim_addr_width-1] dim_addr_minus1;
-		  c_decr
-		    #(.width(dim_addr_width),
-		      .min_value(0),
-		      .max_value(num_routers_per_dim-1))
-		  dim_addr_minus1_decr
-		    (.data_in(curr_dim_addr),
-		     .data_out(dim_addr_minus1));
-		  
 		  // The first port in each dimension connects to smaller 
 		  // neighbors, while the second one connects to larger ones.
 		  
@@ -147,9 +129,60 @@ module rtr_next_hop_addr
 		  wire route_up;
 		  assign route_up = (route_port == dim*2+1);
 		  
-		  assign next_dim_addr = route_down ? dim_addr_minus1 :
-					 route_up ? dim_addr_plus1 : 
-					 curr_dim_addr;
+		  case(connectivity)
+		    
+		    `CONNECTIVITY_LINE:
+		      begin
+			 
+			 // NOTE: In two's complement, +1 is represented by a
+			 // one in the LSB and zeros in all other bits, while
+			 // -1 is represented by ones in all bits (incl. the
+			 // LSB).
+			 
+			 wire [0:dim_addr_width-1] dim_addr_delta;
+			 assign dim_addr_delta[dim_addr_width-1]
+			   = route_down | route_up;
+			 
+			 if(dim_addr_width > 1)
+			   assign dim_addr_delta[0:dim_addr_width-2]
+			     = {(dim_addr_width-1){route_down}};
+			 
+			 // Because there are no wraparound links in line-based
+			 // topologies, we don't have to worry about the cases 
+			 // where an underflow or overflow occurs.
+			 
+			 assign next_dim_addr = curr_dim_addr + dim_addr_delta;
+			 
+		      end
+		    
+		    `CONNECTIVITY_RING:
+		      begin
+			 
+			 wire [0:dim_addr_width-1] dim_addr_plus1;
+			 c_incr
+			   #(.width(dim_addr_width),
+			     .min_value(0),
+			     .max_value(num_routers_per_dim-1))
+			 dim_addr_plus1_incr
+			   (.data_in(curr_dim_addr),
+			    .data_out(dim_addr_plus1));
+			 
+			 wire [0:dim_addr_width-1] dim_addr_minus1;
+			 c_decr
+			   #(.width(dim_addr_width),
+			     .min_value(0),
+			     .max_value(num_routers_per_dim-1))
+			 dim_addr_minus1_decr
+			   (.data_in(curr_dim_addr),
+			    .data_out(dim_addr_minus1));
+			 
+			 assign next_dim_addr = route_down ? dim_addr_minus1 :
+						route_up ? dim_addr_plus1 : 
+						curr_dim_addr;
+			 
+		      end
+		    
+		  endcase
 		  
 	       end
 	     
