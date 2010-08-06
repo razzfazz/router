@@ -88,7 +88,9 @@ module rtr_routing_logic
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
+     = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
+       (num_resource_classes * router_addr_width + node_addr_width) : 
+       -1;
    
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
@@ -139,37 +141,40 @@ module rtr_routing_logic
    // implementation
    //---------------------------------------------------------------------------
    
-   // all router addresses (intermediate + final)
-   wire [0:num_resource_classes*router_addr_width-1] dest_router_addr_irc;
-   assign dest_router_addr_irc
-     = route_info[0:num_resource_classes*router_addr_width-1];
-   
    wire [0:num_resource_classes*num_network_ports-1] route_irc_onp;
-   wire [0:num_resource_classes-1] 		     reached_dest_irc;
-   
-   genvar 					     irc;
+   wire 					     eject;
    
    generate
       
-      for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-	begin:ircs
-	   
-	   // address of destination router for current resource class
-	   wire [0:router_addr_width-1] dest_router_addr;
-	   assign dest_router_addr
-	     = dest_router_addr_irc[irc*router_addr_width:
-				    (irc+1)*router_addr_width-1];
-	   
-	   wire [0:num_network_ports-1] route_onp;
-	   
-	   case(routing_type)
+      case(routing_type)
+	
+	`ROUTING_TYPE_PHASED_DOR:
+	  begin
 	     
-	     `ROUTING_TYPE_PHASED_DOR:
-	       begin
+	     // all router addresses (intermediate + final)
+	     wire [0:num_resource_classes*
+		   router_addr_width-1] dest_router_addr_irc;
+	     assign dest_router_addr_irc
+	       = route_info[0:num_resource_classes*router_addr_width-1];
+	     
+	     wire [0:num_resource_classes-1] reached_dest_irc;
+	     
+	     genvar 			     irc;
+	     
+	     for(irc = 0; irc < num_resource_classes; irc = irc + 1)
+	       begin:ircs
 		  
-		  wire [0:num_dimensions-1] addr_match_d;
+		  // address of destination router for current resource class
+		  wire [0:router_addr_width-1] dest_router_addr;
+		  assign dest_router_addr
+		    = dest_router_addr_irc[irc*router_addr_width:
+					   (irc+1)*router_addr_width-1];
 		  
-		  genvar 		    dim;
+		  wire [0:num_network_ports-1] route_onp;
+		  
+		  wire [0:num_dimensions-1]    addr_match_d;
+		  
+		  genvar 		       dim;
 		  
 		  for(dim = 0; dim < num_dimensions; dim = dim + 1)
 		    begin:dims
@@ -375,13 +380,35 @@ module rtr_routing_logic
 		  
 	       end
 	     
-	   endcase
-	   
-	end
+	     if(num_resource_classes == 1)
+	       begin
+		  assign eject = reached_dest_irc;
+		  assign route_orc = 1'b1;
+	       end
+	     else
+	       begin
+		  
+		  wire [0:num_resource_classes-1] class_done_irc;
+		  assign class_done_irc = sel_irc & reached_dest_irc;
+		  
+		  wire inc_rc;
+		  assign inc_rc = |class_done_irc[0:num_resource_classes-2];
+		  
+		  assign eject = class_done_irc[num_resource_classes-1];
+		  
+		  assign route_orc = inc_rc ?
+				     {1'b0, sel_irc[0:num_resource_classes-2]} :
+				     sel_irc;
+		  
+	       end
+	     
+	  end
+	
+      endcase
       
    endgenerate
    
-   wire [0:num_network_ports-1] 			       route_onp;
+   wire [0:num_network_ports-1] route_onp;
    c_select_1ofn
      #(.num_ports(num_resource_classes),
        .width(num_network_ports))
@@ -392,29 +419,7 @@ module rtr_routing_logic
    
    assign route_op[0:num_network_ports-1] = route_onp;
    
-   wire 						       final_rc;
-   assign final_rc = sel_irc[num_resource_classes-1];
-   
-   wire 						       eject;
-   assign eject = reached_dest_irc[num_resource_classes-1] & final_rc;
-   
    generate
-      
-      if(num_resource_classes == 1)
-	assign route_orc = 1'b1;
-      else
-	begin
-	   
-	   wire reached_dest;
-	   assign reached_dest = |(sel_irc & reached_dest_irc);
-	   
-	   wire inc_rc;
-	   assign inc_rc = reached_dest & ~final_rc;
-	   
-	   assign route_orc
-	     = inc_rc ? {1'b0, sel_irc[0:num_resource_classes-2]} : sel_irc;
-	   
-	end
       
       if(num_nodes_per_router == 1)
 	assign route_op[num_ports-1] = eject;

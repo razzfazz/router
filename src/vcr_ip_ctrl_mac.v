@@ -137,10 +137,6 @@ module vcr_ip_ctrl_mac
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
 
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
-   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -171,6 +167,15 @@ module vcr_ip_ctrl_mac
    localparam la_route_info_width
      = lookahead_routing ? hop_route_info_width : 0;
    
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
+       (num_resource_classes * router_addr_width + node_addr_width) : 
+       -1;
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -178,9 +183,6 @@ module vcr_ip_ctrl_mac
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
-   
-   // select routing function type
-   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;

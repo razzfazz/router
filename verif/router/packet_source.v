@@ -147,10 +147,6 @@ module packet_source
    // width of global addresses
    localparam addr_width = router_addr_width + node_addr_width;
    
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -193,6 +189,15 @@ module packet_source
    localparam la_route_info_width
      = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
    
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
+       (num_resource_classes * router_addr_width + node_addr_width) : 
+       -1;
+   
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -200,9 +205,6 @@ module packet_source
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
-   
-   // select routing function type
-   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;

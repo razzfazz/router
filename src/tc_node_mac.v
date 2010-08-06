@@ -142,10 +142,6 @@ module tc_node_mac
    // total number of bits required to represent maximum packet length
    localparam packet_length_width = clogb(max_packet_length);
    
-   // total number of bits required for storing routing information
-   localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
-   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -176,6 +172,15 @@ module tc_node_mac
    localparam la_route_info_width
      = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
    
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
+   
+   // total number of bits required for storing routing information
+   localparam route_info_width
+     = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
+       (num_resource_classes * router_addr_width + node_addr_width) : 
+       -1;
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -183,9 +188,6 @@ module tc_node_mac
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
-   
-   // select routing function type
-   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;

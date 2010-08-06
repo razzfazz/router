@@ -104,7 +104,9 @@ module testbench
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
+     = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
+       (num_resource_classes * router_addr_width + node_addr_width) : 
+       -1;
    
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width

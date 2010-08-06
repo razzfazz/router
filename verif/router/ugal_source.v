@@ -113,7 +113,9 @@ module ugal_source(/*autoarg*/
    
    // total number of bits required for storing routing information
    localparam route_info_width
-     = num_resource_classes * router_addr_width + node_addr_width;
+     = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
+       (num_resource_classes * router_addr_width + node_addr_width) : 
+       -1;
    
    parameter reset_type 	   = `RESET_TYPE_ASYNC;
 
