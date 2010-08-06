@@ -1258,6 +1258,10 @@ module vcr_ivc_ctrl
 	  $display({"ERROR: Received flit's destination does not match port ",
 		    "constraints in module %m."});
 	
+	if(error_invalid_class)
+	  $display({"ERROR: Received flit's destination does not match class ",
+		    "constraints in module %m."});
+	
      end
    
    // synopsys translate_on
