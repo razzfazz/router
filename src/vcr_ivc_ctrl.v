@@ -1231,8 +1231,6 @@ module vcr_ivc_ctrl
    
    // synopsys translate_off
    
-   integer 				       i;
-   
    always @(posedge clk)
      begin
 	

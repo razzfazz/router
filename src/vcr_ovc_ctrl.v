@@ -657,27 +657,20 @@ module vcr_ovc_ctrl
    
    // synopsys translate_off
    
-   integer 	i;
-   
    always @(posedge clk)
      begin
 	
-	for(i = 0; i < num_vcs; i = i + 1)
-	  begin
-	     
-	     if(error_ct_underflow)
-	       $display("ERROR: Credit tracker underflow in module %m.");
-	     
-	     if(error_ct_overflow)
-	       $display("ERROR: Credit tracker overflow in module %m.");
-	     
-	     if(error_hft_underflow)
-	       $display("ERROR: Head credit tracker underflow in module %m.");
-	     
-	     if(error_hft_overflow)
-	       $display("ERROR: Head credit tracker overflow in module %m.");
-	     
-	  end
+	if(error_ct_underflow)
+	  $display("ERROR: Credit tracker underflow in module %m.");
+	
+	if(error_ct_overflow)
+	  $display("ERROR: Credit tracker overflow in module %m.");
+	
+	if(error_hft_underflow)
+	  $display("ERROR: Head credit tracker underflow in module %m.");
+	
+	if(error_hft_overflow)
+	  $display("ERROR: Head credit tracker overflow in module %m.");
 	
      end
    
