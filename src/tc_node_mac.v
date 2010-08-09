@@ -40,7 +40,6 @@ module tc_node_mac
 `include "c_functions.v"
 `include "c_constants.v"
 `include "rtr_constants.v"
-`include "vcr_constants.v"
 `include "tc_constants.v"
    
    // flit buffer entries per VC
@@ -1055,8 +1054,8 @@ module tc_node_mac
    // flow control interface
    //---------------------------------------------------------------------------
    
-   wire 		      cred_valid_in;
-   wire [0:num_vcs-1] 	      cred_sel_in_ovc;
+   wire 		      fc_event_valid_in;
+   wire [0:num_vcs-1] 	      fc_event_sel_in_ovc;
    rtr_flow_ctrl_input
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -1066,11 +1065,12 @@ module tc_node_mac
       .reset(reset),
       .active(active_q),
       .flow_ctrl_in(flow_ctrl_muxed),
-      .fc_event_valid_out(cred_valid_in),
-      .fc_event_sel_out_ovc(cred_sel_in_ovc));
+      .fc_event_valid_out(fc_event_valid_in),
+      .fc_event_sel_out_ovc(fc_event_sel_in_ovc));
    
-   wire [0:num_vcs-1] 	      cred_valid_in_ovc;
-   assign cred_valid_in_ovc = {num_vcs{cred_valid_in}} & cred_sel_in_ovc;
+   wire [0:num_vcs-1] 	      fc_event_valid_in_ovc;
+   assign fc_event_valid_in_ovc
+     = {num_vcs{fc_event_valid_in}} & fc_event_sel_in_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -1085,7 +1085,7 @@ module tc_node_mac
    assign int_flit_ctrl[1+vc_idx_width] = flit_head_out;
    assign int_flit_ctrl[1+vc_idx_width+1] = flit_tail_out;
    
-   wire [0:num_vcs*4-1] 	  ovcc_errors_ovc;
+   wire [0:num_vcs*4-1] 	  vs_errors_ovc;
    
    genvar 			  ovc;
    
@@ -1108,67 +1108,44 @@ module tc_node_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire next_elig;
-	   assign next_elig = next_elig_ovc[ovc];
+	   wire flit_sent_out;
+	   assign flit_sent_out = flit_sent & sel_ovc[ovc];
 	   
-	   wire sel;
-	   assign sel = sel_opc_rv[ovc / num_vcs_per_class];
+	   wire fc_event_valid_in;
+	   assign fc_event_valid_in = fc_event_valid_in_ovc[ovc];
 	   
-	   wire vc_req;
-	   assign vc_req = packet_valid_q & ~packet_to_self & ~vc_alloc_q & sel;
-	   
-	   wire vc_gnt;
-	   assign vc_gnt = vc_req & next_elig;
-	   
-	   wire cred_valid_in;
-	   assign cred_valid_in = cred_valid_in_ovc[ovc];
-	   
-	   wire match;
 	   wire elig;
 	   wire empty;
-	   wire [0:1] int_flow_ctrl;
-	   wire [0:3] ovcc_errors;
-	   
-	   vcr_ovc_ctrl
+	   wire almost_full;
+	   wire full;
+	   wire [0:3] vs_errors;
+	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
-	       .num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
-	       .packet_format(packet_format),
-	       .vc_id(ovc),
-	       .vc_alloc_requires_credit(1),
-	       .track_vcs_at_output(0),
-	       .int_flow_ctrl_type(`INT_FLOW_CTRL_TYPE_LEVEL),
+	       .flow_ctrl_type(flow_ctrl_type),
 	       .tff_regfile_type(tff_regfile_type),
 	       .reset_type(reset_type))
-	   ovcc
+	   vs
 	     (.clk(clk),
 	      .reset(reset),
-	      .fc_event_valid(cred_valid_in),
-	      .vc_req(vc_req),
-	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ip({num_ports{1'b0}}),
-	      .vc_gnt_ivc({num_vcs{1'b0}}),
-	      .xbr_ctrl_ip(1),
-	      .int_flit_ctrl(int_flit_ctrl),
-	      .match(match),
+	      .active(active_q),
+	      .flit_sent(flit_sent_out),
+	      .flit_head(flit_head_out),
+	      .flit_tail(flit_tail_out),
+	      .fc_event_valid(fc_event_valid_in),
 	      .elig(elig),
 	      .empty(empty),
-	      .int_flow_ctrl(int_flow_ctrl),
-	      .errors(ovcc_errors));
+	      .almost_full(almost_full),
+	      .full(full),
+	      .errors(vs_errors));
 	   
 	   wire       free;
-	   assign free = |int_flow_ctrl;
+	   assign free = ~full;
 	   
 	   assign elig_ovc[ovc] = elig;
 	   assign empty_ovc[ovc] = empty;
 	   assign free_ovc[ovc] = free;
-	   assign ovcc_errors_ovc[ovc*4:(ovc+1)*4-1] = ovcc_errors;
+	   assign vs_errors_ovc[ovc*4:(ovc+1)*4-1] = vs_errors;
 	   
 	end
       
@@ -1867,16 +1844,16 @@ module tc_node_mac
 	for(i = 0; i < num_vcs; i = i + 1)
 	  begin
 	     
-	     if(ovcc_errors_ovc[i*4])
+	     if(vs_errors_ovc[i*4])
 	       $display("ERROR: Credit tracker underflow in module %m.");
 	     
-	     if(ovcc_errors_ovc[i*4+1])
+	     if(vs_errors_ovc[i*4+1])
 	       $display("ERROR: Credit tracker overflow in module %m.");
 	     
-	     if(ovcc_errors_ovc[i*4+2])
+	     if(vs_errors_ovc[i*4+2])
 	       $display("ERROR: Head credit tracker underflow in module %m.");
 	     
-	     if(ovcc_errors_ovc[i*4+3])
+	     if(vs_errors_ovc[i*4+3])
 	       $display("ERROR: Head credit tracker overflow in module %m");
 	     
 	  end
@@ -1891,7 +1868,7 @@ module tc_node_mac
 	begin
 	   
 	   wire [0:num_vcs*4-1] errors_s, errors_q;
-	   assign errors_s = ovcc_errors_ovc;
+	   assign errors_s = vs_errors_ovc;
 	   c_err_rpt
 	     #(.num_errors(num_vcs*4),
 	       .capture_mode(error_capture_mode),

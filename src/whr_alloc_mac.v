@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module whr_alloc_mac
   (clk, reset, route_ip_op, arb_active_op, req_ip, req_head_ip, req_tail_ip, 
-   gnt_ip, gnt_op, gnt_head_op, gnt_tail_op, xbr_ctrl_op_ip, elig_op, cred_op);
+   gnt_ip, gnt_op, gnt_head_op, gnt_tail_op, xbr_ctrl_op_ip, elig_op, full_op);
    
 `include "c_constants.v"
    
@@ -88,8 +88,8 @@ module whr_alloc_mac
    // can output port accept a new packet?
    input [0:num_ports-1] 	    elig_op;
    
-   // can output port accept a new flit?
-   input [0:num_ports-1] 	    cred_op;
+   // is output port full?
+   input [0:num_ports-1] 	    full_op;
    
    
    //---------------------------------------------------------------------------
@@ -127,8 +127,8 @@ module whr_alloc_mac
 	   wire 		elig;
 	   assign elig = elig_op[op];
 	   
-	   wire 		cred;
-	   assign cred = cred_op[op];
+	   wire 		full;
+	   assign full = full_op[op];
 	   
 	   wire [0:num_ports-1] gnt_ip;
 	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
@@ -182,11 +182,11 @@ module whr_alloc_mac
 	      .gnt(arb_gnt_ip));
 	   
 	   // update arbiter priorities any time a new packet is granted
-	   assign arb_update = |(arb_gnt_ip & req_head_ip) & cred;
+	   assign arb_update = |(arb_gnt_ip & req_head_ip) & ~full;
 	   
-	   assign gnt_ip = arb_gnt_ip & {num_ports{cred}};
+	   assign gnt_ip = arb_gnt_ip & {num_ports{~full}};
 	   
-	   assign gnt = arb_gnt & cred;
+	   assign gnt = arb_gnt & ~full;
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_ports),

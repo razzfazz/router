@@ -298,7 +298,7 @@ module whr_top
    wire [0:num_ports-1] 	      gnt_tail_op;
    
    wire [0:num_ports-1] 	      elig_op;
-   wire [0:num_ports-1] 	      cred_op;
+   wire [0:num_ports-1] 	      full_op;
    
    wire [0:num_ports*num_ports-1]     xbr_ctrl_op_ip;
    
@@ -320,7 +320,7 @@ module whr_top
       .gnt_tail_op(gnt_tail_op),
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip),
       .elig_op(elig_op),
-      .cred_op(cred_op));
+      .full_op(full_op));
    
    
    //---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ module whr_top
 	   
 	   wire [0:channel_width-1]   channel_out;
 	   wire 		      elig;
-	   wire 		      cred;
+	   wire 		      full;
 	   wire 		      opc_error;
 	   whr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
@@ -402,14 +402,14 @@ module whr_top
 	      .flit_data_in(flit_data_in),
 	      .channel_out(channel_out),
 	      .elig(elig),
-	      .cred(cred),
+	      .full(full),
 	      .error(opc_error));
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
 	   
 	   assign elig_op[op] = elig;
-	   assign cred_op[op] = cred;
+	   assign full_op[op] = full;
 	   
 	   assign opc_error_op[op] = opc_error;
 	   
