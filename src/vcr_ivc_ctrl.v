@@ -989,19 +989,23 @@ module vcr_ivc_ctrl
 						     int_flow_ctrl_width-1];
    
    wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
-   c_select_1ofn
-     #(.num_ports(num_resource_classes),
-       .width(num_vcs_per_class*int_flow_ctrl_width))
-   int_flow_ctrl_ocvc_sel
-     (.select(route_orc),
-      .data_in(int_flow_ctrl_orc_ocvc),
-      .data_out(int_flow_ctrl_ocvc));
-   
    wire 					    free_allocated;
-   
    wire 					    error_ct_overflow;
    
    generate
+      
+      if(num_resource_classes == 1)
+	assign int_flow_ctrl_ocvc = int_flow_ctrl_orc_ocvc;
+      else if(num_resource_classes > 1)
+	begin
+	   c_select_1ofn
+	     #(.num_ports(num_resource_classes),
+	       .width(num_vcs_per_class*int_flow_ctrl_width))
+	   int_flow_ctrl_ocvc_sel
+	     (.select(route_orc),
+	      .data_in(int_flow_ctrl_orc_ocvc),
+	      .data_out(int_flow_ctrl_ocvc));
+	end
       
       case(int_flow_ctrl_type)
 	

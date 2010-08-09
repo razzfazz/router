@@ -546,7 +546,14 @@ module vcr_ip_ctrl_mac
    
    generate
       
-      if(num_vcs > 1)
+      // if we only have a single VC, just use the address as is
+      if(num_vcs == 1)
+	begin
+	   assign header_info_out = header_info_ivc;
+	   assign fbc_push_addr = fbc_push_addr_ivc;
+	   assign fbc_pop_addr = fbc_pop_addr_ivc;
+	end
+      else if(num_vcs > 1)
 	begin
 	   
 	   c_select_1ofn
@@ -573,14 +580,6 @@ module vcr_ip_ctrl_mac
 	      .data_in(fbc_pop_addr_ivc),
 	      .data_out(fbc_pop_addr));
 	   
-	end
-      
-      // if we only have a single VC, just use the address as is
-      else
-	begin
-	   assign header_info_out = header_info_ivc;
-	   assign fbc_push_addr = fbc_push_addr_ivc;
-	   assign fbc_pop_addr = fbc_pop_addr_ivc;
 	end
       
    endgenerate
@@ -731,9 +730,14 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl_out[0] = flit_valid_out_q;
    
+   wire 			     flit_head_muxed;
+   wire 			     flit_tail_muxed;
+   
    generate
       
-      if(num_vcs > 1)
+      if(num_vcs == 1)
+	assign flit_sent_prev_ivc = flit_valid_out_q;
+      else if(num_vcs > 1)
 	begin
 	   
 	   wire [0:vc_idx_width-1] flit_vc;
@@ -803,22 +807,36 @@ module vcr_ip_ctrl_mac
 	     end
 	   
 	end
-      else
-	assign flit_sent_prev_ivc = flit_valid_out_q;
+      
+      if(num_vcs == 1)
+	begin
+	   assign flit_head_muxed = flit_head_ivc;
+	   assign flit_tail_muxed = flit_tail_ivc;
+	end
+      else if(num_vcs > 1)
+	begin
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_head_muxed_sel
+	     (.select(vc_sel_ivc),
+	      .data_in(flit_head_ivc),
+	      .data_out(flit_head_muxed));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_tail_muxed_sel
+	     (.select(vc_sel_ivc),
+	      .data_in(flit_tail_ivc),
+	      .data_out(flit_tail_muxed));
+	   
+	end
       
    endgenerate
    
-   wire 					  flit_head_muxed;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   flit_head_muxed_sel
-     (.select(vc_sel_ivc),
-      .data_in(flit_head_ivc),
-      .data_out(flit_head_muxed));
-   
-   wire 					  flit_head_out_s, 
-						  flit_head_out_q;
+   wire 				flit_head_out_s, flit_head_out_q;
    assign flit_head_out_s = flit_head_muxed;
    c_dff
      #(.width(1),
@@ -832,17 +850,7 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl_out[1+vc_idx_width] = flit_head_out_q;
    
-   wire 					  flit_tail_muxed;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   flit_tail_muxed_sel
-     (.select(vc_sel_ivc),
-      .data_in(flit_tail_ivc),
-      .data_out(flit_tail_muxed));
-   
-   wire 					  flit_tail_out_s, 
-						  flit_tail_out_q;
+   wire 				flit_tail_out_s, flit_tail_out_q;
    assign flit_tail_out_s = flit_tail_muxed;
    c_dff
      #(.width(1),
