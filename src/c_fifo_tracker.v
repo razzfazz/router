@@ -113,8 +113,8 @@ module c_fifo_tracker
 	   assign full_push = full_q | ~pop;
 	   assign full_nopush = full_q & ~pop;
 	   
-	   assign error_underflow = push & ~pop & full_q;
-	   assign error_overflow = pop & ~push & ~full_q;
+	   assign error_underflow = pop & ~push & ~full_q;
+	   assign error_overflow = push & ~pop & full_q;
 	   
 	   assign almost_full = ~full_q;
 	   assign almost_empty = full_q;
@@ -163,8 +163,8 @@ module c_fifo_tracker
 	   wire 		free_count_max;
 	   assign free_count_max = (free_count_q == (depth - 1));
 	   
-	   assign error_underflow = push & ~pop & full_q;
-	   assign error_overflow = pop & ~push & free_count_max;
+	   assign error_underflow = pop & ~push & free_count_max;
+	   assign error_overflow = push & ~pop & full_q;
 	   
 	   assign almost_full = free_count_zero & ~full_q;
 	   
