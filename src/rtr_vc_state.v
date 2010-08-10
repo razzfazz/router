@@ -146,7 +146,7 @@ module rtr_vc_state
 	     assign track_active = active | ~ft_empty;
 	     
 	     wire ft_debit;
-	     assign ft_debit = flit_sent & (~flit_head | (~pt_full & ~ft_full));
+	     assign ft_debit = flit_sent;
 	     
 	     wire ft_credit;
 	     assign ft_credit = fc_event_valid;
@@ -204,7 +204,7 @@ module rtr_vc_state
 		  // explicitly
 		  
 		  wire pt_debit;
-		  assign pt_debit = flit_sent & flit_head & ~pt_full & ~ft_full;
+		  assign pt_debit = flit_sent & flit_head;
 		  
 		  wire pt_credit;
 		  
@@ -312,14 +312,8 @@ module rtr_vc_state
    // track whether this output VC is currently in use
    //---------------------------------------------------------------------------
    
-   // NOTE: For the reset condition, we don't need to worry about 'pt_full' or 
-   // 'ft_full', as for any flits that are not head flits, these are already 
-   // checked prior to input VC selection; for head flits, 'busy_q' must 
-   // already be zero (as the previous flit must have been a tail flit), so the 
-   // reset condition does not matter.
    wire 					busy_s, busy_q;
-   assign busy_s = (busy_q | (flit_sent & ~pt_full & ~ft_full)) & 
-		   ~(flit_sent & flit_tail);
+   assign busy_s = (busy_q | flit_sent) & ~(flit_sent & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
