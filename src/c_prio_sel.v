@@ -67,6 +67,10 @@ module c_prio_sel
       .data_in(priorities),
       .data_out(prio_some_set));
    
+   // port enable signals
+   wire [0:num_ports-1] 	    enable_b;
+   assign enable_b = ~enable;
+   
    wire [0:prio_width-1] 	    prio_some_unset;
    c_select_mofn
      #(.num_ports(num_ports),
@@ -74,7 +78,7 @@ module c_prio_sel
        .prod_op(`BINARY_OP_OR),
        .sum_op(`BINARY_OP_NAND))
    prio_some_unset_nand
-     (.select(enable),
+     (.select(enable_b),
       .data_in(priorities),
       .data_out(prio_some_unset));
    
