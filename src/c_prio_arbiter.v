@@ -38,17 +38,29 @@ module c_prio_arbiter
 `include "c_functions.v"
 `include "c_constants.v"
    
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
    // number of input ports
    parameter num_ports = 32;
    
    // number of priority levels
    parameter num_priorities = 16;
    
-   // width of priority fields
-   localparam prio_width = clogb(num_priorities);
-   
    // select type of arbiter to use
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // width of priority fields
+   localparam prio_width = clogb(num_priorities);
    
    // width of arbiter internal state
    localparam state_width
@@ -56,7 +68,10 @@ module c_prio_arbiter
        (arbiter_type == `ARBITER_TYPE_MATRIX) ? num_ports*num_ports :
        -1;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
    
    input clk;
    input reset;
@@ -75,7 +90,85 @@ module c_prio_arbiter
    // update port priorities
    input 			    update;
    
+   
+   //---------------------------------------------------------------------------
+   // implementation
+   //---------------------------------------------------------------------------
+   
    wire [0:state_width-1] 	    state;
+   wire [0:num_priorities*num_ports-1] gnt_by_prio;
+   wire [0:num_priorities-1] 	       prio_has_req;
+   
+   
+   //---------------------------------------------------------------------------
+   // priority levels in descending order
+   //---------------------------------------------------------------------------
+   
+   genvar 			       prio;
+   
+   generate
+      
+      for(prio = 0; prio < (num_priorities - 1); prio = prio + 1)
+	begin:prios
+	   
+	   wire [0:num_ports-1] prio_req;
+	   
+	   genvar 		port;
+	   
+	   for(port = 0; port < num_ports; port = port + 1)
+	     begin:ports
+		
+		wire [0:prio_width-1] port_prio;
+		assign port_prio
+		  = priorities[port*prio_width:(port+1)*prio_width-1];
+		
+		assign prio_req[port]
+		  = req[port] && (port_prio >= ((num_priorities - 1) - prio));
+		
+	     end
+	   
+	   wire [0:num_ports-1]       prio_gnt;
+	   
+	   case(arbiter_type)
+	     
+	     `ARBITER_TYPE_ROUND_ROBIN:
+	       begin
+		  
+		  c_rr_arb_logic
+		    #(.num_ports(num_ports))
+		  rr_arb_log
+		    (.state(state),
+		     .req(prio_req),
+		     .gnt(prio_gnt));
+		  
+	       end
+	     
+	     `ARBITER_TYPE_MATRIX:
+	       begin
+		  
+		  c_matrix_arb_logic
+		    #(.num_ports(num_ports))
+		  matrix_arb_log
+		    (.state(state),
+		     .req(prio_req),
+		     .gnt(prio_gnt));
+		  
+	       end
+	     
+	   endcase
+	   
+	   assign gnt_by_prio[prio*num_ports:(prio+1)*num_ports-1] = prio_gnt;
+	   assign prio_has_req[prio] = |prio_req;
+	   
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // lowest priority level and arbiter state
+   //---------------------------------------------------------------------------
+   
    wire [0:num_ports-1] 	    all_gnt;
    
    generate
@@ -132,90 +225,38 @@ module c_prio_arbiter
       
    endgenerate
    
-   wire [0:num_priorities*num_ports-1]  gnt_by_prio;
-   assign gnt_by_prio[0:num_ports-1] = all_gnt;
+   assign gnt_by_prio[(num_priorities-1)*num_ports:num_priorities*num_ports-1]
+     = all_gnt;
    
    // NOTE: The lowest priority level is always treated as active in order to
    // provide a fall-through for the case where no requests are present at all.
    
-   wire [0:num_priorities-1] 	    prio_has_req;
-   assign prio_has_req[0] = 1'b1;
+   assign prio_has_req[num_priorities-1] = 1'b1;
    
-   genvar 			    prio;
+   
+   //---------------------------------------------------------------------------
+   // select grants from highest priority level that has any requests
+   //---------------------------------------------------------------------------
    
    generate
-      
-      for(prio = 1; prio < num_priorities; prio = prio + 1)
-	begin:prios
-	   
-	   wire [0:num_ports-1]     prio_req;
-	   
-	   genvar 		    port;
-	   
-	   for(port = 0; port < num_ports; port = port + 1)
-	     begin:ports
-		
-		wire [0:prio_width-1] port_prio;
-		assign port_prio
-		  = priorities[port*prio_width:(port+1)*prio_width-1];
-		
-		assign prio_req[port] = req[port] && (port_prio >= prio);
-		
-	     end
-	   
-	   wire [0:num_ports-1]       prio_gnt;
-	   
-	   case(arbiter_type)
-	     
-	     `ARBITER_TYPE_ROUND_ROBIN:
-	       begin
-		  
-		  c_rr_arb_logic
-		    #(.num_ports(num_ports))
-		  rr_arb_log
-		    (.state(state),
-		     .req(prio_req),
-		     .gnt(prio_gnt));
-		  
-	       end
-	     
-	     `ARBITER_TYPE_MATRIX:
-	       begin
-		  
-		  c_matrix_arb_logic
-		    #(.num_ports(num_ports))
-		  matrix_arb_log
-		    (.state(state),
-		     .req(prio_req),
-		     .gnt(prio_gnt));
-		  
-	       end
-	     
-	   endcase
-	   
-	   assign gnt_by_prio[prio*num_ports:(prio+1)*num_ports-1] = prio_gnt;
-	   assign prio_has_req[prio] = |prio_req;
-	   
-	end
       
       if(num_priorities == 2)
 	begin
 	   
 	   assign gnt = |(req & priorities) ? 
-			gnt_by_prio[num_ports:2*num_ports-1] : 
-			gnt_by_prio[0:num_ports-1];
+			gnt_by_prio[0:num_ports-1] : 
+			gnt_by_prio[num_ports:2*num_ports-1];
 	   
 	end
       else if(num_priorities > 2)
 	begin
 	   
 	   wire [0:num_priorities-1] prio_sel;
-	   c_fp_arbiter
-	     #(.num_ports(num_priorities),
-	       .descending(1))
-	   prio_sel_arb
-	     (.req(prio_has_req),
-	      .gnt(prio_sel));
+	   c_lod
+	     #(.width(num_priorities))
+	   prio_sel_lod
+	     (.data_in(prio_has_req),
+	      .data_out(prio_sel));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_priorities),
@@ -227,7 +268,16 @@ module c_prio_arbiter
 	   
 	end
       
-      // synopsys translate_off
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // check parameters
+   //---------------------------------------------------------------------------
+   
+   // synopsys translate_off
+   
+   generate
       
       if(arbiter_type == `ARBITER_TYPE_DW_FCFS)
 	begin
@@ -241,8 +291,8 @@ module c_prio_arbiter
 	   
 	end
       
-      // synopsys translate_on
-      
    endgenerate
+   
+   // synopsys translate_on
    
 endmodule

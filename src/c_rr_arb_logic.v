@@ -64,19 +64,19 @@ module c_rr_arb_logic
 	   // qualified grant (w/ priority)
 	   wire [0:num_ports-1] gnt_qual;
 	   assign gnt_qual[0] = 1'b0;
-	   c_fp_arbiter
-	     #(.num_ports(num_ports-1))
-	   gnt_qual_arb
-	     (.req(req_qual[1:num_ports-1]),
-	      .gnt(gnt_qual[1:num_ports-1]));
+	   c_lod
+	     #(.width(num_ports-1))
+	   gnt_qual_lod
+	     (.data_in(req_qual[1:num_ports-1]),
+	      .data_out(gnt_qual[1:num_ports-1]));
 	   
 	   // unqualified grant (ignoring priority)
 	   wire [0:num_ports-1] gnt_unqual;
-	   c_fp_arbiter
-	     #(.num_ports(num_ports))
-	   gnt_unqual_arb
-	     (.req(req),
-	      .gnt(gnt_unqual));
+	   c_lod
+	     #(.width(num_ports))
+	   gnt_unqual_lod
+	     (.data_in(req),
+	      .data_out(gnt_unqual));
 	   
 	   // generate grant vector
 	   assign gnt = |req_qual ? gnt_qual : gnt_unqual;

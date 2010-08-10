@@ -29,66 +29,49 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 //==============================================================================
-// generic fixed-priority arbiter (port 0 has highest priority)
+// leading one detector
 //==============================================================================
 
-module c_fp_arbiter
-  (req, gnt);
-   
-`include "c_constants.v"
+module c_lod
+  (data_in, data_out);
    
    // number of input ports
-   parameter num_ports = 32;
-   
-   // perform arbitration in descending direction (i.e., right-to-left)
-   parameter descending = 0;
+   parameter width = 32;
    
    // vector of requests
-   input [0:num_ports-1] req;
+   input [0:width-1] data_in;
    
    // vector of grants
-   output [0:num_ports-1] gnt;
-   wire [0:num_ports-1]   gnt;
+   output [0:width-1] data_out;
+   wire [0:width-1]   data_out;
    
    generate
       
-      if(num_ports > 1)
+      if(width > 1)
 	begin
-
-	   if(descending)
-	     begin
-		
-		// This finds the first non-zero bit from the right.
-		assign gnt = req & -req;
-		
-	     end
-	   else
-	     begin
-		
-		// If we're interested in finding the finds non-zero bit from 
-		// the left, we must reverse the request and grant vectors.
-		
-		wire [0:num_ports-1] req_rev;
-		c_reverse
-		  #(.width(num_ports))
-		req_rev_revr
-		  (.data_in(req),
-		   .data_out(req_rev));
-		
-		wire [0:num_ports-1] gnt_rev;
-		assign gnt_rev = req_rev & -req_rev;
-		
-		c_reverse
-		  #(.width(num_ports))
-		gnt_revr
-		  (.data_in(gnt_rev),
-		   .data_out(gnt));
-		
-	     end
+	   
+	   // To find the first non-zero bit from the left, we must reverse the 
+	   // input and output vectors.
+	   
+	   wire [0:width-1] data_in_rev;
+	   c_reverse
+	     #(.width(width))
+	   data_in_rev_revr
+	     (.data_in(data_in),
+	      .data_out(data_in_rev));
+	   
+	   wire [0:width-1] data_out_rev;
+	   assign data_out_rev = data_in_rev & -data_in_rev;
+	   
+	   c_reverse
+	     #(.width(width))
+	   data_out_revr
+	     (.data_in(data_out_rev),
+	      .data_out(data_out));
 	   
 	end
       else
-	assign gnt = req;
+	assign data_out = data_in;
       
    endgenerate
    

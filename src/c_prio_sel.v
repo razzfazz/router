@@ -87,11 +87,11 @@ module c_prio_sel
    assign prio_diffs = prio_some_set & prio_some_unset;
    
    wire [0:prio_width-1] 	    first_prio_diff;
-   c_fp_arbiter
-     #(.num_ports(prio_width))
-   first_prio_diff_arb
-     (.req(prio_diffs),
-      .gnt(first_prio_diff));
+   c_lod
+     #(.width(prio_width))
+   first_prio_diff_lod
+     (.data_in(prio_diffs),
+      .data_out(first_prio_diff));
    
    // for each priority bit, list all ports that have this bit set
    wire [0:prio_width*num_ports-1]  prio_ports;
