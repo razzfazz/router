@@ -77,7 +77,7 @@ module testbench
 	
      end
    
-   reg [0:num_ports-1] req;
+   reg [0:num_ports-1] enable;
    reg [0:num_ports*prio_width-1] priorities;
    
    integer 			  i;
@@ -89,7 +89,7 @@ module testbench
 	for(i = 0; i < num_ports; i = i + 1)
 	  begin
 	     
-	     req[i] <= ($dist_uniform(seed, 0, 99) < rate);
+	     enable[i] <= ($dist_uniform(seed, 0, 99) < rate);
 	     priorities[i*prio_width +: prio_width]
 	       <= $dist_uniform(seed, 0, num_priorities - 1);
 	     
@@ -103,14 +103,29 @@ module testbench
        .num_priorities(num_priorities))
    psel
      (.priorities(priorities),
-      .enable(req),
+      .enable(enable),
       .select(sel));
+   
+   reg [0:num_priorities*num_ports-1] req;
+   
+   integer 			      j;
+   
+   always @(enable, priorities)
+     begin
+	
+	for(i = 0; i < num_priorities; i = i + 1)
+	  for(j = 0; j < num_ports; j = j + 1)
+	    req[i*num_ports+j] = enable[j] && 
+		  (priorities[j*prio_width +: prio_width] == 
+		   (num_priorities - 1 - i));
+	
+     end
    
    wire 			  update;
    assign update = |req;
    
    wire [0:num_ports-1] 	  gnt;
-   c_prio_arbiter
+   c_arbiter
      #(.num_ports(num_ports),
        .num_priorities(num_priorities),
        .arbiter_type(arbiter_type),
@@ -120,7 +135,6 @@ module testbench
       .reset(reset),
       .active(1'b1),
       .update(update),
-      .priorities(priorities),
       .req(req),
       .gnt(gnt));
    
@@ -135,12 +149,13 @@ module testbench
 	     
 	     $display($time, " ERROR:");
 	     $display($time, "  sel=%b", sel);
+	     $display($time, "  req=%b", req);
 	     $display($time, "  gnt=%b", gnt);
 	     $display($time, "  err=%b", error);
 	     
 	     for(i = 0; i < num_ports; i = i + 1)
 	       begin
-		  $display($time, " %d = %b %b", i, req[i], 
+		  $display($time, " %d = %b %b", i, enable[i], 
 			   priorities[i*prio_width +: prio_width]);
 	       end
 	     

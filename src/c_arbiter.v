@@ -41,6 +41,9 @@ module c_arbiter
    // number of input ports
    parameter num_ports = 32;
    
+   // number of priority levels
+   parameter num_priorities = 1;
+   
    // number fo bits required to select a port
    localparam port_idx_width = clogb(num_ports);
    
@@ -54,14 +57,14 @@ module c_arbiter
    input active;
    
    // request vector
-   input [0:num_ports-1] req;
+   input [0:num_priorities*num_ports-1] req;
    
    // grant vector
-   output [0:num_ports-1] gnt;
-   wire [0:num_ports-1]   gnt;
+   output [0:num_ports-1] 		gnt;
+   wire [0:num_ports-1] 		gnt;
    
    // update port priorities
-   input 		  update;
+   input 				update;
    
    generate
       
@@ -69,51 +72,53 @@ module c_arbiter
 	`ARBITER_TYPE_ROUND_ROBIN:
 	  begin
 	     
-	     wire [0:num_ports-1] rr_arb_state;
-	     c_rr_arb_logic
-	       #(.num_ports(num_ports))
-	     rr_arb_log
-	       (.state(rr_arb_state),
-		.req(req),
-		.gnt(gnt));
-	     
-	     c_rr_arb_state
+	     c_rr_arbiter
 	       #(.num_ports(num_ports),
+		 .num_priorities(num_priorities),
 		 .reset_type(reset_type))
-	     rr_arb_stat
+	     rr_arb
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.update(update),
+		.req(req),
 		.gnt(gnt),
-		.state(rr_arb_state));
+		.update(update));
 	     
 	  end
 	`ARBITER_TYPE_MATRIX:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] matrix_arb_state;
-	     c_matrix_arb_logic
-	       #(.num_ports(num_ports))
-	     matrix_arb_log
-	       (.state(matrix_arb_state),
-		.req(req),
-		.gnt(gnt));
-	     
-	     c_matrix_arb_state
+	     c_matrix_arbiter
 	       #(.num_ports(num_ports),
+		 .num_priorities(num_priorities),
 		 .reset_type(reset_type))
-	     matrix_arb_stat
+	     matrix_arb
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.update(update),
+		.req(req),
 		.gnt(gnt),
-		.state(matrix_arb_state));
+		.update(update));
 	     
 	  end
 	`ARBITER_TYPE_DW_FCFS:
 	  begin
+	     
+	     // synopsys translate_off
+	     
+	     if(num_priorities > 1)
+	       begin
+		  
+		  initial
+		    begin
+		       $display({"ERROR: DesignWare FCFS arbiter does not ", 
+				 "support multiple priorities."});
+		       $stop;
+		    end
+		  
+	       end
+	     
+	     // synopsys translate_on
 	     
 	     if(num_ports > 1)
 	       begin

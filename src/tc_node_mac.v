@@ -981,17 +981,14 @@ module tc_node_mac
 		
 		assign elig_opc[opc] = |elig_ocvc;
 		
-		wire [0:num_vcs_per_class-1] prio_ocvc;
-		assign prio_ocvc = empty_ocvc;
+		wire [0:2*num_vcs_per_class-1] req_ocvc;
+		assign req_ocvc = {elig_ocvc & empty_ocvc, elig_ocvc};
 		
-		wire [0:num_vcs_per_class-1] req_ocvc;
-		assign req_ocvc = elig_ocvc;
-		
-		wire 			     update;
+		wire 			       update;
 		assign update = flit_sent & flit_head_out;
 		
-		wire [0:num_vcs_per_class-1] gnt_ocvc;
-		c_prio_arbiter
+		wire [0:num_vcs_per_class-1]   gnt_ocvc;
+		c_arbiter
 		  #(.num_ports(num_vcs_per_class),
 		    .num_priorities(2),
 		    .arbiter_type(`ARBITER_TYPE_ROUND_ROBIN),
@@ -1000,17 +997,16 @@ module tc_node_mac
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(active_q),
-		   .priorities(prio_ocvc),
 		   .req(req_ocvc),
 		   .gnt(gnt_ocvc),
 		   .update(update));
 		
-		wire [0:num_vcs_per_class-1] next_elig_ocvc;
+		wire [0:num_vcs_per_class-1]   next_elig_ocvc;
 		assign next_elig_ocvc = gnt_ocvc;
 		
 		assign next_elig_ovc[opc*num_vcs_per_class:
 				     (opc+1)*num_vcs_per_class-1]
-			 = next_elig_ocvc;
+		  = next_elig_ocvc;
 		
 	     end
 	   
