@@ -458,7 +458,9 @@ module vcr_sw_alloc_wf
    c_mat_mult
      #(.dim1_width(num_ports),
        .dim2_width(1),
-       .dim3_width(num_ports))
+       .dim3_width(num_ports),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
    spec_mask_ip_op_mmult
      (.input_a(unused_by_nonspec_ip),
       .input_b(unused_by_nonspec_op),

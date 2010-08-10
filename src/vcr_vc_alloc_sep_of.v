@@ -346,7 +346,9 @@ module vcr_vc_alloc_sep_of
 			    #(.dim1_width(num_ports),
 			      .dim2_width(1),
 			      .dim3_width(num_resource_classes*
-					  num_vcs_per_class))
+					  num_vcs_per_class),
+			      .prod_op(`BINARY_OP_AND),
+			      .sum_op(`BINARY_OP_OR))
 			  gnt_in_op_orc_ocvc_mmult
 			    (.input_a(route_op),
 			     .input_b(gnt_in_orc_ocvc),

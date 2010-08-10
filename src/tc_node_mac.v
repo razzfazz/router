@@ -704,7 +704,9 @@ module tc_node_mac
    c_mat_mult
      #(.dim1_width(num_message_classes),
        .dim2_width(1),
-       .dim3_width(num_resource_classes))
+       .dim3_width(num_resource_classes),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
    sel_opc_rv_mmult
      (.input_a(sel_mc_rv),
       .input_b(sel_orc_rv),
@@ -721,7 +723,9 @@ module tc_node_mac
    c_mat_mult
      #(.dim1_width(num_packet_classes),
        .dim2_width(1),
-       .dim3_width(num_vcs_per_class))
+       .dim3_width(num_vcs_per_class),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
    sel_ovc_mmult
      (.input_a(sel_opc_rv),
       .input_b(sel_ocvc),

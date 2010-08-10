@@ -334,7 +334,9 @@ module router_checker
 	   c_mat_mult
 	     #(.dim1_width(num_resource_classes),
 	       .dim2_width(1),
-	       .dim3_width(num_vcs_per_class))
+	       .dim3_width(num_vcs_per_class),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
 	   sel_orc_ocvc_mmult
 	     (.input_a(sel_orc),
 	      .input_b({num_vcs_per_class{1'b1}}),
@@ -344,7 +346,9 @@ module router_checker
 	   c_mat_mult
 	     #(.dim1_width(num_message_classes),
 	       .dim2_width(1),
-	       .dim3_width(num_resource_classes*num_vcs_per_class))
+	       .dim3_width(num_resource_classes*num_vcs_per_class),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
 	   route_ovc_mmult
 	     (.input_a(sel_mc),
 	      .input_b(sel_orc_ocvc),

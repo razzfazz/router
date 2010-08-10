@@ -98,7 +98,9 @@ module vcr_sw_alloc_mac
    c_mat_mult
      #(.dim1_width(num_ports),
        .dim2_width(num_vcs),
-       .dim3_width(1))
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
    active_nonspec_ip_mmult
      (.input_a(req_nonspec_ip_ivc),
       .input_b({num_vcs{1'b1}}),
@@ -108,7 +110,9 @@ module vcr_sw_alloc_mac
    c_mat_mult
      #(.dim1_width(num_ports),
        .dim2_width(num_vcs),
-       .dim3_width(1))
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
    active_spec_ip_mmult
      (.input_a(req_spec_ip_ivc),
       .input_b({num_vcs{1'b1}}),
