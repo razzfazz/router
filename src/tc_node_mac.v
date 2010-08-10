@@ -727,6 +727,9 @@ module tc_node_mac
       .input_b(sel_ocvc),
       .result(sel_ovc));
    
+   wire 					      flit_sent;
+   wire 					      flit_head_out;
+   
    wire [0:num_vcs-1] 				      elig_ovc;
    wire [0:num_packet_classes-1] 		      elig_opc;
    wire [0:num_resource_classes-1] 		      elig_orc;
@@ -968,17 +971,35 @@ module tc_node_mac
 		assign elig_ocvc = elig_ovc[opc*num_vcs_per_class:
 					    (opc+1)*num_vcs_per_class-1];
 		
+		wire [0:num_vcs_per_class-1] empty_ocvc;
+		assign empty_ocvc = empty_ovc[opc*num_vcs_per_class:
+					      (opc+1)*num_vcs_per_class-1];
+		
 		assign elig_opc[opc] = |elig_ocvc;
+		
+		wire [0:num_vcs_per_class-1] prio_ocvc;
+		assign prio_ocvc = empty_ocvc;
 		
 		wire [0:num_vcs_per_class-1] req_ocvc;
 		assign req_ocvc = elig_ocvc;
 		
+		wire 			     update;
+		assign update = flit_sent & flit_head_out;
+		
 		wire [0:num_vcs_per_class-1] gnt_ocvc;
-		c_fp_arbiter
-		  #(.num_ports(num_vcs_per_class))
+		c_prio_arbiter
+		  #(.num_ports(num_vcs_per_class),
+		    .num_priorities(2),
+		    .arbiter_type(`ARBITER_TYPE_ROUND_ROBIN),
+		    .reset_type(reset_type))
 		gnt_ocvc_arb
-		  (.req(req_ocvc),
-		   .gnt(gnt_ocvc));
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active_q),
+		   .priorities(prio_ocvc),
+		   .req(req_ocvc),
+		   .gnt(gnt_ocvc),
+		   .update(update));
 		
 		wire [0:num_vcs_per_class-1] next_elig_ocvc;
 		assign next_elig_ocvc = gnt_ocvc;
@@ -1030,7 +1051,6 @@ module tc_node_mac
       .flit_sel_out_ivc(flit_sel_in_ivc));
    
    wire 		      flit_valid_out;
-   wire 		      flit_head_out;
    wire 		      flit_tail_out;
    wire [0:flit_data_width-1] flit_data_out;
    rtr_channel_output
@@ -1077,7 +1097,6 @@ module tc_node_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
-   wire flit_sent;
    wire packet_to_self;
    
    wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
