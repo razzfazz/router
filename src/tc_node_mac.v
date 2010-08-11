@@ -1133,6 +1133,9 @@ module tc_node_mac
 	   wire flit_sent_out;
 	   assign flit_sent_out = flit_sent & sel_ovc[ovc];
 	   
+	   wire vc_gnt;
+	   assign vc_gnt = flit_sent_out & flit_head_out;
+	   
 	   wire fc_event_valid_in;
 	   assign fc_event_valid_in = fc_event_valid_in_ovc[ovc];
 	   
@@ -1151,6 +1154,7 @@ module tc_node_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(active_q),
+	      .vc_gnt(vc_gnt),
 	      .flit_sent(flit_sent_out),
 	      .flit_head(flit_head_out),
 	      .flit_tail(flit_tail_out),

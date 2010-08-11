@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_vc_state
-  (clk, reset, active, flit_sent, flit_head, flit_tail, fc_event_valid, elig, 
-   empty, almost_full, full, errors);
+  (clk, reset, active, vc_gnt, flit_sent, flit_head, flit_tail, fc_event_valid, 
+   elig, empty, almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -83,6 +83,9 @@ module rtr_vc_state
    
    // clock enable signal
    input active;
+   
+   // VC was allocated
+   input vc_gnt;
    
    // a flit was sent
    input flit_sent;
@@ -313,7 +316,7 @@ module rtr_vc_state
    //---------------------------------------------------------------------------
    
    wire 					busy_s, busy_q;
-   assign busy_s = (busy_q | flit_sent) & ~(flit_sent & flit_tail);
+   assign busy_s = (busy_q | vc_gnt) & ~(flit_sent & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
