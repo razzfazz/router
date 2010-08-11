@@ -28,9 +28,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-
+//==============================================================================
 // switch allocator variant using wavefront allocation
+//==============================================================================
+
 module vcr_sw_alloc_wf
   (clk, reset, active_nonspec_ip, active_spec_ip, route_ip_ivc_op, 
    req_nonspec_ip_ivc, req_spec_ip_ivc, sel_nonspec_ip_ivc, sel_spec_ip_ivc, 
