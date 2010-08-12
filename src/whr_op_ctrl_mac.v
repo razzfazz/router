@@ -263,9 +263,6 @@ module whr_op_ctrl_mac
    // track state of downstream buffer
    //---------------------------------------------------------------------------
    
-   wire 		       vc_gnt;
-   assign vc_gnt = gnt & gnt_head;
-   
    wire 		       almost_full;
    wire [0:3] 		       vs_errors;
    rtr_vc_state
@@ -278,9 +275,7 @@ module whr_op_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(arb_active),
-      .vc_gnt(vc_gnt),
       .flit_sent(gnt),
-      .flit_head(gnt_head),
       .flit_tail(gnt_tail),
       .fc_event_valid(fc_event_valid),
       .elig(elig),

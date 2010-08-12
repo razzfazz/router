@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_vc_state
-  (clk, reset, active, vc_gnt, flit_sent, flit_head, flit_tail, fc_event_valid, 
-   elig, empty, almost_full, full, errors);
+  (clk, reset, active, flit_sent, flit_tail, fc_event_valid, elig, empty, 
+   almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -84,14 +84,8 @@ module rtr_vc_state
    // clock enable signal
    input active;
    
-   // VC was allocated
-   input vc_gnt;
-   
    // a flit was sent
    input flit_sent;
-   
-   // sent flit was a head flit
-   input flit_head;
    
    // sent flit was a tail flit
    input flit_tail;
@@ -124,8 +118,11 @@ module rtr_vc_state
    // implementation
    //---------------------------------------------------------------------------
    
-   wire 	ft_full;
+   wire 	allocated;
    wire 	pt_full;
+   wire 	ft_full;
+   
+   assign elig = ~allocated & ~pt_full & ~ft_full;
    
    wire 	error_ft_underflow;
    wire 	error_ft_overflow;
@@ -207,7 +204,7 @@ module rtr_vc_state
 		  // explicitly
 		  
 		  wire pt_debit;
-		  assign pt_debit = flit_sent & flit_head;
+		  assign pt_debit = flit_sent & ~allocated;
 		  
 		  wire pt_credit;
 		  
@@ -315,19 +312,19 @@ module rtr_vc_state
    // track whether this output VC is currently in use
    //---------------------------------------------------------------------------
    
-   wire 					busy_s, busy_q;
-   assign busy_s = (busy_q | vc_gnt) & ~(flit_sent & flit_tail);
+   wire 					allocated_s, allocated_q;
+   assign allocated_s = (allocated | flit_sent) & ~(flit_sent & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   busyq
+   allocatedq
      (.clk(clk),
       .reset(reset),
       .active(active),
-      .d(busy_s),
-      .q(busy_q));
+      .d(allocated_s),
+      .q(allocated_q));
    
-   assign elig = ~busy_q & ~pt_full & ~ft_full;
+   assign allocated = allocated_q;
    
    
    //---------------------------------------------------------------------------
