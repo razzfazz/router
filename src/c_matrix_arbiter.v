@@ -62,7 +62,7 @@ module c_matrix_arbiter
    generate
       
       if(num_ports == 1)
-	assign gnt = req;
+	assign gnt = |req;
       else if(num_ports > 1)
 	begin
 	   
