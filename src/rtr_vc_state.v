@@ -146,7 +146,7 @@ module rtr_vc_state
 	     assign track_active = active | ~ft_empty;
 	     
 	     wire ft_debit;
-	     assign ft_debit = flit_sent;
+	     assign ft_debit = flit_sent & (allocated | (~pt_full & ~ft_full));
 	     
 	     wire ft_credit;
 	     assign ft_credit = fc_event_valid;
@@ -204,7 +204,7 @@ module rtr_vc_state
 		  // explicitly
 		  
 		  wire pt_debit;
-		  assign pt_debit = flit_sent & ~allocated;
+		  assign pt_debit = flit_sent & elig;
 		  
 		  wire pt_credit;
 		  
@@ -312,8 +312,16 @@ module rtr_vc_state
    // track whether this output VC is currently in use
    //---------------------------------------------------------------------------
    
+   // NOTE: For the reset condition, we don't have to worry about whether or
+   // not sufficient buffer space is available: If the VC is currently 
+   // allocated, these checks would already have been performed at the 
+   // beginning of switch allocation; on the other hand, if it is not currently 
+   // allocated, 'allocated_q' is zero, and thus the reset condition does not 
+   // have any effect.
+   
    wire 					allocated_s, allocated_q;
-   assign allocated_s = (allocated | flit_sent) & ~(flit_sent & flit_tail);
+   assign allocated_s = (allocated | (flit_sent & ~pt_full & ~ft_full)) & 
+			~(flit_sent & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
