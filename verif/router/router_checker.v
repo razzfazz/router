@@ -189,6 +189,12 @@ module router_checker
    
    wire [0:num_ports*num_vcs*num_ports-1] match_ip_ivc_op;
    
+   wire [0:num_ports-1] 		  flit_valid_out_op;
+   wire [0:num_ports-1] 		  flit_head_out_op;
+   wire [0:num_ports-1] 		  flit_tail_out_op;
+   wire [0:num_ports*flit_data_width-1]   flit_data_out_op;
+   wire [0:num_ports*num_vcs-1] 	  flit_sel_out_op_ovc;
+   
    wire [0:num_ports*num_vcs-1] 	  ref_valid_ip_ivc;
    wire [0:num_ports*num_vcs-1] 	  ref_head_ip_ivc;
    wire [0:num_ports*num_vcs-1] 	  ref_tail_ip_ivc;
@@ -565,34 +571,22 @@ module router_checker
 		
 		// extract observed bit patterns
 		
-		wire [0:channel_width-1]   check_channel;
-		assign check_channel
-		  = channel_out_op[ref_port*channel_width +: channel_width];
-		
 		wire 			   check_valid;
+		assign check_valid = flit_valid_out_op[ref_port];
+		
 		wire 			   check_head;
+		assign check_head = flit_head_out_op[ref_port];
+		
 		wire 			   check_tail;
+		assign check_tail = flit_tail_out_op[ref_port];
+		
 		wire [0:flit_data_width-1] check_data;
-		wire [0:num_vcs-1] 	   check_sel_ivc;
-		rtr_channel_input
-		  #(.num_vcs(num_vcs),
-		    .packet_format(packet_format),
-		    .max_payload_length(max_payload_length),
-		    .min_payload_length(min_payload_length),
-		    .la_route_info_width(la_route_info_width),
-		    .route_info_width(route_info_width),
-		    .flit_data_width(flit_data_width),
-		    .reset_type(reset_type))
-		chi
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .channel_in(check_channel),
-		   .flit_valid_out(check_valid),
-		   .flit_head_out(check_head),
-		   .flit_tail_out(check_tail),
-		   .flit_data_out(check_data),
-		   .flit_sel_out_ivc(check_sel_ivc));
+		assign check_data = flit_data_out_op[ref_port*flit_data_width +:
+						     flit_data_width];
+		
+		wire [0:num_vcs-1] 	   check_sel_ovc;
+		assign check_sel_ovc = flit_sel_out_op_ovc[ref_port*num_vcs +:
+							   num_vcs];
 		
 		wire 			     match_data;
 		assign match_data = (ref_data == check_data);
@@ -604,7 +598,7 @@ module router_checker
 		assign match_tail = (ref_tail == check_tail);
 		
 		wire 			     match_vcs;
-		assign match_vcs = |(ref_sel_ovc & check_sel_ivc);
+		assign match_vcs = |(ref_sel_ovc & check_sel_ovc);
 		
 		// check only if output is active and FIFO contains data
 		assign match = check_valid & ~rff_empty & 
@@ -643,60 +637,38 @@ module router_checker
 		
 	     end
 	   
-	   if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
-	     begin
-		
-		// synopsys translate_off
-		
-		integer i;
-		
-		always @(posedge clk)
-		  begin
-		     
-		     for(i = 0; i < num_vcs; i = i + 1)
-		       begin
-			  
-			  if(rff_errors_ivc[i*2])
-			    $display({"ERROR: Reference FIFO underflow at ", 
-				      "port %d, VC %d."}, ip, i);
-			  
-			  if(rff_errors_ivc[i*2+1])
-			    $display({"ERROR: Reference FIFO overflow at ", 
-				      "port %d, VC %d."}, ip, i);
-			  
-		       end
-		     
-		  end
-		// synopsys translate_on
-		
-		wire [0:num_vcs*2-1] errors_s, errors_q;
-		assign errors_s = rff_errors_ivc;
-		c_err_rpt
-		  #(.num_errors(num_vcs*2),
-		    .capture_mode(error_capture_mode),
-		    .reset_type(reset_type))
-		chk
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .errors_in(errors_s),
-		   .errors_out(errors_q));
-		
-		assign rff_errors_ip[ip] = |errors_q;
-		
-	     end
-	   else
-	     assign rff_errors_ip[ip] = 1'b0;
+	   // synopsys translate_off
 	   
+	   integer 			     i;
+	   
+	   always @(posedge clk)
+	   begin
+	      
+	      for(i = 0; i < num_vcs; i = i + 1)
+		begin
+		   
+		   if(rff_errors_ivc[i*2])
+		     $display({"ERROR: Reference FIFO underflow at port %d, ", 
+			       "VC %d."}, ip, i);
+		   
+		   if(rff_errors_ivc[i*2+1])
+		     $display({"ERROR: Reference FIFO overflow at port %d, ", 
+			       "VC %d."}, ip, i);
+		   
+		end
+	      
+	   end
+	   
+	   // synopsys translate_on
+	   
+	   assign rff_errors_ip[ip] = |rff_errors_ivc;
 	   
 	end
       
    endgenerate
    
-   wire [0:num_ports-1] 	   flit_valid_out_op;
-   
    // summary signal indicating if any input VC matched the flit at each output
-   wire [0:num_ports-1] 	   match_op;
+   wire [0:num_ports-1] match_op;
    c_binary_op
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports),
@@ -706,12 +678,12 @@ module router_checker
       .data_out(match_op));
    
    // unmatched flits indicate something went wrong
-   wire [0:num_ports-1] 	   check_error_op;
+   wire [0:num_ports-1] check_error_op;
    assign check_error_op = (flit_valid_out_op & ~match_op);
    
-   wire [0:num_ports-1] 	   x_error_op;
+   wire [0:num_ports-1] x_error_op;
    
-   genvar 			   op;
+   genvar 		op;
    
    generate
       
@@ -726,7 +698,7 @@ module router_checker
 	   wire 		    flit_head_out;
 	   wire 		    flit_tail_out;
 	   wire [0:flit_data_width-1] flit_data_out;
-	   wire [0:num_vcs-1] 	      flit_sel_out_ivc;
+	   wire [0:num_vcs-1] 	      flit_sel_out_ovc;
 	   rtr_channel_input
 	     #(.num_vcs(num_vcs),
 	       .packet_format(packet_format),
@@ -745,9 +717,15 @@ module router_checker
 	      .flit_head_out(flit_head_out),
 	      .flit_tail_out(flit_tail_out),
 	      .flit_data_out(flit_data_out),
-	      .flit_sel_out_ivc(flit_sel_out_ivc));
+	      .flit_sel_out_ivc(flit_sel_out_ovc));
 	   
 	   assign flit_valid_out_op[op] = flit_valid_out;
+	   assign flit_head_out_op[op] = flit_head_out;
+	   assign flit_tail_out_op[op] = flit_tail_out;
+	   assign flit_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1]
+		    = flit_data_out;
+	   assign flit_sel_out_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
+		    = flit_sel_out_ovc;
 	   
 	   wire 			x_error;
 	   assign x_error
@@ -756,7 +734,7 @@ module router_checker
 		((flit_head_out === 1'bx) ||
 		 (flit_tail_out === 1'bx) ||
 		 (^flit_data_out === 1'bx) ||
-		 (^flit_sel_out_ivc === 1'bx)));
+		 (^flit_sel_out_ovc === 1'bx)));
 
 	   assign x_error_op[op] = x_error;
 	   
@@ -772,7 +750,7 @@ module router_checker
 		     $display("head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_head_out,
 			      flit_tail_out,
-			      flit_sel_out_ivc,
+			      flit_sel_out_ovc,
 			      flit_data_out);
 		     $display("expected flits:");
 		     for(x = 0; x < num_ports*num_vcs; x = x + 1)
@@ -797,7 +775,7 @@ module router_checker
 			      flit_valid_out,
 			      flit_head_out,
 			      flit_tail_out,
-			      flit_sel_out_ivc,
+			      flit_sel_out_ovc,
 			      flit_data_out);
 		  end
 	     end
