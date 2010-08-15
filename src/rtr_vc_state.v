@@ -146,7 +146,7 @@ module rtr_vc_state
 	     assign track_active = active | ~ft_empty;
 	     
 	     wire ft_debit;
-	     assign ft_debit = flit_sent & (allocated | (~pt_full & ~ft_full));
+	     assign ft_debit = flit_sent;
 	     
 	     wire ft_credit;
 	     assign ft_credit = fc_event_valid;
@@ -204,7 +204,7 @@ module rtr_vc_state
 		  // explicitly
 		  
 		  wire pt_debit;
-		  assign pt_debit = flit_sent & elig;
+		  assign pt_debit = flit_sent & ~allocated;
 		  
 		  wire pt_credit;
 		  
@@ -320,8 +320,7 @@ module rtr_vc_state
    // have any effect.
    
    wire 					allocated_s, allocated_q;
-   assign allocated_s = (allocated | (flit_sent & ~pt_full & ~ft_full)) & 
-			~(flit_sent & flit_tail);
+   assign allocated_s = (allocated | flit_sent) & ~(flit_sent & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
