@@ -562,6 +562,7 @@ module rtr_alloc_mac
 			   .data_out(full));
 		     end
 		   
+		   
 		   // we need to track credits even when we temporarily run out 
 		   // of flits; otherwise, there can be a dead cycle when a new 
 		   // flit arrives after the last flit before we ran out 
@@ -880,7 +881,7 @@ module rtr_alloc_mac
 	      assign allocated = |req_hi_ip;
 	      
 	      wire [0:num_vcs-1]   mask_ovc;
-	      assign mask_ovc = allocated ? ~ovs_full_ovc : nvs_next_elig_ovc;
+	      assign mask_ovc = {num_vcs{allocated}} | nvs_next_elig_ovc;
 	      
 	      assign oal_flit_sel_ovc = flit_sel_ovc & mask_ovc;
 	      
