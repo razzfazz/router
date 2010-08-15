@@ -226,6 +226,50 @@ module router_wrap
 	     
 	  end
 	
+	`ROUTER_TYPE_COMBINED:
+	  begin
+	     
+	     rtr_top
+	       #(.num_flits_per_vc(num_flits_per_vc),
+		 .num_packets_per_vc(num_packets_per_vc),
+		 .num_message_classes(num_message_classes),
+		 .num_resource_classes(num_resource_classes),
+		 .num_vcs_per_class(num_vcs_per_class),
+		 .num_routers_per_dim(num_routers_per_dim),
+		 .num_dimensions(num_dimensions),
+		 .num_nodes_per_router(num_nodes_per_router),
+		 .connectivity(connectivity),
+		 .packet_format(packet_format),
+		 .flow_ctrl_type(flow_ctrl_type),
+		 .max_payload_length(max_payload_length),
+		 .min_payload_length(min_payload_length),
+		 .flit_data_width(flit_data_width),
+		 .error_capture_mode(error_capture_mode),
+		 .restrict_turns(restrict_turns),
+		 .lookahead_routing(lookahead_routing),
+		 .routing_type(routing_type),
+		 .dim_order(dim_order),
+		 .fbf_regfile_type(fbf_regfile_type),
+		 .htff_regfile_type(htff_regfile_type),
+		 .hdff_regfile_type(hdff_regfile_type),
+		 .tff_regfile_type(tff_regfile_type),
+		 .explicit_pipeline_register(explicit_pipeline_register),
+		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
+		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+		 .data_crossbar_type(data_crossbar_type),
+		 .reset_type(reset_type))
+	     rtr
+	       (.clk(clk),
+		.reset(reset),
+		.router_address(router_address),
+		.channel_in_ip(channel_in_ip),
+		.flow_ctrl_out_ip(flow_ctrl_out_ip),
+		.channel_out_op(channel_out_op),
+		.flow_ctrl_in_op(flow_ctrl_in_op),
+		.error(error));
+	     
+	  end
+	
       endcase
       
    endgenerate

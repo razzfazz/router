@@ -72,7 +72,7 @@ parameter max_payload_length = 4;
 parameter min_payload_length = 0;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_VC;
+parameter router_type = `ROUTER_TYPE_COMBINED;
 
 // width of flit payload data
 parameter flit_data_width = 64;

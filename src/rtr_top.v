@@ -1,0 +1,505 @@
+// $Id$
+
+/*
+Copyright (c) 2007-2010, Trustees of The Leland Stanford Junior University
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list
+of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright notice, this 
+list of conditions and the following disclaimer in the documentation and/or 
+other materials provided with the distribution.
+Neither the name of the Stanford University nor the names of its contributors 
+may be used to endorse or promote products derived from this software without 
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+//==============================================================================
+// top-level module for router
+//==============================================================================
+
+module rtr_top
+  (clk, reset, router_address, channel_in_ip, flow_ctrl_out_ip, channel_out_op, 
+   flow_ctrl_in_op, error);
+   
+`include "c_functions.v"
+`include "c_constants.v"
+`include "rtr_constants.v"
+   
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
+   // flit buffer entries per VC
+   parameter num_flits_per_vc = 8;
+   
+   // maximum number of packets that can be in a given VC buffer simultaneously
+   parameter num_packets_per_vc = 4;
+   
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
+   
+   // number of VCs per class
+   parameter num_vcs_per_class = 1;
+   
+   // number of routers in each dimension
+   parameter num_routers_per_dim = 4;
+   
+   // number of dimensions in network
+   parameter num_dimensions = 2;
+   
+   // number of nodes per router (a.k.a. concentration factor)
+   parameter num_nodes_per_router = 1;
+   
+   // connectivity within each dimension
+   parameter connectivity = `CONNECTIVITY_LINE;
+   
+   // select packet format
+   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
+   
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // maximum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter max_payload_length = 4;
+   
+   // minimum payload length (in flits)
+   // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
+   parameter min_payload_length = 1;
+   
+   // width of flit payload data
+   parameter flit_data_width = 64;
+   
+   // configure error checking logic
+   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
+   
+   // filter out illegal destination ports
+   // (the intent is to allow synthesis to optimize away the logic associated 
+   // with such turns)
+   parameter restrict_turns = 1;
+   
+   // enable lookahead routing
+   parameter lookahead_routing = 1;
+   
+   // select routing function type
+   parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
+   
+   // select order of dimension traversal
+   parameter dim_order = `DIM_ORDER_ASCENDING;
+   
+   // select implementation variant for flit buffer register file
+   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select implementation variant for head/tail register file
+   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select implementation variant for flit buffer register file
+   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select implementation variant for tail FIFO register file
+   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // use explicit pipeline register between flit buffer and crossbar?
+   parameter explicit_pipeline_register = 0;
+   
+   // select which arbiter type to use for switch allocation
+   parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select which arbiter type to use for VC allocation
+   parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   
+   // select implementation variant for data crossbar
+   parameter data_crossbar_type = `CROSSBAR_TYPE_MUX;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // number of VCs
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   
+   // width required to select individual VC
+   localparam vc_idx_width = clogb(num_vcs);
+   
+   // width required to select individual router in a dimension
+   localparam dim_addr_width = clogb(num_routers_per_dim);
+   
+   // width required to select individual router in entire network
+   localparam router_addr_width = num_dimensions * dim_addr_width;
+   
+   // number of adjacent routers in each dimension
+   localparam num_neighbors_per_dim
+     = ((connectivity == `CONNECTIVITY_LINE) ||
+	(connectivity == `CONNECTIVITY_RING)) ?
+       2 :
+       (connectivity == `CONNECTIVITY_FULL) ?
+       (num_routers_per_dim - 1) :
+       -1;
+   
+   // number of input and output ports on router
+   localparam num_ports
+     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   
+   // width of flow control signals
+   localparam flow_ctrl_width
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+       -1;
+   
+   // width of flit control signals
+   localparam flit_ctrl_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (1 + vc_idx_width + 1) : 
+       -1;
+   
+   // channel width
+   localparam channel_width = flit_ctrl_width + flit_data_width;
+   
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
+   
+   input clk;
+   input reset;
+   
+   // current router's address
+   input [0:router_addr_width-1] router_address;
+   
+   // incoming channels
+   input [0:num_ports*channel_width-1] channel_in_ip;
+   
+   // outgoing flow control signals
+   output [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
+   wire [0:num_ports*flow_ctrl_width-1]   flow_ctrl_out_ip;
+   
+   // outgoing channels
+   output [0:num_ports*channel_width-1]   channel_out_op;
+   wire [0:num_ports*channel_width-1] 	  channel_out_op;
+   
+   // incoming flow control signals
+   input [0:num_ports*flow_ctrl_width-1]  flow_ctrl_in_op;
+   
+   // internal error condition detected
+   output 				  error;
+   wire 				  error;
+   
+   
+   //---------------------------------------------------------------------------
+   // input ports
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*num_vcs-1] 	  alo_flit_sel_ip_ivc;
+   wire [0:num_ports-1] 		  alo_flit_sent_ip;
+   
+   wire [0:num_ports*num_vcs*num_ports-1] ipc_route_ip_ivc_op;
+   wire [0:num_ports*num_vcs*num_resource_classes-1] ipc_route_ip_ivc_orc;
+   wire [0:num_ports*num_vcs-1] 		     ipc_flit_valid_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		     ipc_flit_head_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		     ipc_flit_tail_ip_ivc;
+   wire [0:num_ports*flit_data_width-1] 	     ipc_flit_data_ip;
+   wire [0:num_ports-1] 			     ipc_error_ip;
+   
+   generate
+      
+      genvar 					     ip;
+      
+      for (ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // input controller
+	   //-------------------------------------------------------------------
+	   
+	   wire [0:channel_width-1] channel_in;
+	   assign channel_in
+	     = channel_in_ip[ip*channel_width:(ip+1)*channel_width-1];
+	   
+	   wire [0:num_vcs-1] 	    alo_flit_sel_ivc;
+	   assign alo_flit_sel_ivc
+	     = alo_flit_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire 		    alo_flit_sent;
+	   assign alo_flit_sent = alo_flit_sent_ip[ip];
+	   
+	   wire [0:num_vcs*num_ports-1] ipc_route_ivc_op;
+	   wire [0:num_vcs*num_resource_classes-1] ipc_route_ivc_orc;
+	   wire [0:num_vcs-1] 			   ipc_flit_valid_ivc;
+	   wire [0:num_vcs-1] 			   ipc_flit_head_ivc;
+	   wire [0:num_vcs-1] 			   ipc_flit_tail_ivc;
+	   wire [0:flit_data_width-1] 		   ipc_flit_data;
+	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
+	   wire 				   ipc_error;
+	   rtr_ip_ctrl_mac
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_routers_per_dim(num_routers_per_dim),
+	       .num_dimensions(num_dimensions),
+	       .num_nodes_per_router(num_nodes_per_router),
+	       .connectivity(connectivity),
+	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
+	       .max_payload_length(max_payload_length),
+	       .min_payload_length(min_payload_length),
+	       .flit_data_width(flit_data_width),
+	       .restrict_turns(restrict_turns),
+	       .lookahead_routing(lookahead_routing),
+	       .routing_type(routing_type),
+	       .dim_order(dim_order),
+	       .fbf_regfile_type(fbf_regfile_type),
+	       .htff_regfile_type(htff_regfile_type),
+	       .hdff_regfile_type(hdff_regfile_type),
+	       .explicit_pipeline_register(explicit_pipeline_register),
+	       .error_capture_mode(error_capture_mode),
+	       .port_id(ip),
+	       .reset_type(reset_type))
+	   ipc
+	     (.clk(clk),
+	      .reset(reset),
+	      .router_address(router_address),
+	      .channel_in(channel_in),
+	      .route_out_ivc_op(ipc_route_ivc_op),
+	      .route_out_ivc_orc(ipc_route_ivc_orc),
+	      .flit_valid_out_ivc(ipc_flit_valid_ivc),
+	      .flit_head_out_ivc(ipc_flit_head_ivc),
+	      .flit_tail_out_ivc(ipc_flit_tail_ivc),
+	      .flit_data_out(ipc_flit_data),
+	      .flit_sel_in_ivc(alo_flit_sel_ivc),
+	      .flit_sent_in(alo_flit_sent),
+	      .flow_ctrl_out(flow_ctrl_out),
+	      .error(ipc_error));
+	   
+	   assign ipc_route_ip_ivc_op[ip*num_vcs*num_ports:
+				      (ip+1)*num_vcs*num_ports-1]
+	     = ipc_route_ivc_op;
+	   assign ipc_route_ip_ivc_orc[ip*num_vcs*num_resource_classes:
+				       (ip+1)*num_vcs*num_resource_classes-1]
+	     = ipc_route_ivc_orc;
+	   
+	   assign ipc_flit_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = ipc_flit_valid_ivc;
+	   assign ipc_flit_head_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = ipc_flit_head_ivc;
+	   assign ipc_flit_tail_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = ipc_flit_tail_ivc;
+	   
+	   assign ipc_flit_data_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
+	     = ipc_flit_data;
+	   
+	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:(ip+1)*flow_ctrl_width-1]
+	     = flow_ctrl_out;
+	   
+	   assign ipc_error_ip[ip] = ipc_error;
+	   
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // allocator logic
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports-1] 			   opc_fc_event_valid_op;
+   wire [0:num_ports*num_vcs-1] 		   opc_fc_event_sel_op_ovc;
+   
+   wire [0:num_ports*num_ports-1] 		   alo_flit_sel_op_ip;
+   wire [0:num_ports-1] 			   alo_empty_op;
+   wire [0:num_ports-1] 			   alo_flit_valid_op;
+   wire [0:num_ports-1] 			   alo_flit_head_op;
+   wire [0:num_ports-1] 			   alo_flit_tail_op;
+   wire [0:num_ports*num_vcs-1] 		   alo_flit_sel_op_ovc;
+   wire 					   alo_error;
+   
+   rtr_alloc_mac
+     #(.num_flits_per_vc(num_flits_per_vc),
+       .num_packets_per_vc(num_packets_per_vc),
+       .num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_vcs_per_class(num_vcs_per_class),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .flow_ctrl_type(flow_ctrl_type),
+       .restrict_turns(restrict_turns),
+       .routing_type(routing_type),
+       .dim_order(dim_order),
+       .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
+       .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+       .tff_regfile_type(tff_regfile_type),
+       .error_capture_mode(error_capture_mode),
+       .reset_type(reset_type))
+   alo
+     (.clk(clk),
+      .reset(reset),
+      .route_in_ip_ivc_op(ipc_route_ip_ivc_op),
+      .route_in_ip_ivc_orc(ipc_route_ip_ivc_orc),
+      .flit_valid_in_ip_ivc(ipc_flit_valid_ip_ivc),
+      .flit_head_in_ip_ivc(ipc_flit_head_ip_ivc),
+      .flit_tail_in_ip_ivc(ipc_flit_tail_ip_ivc),
+      .flit_sel_out_ip_ivc(alo_flit_sel_ip_ivc),
+      .flit_sent_out_ip(alo_flit_sent_ip),
+      .flit_sel_out_op_ip(alo_flit_sel_op_ip),
+      .empty_out_op(alo_empty_op),
+      .flit_valid_out_op(alo_flit_valid_op),
+      .flit_head_out_op(alo_flit_head_op),
+      .flit_tail_out_op(alo_flit_tail_op),
+      .flit_sel_out_op_ovc(alo_flit_sel_op_ovc),
+      .fc_event_valid_in_op(opc_fc_event_valid_op),
+      .fc_event_sel_in_op_ovc(opc_fc_event_sel_op_ovc),
+      .error(alo_error));
+   
+   
+   //---------------------------------------------------------------------------
+   // crossbar
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_ports*flit_data_width-1] 	   xbd_flit_data_op;
+   rtr_crossbar_mac
+     #(.num_ports(num_ports),
+       .width(flit_data_width),
+       .crossbar_type(data_crossbar_type))
+   xbd
+     (.ctrl_in_op_ip(alo_flit_sel_op_ip),
+      .data_in_ip(ipc_flit_data_ip),
+      .data_out_op(xbd_flit_data_op));
+   
+   
+   //---------------------------------------------------------------------------
+   // output ports
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      genvar 					   op;
+      
+      for(op = 0; op < num_ports; op = op + 1)
+	begin:ops
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // output controller
+	   //-------------------------------------------------------------------
+	   
+	   wire alo_empty;
+	   assign alo_empty = alo_empty_op[op];
+	   
+	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
+	   assign flow_ctrl_in
+	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
+	   
+	   wire 		      alo_flit_valid;
+	   assign alo_flit_valid = alo_flit_valid_op[op];
+	   
+	   wire 		      alo_flit_head;
+	   assign alo_flit_head = alo_flit_head_op[op];
+	   
+	   wire 		      alo_flit_tail;
+	   assign alo_flit_tail = alo_flit_tail_op[op];
+	   
+	   wire [0:num_vcs-1] 	      alo_flit_sel_ovc;
+	   assign alo_flit_sel_ovc
+	     = alo_flit_sel_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
+	   wire [0:flit_data_width-1] xbd_flit_data;
+	   assign xbd_flit_data
+	     = xbd_flit_data_op[op*flit_data_width:(op+1)*flit_data_width-1];
+	   
+	   wire [0:channel_width-1]   channel_out;
+	   wire 		      opc_fc_event_valid;
+	   wire [0:num_vcs-1] 	      opc_fc_event_sel_ovc;
+	   rtr_op_ctrl_mac
+	     #(.num_vcs(num_vcs),
+	       .num_ports(num_ports),
+	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
+	       .flit_data_width(flit_data_width),
+	       .reset_type(reset_type))
+	   opc
+	     (.clk(clk),
+	      .reset(reset),
+	      .empty_in(alo_empty),
+	      .flow_ctrl_in(flow_ctrl_in),
+	      .flit_valid_in(alo_flit_valid),
+	      .flit_head_in(alo_flit_head),
+	      .flit_tail_in(alo_flit_tail),
+	      .flit_sel_in_ovc(alo_flit_sel_ovc),
+	      .flit_data_in(xbd_flit_data),
+	      .channel_out(channel_out),
+	      .fc_event_valid_out(opc_fc_event_valid),
+	      .fc_event_sel_out_ovc(opc_fc_event_sel_ovc));
+	   
+	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
+		    = channel_out;
+	   
+	   assign opc_fc_event_valid_op[op] = opc_fc_event_valid;
+	   assign opc_fc_event_sel_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
+	     = opc_fc_event_sel_ovc;
+	   
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // error reporting
+   //---------------------------------------------------------------------------
+   
+   generate
+      
+      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
+	begin
+	   
+	   wire [0:num_ports+1-1] errors_s, errors_q;
+	   assign errors_s = {ipc_error_ip, alo_error};
+	   c_err_rpt
+	     #(.num_errors(num_ports+1),
+	       .capture_mode(error_capture_mode),
+	       .reset_type(reset_type))
+	   chk
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .errors_in(errors_s),
+	      .errors_out(errors_q));
+	   
+	   assign error = |errors_q;
+	   
+	end
+      else
+	assign error = 1'b0;
+      
+   endgenerate
+   
+endmodule

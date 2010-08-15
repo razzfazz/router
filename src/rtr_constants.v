@@ -78,7 +78,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // virtual channel router
 `define ROUTER_TYPE_VC       1
 
-`define ROUTER_TYPE_LAST `ROUTER_TYPE_VC
+// router with combined VC and switch allocation
+`define ROUTER_TYPE_COMBINED 2
+
+`define ROUTER_TYPE_LAST `ROUTER_TYPE_COMBINED
 
 
 //------------------------------------------------------------------------------
