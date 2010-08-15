@@ -158,9 +158,6 @@ module tc_node_mac
    // include error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
-   
    // enable lookahead routing
    parameter lookahead_routing = 1;
    
@@ -1102,30 +1099,11 @@ module tc_node_mac
    
    wire packet_to_self;
    
-   wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
-   assign int_flit_ctrl[0] = flit_valid_out;
-   assign int_flit_ctrl[1+vc_idx_width] = flit_head_out;
-   assign int_flit_ctrl[1+vc_idx_width+1] = flit_tail_out;
-   
    wire [0:num_vcs*4-1] 	  vs_errors_ovc;
    
    genvar 			  ovc;
    
    generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc_out;
-	   c_encode
-	     #(.num_ports(num_vcs))
-	   flit_vc_out_enc
-	     (.data_in(sel_ovc),
-	      .data_out(flit_vc_out));
-	   
-	   assign int_flit_ctrl[1:1+vc_idx_width-1] = flit_vc_out;
-	   
-	end
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
