@@ -754,37 +754,34 @@ module vcr_ip_ctrl_mac
       else if(num_vcs > 1)
 	begin
 	   
-	   wire [0:vc_idx_width-1] flit_vc;
-	   c_encode
-	     #(.num_ports(num_vcs))
-	   flit_vc_enc
-	     (.data_in(vc_sel_ivc),
-	      .data_out(flit_vc));
-	   
-	   wire [0:vc_idx_width-1] vc_sel_s, vc_sel_q;
-	   assign vc_sel_s = flit_vc;
+	   wire [0:num_vcs-1] vc_sel_ivc_s, vc_sel_ivc_q;
+	   assign vc_sel_ivc_s = vc_sel_ivc;
 	   c_dff
-	     #(.width(vc_idx_width),
+	     #(.width(num_vcs),
 	       .reset_type(reset_type))
-	   vc_selq
+	   vc_sel_ivcq
 	     (.clk(clk),
-	      .reset(1'b0),
+	      .reset(reset),
 	      .active(alloc_active),
-	      .d(vc_sel_s),
-	      .q(vc_sel_q));
-	   
-	   wire [0:num_vcs-1] 	   prev_vc_sel_ivc;
-	   c_decode
-	     #(.num_ports(num_vcs))
-	   prev_vc_sel_ivc_dec
-	     (.data_in(vc_sel_q),
-	      .data_out(prev_vc_sel_ivc));
+	      .d(vc_sel_ivc_s),
+	      .q(vc_sel_ivc_q));
 	   
 	   assign flit_sent_prev_ivc
-	     = {num_vcs{flit_valid_out_q}} & prev_vc_sel_ivc;
+	     = {num_vcs{flit_valid_out_q}} & vc_sel_ivc_q;
 	   
 	   if(track_vcs_at_output)
-	     assign int_flit_ctrl_out[1:1+vc_idx_width-1] = vc_sel_q;
+	     begin
+		
+		wire [0:num_vcs-1] vc_sel;
+		c_encode
+		  #(.num_ports(num_vcs))
+		vc_sel_enc
+		  (.data_in(vc_sel_ivc_q),
+		   .data_out(vc_sel));
+		
+		assign int_flit_ctrl_out[1:1+vc_idx_width-1] = vc_sel;
+		
+	     end
 	   else
 	     begin
 		
@@ -797,26 +794,26 @@ module vcr_ip_ctrl_mac
 		   .data_in(allocated_ivc_ovc),
 		   .data_out(allocated_ovc));
 		
+		wire [0:num_vcs-1] allocated_ovc_s, allocated_ovc_q;
+		assign allocated_ovc_s = allocated_ovc;
+		c_dff
+		  #(.width(num_vcs),
+		    .reset_type(reset_type))
+		allocated_ovcq
+		  (.clk(clk),
+		   .reset(1'b0),
+		   .active(alloc_active),
+		   .d(allocated_ovc_s),
+		   .q(allocated_ovc_q));
+		
 		wire [0:vc_idx_width-1] dest_vc_sel;
 		c_encode
 		  #(.num_ports(num_vcs))
 		dest_vc_sel_enc
-		  (.data_in(allocated_ovc),
+		  (.data_in(allocated_ovc_q),
 		   .data_out(dest_vc_sel));
 		
-		wire [0:vc_idx_width-1] dest_vc_sel_s, dest_vc_sel_q;
-		assign dest_vc_sel_s = dest_vc_sel;
-		c_dff
-		  #(.width(vc_idx_width),
-		    .reset_type(reset_type))
-		dest_vc_selq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(dest_vc_sel_s),
-		   .q(dest_vc_sel_q));
-		
-		assign int_flit_ctrl_out[1:1+vc_idx_width-1] = dest_vc_sel_q;
+		assign int_flit_ctrl_out[1:1+vc_idx_width-1] = dest_vc_sel;
 		
 	     end
 	   
