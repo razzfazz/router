@@ -455,8 +455,6 @@ module whr_ip_ctrl_mac
    assign flit_valid_out = gnt;
    
    wire 	fbc_almost_empty;
-   wire [0:fbf_addr_width-1] fbc_push_addr;
-   wire [0:fbf_addr_width-1] fbc_pop_addr;
    
    wire 		     flit_head_out;
    wire 		     flit_tail_out;
@@ -771,6 +769,8 @@ module whr_ip_ctrl_mac
    wire 			   fbc_pop;
    assign fbc_pop = flit_valid_out;
    
+   wire [0:fbf_addr_width-1] 	   fbc_push_addr;
+   wire [0:fbf_addr_width-1] 	   fbc_pop_addr;
    wire 			   fbc_full;
    wire [0:1] 			   fbc_errors;
    c_fifo_ctrl
