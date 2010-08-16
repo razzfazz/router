@@ -485,7 +485,7 @@ module whr_ip_ctrl_mac
 	   wire       htff_almost_empty;
 	   wire [0:1] htff_errors;
 	   c_fifo
-	     #(.depth(num_flits_per_vc - 1),
+	     #(.depth(fbf_depth - 1),
 	       .width(2),
 	       .regfile_type(htff_regfile_type),
 	       .reset_type(reset_type))
