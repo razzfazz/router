@@ -176,14 +176,6 @@ module vcr_ip_ctrl_mac
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
    
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
-       -1;
-   
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
@@ -401,19 +393,13 @@ module vcr_ip_ctrl_mac
    wire 					     buffer_active;
    assign buffer_active = flit_valid_in;
    
-   // extract header information from header data
-   wire [0:header_info_width-1] 		     header_info_in;
-   assign header_info_in = flit_data_in[0:header_info_width-1];
-   
    wire [0:num_vcs-1] 				     flit_valid_in_ivc;
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
    wire [0:num_vcs-1] 				     flit_sent_prev_ivc;
    wire [0:num_vcs-1] 				     flit_head_ivc;
    wire [0:num_vcs-1] 				     flit_tail_ivc;
-   wire [0:num_vcs*header_info_width-1] 	     header_info_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 		     fbc_push_addr_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 		     fbc_pop_addr_ivc;
+   wire [0:num_vcs*flit_data_width-1] 		     flit_data_ivc;
    wire [0:num_vcs-1] 				     fbc_empty_ivc;
    wire [0:num_vcs-1] 				     allocated_ivc;
    wire [0:num_vcs*num_vcs-1] 			     allocated_ivc_ovc;
@@ -452,9 +438,7 @@ module vcr_ip_ctrl_mac
 	   wire 			   sw_req_spec;	   
 	   wire 			   flit_head;
 	   wire 			   flit_tail;
-	   wire [0:header_info_width-1]    header_info_out;
-	   wire [0:fbf_addr_width-1] 	   fbc_push_addr;
-	   wire [0:fbf_addr_width-1] 	   fbc_pop_addr;
+	   wire [0:flit_data_width-1] 	   flit_data;
 	   wire 			   fbc_empty;
 	   wire 			   fbc_full;
 	   wire 			   allocated;
@@ -474,6 +458,7 @@ module vcr_ip_ctrl_mac
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
+	       .flit_data_width(flit_data_width),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
 	       .lookahead_routing(lookahead_routing),
@@ -482,8 +467,10 @@ module vcr_ip_ctrl_mac
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .fbf_regfile_type(fbf_regfile_type),
 	       .htff_regfile_type(htff_regfile_type),
 	       .hdff_regfile_type(hdff_regfile_type),
+	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_id(ivc),
 	       .port_id(port_id),
 	       .reset_type(reset_type))
@@ -494,7 +481,7 @@ module vcr_ip_ctrl_mac
 	      .flit_valid_in(flit_valid_in),
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
-	      .header_info_in(header_info_in),
+	      .flit_data_in(flit_data_in),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_op(route_op),
 	      .route_orc(route_orc),
@@ -508,9 +495,7 @@ module vcr_ip_ctrl_mac
 	      .flit_sent_prev(flit_sent_prev),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
-	      .header_info_out(header_info_out),
-	      .fbc_push_addr(fbc_push_addr),
-	      .fbc_pop_addr(fbc_pop_addr),
+	      .flit_data(flit_data),
 	      .fbc_empty(fbc_empty),
 	      .fbc_full(fbc_full),
 	      .allocated(allocated),
@@ -528,15 +513,8 @@ module vcr_ip_ctrl_mac
 	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
 	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
-	   assign header_info_ivc[ivc*header_info_width:
-				  (ivc+1)*header_info_width-1]
-	     = header_info_out;
-	   assign fbc_push_addr_ivc[ivc*fbf_addr_width:
-				     (ivc+1)*fbf_addr_width-1]
-	     = fbc_push_addr;
-	   assign fbc_pop_addr_ivc[ivc*fbf_addr_width:
-				    (ivc+1)*fbf_addr_width-1]
-	     = fbc_pop_addr;
+	   assign flit_data_ivc[ivc*flit_data_width:(ivc+1)*flit_data_width-1]
+	     = flit_data;
 	   assign fbc_empty_ivc[ivc] = fbc_empty;
 	   assign fbc_full_ivc[ivc] = fbc_full;
 	   assign allocated_ivc[ivc] = allocated;
@@ -551,92 +529,38 @@ module vcr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // flit buffer
+   // flit buffer read path
    //---------------------------------------------------------------------------
-   
-   wire [0:header_info_width-1] 	   header_info_out;
-   wire [0:fbf_addr_width-1] 		   fbc_push_addr;
-   wire [0:fbf_addr_width-1] 		   fbc_pop_addr;
-   
-   generate
-      
-      // if we only have a single VC, just use the address as is
-      if(num_vcs == 1)
-	begin
-	   assign header_info_out = header_info_ivc;
-	   assign fbc_push_addr = fbc_push_addr_ivc;
-	   assign fbc_pop_addr = fbc_pop_addr_ivc;
-	end
-      else if(num_vcs > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(header_info_width))
-	   header_info_out_sel
-	     (.select(flit_sel_in_ivc),
-	      .data_in(header_info_ivc),
-	      .data_out(header_info_out));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(fbf_addr_width))
-	   fbc_push_addr_sel
-	     (.select(flit_sel_in_ivc),
-	      .data_in(fbc_push_addr_ivc),
-	      .data_out(fbc_push_addr));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(fbf_addr_width))
-	   fbc_pop_addr_sel
-	     (.select(vc_sel_ivc),
-	      .data_in(fbc_pop_addr_ivc),
-	      .data_out(fbc_pop_addr));
-	   
-	end
-      
-   endgenerate
-   
-   wire 				   fbf_write_active;
-   assign fbf_write_active = buffer_active;
-   
-   wire 				   fbf_write_enable;
-   assign fbf_write_enable = flit_valid_in;
-   
-   wire [0:fbf_addr_width-1] 		   fbf_write_addr;
-   assign fbf_write_addr = fbc_push_addr;
-   
-   wire [0:flit_data_width-1] 		   fbf_write_data;
-   assign fbf_write_data[0:header_info_width-1]
-     = flit_head_in ? header_info_out : header_info_in;
-   assign fbf_write_data[header_info_width:flit_data_width-1]
-     = flit_data_in[header_info_width:flit_data_width-1];
    
    wire 				   alloc_active;
    assign alloc_active = flit_valid_in | ~&fbc_empty_ivc;
    
-   wire 				   fbf_read_active;
-   wire 				   fbf_read_enable;
-   wire [0:fbf_addr_width-1] 		   fbf_read_addr;
-   wire [0:flit_data_width-1] 		   fbf_read_data;
+   wire [0:num_vcs-1] 			   prev_vc_sel_ivc;
    
    generate
       
       if(explicit_pipeline_register)
 	begin
 	   
-	   assign fbf_read_active = alloc_active;
+	   wire [0:flit_data_width-1] flit_data;
 	   
-	   wire fbf_bypass;
-	   assign fbf_bypass = |(vc_sel_ivc & fbc_empty_ivc);
-	   
-	   assign fbf_read_enable = ~fbf_bypass;
-	   
-	   assign fbf_read_addr = fbc_pop_addr;
+	   if(num_vcs == 1)
+	     assign flit_data = flit_data_ivc;
+	   else if(num_vcs > 1)
+	     begin
+		
+		c_select_1ofn
+		  #(.num_ports(num_vcs),
+		    .width(flit_data_width))
+		flit_data_sel
+		  (.select(vc_sel_ivc),
+		   .data_in(flit_data_ivc),
+		   .data_out(flit_data));
+		
+	     end
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = fbf_bypass ? fbf_write_data : fbf_read_data;
+	   assign flit_data_s = flit_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -653,60 +577,32 @@ module vcr_ip_ctrl_mac
       else
 	begin
 	   
-	   // In the absence of an explicit pipeline register between flit 
-	   // buffer and crossbar, the read address is delayed by one clock 
-	   // cycle such as to line up the flit data read from the buffer with 
-	   // the crossbar control signals.
-	   
-	   wire fbf_read_enable_s, fbf_read_enable_q;
-	   assign fbf_read_enable_s = flit_sent;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   fbf_read_enableq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(alloc_active),
-	      .d(fbf_read_enable_s),
-	      .q(fbf_read_enable_q));
-	   
-	   assign fbf_read_active = fbf_read_enable_q;
-	   assign fbf_read_enable = fbf_read_enable_q;
-	   
-	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s = fbc_pop_addr;
-	   c_dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   fbf_read_addrq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(fbf_read_addr_s),
-	      .q(fbf_read_addr_q));
-	   
-	   assign fbf_read_addr = fbf_read_addr_q;
-	   
-	   assign flit_data_out = fbf_read_data;
+	   if(num_vcs == 1)
+	     assign flit_data_out = flit_data_ivc;
+	   else if(num_vcs > 1)
+	     begin
+		
+		// In the absence of an explicit pipeline register between flit 
+		// buffer and crossbar, buffer read is delayed by one clock 
+		// cycle such as to line up the flit data with the crossbar 
+		// control signals.
+		
+		wire [0:flit_data_width-1] flit_data;
+		c_select_1ofn
+		  #(.num_ports(num_vcs),
+		    .width(flit_data_width))
+		flit_data_sel
+		  (.select(prev_vc_sel_ivc),
+		   .data_in(flit_data_ivc),
+		   .data_out(flit_data));
+		
+		assign flit_data_out = flit_data;
+		
+	     end
 	   
 	end
       
    endgenerate
-   
-   c_regfile
-     #(.depth(fbf_depth),
-       .width(flit_data_width),
-       .regfile_type(fbf_regfile_type))
-   fbf
-     (.clk(clk),
-      .write_active(fbf_write_active),
-      .write_enable(fbf_write_enable),
-      .write_address(fbf_write_addr),
-      .write_data(fbf_write_data),
-      .read_active(fbf_read_active),
-      .read_enable(fbf_read_enable),
-      .read_address(fbf_read_addr),
-      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------
@@ -750,7 +646,10 @@ module vcr_ip_ctrl_mac
    generate
       
       if(num_vcs == 1)
-	assign flit_sent_prev_ivc = flit_valid_out_q;
+	begin
+	   assign prev_vc_sel_ivc = 1'b1;
+	   assign flit_sent_prev_ivc = flit_valid_out_q;
+	end
       else if(num_vcs > 1)
 	begin
 	   
@@ -766,13 +665,15 @@ module vcr_ip_ctrl_mac
 	      .d(vc_sel_ivc_s),
 	      .q(vc_sel_ivc_q));
 	   
+	   assign prev_vc_sel_ivc = vc_sel_ivc_q;
+	   
 	   assign flit_sent_prev_ivc
 	     = {num_vcs{flit_valid_out_q}} & vc_sel_ivc_q;
 	   
 	   if(track_vcs_at_output)
 	     begin
 		
-		wire [0:num_vcs-1] vc_sel;
+		wire [0:vc_idx_width-1] vc_sel;
 		c_encode
 		  #(.num_ports(num_vcs))
 		vc_sel_enc
