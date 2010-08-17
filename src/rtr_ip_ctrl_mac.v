@@ -1080,7 +1080,19 @@ module rtr_ip_ctrl_mac
 	   
 	   assign fbf_read_addr = fbc_pop_addr;
 	   
-	   assign flit_data_out = fbf_bypass ? fbf_write_data : fbf_read_data;
+	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
+	   assign flit_data_s = fbf_bypass ? fbf_write_data : fbf_read_data;
+	   c_dff
+	     #(.width(flit_data_width),
+	       .reset_type(reset_type))
+	   flit_dataq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(alloc_active),
+	      .d(flit_data_s),
+	      .q(flit_data_q));
+	   
+	   assign flit_data_out = flit_data_q;
 	   
 	end
       else
