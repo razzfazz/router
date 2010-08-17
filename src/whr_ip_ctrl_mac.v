@@ -866,6 +866,13 @@ module whr_ip_ctrl_mac
 	   // buffer and crossbar, the read address is delayed by one clock 
 	   // cycle such as to line up the flit data read from the buffer with 
 	   // the crossbar control signals.
+	   //
+	   // NOTE: Clock gating needs to be such that this register can be 
+	   // reset once no more flits are available; this will likely force it 
+	   // to be free-running.
+	   
+	   wire read_active;
+	   assign read_active = flags_active | fbf_read_active;
 	   
 	   wire fbf_read_enable_s, fbf_read_enable_q;
 	   assign fbf_read_enable_s = flit_valid_out;
@@ -875,7 +882,7 @@ module whr_ip_ctrl_mac
 	   fbf_read_enableq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(flags_active),
+	      .active(read_active),
 	      .d(fbf_read_enable_s),
 	      .q(fbf_read_enable_q));
 	   
