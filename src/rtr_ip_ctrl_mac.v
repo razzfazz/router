@@ -1071,12 +1071,19 @@ module rtr_ip_ctrl_mac
 	   wire fbf_bypass;
 	   assign fbf_bypass = |(flit_sel_in_ivc & fbc_empty_ivc);
 	   
-	   assign fbf_write_enable
-	     = chi_flit_valid & ~(fbf_bypass & flit_sent_in);
+	   if(explicit_pipeline_register == 1)
+	     begin
+		assign fbf_write_enable = chi_flit_valid;
+		assign fbf_read_enable = ~fbc_empty;
+	     end
+	   else if(explicit_pipeline_register > 1)
+	     begin
+		assign fbf_write_enable
+		  = chi_flit_valid & ~(fbf_bypass & flit_sent_in);
+		assign fbf_read_enable = flit_sent_in;
+	     end
 	   
 	   assign fbf_read_active = ~fbc_empty;
-	   
-	   assign fbf_read_enable = flit_sent_in;
 	   
 	   assign fbf_read_addr = fbc_pop_addr;
 	   
