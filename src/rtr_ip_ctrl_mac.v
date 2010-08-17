@@ -213,12 +213,6 @@ module rtr_ip_ctrl_mac
    // required address size for a single VC's buffer
    localparam fbc_addr_width = clogb(num_flits_per_vc);
    
-   // required address width for flit buffer
-   localparam fbf_addr_width = clogb(num_vcs*num_flits_per_vc);
-   
-   // additional address bits to add to addresses from FIFO controller
-   localparam fbc_extra_addr_width = fbf_addr_width - fbc_addr_width;
-   
    
    //---------------------------------------------------------------------------
    // interface
@@ -528,12 +522,13 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs*fbf_addr_width-1] 		    fbc_push_addr_ivc;
-   wire [0:num_vcs*fbf_addr_width-1] 		    fbc_pop_addr_ivc;
-   wire [0:num_vcs-1] 				    fbc_empty_ivc;
-   wire [0:num_vcs*9-1] 			    errors_ivc;
+   wire [0:num_vcs-1] 				       fbf_read_active_ivc;
+   wire [0:num_vcs-1] 				       fbf_read_enable_ivc;
+   wire [0:num_vcs*flit_data_width-1] 		       fbf_read_data_ivc;
+   wire [0:num_vcs-1] 				       fbc_empty_ivc;
+   wire [0:num_vcs*9-1] 			       errors_ivc;
    
-   genvar 					    ivc;
+   genvar 					       ivc;
    
    generate
       
@@ -541,7 +536,7 @@ module rtr_ip_ctrl_mac
 	begin:ivcs
 	   
 	   //-------------------------------------------------------------------
-	   // connect inputs and outputs
+	   // connect inputs
 	   //-------------------------------------------------------------------
 	   
 	   wire chi_flit_valid;
@@ -549,6 +544,17 @@ module rtr_ip_ctrl_mac
 	   
 	   wire flit_sent_in;
 	   assign flit_sent_in = flit_sent_in_ivc[ivc];
+	   
+	   wire fbf_read_active;
+	   assign fbf_read_active = fbf_read_active_ivc[ivc];
+	   
+	   wire fbf_read_enable;
+	   assign fbf_read_enable = fbf_read_enable_ivc[ivc];
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // connect outputs
+	   //-------------------------------------------------------------------
 	   
 	   wire flit_valid_out;
 	   assign flit_valid_out_ivc[ivc] = flit_valid_out;
@@ -565,13 +571,9 @@ module rtr_ip_ctrl_mac
 	   wire fbc_full;
 	   assign fbc_full_ivc[ivc] = fbc_full;
 	   
-	   wire [0:fbf_addr_width-1] fbc_push_addr;
-	   assign fbc_push_addr_ivc[ivc*fbf_addr_width:(ivc+1)*fbf_addr_width-1]
-	     = fbc_push_addr;
-	   
-	   wire [0:fbf_addr_width-1] fbc_pop_addr;
-	   assign fbc_pop_addr_ivc[ivc*fbf_addr_width:(ivc+1)*fbf_addr_width-1]
-	     = fbc_pop_addr;
+	   wire [0:flit_data_width-1] fbf_read_data;
+	   assign fbf_read_data_ivc[ivc*flit_data_width:
+				    (ivc+1)*flit_data_width-1] = fbf_read_data;
 	   
 	   wire [0:num_ports-1]      route_out_op;
 	   assign route_out_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
@@ -604,13 +606,13 @@ module rtr_ip_ctrl_mac
 	   wire 			   fbc_pop;
 	   assign fbc_pop = flit_sent_in;
 	   
+	   wire [0:fbc_addr_width-1] 	   fbc_push_addr;
+	   wire [0:fbc_addr_width-1] 	   fbc_pop_addr;
 	   wire 			   fbc_almost_empty;
 	   wire 			   fbc_almost_full;
 	   wire [0:1] 			   fbc_errors;
 	   c_fifo_ctrl
 	     #(.depth(num_flits_per_vc),
-	       .extra_addr_width(fbc_extra_addr_width),
-	       .offset(ivc*num_flits_per_vc),
 	       .reset_type(reset_type))
 	   fbc
 	     (.clk(clk),
@@ -632,6 +634,68 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   error_fbc_overflow;
 	   assign error_fbc_overflow = fbc_errors[1];
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // flit buffer
+	   //-------------------------------------------------------------------
+	   
+	   wire 			   fbf_write_active;
+	   assign fbf_write_active = push_active;
+	   
+	   wire [0:fbc_addr_width-1] 	   fbf_write_addr;
+	   assign fbf_write_addr = fbc_push_addr;
+	   
+	   wire 			   fbf_write_enable;
+	   wire [0:fbc_addr_width-1] 	   fbf_read_addr;
+	   
+	   if(explicit_pipeline_register)
+	     begin
+		
+		if(explicit_pipeline_register == 1)
+		  assign fbf_write_enable = chi_flit_valid;
+		else if(explicit_pipeline_register > 1)
+		  assign fbf_write_enable
+		    = chi_flit_valid & ~(fbc_empty & flit_sent_in);
+		
+		assign fbf_read_addr = fbc_pop_addr;
+		
+	     end
+	   else
+	     begin
+		
+		assign fbf_write_enable = chi_flit_valid;
+		
+		wire [0:fbc_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+		assign fbf_read_addr_s = fbc_pop_addr;
+		c_dff
+		  #(.width(fbc_addr_width),
+		    .reset_type(reset_type))
+		fbf_read_addrq
+		  (.clk(clk),
+		   .reset(1'b0),
+		   .active(pop_active),
+		   .d(fbf_read_addr_s),
+		   .q(fbf_read_addr_q));
+		
+		assign fbf_read_addr = fbf_read_addr_q;
+				
+	     end
+	   
+	   c_regfile
+	     #(.depth(num_flits_per_vc),
+	       .width(flit_data_width),
+	       .regfile_type(fbf_regfile_type))
+	   fbf
+	     (.clk(clk),
+	      .write_active(fbf_write_active),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbf_write_addr),
+	      .write_data(fbf_write_data),
+	      .read_active(fbf_read_active),
+	      .read_enable(fbf_read_enable),
+	      .read_address(fbf_read_addr),
+	      .read_data(fbf_read_data));
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -1018,74 +1082,43 @@ module rtr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // flit buffer
+   // flit buffer read path
    //---------------------------------------------------------------------------
    
-   wire fbc_empty;
-   assign fbc_empty = &fbc_empty_ivc;
-   
    wire alloc_active;
-   assign alloc_active = chi_flit_valid | ~fbc_empty;
-   
-   wire [0:fbf_addr_width-1] fbc_push_addr;
-   wire [0:fbf_addr_width-1] fbc_pop_addr;
-   wire 		     fbf_write_enable;
-   wire 		     fbf_read_active;
-   wire 		     fbf_read_enable;
-   wire [0:fbf_addr_width-1] fbf_read_addr;
-   wire [0:flit_data_width-1] fbf_read_data;
+   assign alloc_active = chi_flit_valid | ~&fbc_empty_ivc;
    
    generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(fbf_addr_width))
-	   fbc_push_addr_sel
-	     (.select(chi_flit_sel_ivc),
-	      .data_in(fbc_push_addr_ivc),
-	      .data_out(fbc_push_addr));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(fbf_addr_width))
-	   fbc_pop_addr_sel
-	     (.select(flit_sel_in_ivc),
-	      .data_in(fbc_pop_addr_ivc),
-	      .data_out(fbc_pop_addr));
-	   
-	end
-      
-      // if we only have a single VC, just use the address as is
-      else
-	begin
-	   assign fbc_push_addr = fbc_push_addr_ivc;
-	   assign fbc_pop_addr = fbc_pop_addr_ivc;
-	end
       
       if(explicit_pipeline_register)
 	begin
 	   
-	   wire fbf_bypass;
-	   assign fbf_bypass = |(flit_sel_in_ivc & fbc_empty_ivc);
+	   assign fbf_read_active_ivc = ~fbc_empty_ivc;
 	   
 	   if(explicit_pipeline_register == 1)
-	     begin
-		assign fbf_write_enable = chi_flit_valid;
-		assign fbf_read_enable = ~fbc_empty;
-	     end
+	     assign fbf_read_enable_ivc = ~fbc_empty_ivc;
 	   else if(explicit_pipeline_register > 1)
+	     assign fbf_read_enable_ivc = flit_sent_in_ivc;
+	   
+	   wire [0:flit_data_width-1] fbf_read_data;
+	   
+	   if(num_vcs == 1)
+	     assign fbf_read_data = fbf_read_data_ivc;
+	   else if(num_vcs > 1)
 	     begin
-		assign fbf_write_enable
-		  = chi_flit_valid & ~(fbf_bypass & flit_sent_in);
-		assign fbf_read_enable = flit_sent_in;
+		
+		c_select_1ofn
+		  #(.num_ports(num_vcs),
+		    .width(flit_data_width))
+		fbf_read_data_sel
+		  (.select(flit_sel_in_ivc),
+		   .data_in(fbf_read_data_ivc),
+		   .data_out(fbf_read_data));
+		
 	     end
 	   
-	   assign fbf_read_active = ~fbc_empty;
-	   
-	   assign fbf_read_addr = fbc_pop_addr;
+	   wire fbf_bypass;
+	   assign fbf_bypass = |(flit_sel_in_ivc & fbc_empty_ivc);
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
 	   assign flit_data_s = fbf_bypass ? fbf_write_data : fbf_read_data;
@@ -1105,63 +1138,69 @@ module rtr_ip_ctrl_mac
       else
 	begin
 	   
-	   assign fbf_write_enable = chi_flit_valid;
+	   // NOTE: We need to clock-gate this register such that it can be
+	   // turned off once no more flits are available; this will likely
+	   // cause it to end up being free-running.
 	   
-	   wire fbf_read_enable_s, fbf_read_enable_q;
-	   assign fbf_read_enable_s = flit_sent_in;
+	   wire flit_sent_active;
+	   
+	   wire flit_sent_s, flit_sent_q;
+	   assign flit_sent_s = flit_sent_in;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
-	   fbf_read_enableq
+	   flit_sentq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(alloc_active),
-	      .d(fbf_read_enable_s),
-	      .q(fbf_read_enable_q));
+	      .active(flit_sent_active),
+	      .d(flit_sent_s),
+	      .q(flit_sent_q));
 	   
-	   assign fbf_read_active = fbf_read_enable_q;
-	   assign fbf_read_enable = fbf_read_enable_q;
+	   assign flit_sent_active = alloc_active | flit_sent_q;
 	   
-	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s = fbc_pop_addr;
-	   c_dff
-	     #(.width(fbf_addr_width),
-	       .reset_type(reset_type))
-	   fbf_read_addrq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(fbf_read_addr_s),
-	      .q(fbf_read_addr_q));
+	   wire [0:flit_data_width-1] fbf_read_data;
 	   
-	   assign fbf_read_addr = fbf_read_addr_q;
+	   if(num_vcs == 1)
+	     begin
+		assign fbf_read_active_ivc = flit_sent_q;
+		assign fbf_read_enable_ivc = flit_sent_q;
+		assign fbf_read_data = fbf_read_data_ivc;
+	     end
+	   else if(num_vcs > 1)
+	     begin
+		
+		wire [0:num_vcs-1] flit_sel_ivc_s, flit_sel_ivc_q;
+		assign flit_sel_ivc_s = flit_sel_in_ivc;
+		c_dff
+		  #(.width(num_vcs),
+		    .reset_type(reset_type))
+		flit_sel_ivcq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(alloc_active),
+		   .d(flit_sel_ivc_s),
+		   .q(flit_sel_ivc_q));
+		
+		assign fbf_read_active_ivc
+		  = {num_vcs{flit_sent_q}} & flit_sel_ivc_q;
+		assign fbf_read_enable_ivc
+		  = {num_vcs{flit_sent_q}} & flit_sel_ivc_q;
+		
+		c_select_1ofn
+		  #(.num_ports(num_vcs),
+		    .width(flit_data_width))
+		fbf_read_data_sel
+		  (.select(flit_sel_ivc_q),
+		   .data_in(fbf_read_data_ivc),
+		   .data_out(fbf_read_data));
+		
+	     end
 	   
 	   assign flit_data_out = fbf_read_data;
 	   
 	end
       
    endgenerate
-   
-   wire 			     fbf_write_active;
-   assign fbf_write_active = chi_flit_valid;
-   
-   wire [0:fbf_addr_width-1] 	     fbf_write_addr;
-   assign fbf_write_addr = fbc_push_addr;
-   
-   c_regfile
-     #(.depth(num_vcs*num_flits_per_vc),
-       .width(flit_data_width),
-       .regfile_type(fbf_regfile_type))
-   fbf
-     (.clk(clk),
-      .write_active(fbf_write_active),
-      .write_enable(fbf_write_enable),
-      .write_address(fbf_write_addr),
-      .write_data(fbf_write_data),
-      .read_active(fbf_read_active),
-      .read_enable(fbf_read_enable),
-      .read_address(fbf_read_addr),
-      .read_data(fbf_read_data));
    
    
    //---------------------------------------------------------------------------
