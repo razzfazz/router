@@ -805,9 +805,6 @@ module whr_ip_ctrl_mac
    wire 			   fbf_write_active;
    assign fbf_write_active = buffer_active;
    
-   wire 			   fbf_write_enable;
-   assign fbf_write_enable = flit_valid_thru;
-   
    wire [0:fbf_addr_width-1] 	   fbf_write_addr;
    assign fbf_write_addr = fbc_push_addr;
    
@@ -817,6 +814,7 @@ module whr_ip_ctrl_mac
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in[header_info_width:flit_data_width-1];
    
+   wire 			   fbf_write_enable;
    wire 			   fbf_read_active;
    wire 			   fbf_read_enable;
    wire [0:fbf_addr_width-1] 	   fbf_read_addr;
@@ -827,17 +825,24 @@ module whr_ip_ctrl_mac
       if(explicit_pipeline_register)
 	begin
 	   
-	   assign fbf_read_active = flags_active;
+	   if(explicit_pipeline_register == 1)
+	     begin
+		assign fbf_write_enable = flit_valid_in;
+		assign fbf_read_enable = ~fbc_empty;
+	     end
+	   else if(explicit_pipeline_register > 1)
+	     begin
+		assign fbf_write_enable
+		  = flit_valid_in & ~(fbc_empty & flit_valid_out);
+		assign fbf_read_enable = flit_valid_out;
+	     end
 	   
-	   wire fbf_bypass;
-	   assign fbf_bypass = fbc_empty;
-	   
-	   assign fbf_read_enable = ~fbf_bypass;
+	   assign fbf_read_active = ~fbc_empty;
 	   
 	   assign fbf_read_addr = fbc_pop_addr;
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = fbf_bypass ? fbf_write_data : fbf_read_data;
+	   assign flit_data_s = fbc_empty ? fbf_write_data : fbf_read_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -853,6 +858,9 @@ module whr_ip_ctrl_mac
 	end
       else
 	begin
+	   
+	   assign fbf_write_enable = flit_valid_in;
+	   
 	   
 	   // In the absence of an explicit pipeline register between flit 
 	   // buffer and crossbar, the read address is delayed by one clock 

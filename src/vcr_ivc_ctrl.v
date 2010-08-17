@@ -1186,7 +1186,7 @@ module vcr_ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // flit buffer
+   // flit buffer control
    //---------------------------------------------------------------------------
    
    wire 				       fbc_push;
@@ -1217,19 +1217,21 @@ module vcr_ivc_ctrl
       .full(fbc_full),
       .errors(fbc_errors));
    
+   assign flit_valid = flit_valid_in | ~fbc_empty;
+   
    wire 				       error_fbc_underflow;
    assign error_fbc_underflow = fbc_errors[0];
    
    wire 				       error_fbc_overflow;
    assign error_fbc_overflow = fbc_errors[1];
    
-   assign flit_valid = flit_valid_in | ~fbc_empty;
+   
+   //---------------------------------------------------------------------------
+   // flit buffer
+   //---------------------------------------------------------------------------
    
    wire 				       fbf_write_active;
    assign fbf_write_active = buffer_active;
-   
-   wire 				       fbf_write_enable;
-   assign fbf_write_enable = flit_valid_in;
    
    wire [0:fbc_addr_width-1] 		       fbf_write_addr;
    assign fbf_write_addr = fbc_push_addr;
@@ -1240,6 +1242,7 @@ module vcr_ivc_ctrl
    assign fbf_write_data[header_info_width:flit_data_width-1]
      = flit_data_in[header_info_width:flit_data_width-1];
    
+   wire 				       fbf_write_enable;
    wire 				       fbf_read_active;
    wire 				       fbf_read_enable;
    wire [0:fbc_addr_width-1] 		       fbf_read_addr;
@@ -1250,8 +1253,19 @@ module vcr_ivc_ctrl
       if(explicit_pipeline_register)
 	begin
 	   
-	   assign fbf_read_active = alloc_active;
-	   assign fbf_read_enable = ~fbc_empty;
+	   if(explicit_pipeline_register == 1)
+	     begin
+		assign fbf_write_enable = flit_valid_in;
+		assign fbf_read_enable = ~fbc_empty;
+	     end
+	   else if(explicit_pipeline_register > 1)
+	     begin
+		assign fbf_write_enable
+		  = flit_valid_in & ~(fbc_empty & flit_sent);
+		assign fbf_read_enable = flit_sent;
+	     end
+	   
+	   assign fbf_read_active = ~fbc_empty;
 	   assign fbf_read_addr = fbc_pop_addr;
 	   
 	   assign flit_data = fbc_empty ? fbf_write_data : fbf_read_data;
@@ -1259,6 +1273,9 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
+	   
+	   assign fbf_write_enable = flit_valid_in;
+	   
 	   assign fbf_read_active = flit_sent_prev;
 	   assign fbf_read_enable = flit_sent_prev;
 	   
