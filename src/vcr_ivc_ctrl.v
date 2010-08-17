@@ -1201,7 +1201,6 @@ module vcr_ivc_ctrl
    wire [0:1] 				       fbc_errors;
    c_fifo_ctrl
      #(.depth(num_flits_per_vc),
-       .offset(fbc_min_addr),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
