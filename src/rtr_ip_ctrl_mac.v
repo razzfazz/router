@@ -1071,7 +1071,7 @@ module rtr_ip_ctrl_mac
 	   assign fbf_write_enable
 	     = chi_flit_valid & ~(fbf_bypass & flit_sent_in);
 	   
-	   assign fbf_read_active = ~|fbc_empty_ivc;
+	   assign fbf_read_active = ~&fbc_empty_ivc;
 	   
 	   assign fbf_read_enable = flit_sent_in;
 	   
