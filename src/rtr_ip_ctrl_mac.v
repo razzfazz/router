@@ -1021,8 +1021,11 @@ module rtr_ip_ctrl_mac
    // flit buffer
    //---------------------------------------------------------------------------
    
-   wire flit_valid_out;
-   assign flit_valid_out = chi_flit_valid | ~&fbc_empty_ivc;
+   wire fbc_empty;
+   assign fbc_empty = &fbc_empty_ivc;
+   
+   wire alloc_active;
+   assign alloc_active = chi_flit_valid | ~fbc_empty;
    
    wire [0:fbf_addr_width-1] fbc_push_addr;
    wire [0:fbf_addr_width-1] fbc_pop_addr;
@@ -1071,7 +1074,7 @@ module rtr_ip_ctrl_mac
 	   assign fbf_write_enable
 	     = chi_flit_valid & ~(fbf_bypass & flit_sent_in);
 	   
-	   assign fbf_read_active = ~&fbc_empty_ivc;
+	   assign fbf_read_active = ~fbc_empty;
 	   
 	   assign fbf_read_enable = flit_sent_in;
 	   
@@ -1085,9 +1088,6 @@ module rtr_ip_ctrl_mac
 	   
 	   assign fbf_write_enable = chi_flit_valid;
 	   
-	   wire read_active;
-	   assign read_active = flit_valid_out;
-	   
 	   wire fbf_read_enable_s, fbf_read_enable_q;
 	   assign fbf_read_enable_s = flit_sent_in;
 	   c_dff
@@ -1096,7 +1096,7 @@ module rtr_ip_ctrl_mac
 	   fbf_read_enableq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(read_active),
+	      .active(alloc_active),
 	      .d(fbf_read_enable_s),
 	      .q(fbf_read_enable_q));
 	   
@@ -1104,15 +1104,14 @@ module rtr_ip_ctrl_mac
 	   assign fbf_read_enable = fbf_read_enable_q;
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s
-	     = flit_sent_in ? fbc_pop_addr : fbf_read_addr_q;
+	   assign fbf_read_addr_s = fbc_pop_addr;
 	   c_dff
 	     #(.width(fbf_addr_width),
 	       .reset_type(reset_type))
 	   fbf_read_addrq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(read_active),
+	      .active(alloc_active),
 	      .d(fbf_read_addr_s),
 	      .q(fbf_read_addr_q));
 	   
@@ -1150,9 +1149,6 @@ module rtr_ip_ctrl_mac
    // generate outgoing flow control signals
    //---------------------------------------------------------------------------
    
-   wire 			     fco_active;
-   assign fco_active = flit_valid_out;
-   
    rtr_flow_ctrl_output
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -1160,7 +1156,7 @@ module rtr_ip_ctrl_mac
    fco
      (.clk(clk),
       .reset(reset),
-      .active(fco_active),
+      .active(alloc_active),
       .fc_event_valid_in(flit_sent_in),
       .fc_event_sel_in_ivc(flit_sel_in_ivc),
       .flow_ctrl_out(flow_ctrl_out));
