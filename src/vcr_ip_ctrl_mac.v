@@ -577,8 +577,10 @@ module vcr_ip_ctrl_mac
       else
 	begin
 	   
+	   wire [0:flit_data_width-1] flit_data;
+	   
 	   if(num_vcs == 1)
-	     assign flit_data_out = flit_data_ivc;
+	     assign flit_data = flit_data_ivc;
 	   else if(num_vcs > 1)
 	     begin
 		
@@ -587,7 +589,6 @@ module vcr_ip_ctrl_mac
 		// cycle such as to line up the flit data with the crossbar 
 		// control signals.
 		
-		wire [0:flit_data_width-1] flit_data;
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
@@ -596,9 +597,9 @@ module vcr_ip_ctrl_mac
 		   .data_in(flit_data_ivc),
 		   .data_out(flit_data));
 		
-		assign flit_data_out = flit_data;
-		
 	     end
+	   
+	   assign flit_data_out = flit_data;
 	   
 	end
       
