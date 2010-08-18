@@ -759,7 +759,8 @@ module rtr_ip_ctrl_mac
 		   .full(hdff_full),
 		   .errors(hdff_errors));
 		
-		assign hdff_hop_route_info = hdff_pop_data;
+		assign hdff_hop_route_info
+		  = hdff_empty ? rtl_hop_route_info : hdff_pop_data;
 		
 		assign error_hdff_underflow = hdff_errors[0];
 		assign error_hdff_overflow = hdff_errors[1];
@@ -770,7 +771,7 @@ module rtr_ip_ctrl_mac
 		
 		assign hdff_empty = 1'b1;
 		
-		assign hdff_hop_route_info = {hop_route_info_width{1'b0}};
+		assign hdff_hop_route_info = rtl_hop_route_info;
 		
 		assign error_hdff_underflow = 1'b0;
 		assign error_hdff_overflow = 1'b0;
@@ -797,10 +798,6 @@ module rtr_ip_ctrl_mac
 	   assign error_no_header
 	     = ~hdr_valid & (~fbc_empty | (chi_flit_valid & ~chi_flit_head));
 	   
-	   wire [0:hop_route_info_width-1] hop_route_info_muxed;
-	   assign hop_route_info_muxed
-	     = hdff_empty ? rtl_hop_route_info : hdff_hop_route_info;
-	   
 	   wire 			   hdr_capture;
 	   assign hdr_capture = (~hdr_valid & chi_flit_valid) | 
 				(tail_sent & (~hdff_empty | chi_flit_valid));
@@ -808,7 +805,7 @@ module rtr_ip_ctrl_mac
 	   wire [0:hop_route_info_width-1] hdr_hop_route_info_s;
 	   wire [0:hop_route_info_width-1] hdr_hop_route_info_q;
 	   assign hdr_hop_route_info_s
-	     = hdr_capture ? hop_route_info_muxed : hdr_hop_route_info_q;
+	     = hdr_capture ? hdff_hop_route_info : hdr_hop_route_info_q;
 	   c_dff
 	     #(.width(hop_route_info_width),
 	       .reset_type(reset_type))
