@@ -1025,8 +1025,6 @@ module rtr_ip_ctrl_mac
 	   
 	   // synopsys translate_off
 	   
-	   integer   i;
-	   
 	   always @(posedge clk)
 	     begin
 		
