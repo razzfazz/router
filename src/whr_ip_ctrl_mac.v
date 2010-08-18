@@ -639,11 +639,9 @@ module whr_ip_ctrl_mac
    wire [0:hop_route_info_width-1] hdr_hop_route_info;
    assign hdr_hop_route_info = hdr_hop_route_info_q;
    
-   wire 			   header_valid;
-   assign header_valid = hdr_valid | flit_valid_in;
-   
    wire 			   error_no_header;
-   assign error_no_header = flit_valid & ~header_valid;
+   assign error_no_header
+     = ~hdr_valid & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -684,6 +682,9 @@ module whr_ip_ctrl_mac
       .route_out_op(route_op),
       .route_out_orc(route_orc),
       .errors(rfl_errors));
+   
+   wire 			   header_valid;
+   assign header_valid = hdr_valid | flit_valid_in;
    
    wire 			   error_invalid_port;
    assign error_invalid_port = header_valid & rfl_errors[0];

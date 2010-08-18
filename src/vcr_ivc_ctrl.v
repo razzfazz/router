@@ -811,11 +811,9 @@ module vcr_ivc_ctrl
    wire [0:hop_route_info_width-1] hdr_hop_route_info;
    assign hdr_hop_route_info = hdr_hop_route_info_q;
    
-   wire 			   header_valid;
-   assign header_valid = hdr_valid | flit_valid_in;
-   
    wire 			   error_no_header;
-   assign error_no_header = flit_valid & ~header_valid;
+   assign error_no_header
+     = ~hdr_valid & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -884,10 +882,13 @@ module vcr_ivc_ctrl
       .route_out_orc(route_orc),
       .errors(rfl_errors));
    
-   wire 	error_invalid_port;
+   wire 				   header_valid;
+   assign header_valid = hdr_valid | flit_valid_in;
+   
+   wire 				   error_invalid_port;
    assign error_invalid_port = header_valid & rfl_errors[0];
    
-   wire 	error_invalid_class;
+   wire 				   error_invalid_class;
    assign error_invalid_class = header_valid & rfl_errors[1];
    
    
@@ -895,10 +896,10 @@ module vcr_ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire 	cred_track_active;
+   wire 				   cred_track_active;
    assign cred_track_active = flit_valid | vc_allocated_q;
    
-   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
+   wire [0:num_vcs*int_flow_ctrl_width-1]  int_flow_ctrl_ovc;
    c_select_1ofn
      #(.num_ports(num_ports),
        .width(num_vcs*int_flow_ctrl_width))
@@ -908,7 +909,7 @@ module vcr_ivc_ctrl
       .data_out(int_flow_ctrl_ovc));
    
    wire [0:num_resource_classes*num_vcs_per_class*
-	 int_flow_ctrl_width-1] 	  int_flow_ctrl_orc_ocvc;
+	 int_flow_ctrl_width-1] 	   int_flow_ctrl_orc_ocvc;
    assign int_flow_ctrl_orc_ocvc = int_flow_ctrl_ovc[message_class*
 						     num_resource_classes*
 						     num_vcs_per_class*
