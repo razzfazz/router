@@ -482,9 +482,9 @@ module vcr_ivc_ctrl
 	     (.data_in(hop_route_port),
 	      .data_out(hop_route_op));
 	   
-	   if(resource_class == (num_resource_classes - 1))
-	     assign hop_route_orc = 'd1;
-	   else
+	   if(num_resource_classes == 1)
+	     assign hop_route_orc = 1'b1;
+	   else if(num_resource_classes > 1)
 	     begin
 		
 		wire [0:resource_class_idx_width-1] hop_route_rcsel;
@@ -839,9 +839,9 @@ module vcr_ivc_ctrl
    
    generate
       
-      if(resource_class == (num_resource_classes - 1))
-	assign route_unmasked_orc = 'd1;
-      else
+      if(num_resource_classes == 1)
+	assign route_unmasked_orc = 1'b1;
+      else if(num_resource_classes > 1)
 	begin
 	   
 	   wire [0:resource_class_idx_width-1] hdr_route_rcsel;
