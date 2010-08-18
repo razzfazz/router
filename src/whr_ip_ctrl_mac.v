@@ -451,11 +451,10 @@ module whr_ip_ctrl_mac
    wire 	htff_empty;
    
    wire 	htff_push;
-   assign htff_push
-     = flit_valid_thru & ~fbc_empty & (~flit_valid_out | ~htff_empty);
+   assign htff_push = flit_valid_thru;
    
    wire 	htff_pop;
-   assign htff_pop = flit_valid_out & ~htff_empty;
+   assign htff_pop = (flit_valid_out | fbc_empty) & (~htff_empty | htff_push);
    
    wire [0:1] 	htff_push_data;
    assign htff_push_data[0] = flit_head_in;
@@ -549,10 +548,10 @@ module whr_ip_ctrl_mac
    wire 			     hdff_empty;
    
    wire 			     hdff_push;
-   assign hdff_push = head_received & hdr_valid & (~tail_sent | ~hdff_empty);
+   assign hdff_push = head_received;
    
    wire 			     hdff_pop;
-   assign hdff_pop = tail_sent & ~hdff_empty;
+   assign hdff_pop = (tail_sent | ~hdr_valid) & (~hdff_empty | hdff_push);
    
    wire [0:hop_route_info_width-1]   hdff_push_data;
    assign hdff_push_data = hop_route_info;
