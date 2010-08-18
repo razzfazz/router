@@ -48,6 +48,9 @@ module c_fifo
    // select implementation variant for register file
    parameter regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // if enabled, feed through inputs to outputs when FIFO is empty
+   parameter enable_bypass = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    // width required for read/write address
@@ -91,9 +94,30 @@ module c_fifo
    output [0:1]       errors;
    wire [0:1] 	      errors;
    
+   wire 	      error_underflow;
+   wire 	      error_overflow;
+   
    generate
       
-      if(depth == 1)
+      if(depth == 0)
+	begin
+	   
+	   if(enable_bypass)
+	     assign pop_data = push_data;
+	   
+	   assign almost_empty = 1'b0;
+	   assign empty = 1'b1;
+	   assign almost_full = 1'b0;
+	   assign full = 1'b1;
+	   
+	   assign error_underflow = pop;
+	   assign error_overflow = push;
+	   
+	   assign errors[0] = error_underflow;
+	   assign errors[1] = error_overflow;
+	   
+	end
+      else if(depth == 1)
 	begin
 	   
 	   wire [0:width-1] data_s, data_q;
@@ -108,7 +132,10 @@ module c_fifo
 	      .d(data_s),
 	      .q(data_q));
 	   
-	   assign pop_data = data_q;
+	   if(enable_bypass)
+	     assign pop_data = empty ? push_data : data_q;
+	   else
+	     assign pop_data = data_q;
 	   
 	   wire 	    empty_active;
 	   assign empty_active = push_active | pop_active;
@@ -161,6 +188,10 @@ module c_fifo
 	      .full(full),
 	      .errors(errors));
 	   
+	   assign error_underflow = errors[0];
+	   assign error_overflow = errors[1];
+	   
+	   wire [0:width-1] 	 rf_data;
 	   c_regfile
 	     #(.depth(depth),
 	       .width(width),
@@ -174,7 +205,12 @@ module c_fifo
 	      .read_active(pop_active),
 	      .read_enable(pop),
 	      .read_address(pop_addr),
-	      .read_data(pop_data));
+	      .read_data(rf_data));
+	   
+	   if(enable_bypass)
+	     assign pop_data = empty ? push_data : rf_data;
+	   else
+	     assign pop_data = rf_data;
 	   
 	end
       
