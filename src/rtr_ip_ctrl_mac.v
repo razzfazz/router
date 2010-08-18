@@ -523,7 +523,6 @@ module rtr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:num_vcs-1] 				       fbf_read_active_ivc;
-   wire [0:num_vcs-1] 				       fbf_read_enable_ivc;
    wire [0:num_vcs*flit_data_width-1] 		       fbf_read_data_ivc;
    wire [0:num_vcs-1] 				       fbc_empty_ivc;
    wire [0:num_vcs*9-1] 			       errors_ivc;
@@ -547,9 +546,6 @@ module rtr_ip_ctrl_mac
 	   
 	   wire fbf_read_active;
 	   assign fbf_read_active = fbf_read_active_ivc[ivc];
-	   
-	   wire fbf_read_enable;
-	   assign fbf_read_enable = fbf_read_enable_ivc[ivc];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -693,7 +689,6 @@ module rtr_ip_ctrl_mac
 	      .write_address(fbf_write_addr),
 	      .write_data(fbf_write_data),
 	      .read_active(fbf_read_active),
-	      .read_enable(fbf_read_enable),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   
@@ -1032,11 +1027,6 @@ module rtr_ip_ctrl_mac
 	   
 	   assign fbf_read_active_ivc = ~fbc_empty_ivc;
 	   
-	   if(explicit_pipeline_register == 1)
-	     assign fbf_read_enable_ivc = ~fbc_empty_ivc;
-	   else if(explicit_pipeline_register > 1)
-	     assign fbf_read_enable_ivc = flit_sent_in_ivc;
-	   
 	   wire [0:flit_data_width-1] fbf_read_data;
 	   
 	   if(num_vcs == 1)
@@ -1100,7 +1090,6 @@ module rtr_ip_ctrl_mac
 	   if(num_vcs == 1)
 	     begin
 		assign fbf_read_active_ivc = flit_sent_q;
-		assign fbf_read_enable_ivc = flit_sent_q;
 		assign fbf_read_data = fbf_read_data_ivc;
 	     end
 	   else if(num_vcs > 1)
@@ -1119,8 +1108,6 @@ module rtr_ip_ctrl_mac
 		   .q(flit_sel_ivc_q));
 		
 		assign fbf_read_active_ivc
-		  = {num_vcs{flit_sent_q}} & flit_sel_ivc_q;
-		assign fbf_read_enable_ivc
 		  = {num_vcs{flit_sent_q}} & flit_sel_ivc_q;
 		
 		c_select_1ofn

@@ -745,7 +745,6 @@ module whr_ip_ctrl_mac
    
    wire 			   fbf_write_enable;
    wire 			   fbf_read_active;
-   wire 			   fbf_read_enable;
    wire [0:fbf_addr_width-1] 	   fbf_read_addr;
    wire [0:flit_data_width-1] 	   fbf_read_data;
    
@@ -755,16 +754,10 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   if(explicit_pipeline_register == 1)
-	     begin
-		assign fbf_write_enable = flit_valid_in;
-		assign fbf_read_enable = ~fbc_empty;
-	     end
+	     assign fbf_write_enable = flit_valid_in;
 	   else if(explicit_pipeline_register > 1)
-	     begin
-		assign fbf_write_enable
-		  = flit_valid_in & ~(fbc_empty & flit_valid_out);
-		assign fbf_read_enable = flit_valid_out;
-	     end
+	     assign fbf_write_enable
+	       = flit_valid_in & ~(fbc_empty & flit_valid_out);
 	   
 	   assign fbf_read_active = ~fbc_empty;
 	   
@@ -803,20 +796,19 @@ module whr_ip_ctrl_mac
 	   wire read_active;
 	   assign read_active = flags_active | fbf_read_active;
 	   
-	   wire fbf_read_enable_s, fbf_read_enable_q;
-	   assign fbf_read_enable_s = flit_valid_out;
+	   wire flit_sent_prev_s, flit_sent_prev_q;
+	   assign flit_sent_prev_s = flit_valid_out;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
-	   fbf_read_enableq
+	   flit_sent_prevq
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(read_active),
-	      .d(fbf_read_enable_s),
-	      .q(fbf_read_enable_q));
+	      .d(flit_sent_prev_s),
+	      .q(flit_sent_prev_q));
 	   
-	   assign fbf_read_active = fbf_read_enable_q;
-	   assign fbf_read_enable = fbf_read_enable_q;
+	   assign fbf_read_active = flit_sent_prev_q;
 	   
 	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
@@ -849,7 +841,6 @@ module whr_ip_ctrl_mac
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
       .read_active(fbf_read_active),
-      .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));
    

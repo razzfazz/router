@@ -1173,7 +1173,6 @@ module vcr_ivc_ctrl
    
    wire 				       fbf_write_enable;
    wire 				       fbf_read_active;
-   wire 				       fbf_read_enable;
    wire [0:fbc_addr_width-1] 		       fbf_read_addr;
    wire [0:flit_data_width-1] 		       fbf_read_data;
    
@@ -1183,16 +1182,10 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   if(explicit_pipeline_register == 1)
-	     begin
-		assign fbf_write_enable = flit_valid_in;
-		assign fbf_read_enable = ~fbc_empty;
-	     end
+	     assign fbf_write_enable = flit_valid_in;
 	   else if(explicit_pipeline_register > 1)
-	     begin
-		assign fbf_write_enable
-		  = flit_valid_in & ~(fbc_empty & flit_sent);
-		assign fbf_read_enable = flit_sent;
-	     end
+	     assign fbf_write_enable
+	       = flit_valid_in & ~(fbc_empty & flit_sent);
 	   
 	   assign fbf_read_active = ~fbc_empty;
 	   assign fbf_read_addr = fbc_pop_addr;
@@ -1206,7 +1199,6 @@ module vcr_ivc_ctrl
 	   assign fbf_write_enable = flit_valid_in;
 	   
 	   assign fbf_read_active = flit_sent_prev;
-	   assign fbf_read_enable = flit_sent_prev;
 	   
 	   wire [0:fbc_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
@@ -1239,7 +1231,6 @@ module vcr_ivc_ctrl
       .write_address(fbf_write_addr),
       .write_data(fbf_write_data),
       .read_active(fbf_read_active),
-      .read_enable(fbf_read_enable),
       .read_address(fbf_read_addr),
       .read_data(fbf_read_data));
    

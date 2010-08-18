@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module c_regfile
   (clk, write_active, write_enable, write_address, write_data, read_active, 
-   read_enable, read_address, read_data);
+   read_address, read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -68,9 +68,6 @@ module c_regfile
    input [0:width-1] 	  write_data;
    
    input [0:num_read_ports-1] read_active;
-   
-   // if high, read from entries selected by read_address
-   input [0:num_read_ports-1] read_enable;
    
    // entries to read out
    input [0:num_read_ports*addr_width-1] read_address;
@@ -370,15 +367,11 @@ module c_regfile
 		  wire port_read_active;
 		  assign port_read_active = read_active[read_port];
 		  
-		  wire port_read_enable;
-		  assign port_read_enable = read_enable[read_port];
-		  
 		  reg [0:width-1] port_buffered_data;
-		  always @(clk, read_active, port_read_enable, port_cell_data)
+		  always @(clk, read_active, port_cell_data)
 		    if(clk)
 		      if(port_read_active)
-			if(port_read_enable)
-			  port_buffered_data <= port_cell_data;
+			port_buffered_data <= port_cell_data;
 		  
 		  assign port_read_data = port_buffered_data;
 		  
