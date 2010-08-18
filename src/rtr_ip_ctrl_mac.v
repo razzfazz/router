@@ -708,9 +708,6 @@ module rtr_ip_ctrl_mac
 	   wire 			   head_received;
 	   assign head_received = chi_flit_valid & chi_flit_head;
 	   
-	   wire 			   tail_received;
-	   assign tail_received = chi_flit_valid & chi_flit_tail;
-	   
 	   wire 			   tail_sent;
 	   assign tail_sent = flit_sent_in & flit_tail_out;
 	   
