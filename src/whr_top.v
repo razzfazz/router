@@ -145,16 +145,16 @@ module whr_top
    parameter input_stage_can_hold = 0;
    
    // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for head/tail FIFO register file
-   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for head/tail tracker register file
+   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for header data FIFO register file
-   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for header data tracker register file
+   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for tail FIFO register file
-   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for tail sent tracker register file
+   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -250,9 +250,9 @@ module whr_top
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .input_stage_can_hold(input_stage_can_hold),
-	       .fbf_regfile_type(fbf_regfile_type),
-	       .htff_regfile_type(htff_regfile_type),
-	       .hdff_regfile_type(hdff_regfile_type),
+	       .fb_regfile_type(fb_regfile_type),
+	       .htt_regfile_type(htt_regfile_type),
+	       .hdt_regfile_type(hdt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
@@ -387,7 +387,7 @@ module whr_top
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
-	       .tff_regfile_type(tff_regfile_type),
+	       .tst_regfile_type(tst_regfile_type),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(op),
 	       .reset_type(reset_type))

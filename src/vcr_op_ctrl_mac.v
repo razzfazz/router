@@ -127,8 +127,8 @@ module vcr_op_ctrl_mac
    // controller
    parameter track_vcs_at_output = 0;
    
-   // select implementation variant for tail flit FIFO
-   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for tail sent tracker register file
+   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
@@ -281,7 +281,7 @@ module vcr_op_ctrl_mac
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .tff_regfile_type(tff_regfile_type),
+	       .tst_regfile_type(tst_regfile_type),
 	       .reset_type(reset_type))
 	   ovcc
 	     (.clk(clk),

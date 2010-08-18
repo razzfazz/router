@@ -173,19 +173,13 @@ module whr_ip_ctrl_mac
    localparam fbf_addr_width = clogb(fbf_depth);
    
    // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // required address width for head/tail FIFO
-   localparam htff_addr_width = clogb(num_flits_per_vc - 1);
+   // select implementation variant for head/tail tracker register file
+   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for head/tail FIFO register file
-   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // required address width for header data FIFO
-   localparam hdff_addr_width = clogb(num_packets_per_vc - 1);
-   
-   // select implementation variant for header data FIFO register file
-   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for header data tracker register file
+   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -475,7 +469,7 @@ module whr_ip_ctrl_mac
    c_fifo
      #(.depth(fbf_depth - 1),
        .width(2),
-       .regfile_type(htff_regfile_type),
+       .regfile_type(htt_regfile_type),
        .enable_bypass(1),
        .reset_type(reset_type))
    htff
@@ -571,7 +565,7 @@ module whr_ip_ctrl_mac
    c_fifo
      #(.depth(num_packets_per_vc - 1),
        .width(hop_route_info_width),
-       .regfile_type(hdff_regfile_type),
+       .regfile_type(hdt_regfile_type),
        .enable_bypass(1),
        .reset_type(reset_type))
    hdff
@@ -847,7 +841,7 @@ module whr_ip_ctrl_mac
    c_regfile
      #(.depth(fbf_depth),
        .width(flit_data_width),
-       .regfile_type(fbf_regfile_type))
+       .regfile_type(fb_regfile_type))
    fbf
      (.clk(clk),
       .write_active(fbf_write_active),

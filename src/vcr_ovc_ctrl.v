@@ -121,8 +121,8 @@ module vcr_ovc_ctrl
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
-   // select implementation variant for tail flit FIFO
-   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for tail sent tracker register file
+   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // required address width for tail flit FIFO
    localparam tff_addr_width = clogb(num_flits_per_vc);
@@ -385,7 +385,7 @@ module vcr_ovc_ctrl
 		c_fifo
 		  #(.depth(num_flits_per_vc),
 		    .width(1),
-		    .regfile_type(tff_regfile_type),
+		    .regfile_type(tst_regfile_type),
 		    .reset_type(reset_type))
 		tff
 		  (.clk(clk),

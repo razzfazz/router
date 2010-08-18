@@ -95,8 +95,8 @@ module rtr_alloc_mac
    // select which arbiter type to use for VC allocation
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select implementation variant for tail FIFO register file
-   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for tail sent tracker register file
+   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -1070,7 +1070,7 @@ module rtr_alloc_mac
 		  #(.num_flits_per_vc(num_flits_per_vc),
 		    .num_packets_per_vc(num_packets_per_vc),
 		    .flow_ctrl_type(flow_ctrl_type),
-		    .tff_regfile_type(tff_regfile_type),
+		    .tst_regfile_type(tst_regfile_type),
 		    .reset_type(reset_type))
 		ovs
 		  (.clk(clk),

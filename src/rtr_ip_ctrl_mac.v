@@ -105,13 +105,13 @@ module rtr_ip_ctrl_mac
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
    // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for head/tail register file
-   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for head/tail tracker register file
+   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for header data FIFO register file
-   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for header data tracker register file
+   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 1;
@@ -685,7 +685,7 @@ module rtr_ip_ctrl_mac
 	   c_regfile
 	     #(.depth(num_flits_per_vc),
 	       .width(flit_data_width),
-	       .regfile_type(fbf_regfile_type))
+	       .regfile_type(fb_regfile_type))
 	   fbf
 	     (.clk(clk),
 	      .write_active(fbf_write_active),
@@ -735,7 +735,7 @@ module rtr_ip_ctrl_mac
 	   c_fifo
 	     #(.depth(num_packets_per_vc - 1),
 	       .width(hop_route_info_width),
-	       .regfile_type(hdff_regfile_type),
+	       .regfile_type(hdt_regfile_type),
 	       .enable_bypass(1),
 	       .reset_type(reset_type))
 	   hdff
@@ -896,7 +896,7 @@ module rtr_ip_ctrl_mac
 	   c_fifo
 	     #(.depth(num_flits_per_vc - 1),
 	       .width(2),
-	       .regfile_type(htff_regfile_type),
+	       .regfile_type(htt_regfile_type),
 	       .enable_bypass(1),
 	       .reset_type(reset_type))
 	   htff

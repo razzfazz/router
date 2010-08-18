@@ -54,8 +54,8 @@ module rtr_vc_state
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
    
-   // select implementation variant for tail FIFO register file
-   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for tail sent tracket register file
+   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -254,7 +254,7 @@ module rtr_vc_state
 		       c_fifo
 			 #(.depth(num_flits_per_vc),
 			   .width(1),
-			   .regfile_type(tff_regfile_type),
+			   .regfile_type(tst_regfile_type),
 			   .reset_type(reset_type))
 		       tff
 			 (.clk(clk),

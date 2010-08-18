@@ -161,8 +161,8 @@ module tc_node_mac
    // enable lookahead routing
    parameter lookahead_routing = 1;
    
-   // select implementation variant for tail FIFO register file
-   parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for tail sent tracker register file
+   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // width required for lookahead routing information
    localparam la_route_info_width
@@ -1123,7 +1123,7 @@ module tc_node_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
-	       .tff_regfile_type(tff_regfile_type),
+	       .tst_regfile_type(tst_regfile_type),
 	       .reset_type(reset_type))
 	   vs
 	     (.clk(clk),

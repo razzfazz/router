@@ -193,9 +193,6 @@ module testbench
    // number of node status signals to accept
    parameter node_status_width = 1;
    
-   // delay before credits are returned
-   parameter credit_delay = 1;
-   
    // RNG seed value
    parameter initial_seed = 0;
    
@@ -237,10 +234,10 @@ module testbench
        .dim_order(dim_order),
        .int_flow_ctrl_type(int_flow_ctrl_type),
        .input_stage_can_hold(input_stage_can_hold),
-       .fbf_regfile_type(fbf_regfile_type),
-       .htff_regfile_type(htff_regfile_type),
-       .hdff_regfile_type(hdff_regfile_type),
-       .tff_regfile_type(tff_regfile_type),
+       .fb_regfile_type(fb_regfile_type),
+       .htt_regfile_type(htt_regfile_type),
+       .hdt_regfile_type(hdt_regfile_type),
+       .tst_regfile_type(tst_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .vc_alloc_type(vc_alloc_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
@@ -262,8 +259,7 @@ module testbench
        .plength_idx_rv_width(plength_idx_rv_width),
        .num_plength_vals(num_plength_vals),
        .packet_count_width(packet_count_width),
-       .done_delay_width(done_delay_width),
-       .credit_delay(credit_delay))
+       .done_delay_width(done_delay_width))
    dut
      (.clk(clk),
       .reset(reset),

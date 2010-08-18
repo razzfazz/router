@@ -198,13 +198,13 @@ module vcr_ip_ctrl_mac
    localparam fbf_addr_width = clogb(fbf_depth);
    
    // select implementation variant for flit buffer register file
-   parameter fbf_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for head/tail register file
-   parameter htff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for head/tail tracker register file
+   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for header data FIFO register file
-   parameter hdff_regfile_type = `REGFILE_TYPE_FF_2D;
+   // select implementation variant for header data tracker register file
+   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -467,9 +467,9 @@ module vcr_ip_ctrl_mac
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
-	       .fbf_regfile_type(fbf_regfile_type),
-	       .htff_regfile_type(htff_regfile_type),
-	       .hdff_regfile_type(hdff_regfile_type),
+	       .fb_regfile_type(fb_regfile_type),
+	       .htt_regfile_type(htt_regfile_type),
+	       .hdt_regfile_type(hdt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_id(ivc),
 	       .port_id(port_id),

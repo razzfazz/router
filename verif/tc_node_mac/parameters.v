@@ -82,8 +82,8 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // such turns)
 parameter restrict_turns = 0;
 
-// select implementation variant for tail FIFO register file
-parameter tff_regfile_type = `REGFILE_TYPE_FF_2D;
+// select implementation variant for tail sent tracker register file
+parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
 
 // enable lookahead routing
 parameter lookahead_routing = 1;
