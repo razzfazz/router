@@ -99,8 +99,7 @@ module testbench
    localparam port_idx_width = clogb(num_ports);
    
    // width required for lookahead routing information
-   localparam la_route_info_width
-     = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
+   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
    
    // total number of bits required for storing routing information
    localparam route_info_width
@@ -270,7 +269,6 @@ module testbench
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .tst_regfile_type(tst_regfile_type),
-       .lookahead_routing(lookahead_routing),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),
@@ -375,7 +373,6 @@ module testbench
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .tst_regfile_type(tst_regfile_type),
-       .lookahead_routing(lookahead_routing),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),

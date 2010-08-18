@@ -182,12 +182,8 @@ module packet_source
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   // enable lookahead routing
-   parameter lookahead_routing = 1;
-   
    // width required for lookahead routing information
-   localparam la_route_info_width
-     = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
+   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -578,61 +574,56 @@ module packet_source
       .input_b({num_message_classes{1'b1}}),
       .result(sel_orc));
    
+   wire [0:num_ports-1] 			       route_op;
+   wire [0:num_resource_classes-1] 		       route_orc;
+   rtr_routing_logic
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .dim_order(dim_order))
+   rtl
+     (.router_address(router_address),
+      .sel_mc(sel_mc),
+      .sel_irc(sel_orc),
+      .route_info(route_info),
+      .route_op(route_op),
+      .route_orc(route_orc));
+   
+   wire [0:port_idx_width-1] 			       route_port;
+   c_encode
+     #(.num_ports(num_ports))
+   route_port_enc
+     (.data_in(route_op),
+      .data_out(route_port));
+   
+   wire [0:la_route_info_width-1] 		       la_route_info;
+   assign la_route_info[0:port_idx_width-1] = route_port;
+   
    generate
       
-      if(lookahead_routing)
+      if(num_resource_classes > 1)
 	begin
 	   
-	   wire [0:num_ports-1] route_op;
-	   wire [0:num_resource_classes-1] route_orc;
-	   rtr_routing_logic
-	     #(.num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
-	       .routing_type(routing_type),
-	       .dim_order(dim_order))
-	   rtl
-	     (.router_address(router_address),
-	      .sel_mc(sel_mc),
-	      .sel_irc(sel_orc),
-	      .route_info(route_info),
-	      .route_op(route_op),
-	      .route_orc(route_orc));
-	   
-	   wire [0:port_idx_width-1] 	   route_port;
+	   wire [0:resource_class_idx_width-1] route_rcsel;
 	   c_encode
-	     #(.num_ports(num_ports))
-	   route_port_enc
-	     (.data_in(route_op),
-	      .data_out(route_port));
+	     #(.num_ports(num_resource_classes))
+	   route_rcsel_enc
+	     (.data_in(route_orc),
+	      .data_out(route_rcsel));
 	   
-	   wire [0:la_route_info_width-1]  la_route_info;
-	   assign la_route_info[0:port_idx_width-1] = route_port;
-	   
-	   if(num_resource_classes > 1)
-	     begin
-		
-		wire [0:resource_class_idx_width-1] route_rcsel;
-		c_encode
-		  #(.num_ports(num_resource_classes))
-		route_rcsel_enc
-		  (.data_in(route_orc),
-		   .data_out(route_rcsel));
-		
-		assign la_route_info[port_idx_width:
-				     port_idx_width+resource_class_idx_width-1]
-		  = route_rcsel;
-		
-	     end
-	   
-	   assign header_info[0:la_route_info_width-1] = la_route_info;
+	   assign la_route_info[port_idx_width:
+				port_idx_width+resource_class_idx_width-1]
+	     = route_rcsel;
 	   
 	end
       
    endgenerate
+   
+   assign header_info[0:la_route_info_width-1] = la_route_info;
    
    wire [0:num_resource_classes*router_addr_width-1] route_info_addresses;
    assign route_info_addresses

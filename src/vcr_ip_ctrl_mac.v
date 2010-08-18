@@ -111,9 +111,6 @@ module vcr_ip_ctrl_mac
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // width required for routing information for a single hop
-   localparam hop_route_info_width = port_idx_width + resource_class_idx_width;
-   
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
@@ -160,12 +157,8 @@ module vcr_ip_ctrl_mac
    // with such turns)
    parameter restrict_turns = 1;
    
-   // enable lookahead routing
-   parameter lookahead_routing = 1;
-   
    // width required for lookahead routing information
-   localparam la_route_info_width
-     = lookahead_routing ? hop_route_info_width : 0;
+   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -397,6 +390,7 @@ module vcr_ip_ctrl_mac
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
    wire [0:num_vcs-1] 				     flit_sent_prev_ivc;
+   wire 					     flit_head_prev;
    wire [0:num_vcs-1] 				     flit_head_ivc;
    wire [0:num_vcs-1] 				     flit_tail_ivc;
    wire [0:num_vcs*flit_data_width-1] 		     flit_data_ivc;
@@ -461,7 +455,6 @@ module vcr_ip_ctrl_mac
 	       .flit_data_width(flit_data_width),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
-	       .lookahead_routing(lookahead_routing),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
@@ -493,6 +486,7 @@ module vcr_ip_ctrl_mac
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
 	      .flit_sent_prev(flit_sent_prev),
+	      .flit_head_prev(flit_head_prev),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .flit_data(flit_data),
@@ -761,6 +755,7 @@ module vcr_ip_ctrl_mac
       .d(flit_head_out_s),
       .q(flit_head_out_q));
    
+   assign flit_head_prev = flit_head_out_q;
    assign int_flit_ctrl_out[1+vc_idx_width] = flit_head_out_q;
    
    wire 				flit_tail_out_s, flit_tail_out_q;

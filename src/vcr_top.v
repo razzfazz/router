@@ -141,9 +141,6 @@ module vcr_top
    // with such turns)
    parameter restrict_turns = 1;
    
-   // enable lookahead routing
-   parameter lookahead_routing = 1;
-   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
@@ -318,7 +315,6 @@ module vcr_top
 	       .flit_data_width(flit_data_width),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
-	       .lookahead_routing(lookahead_routing),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),

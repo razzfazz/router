@@ -132,9 +132,6 @@ module whr_top
    // with such turns)
    parameter restrict_turns = 1;
    
-   // enable lookahead routing
-   parameter lookahead_routing = 1;
-   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
@@ -246,7 +243,6 @@ module whr_top
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
 	       .restrict_turns(restrict_turns),
-	       .lookahead_routing(lookahead_routing),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .input_stage_can_hold(input_stage_can_hold),

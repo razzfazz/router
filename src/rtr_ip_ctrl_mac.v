@@ -95,9 +95,6 @@ module rtr_ip_ctrl_mac
    // with such turns)
    parameter restrict_turns = 1;
    
-   // enable lookahead routing
-   parameter lookahead_routing = 1;
-   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
@@ -169,9 +166,6 @@ module rtr_ip_ctrl_mac
    // width required to select an individual port
    localparam port_idx_width = clogb(num_ports);
    
-   // width required for routing information for a single hop
-   localparam hop_route_info_width = port_idx_width + resource_class_idx_width;
-   
    // width of flow control signals
    localparam flow_ctrl_width
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
@@ -199,8 +193,7 @@ module rtr_ip_ctrl_mac
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width required for lookahead routing information
-   localparam la_route_info_width
-     = lookahead_routing ? hop_route_info_width : 0;
+   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
@@ -211,7 +204,10 @@ module rtr_ip_ctrl_mac
        -1;
    
    // required address size for a single VC's buffer
-   localparam fbc_addr_width = clogb(num_flits_per_vc);
+   localparam fb_addr_width = clogb(num_flits_per_vc);
+   
+   // total number of bits of header information required for each VC
+   localparam hdt_width = la_route_info_width + route_info_width;
    
    
    //---------------------------------------------------------------------------
@@ -270,10 +266,10 @@ module rtr_ip_ctrl_mac
    // channel input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 			     fbc_full_ivc;
+   wire [0:num_vcs-1] 			     fb_full_ivc;
    
    wire 				     chi_active;
-   assign chi_active = ~&fbc_full_ivc;
+   assign chi_active = ~&fb_full_ivc;
    
    wire 				     chi_flit_valid;
    wire 				     chi_flit_head;
@@ -303,231 +299,176 @@ module rtr_ip_ctrl_mac
    wire [0:num_vcs-1] 			     chi_flit_valid_ivc;
    assign chi_flit_valid_ivc = {num_vcs{chi_flit_valid}} & chi_flit_sel_ivc;
    
+   wire [0:header_info_width-1] 	     chi_header_info;
+   assign chi_header_info = chi_flit_data[0:header_info_width-1];
+
+   wire [0:la_route_info_width-1] 	     chi_la_route_info;
+   assign chi_la_route_info = chi_header_info[0:la_route_info_width-1];
+
+   wire [0:route_info_width-1] 		     chi_route_info;
+   assign chi_route_info
+     = chi_header_info[la_route_info_width:
+		       la_route_info_width+route_info_width-1];
+   
    wire [0:num_vcs-1] 			     flit_sent_in_ivc;
    assign flit_sent_in_ivc = {num_vcs{flit_sent_in}} & flit_sel_in_ivc;
    
    
    //---------------------------------------------------------------------------
-   // routing logic
+   // global lookahead routing information decoder
    //---------------------------------------------------------------------------
    
-   wire [0:hop_route_info_width-1] 	     rtl_hop_route_info;
-   wire [0:num_ports-1] 		     rtl_route_op;
-   wire [0:port_idx_width-1] 		     rtl_route_port;
-   wire [0:num_resource_classes-1] 	     rtl_route_orc;
-   wire [0:flit_data_width-1] 		     fbf_write_data;
+   wire [0:num_ports-1] 		     gld_route_op;
+   wire [0:num_resource_classes-1] 	     gld_route_orc;
    
    generate
       
-      begin:rtl
+      begin:gld
 	 
-	 // extract header information from header data
-	 wire [0:header_info_width-1] 	     header_info_in;
-	 assign header_info_in = chi_flit_data[0:header_info_width-1];
+	 wire [0:port_idx_width-1] route_port;
+	 assign route_port = chi_la_route_info[0:port_idx_width-1];
 	 
-	 wire [0:route_info_width-1] 		     route_info_in;
-	 assign route_info_in
-	   = header_info_in[la_route_info_width:
-			    la_route_info_width+route_info_width-1];
+	 wire [0:num_ports-1] 	   route_op;
+	 c_decode
+	   #(.num_ports(num_ports))
+	 route_op_dec
+	   (.data_in(route_port),
+	    .data_out(route_op));
 	 
-	 wire [0:num_packet_classes-1] 		     chi_flit_sel_ipc;
-	 c_mat_mult
-	   #(.dim1_width(num_message_classes*num_resource_classes),
-	     .dim2_width(num_vcs_per_class),
-	     .dim3_width(1),
-	     .prod_op(`BINARY_OP_AND),
-	     .sum_op(`BINARY_OP_OR))
-	 chi_flit_sel_ipc_mmult
-	   (.input_a(chi_flit_sel_ivc),
-	    .input_b({num_vcs_per_class{1'b1}}),
-	    .result(chi_flit_sel_ipc));
+	 wire [0:num_resource_classes-1] route_orc;
 	 
-	 wire [0:num_message_classes-1] 	     chi_flit_sel_mc;
-	 c_mat_mult
-	   #(.dim1_width(num_message_classes),
-	     .dim2_width(num_resource_classes),
-	     .dim3_width(1),
-	     .prod_op(`BINARY_OP_AND),
-	     .sum_op(`BINARY_OP_OR))
-	 chi_flit_sel_mc_mmult
-	   (.input_a(chi_flit_sel_ipc),
-	    .input_b({num_resource_classes{1'b1}}),
-	    .result(chi_flit_sel_mc));
-	 
-	 if(lookahead_routing)
+	 if(num_resource_classes == 1)
+	   assign route_orc = 1'b1;
+	 else if(num_resource_classes > 1)
 	   begin
 	      
-	      wire [0:la_route_info_width-1] la_route_info_in;
-	      assign la_route_info_in = header_info_in[0:la_route_info_width-1];
-	      
-	      assign rtl_hop_route_info = la_route_info_in;
-	      
-	      assign rtl_route_port = la_route_info_in[0:port_idx_width-1];
+	      wire [0:resource_class_idx_width-1] route_rcsel;
+	      assign route_rcsel
+		= chi_la_route_info[port_idx_width:
+				    port_idx_width+resource_class_idx_width-1];
 	      
 	      c_decode
-		#(.num_ports(num_ports))
-	      rtl_route_op_dec
-		(.data_in(rtl_route_port),
-		 .data_out(rtl_route_op));
-	      
-	      if(num_resource_classes == 1)
-		assign rtl_route_orc = 1'b1;
-	      else
-		begin
-		   
-		   wire [0:resource_class_idx_width-1] route_rcsel;
-		   assign route_rcsel
-		     = la_route_info_in[port_idx_width:
-					port_idx_width+
-					resource_class_idx_width-1];
-		   
-		   c_decode
-		     #(.num_ports(num_resource_classes))
-		   rtl_route_orc_dec
-		     (.data_in(route_rcsel),
-		      .data_out(rtl_route_orc));
-		   
-		end
-	      
-	      wire [0:router_addr_width-1] 	       nha_router_address;
-	      rtr_next_hop_addr
-		#(.num_resource_classes(num_resource_classes),
-		  .num_routers_per_dim(num_routers_per_dim),
-		  .num_dimensions(num_dimensions),
-		  .num_nodes_per_router(num_nodes_per_router),
-		  .connectivity(connectivity),
-		  .routing_type(routing_type))
-	      nha
-		(.router_address(router_address),
-		 .route_info(route_info_in),
-		 .la_route_info(la_route_info_in),
-		 .next_router_address(nha_router_address));
-	      
-	      wire [0:num_ports-1] 		       nrtl_route_op;
-	      wire [0:num_resource_classes-1] 	       nrtl_route_orc;
-	      rtr_routing_logic
-		#(.num_message_classes(num_message_classes),
-		  .num_resource_classes(num_resource_classes),
-		  .num_routers_per_dim(num_routers_per_dim),
-		  .num_dimensions(num_dimensions),
-		  .num_nodes_per_router(num_nodes_per_router),
-		  .connectivity(connectivity),
-		  .routing_type(routing_type),
-		  .dim_order(dim_order))
-	      nrtl
-		(.router_address(nha_router_address),
-		 .sel_mc(chi_flit_sel_mc),
-		 .sel_irc(rtl_route_orc),
-		 .route_info(route_info_in),
-		 .route_op(nrtl_route_op),
-		 .route_orc(nrtl_route_orc));
-	      
-	      wire [0:port_idx_width-1] 	       nrtl_route_port;
-	      c_encode
-		#(.num_ports(num_ports))
-	      nrtl_route_port_enc
-		(.data_in(nrtl_route_op),
-		 .data_out(nrtl_route_port));
-	      
-	      wire [0:la_route_info_width-1] 	       la_route_info_out;
-	      assign la_route_info_out[0:port_idx_width-1] = nrtl_route_port;
-	      
-	      if(num_resource_classes > 1)
-		begin
-		   
-		   wire [0:resource_class_idx_width-1] nrtl_route_rcsel;
-		   c_encode
-		     #(.num_ports(num_resource_classes))
-		   nrtl_route_rcsel_enc
-		     (.data_in(nrtl_route_orc),
-		      .data_out(nrtl_route_rcsel));
-		   
-		   assign la_route_info_out[port_idx_width:
-					    port_idx_width+
-					    resource_class_idx_width-1]
-		     = nrtl_route_rcsel;
-		
-		end
-	      
-	      // update lookahead routing information for head flits
-	      assign fbf_write_data[0:la_route_info_width-1]
-		= chi_flit_head ? la_route_info_out : la_route_info_in;
+		#(.num_ports(num_resource_classes))
+	      route_orc_dec
+		(.data_in(route_rcsel),
+		 .data_out(route_orc));
 	      
 	   end
-	 else
-	   begin
-	      
-	      wire [0:num_resource_classes-1] chi_flit_sel_irc;
-	      c_binary_op
-		#(.num_ports(num_message_classes),
-		  .width(num_resource_classes),
-		  .op(`BINARY_OP_OR))
-	      chi_flit_sel_irc_or
-		(.data_in(chi_flit_sel_ipc),
-		 .data_out(chi_flit_sel_irc));
-	      
-	      rtr_routing_logic
-		#(.num_message_classes(num_message_classes),
-		  .num_resource_classes(num_resource_classes),
-		  .num_routers_per_dim(num_routers_per_dim),
-		  .num_dimensions(num_dimensions),
-		  .num_nodes_per_router(num_nodes_per_router),
-		  .connectivity(connectivity),
-		  .routing_type(routing_type),
-		  .dim_order(dim_order))
-	      crtl
-		(.router_address(router_address),
-		 .sel_mc(chi_flit_sel_mc),
-		 .sel_irc(chi_flit_sel_irc),
-		 .route_info(route_info_in),
-		 .route_op(rtl_route_op),
-		 .route_orc(rtl_route_orc));
-	      
-	      c_encode
-		#(.num_ports(num_ports))
-	      rtl_route_port_enc
-		(.data_in(rtl_route_op),
-		 .data_out(rtl_route_port));
-	      
-	      assign rtl_hop_route_info[0:port_idx_width-1] = rtl_route_port;
-	      
-	      if(num_resource_classes > 1)
-		begin
-		   
-		   wire [0:resource_class_idx_width-1] rtl_route_rcsel;
-		   c_encode
-		     #(.num_ports(num_resource_classes))
-		   rtl_route_rcsel_enc
-		     (.data_in(rtl_route_orc),
-		      .data_out(rtl_route_rcsel));
-		   
-		   assign rtl_hop_route_info[port_idx_width:
-					     port_idx_width+
-					     resource_class_idx_width-1]
-		     = rtl_route_rcsel;
-		   
-		end
-	      
-	   end
+	 
+	 assign gld_route_op = route_op;
+	 assign gld_route_orc = route_orc;
 	 
       end
       
    endgenerate
    
-   assign fbf_write_data[la_route_info_width:flit_data_width-1]
-     = chi_flit_data[la_route_info_width:flit_data_width-1];
+   
+   //---------------------------------------------------------------------------
+   // local lookahead routing information update logic
+   //---------------------------------------------------------------------------
+   
+   wire [0:la_route_info_width-1] 		  glu_la_route_info;
+   wire [0:flit_data_width-1] 			  glu_flit_data;
+   
+   generate
+      
+      begin:glu
+	 
+	 wire [0:router_addr_width-1] next_router_address;
+	 rtr_next_hop_addr
+	   #(.num_resource_classes(num_resource_classes),
+	     .num_routers_per_dim(num_routers_per_dim),
+	     .num_dimensions(num_dimensions),
+	     .num_nodes_per_router(num_nodes_per_router),
+	     .connectivity(connectivity),
+	     .routing_type(routing_type))
+	 nha
+	   (.router_address(router_address),
+	    .route_info(chi_route_info),
+	    .la_route_info(chi_la_route_info),
+	    .next_router_address(next_router_address));
+	 
+	 wire [0:num_message_classes-1] sel_mc;
+	 c_mat_mult
+	   #(.dim1_width(num_message_classes),
+	     .dim2_width(num_resource_classes*num_vcs_per_class),
+	     .dim3_width(1),
+	     .prod_op(`BINARY_OP_AND),
+	     .sum_op(`BINARY_OP_OR))
+	 sel_mc_mmult
+	   (.input_a(chi_flit_sel_ivc),
+	    .input_b({(num_resource_classes*num_vcs_per_class){1'b1}}),
+	    .result(sel_mc));
+	 
+	 wire [0:num_ports-1] 		route_op;
+	 wire [0:num_resource_classes-1] route_orc;
+	 rtr_routing_logic
+	   #(.num_message_classes(num_message_classes),
+	     .num_resource_classes(num_resource_classes),
+	     .num_routers_per_dim(num_routers_per_dim),
+	     .num_dimensions(num_dimensions),
+	     .num_nodes_per_router(num_nodes_per_router),
+	     .connectivity(connectivity),
+	     .routing_type(routing_type),
+	     .dim_order(dim_order))
+	 rtl
+	   (.router_address(next_router_address),
+	    .sel_mc(sel_mc),
+	    .sel_irc(gld_route_orc),
+	    .route_info(chi_route_info),
+	    .route_op(route_op),
+	    .route_orc(route_orc));
+	 
+	 wire [0:port_idx_width-1] 	 route_port;
+	 c_encode
+	   #(.num_ports(num_ports))
+	 route_port_enc
+	   (.data_in(route_op),
+	    .data_out(route_port));
+	 
+	 wire [0:la_route_info_width-1]  la_route_info;
+	 assign la_route_info[0:port_idx_width-1] = route_port;
+	 
+	 if(num_resource_classes > 1)
+	   begin
+	      
+	      wire [0:resource_class_idx_width-1] route_rcsel;
+	      c_encode
+		#(.num_ports(num_resource_classes))
+	      route_rcsel_enc
+		(.data_in(route_orc),
+		 .data_out(route_rcsel));
+	      
+	      assign la_route_info[port_idx_width:
+				   port_idx_width+resource_class_idx_width-1]
+		= route_rcsel;
+	      
+	   end
+	 
+	 assign glu_la_route_info = la_route_info;
+	 assign glu_flit_data[0:la_route_info_width-1]
+	   = (chi_flit_valid & chi_flit_head) ? 
+	     la_route_info : 
+	     chi_flit_data[0:la_route_info_width-1];
+	 assign glu_flit_data[la_route_info_width:flit_data_width-1]
+	   = chi_flit_data[la_route_info_width:flit_data_width-1];
+	 
+      end
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				       fbf_read_active_ivc;
-   wire [0:num_vcs*flit_data_width-1] 		       fbf_read_data_ivc;
-   wire [0:num_vcs-1] 				       fbc_empty_ivc;
-   wire [0:num_vcs*9-1] 			       errors_ivc;
+   wire [0:num_vcs-1] 				  flit_sent_prev_ivc;
+   wire 					  flit_head_prev;
+   wire [0:num_vcs-1] 				  fb_empty_ivc;
+   wire [0:num_vcs*flit_data_width-1] 		  llu_flit_data_ivc;
+   wire [0:num_vcs*9-1] 			  errors_ivc;
    
-   genvar 					       ivc;
+   genvar 					  ivc;
    
    generate
       
@@ -544,8 +485,8 @@ module rtr_ip_ctrl_mac
 	   wire flit_sent_in;
 	   assign flit_sent_in = flit_sent_in_ivc[ivc];
 	   
-	   wire fbf_read_active;
-	   assign fbf_read_active = fbf_read_active_ivc[ivc];
+	   wire flit_sent_prev;
+	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -561,15 +502,15 @@ module rtr_ip_ctrl_mac
 	   wire flit_tail_out;
 	   assign flit_tail_out_ivc[ivc] = flit_tail_out;
 	   
-	   wire fbc_empty;
-	   assign fbc_empty_ivc[ivc] = fbc_empty;
+	   wire fb_empty;
+	   assign fb_empty_ivc[ivc] = fb_empty;
 	   
-	   wire fbc_full;
-	   assign fbc_full_ivc[ivc] = fbc_full;
+	   wire fb_full;
+	   assign fb_full_ivc[ivc] = fb_full;
 	   
-	   wire [0:flit_data_width-1] fbf_read_data;
-	   assign fbf_read_data_ivc[ivc*flit_data_width:
-				    (ivc+1)*flit_data_width-1] = fbf_read_data;
+	   wire [0:flit_data_width-1] llu_flit_data;
+	   assign llu_flit_data_ivc[ivc*flit_data_width:
+				    (ivc+1)*flit_data_width-1] = llu_flit_data;
 	   
 	   wire [0:num_ports-1]      route_out_op;
 	   assign route_out_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
@@ -585,254 +526,400 @@ module rtr_ip_ctrl_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // flit buffer control
+	   // flit buffer
 	   //-------------------------------------------------------------------
 	   
 	   wire 			   push_active;
 	   assign push_active = chi_flit_valid;
 	   
-	   assign flit_valid_out = chi_flit_valid | ~fbc_empty;
-	   
 	   wire 			   pop_active;
 	   assign pop_active = flit_valid_out;
 	   
-	   wire 			   fbc_push;
-	   assign fbc_push = chi_flit_valid;
+	   wire 			   error_fb_underflow;
+	   wire 			   error_fb_overflow;
 	   
-	   wire 			   fbc_pop;
-	   assign fbc_pop = flit_sent_in;
+	   wire [0:flit_data_width-1] 	   fb_flit_data;
 	   
-	   wire [0:fbc_addr_width-1] 	   fbc_push_addr;
-	   wire [0:fbc_addr_width-1] 	   fbc_pop_addr;
-	   wire 			   fbc_almost_empty;
-	   wire 			   fbc_almost_full;
-	   wire [0:1] 			   fbc_errors;
-	   c_fifo_ctrl
-	     #(.depth(num_flits_per_vc),
-	       .reset_type(reset_type))
-	   fbc
-	     (.clk(clk),
-	      .reset(reset),
-	      .push_active(push_active),
-	      .pop_active(pop_active),
-	      .push(fbc_push),
-	      .pop(fbc_pop),
-	      .push_addr(fbc_push_addr),
-	      .pop_addr(fbc_pop_addr),
-	      .almost_empty(fbc_almost_empty),
-	      .empty(fbc_empty),
-	      .almost_full(fbc_almost_full),
-	      .full(fbc_full),
-	      .errors(fbc_errors));
+	   begin:fb
+	      
+	      wire push;
+	      assign push = chi_flit_valid;
+	      
+	      wire pop;
+	      assign pop = flit_sent_in;
+	      
+	      wire [0:fb_addr_width-1] push_addr;
+	      wire [0:fb_addr_width-1] pop_addr;
+	      wire 		       almost_empty;
+	      wire 		       empty;
+	      wire 		       almost_full;
+	      wire 		       full;
+	      wire [0:1] 	       errors;
+	      c_fifo_ctrl
+		#(.depth(num_flits_per_vc),
+		  .reset_type(reset_type))
+	      fc
+		(.clk(clk),
+		 .reset(reset),
+		 .push_active(push_active),
+		 .pop_active(pop_active),
+		 .push(push),
+		 .pop(pop),
+		 .push_addr(push_addr),
+		 .pop_addr(pop_addr),
+		 .almost_empty(almost_empty),
+		 .empty(empty),
+		 .almost_full(almost_full),
+		 .full(full),
+		 .errors(errors));
+	      
+	      wire 		       write_enable;
+	      wire 		       read_active;
+	      wire [0:fb_addr_width-1] read_addr;
+	      
+	      if(explicit_pipeline_register)
+		begin
+		   
+		   if(explicit_pipeline_register == 1)
+		     assign write_enable = chi_flit_valid;
+		   else if(explicit_pipeline_register > 1)
+		     assign write_enable
+		       = chi_flit_valid & ~(empty & flit_sent_in);
+		   
+		   assign read_active = ~empty;
+		   
+		   assign read_addr = pop_addr;
+		   
+		end
+	      else
+		begin
+		   
+		   assign write_enable = chi_flit_valid;
+		   
+		   wire [0:fb_addr_width-1] read_addr_s, read_addr_q;
+		   assign read_addr_s = pop_addr;
+		   c_dff
+		     #(.width(fb_addr_width),
+		       .reset_type(reset_type))
+		   read_addrq
+		     (.clk(clk),
+		      .reset(1'b0),
+		      .active(pop_active),
+		      .d(read_addr_s),
+		      .q(read_addr_q));
+		   
+		   assign read_active = flit_sent_prev;
+		   
+		   assign read_addr = read_addr_q;
+		   
+		end
+	      
+	      wire [0:flit_data_width-1]    read_data;
+	      c_regfile
+		#(.depth(num_flits_per_vc),
+		  .width(flit_data_width),
+		  .regfile_type(fb_regfile_type))
+	      rf
+		(.clk(clk),
+		 .write_active(push_active),
+		 .write_enable(write_enable),
+		 .write_address(push_addr),
+		 .write_data(chi_flit_data),
+		 .read_active(read_active),
+		 .read_address(read_addr),
+		 .read_data(read_data));
+	      
+	      assign error_fb_underflow = errors[0];
+	      assign error_fb_overflow = errors[1];
+	      
+	      assign fb_empty = empty;
+	      assign fb_full = full;
+	      assign fb_flit_data = read_data;
+	      
+	   end
 	   
-	   wire 			   error_fbc_underflow;
-	   assign error_fbc_underflow = fbc_errors[0];
-	   
-	   wire 			   error_fbc_overflow;
-	   assign error_fbc_overflow = fbc_errors[1];
+	   assign flit_valid_out = chi_flit_valid | ~fb_empty;
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // flit buffer
+	   // track whether frontmost flit is head or tail
 	   //-------------------------------------------------------------------
 	   
-	   wire 			   fbf_write_active;
-	   assign fbf_write_active = push_active;
+	   wire 			  htt_flit_head;
+	   wire 			  htt_flit_tail;
 	   
-	   wire [0:fbc_addr_width-1] 	   fbf_write_addr;
-	   assign fbf_write_addr = fbc_push_addr;
+	   wire 			  error_htt_underflow;
+	   wire 			  error_htt_overflow;
 	   
-	   wire 			   fbf_write_enable;
-	   wire [0:fbc_addr_width-1] 	   fbf_read_addr;
+	   begin:htt
+	      
+	      wire empty;
+	      
+	      wire push;
+	      assign push = chi_flit_valid;
+	      
+	      wire pop;
+	      assign pop = (flit_sent_in | fb_empty) & (~empty | push);
+	      
+	      wire [0:1] push_data;
+	      assign push_data[0] = chi_flit_head;
+	      assign push_data[1] = chi_flit_tail;
+	      
+	      wire [0:1] pop_data;
+	      wire 	 almost_full;
+	      wire 	 full;
+	      wire 	 almost_empty;
+	      wire [0:1] errors;
+	      c_fifo
+		#(.depth(num_flits_per_vc - 1),
+		  .width(2),
+		  .regfile_type(htt_regfile_type),
+		  .enable_bypass(1),
+		  .reset_type(reset_type))
+	      ff
+		(.clk(clk),
+		 .reset(reset),
+		 .push_active(push_active),
+		 .pop_active(pop_active),
+		 .push(push),
+		 .pop(pop),
+		 .push_data(push_data),
+		 .pop_data(pop_data),
+		 .almost_empty(almost_empty),
+		 .empty(empty),
+		 .almost_full(almost_full),
+		 .full(full),
+		 .errors(errors));
+	      
+	      wire 	 flit_head;
+	      assign flit_head = pop_data[0];
+	      
+	      wire 	 flit_tail;
+	      assign flit_tail = pop_data[1];
+	      
+	      wire 	 capture;
+	      assign capture = (fb_empty & chi_flit_valid) | 
+			       (flit_sent_in & (~empty | chi_flit_valid));
+	      
+	      wire 	 flit_head_s;
+	      wire 	 flit_head_q;
+	      assign flit_head_s = capture ? flit_head : flit_head_q;
+	      c_dff
+		#(.width(1),
+		  .reset_type(reset_type))
+	      flit_headq
+		(.clk(clk),
+		 .reset(1'b0),
+		 .active(pop_active),
+		 .d(flit_head_s),
+		 .q(flit_head_q));
+	      
+	      wire 	 flit_tail_s;
+	      wire 	 flit_tail_q;
+	      assign flit_tail_s = capture ? flit_tail : flit_tail_q;
+	      c_dff
+		#(.width(1),
+		  .reset_type(reset_type))
+	      flit_tailq
+		(.clk(clk),
+		 .reset(1'b0),
+		 .active(pop_active),
+		 .d(flit_tail_s),
+		 .q(flit_tail_q));
+	      
+	      assign error_htt_underflow = errors[0];		
+	      assign error_htt_overflow = errors[1];
+	      
+	      assign htt_flit_head = fb_empty ? chi_flit_head : flit_head_q;
+	      assign htt_flit_tail = fb_empty ? chi_flit_tail : flit_tail_q;
+	      
+	   end
 	   
-	   if(explicit_pipeline_register)
-	     begin
-		
-		if(explicit_pipeline_register == 1)
-		  assign fbf_write_enable = chi_flit_valid;
-		else if(explicit_pipeline_register > 1)
-		  assign fbf_write_enable
-		    = chi_flit_valid & ~(fbc_empty & flit_sent_in);
-		
-		assign fbf_read_addr = fbc_pop_addr;
-		
-	     end
-	   else
-	     begin
-		
-		assign fbf_write_enable = chi_flit_valid;
-		
-		wire [0:fbc_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-		assign fbf_read_addr_s = fbc_pop_addr;
-		c_dff
-		  #(.width(fbc_addr_width),
-		    .reset_type(reset_type))
-		fbf_read_addrq
-		  (.clk(clk),
-		   .reset(1'b0),
-		   .active(pop_active),
-		   .d(fbf_read_addr_s),
-		   .q(fbf_read_addr_q));
-		
-		assign fbf_read_addr = fbf_read_addr_q;
-				
-	     end
-	   
-	   c_regfile
-	     #(.depth(num_flits_per_vc),
-	       .width(flit_data_width),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(fbf_write_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_active(fbf_read_active),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
+	   assign flit_head_out = htt_flit_head;
+	   assign flit_tail_out = htt_flit_tail;
 	   
 	   
 	   //-------------------------------------------------------------------
 	   // track routing information for frontmost packet
 	   //-------------------------------------------------------------------
 	   
-	   wire 			   flags_active;
-	   assign flags_active = flit_valid_out;
+	   wire 	 hdt_valid;
+	   wire [0:la_route_info_width-1] hdt_la_route_info;
+	   wire [0:route_info_width-1] 	  hdt_route_info;
 	   
-	   wire 			   head_received;
-	   assign head_received = chi_flit_valid & chi_flit_head;
+	   wire 			  error_hdt_underflow;
+	   wire 			  error_hdt_overflow;
+	   wire 			  error_no_header;
 	   
-	   wire 			   tail_sent;
-	   assign tail_sent = flit_sent_in & flit_tail_out;
+	   begin:hdt
+	      
+	      wire head_received;
+	      assign head_received = chi_flit_valid & chi_flit_head;
+	      
+	      wire tail_sent;
+	      assign tail_sent = flit_sent_in & flit_tail_out;
+	      
+	      wire push;
+	      assign push = head_received;
+	      
+	      wire empty;
+	      
+	      wire pop;
+	      assign pop = (tail_sent | ~hdt_valid) & (~empty | push);
+	      
+	      wire [0:hdt_width-1] push_data;
+	      assign push_data[0:la_route_info_width-1] = chi_la_route_info;
+	      assign push_data[la_route_info_width:
+			       la_route_info_width+route_info_width-1]
+		= chi_route_info;
+	      
+	      wire [0:hdt_width-1] pop_data;
+	      wire 		   almost_full;
+	      wire 		   full;
+	      wire 		   almost_empty;
+	      wire [0:1] 	   errors;
+	      c_fifo
+		#(.depth(num_packets_per_vc - 1),
+		  .width(hdt_width),
+		  .regfile_type(hdt_regfile_type),
+		  .enable_bypass(1),
+		  .reset_type(reset_type))
+	      ff
+		(.clk(clk),
+		 .reset(reset),
+		 .push_active(push_active),
+		 .pop_active(pop_active),
+		 .push(push),
+		 .pop(pop),
+		 .push_data(push_data),
+		 .pop_data(pop_data),
+		 .almost_empty(almost_empty),
+		 .empty(empty),
+		 .almost_full(almost_full),
+		 .full(full),
+		 .errors(errors));
+	      
+	      wire [0:la_route_info_width-1] la_route_info;
+	      assign la_route_info = pop_data[0:la_route_info_width-1];
+	      
+	      wire [0:route_info_width-1]    route_info;
+	      assign route_info
+		= pop_data[la_route_info_width:
+			   la_route_info_width+route_info_width-1];
+	      
+	      wire 			     valid_s, valid_q;
+	      assign valid_s = valid_q ?
+			       (~tail_sent | ~empty | head_received) : 
+			       (chi_flit_valid & ~tail_sent);
+	      c_dff
+		#(.width(1),
+		  .reset_type(reset_type))
+	      validq
+		(.clk(clk),
+		 .reset(reset),
+		 .active(pop_active),
+		 .d(valid_s),
+		 .q(valid_q));
+	      
+	      wire 			     capture;
+	      assign capture = (~hdt_valid & chi_flit_valid) | 
+			       (tail_sent & (~empty | chi_flit_valid));
+	      
+	      wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
+	      assign la_route_info_s
+		= capture ? la_route_info : la_route_info_q;
+	      c_dff
+		#(.width(la_route_info_width),
+		  .reset_type(reset_type))
+	      la_route_infoq
+		(.clk(clk),
+		 .reset(1'b0),
+		 .active(pop_active),
+		 .d(la_route_info_s),
+		 .q(la_route_info_q));
+	      
+	      wire [0:route_info_width-1]    route_info_s, route_info_q;
+	      assign route_info_s = capture ? route_info : route_info_q;
+	      c_dff
+		#(.width(route_info_width),
+		  .reset_type(reset_type))
+	      route_infoq
+		(.clk(clk),
+		 .reset(1'b0),
+		 .active(pop_active),
+		 .d(route_info_s),
+		 .q(route_info_q));
+	      
+	      assign hdt_valid = valid_q;
+	      assign hdt_la_route_info = la_route_info_q;
+	      assign hdt_route_info = route_info_q;
+	      
+	      assign error_hdt_underflow = errors[0];
+	      assign error_hdt_overflow = errors[1];	   
+	      assign error_no_header
+		= ~hdt_valid & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
+	      
+	   end
 	   
-	   wire 			   hdr_valid;
-	   wire 			   hdff_empty;
 	   
-	   wire 			   hdff_push;
-	   assign hdff_push = head_received;
+	   //-------------------------------------------------------------------
+	   // local lookahead routing information decoder
+	   //-------------------------------------------------------------------
 	   
-	   wire [0:hop_route_info_width-1] hdff_push_data;
-	   assign hdff_push_data = rtl_hop_route_info;
+	   wire [0:num_ports-1] 	  lld_route_op;
+	   wire [0:num_resource_classes-1] lld_route_orc;
 	   
-	   wire 			   hdff_pop;
-	   assign hdff_pop
-	     = (tail_sent | ~hdr_valid) & (~hdff_empty | hdff_push);
+	   begin:lld
+	      
+	      wire [0:port_idx_width-1] route_port;
+	      assign route_port = hdt_la_route_info[0:port_idx_width-1];
+	      
+	      wire [0:num_ports-1] 	route_op;
+	      c_decode
+		#(.num_ports(num_ports))
+	      route_op_dec
+		(.data_in(route_port),
+		 .data_out(route_op));
+	      
+	      wire [0:num_resource_classes-1] route_orc;
+	      
+	      if(num_resource_classes == 1)
+		assign route_orc = 1'b1;
+	      else if(num_resource_classes > 1)
+		begin
+		   
+		   wire [0:resource_class_idx_width-1] route_rcsel;
+		   assign route_rcsel
+		     = hdt_la_route_info[port_idx_width:
+					 port_idx_width+
+					 resource_class_idx_width-1];
+		   
+		   c_decode
+		     #(.num_ports(num_resource_classes))
+		   route_orc_dec
+		     (.data_in(route_rcsel),
+		      .data_out(route_orc));
+		   
+		end
+	      
+	      assign lld_route_op = route_op;
+	      assign lld_route_orc = route_orc;
+	      
+	   end
 	   
-	   wire [0:hop_route_info_width-1] hdff_pop_data;
-	   wire 			   hdff_almost_full;
-	   wire 			   hdff_full;
-	   wire 			   hdff_almost_empty;
-	   wire [0:1] 			   hdff_errors;
-	   c_fifo
-	     #(.depth(num_packets_per_vc - 1),
-	       .width(hop_route_info_width),
-	       .regfile_type(hdt_regfile_type),
-	       .enable_bypass(1),
-	       .reset_type(reset_type))
-	   hdff
-	     (.clk(clk),
-	      .reset(reset),
-	      .push_active(push_active),
-	      .pop_active(pop_active),
-	      .push(hdff_push),
-	      .pop(hdff_pop),
-	      .push_data(hdff_push_data),
-	      .pop_data(hdff_pop_data),
-	      .almost_empty(hdff_almost_empty),
-	      .empty(hdff_empty),
-	      .almost_full(hdff_almost_full),
-	      .full(hdff_full),
-	      .errors(hdff_errors));
 	   
-	   wire [0:hop_route_info_width-1] hdff_hop_route_info;
-	   assign hdff_hop_route_info = hdff_pop_data;
+	   //-------------------------------------------------------------------
+	   // generate routing control signals
+	   //-------------------------------------------------------------------
 	   
-	   wire 			   error_hdff_underflow;
-	   assign error_hdff_underflow = hdff_errors[0];
+	   wire [0:num_ports-1] 		       route_unmasked_op;
+	   assign route_unmasked_op = hdt_valid ? lld_route_op : gld_route_op;
 	   
-	   wire 			   error_hdff_overflow;
-	   assign error_hdff_overflow = hdff_errors[1];
+	   wire [0:num_resource_classes-1] 	       route_unmasked_orc;
+	   assign route_unmasked_orc
+	     = hdt_valid ? lld_route_orc : gld_route_orc;
 	   
-	   wire hdr_valid_s, hdr_valid_q;
-	   assign hdr_valid_s = hdr_valid_q ?
-				(~tail_sent | ~hdff_empty | head_received) : 
-				(chi_flit_valid & ~tail_sent);
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   hdr_validq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(flags_active),
-	      .d(hdr_valid_s),
-	      .q(hdr_valid_q));
-	   
-	   assign hdr_valid = hdr_valid_q;
-	   
-	   wire error_no_header;
-	   assign error_no_header
-	     = ~hdr_valid & (~fbc_empty | (chi_flit_valid & ~chi_flit_head));
-	   
-	   wire 			   hdr_capture;
-	   assign hdr_capture = (~hdr_valid & chi_flit_valid) | 
-				(tail_sent & (~hdff_empty | chi_flit_valid));
-	   
-	   wire [0:hop_route_info_width-1] hdr_hop_route_info_s;
-	   wire [0:hop_route_info_width-1] hdr_hop_route_info_q;
-	   assign hdr_hop_route_info_s
-	     = hdr_capture ? hdff_hop_route_info : hdr_hop_route_info_q;
-	   c_dff
-	     #(.width(hop_route_info_width),
-	       .reset_type(reset_type))
-	   hdr_hop_route_infoq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(flags_active),
-	      .d(hdr_hop_route_info_s),
-	      .q(hdr_hop_route_info_q));
-	   
-	   wire [0:hop_route_info_width-1] hdr_hop_route_info;
-	   assign hdr_hop_route_info = hdr_hop_route_info_q;
-	   
-	   wire [0:port_idx_width-1] 	   hdr_route_port;
-	   assign hdr_route_port = hdr_hop_route_info[0:port_idx_width-1];
-	   
-	   wire [0:num_ports-1] 	   hdr_route_op;
-	   c_decode
-	     #(.num_ports(num_ports))
-	   hdr_route_op_dec
-	     (.data_in(hdr_route_port),
-	      .data_out(hdr_route_op));
-	   
-	   wire [0:num_ports-1] 	   route_raw_op;
-	   assign route_raw_op = hdr_valid ? hdr_route_op : rtl_route_op;
-	   
-	   wire [0:num_resource_classes-1] route_raw_orc;
-	   if(num_resource_classes == 1)
-	     assign route_raw_orc = 1'b1;
-	   else if(num_resource_classes > 1)
-	     begin
-		
-		wire [0:resource_class_idx_width-1] hdr_route_rcsel;
-		assign hdr_route_rcsel
-		  = hdr_hop_route_info[port_idx_width:
-				       port_idx_width+
-				       resource_class_idx_width-1];
-		
-		wire [0:num_resource_classes-1]     hdr_route_orc;
-		c_decode
-		  #(.num_ports(num_resource_classes))
-		hdr_route_orc_dec
-		  (.data_in(hdr_route_rcsel),
-		   .data_out(hdr_route_orc));
-		
-		assign route_raw_orc
-		  = hdr_valid ? hdr_route_orc : rtl_route_orc;
-		
-	     end
-	   
-	   wire [0:1] 				    rf_errors;
+	   wire [0:1] 				       rf_errors;
 	   rtr_route_filter
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -847,14 +934,14 @@ module rtr_ip_ctrl_mac
 	       .port_id(port_id),
 	       .vc_id(ivc))
 	   rf
-	     (.route_in_op(route_raw_op),
-	      .route_in_orc(route_raw_orc),
+	     (.route_in_op(route_unmasked_op),
+	      .route_in_orc(route_unmasked_orc),
 	      .route_out_op(route_out_op),
 	      .route_out_orc(route_out_orc),
 	      .errors(rf_errors));
 	   
 	   wire 				    route_valid;
-	   assign route_valid = hdr_valid | chi_flit_valid;
+	   assign route_valid = hdt_valid | chi_flit_valid;
 	   
 	   wire 				    error_invalid_port;
 	   assign error_invalid_port =  route_valid & rf_errors[0];
@@ -864,96 +951,115 @@ module rtr_ip_ctrl_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // track whether frontmost flit is head or tail
+	   // local lookahead routing information update logic
 	   //-------------------------------------------------------------------
 	   
-	   wire 				    htff_empty;
-	   
-	   wire 				    htff_push;
-	   assign htff_push = chi_flit_valid;
-	   
-	   wire 				    htff_pop;
-	   assign htff_pop
-	     = (flit_sent_in | fbc_empty) & (~htff_empty | htff_push);
-	   
-	   wire [0:1] 				    htff_push_data;
-	   assign htff_push_data[0] = chi_flit_head;
-	   assign htff_push_data[1] = chi_flit_tail;
-	   
-	   wire [0:1] 				    htff_pop_data;
-	   wire 				    htff_almost_full;
-	   wire 				    htff_full;
-	   wire 				    htff_almost_empty;
-	   wire [0:1] 				    htff_errors;
-	   c_fifo
-	     #(.depth(num_flits_per_vc - 1),
-	       .width(2),
-	       .regfile_type(htt_regfile_type),
-	       .enable_bypass(1),
-	       .reset_type(reset_type))
-	   htff
-	     (.clk(clk),
-	      .reset(reset),
-	      .push_active(push_active),
-	      .pop_active(pop_active),
-	      .push(htff_push),
-	      .pop(htff_pop),
-	      .push_data(htff_push_data),
-	      .pop_data(htff_pop_data),
-	      .almost_empty(htff_almost_empty),
-	      .empty(htff_empty),
-	      .almost_full(htff_almost_full),
-	      .full(htff_full),
-	      .errors(htff_errors));
-	   
-	   wire 				    htff_flit_head;
-	   assign htff_flit_head = htff_pop_data[0];
-	   
-	   wire 				    htff_flit_tail;
-	   assign htff_flit_tail = htff_pop_data[1];
-	   
-	   wire 				    error_htff_underflow;
-	   assign error_htff_underflow = htff_errors[0];		
-	   
-	   wire 				    error_htff_overflow;
-	   assign error_htff_overflow = htff_errors[1];
-	   
-	   wire 				    htr_capture;
-	   assign htr_capture
-	     = (fbc_empty & chi_flit_valid) | 
-	       (flit_sent_in & (~htff_empty | chi_flit_valid));
-	   
-	   wire 				    htr_flit_head_s;
-	   wire 				    htr_flit_head_q;
-	   assign htr_flit_head_s
-	     = htr_capture ? htff_flit_head : htr_flit_head_q;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   htr_flit_headq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(flags_active),
-	      .d(htr_flit_head_s),
-	      .q(htr_flit_head_q));
-	   
-	   assign flit_head_out = fbc_empty ? chi_flit_head : htr_flit_head_q;
-	   
-	   wire  				    htr_flit_tail_s;
-	   wire 				    htr_flit_tail_q;
-	   assign htr_flit_tail_s
-	     = htr_capture ? htff_flit_tail : htr_flit_tail_q;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   htr_flit_tailq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(flags_active),
-	      .d(htr_flit_tail_s),
-	      .q(htr_flit_tail_q));
-	   
-	   assign flit_tail_out = fbc_empty ? chi_flit_tail : htr_flit_tail_q;
+	   begin:llu
+	      
+	      wire [0:router_addr_width-1] next_router_address;
+	      rtr_next_hop_addr
+		#(.num_resource_classes(num_resource_classes),
+		  .num_routers_per_dim(num_routers_per_dim),
+		  .num_dimensions(num_dimensions),
+		  .num_nodes_per_router(num_nodes_per_router),
+		  .connectivity(connectivity),
+		  .routing_type(routing_type))
+	      nha
+		(.router_address(router_address),
+		 .route_info(hdt_route_info),
+		 .la_route_info(hdt_la_route_info),
+		 .next_router_address(next_router_address));
+	      
+	      wire [0:num_message_classes-1] sel_mc;
+	      c_align
+		#(.in_width(1),
+		  .out_width(num_message_classes),
+		  .offset((ivc / (num_resource_classes*num_vcs_per_class)) %
+			  num_message_classes))
+	      sel_mc_agn
+		(.data_in(1'b1),
+		 .dest_in({num_message_classes{1'b0}}),
+		 .data_out(sel_mc));
+	      
+	      wire [0:num_ports-1] 	     route_op;
+	      wire [0:num_resource_classes-1] route_orc;
+	      rtr_routing_logic
+		#(.num_message_classes(num_message_classes),
+		  .num_resource_classes(num_resource_classes),
+		  .num_routers_per_dim(num_routers_per_dim),
+		  .num_dimensions(num_dimensions),
+		  .num_nodes_per_router(num_nodes_per_router),
+		  .connectivity(connectivity),
+		  .routing_type(routing_type),
+		  .dim_order(dim_order))
+	      rtl
+		(.router_address(next_router_address),
+		 .sel_mc(sel_mc),
+		 .sel_irc(lld_route_orc),
+		 .route_info(hdt_route_info),
+		 .route_op(route_op),
+		 .route_orc(route_orc));
+	      
+	      wire [0:port_idx_width-1]       route_port;
+	      c_encode
+		#(.num_ports(num_ports))
+	      route_port_enc
+		(.data_in(route_op),
+		 .data_out(route_port));
+	      
+	      wire [0:la_route_info_width-1]  la_route_info;
+	      assign la_route_info[0:port_idx_width-1] = route_port;
+	      
+	      if(num_resource_classes > 1)
+		begin
+		   
+		   wire [0:resource_class_idx_width-1] route_rcsel;
+		   c_encode
+		     #(.num_ports(num_resource_classes))
+		   route_rcsel_enc
+		     (.data_in(route_orc),
+		      .data_out(route_rcsel));
+		   
+		   assign la_route_info[port_idx_width:
+					port_idx_width+
+					resource_class_idx_width-1]
+		     = route_rcsel;
+		   
+		end
+	      
+	      if(explicit_pipeline_register)
+		assign llu_flit_data[0:la_route_info_width-1]
+		  = (~fb_empty & htt_flit_head) ? 
+		    la_route_info : 
+		    fb_flit_data[0:la_route_info_width-1];
+	      else
+		begin
+		   
+		   wire [0:la_route_info_width-1] la_route_info_s;
+		   wire [0:la_route_info_width-1] la_route_info_q;
+		   assign la_route_info_s
+		     = hdt_valid ? la_route_info : glu_la_route_info;
+		   c_dff
+		     #(.width(la_route_info_width),
+		       .reset_type(reset_type))
+		   la_route_infoq
+		     (.clk(clk),
+		      .reset(1'b0),
+		      .active(pop_active),
+		      .d(la_route_info_s),
+		      .q(la_route_info_q));
+		   
+		   assign llu_flit_data[0:la_route_info_width-1]
+		     = (flit_sent_prev & flit_head_prev) ? 
+		       la_route_info_q :
+		       fb_flit_data[0:la_route_info_width-1];
+		   
+		end
+	      
+	      assign llu_flit_data[la_route_info_width:flit_data_width-1]
+		= fb_flit_data[la_route_info_width:flit_data_width-1];
+	      
+	   end
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -965,23 +1071,23 @@ module rtr_ip_ctrl_mac
 	   always @(posedge clk)
 	     begin
 		
-		if(error_fbc_underflow)
+		if(error_fb_underflow)
 		  $display("ERROR: Flit buffer underflow in module %m.");
 		
-		if(error_fbc_overflow)
+		if(error_fb_overflow)
 		  $display("ERROR: Flit buffer overflow in module %m.");
 		
-		if(error_hdff_underflow)
-		  $display("ERROR: Head data FIFO underflow in module %m.");
+		if(error_hdt_underflow)
+		  $display("ERROR: Head data tracker underflow in module %m.");
 		
-		if(error_hdff_overflow)
-		  $display("ERROR: Head data FIFO overflow in module %m.");
+		if(error_hdt_overflow)
+		  $display("ERROR: Head data tracker overflow in module %m.");
 		
-		if(error_htff_underflow)
-		  $display("ERROR: Head/tail FIFO underflow in module %m.");
+		if(error_htt_underflow)
+		  $display("ERROR: Head/tail tracker underflow in module %m.");
 		
-		if(error_htff_overflow)
-		  $display("ERROR: Head/tail FIFO overflow in module %m.");
+		if(error_htt_overflow)
+		  $display("ERROR: Head/tail tracker overflow in module %m.");
 		
 		if(error_no_header)
 		  $display("ERROR: Stray flit received in module %m.");
@@ -998,12 +1104,12 @@ module rtr_ip_ctrl_mac
 	   
 	   // synopsys translate_on
 	   
-	   assign errors[0] = error_fbc_underflow;
-	   assign errors[1] = error_fbc_overflow;
-	   assign errors[2] = error_hdff_underflow;
-	   assign errors[3] = error_hdff_overflow;
-	   assign errors[4] = error_htff_underflow;
-	   assign errors[5] = error_htff_overflow;
+	   assign errors[0] = error_fb_underflow;
+	   assign errors[1] = error_fb_overflow;
+	   assign errors[2] = error_hdt_underflow;
+	   assign errors[3] = error_hdt_overflow;
+	   assign errors[4] = error_htt_underflow;
+	   assign errors[5] = error_htt_overflow;
 	   assign errors[6] = error_no_header;
 	   assign errors[7] = error_invalid_port;
 	   assign errors[8] = error_invalid_class;
@@ -1018,37 +1124,35 @@ module rtr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire alloc_active;
-   assign alloc_active = chi_flit_valid | ~&fbc_empty_ivc;
+   assign alloc_active = chi_flit_valid | ~&fb_empty_ivc;
    
    generate
       
       if(explicit_pipeline_register)
 	begin
 	   
-	   assign fbf_read_active_ivc = ~fbc_empty_ivc;
-	   
-	   wire [0:flit_data_width-1] fbf_read_data;
+	   wire [0:flit_data_width-1] flit_data;
 	   
 	   if(num_vcs == 1)
-	     assign fbf_read_data = fbf_read_data_ivc;
+	     assign flit_data = llu_flit_data_ivc;
 	   else if(num_vcs > 1)
 	     begin
 		
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
-		fbf_read_data_sel
+		flit_data_sel
 		  (.select(flit_sel_in_ivc),
-		   .data_in(fbf_read_data_ivc),
-		   .data_out(fbf_read_data));
+		   .data_in(llu_flit_data_ivc),
+		   .data_out(flit_data));
 		
 	     end
 	   
-	   wire fbf_bypass;
-	   assign fbf_bypass = |(flit_sel_in_ivc & fbc_empty_ivc);
+	   wire bypass;
+	   assign bypass = |(flit_sel_in_ivc & fb_empty_ivc);
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = fbf_bypass ? fbf_write_data : fbf_read_data;
+	   assign flit_data_s = bypass ? glu_flit_data :flit_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -1085,12 +1189,35 @@ module rtr_ip_ctrl_mac
 	   
 	   assign flit_sent_active = alloc_active | flit_sent_q;
 	   
-	   wire [0:flit_data_width-1] fbf_read_data;
+	   wire flit_head;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_head_sel
+	     (.select(flit_sel_in_ivc),
+	      .data_in(flit_head_out_ivc),
+	      .data_out(flit_head));
+	   
+	   wire flit_head_s, flit_head_q;
+	   assign flit_head_s = flit_head;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_headq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(alloc_active),
+	      .d(flit_head_s),
+	      .q(flit_head_q));
+	   
+	   assign flit_head_prev = flit_head_q;
+	   	      
+	   wire [0:flit_data_width-1] flit_data;
 	   
 	   if(num_vcs == 1)
 	     begin
-		assign fbf_read_active_ivc = flit_sent_q;
-		assign fbf_read_data = fbf_read_data_ivc;
+		assign flit_sent_prev_ivc = flit_sent_q;
+		assign flit_data = llu_flit_data_ivc;
 	     end
 	   else if(num_vcs > 1)
 	     begin
@@ -1107,20 +1234,20 @@ module rtr_ip_ctrl_mac
 		   .d(flit_sel_ivc_s),
 		   .q(flit_sel_ivc_q));
 		
-		assign fbf_read_active_ivc
+		assign flit_sent_prev_ivc
 		  = {num_vcs{flit_sent_q}} & flit_sel_ivc_q;
 		
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
-		fbf_read_data_sel
+		flit_data_sel
 		  (.select(flit_sel_ivc_q),
-		   .data_in(fbf_read_data_ivc),
-		   .data_out(fbf_read_data));
+		   .data_in(llu_flit_data_ivc),
+		   .data_out(flit_data));
 		
 	     end
 	   
-	   assign flit_data_out = fbf_read_data;
+	   assign flit_data_out = flit_data;
 	   
 	end
       

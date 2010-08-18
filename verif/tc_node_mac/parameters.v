@@ -85,9 +85,6 @@ parameter restrict_turns = 0;
 // select implementation variant for tail sent tracker register file
 parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
 
-// enable lookahead routing
-parameter lookahead_routing = 1;
-
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
 

@@ -158,15 +158,11 @@ module tc_node_mac
    // include error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
-   // enable lookahead routing
-   parameter lookahead_routing = 1;
-   
    // select implementation variant for tail sent tracker register file
    parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // width required for lookahead routing information
-   localparam la_route_info_width
-     = lookahead_routing ? (port_idx_width + resource_class_idx_width) : 0;
+   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -1349,66 +1345,59 @@ module tc_node_mac
    // generate random lookahead routing info
    //---------------------------------------------------------------------------
    
+   wire [0:router_addr_width-1] 	     router_address;
+   assign router_address = address[0:router_addr_width-1];
+   
+   wire [0:num_ports-1] 		     route_op_rv;
+   wire [0:num_resource_classes-1] 	     route_orc_rv;
+   rtr_routing_logic
+     #(.num_message_classes(num_message_classes),
+       .num_resource_classes(num_resource_classes),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .dim_order(dim_order))
+   rtl
+     (.router_address(router_address),
+      .sel_mc(sel_mc_rv),
+      .sel_irc(sel_orc_rv),
+      .route_info(route_info_rv),
+      .route_op(route_op_rv),
+      .route_orc(route_orc_rv));
+   
+   wire [0:port_idx_width-1] 		     route_port_rv;
+   c_encode
+     #(.num_ports(num_ports))
+   route_port_rv_enc
+     (.data_in(route_op_rv),
+      .data_out(route_port_rv));
+   
+   wire [0:la_route_info_width-1] 	     la_route_info_rv;
+   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
+   
    generate
       
-      if(lookahead_routing)
+      if(num_resource_classes > 1)
 	begin
 	   
-	   wire [0:router_addr_width-1] router_address;
-	   assign router_address = address[0:router_addr_width-1];
-	   
-	   wire [0:num_ports-1] 	route_op_rv;
-	   wire [0:num_resource_classes-1] route_orc_rv;
-	   rtr_routing_logic
-	     #(.num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
-	       .routing_type(routing_type),
-	       .dim_order(dim_order))
-	   rtl
-	     (.router_address(router_address),
-	      .sel_mc(sel_mc_rv),
-	      .sel_irc(sel_orc_rv),
-	      .route_info(route_info_rv),
-	      .route_op(route_op_rv),
-	      .route_orc(route_orc_rv));
-	   
-	   wire [0:port_idx_width-1] 	   route_port_rv;
+	   wire [0:resource_class_idx_width-1] route_rcsel_rv;
 	   c_encode
-	     #(.num_ports(num_ports))
-	   route_port_rv_enc
-	     (.data_in(route_op_rv),
-	      .data_out(route_port_rv));
+	     #(.num_ports(num_resource_classes))
+	   route_rcsel_rv_enc
+	     (.data_in(route_orc_rv),
+	      .data_out(route_rcsel_rv));
 	   
-	   wire [0:la_route_info_width-1]  la_route_info_rv;
-	   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
-	   
-	   if(num_resource_classes > 1)
-	     begin
-		
-		wire [0:resource_class_idx_width-1] route_rcsel_rv;
-		c_encode
-		  #(.num_ports(num_resource_classes))
-		route_rcsel_rv_enc
-		  (.data_in(route_orc_rv),
-		   .data_out(route_rcsel_rv));
-		
-		assign la_route_info_rv[port_idx_width:
-					port_idx_width+
-					resource_class_idx_width-1]
-		  = route_rcsel_rv;
-		
-	     end
-	   
-	   assign header_info_out[0:la_route_info_width-1]
-	     = la_route_info_rv;
+	   assign la_route_info_rv[port_idx_width:
+				   port_idx_width+resource_class_idx_width-1]
+	     = route_rcsel_rv;
 	   
 	end
       
    endgenerate
+   
+   assign header_info_out[0:la_route_info_width-1] = la_route_info_rv;
    
    
    //---------------------------------------------------------------------------
