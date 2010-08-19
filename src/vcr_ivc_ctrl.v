@@ -209,9 +209,6 @@ module vcr_ivc_ctrl
    localparam resource_class
      = (vc_id / num_vcs_per_class) % num_resource_classes;
    
-   // packet class to which this VC belongs
-   localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
-   
    // required address size for a single VC's buffer
    localparam fb_addr_width = clogb(num_flits_per_vc);
    
