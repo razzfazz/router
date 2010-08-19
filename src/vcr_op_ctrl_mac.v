@@ -48,48 +48,14 @@ module vcr_op_ctrl_mac
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_packets_per_vc = 4;
    
-   // number of traffic classes (e.g. request, reply)
-   parameter num_message_classes = 2;
-   
-   // number of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
-   
-   // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
-   
-   // number of VCs available for each class
-   parameter num_vcs_per_class = 1;
-   
    // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   parameter num_vcs = 4;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
-   // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
-   
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
-   // number of nodes per router (a.k.a. consentration factor)
-   parameter num_nodes_per_router = 1;
-   
-   // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
-   
-   // number of adjacent routers in each dimension
-   localparam num_neighbors_per_dim
-     = ((connectivity == `CONNECTIVITY_LINE) ||
-	(connectivity == `CONNECTIVITY_RING)) ?
-       2 :
-       (connectivity == `CONNECTIVITY_FULL) ?
-       (num_routers_per_dim - 1) :
-       -1;
-   
    // number of input and output ports on router
-   localparam num_ports
-     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   parameter num_ports = 5;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -269,13 +235,8 @@ module vcr_op_ctrl_mac
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
-	       .num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
+	       .num_vcs(num_vcs),
+	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .vc_id(ovc),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
