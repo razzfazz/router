@@ -539,7 +539,7 @@ module rtr_ip_ctrl_mac
 	      assign push_active = chi_flit_valid;
 	      
 	      wire pop_active;
-	      assign pop_active = flit_valid_out;
+	      assign pop_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire push;
 	      assign push = chi_flit_valid;
@@ -679,7 +679,7 @@ module rtr_ip_ctrl_mac
 	   begin:htt
 	      
 	      wire active;
-	      assign active = flit_valid_out;
+	      assign active = chi_flit_valid | ~fb_empty;
 	      
 	      wire reload_from_fb;
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
@@ -717,13 +717,13 @@ module rtr_ip_ctrl_mac
 		 .d(flit_tail_s),
 		 .q(flit_tail_q));
 	      
-	      assign htt_flit_head = fb_empty ? chi_flit_head : flit_head_q;
-	      assign htt_flit_tail = fb_empty ? chi_flit_tail : flit_tail_q;
+	      assign htt_flit_head = flit_head_q;
+	      assign htt_flit_tail = flit_tail_q;
 	      
 	   end
 	   
-	   assign flit_head_out = htt_flit_head;
-	   assign flit_tail_out = htt_flit_tail;
+	   assign flit_head_out = fb_empty ? chi_flit_head : htt_flit_head;
+	   assign flit_tail_out = fb_empty ? chi_flit_tail : htt_flit_tail;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -739,7 +739,7 @@ module rtr_ip_ctrl_mac
 	   begin:hdt
 	      
 	      wire valid_active;
-	      assign valid_active = flit_valid_out;
+	      assign valid_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire head_received;
 	      assign head_received = chi_flit_valid & chi_flit_head;
