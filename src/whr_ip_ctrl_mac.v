@@ -753,6 +753,9 @@ module whr_ip_ctrl_mac
 	      .d(flit_head_out_s),
 	      .q(flit_head_out_q));
 	   
+	   wire active;
+	   assign active = flit_valid_out & flit_head_out;
+	   
 	   wire update_next_la_route_info;
 	   assign update_next_la_route_info
 	     = flit_sent_prev_q & flit_head_out_q;
@@ -766,7 +769,7 @@ module whr_ip_ctrl_mac
 	   next_la_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(pop_active),
+	      .active(active),
 	      .d(next_la_route_info_s),
 	      .q(next_la_route_info_q));
 	   

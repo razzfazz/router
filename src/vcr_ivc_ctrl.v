@@ -872,6 +872,9 @@ module vcr_ivc_ctrl
       else
 	begin
 	   
+	   wire active;
+	   assign active = flit_valid & flit_head;
+	   
 	   wire update_next_la_route_info;
 	   assign update_next_la_route_info = flit_sent_prev & flit_head_prev;
 	   
@@ -884,7 +887,7 @@ module vcr_ivc_ctrl
 	   next_la_route_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(pop_active),
+	      .active(active),
 	      .d(next_la_route_info_s),
 	      .q(next_la_route_info_q));
 	   

@@ -980,6 +980,9 @@ module rtr_ip_ctrl_mac
 		    fb_flit_data[0:la_route_info_width-1];
 	      else
 		begin
+
+		   wire active;
+		   assign active = flit_valid_out & flit_head_out;
 		   
 		   wire [0:la_route_info_width-1] la_route_info_s;
 		   wire [0:la_route_info_width-1] la_route_info_q;
@@ -991,7 +994,7 @@ module rtr_ip_ctrl_mac
 		   la_route_infoq
 		     (.clk(clk),
 		      .reset(1'b0),
-		      .active(pop_active),
+		      .active(active),
 		      .d(la_route_info_s),
 		      .q(la_route_info_q));
 		   
