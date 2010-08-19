@@ -213,10 +213,7 @@ module vcr_ivc_ctrl
    localparam packet_class = (vc_id / num_vcs_per_class) % num_packet_classes;
    
    // required address size for a single VC's buffer
-   localparam fbc_addr_width = clogb(num_flits_per_vc);
-   
-   // index of leftmost entry in shared flit buffer
-   localparam fbc_min_addr = vc_id * num_flits_per_vc;
+   localparam fb_addr_width = clogb(num_flits_per_vc);
    
    // ID of current input port
    parameter port_id = 0;
@@ -432,8 +429,8 @@ module vcr_ivc_ctrl
    wire 					     fbc_pop;
    assign fbc_pop = flit_sent;
    
-   wire [0:fbc_addr_width-1] 			     fbc_push_addr;
-   wire [0:fbc_addr_width-1] 			     fbc_pop_addr;
+   wire [0:fb_addr_width-1] 			     fbc_push_addr;
+   wire [0:fb_addr_width-1] 			     fbc_pop_addr;
    wire 					     fbc_almost_empty;
    wire 					     fbc_almost_full;
    wire [0:1] 					     fbc_errors;
@@ -479,7 +476,7 @@ module vcr_ivc_ctrl
    
    wire 					     fbf_write_enable;
    wire 					     fbf_read_active;
-   wire [0:fbc_addr_width-1] 			     fbf_read_addr;
+   wire [0:fb_addr_width-1] 			     fbf_read_addr;
    wire [0:flit_data_width-1] 			     fbf_read_data;
    
    generate
@@ -505,10 +502,10 @@ module vcr_ivc_ctrl
 	   
 	   // NOTE: fbf_read_active is generated later on in the file
 	   
-	   wire [0:fbc_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
 	   c_dff
-	     #(.width(fbc_addr_width),
+	     #(.width(fb_addr_width),
 	       .reset_type(reset_type))
 	   fbf_read_addrq
 	     (.clk(clk),
@@ -529,9 +526,9 @@ module vcr_ivc_ctrl
    wire 			     fbf_peek_active;
    assign fbf_peek_active = ~bypass_peek;
    
-   wire [0:fbc_addr_width-1] 	     fbf_peek_addr;
+   wire [0:fb_addr_width-1] 	     fbf_peek_addr;
    c_incr
-     #(.width(fbc_addr_width),
+     #(.width(fb_addr_width),
        .max_value(num_flits_per_vc - 1))
    fbf_peek_addr_incr
      (.data_in(fbc_pop_addr),

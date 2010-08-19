@@ -156,11 +156,11 @@ module whr_ip_ctrl_mac
    parameter input_stage_can_hold = 0;
    
    // number of entries in flit buffer
-   localparam fbf_depth
+   localparam fb_depth
      = input_stage_can_hold ? (num_flits_per_vc - 1) : num_flits_per_vc;
    
    // required address width for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
+   localparam fb_addr_width = clogb(fb_depth);
    
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -333,13 +333,13 @@ module whr_ip_ctrl_mac
    wire 			  fbc_pop;
    assign fbc_pop = flit_valid_out;
    
-   wire [0:fbf_addr_width-1] 	  fbc_push_addr;
-   wire [0:fbf_addr_width-1] 	  fbc_pop_addr;
+   wire [0:fb_addr_width-1] 	  fbc_push_addr;
+   wire [0:fb_addr_width-1] 	  fbc_pop_addr;
    wire 			  fbc_almost_empty;
    wire 			  fbc_full;
    wire [0:1] 			  fbc_errors;
    c_fifo_ctrl
-     #(.depth(fbf_depth),
+     #(.depth(fb_depth),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
@@ -369,7 +369,7 @@ module whr_ip_ctrl_mac
    
    wire 			  fbf_write_enable;
    wire 			  fbf_read_active;
-   wire [0:fbf_addr_width-1] 	  fbf_read_addr;
+   wire [0:fb_addr_width-1] 	  fbf_read_addr;
    wire [0:flit_data_width-1] 	  fbf_read_data;
    
    generate
@@ -395,10 +395,10 @@ module whr_ip_ctrl_mac
 	   
 	   // NOTE: fbf_read_active is generated later on in the file
 	   
-	   wire [0:fbf_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
 	   c_dff
-	     #(.width(fbf_addr_width),
+	     #(.width(fb_addr_width),
 	       .reset_type(reset_type))
 	   fbf_read_addrq
 	     (.clk(clk),
@@ -419,10 +419,10 @@ module whr_ip_ctrl_mac
    wire 			     fbf_peek_active;
    assign fbf_peek_active = ~bypass_peek;
    
-   wire [0:fbf_addr_width-1] 	     fbf_peek_addr;
+   wire [0:fb_addr_width-1] 	     fbf_peek_addr;
    c_incr
-     #(.width(fbf_addr_width),
-       .max_value(fbf_depth - 1))
+     #(.width(fb_addr_width),
+       .max_value(fb_depth - 1))
    fbf_peek_addr_incr
      (.data_in(fbc_pop_addr),
       .data_out(fbf_peek_addr));
@@ -430,7 +430,7 @@ module whr_ip_ctrl_mac
    wire [0:flit_data_width-1] 	     fbf_peek_data;
    
    c_regfile
-     #(.depth(fbf_depth),
+     #(.depth(fb_depth),
        .width(flit_data_width),
        .num_read_ports(2),
        .regfile_type(fb_regfile_type))
@@ -479,7 +479,7 @@ module whr_ip_ctrl_mac
    wire 			     htff_almost_empty;
    wire [0:1] 			     htff_errors;
    c_fifo
-     #(.depth(fbf_depth - 1),
+     #(.depth(fb_depth - 1),
        .width(2),
        .regfile_type(htt_regfile_type),
        .enable_bypass(1),
