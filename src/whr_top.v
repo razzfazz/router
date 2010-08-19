@@ -141,9 +141,6 @@ module whr_top
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for head/tail tracker register file
-   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -237,7 +234,6 @@ module whr_top
 	       .dim_order(dim_order),
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fb_regfile_type(fb_regfile_type),
-	       .htt_regfile_type(htt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),

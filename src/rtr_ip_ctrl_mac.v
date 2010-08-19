@@ -104,9 +104,6 @@ module rtr_ip_ctrl_mac
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for head/tail tracker register file
-   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 1;
    
@@ -199,6 +196,9 @@ module rtr_ip_ctrl_mac
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
+   
+   // width of flit buffer
+   localparam fb_width = 1 + 1 + flit_data_width;
    
    // required address size for a single VC's buffer
    localparam fb_addr_width = clogb(num_flits_per_vc);
@@ -463,7 +463,7 @@ module rtr_ip_ctrl_mac
    wire 					  flit_head_prev;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*flit_data_width-1] 		  llu_flit_data_ivc;
-   wire [0:num_vcs*7-1] 			  errors_ivc;
+   wire [0:num_vcs*5-1] 			  errors_ivc;
    
    genvar 					  ivc;
    
@@ -518,8 +518,8 @@ module rtr_ip_ctrl_mac
 				    (ivc+1)*num_resource_classes-1]
 	     = route_out_orc;
 	   
-	   wire [0:6] 			   errors;
-	   assign errors_ivc[ivc*7:(ivc+1)*7-1] = errors;
+	   wire [0:4] 			   errors;
+	   assign errors_ivc[ivc*5:(ivc+1)*5-1] = errors;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -537,6 +537,8 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   fb_almost_empty;
 	   wire [0:flit_data_width-1] 	   fb_flit_data;
+	   wire 			   fb_flit_head;
+	   wire 			   fb_flit_tail;
 	   wire [0:la_route_info_width-1]  fb_la_route_info;
 	   wire [0:route_info_width-1] 	   fb_route_info;
 	   
@@ -625,11 +627,16 @@ module rtr_ip_ctrl_mac
 		(.data_in(pop_addr),
 		 .data_out(peek_addr));
 	      
-	      wire [0:flit_data_width-1]    read_data;
-	      wire [0:flit_data_width-1]    peek_data;
+	      wire [0:fb_width-1] 	    write_data;
+	      assign write_data[0] = chi_flit_head;
+	      assign write_data[1] = chi_flit_tail;
+	      assign write_data[2:2+flit_data_width-1] = chi_flit_data;
+	      
+	      wire [0:fb_width-1] 	    read_data;
+	      wire [0:fb_width-1] 	    peek_data;
 	      c_regfile
 		#(.depth(num_flits_per_vc),
-		  .width(flit_data_width),
+		  .width(fb_width),
 		  .num_read_ports(2),
 		  .regfile_type(fb_regfile_type))
 	      rf
@@ -637,18 +644,13 @@ module rtr_ip_ctrl_mac
 		 .write_active(push_active),
 		 .write_enable(write_enable),
 		 .write_address(push_addr),
-		 .write_data(chi_flit_data),
+		 .write_data(write_data),
 		 .read_active({read_active, peek_active}),
 		 .read_address({read_addr, peek_addr}),
 		 .read_data({read_data, peek_data}));
 	      
-	      wire [0:la_route_info_width-1] peek_la_route_info;
-	      assign peek_la_route_info = peek_data[0:la_route_info_width-1];
-   
-	      wire [0:route_info_width-1]    peek_route_info;
-	      assign peek_route_info
-		= peek_data[la_route_info_width:
-			    la_route_info_width+route_info_width-1];
+	      wire [0:header_info_width-1]  peek_header_info;
+	      assign peek_header_info = peek_data[2:2+header_info_width-1];
 	      
 	      assign error_fb_underflow = errors[0];
 	      assign error_fb_overflow = errors[1];
@@ -656,9 +658,14 @@ module rtr_ip_ctrl_mac
 	      assign fb_almost_empty = almost_empty;
 	      assign fb_empty = empty;
 	      assign fb_full = full;
-	      assign fb_flit_data = read_data;
-	      assign fb_la_route_info = peek_la_route_info;
-	      assign fb_route_info = peek_route_info;
+	      assign fb_flit_data = read_data[2:2+flit_data_width-1];
+	      assign fb_flit_head = peek_data[0];
+	      assign fb_flit_tail = peek_data[1];
+	      assign fb_la_route_info
+		= peek_header_info[0:la_route_info_width-1];
+	      assign fb_route_info
+		= peek_header_info[la_route_info_width:
+				   la_route_info_width+route_info_width-1];
 	      
 	   end
 	   
@@ -672,61 +679,21 @@ module rtr_ip_ctrl_mac
 	   wire 			     htt_flit_head;
 	   wire 			     htt_flit_tail;
 	   
-	   wire 			     error_htt_underflow;
-	   wire 			     error_htt_overflow;
-	   
 	   begin:htt
 	      
-	      wire empty;
+	      wire reload_from_fb;
+	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire push;
-	      assign push = chi_flit_valid;
+	      wire flit_head;
+	      assign flit_head = reload_from_fb ? fb_flit_head : chi_flit_head;
 	      
-	      wire pop;
-	      assign pop = (flit_sent_in | fb_empty) & (~empty | push);
+	      wire flit_tail;
+	      assign flit_tail = reload_from_fb ? fb_flit_tail : chi_flit_tail;
 	      
-	      wire [0:1] push_data;
-	      assign push_data[0] = chi_flit_head;
-	      assign push_data[1] = chi_flit_tail;
+	      wire capture;
+	      assign capture = (fb_empty & chi_flit_valid) | flit_sent_in;
 	      
-	      wire [0:1] pop_data;
-	      wire 	 almost_full;
-	      wire 	 full;
-	      wire 	 almost_empty;
-	      wire [0:1] errors;
-	      c_fifo
-		#(.depth(num_flits_per_vc - 1),
-		  .width(2),
-		  .regfile_type(htt_regfile_type),
-		  .enable_bypass(1),
-		  .reset_type(reset_type))
-	      ff
-		(.clk(clk),
-		 .reset(reset),
-		 .push_active(push_active),
-		 .pop_active(pop_active),
-		 .push(push),
-		 .pop(pop),
-		 .push_data(push_data),
-		 .pop_data(pop_data),
-		 .almost_empty(almost_empty),
-		 .empty(empty),
-		 .almost_full(almost_full),
-		 .full(full),
-		 .errors(errors));
-	      
-	      wire 	 flit_head;
-	      assign flit_head = pop_data[0];
-	      
-	      wire 	 flit_tail;
-	      assign flit_tail = pop_data[1];
-	      
-	      wire 	 capture;
-	      assign capture = (fb_empty & chi_flit_valid) | 
-			       (flit_sent_in & (~empty | chi_flit_valid));
-	      
-	      wire 	 flit_head_s;
-	      wire 	 flit_head_q;
+	      wire flit_head_s, flit_head_q;
 	      assign flit_head_s = capture ? flit_head : flit_head_q;
 	      c_dff
 		#(.width(1),
@@ -738,8 +705,7 @@ module rtr_ip_ctrl_mac
 		 .d(flit_head_s),
 		 .q(flit_head_q));
 	      
-	      wire 	 flit_tail_s;
-	      wire 	 flit_tail_q;
+	      wire flit_tail_s, flit_tail_q;
 	      assign flit_tail_s = capture ? flit_tail : flit_tail_q;
 	      c_dff
 		#(.width(1),
@@ -750,9 +716,6 @@ module rtr_ip_ctrl_mac
 		 .active(pop_active),
 		 .d(flit_tail_s),
 		 .q(flit_tail_q));
-	      
-	      assign error_htt_underflow = errors[0];		
-	      assign error_htt_overflow = errors[1];
 	      
 	      assign htt_flit_head = fb_empty ? chi_flit_head : flit_head_q;
 	      assign htt_flit_tail = fb_empty ? chi_flit_tail : flit_tail_q;
@@ -767,7 +730,7 @@ module rtr_ip_ctrl_mac
 	   // track routing information for frontmost packet
 	   //-------------------------------------------------------------------
 	   
-	   wire 	 hdt_valid;
+	   wire    hdt_valid;
 	   wire [0:la_route_info_width-1] hdt_la_route_info;
 	   wire [0:route_info_width-1] 	  hdt_route_info;
 	   
@@ -1060,12 +1023,6 @@ module rtr_ip_ctrl_mac
 		if(error_fb_overflow)
 		  $display("ERROR: Flit buffer overflow in module %m.");
 		
-		if(error_htt_underflow)
-		  $display("ERROR: Head/tail tracker underflow in module %m.");
-		
-		if(error_htt_overflow)
-		  $display("ERROR: Head/tail tracker overflow in module %m.");
-		
 		if(error_no_header)
 		  $display("ERROR: Stray flit received in module %m.");
 		
@@ -1083,11 +1040,9 @@ module rtr_ip_ctrl_mac
 	   
 	   assign errors[0] = error_fb_underflow;
 	   assign errors[1] = error_fb_overflow;
-	   assign errors[2] = error_htt_underflow;
-	   assign errors[3] = error_htt_overflow;
-	   assign errors[4] = error_no_header;
-	   assign errors[5] = error_invalid_port;
-	   assign errors[6] = error_invalid_class;
+	   assign errors[2] = error_no_header;
+	   assign errors[3] = error_invalid_port;
+	   assign errors[4] = error_invalid_class;
 	   
 	end
       
@@ -1255,10 +1210,10 @@ module rtr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*7-1] errors_s, errors_q;
+	   wire [0:num_vcs*5-1] errors_s, errors_q;
 	   assign errors_s = errors_ivc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*7),
+	     #(.num_errors(num_vcs*5),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

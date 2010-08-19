@@ -159,14 +159,14 @@ module whr_ip_ctrl_mac
    localparam fb_depth
      = input_stage_can_hold ? (num_flits_per_vc - 1) : num_flits_per_vc;
    
+   // width of flit buffer
+   localparam fb_width = 1 + 1 + flit_data_width;
+   
    // required address width for flit buffer
    localparam fb_addr_width = clogb(fb_depth);
    
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for head/tail tracker register file
-   parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -426,11 +426,17 @@ module whr_ip_ctrl_mac
      (.data_in(fbc_pop_addr),
       .data_out(fbf_peek_addr));
    
-   wire [0:flit_data_width-1] 	     fbf_read_data;
-   wire [0:flit_data_width-1] 	     fbf_peek_data;
+   wire [0:fb_width-1] 		     fbf_write_data;
+   assign fbf_write_data[0] = flit_head_in;
+   assign fbf_write_data[1] = flit_tail_in;
+   assign fbf_write_data[2:2+flit_data_width-1] = flit_data_in;
+   
+   wire [0:fb_width-1] 		     fbf_read_data;
+   wire [0:fb_width-1] 		     fbf_peek_data;
+   
    c_regfile
      #(.depth(fb_depth),
-       .width(flit_data_width),
+       .width(fb_width),
        .num_read_ports(2),
        .regfile_type(fb_regfile_type))
    fbf
@@ -438,83 +444,42 @@ module whr_ip_ctrl_mac
       .write_active(push_active),
       .write_enable(fbf_write_enable),
       .write_address(fbc_push_addr),
-      .write_data(flit_data_in),
+      .write_data(fbf_write_data),
       .read_active({fbf_read_active, fbf_peek_active}),
       .read_address({fbf_read_addr, fbf_peek_addr}),
       .read_data({fbf_read_data, fbf_peek_data}));
    
+   wire [0:flit_data_width-1] 	     fbf_flit_data;
+   assign fbf_flit_data = fbf_read_data[2:2+flit_data_width-1];
+   
+   wire 			     peek_flit_head;
+   assign peek_flit_head = bypass_peek ? flit_head_in : fbf_peek_data[0];
+
+   wire 			     peek_flit_tail;
+   assign peek_flit_tail = bypass_peek ? flit_tail_in : fbf_peek_data[1];
+   
+   wire [0:header_info_width-1]      peek_header_info;
+   assign peek_header_info
+     = bypass_peek ? header_info_in : fbf_peek_data[2:2+header_info_width-1];
+   
    wire [0:la_route_info_width-1]    peek_la_route_info;
-   assign peek_la_route_info = bypass_peek ? 
-			       la_route_info_in : 
-			       fbf_peek_data[0:la_route_info_width-1];
+   assign peek_la_route_info = peek_header_info[0:la_route_info_width-1];
    
    wire [0:route_info_width-1] 	     peek_route_info;
-   assign peek_route_info = bypass_peek ? 
-			    route_info_in : 
-			    fbf_peek_data[la_route_info_width:
-					  la_route_info_width+
-					  route_info_width-1];
+   assign peek_route_info = peek_header_info[la_route_info_width:
+					     la_route_info_width+
+					     route_info_width-1];
    
    
    //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 			     htff_empty;
-   
-   wire 			     htff_push;
-   assign htff_push = flit_valid_thru;
-   
-   wire 			     htff_pop;
-   assign htff_pop = (flit_valid_out | fbc_empty) & (~htff_empty | htff_push);
-   
-   wire [0:1] 			     htff_push_data;
-   assign htff_push_data[0] = flit_head_in;
-   assign htff_push_data[1] = flit_tail_in;
-   
-   wire [0:1] 			     htff_pop_data;
-   wire 			     htff_almost_full;
-   wire 			     htff_full;
-   wire 			     htff_almost_empty;
-   wire [0:1] 			     htff_errors;
-   c_fifo
-     #(.depth(fb_depth - 1),
-       .width(2),
-       .regfile_type(htt_regfile_type),
-       .enable_bypass(1),
-       .reset_type(reset_type))
-   htff
-     (.clk(clk),
-      .reset(reset),
-      .push_active(push_active),
-      .pop_active(pop_active),
-      .push(htff_push),
-      .pop(htff_pop),
-      .push_data(htff_push_data),
-      .pop_data(htff_pop_data),
-      .almost_empty(htff_almost_empty),
-      .empty(htff_empty),
-      .almost_full(htff_almost_full),
-      .full(htff_full),
-      .errors(htff_errors));
-   
-   wire 			     htff_flit_head;
-   assign htff_flit_head = htff_pop_data[0];
-   
-   wire 			     htff_flit_tail;
-   assign htff_flit_tail = htff_pop_data[1];
-   
-   wire 			     error_htff_underflow;
-   assign error_htff_underflow = htff_errors[0];
-   
-   wire 			     error_htff_overflow;
-   assign error_htff_overflow = htff_errors[1];
-   
    wire 			     htr_capture;
    assign htr_capture = (fbc_empty & flit_valid_in) | flit_valid_out;
    
    wire 			     htr_flit_head_s, htr_flit_head_q;
-   assign htr_flit_head_s = htr_capture ? htff_flit_head : htr_flit_head_q;
+   assign htr_flit_head_s = htr_capture ? peek_flit_head : htr_flit_head_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -529,7 +494,7 @@ module whr_ip_ctrl_mac
    assign flit_head_out = fbc_empty ? flit_head_in : htr_flit_head_q;
    
    wire 			     htr_flit_tail_s, htr_flit_tail_q;
-   assign htr_flit_tail_s = htr_capture ? htff_flit_tail : htr_flit_tail_q;
+   assign htr_flit_tail_s = htr_capture ? peek_flit_tail : htr_flit_tail_q;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -725,7 +690,7 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:flit_data_width-1] flit_data_muxed;
-	   assign flit_data_muxed = fbc_empty ? flit_data_in : fbf_read_data;
+	   assign flit_data_muxed = fbc_empty ? flit_data_in : fbf_flit_data;
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
 	   assign flit_data_s[0:la_route_info_width-1]
@@ -808,9 +773,9 @@ module whr_ip_ctrl_mac
 	   assign flit_data_out[0:la_route_info_width-1]
 	     = update_next_la_route_info ? 
 	       next_la_route_info_q : 
-	       fbf_read_data[0:la_route_info_width-1];
+	       fbf_flit_data[0:la_route_info_width-1];
 	   assign flit_data_out[la_route_info_width:flit_data_width-1]
-	     = fbf_read_data[la_route_info_width:flit_data_width-1];
+	     = fbf_flit_data[la_route_info_width:flit_data_width-1];
 	   
 	end
       

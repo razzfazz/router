@@ -101,9 +101,6 @@ parameter input_stage_can_hold = 1;
 // select implementation variant for flit buffer register file
 parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 
-// select implementation variant for head/tail tracker register file
-parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
-
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 
