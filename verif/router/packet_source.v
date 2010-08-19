@@ -324,8 +324,8 @@ module packet_source
       .flit_sel_in_ovc(sel_ovc),
       .channel_out(channel));
    
-   wire 				 cred_valid;
-   wire [0:num_vcs-1] 			 cred_sel_ovc;
+   wire 				 fc_event_valid;
+   wire [0:num_vcs-1] 			 fc_event_sel_ovc;
    rtr_flow_ctrl_input
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -335,26 +335,18 @@ module packet_source
       .reset(reset),
       .active(1'b1),
       .flow_ctrl_in(flow_ctrl),
-      .fc_event_valid_out(cred_valid),
-      .fc_event_sel_out_ovc(cred_sel_ovc));
+      .fc_event_valid_out(fc_event_valid),
+      .fc_event_sel_out_ovc(fc_event_sel_ovc));
    
-   wire [0:num_vcs-1] 			 credit_ovc;
-   assign credit_ovc = {num_vcs{cred_valid}} & cred_sel_ovc;
+   wire [0:num_vcs-1] 			 fc_event_valid_ovc;
+   assign fc_event_valid_ovc = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
    
-   wire 				 flit_sent;
-   wire 				 flit_kill;
+   wire [0:num_vcs-1] 			 flit_valid_ovc;
+   assign flit_valid_ovc = {num_vcs{flit_valid}} & sel_ovc;
    
-   wire [0:num_vcs-1] 			 free_ovc;
-   wire [0:num_vcs-1] 			 head_free_ovc;
-   
-   wire [0:num_vcs*2-1] 		 hft_errors_ovc;
-   wire [0:num_vcs*2-1] 		 ft_errors_ovc;
-   
-   wire 				 free;
-   assign free = |(sel_ovc & free_ovc);
-   
-   wire 				 head_free;
-   assign head_free = |(sel_ovc & head_free_ovc);
+   wire [0:num_vcs-1] 			 full_ovc;
+   wire [0:num_vcs-1] 			 elig_ovc;
+   wire [0:num_vcs*4-1] 		 vs_errors_ovc;
    
    genvar 				 ovc;
    
@@ -363,144 +355,62 @@ module packet_source
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire credit;
-	   assign credit = credit_ovc[ovc];
+	   wire fc_event_valid;
+	   assign fc_event_valid = fc_event_valid_ovc[ovc];
 	   
-	   wire debit;
-	   assign debit = flit_sent & sel_ovc[ovc] & ~flit_kill;
+	   wire flit_valid;
+	   assign flit_valid = flit_valid_ovc[ovc];
 	   
-	   wire hft_credit;
-	   wire ft_almost_empty;
-	   
-	   if(num_packets_per_vc == 1)
-	     begin
-		
-		// if we can only have one packet per buffer, we can accept the 
-		// next one once the buffer has been completely drained after 
-		// the tail has been sent
-		
-		wire last_credit_received;
-		assign last_credit_received = ft_almost_empty & credit;
-		
-		wire tail_sent_s, tail_sent_q;
-		assign tail_sent_s = ((tail_sent_q & ~(debit & flit_head)) | 
-				      (debit & flit_tail));
-		c_dff
-		  #(.width(1),
-		    .reset_type(reset_type))
-		tail_sentq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(1'b1),
-		   .d(tail_sent_s),
-		   .q(tail_sent_q));
-		
-		assign hft_credit = tail_sent_q & last_credit_received;
-		
-	     end
-	   else
-	     begin
-		
-		wire tff_push_data;
-		assign tff_push_data = flit_tail;
-		
-		wire tff_pop_data;
-		wire tff_almost_full;
-		wire tff_full;
-		wire tff_almost_empty;
-		wire tff_empty;
-		wire [0:1] tff_errors;
-		c_fifo
-		  #(.depth(num_flits_per_vc),
-		    .width(1),
-		    .reset_type(reset_type))
-		tff
-		  (.clk(clk),
-		   .reset(reset),
-		   .push_active(1'b1),
-		   .pop_active(1'b1),
-		   .push(debit),
-		   .pop(credit),
-		   .push_data(tff_push_data),
-		   .pop_data(tff_pop_data),
-		   .almost_empty(tff_almost_empty),
-		   .empty(tff_empty),
-		   .almost_full(tff_almost_full),
-		   .full(tff_full),
-		   .errors(tff_errors));
-		
-		assign hft_credit = credit & tff_pop_data;
-		
-	     end
-	   
-	   wire hft_debit;
-	   assign hft_debit = debit & flit_head;
-	   
-	   wire hft_almost_full;
-	   wire hft_full;
-	   wire hft_almost_empty;
-	   wire hft_empty;
-	   wire [0:packet_count_width-1] hft_free;
-	   wire [0:1] 			 hft_errors;
-	   c_fifo_tracker
-	     #(.depth(num_packets_per_vc),
+	   wire elig;
+	   wire empty;
+	   wire almost_full;
+	   wire full;
+	   wire [0:3] vs_errors;
+	   rtr_vc_state
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_packets_per_vc(num_packets_per_vc),
+	       .flow_ctrl_type(flow_ctrl_type),
 	       .reset_type(reset_type))
-	   hft
+	   vs
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
-	      .push(hft_debit),
-	      .pop(hft_credit),
-	      .almost_full(hft_almost_full),
-	      .full(hft_full),
-	      .almost_empty(hft_almost_empty),
-	      .empty(hft_empty),
-	      .free(hft_free),
-	      .errors(hft_errors));
+	      .flit_sent(flit_valid),
+	      .flit_tail(flit_tail),
+	      .fc_event_valid(fc_event_valid),
+	      .elig(elig),
+	      .empty(empty),
+	      .almost_full(almost_full),
+	      .full(full),
+	      .errors(vs_errors));
 	   
-	   wire 			 head_free;
-	   assign head_free = ~hft_full;
+	   assign elig_ovc[ovc] = elig;
+	   assign full_ovc[ovc] = full;
 	   
-	   assign head_free_ovc[ovc] = head_free;
-	   assign hft_errors_ovc[ovc*2:(ovc+1)*2-1] = hft_errors;
-	   
-	   wire 			 ft_almost_full;
-	   wire 			 ft_full;
-	   wire 			 ft_empty;
-	   wire [0:flit_count_width-1] 	 ft_free;
-	   wire [0:1] 			 ft_errors;
-	   c_fifo_tracker
-	     #(.depth(num_flits_per_vc),
-	       .reset_type(reset_type))
-	   ft
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .push(debit),
-	      .pop(credit),
-	      .almost_full(ft_almost_full),
-	      .full(ft_full),
-	      .almost_empty(ft_almost_empty),
-	      .empty(ft_empty),
-	      .free(ft_free),
-	      .errors(ft_errors));
-	   
-	   assign free_ovc[ovc] = ~ft_full;
-	   
-	   assign ft_errors_ovc[ovc*2:(ovc+1)*2-1] = ft_errors;
+	   assign vs_errors_ovc[ovc*4:(ovc+1)*4-1] = vs_errors;
 	   
 	end
       
    endgenerate
    
-   wire 			       flit_valid_q;
-   assign flit_sent = flit_valid_q & free & (head_free | ~flit_head);
+   wire 				 full;
+   assign full = |(sel_ovc & full_ovc);
+   
+   wire 				 elig;
+   assign elig = |(sel_ovc & elig_ovc);
+   
+   wire 				 flit_valid_q;
+   
+   wire 				 flit_sent;
+   assign flit_sent = flit_valid_q & ~full & (elig | ~flit_head);
+   
+   wire 				 flit_kill;
    
    assign flit_valid = flit_sent & ~flit_kill;
    
    assign packet_sent = flit_tail & flit_sent;
    
-   wire 			       flit_valid_s;
+   wire 				 flit_valid_s;
    assign flit_valid_s
      = (flit_valid_q & ~packet_sent) | ~ready_packet_count_zero;
    c_dff
@@ -513,7 +423,7 @@ module packet_source
       .d(flit_valid_s),
       .q(flit_valid_q));
    
-   reg [0:flit_data_width-1] 	       data_q;
+   reg [0:flit_data_width-1] 		 data_q;
    always @(posedge clk, posedge reset)
      begin
 	if(reset | flit_sent)
@@ -977,6 +887,6 @@ module packet_source
       
    endgenerate
    
-   assign error = |hft_errors_ovc | |ft_errors_ovc;
+   assign error = |vs_errors_ovc;
    
 endmodule
