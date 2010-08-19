@@ -310,9 +310,6 @@ module rtr_ip_ctrl_mac
      = chi_header_info[la_route_info_width:
 		       la_route_info_width+route_info_width-1];
    
-   wire [0:num_vcs-1] 			     flit_sent_in_ivc;
-   assign flit_sent_in_ivc = {num_vcs{flit_sent_in}} & flit_sel_in_ivc;
-   
    
    //---------------------------------------------------------------------------
    // global lookahead routing information decoder
@@ -461,6 +458,9 @@ module rtr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // input vc controllers
    //---------------------------------------------------------------------------
+   
+   wire [0:num_vcs-1] 				  flit_sent_in_ivc;
+   assign flit_sent_in_ivc = {num_vcs{flit_sent_in}} & flit_sel_in_ivc;
    
    wire [0:num_vcs-1] 				  flit_sent_prev_ivc;
    wire 					  flit_head_prev;
