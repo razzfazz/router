@@ -526,12 +526,6 @@ module rtr_ip_ctrl_mac
 	   // flit buffer
 	   //-------------------------------------------------------------------
 	   
-	   wire 			   push_active;
-	   assign push_active = chi_flit_valid;
-	   
-	   wire 			   pop_active;
-	   assign pop_active = flit_valid_out;
-	   
 	   wire 			   error_fb_underflow;
 	   wire 			   error_fb_overflow;
 	   
@@ -543,6 +537,12 @@ module rtr_ip_ctrl_mac
 	   wire [0:route_info_width-1] 	   fb_route_info;
 	   
 	   begin:fb
+	      
+	      wire push_active;
+	      assign push_active = chi_flit_valid;
+	      
+	      wire pop_active;
+	      assign pop_active = flit_valid_out;
 	      
 	      wire push;
 	      assign push = chi_flit_valid;
@@ -681,6 +681,9 @@ module rtr_ip_ctrl_mac
 	   
 	   begin:htt
 	      
+	      wire active;
+	      assign active = flit_valid_out;
+	      
 	      wire reload_from_fb;
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
@@ -701,7 +704,7 @@ module rtr_ip_ctrl_mac
 	      flit_headq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(pop_active),
+		 .active(active),
 		 .d(flit_head_s),
 		 .q(flit_head_q));
 	      
@@ -713,7 +716,7 @@ module rtr_ip_ctrl_mac
 	      flit_tailq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(pop_active),
+		 .active(active),
 		 .d(flit_tail_s),
 		 .q(flit_tail_q));
 	      
@@ -738,6 +741,9 @@ module rtr_ip_ctrl_mac
 	   
 	   begin:hdt
 	      
+	      wire valid_active;
+	      assign valid_active = flit_valid_out;
+	      
 	      wire head_received;
 	      assign head_received = chi_flit_valid & chi_flit_head;
 	      
@@ -757,9 +763,13 @@ module rtr_ip_ctrl_mac
 	      validq
 		(.clk(clk),
 		 .reset(reset),
-		 .active(pop_active),
+		 .active(valid_active),
 		 .d(valid_s),
 		 .q(valid_q));
+	      
+	      wire active;
+	      assign active
+		= hdt_valid ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
 	      
 	      wire capture;
 	      assign capture = (~hdt_valid & chi_flit_valid) | 
@@ -778,7 +788,7 @@ module rtr_ip_ctrl_mac
 	      la_route_infoq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(pop_active),
+		 .active(active),
 		 .d(la_route_info_s),
 		 .q(la_route_info_q));
 	      
@@ -794,7 +804,7 @@ module rtr_ip_ctrl_mac
 	      route_infoq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(pop_active),
+		 .active(active),
 		 .d(route_info_s),
 		 .q(route_info_q));
 	      

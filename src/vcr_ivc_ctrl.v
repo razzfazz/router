@@ -634,6 +634,9 @@ module vcr_ivc_ctrl
       .d(hdr_valid_s),
       .q(hdr_valid_q));
    
+   wire 			     hdr_active;
+   assign hdr_active = hdr_valid_q ? (~fbc_empty & flit_tail) : flit_valid_in;
+   
    wire 			     hdr_capture;
    assign hdr_capture = (~hdr_valid_q & flit_valid_in) | 
 			(tail_sent & (~bypass_peek | flit_valid_in));
@@ -647,7 +650,7 @@ module vcr_ivc_ctrl
    hdr_la_route_infoq
      (.clk(clk),
       .reset(1'b0),
-      .active(pop_active),
+      .active(hdr_active),
       .d(hdr_la_route_info_s),
       .q(hdr_la_route_info_q));
    
@@ -659,7 +662,7 @@ module vcr_ivc_ctrl
    hdr_route_infoq
      (.clk(clk),
       .reset(1'b0),
-      .active(pop_active),
+      .active(hdr_active),
       .d(hdr_route_info_s),
       .q(hdr_route_info_q));
    
