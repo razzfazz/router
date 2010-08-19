@@ -374,10 +374,7 @@ module whr_top
 	   whr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_packets_per_vc(num_packets_per_vc),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
+	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .max_payload_length(max_payload_length),

@@ -44,39 +44,14 @@ module whr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
-   
    // maximum number of packets that can be in a given VC buffer simultaneously
    parameter num_packets_per_vc = 4;
-   
-   // width required to express number of packets in a VC
-   localparam packet_count_width = clogb(num_packets_per_vc + 1);
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
-   // number of dimensions in network
-   parameter num_dimensions = 2;
-   
-   // number of nodes per router (a.k.a. consentration factor)
-   parameter num_nodes_per_router = 1;
-   
-   // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
-   
-   // number of adjacent routers in each dimension
-   localparam num_neighbors_per_dim
-     = ((connectivity == `CONNECTIVITY_LINE) ||
-	(connectivity == `CONNECTIVITY_RING)) ?
-       2 :
-       (connectivity == `CONNECTIVITY_FULL) ?
-       (num_routers_per_dim - 1) :
-       -1;
-   
    // number of input and output ports on router
-   localparam num_ports
-     = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
+   parameter num_ports = 5;
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -101,9 +76,6 @@ module whr_op_ctrl_mac
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
 
-   // width of counter for remaining flits
-   localparam flit_ctr_width = clogb(max_payload_length);
-   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
