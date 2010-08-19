@@ -1255,10 +1255,10 @@ module rtr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*9-1] errors_s, errors_q;
+	   wire [0:num_vcs*7-1] errors_s, errors_q;
 	   assign errors_s = errors_ivc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*9),
+	     #(.num_errors(num_vcs*7),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
