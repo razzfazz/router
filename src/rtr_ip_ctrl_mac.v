@@ -107,9 +107,6 @@ module rtr_ip_ctrl_mac
    // select implementation variant for head/tail tracker register file
    parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for header data tracker register file
-   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 1;
    
