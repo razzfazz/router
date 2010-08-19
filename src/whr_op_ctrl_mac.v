@@ -44,9 +44,6 @@ module whr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
@@ -233,12 +230,10 @@ module whr_op_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 		       almost_full;
-   wire [0:3] 		       vs_errors;
+   wire [0:1] 		       vs_errors;
    rtr_vc_state
      #(.num_flits_per_vc(num_flits_per_vc),
-       .num_packets_per_vc(num_packets_per_vc),
        .flow_ctrl_type(flow_ctrl_type),
-       .tst_regfile_type(tst_regfile_type),
        .reset_type(reset_type))
    vs
      (.clk(clk),
@@ -287,10 +282,10 @@ module whr_op_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:3] errors_s, errors_q;
+	   wire [0:1] errors_s, errors_q;
 	   assign errors_s = vs_errors;
 	   c_err_rpt
-	     #(.num_errors(4),
+	     #(.num_errors(2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

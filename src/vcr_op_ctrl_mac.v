@@ -45,9 +45,6 @@ module vcr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of VCs
    parameter num_vcs = 4;
    
@@ -203,7 +200,7 @@ module vcr_op_ctrl_mac
    assign error_unmatched = flit_valid_in & ~|match_ovc;
    
    wire [0:num_vcs-1] 			    next_cred_ovc;
-   wire [0:num_vcs*4-1] 		    ovcc_errors_ovc;
+   wire [0:num_vcs*2-1] 		    ovcc_errors_ovc;
    
    generate
       
@@ -231,10 +228,9 @@ module vcr_op_ctrl_mac
 	   wire 		elig;
 	   wire 		empty;
 	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
-	   wire [0:3] 			  ovcc_errors;
+	   wire [0:1] 			  ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
@@ -266,7 +262,7 @@ module vcr_op_ctrl_mac
 	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
 				    (ovc+1)*int_flow_ctrl_width-1]
 		    = int_flow_ctrl;
-	   assign ovcc_errors_ovc[ovc*4:(ovc+1)*4-1] = ovcc_errors;
+	   assign ovcc_errors_ovc[ovc*2:(ovc+1)*2-1] = ovcc_errors;
 	   
 	end
       
@@ -347,10 +343,10 @@ module vcr_op_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:1+num_vcs*4-1] errors_s, errors_q;
+	   wire [0:1+num_vcs*2-1] errors_s, errors_q;
 	   assign errors_s = {error_unmatched, ovcc_errors_ovc};
 	   c_err_rpt
-	     #(.num_errors(1+num_vcs*4),
+	     #(.num_errors(1+num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

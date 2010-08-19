@@ -139,7 +139,6 @@ module router_wrap
 	     
 	     whr_top
 	       #(.num_flits_per_vc(num_flits_per_vc),
-		 .num_packets_per_vc(num_packets_per_vc),
 		 .num_routers_per_dim(num_routers_per_dim),
 		 .num_dimensions(num_dimensions),
 		 .num_nodes_per_router(num_nodes_per_router),
@@ -156,11 +155,9 @@ module router_wrap
 		 .input_stage_can_hold(input_stage_can_hold),
 		 .fb_regfile_type(fb_regfile_type),
 		 .htt_regfile_type(htt_regfile_type),
-		 .hdt_regfile_type(hdt_regfile_type),
-		 .tst_regfile_type(tst_regfile_type),
 		 .explicit_pipeline_register(explicit_pipeline_register),
 		 .arbiter_type(sw_alloc_arbiter_type),
-		 .crossbar_type(data_crossbar_type),
+		 .crossbar_type(crossbar_type),
 		 .reset_type(reset_type))
 	     whr
 	       (.clk(clk),
@@ -179,7 +176,6 @@ module router_wrap
 	     
 	     vcr_top
 	       #(.num_flits_per_vc(num_flits_per_vc),
-		 .num_packets_per_vc(num_packets_per_vc),
 		 .num_message_classes(num_message_classes),
 		 .num_resource_classes(num_resource_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
@@ -200,8 +196,6 @@ module router_wrap
 		 .int_flow_ctrl_type(int_flow_ctrl_type),
 		 .fb_regfile_type(fb_regfile_type),
 		 .htt_regfile_type(htt_regfile_type),
-		 .hdt_regfile_type(hdt_regfile_type),
-		 .tst_regfile_type(tst_regfile_type),
 		 .explicit_pipeline_register(explicit_pipeline_register),
 		 .vc_alloc_type(vc_alloc_type),
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
@@ -209,8 +203,8 @@ module router_wrap
 		 .sw_alloc_type(sw_alloc_type),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .sw_alloc_spec_type(sw_alloc_spec_type),
-		 .ctrl_crossbar_type(ctrl_crossbar_type),
-		 .data_crossbar_type(data_crossbar_type),
+		 .ctrl_crossbar_type(crossbar_type),
+		 .data_crossbar_type(crossbar_type),
 		 .reset_type(reset_type))
 	     vcr
 	       (.clk(clk),
@@ -229,7 +223,6 @@ module router_wrap
 	     
 	     rtr_top
 	       #(.num_flits_per_vc(num_flits_per_vc),
-		 .num_packets_per_vc(num_packets_per_vc),
 		 .num_message_classes(num_message_classes),
 		 .num_resource_classes(num_resource_classes),
 		 .num_vcs_per_class(num_vcs_per_class),
@@ -248,12 +241,10 @@ module router_wrap
 		 .dim_order(dim_order),
 		 .fb_regfile_type(fb_regfile_type),
 		 .htt_regfile_type(htt_regfile_type),
-		 .hdt_regfile_type(hdt_regfile_type),
-		 .tst_regfile_type(tst_regfile_type),
 		 .explicit_pipeline_register(explicit_pipeline_register),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
-		 .data_crossbar_type(data_crossbar_type),
+		 .crossbar_type(crossbar_type),
 		 .reset_type(reset_type))
 	     rtr
 	       (.clk(clk),

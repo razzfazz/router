@@ -66,12 +66,6 @@ module packet_source
    // width required to express number of flits in a VC
    localparam flit_count_width = clogb(num_flits_per_vc + 1);
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
-   // width required to express number of packets in a VC
-   localparam packet_count_width = clogb(num_packets_per_vc + 1);
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -346,7 +340,7 @@ module packet_source
    
    wire [0:num_vcs-1] 			 full_ovc;
    wire [0:num_vcs-1] 			 elig_ovc;
-   wire [0:num_vcs*4-1] 		 vs_errors_ovc;
+   wire [0:num_vcs*2-1] 		 vs_errors_ovc;
    
    genvar 				 ovc;
    
@@ -365,10 +359,9 @@ module packet_source
 	   wire empty;
 	   wire almost_full;
 	   wire full;
-	   wire [0:3] vs_errors;
+	   wire [0:1] vs_errors;
 	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .reset_type(reset_type))
 	   vs
@@ -387,7 +380,7 @@ module packet_source
 	   assign elig_ovc[ovc] = elig;
 	   assign full_ovc[ovc] = full;
 	   
-	   assign vs_errors_ovc[ovc*4:(ovc+1)*4-1] = vs_errors;
+	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
 	   
 	end
       

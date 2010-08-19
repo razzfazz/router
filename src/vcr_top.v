@@ -44,9 +44,6 @@ module vcr_top
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -164,12 +161,6 @@ module vcr_top
    
    // select implementation variant for head/tail tracker register file
    parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for header data tracker register file
-   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -300,7 +291,6 @@ module vcr_top
 	   wire 				   ipc_error;
 	   vcr_ip_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
@@ -320,7 +310,6 @@ module vcr_top
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .fb_regfile_type(fb_regfile_type),
 	       .htt_regfile_type(htt_regfile_type),
-	       .hdt_regfile_type(hdt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
@@ -517,7 +506,6 @@ module vcr_top
 	   wire 				  opc_error;
 	   vcr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
@@ -526,7 +514,6 @@ module vcr_top
 	       .error_capture_mode(error_capture_mode),
 	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .tst_regfile_type(tst_regfile_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .port_id(op),
 	       .reset_type(reset_type))

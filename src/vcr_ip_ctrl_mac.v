@@ -47,9 +47,6 @@ module vcr_ip_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -195,9 +192,6 @@ module vcr_ip_ctrl_mac
    
    // select implementation variant for head/tail tracker register file
    parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for header data tracker register file
-   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
@@ -397,7 +391,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 				     fbc_empty_ivc;
    wire [0:num_vcs-1] 				     allocated_ivc;
    wire [0:num_vcs*num_vcs-1] 			     allocated_ivc_ovc;
-   wire [0:num_vcs*8-1] 			     ivcc_errors_ivc;
+   wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
    
    genvar 					     ivc;
    
@@ -438,10 +432,9 @@ module vcr_ip_ctrl_mac
 	   wire 			   allocated;
 	   wire [0:num_vcs-1] 		   allocated_ovc;
 	   wire 			   free_spec;
-	   wire [0:7] 			   ivcc_errors;
+	   wire [0:5] 			   ivcc_errors;
 	   vcr_ivc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
@@ -462,7 +455,6 @@ module vcr_ip_ctrl_mac
 	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .fb_regfile_type(fb_regfile_type),
 	       .htt_regfile_type(htt_regfile_type),
-	       .hdt_regfile_type(hdt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_id(ivc),
 	       .port_id(port_id),
@@ -515,7 +507,7 @@ module vcr_ip_ctrl_mac
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
 	     = allocated_ovc;
 	   assign free_spec_ivc[ivc] = free_spec;
-	   assign ivcc_errors_ivc[ivc*8:(ivc+1)*8-1] = ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*6:(ivc+1)*6-1] = ivcc_errors;
 	   
 	end
       
@@ -799,10 +791,10 @@ module vcr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*8-1] errors_s, errors_q;
+	   wire [0:num_vcs*6-1] errors_s, errors_q;
 	   assign errors_s = ivcc_errors_ivc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*8),
+	     #(.num_errors(num_vcs*6),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

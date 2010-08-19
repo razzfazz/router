@@ -51,9 +51,6 @@ module rtr_alloc_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -94,9 +91,6 @@ module rtr_alloc_mac
    
    // select which arbiter type to use for VC allocation
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -769,7 +763,7 @@ module rtr_alloc_mac
    // output side
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs*4-1] ovs_errors_op_ovc;
+   wire [0:num_ports*num_vcs*2-1] ovs_errors_op_ovc;
    
    generate
       
@@ -1048,9 +1042,9 @@ module rtr_alloc_mac
 		wire ovs_full;
 		assign ovs_full_ovc[ovc] = ovs_full;
 		
-		wire [0:3] ovs_errors;
-		assign ovs_errors_op_ovc[(op*num_vcs+ovc)*4:
-					 (op*num_vcs+ovc+1)*4-1] = ovs_errors;
+		wire [0:1] ovs_errors;
+		assign ovs_errors_op_ovc[(op*num_vcs+ovc)*2:
+					 (op*num_vcs+ovc+1)*2-1] = ovs_errors;
 		
 		
 		//--------------------------------------------------------------
@@ -1068,9 +1062,7 @@ module rtr_alloc_mac
 		
 		rtr_vc_state
 		  #(.num_flits_per_vc(num_flits_per_vc),
-		    .num_packets_per_vc(num_packets_per_vc),
 		    .flow_ctrl_type(flow_ctrl_type),
-		    .tst_regfile_type(tst_regfile_type),
 		    .reset_type(reset_type))
 		ovs
 		  (.clk(clk),
@@ -1167,10 +1159,10 @@ module rtr_alloc_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_ports*num_vcs*4-1] errors_s, errors_q;
+	   wire [0:num_ports*num_vcs*2-1] errors_s, errors_q;
 	   assign errors_s = ovs_errors_op_ovc;
 	   c_err_rpt
-	     #(.num_errors(num_ports*num_vcs*4),
+	     #(.num_errors(num_ports*num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

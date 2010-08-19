@@ -45,9 +45,6 @@ module tc_node_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -157,9 +154,6 @@ module tc_node_mac
    
    // include error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
-   
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
    // width required for lookahead routing information
    localparam la_route_info_width = port_idx_width + resource_class_idx_width;
@@ -1095,7 +1089,7 @@ module tc_node_mac
    
    wire packet_to_self;
    
-   wire [0:num_vcs*4-1] 	  vs_errors_ovc;
+   wire [0:num_vcs*2-1] 	  vs_errors_ovc;
    
    genvar 			  ovc;
    
@@ -1114,12 +1108,10 @@ module tc_node_mac
 	   wire empty;
 	   wire almost_full;
 	   wire full;
-	   wire [0:3] vs_errors;
+	   wire [0:1] vs_errors;
 	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
-	       .tst_regfile_type(tst_regfile_type),
 	       .reset_type(reset_type))
 	   vs
 	     (.clk(clk),
@@ -1140,7 +1132,7 @@ module tc_node_mac
 	   assign elig_ovc[ovc] = elig;
 	   assign empty_ovc[ovc] = empty;
 	   assign free_ovc[ovc] = free;
-	   assign vs_errors_ovc[ovc*4:(ovc+1)*4-1] = vs_errors;
+	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
 	   
 	end
       
@@ -1832,17 +1824,11 @@ module tc_node_mac
 	for(i = 0; i < num_vcs; i = i + 1)
 	  begin
 	     
-	     if(vs_errors_ovc[i*4])
+	     if(vs_errors_ovc[i*2])
 	       $display("ERROR: Credit tracker underflow in module %m.");
 	     
-	     if(vs_errors_ovc[i*4+1])
+	     if(vs_errors_ovc[i*2+1])
 	       $display("ERROR: Credit tracker overflow in module %m.");
-	     
-	     if(vs_errors_ovc[i*4+2])
-	       $display("ERROR: Head credit tracker underflow in module %m.");
-	     
-	     if(vs_errors_ovc[i*4+3])
-	       $display("ERROR: Head credit tracker overflow in module %m");
 	     
 	  end
 	
@@ -1855,10 +1841,10 @@ module tc_node_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*4-1] errors_s, errors_q;
+	   wire [0:num_vcs*2-1] errors_s, errors_q;
 	   assign errors_s = vs_errors_ovc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*4),
+	     #(.num_errors(num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

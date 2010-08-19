@@ -47,12 +47,6 @@ module vcr_ovc_ctrl
    // width required to express number of flits in a VC
    localparam flit_count_width = clogb(num_flits_per_vc + 1);
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
-   // width required to express number of packets in a VC
-   localparam packet_count_width = clogb(num_packets_per_vc + 1);
-   
    // number of VCs
    parameter num_vcs = 4;
    
@@ -156,8 +150,8 @@ module vcr_ovc_ctrl
    wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
    
    // internal error condition detected
-   output [0:3] errors;
-   wire [0:3] 			  errors;
+   output [0:1] errors;
+   wire [0:1] 			  errors;
    
    
    //---------------------------------------------------------------------------
@@ -273,150 +267,18 @@ module vcr_ovc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // track number of packets that downstream buffer can still accept
-   //---------------------------------------------------------------------------
-   
-   wire 				cred_active;
-   assign cred_active = credit;
-   
-   wire 				flags_active;
-   assign flags_active = alloc_active | cred_active;
-   
-   wire 				ft_almost_empty;
-   wire 				head_full;
-   wire 				error_hft_underflow;
-   wire 				error_hft_overflow;
-   
-   generate
-      
-      if(num_packets_per_vc == num_flits_per_vc)
-	begin
-	   
-	   // if every flit buffer entry can be a head flit, we don't need 
-	   // dedicated credit tracking for headers, and can instead just rely 
-	   // on the normal credit tracking mechanism
-	   assign head_full = 1'b0;
-	   
-	   assign error_hft_underflow = 1'b0;
-	   assign error_hft_overflow = 1'b0;
-	   
-	end
-      else if(num_packets_per_vc < num_flits_per_vc)
-	begin
-	   
-	   // if only a subset of the flit buffer entries can be headers, we 
-	   // need to keep track of how many such slots are left
-	   
-	   wire head_credit;
-	   
-	   if(num_packets_per_vc == 1)
-	     begin
-		
-		// if we can only have one packet per buffer, we can accept the 
-		// next one once the buffer has been completely drained after 
-		// the tail has been sent
-		
-		wire last_credit_received;
-		assign last_credit_received = ft_almost_empty & credit;
-		
-		wire tail_sent_s, tail_sent_q;
-		assign tail_sent_s
-		  = ((tail_sent_q & ~(flit_valid_qual & flit_head)) | 
-		     (flit_valid_qual & flit_tail));
-		c_dff
-		  #(.width(1),
-		    .reset_type(reset_type))
-		tail_sentq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(tail_sent_s),
-		   .q(tail_sent_q));
-		
-		assign head_credit = tail_sent_q & last_credit_received;
-		
-	     end
-	   else if(num_packets_per_vc > 1)
-	     begin
-		
-		wire 			  tff_push_data;
-		assign tff_push_data = flit_tail;
-		
-		wire 			  tff_pop_data;
-		wire 			  tff_almost_full;
-		wire 			  tff_full;
-		wire 			  tff_almost_empty;
-		wire 			  tff_empty;
-		wire [0:1] 		  tff_errors;
-		c_fifo
-		  #(.depth(num_flits_per_vc),
-		    .width(1),
-		    .regfile_type(tst_regfile_type),
-		    .reset_type(reset_type))
-		tff
-		  (.clk(clk),
-		   .reset(reset),
-		   .push_active(alloc_active),
-		   .pop_active(cred_active),
-		   .push(flit_valid_qual),
-		   .pop(credit),
-		   .push_data(tff_push_data),
-		   .pop_data(tff_pop_data),
-		   .almost_empty(tff_almost_empty),
-		   .empty(tff_empty),
-		   .almost_full(tff_almost_full),
-		   .full(tff_full),
-		   .errors(tff_errors));
-		
-		assign head_credit = credit & tff_pop_data;		
-		
-	     end
-	   
-	   wire 				 head_debit;
-	   assign head_debit = vc_gnt;
-	   
-	   // track header credits using stock FIFO tracker module
-	   wire 				 hft_almost_empty;
-	   wire 				 hft_empty;
-	   wire 				 hft_almost_full;
-	   wire 				 hft_full;
-	   wire [0:packet_count_width-1] 	 hft_free;
-	   wire [0:1] 				 hft_errors;
-	   c_fifo_tracker
-	     #(.depth(num_packets_per_vc),
-	       .reset_type(reset_type))
-	   hft
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(flags_active),
-	      .push(head_debit),
-	      .pop(head_credit),
-	      .almost_empty(hft_almost_empty),
-	      .empty(hft_empty),
-	      .almost_full(hft_almost_full),
-	      .full(hft_full),
-	      .free(hft_free),
-	      .errors(hft_errors));
-	   
-	   assign head_full = hft_full;
-	   
-	   assign error_hft_underflow = hft_errors[0];
-	   assign error_hft_overflow = hft_errors[1];
-	   
-	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 					 ft_empty;
-   wire 					 ft_almost_full;
-   wire 					 ft_full;
-   wire [0:flit_count_width-1] 			 ft_free;
-   wire [0:1] 					 ft_errors;
+   wire 				flags_active;
+   assign flags_active = alloc_active | credit;
+   
+   wire 				ft_almost_empty;
+   wire 				ft_empty;
+   wire 				ft_almost_full;
+   wire 				ft_full;
+   wire [0:flit_count_width-1] 		ft_free;
+   wire [0:1] 				ft_errors;
    c_fifo_tracker
      #(.depth(num_flits_per_vc),
        .reset_type(reset_type))
@@ -435,10 +297,10 @@ module vcr_ovc_ctrl
    
    assign empty = ft_empty;
    
-   wire 					 error_ct_underflow;
+   wire 				error_ct_underflow;
    assign error_ct_underflow = ft_errors[0];
    
-   wire 					 error_ct_overflow;
+   wire 				error_ct_overflow;
    assign error_ct_overflow = ft_errors[1];
    
    
@@ -608,11 +470,11 @@ module vcr_ovc_ctrl
 	      .d(cred_s),
 	      .q(cred_q));
 	   
-	   assign elig = ~allocated_q & ~head_full & cred_q;
+	   assign elig = ~allocated_q & cred_q;
 	   
 	end
       else
-	assign elig = ~allocated_q & ~head_full;
+	assign elig = ~allocated_q;
       
    endgenerate
    
@@ -632,19 +494,11 @@ module vcr_ovc_ctrl
 	if(error_ct_overflow)
 	  $display("ERROR: Credit tracker overflow in module %m.");
 	
-	if(error_hft_underflow)
-	  $display("ERROR: Head credit tracker underflow in module %m.");
-	
-	if(error_hft_overflow)
-	  $display("ERROR: Head credit tracker overflow in module %m.");
-	
      end
    
    // synopsys translate_on
    
-   assign errors = {error_ct_underflow, 
-		    error_ct_overflow,
-		    error_hft_underflow, 
-		    error_hft_overflow};
+   assign errors[0] = error_ct_underflow;
+   assign errors[1] = error_ct_overflow;
    
 endmodule

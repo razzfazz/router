@@ -254,7 +254,6 @@ module testbench
    
    tc_node_mac
      #(.num_flits_per_vc(num_flits_per_vc),
-       .num_packets_per_vc(num_packets_per_vc),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -268,7 +267,6 @@ module testbench
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
-       .tst_regfile_type(tst_regfile_type),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),
@@ -358,7 +356,6 @@ module testbench
    
    tc_node_mac
      #(.num_flits_per_vc(num_flits_per_vc),
-       .num_packets_per_vc(num_packets_per_vc),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -372,7 +369,6 @@ module testbench
        .min_payload_length(min_payload_length),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
-       .tst_regfile_type(tst_regfile_type),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .lfsr_index(lfsr_index),

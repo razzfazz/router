@@ -38,9 +38,6 @@ parameter topology = `TOPOLOGY_MESH;
 // flit buffer entries per VC
 parameter num_flits_per_vc = 8;
 
-// maximum number of packets that can be in a given VC buffer simultaneously
-parameter num_packets_per_vc = 4;
-
 // number of message classes (e.g. request, reply)
 parameter num_message_classes = 2;
 
@@ -107,12 +104,6 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 // select implementation variant for head/tail tracker register file
 parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
 
-// select implementation variant for head data tracker register file
-parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
-
-// select implementation variant for tail sent tracker register file
-parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
-
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 
@@ -135,10 +126,7 @@ parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 // select speculation type for switch allocator
 parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
 
-// select implementation variant for control crossbar
-parameter ctrl_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
-
-// select implementation variant for data crossbar
-parameter data_crossbar_type = `CROSSBAR_TYPE_TRISTATE;
+// select implementation variant for crossbar
+parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
 parameter reset_type = `RESET_TYPE_ASYNC;

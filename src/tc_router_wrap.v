@@ -330,7 +330,6 @@ module tc_router_wrap
 		
 		tc_node_mac
 		  #(.num_flits_per_vc(num_flits_per_vc),
-		    .num_packets_per_vc(num_packets_per_vc),
 		    .num_message_classes(num_message_classes),
 		    .num_resource_classes(num_resource_classes),
 		    .num_vcs_per_class(num_vcs_per_class),
@@ -344,7 +343,6 @@ module tc_router_wrap
 		    .min_payload_length(min_payload_length),
 		    .flit_data_width(flit_data_width),
 		    .error_capture_mode(error_capture_mode),
-		    .tst_regfile_type(tst_regfile_type),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
 		    .lfsr_index(/*num_ports * */ lfsr_index /*+ port*/),
@@ -417,7 +415,6 @@ module tc_router_wrap
    router_wrap
      #(.topology(topology),
        .num_flits_per_vc(num_flits_per_vc),
-       .num_packets_per_vc(num_packets_per_vc),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -439,8 +436,6 @@ module tc_router_wrap
        .input_stage_can_hold(input_stage_can_hold),
        .fb_regfile_type(fb_regfile_type),
        .htt_regfile_type(htt_regfile_type),
-       .hdt_regfile_type(hdt_regfile_type),
-       .tst_regfile_type(tst_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .vc_alloc_type(vc_alloc_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
@@ -448,8 +443,7 @@ module tc_router_wrap
        .sw_alloc_type(sw_alloc_type),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .sw_alloc_spec_type(sw_alloc_spec_type),
-       .ctrl_crossbar_type(ctrl_crossbar_type),
-       .data_crossbar_type(data_crossbar_type),
+       .crossbar_type(crossbar_type),
        .reset_type(reset_type))
    rtr
      (.clk(rtr_clk),

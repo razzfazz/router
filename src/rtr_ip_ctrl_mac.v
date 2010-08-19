@@ -364,7 +364,7 @@ module rtr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // local lookahead routing information update logic
+   // global lookahead routing information update logic
    //---------------------------------------------------------------------------
    
    wire [0:la_route_info_width-1] 		  glu_la_route_info;
@@ -466,7 +466,7 @@ module rtr_ip_ctrl_mac
    wire 					  flit_head_prev;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*flit_data_width-1] 		  llu_flit_data_ivc;
-   wire [0:num_vcs*9-1] 			  errors_ivc;
+   wire [0:num_vcs*7-1] 			  errors_ivc;
    
    genvar 					  ivc;
    
@@ -521,8 +521,8 @@ module rtr_ip_ctrl_mac
 				    (ivc+1)*num_resource_classes-1]
 	     = route_out_orc;
 	   
-	   wire [0:8] 			   errors;
-	   assign errors_ivc[ivc*9:(ivc+1)*9-1] = errors;
+	   wire [0:6] 			   errors;
+	   assign errors_ivc[ivc*7:(ivc+1)*7-1] = errors;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -538,7 +538,10 @@ module rtr_ip_ctrl_mac
 	   wire 			   error_fb_underflow;
 	   wire 			   error_fb_overflow;
 	   
+	   wire 			   fb_almost_empty;
 	   wire [0:flit_data_width-1] 	   fb_flit_data;
+	   wire [0:la_route_info_width-1]  fb_la_route_info;
+	   wire [0:route_info_width-1] 	   fb_route_info;
 	   
 	   begin:fb
 	      
@@ -614,10 +617,23 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
+	      wire 			    peek_active;
+	      assign peek_active = ~empty & ~almost_empty;
+	      
+	      wire [0:fb_addr_width-1] 	    peek_addr;
+	      c_incr
+		#(.width(fb_addr_width),
+		  .max_value(num_flits_per_vc - 1))
+	      peek_addr_incr
+		(.data_in(pop_addr),
+		 .data_out(peek_addr));
+	      
 	      wire [0:flit_data_width-1]    read_data;
+	      wire [0:flit_data_width-1]    peek_data;
 	      c_regfile
 		#(.depth(num_flits_per_vc),
 		  .width(flit_data_width),
+		  .num_read_ports(2),
 		  .regfile_type(fb_regfile_type))
 	      rf
 		(.clk(clk),
@@ -625,16 +641,27 @@ module rtr_ip_ctrl_mac
 		 .write_enable(write_enable),
 		 .write_address(push_addr),
 		 .write_data(chi_flit_data),
-		 .read_active(read_active),
-		 .read_address(read_addr),
-		 .read_data(read_data));
+		 .read_active({read_active, peek_active}),
+		 .read_address({read_addr, peek_addr}),
+		 .read_data({read_data, peek_data}));
+	      
+	      wire [0:la_route_info_width-1] peek_la_route_info;
+	      assign peek_la_route_info = peek_data[0:la_route_info_width-1];
+   
+	      wire [0:route_info_width-1]    peek_route_info;
+	      assign peek_route_info
+		= peek_data[la_route_info_width:
+			    la_route_info_width+route_info_width-1];
 	      
 	      assign error_fb_underflow = errors[0];
 	      assign error_fb_overflow = errors[1];
 	      
+	      assign fb_almost_empty = almost_empty;
 	      assign fb_empty = empty;
 	      assign fb_full = full;
 	      assign fb_flit_data = read_data;
+	      assign fb_la_route_info = peek_la_route_info;
+	      assign fb_route_info = peek_route_info;
 	      
 	   end
 	   
@@ -645,11 +672,11 @@ module rtr_ip_ctrl_mac
 	   // track whether frontmost flit is head or tail
 	   //-------------------------------------------------------------------
 	   
-	   wire 			  htt_flit_head;
-	   wire 			  htt_flit_tail;
+	   wire 			     htt_flit_head;
+	   wire 			     htt_flit_tail;
 	   
-	   wire 			  error_htt_underflow;
-	   wire 			  error_htt_overflow;
+	   wire 			     error_htt_underflow;
+	   wire 			     error_htt_overflow;
 	   
 	   begin:htt
 	      
@@ -747,8 +774,6 @@ module rtr_ip_ctrl_mac
 	   wire [0:la_route_info_width-1] hdt_la_route_info;
 	   wire [0:route_info_width-1] 	  hdt_route_info;
 	   
-	   wire 			  error_hdt_underflow;
-	   wire 			  error_hdt_overflow;
 	   wire 			  error_no_header;
 	   
 	   begin:hdt
@@ -759,57 +784,12 @@ module rtr_ip_ctrl_mac
 	      wire tail_sent;
 	      assign tail_sent = flit_sent_in & flit_tail_out;
 	      
-	      wire push;
-	      assign push = head_received;
+	      wire reload_from_fb;
+	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire empty;
-	      
-	      wire pop;
-	      assign pop = (tail_sent | ~hdt_valid) & (~empty | push);
-	      
-	      wire [0:hdt_width-1] push_data;
-	      assign push_data[0:la_route_info_width-1] = chi_la_route_info;
-	      assign push_data[la_route_info_width:
-			       la_route_info_width+route_info_width-1]
-		= chi_route_info;
-	      
-	      wire [0:hdt_width-1] pop_data;
-	      wire 		   almost_full;
-	      wire 		   full;
-	      wire 		   almost_empty;
-	      wire [0:1] 	   errors;
-	      c_fifo
-		#(.depth(num_packets_per_vc - 1),
-		  .width(hdt_width),
-		  .regfile_type(hdt_regfile_type),
-		  .enable_bypass(1),
-		  .reset_type(reset_type))
-	      ff
-		(.clk(clk),
-		 .reset(reset),
-		 .push_active(push_active),
-		 .pop_active(pop_active),
-		 .push(push),
-		 .pop(pop),
-		 .push_data(push_data),
-		 .pop_data(pop_data),
-		 .almost_empty(almost_empty),
-		 .empty(empty),
-		 .almost_full(almost_full),
-		 .full(full),
-		 .errors(errors));
-	      
-	      wire [0:la_route_info_width-1] la_route_info;
-	      assign la_route_info = pop_data[0:la_route_info_width-1];
-	      
-	      wire [0:route_info_width-1]    route_info;
-	      assign route_info
-		= pop_data[la_route_info_width:
-			   la_route_info_width+route_info_width-1];
-	      
-	      wire 			     valid_s, valid_q;
+	      wire valid_s, valid_q;
 	      assign valid_s = valid_q ?
-			       (~tail_sent | ~empty | head_received) : 
+			       (~tail_sent | reload_from_fb | head_received) : 
 			       (chi_flit_valid & ~tail_sent);
 	      c_dff
 		#(.width(1),
@@ -821,9 +801,13 @@ module rtr_ip_ctrl_mac
 		 .d(valid_s),
 		 .q(valid_q));
 	      
-	      wire 			     capture;
+	      wire capture;
 	      assign capture = (~hdt_valid & chi_flit_valid) | 
-			       (tail_sent & (~empty | chi_flit_valid));
+			       (tail_sent & (reload_from_fb | chi_flit_valid));
+	      
+	      wire [0:la_route_info_width-1] la_route_info;
+	      assign la_route_info
+		= reload_from_fb ? fb_la_route_info : chi_la_route_info;
 	      
 	      wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
 	      assign la_route_info_s
@@ -837,6 +821,10 @@ module rtr_ip_ctrl_mac
 		 .active(pop_active),
 		 .d(la_route_info_s),
 		 .q(la_route_info_q));
+	      
+	      wire [0:route_info_width-1]    route_info;
+	      assign route_info
+		= reload_from_fb ? fb_route_info : chi_route_info;
 	      
 	      wire [0:route_info_width-1]    route_info_s, route_info_q;
 	      assign route_info_s = capture ? route_info : route_info_q;
@@ -854,8 +842,6 @@ module rtr_ip_ctrl_mac
 	      assign hdt_la_route_info = la_route_info_q;
 	      assign hdt_route_info = route_info_q;
 	      
-	      assign error_hdt_underflow = errors[0];
-	      assign error_hdt_overflow = errors[1];	   
 	      assign error_no_header
 		= ~hdt_valid & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
 	      
@@ -1077,12 +1063,6 @@ module rtr_ip_ctrl_mac
 		if(error_fb_overflow)
 		  $display("ERROR: Flit buffer overflow in module %m.");
 		
-		if(error_hdt_underflow)
-		  $display("ERROR: Head data tracker underflow in module %m.");
-		
-		if(error_hdt_overflow)
-		  $display("ERROR: Head data tracker overflow in module %m.");
-		
 		if(error_htt_underflow)
 		  $display("ERROR: Head/tail tracker underflow in module %m.");
 		
@@ -1106,13 +1086,11 @@ module rtr_ip_ctrl_mac
 	   
 	   assign errors[0] = error_fb_underflow;
 	   assign errors[1] = error_fb_overflow;
-	   assign errors[2] = error_hdt_underflow;
-	   assign errors[3] = error_hdt_overflow;
-	   assign errors[4] = error_htt_underflow;
-	   assign errors[5] = error_htt_overflow;
-	   assign errors[6] = error_no_header;
-	   assign errors[7] = error_invalid_port;
-	   assign errors[8] = error_invalid_class;
+	   assign errors[2] = error_htt_underflow;
+	   assign errors[3] = error_htt_overflow;
+	   assign errors[4] = error_no_header;
+	   assign errors[5] = error_invalid_port;
+	   assign errors[6] = error_invalid_class;
 	   
 	end
       

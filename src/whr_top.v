@@ -44,9 +44,6 @@ module whr_top
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
@@ -147,12 +144,6 @@ module whr_top
    // select implementation variant for head/tail tracker register file
    parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for header data tracker register file
-   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -232,7 +223,6 @@ module whr_top
 	   wire 		      ipc_error;
 	   whr_ip_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
@@ -248,7 +238,6 @@ module whr_top
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fb_regfile_type(fb_regfile_type),
 	       .htt_regfile_type(htt_regfile_type),
-	       .hdt_regfile_type(hdt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
@@ -373,14 +362,12 @@ module whr_top
 	   wire 		      opc_error;
 	   whr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
-	       .tst_regfile_type(tst_regfile_type),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(op),
 	       .reset_type(reset_type))

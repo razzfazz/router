@@ -48,9 +48,6 @@ module rtr_top
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // maximum number of packets that can be in a given VC buffer simultaneously
-   parameter num_packets_per_vc = 4;
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -109,12 +106,6 @@ module rtr_top
    // select implementation variant for head/tail tracker register file
    parameter htt_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // select implementation variant for header data tracker register file
-   parameter hdt_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -124,8 +115,8 @@ module rtr_top
    // select which arbiter type to use for VC allocation
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select implementation variant for data crossbar
-   parameter data_crossbar_type = `CROSSBAR_TYPE_MUX;
+   // select implementation variant for crossbar
+   parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -256,7 +247,6 @@ module rtr_top
 	   wire 				   ipc_error;
 	   rtr_ip_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_packets_per_vc(num_packets_per_vc),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
@@ -274,7 +264,6 @@ module rtr_top
 	       .dim_order(dim_order),
 	       .fb_regfile_type(fb_regfile_type),
 	       .htt_regfile_type(htt_regfile_type),
-	       .hdt_regfile_type(hdt_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
@@ -339,7 +328,6 @@ module rtr_top
    
    rtr_alloc_mac
      #(.num_flits_per_vc(num_flits_per_vc),
-       .num_packets_per_vc(num_packets_per_vc),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -353,7 +341,6 @@ module rtr_top
        .dim_order(dim_order),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
-       .tst_regfile_type(tst_regfile_type),
        .error_capture_mode(error_capture_mode),
        .reset_type(reset_type))
    alo
@@ -385,7 +372,7 @@ module rtr_top
    rtr_crossbar_mac
      #(.num_ports(num_ports),
        .width(flit_data_width),
-       .crossbar_type(data_crossbar_type))
+       .crossbar_type(crossbar_type))
    xbd
      (.ctrl_in_op_ip(alo_flit_sel_op_ip),
       .data_in_ip(ipc_flit_data_ip),

@@ -38,9 +38,6 @@ parameter topology = `TOPOLOGY_FBFLY;
 // flit buffer entries per VC
 parameter num_flits_per_vc = 8;
 
-// maximum number of packets that can be in a given VC buffer simultaneously
-parameter num_packets_per_vc = 4;
-
 // number of message classes (e.g. request, reply)
 parameter num_message_classes = 2;
 
@@ -81,9 +78,6 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // (the intent is to allow synthesis to optimize away the logic associated with 
 // such turns)
 parameter restrict_turns = 0;
-
-// select implementation variant for tail sent tracker register file
-parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
 
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
