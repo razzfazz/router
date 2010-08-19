@@ -370,7 +370,6 @@ module whr_ip_ctrl_mac
    wire 			  fbf_write_enable;
    wire 			  fbf_read_active;
    wire [0:fb_addr_width-1] 	  fbf_read_addr;
-   wire [0:flit_data_width-1] 	  fbf_read_data;
    
    generate
       
@@ -427,8 +426,8 @@ module whr_ip_ctrl_mac
      (.data_in(fbc_pop_addr),
       .data_out(fbf_peek_addr));
    
+   wire [0:flit_data_width-1] 	     fbf_read_data;
    wire [0:flit_data_width-1] 	     fbf_peek_data;
-   
    c_regfile
      #(.depth(fb_depth),
        .width(flit_data_width),

@@ -477,7 +477,6 @@ module vcr_ivc_ctrl
    wire 					     fbf_write_enable;
    wire 					     fbf_read_active;
    wire [0:fb_addr_width-1] 			     fbf_read_addr;
-   wire [0:flit_data_width-1] 			     fbf_read_data;
    
    generate
       
@@ -533,9 +532,9 @@ module vcr_ivc_ctrl
    fbf_peek_addr_incr
      (.data_in(fbc_pop_addr),
       .data_out(fbf_peek_addr));
-   
+    
+   wire [0:flit_data_width-1] 	     fbf_read_data;
    wire [0:flit_data_width-1] 	     fbf_peek_data;
-   
    c_regfile
      #(.depth(num_flits_per_vc),
        .width(flit_data_width),
