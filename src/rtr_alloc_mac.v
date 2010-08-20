@@ -859,22 +859,40 @@ module rtr_alloc_mac
 		 .data_in(ial_flit_tail_ip),
 		 .data_out(oal_flit_tail));
 	      
-	      wire [0:num_vcs-1]   flit_sel_ovc;
+	      wire [0:num_ports*num_vcs-1] flit_sel_ip_ovc;
+	      
+	      genvar 			   ip;
+	      
+	      for(ip = 0; ip < num_ports; ip = ip + 1)
+		begin:ips
+		   
+		   wire [0:num_vcs-1] ial_flit_sel_ovc;
+		   assign ial_flit_sel_ovc
+		     = ial_flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1];
+		   
+		   wire 	      ial_allocated;
+		   assign ial_allocated = ial_allocated_ip[ip];
+		   
+		   wire [0:num_vcs-1] flit_sel_ovc;
+		   assign flit_sel_ovc
+		     = ial_flit_sel_ovc & 
+		       ({num_vcs{ial_allocated}} | nvs_next_elig_ovc);
+		   
+		   assign flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1]
+		     = flit_sel_ovc;
+		   
+		end
+	      
+	      wire [0:num_vcs-1]      flit_sel_ovc;
 	      c_select_1ofn
 		#(.num_ports(num_ports),
 		  .width(num_vcs))
 	      flit_sel_ovc_sel
 		(.select(gnt_ip),
-		 .data_in(ial_flit_sel_ip_ovc),
+		 .data_in(flit_sel_ip_ovc),
 		 .data_out(flit_sel_ovc));
 	      
-	      wire 		   allocated;
-	      assign allocated = |req_hi_ip;
-	      
-	      wire [0:num_vcs-1]   mask_ovc;
-	      assign mask_ovc = {num_vcs{allocated}} | nvs_next_elig_ovc;
-	      
-	      assign oal_flit_sel_ovc = flit_sel_ovc & mask_ovc;
+	      assign oal_flit_sel_ovc = flit_sel_ovc;
 	      
 	   end
 	   
@@ -883,7 +901,7 @@ module rtr_alloc_mac
 	   // generate crossbar control signals
 	   //-------------------------------------------------------------------
 	   
-	   wire 		   valid_active;
+	   wire 		      valid_active;
 	   assign valid_active = active | flit_valid_out;
 	   
 	   begin:xcl
