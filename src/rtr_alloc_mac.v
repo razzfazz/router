@@ -311,9 +311,6 @@ module rtr_alloc_mac
 		wire 				flit_valid_in;
 		assign flit_valid_in = flit_valid_in_ivc[ivc];
 		
-		wire 				flit_head_in;
-		assign flit_head_in = flit_head_in_ivc[ivc];
-		
 		wire 				flit_tail_in;
 		assign flit_tail_in = flit_tail_in_ivc[ivc];
 		
