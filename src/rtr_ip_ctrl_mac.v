@@ -1092,7 +1092,7 @@ module rtr_ip_ctrl_mac
 	   assign bypass = |(flit_sel_in_ivc & fb_empty_ivc);
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = bypass ? glu_flit_data :flit_data;
+	   assign flit_data_s = bypass ? glu_flit_data : flit_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
