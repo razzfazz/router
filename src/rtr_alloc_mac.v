@@ -502,18 +502,6 @@ module rtr_alloc_mac
 		   // credit tracking for a priori check (allocated VCs)
 		   //-----------------------------------------------------------
 		   
-		   // we need to track downstream buffer state even when we 
-		   // temporarily run out of flits at the upstream buffer; 
-		   // otherwise, there can be a dead cycle when a new flit 
-		   // arrives after the last flit before we ran out filled up 
-		   // the downstream buffer
-		   //
-		   // NOTE: As it is, synthesis will probably turn these into 
-		   // free-running registers!
-		   
-		   wire track_active;
-		   assign track_active = flit_valid_in | allocated_q;
-		   
 		   wire [0:num_vcs_per_class-1] almost_full_ocvc;
 		   rtr_vc_flags_mux
 		     #(.num_message_classes(num_message_classes),
@@ -540,18 +528,6 @@ module rtr_alloc_mac
 			   .data_in(almost_full_ocvc),
 			   .data_out(almost_full));
 		     end
-		   
-		   wire almost_full_s, almost_full_q;
-		   assign almost_full_s = almost_full;
-		   c_dff
-		     #(.width(1),
-		       .reset_type(reset_type))
-		   almost_fullq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(track_active),
-		      .d(almost_full_s),
-		      .q(almost_full_q));
 		   
 		   wire [0:num_vcs_per_class-1] full_ocvc;
 		   rtr_vc_flags_mux
@@ -580,39 +556,36 @@ module rtr_alloc_mac
 			   .data_out(full));
 		     end
 		   
-		   wire full_s, full_q;
-		   assign full_s = full;
+		   
+		   // we need to track credits even when we temporarily run out 
+		   // of flits; otherwise, there can be a dead cycle when a new 
+		   // flit arrives after the last flit before we ran out 
+		   // filled up the downstream buffer
+		   //
+		   // NOTE: As it is, synthesis will probably turn this into a 
+		   // free-running register!
+		   
+		   wire cred_active;
+		   assign cred_active = flit_valid_in | allocated_q;
+		   
+		   wire cred_s, cred_q;
+		   assign cred_s = ~full & ~(almost_full & flit_sent);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
-		   fullq
+		   credq
 		     (.clk(clk),
 		      .reset(1'b0),
-		      .active(track_active),
-		      .d(full_s),
-		      .q(full_q));
-
-		   wire flit_sent_s, flit_sent_q;
-		   assign flit_sent_s = flit_sent;
-		   c_dff
-		     #(.width(1),
-		       .reset_type(reset_type))
-		   flit_sentq
-		     (.clk(clk),
-		      .reset(reset),
-		      .active(track_active),
-		      .d(flit_sent_s),
-		      .q(flit_sent_q));
+		      .active(cred_active),
+		      .d(cred_s),
+		      .q(cred_q));
 		   
-		   wire cred;
-		   assign cred = ~full_q & ~(almost_full_q & flit_sent_q);
 		   
-		     
 		   //-----------------------------------------------------------
 		   // connect outputs
 		   //-----------------------------------------------------------
 		   
-		   assign ivs_cred = cred;
+		   assign ivs_cred = cred_q;
 		   assign ivs_allocated = allocated_q;
 		   assign ivs_flit_kill = flit_kill;
 		   assign ivs_flit_sel_ovc = flit_sel_ovc;
