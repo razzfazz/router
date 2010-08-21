@@ -199,7 +199,7 @@ module rtr_alloc_mac
    wire [0:num_ports-1] 			      ial_flit_tail_ip;
    wire [0:num_ports*num_vcs-1] 		      ial_flit_sel_ip_ovc;
    
-   wire [0:num_ports-1] 			      oal_flit_sent_ip;
+   wire [0:num_ports*num_ports-1] 		      oal_flit_sent_ip_op;
    
    generate
       
@@ -228,8 +228,9 @@ module rtr_alloc_mac
 	   assign flit_tail_in_ivc
 	     = flit_tail_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire 	      oal_flit_sent;
-	   assign oal_flit_sent = oal_flit_sent_ip[ip];
+	   wire [0:num_ports-1] oal_flit_sent_op;
+	   assign oal_flit_sent_op
+	     = oal_flit_sent_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -277,6 +278,9 @@ module rtr_alloc_mac
 	   //-------------------------------------------------------------------
 	   // input VCs
 	   //-------------------------------------------------------------------
+	   
+	   wire 			oal_flit_sent;
+	   assign oal_flit_sent = |oal_flit_sent_op;
 	   
 	   wire [0:num_vcs-1] 		ial_flit_sel_ivc;
 	   
@@ -724,13 +728,12 @@ module rtr_alloc_mac
       .data_out(ial_flit_valid_op_ip));
    
    wire [0:num_ports*num_ports-1] oal_flit_sent_op_ip;
-   c_binary_op
-     #(.num_ports(num_ports),
-       .width(num_ports),
-       .op(`BINARY_OP_OR))
-   oal_flit_sent_ip_or
+   c_interleave
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   oal_flit_sent_ip_op_intl
      (.data_in(oal_flit_sent_op_ip),
-      .data_out(oal_flit_sent_ip));
+      .data_out(oal_flit_sent_ip_op));
    
    
    //---------------------------------------------------------------------------
