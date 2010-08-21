@@ -400,9 +400,11 @@ module rtr_alloc_mac
 		   
 		   wire 			flit_kill;
 		   
+		   wire 			flit_sent_unmasked;
+		   assign flit_sent_unmasked = oal_flit_sent & ial_flit_sel;
+		   
 		   wire 			flit_sent;
-		   assign flit_sent
-		     = oal_flit_sent & ial_flit_sel & ~flit_kill;
+		   assign flit_sent = flit_sent_unmasked & ~flit_kill;
 		   
 		   // NOTE: For the reset condition, we don't have to worry 
 		   // about 'flit_kill', as it only affects flits that are sent 
@@ -411,9 +413,8 @@ module rtr_alloc_mac
 		   // effect anyway.
 		   
 		   wire 			allocated_s, allocated_q;
-		   assign allocated_s
-		     = (allocated_q | flit_sent) & 
-		       ~(oal_flit_sent & ial_flit_sel & flit_tail_in);
+		   assign allocated_s = (allocated_q | flit_sent) & 
+					~(flit_sent_unmasked & flit_tail_in);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
@@ -565,8 +566,13 @@ module rtr_alloc_mac
 		   wire cred_active;
 		   assign cred_active = flit_valid_in | allocated_q;
 		   
+		   // NOTE: Since we only use 'cred_q' once the VC is
+		   // allocated, we can ignore 'flit_kill' here -- if the flit
+		   // is killed, we failed allocation, and thus the value of
+		   // 'cred_q' will be ignored in the next cycle anyway.
+		   
 		   wire cred_s, cred_q;
-		   assign cred_s = ~full & ~(almost_full & flit_sent);
+		   assign cred_s = ~full & ~(almost_full & flit_sent_unmasked);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
