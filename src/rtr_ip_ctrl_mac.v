@@ -201,7 +201,7 @@ module rtr_ip_ctrl_mac
    localparam fb_addr_width = clogb(num_flits_per_vc);
    
    // total number of bits of header information required for each VC
-   localparam hdt_width = la_route_info_width + route_info_width;
+   localparam hit_width = la_route_info_width + route_info_width;
    
    
    //---------------------------------------------------------------------------
@@ -727,16 +727,16 @@ module rtr_ip_ctrl_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // track routing information for frontmost packet
+	   // track header information for frontmost packet
 	   //-------------------------------------------------------------------
 	   
-	   wire    hdt_valid;
-	   wire [0:la_route_info_width-1] hdt_la_route_info;
-	   wire [0:route_info_width-1] 	  hdt_route_info;
+	   wire    hit_valid;
+	   wire [0:la_route_info_width-1] hit_la_route_info;
+	   wire [0:route_info_width-1] 	  hit_route_info;
 	   
 	   wire 			  error_no_header;
 	   
-	   begin:hdt
+	   begin:hit
 	      
 	      wire valid_active;
 	      assign valid_active = chi_flit_valid | ~fb_empty;
@@ -766,10 +766,10 @@ module rtr_ip_ctrl_mac
 	      
 	      wire active;
 	      assign active
-		= hdt_valid ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
+		= hit_valid ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
 	      
 	      wire capture;
-	      assign capture = (~hdt_valid & chi_flit_valid) | 
+	      assign capture = (~hit_valid & chi_flit_valid) | 
 			       (tail_sent & (reload_from_fb | chi_flit_valid));
 	      
 	      wire [0:la_route_info_width-1] la_route_info;
@@ -805,12 +805,12 @@ module rtr_ip_ctrl_mac
 		 .d(route_info_s),
 		 .q(route_info_q));
 	      
-	      assign hdt_valid = valid_q;
-	      assign hdt_la_route_info = la_route_info_q;
-	      assign hdt_route_info = route_info_q;
+	      assign hit_valid = valid_q;
+	      assign hit_la_route_info = la_route_info_q;
+	      assign hit_route_info = route_info_q;
 	      
 	      assign error_no_header
-		= ~hdt_valid & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
+		= ~hit_valid & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
 	      
 	   end
 	   
@@ -825,7 +825,7 @@ module rtr_ip_ctrl_mac
 	   begin:lld
 	      
 	      wire [0:port_idx_width-1] route_port;
-	      assign route_port = hdt_la_route_info[0:port_idx_width-1];
+	      assign route_port = hit_la_route_info[0:port_idx_width-1];
 	      
 	      wire [0:num_ports-1] 	route_op;
 	      c_decode
@@ -843,7 +843,7 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:resource_class_idx_width-1] route_rcsel;
 		   assign route_rcsel
-		     = hdt_la_route_info[port_idx_width:
+		     = hit_la_route_info[port_idx_width:
 					 port_idx_width+
 					 resource_class_idx_width-1];
 		   
@@ -866,11 +866,11 @@ module rtr_ip_ctrl_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] 		       route_unmasked_op;
-	   assign route_unmasked_op = hdt_valid ? lld_route_op : gld_route_op;
+	   assign route_unmasked_op = hit_valid ? lld_route_op : gld_route_op;
 	   
 	   wire [0:num_resource_classes-1] 	       route_unmasked_orc;
 	   assign route_unmasked_orc
-	     = hdt_valid ? lld_route_orc : gld_route_orc;
+	     = hit_valid ? lld_route_orc : gld_route_orc;
 	   
 	   wire [0:1] 				       rf_errors;
 	   rtr_route_filter
@@ -894,7 +894,7 @@ module rtr_ip_ctrl_mac
 	      .errors(rf_errors));
 	   
 	   wire 				    route_valid;
-	   assign route_valid = hdt_valid | chi_flit_valid;
+	   assign route_valid = hit_valid | chi_flit_valid;
 	   
 	   wire 				    error_invalid_port;
 	   assign error_invalid_port =  route_valid & rf_errors[0];
@@ -919,8 +919,8 @@ module rtr_ip_ctrl_mac
 		  .routing_type(routing_type))
 	      nha
 		(.router_address(router_address),
-		 .route_info(hdt_route_info),
-		 .la_route_info(hdt_la_route_info),
+		 .route_info(hit_route_info),
+		 .la_route_info(hit_la_route_info),
 		 .next_router_address(next_router_address));
 	      
 	      wire [0:num_message_classes-1] sel_mc;
@@ -949,7 +949,7 @@ module rtr_ip_ctrl_mac
 		(.router_address(next_router_address),
 		 .sel_mc(sel_mc),
 		 .sel_irc(lld_route_orc),
-		 .route_info(hdt_route_info),
+		 .route_info(hit_route_info),
 		 .route_op(route_op),
 		 .route_orc(route_orc));
 	      
@@ -994,7 +994,7 @@ module rtr_ip_ctrl_mac
 		   wire [0:la_route_info_width-1] la_route_info_s;
 		   wire [0:la_route_info_width-1] la_route_info_q;
 		   assign la_route_info_s
-		     = hdt_valid ? la_route_info : glu_la_route_info;
+		     = hit_valid ? la_route_info : glu_la_route_info;
 		   c_dff
 		     #(.width(la_route_info_width),
 		       .reset_type(reset_type))
