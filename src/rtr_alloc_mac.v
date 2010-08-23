@@ -268,14 +268,6 @@ module rtr_alloc_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // generate clock enable signal
-	   //-------------------------------------------------------------------
-	   
-	   wire 			active;
-	   assign active = |flit_valid_in_ivc;
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // input VCs
 	   //-------------------------------------------------------------------
 	   
@@ -379,6 +371,13 @@ module rtr_alloc_mac
 		//--------------------------------------------------------------
 		
 		begin:ivs
+		   
+		   wire active;
+		   
+		   if(dual_path_alloc)
+		     assign active = flit_valid_in | flit_valid_fast_in;
+		   else
+		     assign active = flit_valid_in;
 		   
 		   wire [0:num_vcs-1] sel_ivc;
 		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
@@ -611,6 +610,9 @@ module rtr_alloc_mac
 	   //-------------------------------------------------------------------
 	   
 	   begin:ial
+	      
+	      wire active;
+	      assign active = |flit_valid_in_ivc;
 	      
 	      // We only allow speculative requests and those that already have 
 	      // an output VC allocated to them and at least one credit 
