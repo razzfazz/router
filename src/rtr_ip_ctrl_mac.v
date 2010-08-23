@@ -741,9 +741,6 @@ module rtr_ip_ctrl_mac
 	      wire valid_active;
 	      assign valid_active = chi_flit_valid | ~fb_empty;
 	      
-	      wire head_received;
-	      assign head_received = chi_flit_valid & chi_flit_head;
-	      
 	      wire tail_sent;
 	      assign tail_sent = flit_sent_in & flit_tail_out;
 	      
@@ -751,9 +748,13 @@ module rtr_ip_ctrl_mac
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
 	      wire valid_s, valid_q;
-	      assign valid_s = valid_q ?
-			       (~tail_sent | reload_from_fb | head_received) : 
-			       (chi_flit_valid & ~tail_sent);
+	      assign valid_s
+		= valid_q ?
+		  (~flit_sent_in | 
+		   (fb_empty ? 
+		    ~chi_flit_tail : 
+		    (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) : 
+		  (chi_flit_valid & (~chi_flit_tail | ~flit_sent_in));
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type))
@@ -766,11 +767,12 @@ module rtr_ip_ctrl_mac
 	      
 	      wire active;
 	      assign active
-		= hit_valid ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
+		= valid_q ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
 	      
 	      wire capture;
-	      assign capture = (~hit_valid & chi_flit_valid) | 
-			       (tail_sent & (reload_from_fb | chi_flit_valid));
+	      assign capture = (~valid_q & chi_flit_valid) |
+			       (flit_sent_in & ~fb_empty & htt_flit_tail & 
+				(~fb_almost_empty | chi_flit_valid));
 	      
 	      wire [0:la_route_info_width-1] la_route_info;
 	      assign la_route_info
@@ -810,7 +812,7 @@ module rtr_ip_ctrl_mac
 	      assign hit_route_info = route_info_q;
 	      
 	      assign error_no_header
-		= ~hit_valid & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
+		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
 	      
 	   end
 	   
