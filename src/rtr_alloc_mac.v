@@ -373,11 +373,7 @@ module rtr_alloc_mac
 		begin:ivs
 		   
 		   wire active;
-		   
-		   if(dual_path_alloc)
-		     assign active = flit_valid_in | flit_valid_fast_in;
-		   else
-		     assign active = flit_valid_in;
+		   assign active = flit_valid_in;
 		   
 		   wire [0:num_vcs-1] sel_ivc;
 		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
