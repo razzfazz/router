@@ -380,20 +380,30 @@ module rtr_alloc_mac
 		
 		begin:ivs
 		   
-		   wire [0:num_vcs-1] sel_ivc;
-		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
-		   
 		   wire [0:num_message_classes-1] sel_mc;
-		   c_mat_mult
-		     #(.dim1_width(num_message_classes),
-		       .dim2_width(num_resource_classes*num_vcs_per_class),
-		       .dim3_width(1),
-		       .prod_op(`BINARY_OP_AND),
-		       .sum_op(`BINARY_OP_OR))
-		   sel_mc_mmult
-		     (.input_a(sel_ivc),
-		      .input_b({num_resource_classes*num_vcs_per_class{1'b1}}),
-		      .result(sel_mc));
+		   
+		   if(num_message_classes == 1)
+		     assign sel_mc = 1'b1;
+		   else if(num_message_classes > 1)
+		     begin
+			
+			wire [0:num_vcs-1] sel_ivc;
+			assign sel_ivc = (1 << (num_vcs - 1 - ivc));
+			
+			c_mat_mult
+			  #(.dim1_width(num_message_classes),
+			    .dim2_width(num_resource_classes*num_vcs_per_class),
+			    .dim3_width(1),
+			    .prod_op(`BINARY_OP_AND),
+			    .sum_op(`BINARY_OP_OR))
+			sel_mc_mmult
+			  (.input_a(sel_ivc),
+			   .input_b({(num_resource_classes*
+				      num_vcs_per_class){1'b1}}),
+			   .result(sel_mc));
+			
+		     end
+		   
 		   
 		   //-----------------------------------------------------------
 		   // determine next eligible output VC in selected packet class
