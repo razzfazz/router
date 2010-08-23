@@ -380,29 +380,21 @@ module rtr_alloc_mac
 		
 		begin:ivs
 		   
-		   wire [0:num_message_classes-1] sel_mc;
+		   wire [0:num_vcs-1] sel_ivc;
+		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
 		   
-		   if(num_message_classes == 1)
-		     assign sel_mc = 1'b1;
-		   else if(num_message_classes > 1)
-		     begin
-			
-			wire [0:num_vcs-1] sel_ivc;
-			assign sel_ivc = (1 << (num_vcs - 1 - ivc));
-			
-			c_mat_mult
-			  #(.dim1_width(num_message_classes),
-			    .dim2_width(num_resource_classes*num_vcs_per_class),
-			    .dim3_width(1),
-			    .prod_op(`BINARY_OP_AND),
-			    .sum_op(`BINARY_OP_OR))
-			sel_mc_mmult
-			  (.input_a(sel_ivc),
-			   .input_b({(num_resource_classes*
-				      num_vcs_per_class){1'b1}}),
-			   .result(sel_mc));
-			
-		     end
+		   wire [0:num_message_classes-1] sel_mc;
+		   c_mat_mult
+		     #(.dim1_width(num_message_classes),
+		       .dim2_width(num_resource_classes*num_vcs_per_class),
+		       .dim3_width(1),
+		       .prod_op(`BINARY_OP_AND),
+		       .sum_op(`BINARY_OP_OR))
+		   sel_mc_mmult
+		     (.input_a(sel_ivc),
+		      .input_b({(num_resource_classes*
+				 num_vcs_per_class){1'b1}}),
+		      .result(sel_mc));
 		   
 		   
 		   //-----------------------------------------------------------
@@ -488,21 +480,16 @@ module rtr_alloc_mac
 		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	     flit_sel_orc_ocvc;
-		   if(num_resource_classes == 1)
-		     assign flit_sel_orc_ocvc = flit_sel_ocvc;
-		   else if(num_resource_classes > 1)
-		     begin
-			c_mat_mult
-			  #(.dim1_width(num_resource_classes),
-			    .dim2_width(1),
-			    .dim3_width(num_vcs_per_class),
-			    .prod_op(`BINARY_OP_AND),
-			    .sum_op(`BINARY_OP_OR))
-			flit_sel_orc_ocvc_mmult
-			  (.input_a(rf_route_orc),
-			   .input_b(flit_sel_ocvc),
-			   .result(flit_sel_orc_ocvc));
-		     end
+		   c_mat_mult
+		     #(.dim1_width(num_resource_classes),
+		       .dim2_width(1),
+		       .dim3_width(num_vcs_per_class),
+		       .prod_op(`BINARY_OP_AND),
+		       .sum_op(`BINARY_OP_OR))
+		   flit_sel_orc_ocvc_mmult
+		     (.input_a(rf_route_orc),
+		      .input_b(flit_sel_ocvc),
+		      .result(flit_sel_orc_ocvc));
 		   
 		   wire [0:num_vcs-1] flit_sel_ovc;
 		   c_mat_mult
