@@ -741,12 +741,6 @@ module rtr_ip_ctrl_mac
 	      wire valid_active;
 	      assign valid_active = chi_flit_valid | ~fb_empty;
 	      
-	      wire tail_sent;
-	      assign tail_sent = flit_sent_in & flit_tail_out;
-	      
-	      wire reload_from_fb;
-	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
-	      
 	      wire valid_s, valid_q;
 	      assign valid_s
 		= valid_q ?
@@ -773,6 +767,9 @@ module rtr_ip_ctrl_mac
 	      assign capture = (~valid_q & chi_flit_valid) |
 			       (flit_sent_in & ~fb_empty & htt_flit_tail & 
 				(~fb_almost_empty | chi_flit_valid));
+	      
+	      wire reload_from_fb;
+	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
 	      wire [0:la_route_info_width-1] la_route_info;
 	      assign la_route_info
