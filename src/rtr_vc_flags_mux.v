@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_vc_flags_mux
-  (route_op, route_orc, flags_op_ovc, flags_ocvc);
+  (sel_mc, route_op, route_orc, flags_op_ovc, flags_ocvc);
       
 `include "c_functions.v"
 `include "c_constants.v"
@@ -55,9 +55,6 @@ module rtr_vc_flags_mux
    // number of input and output ports on router
    parameter num_ports = 5;
    
-   // ID of current input VC
-   parameter vc_id = 0;
-   
    
    //---------------------------------------------------------------------------
    // derived parameters
@@ -69,17 +66,16 @@ module rtr_vc_flags_mux
    // number of VCs
    localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
-   // message class to which this VC belongs
-   localparam message_class
-     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
-   
    
    //---------------------------------------------------------------------------
    // interface
    //---------------------------------------------------------------------------
    
+   // current message class
+   input [0:num_message_classes-1] sel_mc;
+   
    // destination port
-   input [0:num_ports-1] route_op;
+   input [0:num_ports-1] 	   route_op;
    
    // destination resource class
    input [0:num_resource_classes-1] route_orc;
@@ -106,11 +102,23 @@ module rtr_vc_flags_mux
       .data_out(flags_ovc));
    
    wire [0:num_resource_classes*num_vcs_per_class-1] flags_orc_ocvc;
-   assign flags_orc_ocvc
-     = flags_ovc[message_class*num_resource_classes*num_vcs_per_class:
-		 (message_class+1)*num_resource_classes*num_vcs_per_class-1];
    
    generate
+      
+      if(num_message_classes == 1)
+	assign flags_orc_ocvc = flags_ovc;
+      else
+	begin
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_message_classes),
+	       .width(num_resource_classes*num_vcs_per_class))
+	   flags_orc_ocvc_sel
+	     (.select(sel_mc),
+	      .data_in(flags_ovc),
+	      .data_out(flags_orc_ocvc));
+	   
+	end
       
       if(num_resource_classes == 1)
 	assign flags_ocvc = flags_orc_ocvc;

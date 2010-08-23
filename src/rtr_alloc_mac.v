@@ -380,6 +380,21 @@ module rtr_alloc_mac
 		
 		begin:ivs
 		   
+		   wire [0:num_vcs-1] sel_ivc;
+		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
+		   
+		   wire [0:num_message_classes-1] sel_mc;
+		   c_mat_mult
+		     #(.dim1_width(num_message_classes),
+		       .dim2_width(num_resource_classes*num_vcs_per_class),
+		       .dim3_width(1),
+		       .prod_op(`BINARY_OP_AND),
+		       .sum_op(`BINARY_OP_OR))
+		   sel_mc_mmult
+		     (.input_a(sel_ivc),
+		      .input_b({num_resource_classes*num_vcs_per_class{1'b1}}),
+		      .result(sel_mc));
+		   
 		   //-----------------------------------------------------------
 		   // determine next eligible output VC in selected packet class
 		   //-----------------------------------------------------------
@@ -389,10 +404,10 @@ module rtr_alloc_mac
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
 		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports),
-		       .vc_id(ivc))
+		       .num_ports(num_ports))
 		   next_elig_ocvc_fmux
-		     (.route_op(rf_route_op),
+		     (.sel_mc(sel_mc),
+		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_ovc(nvs_next_elig_op_ovc),
 		      .flags_ocvc(next_elig_ocvc));
@@ -485,17 +500,16 @@ module rtr_alloc_mac
 		     end
 		   
 		   wire [0:num_vcs-1] flit_sel_ovc;
-		   c_align
-		     #(.in_width(num_resource_classes*num_vcs_per_class),
-		       .out_width(num_vcs),
-		       .offset(((ivc / (num_resource_classes*
-					num_vcs_per_class)) %
-				num_message_classes)*
-			       num_resource_classes*num_vcs_per_class))
+		   c_mat_mult
+		     #(.dim1_width(num_message_classes),
+		       .dim2_width(1),
+		       .dim3_width(num_resource_classes*num_vcs_per_class),
+		       .prod_op(`BINARY_OP_AND),
+		       .sum_op(`BINARY_OP_OR))
 		   flit_sel_ovc_agn
-		     (.data_in(flit_sel_orc_ocvc),
-		      .dest_in({num_vcs{1'b0}}),
-		      .data_out(flit_sel_ovc));
+		     (.input_a(sel_mc),
+		      .input_b(flit_sel_orc_ocvc),
+		      .result(flit_sel_ovc));
 		   
 		   
 		   //-----------------------------------------------------------
@@ -507,10 +521,10 @@ module rtr_alloc_mac
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
 		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports),
-		       .vc_id(ivc))
+		       .num_ports(num_ports))
 		   almost_full_ocvc_fmux
-		     (.route_op(rf_route_op),
+		     (.sel_mc(sel_mc),
+		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_ovc(ovs_almost_full_op_ovc),
 		      .flags_ocvc(almost_full_ocvc));
@@ -534,10 +548,10 @@ module rtr_alloc_mac
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
 		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports),
-		       .vc_id(ivc))
+		       .num_ports(num_ports))
 		   full_ocvc_fmux
-		     (.route_op(rf_route_op),
+		     (.sel_mc(sel_mc),
+		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_ovc(ovs_full_op_ovc),
 		      .flags_ocvc(full_ocvc));
