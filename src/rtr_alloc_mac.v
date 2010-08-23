@@ -406,24 +406,6 @@ module rtr_alloc_mac
 		   
 		   
 		   //-----------------------------------------------------------
-		   // determine next eligible output VC in selected packet class
-		   //-----------------------------------------------------------
-		   
-		   wire [0:num_vcs_per_class-1] next_elig_ocvc;
-		   rtr_vc_flags_mux
-		     #(.num_message_classes(num_message_classes),
-		       .num_resource_classes(num_resource_classes),
-		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports))
-		   next_elig_ocvc_fmux
-		     (.sel_mc(sel_mc),
-		      .route_op(rf_route_op),
-		      .route_orc(rf_route_orc),
-		      .flags_op_ovc(nvs_next_elig_op_ovc),
-		      .flags_ocvc(next_elig_ocvc));
-		   
-		   
-		   //-----------------------------------------------------------
 		   // keep track of which output VC this input VC has allocated
 		   //-----------------------------------------------------------
 		   
@@ -451,6 +433,19 @@ module rtr_alloc_mac
 		      .active(active),
 		      .d(allocated_s),
 		      .q(allocated_q));
+		   
+		   wire [0:num_vcs_per_class-1] next_elig_ocvc;
+		   rtr_vc_flags_mux
+		     #(.num_message_classes(num_message_classes),
+		       .num_resource_classes(num_resource_classes),
+		       .num_vcs_per_class(num_vcs_per_class),
+		       .num_ports(num_ports))
+		   next_elig_ocvc_fmux
+		     (.sel_mc(sel_mc),
+		      .route_op(rf_route_op),
+		      .route_orc(rf_route_orc),
+		      .flags_op_ovc(nvs_next_elig_op_ovc),
+		      .flags_ocvc(next_elig_ocvc));
 		   
 		   assign flit_kill = ~allocated_q & ~|next_elig_ocvc;
 		   
