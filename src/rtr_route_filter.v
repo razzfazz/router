@@ -232,46 +232,57 @@ module rtr_route_filter
    
    wire [0:num_resource_classes-1] error_orc;
    
-   genvar orc;
-   
    generate
       
-      for(orc = 0; orc < num_resource_classes; orc = orc + 1)
-	begin:orcs
+      if(num_resource_classes == 1)
+	begin
+	   assign route_out_orc = 1'b1;
+	   assign error_orc = ~route_out_orc;
+	end
+      else if(num_resource_classes > 1)
+	begin
 	   
-	   case(routing_type)
-	     
-	     `ROUTING_TYPE_PHASED_DOR:
-	       begin
+	   genvar orc;
+	   
+	   for(orc = 0; orc < num_resource_classes; orc = orc + 1)
+	     begin:orcs
+		
+		case(routing_type)
 		  
-		  // at each hop, packets can either stay in the same resource 
-		  // class or advance to the next one
-		  if((orc == resource_class) || (orc == (resource_class + 1)))
+		  `ROUTING_TYPE_PHASED_DOR:
 		    begin
-		       assign route_out_orc[orc] = route_in_orc[orc];
-		       assign error_orc[orc] = 1'b0;
-		    end
-		  else
-		    begin
-		       assign route_out_orc[orc] = 1'b0;
-		       assign error_orc[orc] = route_in_orc[orc];
+		       
+		       // at each hop, packets can either stay in the same 
+		       // resource class or advance to the next one
+		       if((orc == resource_class) || 
+			  (orc == (resource_class + 1)))
+			 begin
+			    assign route_out_orc[orc] = route_in_orc[orc];
+			    assign error_orc[orc] = 1'b0;
+			 end
+		       else
+			 begin
+			    assign route_out_orc[orc] = 1'b0;
+			    assign error_orc[orc] = route_in_orc[orc];
+			 end
+		       
 		    end
 		  
-	       end
-	     
-	   endcase
+		endcase
+		
+	     end
 	   
 	end
       
    endgenerate
    
    wire error_invalid_port;
-   assign error_invalid_port = |error_op;
+   assign error_invalid_port = (|error_op) | (~|route_in_op);
    
    assign errors[0] = error_invalid_port;
    
    wire error_invalid_class;
-   assign error_invalid_class = |error_orc;
+   assign error_invalid_class = (|error_orc) | (~|route_in_orc);
    
    assign errors[1] = error_invalid_class;
    
