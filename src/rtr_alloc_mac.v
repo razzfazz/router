@@ -191,7 +191,7 @@ module rtr_alloc_mac
    
    wire [0:num_ports*num_vcs-1] 		      nvs_next_elig_op_ovc;
    
-   wire [0:num_ports*num_vcs*num_ports-1] 	      rf_route_ip_ivc_op;
+   wire [0:num_ports*num_ports-1] 		      active_ip_op;
    
    wire [0:num_ports*num_ports-1] 		      ial_flit_valid_ip_op;
    wire [0:num_ports-1] 			      ial_flit_head_ip;
@@ -236,29 +236,27 @@ module rtr_alloc_mac
 	   // connect outputs
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs*num_ports-1] rf_route_ivc_op;
-	   assign rf_route_ip_ivc_op[ip*num_vcs*num_ports:
-				      (ip+1)*num_vcs*num_ports-1]
-	     = rf_route_ivc_op;
+	   wire [0:num_ports-1] active_op;
+	   assign active_ip_op[ip*num_ports:(ip+1)*num_ports-1] = active_op;
 	   
-	   wire [0:num_ports-1] 	ial_flit_valid_op;
+	   wire [0:num_ports-1] ial_flit_valid_op;
 	   assign ial_flit_valid_ip_op[ip*num_ports:(ip+1)*num_ports-1]
 	     = ial_flit_valid_op;
 	   
-	   wire 			ial_flit_head;
+	   wire 		ial_flit_head;
 	   assign ial_flit_head_ip[ip] = ial_flit_head;
 	   
-	   wire 			ial_flit_tail;
+	   wire 		ial_flit_tail;
 	   assign ial_flit_tail_ip[ip] = ial_flit_tail;
 	   
-	   wire [0:num_vcs-1] 		ial_flit_sel_ovc;
+	   wire [0:num_vcs-1] 	ial_flit_sel_ovc;
 	   assign ial_flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1]
 	     = ial_flit_sel_ovc;
 	   
-	   wire 			flit_sent_out;
+	   wire 		flit_sent_out;
 	   assign flit_sent_out_ip[ip] = flit_sent_out;
 	   
-	   wire [0:num_vcs-1] 		flit_sel_out_ivc;
+	   wire [0:num_vcs-1] 	flit_sel_out_ivc;
 	   assign flit_sel_out_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 	     = flit_sel_out_ivc;
 	   
@@ -267,11 +265,12 @@ module rtr_alloc_mac
 	   // input VCs
 	   //-------------------------------------------------------------------
 	   
-	   wire 			oal_flit_sent;
+	   wire 		oal_flit_sent;
 	   assign oal_flit_sent = |oal_flit_sent_op;
 	   
-	   wire [0:num_vcs-1] 		ial_flit_sel_ivc;
+	   wire [0:num_vcs-1] 	ial_flit_sel_ivc;
 	   
+	   wire [0:num_vcs*num_ports-1] rf_route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] rf_route_ivc_orc;
 	   
 	   wire [0:num_vcs-1] 			   ivs_cred_ivc;
@@ -684,22 +683,35 @@ module rtr_alloc_mac
 	      
 	   end
 	   
+	   
+	   //-------------------------------------------------------------------
+	   // generate activity signals for output side
+	   //-------------------------------------------------------------------
+	   
+	   c_select_mofn
+	     #(.num_ports(num_vcs),
+	       .width(num_ports))
+	   active_op_sel
+	     (.select(flit_valid_in_ivc),
+	      .data_in(rf_route_ivc_op),
+	      .data_out(active_op));
+	   
 	end
       
    endgenerate
    
    
    //---------------------------------------------------------------------------
-   // generate activity signals for output side
+   // combine activity signals for output side
    //---------------------------------------------------------------------------
    
    wire [0:num_ports-1] active_op;
-   c_select_mofn
-     #(.num_ports(num_ports*num_vcs),
-       .width(num_ports))
-   active_op_sel
-     (.select(flit_valid_in_ip_ivc),
-      .data_in(rf_route_ip_ivc_op),
+   c_binary_op
+     #(.num_ports(num_ports),
+       .width(num_ports),
+       .op(`BINARY_OP_OR))
+   active_op_or
+     (.data_in(active_ip_op),
       .data_out(active_op));
    
    
