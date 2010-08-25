@@ -604,17 +604,17 @@ module rtr_alloc_mac
 	      // an output VC allocated to them and at least one credit 
 	      // available.
 	      
-	      wire [0:num_vcs-1] 			  req_hi_ivc;
+	      wire [0:num_vcs-1] req_hi_ivc;
 	      assign req_hi_ivc
 		= flit_valid_in_ivc & ~flit_head_in_ivc & ivs_cred_ivc;
 	      
-	      wire [0:num_vcs-1] 			  req_lo_ivc;
+	      wire [0:num_vcs-1] req_lo_ivc;
 	      assign req_lo_ivc = flit_valid_in_ivc & flit_head_in_ivc;
 	      
-	      wire 					  update;
+	      wire 		 update;
 	      assign update = oal_flit_sent;
 	      
-	      wire [0:num_vcs-1] 			  gnt_ivc;
+	      wire [0:num_vcs-1] gnt_ivc;
 	      c_arbiter
 		#(.num_ports(num_vcs),
 		  .num_priorities(2),
@@ -628,45 +628,47 @@ module rtr_alloc_mac
 		 .gnt(gnt_ivc),
 		 .update(update));
 	      
-	      assign ial_flit_sel_ivc = gnt_ivc;
-	      
+	      wire [0:num_ports-1] flit_valid_op;
 	      c_select_mofn
 		#(.num_ports(num_vcs),
 		  .width(num_ports))
-	      ial_flit_valid_op_sel
+	      flit_valid_op_sel
 		(.select(gnt_ivc),
 		 .data_in(rf_route_ivc_op),
-		 .data_out(ial_flit_valid_op));
+		 .data_out(flit_valid_op));
 	      
-	      wire 					  flit_kill;
+	      wire 		   flit_head;
+	      wire 		   flit_tail;
+	      wire [0:num_vcs-1]   flit_sel_ovc;
+	      wire 		   flit_kill;
 	      
 	      if(num_vcs == 1)
 		begin
-		   assign ial_flit_head = ~req_hi_ivc;
-		   assign ial_flit_tail = flit_tail_in_ivc;
-		   assign ial_flit_sel_ovc = ivs_flit_sel_ivc_ovc;
+		   assign flit_head = ~req_hi_ivc;
+		   assign flit_tail = flit_tail_in_ivc;
+		   assign flit_sel_ovc = ivs_flit_sel_ivc_ovc;
 		   assign flit_kill = ivs_flit_kill_ivc;
 		end
 	      else if(num_vcs > 1)
 		begin
 		   
-		   assign ial_flit_head = ~|req_hi_ivc;
+		   assign flit_head = ~|req_hi_ivc;
 		   
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
 		       .width(1))
-		   ial_flit_tail_sel
+		   flit_tail_sel
 		     (.select(gnt_ivc),
 		      .data_in(flit_tail_in_ivc),
-		      .data_out(ial_flit_tail));
+		      .data_out(flit_tail));
 		   
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
 		       .width(num_vcs))
-		   ial_flit_sel_ovc_sel
+		   flit_sel_ovc_sel
 		     (.select(gnt_ivc),
 		      .data_in(ivs_flit_sel_ivc_ovc),
-		      .data_out(ial_flit_sel_ovc));
+		      .data_out(flit_sel_ovc));
 		   
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
@@ -677,6 +679,12 @@ module rtr_alloc_mac
 		      .data_out(flit_kill));
 		   
 		end
+	      
+	      assign ial_flit_valid_op = flit_valid_op;
+	      assign ial_flit_sel_ivc = gnt_ivc;
+	      assign ial_flit_head = flit_head;
+	      assign ial_flit_tail = flit_tail;
+	      assign ial_flit_sel_ovc = flit_sel_ovc;
 	      
 	      assign flit_sel_out_ivc = gnt_ivc;
 	      assign flit_sent_out = oal_flit_sent & ~flit_kill;
