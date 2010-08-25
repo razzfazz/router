@@ -239,6 +239,7 @@ module router_wrap
 		 .dim_order(dim_order),
 		 .fb_regfile_type(fb_regfile_type),
 		 .explicit_pipeline_register(explicit_pipeline_register),
+		 .dual_path_alloc(dual_path_alloc),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
 		 .crossbar_type(crossbar_type),

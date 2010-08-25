@@ -106,6 +106,9 @@ module rtr_top
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // enable dual-path allocation
+   parameter dual_path_alloc = 1;
+   
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -201,13 +204,21 @@ module rtr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs-1] 	  alo_flit_sel_ip_ivc;
+   wire [0:num_ports-1] 		  alo_flit_sel_fast_ip;
    wire [0:num_ports-1] 		  alo_flit_sent_ip;
    
+   wire [0:num_ports*num_vcs-1] 	  ipc_route_valid_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] ipc_route_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_resource_classes-1] ipc_route_ip_ivc_orc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_valid_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_head_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_tail_ip_ivc;
+   wire [0:num_ports*num_ports-1] 		     ipc_route_fast_ip_op;
+   wire [0:num_ports*num_resource_classes-1] 	     ipc_route_fast_ip_orc;
+   wire [0:num_ports-1] 			     ipc_flit_valid_fast_ip;
+   wire [0:num_ports-1] 			     ipc_flit_head_fast_ip;
+   wire [0:num_ports-1] 			     ipc_flit_tail_fast_ip;
+   wire [0:num_ports*num_vcs-1] 		     ipc_flit_sel_fast_ip_ivc;
    wire [0:num_ports*flit_data_width-1] 	     ipc_flit_data_ip;
    wire [0:num_ports-1] 			     ipc_error_ip;
    
@@ -231,14 +242,24 @@ module rtr_top
 	   assign alo_flit_sel_ivc
 	     = alo_flit_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
+	   wire 		    alo_flit_sel_fast;
+	   assign alo_flit_sel_fast = alo_flit_sel_fast_ip[ip];
+	   
 	   wire 		    alo_flit_sent;
 	   assign alo_flit_sent = alo_flit_sent_ip[ip];
 	   
+	   wire [0:num_vcs-1] 	    ipc_route_valid_ivc;
 	   wire [0:num_vcs*num_ports-1] ipc_route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] ipc_route_ivc_orc;
 	   wire [0:num_vcs-1] 			   ipc_flit_valid_ivc;
 	   wire [0:num_vcs-1] 			   ipc_flit_head_ivc;
 	   wire [0:num_vcs-1] 			   ipc_flit_tail_ivc;
+	   wire [0:num_ports-1] 		   ipc_route_fast_op;
+	   wire [0:num_resource_classes-1] 	   ipc_route_fast_orc;
+	   wire 				   ipc_flit_valid_fast;
+	   wire 				   ipc_flit_head_fast;
+	   wire 				   ipc_flit_tail_fast;
+	   wire [0:num_vcs-1] 			   ipc_flit_sel_fast_ivc;
 	   wire [0:flit_data_width-1] 		   ipc_flit_data;
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
 	   wire 				   ipc_error;
@@ -261,6 +282,7 @@ module rtr_top
 	       .dim_order(dim_order),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
+	       .dual_path_alloc(dual_path_alloc),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
 	       .reset_type(reset_type))
@@ -269,17 +291,27 @@ module rtr_top
 	      .reset(reset),
 	      .router_address(router_address),
 	      .channel_in(channel_in),
+	      .route_valid_out_ivc(ipc_route_valid_ivc),
 	      .route_out_ivc_op(ipc_route_ivc_op),
 	      .route_out_ivc_orc(ipc_route_ivc_orc),
 	      .flit_valid_out_ivc(ipc_flit_valid_ivc),
 	      .flit_head_out_ivc(ipc_flit_head_ivc),
 	      .flit_tail_out_ivc(ipc_flit_tail_ivc),
+	      .route_fast_out_op(ipc_route_fast_op),
+	      .route_fast_out_orc(ipc_route_fast_orc),
+	      .flit_valid_fast_out(ipc_flit_valid_fast),
+	      .flit_head_fast_out(ipc_flit_head_fast),
+	      .flit_tail_fast_out(ipc_flit_tail_fast),
+	      .flit_sel_fast_out_ivc(ipc_flit_sel_fast_ivc),
 	      .flit_data_out(ipc_flit_data),
 	      .flit_sel_in_ivc(alo_flit_sel_ivc),
+	      .flit_sel_fast_in(alo_flit_sel_fast),
 	      .flit_sent_in(alo_flit_sent),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
+	   assign ipc_route_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = ipc_route_valid_ivc;
 	   assign ipc_route_ip_ivc_op[ip*num_vcs*num_ports:
 				      (ip+1)*num_vcs*num_ports-1]
 	     = ipc_route_ivc_op;
@@ -293,6 +325,19 @@ module rtr_top
 	     = ipc_flit_head_ivc;
 	   assign ipc_flit_tail_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 	     = ipc_flit_tail_ivc;
+	   
+	   assign ipc_route_fast_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+	     = ipc_route_fast_op;
+	   assign ipc_route_fast_ip_orc[ip*num_resource_classes:
+					(ip+1)*num_resource_classes-1]
+	     = ipc_route_fast_orc;
+	   
+	   assign ipc_flit_valid_fast_ip[ip] = ipc_flit_valid_fast;
+	   assign ipc_flit_head_fast_ip[ip] = ipc_flit_head_fast;
+	   assign ipc_flit_tail_fast_ip[ip] = ipc_flit_tail_fast;
+	   
+	   assign ipc_flit_sel_fast_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = ipc_flit_sel_fast_ivc;
 	   
 	   assign ipc_flit_data_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
 	     = ipc_flit_data;
@@ -337,17 +382,26 @@ module rtr_top
        .dim_order(dim_order),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+       .dual_path_alloc(dual_path_alloc),
        .error_capture_mode(error_capture_mode),
        .reset_type(reset_type))
    alo
      (.clk(clk),
       .reset(reset),
+      .route_valid_in_ip_ivc(ipc_route_valid_ip_ivc),
       .route_in_ip_ivc_op(ipc_route_ip_ivc_op),
       .route_in_ip_ivc_orc(ipc_route_ip_ivc_orc),
       .flit_valid_in_ip_ivc(ipc_flit_valid_ip_ivc),
       .flit_head_in_ip_ivc(ipc_flit_head_ip_ivc),
       .flit_tail_in_ip_ivc(ipc_flit_tail_ip_ivc),
+      .route_fast_in_ip_op(ipc_route_fast_ip_op),
+      .route_fast_in_ip_orc(ipc_route_fast_ip_orc),
+      .flit_valid_fast_in_ip(ipc_flit_valid_fast_ip),
+      .flit_head_fast_in_ip(ipc_flit_head_fast_ip),
+      .flit_tail_fast_in_ip(ipc_flit_tail_fast_ip),
+      .flit_sel_fast_in_ip_ivc(ipc_flit_sel_fast_ip_ivc),
       .flit_sel_out_ip_ivc(alo_flit_sel_ip_ivc),
+      .flit_sel_fast_out_ip(alo_flit_sel_fast_ip),
       .flit_sent_out_ip(alo_flit_sent_ip),
       .flit_sel_out_op_ip(alo_flit_sel_op_ip),
       .empty_out_op(alo_empty_op),
