@@ -1075,12 +1075,8 @@ module rtr_ip_ctrl_mac
 		begin
 		   
 		   wire active;
-		   
-		   if(dual_path_alloc)
-		     assign active = (~fb_empty & htt_flit_head) |
-				     (chi_flit_valid & chi_flit_head);
-		   else
-		     assign active = flit_valid_out & flit_head_out;
+		   assign active = (~fb_empty & htt_flit_head) |
+				   (chi_flit_valid & chi_flit_head);
 		   
 		   wire [0:la_route_info_width-1] la_route_info_s;
 		   wire [0:la_route_info_width-1] la_route_info_q;
