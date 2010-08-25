@@ -490,8 +490,17 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				  flit_sel_fast_in_ivc;
-   assign flit_sel_fast_in_ivc = {num_vcs{flit_sel_fast_in}} & chi_flit_sel_ivc;
+   wire [0:num_vcs-1] 				  flit_sel_ivc;
+   
+   generate
+      
+      if(dual_path_alloc)
+	assign flit_sel_ivc
+	  = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
+      else
+	assign flit_sel_ivc = flit_sel_in_ivc;
+      
+   endgenerate
    
    wire [0:num_vcs-1] 				  flit_sent_prev_ivc;
    wire 					  flit_head_prev;
@@ -513,11 +522,8 @@ module rtr_ip_ctrl_mac
 	   wire chi_flit_valid;
 	   assign chi_flit_valid = chi_flit_valid_ivc[ivc];
 	   
-	   wire flit_sel_in;
-	   assign flit_sel_in = flit_sel_in_ivc[ivc];
-	   
-	   wire flit_sel_fast_in;
-	   assign flit_sel_fast_in = flit_sel_fast_in_ivc[ivc];
+	   wire flit_sel;
+	   assign flit_sel = flit_sel_ivc[ivc];
 	   
 	   wire flit_sent_prev;
 	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
@@ -567,11 +573,7 @@ module rtr_ip_ctrl_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire 			   flit_sent;
-	   
-	   if(dual_path_alloc)
-	     assign flit_sent = flit_sent_in & (flit_sel_in | flit_sel_fast_in);
-	   else
-	     assign flit_sent = flit_sent_in & flit_sel_in;
+	   assign flit_sent = flit_sent_in & flit_sel;
 	   
 	   wire 			   error_fb_underflow;
 	   wire 			   error_fb_overflow;
@@ -1325,7 +1327,7 @@ module rtr_ip_ctrl_mac
       .reset(reset),
       .active(alloc_active),
       .fc_event_valid_in(flit_sent_in),
-      .fc_event_sel_in_ivc(flit_sel_in_ivc),
+      .fc_event_sel_in_ivc(flit_sel_ivc),
       .flow_ctrl_out(flow_ctrl_out));
    
    
