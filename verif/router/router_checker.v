@@ -493,31 +493,32 @@ module router_checker
 		wire 			  pop;
 		assign pop = match;
 		
-		wire [0:(flit_data_width+2+
-			 port_idx_width+num_vcs)-1] rff_push_data;
-		assign rff_push_data[0:header_info_width-1]
-		  = flit_head ? header_info_out : header_info_in;
-		assign rff_push_data[header_info_width:flit_data_width-1]
-		  = flit_data[header_info_width:flit_data_width-1];
-		assign rff_push_data[flit_data_width] = flit_head;
-		assign rff_push_data[flit_data_width+1] = flit_tail;
-		assign rff_push_data[flit_data_width+2:
-				     flit_data_width+2+port_idx_width-1]
-		  = dest_port_s;
-		assign rff_push_data[flit_data_width+2+port_idx_width:
-				     flit_data_width+2+port_idx_width+num_vcs-1]
+		wire [0:(port_idx_width+num_vcs+2+
+			 flit_data_width)-1] rff_push_data;
+		assign rff_push_data[0:port_idx_width-1] = dest_port_s;
+		assign rff_push_data[port_idx_width:
+				     port_idx_width+num_vcs-1]
 		  = dest_ovc_s;
+		assign rff_push_data[port_idx_width+num_vcs] = flit_head;
+		assign rff_push_data[port_idx_width+num_vcs+1] = flit_tail;
+		assign rff_push_data[port_idx_width+num_vcs+2:
+				     port_idx_width+num_vcs+2+
+				     header_info_width-1]
+		  = flit_head ? header_info_out : header_info_in;
+		assign rff_push_data[port_idx_width+num_vcs+2+header_info_width:
+				     port_idx_width+num_vcs+2+flit_data_width-1]
+		  = flit_data[header_info_width:flit_data_width-1];
 		
-		wire [0:(flit_data_width+2+
-			 port_idx_width+num_vcs)-1] rff_pop_data;
-		wire 				    rff_almost_full;
-		wire 				    rff_full;
-		wire 				    rff_almost_empty;
-		wire 				    rff_empty;
-		wire [0:1] 			    rff_errors;
+		wire [0:(port_idx_width+num_vcs+2+
+			 flit_data_width)-1] rff_pop_data;
+		wire 			     rff_almost_full;
+		wire 			     rff_full;
+		wire 			     rff_almost_empty;
+		wire 			     rff_empty;
+		wire [0:1] 		     rff_errors;
 		c_fifo
 		  #(.depth(num_flits_per_vc),
-		    .width(flit_data_width+2+port_idx_width+num_vcs),
+		    .width(2+port_idx_width+num_vcs+flit_data_width),
 		    .reset_type(reset_type))
 		rff
 		  (.clk(clk),
@@ -539,24 +540,23 @@ module router_checker
 		
 		// generate reference bit patterns
 		
-		wire [0:flit_data_width-1] ref_data;
-		assign ref_data = rff_pop_data[0:flit_data_width-1];
+		wire [0:port_idx_width-1]    ref_port;
+		assign ref_port = rff_pop_data[0:port_idx_width-1];
 		
-		wire 			   ref_head;
-		assign ref_head = rff_pop_data[flit_data_width];
+		wire [0:num_vcs-1] 	     ref_sel_ovc;
+		assign ref_sel_ovc
+		  = rff_pop_data[port_idx_width:port_idx_width+num_vcs-1];
+		
+		wire 			     ref_head;
+		assign ref_head = rff_pop_data[port_idx_width+num_vcs];
 		
 		wire 			   ref_tail;
-		assign ref_tail = rff_pop_data[flit_data_width+1];
+		assign ref_tail = rff_pop_data[port_idx_width+num_vcs+1];
 		
-		wire [0:port_idx_width-1]  ref_port;
-		assign ref_port
-		  = rff_pop_data[flit_data_width+2:
-				 flit_data_width+2+port_idx_width-1];
-		
-		wire [0:num_vcs-1] 	   ref_sel_ovc;
-		assign ref_sel_ovc
-		  = rff_pop_data[flit_data_width+2+port_idx_width:
-				 flit_data_width+2+port_idx_width+num_vcs-1];
+		wire [0:flit_data_width-1] ref_data;
+		assign ref_data
+		  = rff_pop_data[port_idx_width+num_vcs+2:
+				 port_idx_width+num_vcs+2+flit_data_width-1];
 		
 		
 		// extract observed bit patterns
