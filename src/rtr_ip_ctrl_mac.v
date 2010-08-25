@@ -803,25 +803,13 @@ module rtr_ip_ctrl_mac
 	      assign valid_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire valid_s, valid_q;
-
-	      if(dual_path_alloc)
-		assign valid_s
-		  = valid_q ?
-		    (~flit_sent | 
-		     (fb_empty ? 
-		      ~chi_flit_tail : 
-		      (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) : 
-		    (chi_flit_valid & 
-		     (~chi_flit_tail | ~flit_sent_in | ~flit_sel_fast_in));
-	      else
-		assign valid_s
-		  = valid_q ?
-		    (~flit_sent | 
-		     (fb_empty ? 
-		      ~chi_flit_tail : 
-		      (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) : 
-		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent));
-		
+	      assign valid_s
+		= valid_q ?
+		  (~flit_sent | 
+		   (fb_empty ? 
+		    ~chi_flit_tail : 
+		    (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) : 
+		  (chi_flit_valid & (~chi_flit_tail | ~flit_sent));
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type))
@@ -837,15 +825,9 @@ module rtr_ip_ctrl_mac
 		= valid_q ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
 	      
 	      wire capture;
-
-	      if(dual_path_alloc)
-		assign capture = (~valid_q & chi_flit_valid) |
-				 (flit_sent_in & flit_sel_in & htt_flit_tail & 
-				  (~fb_almost_empty | chi_flit_valid));
-	      else
-		assign capture = (~valid_q & chi_flit_valid) |
-				 (flit_sent & ~fb_empty & htt_flit_tail & 
-				  (~fb_almost_empty | chi_flit_valid));
+	      assign capture = (~valid_q & chi_flit_valid) |
+			       (flit_sent & ~fb_empty & htt_flit_tail & 
+				(~fb_almost_empty | chi_flit_valid));
 	      
 	      wire reload_from_fb;
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
