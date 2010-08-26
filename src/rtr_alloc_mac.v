@@ -637,11 +637,11 @@ module rtr_alloc_mac
 		   
 		   if(num_vcs == 1)
 		     assign gnt_ivc = req_ivc;
-		   else
+		   else if(num_vcs > 1)
 		     begin
 			
 			wire update;
-
+			
 			wire [0:num_vcs-1] req_all_ivc;
 			assign req_all_ivc = flit_valid_in_ivc;
 			
