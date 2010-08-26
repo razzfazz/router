@@ -109,6 +109,9 @@ module rtr_top
    // enable dual-path allocation
    parameter dual_path_alloc = 1;
    
+   // precompute input-side arbitration decision one cycle ahead
+   parameter precomp_ivc_sel = 1;
+   
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -211,6 +214,7 @@ module rtr_top
    wire [0:num_ports*num_vcs*num_ports-1] ipc_route_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_resource_classes-1] ipc_route_ip_ivc_orc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_valid_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		     ipc_flit_last_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_head_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_tail_ip_ivc;
    wire [0:num_ports*num_ports-1] 		     ipc_route_fast_ip_op;
@@ -252,6 +256,7 @@ module rtr_top
 	   wire [0:num_vcs*num_ports-1] ipc_route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] ipc_route_ivc_orc;
 	   wire [0:num_vcs-1] 			   ipc_flit_valid_ivc;
+	   wire [0:num_vcs-1] 			   ipc_flit_last_ivc;
 	   wire [0:num_vcs-1] 			   ipc_flit_head_ivc;
 	   wire [0:num_vcs-1] 			   ipc_flit_tail_ivc;
 	   wire [0:num_ports-1] 		   ipc_route_fast_op;
@@ -295,6 +300,7 @@ module rtr_top
 	      .route_out_ivc_op(ipc_route_ivc_op),
 	      .route_out_ivc_orc(ipc_route_ivc_orc),
 	      .flit_valid_out_ivc(ipc_flit_valid_ivc),
+	      .flit_last_out_ivc(ipc_flit_last_ivc),
 	      .flit_head_out_ivc(ipc_flit_head_ivc),
 	      .flit_tail_out_ivc(ipc_flit_tail_ivc),
 	      .route_fast_out_op(ipc_route_fast_op),
@@ -321,6 +327,8 @@ module rtr_top
 	   
 	   assign ipc_flit_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 	     = ipc_flit_valid_ivc;
+	   assign ipc_flit_last_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = ipc_flit_last_ivc;
 	   assign ipc_flit_head_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 	     = ipc_flit_head_ivc;
 	   assign ipc_flit_tail_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
@@ -380,6 +388,7 @@ module rtr_top
        .restrict_turns(restrict_turns),
        .routing_type(routing_type),
        .dim_order(dim_order),
+       .precomp_ivc_sel(precomp_ivc_sel),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .dual_path_alloc(dual_path_alloc),
@@ -392,6 +401,7 @@ module rtr_top
       .route_in_ip_ivc_op(ipc_route_ip_ivc_op),
       .route_in_ip_ivc_orc(ipc_route_ip_ivc_orc),
       .flit_valid_in_ip_ivc(ipc_flit_valid_ip_ivc),
+      .flit_last_in_ip_ivc(ipc_flit_last_ip_ivc),
       .flit_head_in_ip_ivc(ipc_flit_head_ip_ivc),
       .flit_tail_in_ip_ivc(ipc_flit_tail_ip_ivc),
       .route_fast_in_ip_op(ipc_route_fast_ip_op),

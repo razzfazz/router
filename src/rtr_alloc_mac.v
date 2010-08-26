@@ -34,13 +34,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module rtr_alloc_mac
   (clk, reset, route_valid_in_ip_ivc, route_in_ip_ivc_op, route_in_ip_ivc_orc, 
-   flit_valid_in_ip_ivc, flit_head_in_ip_ivc, flit_tail_in_ip_ivc, 
-   route_fast_in_ip_op, route_fast_in_ip_orc, flit_valid_fast_in_ip, 
-   flit_head_fast_in_ip, flit_tail_fast_in_ip, flit_sel_fast_in_ip_ivc, 
-   flit_sel_out_ip_ivc, flit_sel_fast_out_ip, flit_sent_out_ip, 
-   flit_sel_out_op_ip, empty_out_op, flit_valid_out_op, flit_head_out_op, 
-   flit_tail_out_op, flit_sel_out_op_ovc, fc_event_valid_in_op, 
-   fc_event_sel_in_op_ovc, error);
+   flit_valid_in_ip_ivc, flit_last_in_ip_ivc, flit_head_in_ip_ivc, 
+   flit_tail_in_ip_ivc, route_fast_in_ip_op, route_fast_in_ip_orc, 
+   flit_valid_fast_in_ip, flit_head_fast_in_ip, flit_tail_fast_in_ip, 
+   flit_sel_fast_in_ip_ivc, flit_sel_out_ip_ivc, flit_sel_fast_out_ip, 
+   flit_sent_out_ip, flit_sel_out_op_ip, empty_out_op, flit_valid_out_op, 
+   flit_head_out_op, flit_tail_out_op, flit_sel_out_op_ovc, 
+   fc_event_valid_in_op, fc_event_sel_in_op_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -88,6 +88,9 @@ module rtr_alloc_mac
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
+   
+   // precompute input-side arbitration decision one cycle ahead
+   parameter precomp_ivc_sel = 1;
    
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
@@ -149,6 +152,7 @@ module rtr_alloc_mac
    
    // incoming flit control signals
    input [0:num_ports*num_vcs-1] 		      flit_valid_in_ip_ivc;
+   input [0:num_ports*num_vcs-1] 		      flit_last_in_ip_ivc;
    input [0:num_ports*num_vcs-1] 		      flit_head_in_ip_ivc;
    input [0:num_ports*num_vcs-1] 		      flit_tail_in_ip_ivc;
    
@@ -243,6 +247,10 @@ module rtr_alloc_mac
 	   wire [0:num_vcs-1] flit_valid_in_ivc;
 	   assign flit_valid_in_ivc
 	     = flit_valid_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] flit_last_in_ivc;
+	   assign flit_last_in_ivc
+	     = flit_last_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
 	   wire [0:num_vcs-1] flit_head_in_ivc;
 	   assign flit_head_in_ivc
@@ -855,7 +863,7 @@ module rtr_alloc_mac
 	      
 	      wire active;
 	      assign active = |flit_valid_in_ivc;
-	      
+	      	      
 	      // We only allow speculative requests and those that already have 
 	      // an output VC allocated to them and at least one credit 
 	      // available.
@@ -876,22 +884,92 @@ module rtr_alloc_mac
 	      else
 		assign kill_fast_ivc = {num_vcs{1'b1}};
 	      
-	      wire 		 update;
-	      assign update = oal_flit_sent & (|kill_fast_ivc);
-	      
 	      wire [0:num_vcs-1] gnt_ivc;
-	      c_arbiter
-		#(.num_ports(num_vcs),
-		  .num_priorities(2),
-		  .arbiter_type(sw_alloc_arbiter_type),
-		  .reset_type(reset_type))
-	      arb
-		(.clk(clk),
-		 .reset(reset),
-		 .active(active),
-		 .req({req_hi_ivc, req_lo_ivc}),
-		 .gnt(gnt_ivc),
-		 .update(update));
+	      
+	      if(precomp_ivc_sel)
+		begin
+		   
+		   wire [0:num_vcs-1] req_ivc;
+		   assign req_ivc = req_hi_ivc | req_lo_ivc;
+		   
+		   if(num_vcs == 1)
+		     assign gnt_ivc = req_ivc;
+		   else if(num_vcs > 1)
+		     begin
+			
+			wire update;
+			
+			wire [0:num_vcs-1] req_all_ivc;
+			assign req_all_ivc = flit_valid_in_ivc;
+			
+			wire [0:num_vcs-1] mgnt_ivc;
+			c_arbiter
+			  #(.num_ports(num_vcs),
+			    .num_priorities(3),
+			    .arbiter_type(sw_alloc_arbiter_type),
+			    .reset_type(reset_type))
+			marb
+			  (.clk(clk),
+			   .reset(reset),
+			   .active(active),
+			   .req({req_hi_ivc, req_lo_ivc, req_all_ivc}),
+			   .gnt(mgnt_ivc),
+			   .update(update));
+			
+			wire [0:num_vcs-1] flit_sent_ivc;
+			assign flit_sent_ivc = {num_vcs{oal_flit_sent}} & 
+					       gnt_ivc & ~ivs_flit_kill_ivc;
+			
+			wire [0:num_vcs-1] rem_ivc;
+			assign rem_ivc = flit_valid_in_ivc & 
+					 ~(flit_sent_ivc & flit_last_in_ivc);
+			
+			wire [0:num_vcs-1] mask_ivc_s, mask_ivc_q;
+			assign mask_ivc_s = update ? 
+					    (mgnt_ivc | {num_vcs{~|rem_ivc}}) : 
+					    mask_ivc_q;
+			c_dff
+			  #(.width(num_vcs),
+			    .reset_value({num_vcs{1'b1}}),
+			    .reset_type(reset_type))
+			mask_ivcq
+			  (.clk(clk),
+			   .reset(reset),
+			   .active(active),
+			   .d(mask_ivc_s),
+			   .q(mask_ivc_q));
+			
+			assign update
+			  = (oal_flit_sent & (|kill_fast_ivc)) | 
+			    (|req_hi_ivc & ~|(req_hi_ivc & mask_ivc_q)) | 
+			    (|req_ivc & ~|(req_ivc & mask_ivc_q)) | 
+			    (|req_all_ivc & &mask_ivc_q);
+			
+			assign gnt_ivc = req_ivc & mask_ivc_q;
+			
+		     end
+		   
+		end
+	      else
+		begin
+		   
+		   wire update;
+		   assign update = oal_flit_sent & (|kill_fast_ivc);
+		   
+		   c_arbiter
+		     #(.num_ports(num_vcs),
+		       .num_priorities(2),
+		       .arbiter_type(sw_alloc_arbiter_type),
+		       .reset_type(reset_type))
+		   arb
+		     (.clk(clk),
+		      .reset(reset),
+		      .active(active),
+		      .req({req_hi_ivc, req_lo_ivc}),
+		      .gnt(gnt_ivc),
+		      .update(update));
+		   
+		end
 	      
 	      wire [0:num_ports-1] flit_valid_op;
 	      c_select_mofn
@@ -905,7 +983,7 @@ module rtr_alloc_mac
 	      wire 		   flit_head;
 	      wire 		   flit_tail;
 	      wire [0:num_vcs-1]   flit_sel_ovc;
-	      wire 		   flit_kill;
+	      wire flit_kill;
 	      
 	      if(num_vcs == 1)
 		begin
@@ -917,7 +995,18 @@ module rtr_alloc_mac
 	      else if(num_vcs > 1)
 		begin
 		   
-		   assign flit_head = ~|req_hi_ivc;
+		   if(precomp_ivc_sel)
+		     begin
+			c_select_1ofn
+			  #(.num_ports(num_vcs),
+			    .width(1))
+			flit_head_sel
+			  (.select(gnt_ivc),
+			   .data_in(flit_head_in_ivc),
+			   .data_out(flit_head));
+		     end
+		   else
+		     assign flit_head = ~|req_hi_ivc;
 		   
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),

@@ -309,6 +309,7 @@ module testbench
        .fb_regfile_type(fb_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .dual_path_alloc(dual_path_alloc),
+       .precomp_ivc_sel(precomp_ivc_sel),
        .vc_alloc_type(vc_alloc_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .vc_alloc_requires_credit(vc_alloc_requires_credit),

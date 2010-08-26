@@ -107,6 +107,9 @@ parameter explicit_pipeline_register = 0;
 // enable dual-path allocation
 parameter dual_path_alloc = 1;
 
+// precompute input-side arbitration decision one cycle ahead
+parameter precomp_ivc_sel = 1;
+
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 

@@ -34,8 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module rtr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_valid_out_ivc, 
-   route_out_ivc_op, route_out_ivc_orc, flit_valid_out_ivc, flit_head_out_ivc, 
-   flit_tail_out_ivc, route_fast_out_op, route_fast_out_orc, 
+   route_out_ivc_op, route_out_ivc_orc, flit_valid_out_ivc, flit_last_out_ivc, 
+   flit_head_out_ivc, flit_tail_out_ivc, route_fast_out_op, route_fast_out_orc, 
    flit_valid_fast_out, flit_head_fast_out, flit_tail_fast_out, 
    flit_sel_fast_out_ivc, flit_data_out, flit_sel_in_ivc, flit_sel_fast_in, 
    flit_sent_in, flow_ctrl_out, error);
@@ -238,6 +238,10 @@ module rtr_ip_ctrl_mac
    // flit is present
    output [0:num_vcs-1] 		     flit_valid_out_ivc;
    wire [0:num_vcs-1] 			     flit_valid_out_ivc;
+   
+   // flit is last remaining flit
+   output [0:num_vcs-1] 		     flit_last_out_ivc;
+   wire [0:num_vcs-1] 			     flit_last_out_ivc;
    
    // flit is head flit
    output [0:num_vcs-1] 		     flit_head_out_ivc;
@@ -536,6 +540,9 @@ module rtr_ip_ctrl_mac
 	   wire flit_valid_out;
 	   assign flit_valid_out_ivc[ivc] = flit_valid_out;
 	   
+	   wire flit_last_out;
+	   assign flit_last_out_ivc[ivc] = flit_last_out;
+	   
 	   wire flit_head_out;
 	   assign flit_head_out_ivc[ivc] = flit_head_out;
 	   
@@ -719,9 +726,16 @@ module rtr_ip_ctrl_mac
 	   end
 	   
 	   if(dual_path_alloc)
-	     assign flit_valid_out = ~fb_empty;
+	     begin
+		assign flit_valid_out = ~fb_empty;
+		assign flit_last_out = fb_almost_empty;
+	     end
 	   else
-	     assign flit_valid_out = chi_flit_valid | ~fb_empty;
+	     begin
+		assign flit_valid_out = chi_flit_valid | ~fb_empty;
+		assign flit_last_out
+		  = chi_flit_valid ? fb_empty : fb_almost_empty;
+	     end
 	   
 	   
 	   //-------------------------------------------------------------------
