@@ -340,6 +340,7 @@ module rtr_alloc_mac
 		rtr_route_filter
 		  #(.num_message_classes(num_message_classes),
 		    .num_resource_classes(num_resource_classes),
+		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .num_nodes_per_router(num_nodes_per_router),
@@ -355,6 +356,12 @@ module rtr_alloc_mac
 		   .route_out_op(rf_route_op),
 		   .route_out_orc(rf_route_orc),
 		   .errors(rf_errors));
+		
+		wire 				error_invalid_port;
+		assign error_invalid_port =  flit_valid_in & rf_errors[0];
+		
+		wire 				error_invalid_class;
+		assign error_invalid_class = flit_valid_in & rf_errors[1];
 		
 		
 		//--------------------------------------------------------------
