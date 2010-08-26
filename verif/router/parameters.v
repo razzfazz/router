@@ -104,6 +104,9 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 
+// precompute input-side arbitration decision one cycle ahead
+parameter precomp_ivc_sel = 0;
+
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 
