@@ -577,12 +577,15 @@ module rtr_alloc_mac
 		
 		begin:ivs
 		   
-		   wire active;
+		   wire flit_valid;
 		   
 		   if(dual_path_alloc)
-		     assign active = flit_valid_in | flit_valid_fast_in;
+		     assign flit_valid = flit_valid_in | flit_valid_fast_in;
 		   else
-		     assign active = flit_valid_in;
+		     assign flit_valid = flit_valid_in;
+		   
+		   wire active;
+		   assign active = flit_valid;
 		   
 		   wire [0:num_vcs-1] sel_ivc;
 		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
@@ -811,12 +814,7 @@ module rtr_alloc_mac
 		   // free-running register!
 		   
 		   wire cred_active;
-		   
-		   if(dual_path_alloc)
-		     assign cred_active
-		       = flit_valid_in | flit_valid_fast_in | allocated_q;
-		   else
-		     assign cred_active = flit_valid_in | allocated_q;
+		   assign cred_active = flit_valid | allocated_q;
 		   
 		   // NOTE: Since we only use 'cred_q' once the VC is
 		   // allocated, we can ignore 'flit_kill' here -- if the flit
@@ -870,20 +868,16 @@ module rtr_alloc_mac
 	      assign req_lo_ivc = flit_valid_in_ivc & flit_head_in_ivc;
 	      
 	      wire [0:num_vcs-1] kill_fast_ivc;
-	      wire 		 update;
 	      
 	      if(dual_path_alloc)
-		begin
-		   assign kill_fast_ivc
-		     = flit_valid_in_ivc & 
-		       (flit_head_in_ivc | ivs_cred_ivc | flit_sel_fast_in_ivc);
-		   assign update = oal_flit_sent & (|kill_fast_ivc);
-		end
+		assign kill_fast_ivc
+		  = flit_valid_in_ivc & 
+		    (flit_head_in_ivc | ivs_cred_ivc | flit_sel_fast_in_ivc);
 	      else
-		begin
-		   assign kill_fast_ivc = {num_vcs{1'b0}};
-		   assign update = oal_flit_sent;
-		end
+		assign kill_fast_ivc = {num_vcs{1'b1}};
+	      
+	      wire 		 update;
+	      assign update = oal_flit_sent & (|kill_fast_ivc);
 	      
 	      wire [0:num_vcs-1] gnt_ivc;
 	      c_arbiter
@@ -951,44 +945,24 @@ module rtr_alloc_mac
 		   
 		end
 	      
-	      if(dual_path_alloc)
-		begin
-		   
-		   wire flit_sel_fast;
-		   assign flit_sel_fast = ~|kill_fast_ivc;
-		   
-		   assign ial_flit_valid_op
-		     = flit_sel_fast ? ifl_flit_valid_op : flit_valid_op;
-		   assign ial_flit_sel_ivc
-		     = flit_sel_fast ? flit_sel_fast_in_ivc : gnt_ivc;
-		   assign ial_flit_head
-		     = flit_sel_fast ? flit_head_fast_in : flit_head;
-		   assign ial_flit_tail
-		     = flit_sel_fast ? flit_tail_fast_in : flit_tail;
-		   assign ial_flit_sel_ovc
-		     = flit_sel_fast ? ifl_flit_sel_ovc : flit_sel_ovc;
-		   
-		   assign flit_sel_fast_out = flit_sel_fast;
-		   assign flit_sent_out
-		     = oal_flit_sent & 
-		       ~(flit_sel_fast ? ifl_flit_kill : flit_kill);
-		   
-		end
-	      else
-		begin
-		   
-		   assign ial_flit_valid_op = flit_valid_op;
-		   assign ial_flit_sel_ivc = gnt_ivc;
-		   assign ial_flit_head = flit_head;
-		   assign ial_flit_tail = flit_tail;
-		   assign ial_flit_sel_ovc = flit_sel_ovc;
-		   
-		   assign flit_sel_fast_out = 1'b0;
-		   assign flit_sent_out = oal_flit_sent & ~flit_kill;
-		   
-		end
+	      wire flit_sel_fast;
+	      assign flit_sel_fast = ~|kill_fast_ivc;
 	      
-	      assign flit_sel_out_ivc = gnt_ivc;
+	      assign ial_flit_valid_op
+		= flit_sel_fast ? ifl_flit_valid_op : flit_valid_op;
+	      assign ial_flit_sel_ivc
+		= flit_sel_fast ? flit_sel_fast_in_ivc : gnt_ivc;
+	      assign ial_flit_head
+		= flit_sel_fast ? flit_head_fast_in : flit_head;
+	      assign ial_flit_tail
+		= flit_sel_fast ? flit_tail_fast_in : flit_tail;
+	      assign ial_flit_sel_ovc
+		= flit_sel_fast ? ifl_flit_sel_ovc : flit_sel_ovc;
+	      
+	      assign flit_sel_out_ivc = gnt_ivc;	
+	      assign flit_sel_fast_out = flit_sel_fast;
+	      assign flit_sent_out
+		= oal_flit_sent & ~(flit_sel_fast ? ifl_flit_kill : flit_kill);
 	      
 	   end
 	   
