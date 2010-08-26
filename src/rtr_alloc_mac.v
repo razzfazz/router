@@ -351,17 +351,18 @@ module rtr_alloc_mac
 		    .port_id(ip),
 		    .vc_id(ivc))
 		rf
-		  (.route_in_op(route_in_op),
+		  (.route_valid(flit_valid_in),
+		   .route_in_op(route_in_op),
 		   .route_in_orc(route_in_orc),
 		   .route_out_op(rf_route_op),
 		   .route_out_orc(rf_route_orc),
 		   .errors(rf_errors));
 		
 		wire 				error_invalid_port;
-		assign error_invalid_port =  flit_valid_in & rf_errors[0];
+		assign error_invalid_port =  rf_errors[0];
 		
 		wire 				error_invalid_class;
-		assign error_invalid_class = flit_valid_in & rf_errors[1];
+		assign error_invalid_class = rf_errors[1];
 		
 		
 		//--------------------------------------------------------------

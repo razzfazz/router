@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_route_filter
-  (route_in_op, route_in_orc, route_out_op, route_out_orc, errors);
+  (route_valid, route_in_op, route_in_orc, route_out_op, route_out_orc, errors);
    
 `include "c_constants.v"
    
@@ -98,6 +98,9 @@ module rtr_route_filter
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
+   
+   // route information is valid
+   input route_valid;
    
    // raw output port
    input [0:num_ports-1] route_in_op;
@@ -277,12 +280,12 @@ module rtr_route_filter
    endgenerate
    
    wire error_invalid_port;
-   assign error_invalid_port = (|error_op) | (~|route_in_op);
+   assign error_invalid_port = route_valid & ((|error_op) | (~|route_in_op));
    
    assign errors[0] = error_invalid_port;
    
    wire error_invalid_class;
-   assign error_invalid_class = (|error_orc) | (~|route_in_orc);
+   assign error_invalid_class = route_valid & ((|error_orc) | (~|route_in_orc));
    
    assign errors[1] = error_invalid_class;
    
