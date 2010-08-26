@@ -945,7 +945,7 @@ module rtr_ip_ctrl_mac
 		  = hit_valid ? lld_route_orc : gld_route_orc;
 	     end
 	   
-	   wire [0:1] 				       rf_errors;
+	   wire [0:1] rf_errors;
 	   rtr_route_filter
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -960,17 +960,18 @@ module rtr_ip_ctrl_mac
 	       .port_id(port_id),
 	       .vc_id(ivc))
 	   rf
-	     (.route_in_op(route_unmasked_op),
+	     (.route_valid(route_valid_out),
+	      .route_in_op(route_unmasked_op),
 	      .route_in_orc(route_unmasked_orc),
 	      .route_out_op(route_out_op),
 	      .route_out_orc(route_out_orc),
 	      .errors(rf_errors));
 	   
-	   wire 				    error_invalid_port;
-	   assign error_invalid_port =  route_valid_out & rf_errors[0];
+	   wire       error_invalid_port;
+	   assign error_invalid_port =  rf_errors[0];
 	   
-	   wire 				    error_invalid_class;
-	   assign error_invalid_class = route_valid_out & rf_errors[1];
+	   wire       error_invalid_class;
+	   assign error_invalid_class = rf_errors[1];
 	   
 	   
 	   //-------------------------------------------------------------------

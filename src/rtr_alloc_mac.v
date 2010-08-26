@@ -546,6 +546,7 @@ module rtr_alloc_mac
 		rtr_route_filter
 		  #(.num_message_classes(num_message_classes),
 		    .num_resource_classes(num_resource_classes),
+		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_ports(num_ports),
 		    .num_neighbors_per_dim(num_neighbors_per_dim),
 		    .num_nodes_per_router(num_nodes_per_router),
@@ -556,11 +557,18 @@ module rtr_alloc_mac
 		    .port_id(ip),
 		    .vc_id(ivc))
 		rf
-		  (.route_in_op(route_in_op),
+		  (.route_valid(flit_valid_in),
+		   .route_in_op(route_in_op),
 		   .route_in_orc(route_in_orc),
 		   .route_out_op(rf_route_op),
 		   .route_out_orc(rf_route_orc),
 		   .errors(rf_errors));
+		
+		wire 				error_invalid_port;
+		assign error_invalid_port =  rf_errors[0];
+		
+		wire 				error_invalid_class;
+		assign error_invalid_class = rf_errors[1];
 		
 		
 		//--------------------------------------------------------------
@@ -907,7 +915,7 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs == 1)
 		begin
-		   assign flit_head = ~req_hi_ivc;
+		   assign flit_head = flit_head_in_ivc;
 		   assign flit_tail = flit_tail_in_ivc;
 		   assign flit_sel_ovc = ivs_flit_sel_ivc_ovc;
 		   assign flit_kill = ivs_flit_kill_ivc;

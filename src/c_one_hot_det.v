@@ -67,7 +67,7 @@ module c_one_hot_det
 	begin
 	   
 	   // connections between levels
-	   wire [0:(2*width-1)-1] connections;
+	   wire [0:(2*ext_width-1)-1] connections;
 	   
 	   // for first stage input, zero-extend data to power-of-two width
 	   assign connections[0:width-1] = data;
@@ -82,18 +82,17 @@ module c_one_hot_det
    	   for(level = 0; level < num_levels; level = level + 1)
 	     begin:levels
 		
-		wire [0:(width / (1 << level))-1] data;
+		wire [0:(ext_width/(1 << level))-1] data;
 		assign data
-		  = connections[(2 * (width - (width / (1 << level)))):
-				(2 * (width - (width / (1 << level))))+
-				(width / (1 << level))-1];
+		  = connections[((2*ext_width)-(2*ext_width/(1 << level))):
+				((2*ext_width)-(ext_width/(1 << level)))-1];
 		
-		wire [0:(width / (1 << level))-1] both_set;
-		wire [0:(width / (1 << level))-1] any_set;
+		wire [0:(ext_width/(2 << level))-1] both_set;
+		wire [0:(ext_width/(2 << level))-1] any_set;
 		
-		genvar 				  pair;
+		genvar 				    pair;
 		
-		for(pair = 0; pair < (width / (2 << level)); pair = pair + 1)
+		for(pair = 0; pair < (ext_width/(2 << level)); pair = pair + 1)
 		  begin:pairs
 		     
 		     assign both_set[pair] = &data[pair*2:pair*2+1];
@@ -103,9 +102,9 @@ module c_one_hot_det
 		
 		assign multi_hot[level] = |both_set;
 		
-		assign connections[(2 * (width - (width / (1 << level)))):
-				   (2 * (width - (width / (1 << level))))+
-				   (width / (1 << level))-1] = any_set;
+		assign connections[((2*ext_width)-(ext_width/(1 << level))):
+				   ((2*ext_width)-(ext_width/(2 << level)))-1]
+		  = any_set;
 		
 	     end
 	   

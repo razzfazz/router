@@ -731,11 +731,15 @@ module vcr_ivc_ctrl
 	     (.data_in(hdr_route_rcsel),
 	      .data_out(hdr_route_orc));
 	   
-	   assign route_unmasked_orc = hdr_valid_q ? hdr_route_orc : route_in_orc;
+	   assign route_unmasked_orc
+	     = hdr_valid_q ? hdr_route_orc : route_in_orc;
 	   
 	end
       
    endgenerate
+   
+   wire 				       header_valid;
+   assign header_valid = hdr_valid_q | flit_valid_in;
    
    wire [0:1] 				       rfl_errors;
    rtr_route_filter
@@ -752,20 +756,18 @@ module vcr_ivc_ctrl
        .port_id(port_id),
        .vc_id(vc_id))
    rfl
-     (.route_in_op(route_unmasked_op),
+     (.route_valid(header_valid),
+      .route_in_op(route_unmasked_op),
       .route_in_orc(route_unmasked_orc),
       .route_out_op(route_op),
       .route_out_orc(route_orc),
       .errors(rfl_errors));
    
-   wire 				       header_valid;
-   assign header_valid = hdr_valid_q | flit_valid_in;
-   
    wire 				       error_invalid_port;
-   assign error_invalid_port = header_valid & rfl_errors[0];
+   assign error_invalid_port = rfl_errors[0];
    
    wire 				       error_invalid_class;
-   assign error_invalid_class = header_valid & rfl_errors[1];
+   assign error_invalid_class = rfl_errors[1];
    
    
    //---------------------------------------------------------------------------

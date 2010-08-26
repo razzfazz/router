@@ -598,6 +598,9 @@ module whr_ip_ctrl_mac
    wire [0:num_ports-1] 	     route_unmasked_op;
    assign route_unmasked_op = hdr_valid_q ? hdr_route_op : route_in_op;
    
+   wire 			     header_valid;
+   assign header_valid = hdr_valid_q | flit_valid_in;
+   
    wire 			     route_orc;
    wire [0:1] 			     rfl_errors;
    rtr_route_filter
@@ -614,20 +617,18 @@ module whr_ip_ctrl_mac
        .port_id(port_id),
        .vc_id(0))
    rfl
-     (.route_in_op(route_unmasked_op),
+     (.route_valid(header_valid),
+      .route_in_op(route_unmasked_op),
       .route_in_orc(1'b1),
       .route_out_op(route_op),
       .route_out_orc(route_orc),
       .errors(rfl_errors));
    
-   wire 			     header_valid;
-   assign header_valid = hdr_valid_q | flit_valid_in;
-   
    wire 			     error_invalid_port;
-   assign error_invalid_port = header_valid & rfl_errors[0];
+   assign error_invalid_port = rfl_errors[0];
    
    wire 			     error_invalid_class;
-   assign error_invalid_class = header_valid & rfl_errors[1];
+   assign error_invalid_class = rfl_errors[1];
    
    
    //---------------------------------------------------------------------------
