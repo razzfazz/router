@@ -493,7 +493,7 @@ module rtr_alloc_mac
 		      .input_b(flit_sel_ocvc),
 		      .result(flit_sel_orc_ocvc));
 		   
-		   wire [0:num_vcs-1] flit_sel_ovc;
+		   wire [0:num_vcs-1] 		     flit_sel_ovc;
 		   c_mat_mult
 		     #(.dim1_width(num_message_classes),
 		       .dim2_width(1),
@@ -510,7 +510,7 @@ module rtr_alloc_mac
 		   // credit tracking for a priori check (allocated VCs)
 		   //-----------------------------------------------------------
 		   
-		   wire [0:num_vcs_per_class-1] almost_full_ocvc;
+		   wire [0:num_vcs_per_class-1]      almost_full_ocvc;
 		   rtr_vc_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
@@ -523,7 +523,7 @@ module rtr_alloc_mac
 		      .flags_op_ovc(ovs_almost_full_op_ovc),
 		      .flags_ocvc(almost_full_ocvc));
 		   
-		   wire 			almost_full;
+		   wire 			     almost_full;
 		   if(num_vcs_per_class == 1)
 		     assign almost_full = almost_full_ocvc;
 		   else if(num_vcs_per_class > 1)
