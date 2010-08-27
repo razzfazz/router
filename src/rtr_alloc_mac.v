@@ -445,13 +445,11 @@ module rtr_alloc_mac
 		   
 		   wire [0:num_vcs_per_class-1]   allocated_next_ocvc;
 		   wire [0:num_vcs_per_class-1]   allocated_ocvc;
-		   wire [0:num_vcs_per_class-1]   flit_sel_ocvc;
 		   
 		   if(num_vcs_per_class == 1)
 		     begin
 			assign allocated_next_ocvc = 1'b1;
 			assign allocated_ocvc = 1'b1;
-			assign flit_sel_ocvc = 1'b1;
 		     end
 		   else if(num_vcs_per_class > 1)
 		     begin
@@ -474,10 +472,11 @@ module rtr_alloc_mac
 			
 			assign allocated_ocvc = allocated_ocvc_q;
 			
-			assign flit_sel_ocvc
-			  = allocated_ocvc | {num_vcs_per_class{~allocated_q}};
-			
 		     end
+		   
+		   wire [0:num_vcs_per_class-1]      flit_sel_ocvc;
+		   assign flit_sel_ocvc
+		     = allocated_ocvc | {num_vcs_per_class{~allocated_q}};
 		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	     flit_sel_orc_ocvc;
