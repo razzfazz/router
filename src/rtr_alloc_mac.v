@@ -281,6 +281,7 @@ module rtr_alloc_mac
 	   wire [0:num_vcs*num_ports-1] rf_route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] rf_route_ivc_orc;
 	   
+	   wire [0:num_vcs-1] 			   ivs_allocated_ivc;
 	   wire [0:num_vcs-1] 			   ivs_cred_ivc;
 	   wire [0:num_vcs*num_vcs-1] 		   ivs_flit_sel_ivc_ovc;
 	   wire [0:num_vcs-1] 			   ivs_flit_kill_ivc;
@@ -328,6 +329,9 @@ module rtr_alloc_mac
 		assign rf_route_ivc_orc[ivc*num_resource_classes:
 					(ivc+1)*num_resource_classes-1]
 		  = rf_route_orc;
+		
+		wire 				ivs_allocated;
+		assign ivs_allocated_ivc[ivc] = ivs_allocated;
 		
 		wire 				ivs_cred;
 		assign ivs_cred_ivc[ivc] = ivs_cred;
@@ -596,6 +600,7 @@ module rtr_alloc_mac
 		   // connect outputs
 		   //-----------------------------------------------------------
 		   
+		   assign ivs_allocated = allocated_q;
 		   assign ivs_cred = cred_q;
 		   assign ivs_flit_kill = flit_kill;
 		   assign ivs_flit_sel_ovc = flit_sel_ovc;
@@ -620,10 +625,10 @@ module rtr_alloc_mac
 	      
 	      wire [0:num_vcs-1] req_hi_ivc;
 	      assign req_hi_ivc
-		= flit_valid_in_ivc & ~flit_head_in_ivc & ivs_cred_ivc;
+		= flit_valid_in_ivc & ivs_allocated_ivc & ivs_cred_ivc;
 	      
 	      wire [0:num_vcs-1] req_lo_ivc;
-	      assign req_lo_ivc = flit_valid_in_ivc & flit_head_in_ivc;
+	      assign req_lo_ivc = flit_valid_in_ivc & ~ivs_allocated_ivc;
 	      
 	      wire [0:num_vcs-1] gnt_ivc;
 	      
@@ -728,7 +733,7 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs == 1)
 		begin
-		   assign flit_head = flit_head_in_ivc;
+		   assign flit_head = ~ivs_allocated_ivc;
 		   assign flit_tail = flit_tail_in_ivc;
 		   assign flit_sel_ovc = ivs_flit_sel_ivc_ovc;
 		   assign flit_kill = ivs_flit_kill_ivc;
@@ -737,15 +742,7 @@ module rtr_alloc_mac
 		begin
 		   
 		   if(precomp_ivc_sel)
-		     begin
-			c_select_1ofn
-			  #(.num_ports(num_vcs),
-			    .width(1))
-			flit_head_sel
-			  (.select(gnt_ivc),
-			   .data_in(flit_head_in_ivc),
-			   .data_out(flit_head));
-		     end
+		     assign flit_head = ~|(ivs_allocated_ivc & gnt_ivc);
 		   else
 		     assign flit_head = ~|req_hi_ivc;
 		   
