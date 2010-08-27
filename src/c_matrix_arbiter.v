@@ -132,47 +132,25 @@ module c_matrix_arbiter
 		
 	     end
 	   
-	   if(num_priorities == 1)
-	     assign gnt = gnt_by_prio;
-	   else if(num_priorities == 2)
-	     assign gnt = (|req[0:num_ports-1]) ? 
-			  gnt_by_prio[0:num_ports-1] :
-			  gnt_by_prio[num_ports:2*num_ports-1];
-	   else if(num_priorities > 2)
-	     begin
-		
-		wire [0:num_priorities-1] any_req_for_prio;
-		c_mat_mult
-		  #(.dim1_width(num_priorities),
-		    .dim2_width(num_ports),
-		    .dim3_width(1),
-		    .prod_op(`BINARY_OP_AND),
-		    .sum_op(`BINARY_OP_OR))
-		any_req_for_prio_mmult
-		  (.input_a(req),
-		   .input_b({num_ports{1'b1}}),
-		   .result(any_req_for_prio));
-		
-		// always fall back to lowest priority if no other requests
-		wire [0:num_priorities-1] req_prio;
-		assign req_prio = {any_req_for_prio[0:num_priorities-2], 1'b1};
-		
-		wire [0:num_priorities-1] sel_prio;
-		c_lod
-		  #(.width(num_priorities-1))
-		sel_prio_lod
-		  (.data_in(req_prio),
-		   .data_out(sel_prio));
-		
-		c_select_1ofn
-		  #(.num_ports(num_priorities),
-		    .width(num_ports))
-		gnt_sel
-		  (.select(sel_prio),
-		   .data_in(gnt_by_prio),
-		   .data_out(gnt));
-		
+	   wire [0:num_priorities-1] enable_prio;
+	   assign enable_prio[0] = 1'b1;
+	   
+	   genvar 		     prio;
+	   
+	   for(prio = 0; prio < (num_priorities - 1); prio = prio + 1)
+	     begin:prios
+		assign enable_prio[prio+1]
+		  = enable_prio[prio] & 
+		    ~|req[prio*num_ports:(prio+1)*num_ports-1];
 	     end
+	   
+	   c_select_mofn
+	     #(.num_ports(num_priorities),
+	       .width(num_ports))
+	   gnt_sel
+	     (.select(enable_prio),
+	      .data_in(gnt_by_prio),
+	      .data_out(gnt));
 	   
 	end
       
