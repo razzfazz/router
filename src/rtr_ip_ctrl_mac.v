@@ -1138,17 +1138,8 @@ module rtr_ip_ctrl_mac
 	   
 	   assign flit_sent_active = alloc_active | flit_sent_q;
 	   
-	   wire flit_head;
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_head_sel
-	     (.select(flit_sel_in_ivc),
-	      .data_in(flit_head_out_ivc),
-	      .data_out(flit_head));
-	   
 	   wire flit_head_s, flit_head_q;
-	   assign flit_head_s = flit_head;
+	   assign flit_head_s = |(flit_sel_in_ivc & flit_head_out_ivc);
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
