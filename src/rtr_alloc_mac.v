@@ -483,6 +483,7 @@ module rtr_alloc_mac
 	   
 	   wire [0:num_vcs*num_resource_classes-1] rf_route_ivc_orc;
 	   
+	   wire [0:num_vcs-1] 			   ivs_allocated_ivc;
 	   wire [0:num_vcs-1] 			   ivs_flit_kill_ivc;
 	   
 	   genvar 				   ivc;
@@ -534,6 +535,9 @@ module rtr_alloc_mac
 		assign rf_route_ivc_orc[ivc*num_resource_classes:
 					(ivc+1)*num_resource_classes-1]
 		  = rf_route_orc;
+		
+		wire 				ivs_allocated;
+		assign ivs_allocated_ivc[ivc] = ivs_allocated;
 		
 		wire 				ivs_cred;
 		assign ivs_cred_ivc[ivc] = ivs_cred;
@@ -673,15 +677,13 @@ module rtr_alloc_mac
 		
 		   assign flit_kill = ~allocated_q & ~|next_elig_ocvc;
 		   
-		   wire [0:num_vcs_per_class-1] allocated_next_ocvc;
-		   wire [0:num_vcs_per_class-1] allocated_ocvc;
-		   wire [0:num_vcs_per_class-1] flit_sel_ocvc;
+		   wire [0:num_vcs_per_class-1]   allocated_next_ocvc;
+		   wire [0:num_vcs_per_class-1]   allocated_ocvc;
 		   
 		   if(num_vcs_per_class == 1)
 		     begin
 			assign allocated_next_ocvc = 1'b1;
 			assign allocated_ocvc = 1'b1;
-			assign flit_sel_ocvc = 1'b1;
 		     end
 		   else if(num_vcs_per_class > 1)
 		     begin
@@ -694,7 +696,6 @@ module rtr_alloc_mac
 			assign allocated_ocvc_s = allocated_next_ocvc;
 			c_dff
 			  #(.width(num_vcs_per_class),
-			    .reset_value({num_vcs_per_class{1'b1}}),
 			    .reset_type(reset_type))
 			allocated_ocvcq
 			  (.clk(clk),
@@ -705,10 +706,11 @@ module rtr_alloc_mac
 			
 			assign allocated_ocvc = allocated_ocvc_q;
 			
-			assign flit_sel_ocvc
-			  = allocated_ocvc | {num_vcs_per_class{~allocated_q}};
-			
 		     end
+		   
+		   wire [0:num_vcs_per_class-1]      flit_sel_ocvc;
+		   assign flit_sel_ocvc
+		     = allocated_ocvc | {num_vcs_per_class{~allocated_q}};
 		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	     flit_sel_orc_ocvc;
@@ -763,20 +765,10 @@ module rtr_alloc_mac
 		     assign almost_full_ocvc = ovs_almost_full_ocvc;
 		   
 		   wire 			     almost_full;
-		   if(num_vcs_per_class == 1)
-		     assign almost_full = almost_full_ocvc;
-		   else if(num_vcs_per_class > 1)
-		     begin
-			c_select_1ofn
-			  #(.num_ports(num_vcs_per_class),
-			    .width(1))
-			almost_full_sel
-			  (.select(allocated_next_ocvc),
-			   .data_in(almost_full_ocvc),
-			   .data_out(almost_full));
-		     end
+		   assign almost_full
+		     = |(allocated_next_ocvc & almost_full_ocvc);
 		   
-		   wire [0:num_vcs_per_class-1] ovs_full_ocvc;
+		   wire [0:num_vcs_per_class-1]      ovs_full_ocvc;
 		   rtr_vc_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
@@ -789,7 +781,7 @@ module rtr_alloc_mac
 		      .flags_op_ovc(ovs_full_op_ovc),
 		      .flags_ocvc(ovs_full_ocvc));
 		   
-		   wire [0:num_vcs_per_class-1] full_ocvc;
+		   wire [0:num_vcs_per_class-1]      full_ocvc;
 		   
 		   if(dual_path_alloc)
 		     assign full_ocvc = route_valid_in ?
@@ -798,20 +790,8 @@ module rtr_alloc_mac
 		   else
 		     assign full_ocvc = ovs_full_ocvc;
 		   
-		   wire 			full;
-		   if(num_vcs_per_class == 1)
-		     assign full = full_ocvc;
-		   else if(num_vcs_per_class > 1)
-		     begin
-			c_select_1ofn
-			  #(.num_ports(num_vcs_per_class),
-			    .width(1))
-			full_sel
-			  (.select(allocated_next_ocvc),
-			   .data_in(full_ocvc),
-			   .data_out(full));
-		     end
-		   
+		   wire 			     full;
+		   assign full = |(allocated_next_ocvc & full_ocvc);
 		   
 		   // we need to track credits even when we temporarily run out 
 		   // of flits; otherwise, there can be a dead cycle when a new 
@@ -821,7 +801,7 @@ module rtr_alloc_mac
 		   // NOTE: As it is, synthesis will probably turn this into a 
 		   // free-running register!
 		   
-		   wire cred_active;
+		   wire 			     cred_active;
 		   assign cred_active = flit_valid | allocated_q;
 		   
 		   // NOTE: Since we only use 'cred_q' once the VC is
@@ -829,7 +809,7 @@ module rtr_alloc_mac
 		   // is killed, we failed allocation, and thus the value of
 		   // 'cred_q' will be ignored in the next cycle anyway.
 		   
-		   wire cred_s, cred_q;
+		   wire 			     cred_s, cred_q;
 		   assign cred_s = ~full & ~(almost_full & flit_sent);
 		   c_dff
 		     #(.width(1),
@@ -846,6 +826,7 @@ module rtr_alloc_mac
 		   // connect outputs
 		   //-----------------------------------------------------------
 		   
+		   assign ivs_allocated = allocated_q;
 		   assign ivs_cred = cred_q;
 		   assign ivs_flit_kill = flit_kill;
 		   assign ivs_flit_sel_ovc = flit_sel_ovc;
@@ -870,10 +851,10 @@ module rtr_alloc_mac
 	      
 	      wire [0:num_vcs-1] req_hi_ivc;
 	      assign req_hi_ivc
-		= flit_valid_in_ivc & ~flit_head_in_ivc & ivs_cred_ivc;
+		= flit_valid_in_ivc & ivs_allocated_ivc & ivs_cred_ivc;
 	      
 	      wire [0:num_vcs-1] req_lo_ivc;
-	      assign req_lo_ivc = flit_valid_in_ivc & flit_head_in_ivc;
+	      assign req_lo_ivc = flit_valid_in_ivc & ~ivs_allocated_ivc;
 	      
 	      wire [0:num_vcs-1] kill_fast_ivc;
 	      
@@ -987,7 +968,7 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs == 1)
 		begin
-		   assign flit_head = flit_head_in_ivc;
+		   assign flit_head = ~ivs_allocated_ivc;
 		   assign flit_tail = flit_tail_in_ivc;
 		   assign flit_sel_ovc = ivs_flit_sel_ivc_ovc;
 		   assign flit_kill = ivs_flit_kill_ivc;
@@ -996,25 +977,11 @@ module rtr_alloc_mac
 		begin
 		   
 		   if(precomp_ivc_sel)
-		     begin
-			c_select_1ofn
-			  #(.num_ports(num_vcs),
-			    .width(1))
-			flit_head_sel
-			  (.select(gnt_ivc),
-			   .data_in(flit_head_in_ivc),
-			   .data_out(flit_head));
-		     end
+		     assign flit_head = ~|(gnt_ivc & ivs_allocated_ivc);
 		   else
 		     assign flit_head = ~|req_hi_ivc;
 		   
-		   c_select_1ofn
-		     #(.num_ports(num_vcs),
-		       .width(1))
-		   flit_tail_sel
-		     (.select(gnt_ivc),
-		      .data_in(flit_tail_in_ivc),
-		      .data_out(flit_tail));
+		   assign flit_tail = |(gnt_ivc & flit_tail_in_ivc);
 		   
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
@@ -1024,13 +991,7 @@ module rtr_alloc_mac
 		      .data_in(ivs_flit_sel_ivc_ovc),
 		      .data_out(flit_sel_ovc));
 		   
-		   c_select_1ofn
-		     #(.num_ports(num_vcs),
-		       .width(1))
-		   flit_kill_sel
-		     (.select(gnt_ivc),
-		      .data_in(ivs_flit_kill_ivc),
-		      .data_out(flit_kill));
+		   assign flit_kill = |(gnt_ivc & ivs_flit_kill_ivc);
 		   
 		end
 	      
@@ -1248,22 +1209,8 @@ module rtr_alloc_mac
 	      
 	      assign oal_flit_sent_ip = gnt_ip;
 	      assign oal_flit_sent = flit_sent;
-	      
-	      c_select_1ofn
-		#(.num_ports(num_ports),
-		  .width(1))
-	      oal_flit_head_sel
-		(.select(gnt_ip),
-		 .data_in(ial_flit_head_ip),
-		 .data_out(oal_flit_head));
-	      
-	      c_select_1ofn
-		#(.num_ports(num_ports),
-		  .width(1))
-	      oal_flit_tail_sel
-		(.select(gnt_ip),
-		 .data_in(ial_flit_tail_ip),
-		 .data_out(oal_flit_tail));
+	      assign oal_flit_head = |(gnt_ip & ial_flit_head_ip);
+	      assign oal_flit_tail = |(gnt_ip & ial_flit_tail_ip);
 	      
 	      wire [0:num_ports*num_vcs-1] flit_sel_ip_ovc;
 	      
