@@ -943,7 +943,7 @@ module rtr_alloc_mac
 			  = (oal_flit_sent & (|kill_fast_ivc)) | 
 			    (|req_hi_ivc & ~|(req_hi_ivc & mask_ivc_q)) | 
 			    (|req_ivc & ~|(req_ivc & mask_ivc_q)) | 
-			    (|req_all_ivc & &mask_ivc_q);
+			    (|req_all_ivc & (&mask_ivc_q));
 			
 			assign gnt_ivc = req_ivc & mask_ivc_q;
 			

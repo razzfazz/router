@@ -120,7 +120,9 @@ module c_arbiter
 	     
 	     // synopsys translate_on
 	     
-	     if(num_ports > 1)
+	     if(num_ports == 1)
+	       assign gnt = |req;
+	     else if(num_ports > 1)
 	       begin
 		  
 		  wire enable;
@@ -159,8 +161,6 @@ module c_arbiter
 		     .grant_index(grant_index));
 		  
 	       end
-	     else
-	       assign gnt = req;
 	     
 	  end
       endcase

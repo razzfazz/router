@@ -68,7 +68,10 @@ module c_rr_arbiter
 	   
 	   wire [0:num_ports-1] state;
 	   
-	   wire [0:num_priorities*num_ports-1] 	gnt_by_prio;
+	   wire [0:num_priorities-1] enable_prio;
+	   assign enable_prio[0] = 1'b1;
+	   
+	   wire [0:num_priorities*num_ports-1] gnt_by_prio;
 	   wire [0:num_priorities*num_ports-1] 	next_state_by_prio;
 	   
 	   genvar 		prio;
@@ -78,6 +81,9 @@ module c_rr_arbiter
 		
 		wire [0:num_ports-1] req_unqual;
 		assign req_unqual = req[prio*num_ports:(prio+1)*num_ports-1];
+		
+		if(prio < (num_priorities - 1))
+		  assign enable_prio[prio+1] = enable_prio[prio] & ~|req_unqual;
 		
 		wire [0:num_ports-1] req_unqual_rev;
 		c_reverse
@@ -151,67 +157,24 @@ module c_rr_arbiter
 		
 	     end
 	   
+	   c_select_mofn
+	     #(.num_ports(num_priorities),
+	       .width(num_ports))
+	   gnt_sel
+	     (.select(enable_prio),
+	      .data_in(gnt_by_prio),
+	      .data_out(gnt));
+	   
 	   wire [0:num_ports-1]      next_state;
+	   c_select_mofn
+	     #(.num_ports(num_priorities),
+	       .width(num_ports))
+	   next_state_sel
+	     (.select(enable_prio),
+	      .data_in(next_state_by_prio),
+	      .data_out(next_state));
 	   
-	   if(num_priorities == 1)
-	     begin
-		assign gnt = gnt_by_prio;
-		assign next_state = next_state_by_prio;
-	     end
-	   else if(num_priorities == 2)
-	     begin
-		assign gnt = (|req[0:num_ports-1]) ? 
-			     gnt_by_prio[0:num_ports-1] :
-			     gnt_by_prio[num_ports:2*num_ports-1];
-		assign next_state = (|req[0:num_ports-1]) ?
-				    next_state_by_prio[0:num_ports-1] :
-				    next_state_by_prio[num_ports:2*num_ports-1];
-	     end
-	   else if(num_priorities > 2)
-	     begin
-		
-		wire [0:num_priorities-1] any_req_for_prio;
-		c_mat_mult
-		  #(.dim1_width(num_priorities),
-		    .dim2_width(num_ports),
-		    .dim3_width(1),
-		    .prod_op(`BINARY_OP_AND),
-		    .sum_op(`BINARY_OP_OR))
-		any_req_for_prio_mmult
-		  (.input_a(req),
-		   .input_b({num_ports{1'b1}}),
-		   .result(any_req_for_prio));
-		
-		// always fall back to lowest priority if no other requests
-		wire [0:num_priorities-1] req_prio;
-		assign req_prio = {any_req_for_prio[0:num_priorities-2], 1'b1};
-		
-		wire [0:num_priorities-1] sel_prio;
-		c_lod
-		  #(.width(num_priorities))
-		sel_prio_lod
-		  (.data_in(req_prio),
-		   .data_out(sel_prio));
-		
-		c_select_1ofn
-		  #(.num_ports(num_priorities),
-		    .width(num_ports))
-		gnt_sel
-		  (.select(sel_prio),
-		   .data_in(gnt_by_prio),
-		   .data_out(gnt));
-		
-		c_select_1ofn
-		  #(.num_ports(num_priorities),
-		    .width(num_ports))
-		next_state_sel
-		  (.select(sel_prio),
-		   .data_in(next_state_by_prio),
-		   .data_out(next_state));
-		
-	     end
-	   
-	   wire [0:num_ports-1] 	  state_s, state_q;
+	   wire [0:num_ports-1]      state_s, state_q;
 	   assign state_s = update ? next_state : state_q;
 	   assign state_q[0] = 1'b0;
 	   c_dff
