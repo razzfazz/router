@@ -464,7 +464,6 @@ module rtr_alloc_mac
 			assign allocated_ocvc_s = allocated_next_ocvc;
 			c_dff
 			  #(.width(num_vcs_per_class),
-			    .reset_value({num_vcs_per_class{1'b1}}),
 			    .reset_type(reset_type))
 			allocated_ocvcq
 			  (.clk(clk),
