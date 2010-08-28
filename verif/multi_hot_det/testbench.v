@@ -44,12 +44,12 @@ module testbench
    
    reg [0:width-1] data;
    
-   wire 	   dut_one_hot;
-   c_one_hot_det
+   wire 	   dut_multi_hot;
+   c_multi_hot_det
      #(.width(width))
    dut
      (.data(data),
-      .one_hot(dut_one_hot));
+      .multi_hot(dut_multi_hot));
    
    wire [0:cnt_width-1] count;
    c_add_nto1
@@ -59,11 +59,11 @@ module testbench
      (.data_in(data),
       .data_out(count));
    
-   wire 		ref_one_hot;
-   assign ref_one_hot = (count <= 1);
+   wire 		ref_multi_hot;
+   assign ref_multi_hot = (count > 1);
    
    wire 		error;
-   assign error = ref_one_hot ^ dut_one_hot;
+   assign error = ref_multi_hot ^ dut_multi_hot;
    
    reg 			clk;
    

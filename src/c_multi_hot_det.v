@@ -29,11 +29,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 //==============================================================================
-// generic one-hot detect logic
+// generic multi-hot detect logic
 //==============================================================================
 
-module c_one_hot_det
-  (data, one_hot);
+module c_multi_hot_det
+  (data, multi_hot);
    
 `include "c_constants.v"
 `include "c_functions.v"
@@ -51,16 +51,16 @@ module c_one_hot_det
    input [0:width-1] data;
    
    // one-hot indicator
-   output 	     one_hot;
-   wire 	     one_hot;
+   output 	     multi_hot;
+   wire 	     multi_hot;
    
    generate
       
       if(width == 1)
 	begin
 	   
-	   // a single wire is always one-hot encoded!
-	   assign one_hot = 1'b1;
+	   // a single wire is never multi-hot!
+	   assign multi_hot = 1'b0;
 	   
 	end
       else
@@ -75,7 +75,7 @@ module c_one_hot_det
 	     assign connections[width:ext_width-1] = {(ext_width-width){1'b0}};
 	   
 	   // bit for each level indicating whether multiple bits are set
-	   wire [0:num_levels-1]  multi_hot;
+	   wire [0:num_levels-1]  level_multi_hot;
 	   
 	   genvar 		  level;
 	   
@@ -100,7 +100,7 @@ module c_one_hot_det
 		     
 		  end
 		
-		assign multi_hot[level] = |both_set;
+		assign level_multi_hot[level] = |both_set;
 		
 		assign connections[((2*ext_width)-(ext_width/(1 << level))):
 				   ((2*ext_width)-(ext_width/(2 << level)))-1]
@@ -108,7 +108,7 @@ module c_one_hot_det
 		
 	     end
 	   
-	   assign one_hot = ~|multi_hot;
+	   assign multi_hot = |level_multi_hot;
 	   
 	end
       
