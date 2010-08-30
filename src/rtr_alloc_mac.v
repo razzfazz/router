@@ -856,22 +856,20 @@ module rtr_alloc_mac
 	      wire [0:num_vcs-1] req_lo_ivc;
 	      assign req_lo_ivc = flit_valid_in_ivc & ~ivs_allocated_ivc;
 	      
-	      wire [0:num_vcs-1] kill_fast_ivc;
+	      wire [0:num_vcs-1] req_ivc;
+	      assign req_ivc = req_hi_ivc | req_lo_ivc;
+	      
+	      wire kill_fast;
 	      
 	      if(dual_path_alloc)
-		assign kill_fast_ivc
-		  = flit_valid_in_ivc & 
-		    (flit_head_in_ivc | ivs_cred_ivc | flit_sel_fast_in_ivc);
+		assign kill_fast = |req_ivc;
 	      else
-		assign kill_fast_ivc = {num_vcs{1'b1}};
+		assign kill_fast = 1'b1;
 	      
 	      wire [0:num_vcs-1] gnt_ivc;
 	      
 	      if(precomp_ivc_sel)
 		begin
-		   
-		   wire [0:num_vcs-1] req_ivc;
-		   assign req_ivc = req_hi_ivc | req_lo_ivc;
 		   
 		   if(num_vcs == 1)
 		     assign gnt_ivc = req_ivc;
@@ -921,7 +919,7 @@ module rtr_alloc_mac
 			   .q(mask_ivc_q));
 			
 			assign update
-			  = (oal_flit_sent & (|kill_fast_ivc)) | 
+			  = (oal_flit_sent & kill_fast) | 
 			    (|req_hi_ivc & ~|(req_hi_ivc & mask_ivc_q)) | 
 			    (|req_ivc & ~|(req_ivc & mask_ivc_q)) | 
 			    (|req_all_ivc & (&mask_ivc_q));
@@ -935,7 +933,7 @@ module rtr_alloc_mac
 		begin
 		   
 		   wire update;
-		   assign update = oal_flit_sent & (|kill_fast_ivc);
+		   assign update = oal_flit_sent & kill_fast;
 		   
 		   c_arbiter
 		     #(.num_ports(num_vcs),
@@ -996,7 +994,7 @@ module rtr_alloc_mac
 		end
 	      
 	      wire flit_sel_fast;
-	      assign flit_sel_fast = ~|kill_fast_ivc;
+	      assign flit_sel_fast = ~kill_fast;
 	      
 	      assign ial_flit_valid_op
 		= flit_sel_fast ? ifl_flit_valid_op : flit_valid_op;
