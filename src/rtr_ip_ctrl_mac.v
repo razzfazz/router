@@ -1255,15 +1255,16 @@ module rtr_ip_ctrl_mac
 	   assign flit_sent_active = alloc_active | flit_sent_q;
 	   
 	   wire flit_head;
-	   assign flit_head = |(flit_sel_in_ivc & flit_head_out_ivc);
-	   
-	   wire flit_head_s, flit_head_q;
 	   
 	   if(dual_path_alloc)
-	     assign flit_head_s = flit_sel_fast_in ? chi_flit_head : flit_head;
+	     assign flit_head = flit_sel_fast_in ? 
+				chi_flit_head : 
+				|(flit_sel_in_ivc & flit_head_out_ivc);
 	   else
-	     assign flit_head_s = flit_head;
+	     assign flit_head = |(flit_sel_in_ivc & flit_head_out_ivc);
 	   
+	   wire flit_head_s, flit_head_q;
+	   assign flit_head_s = flit_head;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
