@@ -1287,13 +1287,7 @@ module rtr_ip_ctrl_mac
 	     begin
 		
 		wire [0:num_vcs-1] flit_sel_ivc_s, flit_sel_ivc_q;
-		
-		if(dual_path_alloc)
-		  assign flit_sel_ivc_s
-		    = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
-		else
-		  assign flit_sel_ivc_s = flit_sel_in_ivc;
-		
+		assign flit_sel_ivc_s = flit_sel_ivc;
 		c_dff
 		  #(.width(num_vcs),
 		    .reset_type(reset_type))
