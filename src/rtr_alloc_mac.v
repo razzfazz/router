@@ -336,8 +336,8 @@ module rtr_alloc_mac
 	   wire [0:num_vcs-1] 		   ivs_cred_ivc;
 	   
 	   wire [0:num_vcs_per_class-1]    ifl_next_elig_ocvc;
-	   wire [0:num_vcs_per_class-1]    ifl_almost_full_ocvc;
-	   wire [0:num_vcs_per_class-1]    ifl_full_ocvc;
+	   wire 			   ifl_almost_full;
+	   wire 			   ifl_full;
 	   wire [0:num_ports-1] 	   ifl_flit_valid_op;
 	   wire [0:num_vcs-1] 		   ifl_flit_sel_ovc;
 	   wire 			   ifl_flit_kill;
@@ -386,6 +386,13 @@ module rtr_alloc_mac
 		      .flags_op_ovc(ovs_almost_full_op_ovc),
 		      .flags_ocvc(almost_full_ocvc));
 		   
+		   wire 			almost_full;
+		   
+		   if(num_vcs_per_class == 1)
+		     assign almost_full = almost_full_ocvc;
+		   else if(num_vcs_per_class > 1)
+		     assign almost_full = |(next_elig_ocvc & almost_full_ocvc);
+		   
 		   wire [0:num_vcs_per_class-1] full_ocvc;
 		   rtr_vc_flags_mux
 		     #(.num_message_classes(num_message_classes),
@@ -398,6 +405,13 @@ module rtr_alloc_mac
 		      .route_orc(route_fast_in_orc),
 		      .flags_op_ovc(ovs_full_op_ovc),
 		      .flags_ocvc(full_ocvc));
+		   
+		   wire 			full;
+		   
+		   if(num_vcs_per_class == 1)
+		     assign full = full_ocvc;
+		   else
+		     assign full = |(next_elig_ocvc & full_ocvc);
 		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	flit_sel_orc_ocvc;
@@ -452,8 +466,8 @@ module rtr_alloc_mac
 		      .data_out(rf_route_op));
 		   
 		   assign ifl_next_elig_ocvc = next_elig_ocvc;
-		   assign ifl_almost_full_ocvc = almost_full_ocvc;
-		   assign ifl_full_ocvc = full_ocvc;
+		   assign ifl_almost_full = almost_full;
+		   assign ifl_full = full;
 		   assign ifl_flit_valid_op
 		     = (flit_head_fast_in ? route_fast_in_op : rf_route_op) & 
 		       {num_ports{flit_valid_fast_in}};
@@ -465,8 +479,8 @@ module rtr_alloc_mac
 	      else
 		begin
 		   assign ifl_next_elig_ocvc = {num_vcs_per_class{1'b0}};
-		   assign ifl_almost_full_ocvc = {num_vcs_per_class{1'b0}};
-		   assign ifl_full_ocvc = {num_vcs_per_class{1'b0}};
+		   assign ifl_almost_full = 1'b0;
+		   assign ifl_full = 1'b0;
 		   assign ifl_flit_valid_op = {num_ports{1'b0}};
 		   assign ifl_flit_sel_ovc = {num_vcs{1'b0}};
 		   assign ifl_flit_kill = 1'b0;
@@ -743,56 +757,51 @@ module rtr_alloc_mac
 		   // credit tracking for a priori check (allocated VCs)
 		   //-----------------------------------------------------------
 		   
-		   wire [0:num_vcs_per_class-1]      ovs_almost_full_ocvc;
+		   wire [0:num_vcs_per_class-1]      almost_full_ocvc;
 		   rtr_vc_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
 		       .num_vcs_per_class(num_vcs_per_class),
 		       .num_ports(num_ports))
-		   ovs_almost_full_ocvc_fmux
+		   almost_full_ocvc_fmux
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_ovc(ovs_almost_full_op_ovc),
-		      .flags_ocvc(ovs_almost_full_ocvc));
-		   
-		   wire [0:num_vcs_per_class-1]      almost_full_ocvc;
-		   
-		   if(dual_path_alloc)
-		     assign almost_full_ocvc = route_valid_in ?
-					       ovs_almost_full_ocvc :
-					       ifl_almost_full_ocvc;
-		   else
-		     assign almost_full_ocvc = ovs_almost_full_ocvc;
+		      .flags_ocvc(almost_full_ocvc));
 		   
 		   wire 			     almost_full;
-		   assign almost_full
-		     = |(allocated_next_ocvc & almost_full_ocvc);
 		   
-		   wire [0:num_vcs_per_class-1]      ovs_full_ocvc;
+		   if(dual_path_alloc)
+		     assign almost_full
+		       = route_valid_in ? 
+			 |(allocated_next_ocvc & almost_full_ocvc) : 
+			 ifl_almost_full;
+		   else
+		     assign almost_full
+		       = |(allocated_next_ocvc & almost_full_ocvc);
+		   
+		   wire [0:num_vcs_per_class-1]      full_ocvc;
 		   rtr_vc_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
 		       .num_vcs_per_class(num_vcs_per_class),
 		       .num_ports(num_ports))
-		   ovs_full_ocvc_fmux
+		   full_ocvc_fmux
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_ovc(ovs_full_op_ovc),
-		      .flags_ocvc(ovs_full_ocvc));
-		   
-		   wire [0:num_vcs_per_class-1]      full_ocvc;
-		   
-		   if(dual_path_alloc)
-		     assign full_ocvc = route_valid_in ?
-					ovs_full_ocvc :
-					ifl_full_ocvc;
-		   else
-		     assign full_ocvc = ovs_full_ocvc;
+		      .flags_ocvc(full_ocvc));
 		   
 		   wire 			     full;
-		   assign full = |(allocated_next_ocvc & full_ocvc);
+		   
+		   if(dual_path_alloc)
+		     assign full = route_valid_in ? 
+				   |(allocated_next_ocvc & full_ocvc) : 
+				   ifl_full;
+		   else
+		     assign full = |(allocated_next_ocvc & full_ocvc);
 		   
 		   // we need to track credits even when we temporarily run out 
 		   // of flits; otherwise, there can be a dead cycle when a new 
