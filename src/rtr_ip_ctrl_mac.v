@@ -1168,7 +1168,7 @@ module rtr_ip_ctrl_mac
 	begin
 	   
 	   assign route_fast_out_op = {num_ports{1'b0}};
-	   assign route_fast_out_orc = {num_vcs{1'b0}};
+	   assign route_fast_out_orc = {num_resource_classes{1'b0}};
 	   
 	   assign flit_valid_fast_out = 1'b0;
 	   assign flit_head_fast_out = 1'b0;
