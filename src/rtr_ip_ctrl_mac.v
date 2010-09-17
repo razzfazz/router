@@ -37,8 +37,8 @@ module rtr_ip_ctrl_mac
    route_out_ivc_op, route_out_ivc_orc, flit_valid_out_ivc, flit_last_out_ivc, 
    flit_head_out_ivc, flit_tail_out_ivc, route_fast_out_op, route_fast_out_orc, 
    flit_valid_fast_out, flit_head_fast_out, flit_tail_fast_out, 
-   flit_sel_fast_out_ivc, flit_data_out, flit_sel_in_ivc, flit_sel_fast_in, 
-   flit_sent_in, flow_ctrl_out, error);
+   flit_sel_fast_out_ivc, flit_data_out, flit_sel_in_ivc, flit_sent_in, 
+   flit_sel_fast_in, flit_sent_fast_in, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -282,11 +282,14 @@ module rtr_ip_ctrl_mac
    // indicate which VC is candidate for being sent
    input [0:num_vcs-1] 			     flit_sel_in_ivc;
    
+   // flit was sent
+   input 				     flit_sent_in;
+   
    //
    input 				     flit_sel_fast_in;
    
-   // flit was sent
-   input 				     flit_sent_in;
+   //
+   input 				     flit_sent_fast_in;
    
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] 	     flow_ctrl_out;
@@ -494,15 +497,18 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				  flit_sel_ivc;
+   wire [0:num_vcs-1] 				  flit_sent_in_ivc;
+   assign flit_sent_in_ivc = {num_vcs{flit_sent_in}} & flit_sel_in_ivc;
+   
+   wire [0:num_vcs-1] 				  flit_sent_fast_in_ivc;
    
    generate
       
       if(dual_path_alloc)
-	assign flit_sel_ivc
-	  = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
+	assign flit_sent_fast_in_ivc
+	  = {num_vcs{flit_sent_fast_in}} & chi_flit_sel_ivc;
       else
-	assign flit_sel_ivc = flit_sel_in_ivc;
+	assign flit_sent_fast_in_ivc = {num_vcs{1'b0}};
       
    endgenerate
    
@@ -526,8 +532,11 @@ module rtr_ip_ctrl_mac
 	   wire chi_flit_valid;
 	   assign chi_flit_valid = chi_flit_valid_ivc[ivc];
 	   
-	   wire flit_sel;
-	   assign flit_sel = flit_sel_ivc[ivc];
+	   wire flit_sent_in;
+	   assign flit_sent_in = flit_sent_in_ivc[ivc];
+	   
+	   wire flit_sent_fast_in;
+	   assign flit_sent_fast_in = flit_sent_fast_in_ivc[ivc];
 	   
 	   wire flit_sent_prev;
 	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
@@ -579,9 +588,6 @@ module rtr_ip_ctrl_mac
 	   // flit buffer
 	   //-------------------------------------------------------------------
 	   
-	   wire 			   flit_sent;
-	   assign flit_sent = flit_sent_in & flit_sel;
-	   
 	   wire 			   error_fb_underflow;
 	   wire 			   error_fb_overflow;
 	   
@@ -604,7 +610,7 @@ module rtr_ip_ctrl_mac
 	      assign push = chi_flit_valid;
 	      
 	      wire pop;
-	      assign pop = flit_sent;
+	      assign pop = flit_sent_in | flit_sent_fast_in;
 	      
 	      wire [0:fb_addr_width-1] push_addr;
 	      wire [0:fb_addr_width-1] pop_addr;
@@ -641,8 +647,14 @@ module rtr_ip_ctrl_mac
 		   if(explicit_pipeline_register == 1)
 		     assign write_enable = chi_flit_valid;
 		   else if(explicit_pipeline_register > 1)
-		     assign write_enable
-		       = chi_flit_valid & ~(empty & flit_sent);
+		     begin
+			if(dual_path_alloc)
+			  assign write_enable
+			    = chi_flit_valid & ~flit_sent_fast_in;
+			else
+			  assign write_enable
+			    = chi_flit_valid & ~(empty & flit_sent_in);
+		     end
 		   
 		   assign read_active = ~empty;
 		   
@@ -760,7 +772,7 @@ module rtr_ip_ctrl_mac
 	      assign flit_tail = reload_from_fb ? fb_flit_tail : chi_flit_tail;
 	      
 	      wire capture;
-	      assign capture = (fb_empty & chi_flit_valid) | flit_sent;
+	      assign capture = (fb_empty & chi_flit_valid) | flit_sent_in;
 	      
 	      wire flit_head_s, flit_head_q;
 	      assign flit_head_s = capture ? flit_head : flit_head_q;
@@ -807,7 +819,7 @@ module rtr_ip_ctrl_mac
 	   // track header information for frontmost packet
 	   //-------------------------------------------------------------------
 	   
-	   wire    hit_valid;
+	   wire hit_valid;
 	   wire [0:la_route_info_width-1] hit_la_route_info;
 	   wire [0:route_info_width-1] 	  hit_route_info;
 	   
@@ -819,13 +831,24 @@ module rtr_ip_ctrl_mac
 	      assign valid_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire valid_s, valid_q;
-	      assign valid_s
-		= valid_q ?
-		  (~flit_sent | 
-		   (fb_empty ? 
-		    ~chi_flit_tail : 
-		    (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) : 
-		  (chi_flit_valid & (~chi_flit_tail | ~flit_sent));
+	      
+	      if(dual_path_alloc)
+		assign valid_s
+		  = valid_q ?
+		    (fb_empty ? 
+		     (~flit_sent_fast_in | ~chi_flit_tail) : 
+		     (~flit_sent_in | ~htt_flit_tail | ~fb_almost_empty | 
+		      chi_flit_valid)) : 
+		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent_fast_in));
+	      else
+		assign valid_s
+		  = valid_q ?
+		    (~flit_sent_in |
+		     (fb_empty ?
+		      ~chi_flit_tail :
+		      (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) :
+		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent_in));
+	      
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type))
@@ -842,7 +865,7 @@ module rtr_ip_ctrl_mac
 	      
 	      wire capture;
 	      assign capture = (~valid_q & chi_flit_valid) |
-			       (flit_sent & ~fb_empty & htt_flit_tail & 
+			       (flit_sent_in & ~fb_empty & htt_flit_tail & 
 				(~fb_almost_empty | chi_flit_valid));
 	      
 	      wire reload_from_fb;
@@ -1187,7 +1210,22 @@ module rtr_ip_ctrl_mac
    wire alloc_active;
    assign alloc_active = chi_flit_valid | ~&fb_empty_ivc;
    
+   wire [0:num_vcs-1] flit_sel_ivc;
+   wire 	      flit_sent;
+   
    generate
+      
+      if(dual_path_alloc)
+	begin
+	   assign flit_sel_ivc
+	     = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
+	   assign flit_sent = flit_sent_in | flit_sent_fast_in;
+	end
+      else
+	begin
+	   assign flit_sel_ivc = flit_sel_in_ivc;
+	   assign flit_sent = flit_sent_in;
+	end
       
       if(explicit_pipeline_register)
 	begin
@@ -1241,7 +1279,7 @@ module rtr_ip_ctrl_mac
 	   wire flit_sent_active;
 	   
 	   wire flit_sent_s, flit_sent_q;
-	   assign flit_sent_s = flit_sent_in;
+	   assign flit_sent_s = flit_sent;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -1331,7 +1369,7 @@ module rtr_ip_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(alloc_active),
-      .fc_event_valid_in(flit_sent_in),
+      .fc_event_valid_in(flit_sent),
       .fc_event_sel_in_ivc(flit_sel_ivc),
       .flow_ctrl_out(flow_ctrl_out));
    

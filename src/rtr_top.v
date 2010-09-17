@@ -207,8 +207,9 @@ module rtr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs-1] 	  alo_flit_sel_ip_ivc;
-   wire [0:num_ports-1] 		  alo_flit_sel_fast_ip;
    wire [0:num_ports-1] 		  alo_flit_sent_ip;
+   wire [0:num_ports-1] 		  alo_flit_sel_fast_ip;
+   wire [0:num_ports-1] 		  alo_flit_sent_fast_ip;
    
    wire [0:num_ports*num_vcs-1] 	  ipc_route_valid_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] ipc_route_ip_ivc_op;
@@ -246,11 +247,14 @@ module rtr_top
 	   assign alo_flit_sel_ivc
 	     = alo_flit_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
+	   wire 		    alo_flit_sent;
+	   assign alo_flit_sent = alo_flit_sent_ip[ip];
+	   
 	   wire 		    alo_flit_sel_fast;
 	   assign alo_flit_sel_fast = alo_flit_sel_fast_ip[ip];
 	   
-	   wire 		    alo_flit_sent;
-	   assign alo_flit_sent = alo_flit_sent_ip[ip];
+	   wire 		    alo_flit_sent_fast;
+	   assign alo_flit_sent_fast = alo_flit_sent_fast_ip[ip];
 	   
 	   wire [0:num_vcs-1] 	    ipc_route_valid_ivc;
 	   wire [0:num_vcs*num_ports-1] ipc_route_ivc_op;
@@ -311,8 +315,9 @@ module rtr_top
 	      .flit_sel_fast_out_ivc(ipc_flit_sel_fast_ivc),
 	      .flit_data_out(ipc_flit_data),
 	      .flit_sel_in_ivc(alo_flit_sel_ivc),
-	      .flit_sel_fast_in(alo_flit_sel_fast),
 	      .flit_sent_in(alo_flit_sent),
+	      .flit_sel_fast_in(alo_flit_sel_fast),
+	      .flit_sent_fast_in(alo_flit_sent_fast),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
@@ -411,8 +416,9 @@ module rtr_top
       .flit_tail_fast_in_ip(ipc_flit_tail_fast_ip),
       .flit_sel_fast_in_ip_ivc(ipc_flit_sel_fast_ip_ivc),
       .flit_sel_out_ip_ivc(alo_flit_sel_ip_ivc),
-      .flit_sel_fast_out_ip(alo_flit_sel_fast_ip),
       .flit_sent_out_ip(alo_flit_sent_ip),
+      .flit_sel_fast_out_ip(alo_flit_sel_fast_ip),
+      .flit_sent_fast_out_ip(alo_flit_sent_fast_ip),
       .flit_sel_out_op_ip(alo_flit_sel_op_ip),
       .empty_out_op(alo_empty_op),
       .flit_valid_out_op(alo_flit_valid_op),
