@@ -1180,8 +1180,7 @@ module rtr_ip_ctrl_mac
 	   assign route_fast_out_op = gld_route_op;
 	   assign route_fast_out_orc = gld_route_orc;
 	   
-	   assign flit_valid_fast_out
-	     = chi_flit_valid & |(chi_flit_sel_ivc & fb_empty_ivc);
+	   assign flit_valid_fast_out = chi_flit_valid;
 	   assign flit_head_fast_out = chi_flit_head;
 	   assign flit_tail_fast_out = chi_flit_tail;
 	   assign flit_sel_fast_out_ivc = chi_flit_sel_ivc;

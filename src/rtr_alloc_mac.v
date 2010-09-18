@@ -907,7 +907,8 @@ module rtr_alloc_mac
 	      wire 		 flit_sel_fast;
 	      
 	      if(dual_path_alloc)
-		assign flit_sel_fast = ~|req_ivc;
+		assign flit_sel_fast
+		  = ~|(req_ivc | (flit_valid_in_ivc & flit_sel_fast_in_ivc));
 	      else
 		assign flit_sel_fast = 1'b0;
 	      
