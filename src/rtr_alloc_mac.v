@@ -1378,9 +1378,10 @@ module rtr_alloc_mac
 			assign flit_head_fast_in = flit_head_fast_in_ip[ip];
 			
 			wire [0:num_vcs-1] flit_sel_ovc;
-			assign flit_sel_ovc
-			  = ifl_flit_sel_ovc & 
-			    ({num_vcs{~flit_head_fast_in}} | nvs_next_elig_ovc);
+			assign flit_sel_ovc = ifl_flit_sel_ovc & 
+					      (flit_head_fast_in ? 
+					       nvs_next_elig_ovc : 
+					       ~ovs_full_ovc);
 			
 			assign flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1]
 			  = flit_sel_ovc;
