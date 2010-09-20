@@ -44,9 +44,6 @@ module c_multi_hot_det
    // number of reduction levels required
    localparam num_levels = clogb(width);
    
-   // smallest power-of-two width that is greater than or equal to width
-   localparam ext_width = (1 << num_levels);
-   
    // input data
    input [0:width-1] data;
    
@@ -67,12 +64,13 @@ module c_multi_hot_det
 	begin
 	   
 	   // connections between levels
-	   wire [0:(2*ext_width-1)-1] connections;
+	   wire [0:((2 << num_levels)-1)-1] connections;
 	   
 	   // for first stage input, zero-extend data to power-of-two width
 	   assign connections[0:width-1] = data;
-	   if(ext_width > width)
-	     assign connections[width:ext_width-1] = {(ext_width-width){1'b0}};
+	   if((1 << num_levels) > width)
+	     assign connections[width:(1 << num_levels)-1]
+	       = {(1 << num_levels){1'b0}};
 	   
 	   // bit for each level indicating whether multiple bits are set
 	   wire [0:num_levels-1]  level_multi_hot;
@@ -82,17 +80,19 @@ module c_multi_hot_det
    	   for(level = 0; level < num_levels; level = level + 1)
 	     begin:levels
 		
-		wire [0:(ext_width/(1 << level))-1] data;
-		assign data
-		  = connections[((2*ext_width)-(2*ext_width/(1 << level))):
-				((2*ext_width)-(ext_width/(1 << level)))-1];
+		wire [0:((1 << num_levels)/(1 << level))-1] data;
+		assign data = connections[((2 << num_levels)-
+					   (2 << (num_levels - level))):
+					  ((2 << num_levels)-
+					   (1 << (num_levels - level)))-1];
 		
-		wire [0:(ext_width/(2 << level))-1] both_set;
-		wire [0:(ext_width/(2 << level))-1] any_set;
+		wire [0:(1 << (num_levels - level - 1))-1]  both_set;
+		wire [0:(1 << (num_levels - level - 1))-1]  any_set;
 		
-		genvar 				    pair;
+		genvar 					    pair;
 		
-		for(pair = 0; pair < (ext_width/(2 << level)); pair = pair + 1)
+		for(pair = 0; pair < (1 << (num_levels - level - 1)); 
+		    pair = pair + 1)
 		  begin:pairs
 		     
 		     assign both_set[pair] = &data[pair*2:pair*2+1];
@@ -102,8 +102,10 @@ module c_multi_hot_det
 		
 		assign level_multi_hot[level] = |both_set;
 		
-		assign connections[((2*ext_width)-(ext_width/(1 << level))):
-				   ((2*ext_width)-(ext_width/(2 << level)))-1]
+		assign connections[((2 << num_levels)-
+				    (1 << (num_levels - level))):
+				   ((2 << num_levels)-
+				    (1 << (num_levels - level - 1)))-1]
 		  = any_set;
 		
 	     end
