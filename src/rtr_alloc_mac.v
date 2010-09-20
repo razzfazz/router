@@ -309,9 +309,6 @@ module rtr_alloc_mac
 		wire 				flit_valid_in;
 		assign flit_valid_in = flit_valid_in_ivc[ivc];
 		
-		wire 				flit_head_in;
-		assign flit_head_in = flit_head_in_ivc[ivc];
-		
 		wire 				flit_tail_in;
 		assign flit_tail_in = flit_tail_in_ivc[ivc];
 		
@@ -422,19 +419,21 @@ module rtr_alloc_mac
 		      .flags_op_ovc(nvs_next_elig_op_ovc),
 		      .flags_ocvc(next_elig_ocvc));
 		   
-		   wire 			  flit_kill;
-		   assign flit_kill = flit_head_in & ~|next_elig_ocvc;
-		   
 		   wire [0:num_vcs_per_class-1]   allocated_ocvc_q;
+		   
+		   wire 			  allocated;
+		   assign allocated = |allocated_ocvc_q;
 		   
 		   wire [0:num_vcs_per_class-1]   allocated_next_ocvc;
 		   assign allocated_next_ocvc
-		     = flit_head_in ? next_elig_ocvc : allocated_ocvc_q;
+		     = allocated ? allocated_ocvc_q : next_elig_ocvc;
 		   
 		   wire [0:num_vcs_per_class-1]   allocated_ocvc_s;
 		   assign allocated_ocvc_s
-		     = allocated_next_ocvc & 
-		       ~{num_vcs_per_class{flit_sent & flit_tail_in}};
+		     = flit_sent ? 
+		       (allocated_next_ocvc & 
+			~{num_vcs_per_class{flit_tail_in}}) :
+		       allocated_ocvc_q;
 		   c_dff
 		     #(.width(num_vcs_per_class),
 		       .reset_type(reset_type))
@@ -445,13 +444,16 @@ module rtr_alloc_mac
 		      .d(allocated_ocvc_s),
 		      .q(allocated_ocvc_q));
 		   
+		   wire 			  flit_kill;
+		   assign flit_kill = ~allocated & ~|next_elig_ocvc;
+		   
 		   wire [0:num_vcs_per_class-1]   flit_sel_ocvc;
 		   
 		   if(num_vcs_per_class == 1)
 		     assign flit_sel_ocvc = 1'b1;
 		   else if(num_vcs_per_class > 1)
 		     assign flit_sel_ocvc
-		       = allocated_ocvc_q | {num_vcs_per_class{flit_head_in}};
+		       = allocated_ocvc_q | ~{num_vcs_per_class{allocated}};
 		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	  flit_sel_orc_ocvc;
@@ -533,7 +535,7 @@ module rtr_alloc_mac
 		   // free-running register!
 		   
 		   wire 			  cred_active;
-		   assign cred_active = flit_valid_in | (|allocated_ocvc_q);
+		   assign cred_active = flit_valid_in | allocated;
 		   
 		   // NOTE: Since we only use 'cred_q' once the VC is
 		   // allocated, we can ignore 'flit_kill' here -- if the flit
