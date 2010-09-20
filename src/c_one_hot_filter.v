@@ -58,7 +58,6 @@ module c_one_hot_filter
 	   wire [0:num_priorities-1] enable_prio;
 	   assign enable_prio[0] = 1'b1;
 	   
-	   wire [0:num_priorities-1] any_for_prio;
 	   wire [0:num_priorities*width-1] data_by_prio;
 	   
 	   genvar 			   prio;
@@ -83,7 +82,7 @@ module c_one_hot_filter
 		     if(pos < (width - 1))
 		       assign others[pos:(width-1)-1] = data[(pos+1):width-1];
 		     
-		     assign data_by_prio[pos] = data[pos] & ~|others;
+		     assign data_by_prio[prio*width+pos] = data[pos] & ~|others;
 		     
 		  end
 		
