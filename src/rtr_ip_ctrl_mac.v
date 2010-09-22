@@ -200,9 +200,6 @@ module rtr_ip_ctrl_mac
    // required address size for a single VC's buffer
    localparam fb_addr_width = clogb(num_flits_per_vc);
    
-   // total number of bits of header information required for each VC
-   localparam hit_width = la_route_info_width + route_info_width;
-   
    
    //---------------------------------------------------------------------------
    // interface
