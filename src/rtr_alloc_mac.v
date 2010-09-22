@@ -1333,46 +1333,15 @@ module rtr_alloc_mac
 	      if(dual_path_alloc)
 		begin
 		   
-		   wire [0:num_ports-1] req_hi_ip;
-		   assign req_hi_ip = ifl_flit_valid_ip & ~flit_head_fast_in_ip;
-		   
-		   wire [0:num_ports-1] req_lo_ip;
-		   assign req_lo_ip = ifl_flit_valid_ip;
-		   
-		   // NOTE: If a head flit wins output arbitration, but the 
-		   // subsequent check for an eligible output VC to go to 
-		   // fails, we still update the arbiter. This is so  we don't 
-		   // get stuck on a single VC that is unable to acquire an 
-		   // output VC trying over and over again to the exclusion of 
-		   // all others.
-		   
-		   wire 		flit_sent;
-		   assign flit_sent = |ifl_flit_valid_ip;
-		   
-		   wire 		update;
-		   assign update = flit_sent;
+		   wire [0:num_ports-1] req_ip;
+		   assign req_ip = ifl_flit_valid_ip;
 		   
 		   wire [0:num_ports-1] gnt_ip;
-		   c_arbiter
-		     #(.num_ports(num_ports),
-		       .num_priorities(2),
-		       .arbiter_type(sw_alloc_arbiter_type),
-		       .reset_type(reset_type))
-		   oarb
-		     (.clk(clk),
-		      .reset(reset),
-		      .active(active),
-		      .req({req_hi_ip, req_lo_ip}),
-		      .gnt(gnt_ip),
-		      .update(update));
-		   
-		   assign ofl_flit_sent_ip
-		     = gnt_ip & {num_ports{~oal_flit_sent}};
-		   assign ofl_flit_sent = flit_sent & ~oal_flit_sent;
-		   assign ofl_flit_head
-		     = |(gnt_ip & flit_head_fast_in_ip) & ~oal_flit_sent;
-		   assign ofl_flit_tail
-		     = |(gnt_ip & flit_tail_fast_in_ip) & ~oal_flit_sent;
+		   c_one_hot_filter
+		     #(.width(num_ports))
+		   oohf
+		     (.data_in(req_ip),
+		      .data_out(gnt_ip));
 		   
 		   wire [0:num_ports*num_vcs-1] flit_sel_ip_ovc;
 		   
@@ -1408,6 +1377,13 @@ module rtr_alloc_mac
 		      .data_in(flit_sel_ip_ovc),
 		      .data_out(flit_sel_ovc));
 		   
+		   assign ofl_flit_sent_ip
+		     = gnt_ip & {num_ports{~oal_flit_sent}};
+		   assign ofl_flit_sent = |req_ip & ~oal_flit_sent;
+		   assign ofl_flit_head
+		     = |(gnt_ip & flit_head_fast_in_ip) & ~oal_flit_sent;
+		   assign ofl_flit_tail
+		     = |(gnt_ip & flit_tail_fast_in_ip) & ~oal_flit_sent;
 		   assign ofl_flit_sel_ovc
 		     = flit_sel_ovc & {num_vcs{~oal_flit_sent}};
 		   
