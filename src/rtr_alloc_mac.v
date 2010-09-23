@@ -709,6 +709,14 @@ module rtr_alloc_mac
 		end
 	      
 	      wire [0:num_ports-1] flit_valid_op;
+	      c_select_mofn
+		#(.num_ports(num_vcs),
+		  .width(num_ports))
+	      flit_valid_op_sel
+		(.select(gnt_ivc),
+		 .data_in(rf_route_ivc_op),
+		 .data_out(flit_valid_op));
+	      
 	      wire 		   flit_head;
 	      wire 		   flit_tail;
 	      wire [0:num_vcs-1]   flit_sel_ovc;
@@ -716,7 +724,6 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs == 1)
 		begin
-		   assign flit_valid_op = rf_route_ivc_op;
 		   assign flit_head = flit_head_in_ivc;
 		   assign flit_tail = flit_tail_in_ivc;
 		   assign flit_sel_ovc = 1'b1;
@@ -724,14 +731,6 @@ module rtr_alloc_mac
 		end
 	      else if(num_vcs > 1)
 		begin
-		   
-		   c_select_mofn
-		     #(.num_ports(num_vcs),
-		       .width(num_ports))
-		   flit_valid_op_sel
-		     (.select(gnt_ivc),
-		      .data_in(rf_route_ivc_op),
-		      .data_out(flit_valid_op));
 		   
 		   assign flit_head = |(gnt_ivc & flit_head_in_ivc);
 		   assign flit_tail = |(gnt_ivc & flit_tail_in_ivc);
