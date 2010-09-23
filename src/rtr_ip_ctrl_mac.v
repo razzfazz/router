@@ -736,10 +736,12 @@ module rtr_ip_ctrl_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire    hit_valid;
-	   wire [0:la_route_info_width-1] hit_la_route_info;
-	   wire [0:route_info_width-1] 	  hit_route_info;
+	   wire [0:num_ports-1] hit_route_op;
+	   wire [0:num_resource_classes-1] hit_route_orc;
+	   wire [0:la_route_info_width-1]  hit_la_route_info;
+	   wire [0:route_info_width-1] 	   hit_route_info;
 	   
-	   wire 			  error_no_header;
+	   wire 			   error_no_header;
 	   
 	   begin:hit
 	      
@@ -809,29 +811,10 @@ module rtr_ip_ctrl_mac
 		 .d(route_info_s),
 		 .q(route_info_q));
 	      
-	      assign hit_valid = valid_q;
-	      assign hit_la_route_info = la_route_info_q;
-	      assign hit_route_info = route_info_q;
+	      wire [0:port_idx_width-1]      route_port;
+	      assign route_port = la_route_info_q[0:port_idx_width-1];
 	      
-	      assign error_no_header
-		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
-	      
-	   end
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // local lookahead routing information decoder
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_ports-1] 	  lld_route_op;
-	   wire [0:num_resource_classes-1] lld_route_orc;
-	   
-	   begin:lld
-	      
-	      wire [0:port_idx_width-1] route_port;
-	      assign route_port = hit_la_route_info[0:port_idx_width-1];
-	      
-	      wire [0:num_ports-1] 	route_op;
+	      wire [0:num_ports-1] 	     route_op;
 	      c_decode
 		#(.num_ports(num_ports))
 	      route_op_dec
@@ -847,9 +830,9 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:resource_class_idx_width-1] route_rcsel;
 		   assign route_rcsel
-		     = hit_la_route_info[port_idx_width:
-					 port_idx_width+
-					 resource_class_idx_width-1];
+		     = la_route_info_q[port_idx_width:
+				       port_idx_width+
+				       resource_class_idx_width-1];
 		   
 		   c_decode
 		     #(.num_ports(num_resource_classes))
@@ -859,8 +842,14 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      assign lld_route_op = route_op;
-	      assign lld_route_orc = route_orc;
+	      assign hit_valid = valid_q;
+	      assign hit_route_op = route_op;
+	      assign hit_route_orc = route_orc;
+	      assign hit_la_route_info = la_route_info_q;
+	      assign hit_route_info = route_info_q;
+	      
+	      assign error_no_header
+		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
 	      
 	   end
 	   
@@ -870,11 +859,11 @@ module rtr_ip_ctrl_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] 		       route_unmasked_op;
-	   assign route_unmasked_op = hit_valid ? lld_route_op : gld_route_op;
+	   assign route_unmasked_op = hit_valid ? hit_route_op : gld_route_op;
 	   
 	   wire [0:num_resource_classes-1] 	       route_unmasked_orc;
 	   assign route_unmasked_orc
-	     = hit_valid ? lld_route_orc : gld_route_orc;
+	     = hit_valid ? hit_route_orc : gld_route_orc;
 	   
 	   wire 				       route_valid;
 	   assign route_valid = hit_valid | chi_flit_valid;
@@ -953,7 +942,7 @@ module rtr_ip_ctrl_mac
 	      rtl
 		(.router_address(next_router_address),
 		 .sel_mc(sel_mc),
-		 .sel_irc(lld_route_orc),
+		 .sel_irc(hit_route_orc),
 		 .route_info(hit_route_info),
 		 .route_op(route_op),
 		 .route_orc(route_orc));
