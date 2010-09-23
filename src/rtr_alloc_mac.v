@@ -1343,6 +1343,16 @@ module rtr_alloc_mac
 		     (.data_in(req_ip),
 		      .data_out(gnt_ip));
 		   
+		   wire 		multi_hot;
+		   c_multi_hot_det
+		     #(.width(num_ports))
+		   omhd
+		     (.data(req_ip),
+		      .multi_hot(multi_hot));
+		   
+		   wire 		flit_sent;
+		   assign flit_sent = |req_ip & ~multi_hot;
+		   
 		   wire [0:num_ports*num_vcs-1] flit_sel_ip_ovc;
 		   
 		   genvar 			ip;
@@ -1379,11 +1389,11 @@ module rtr_alloc_mac
 		   
 		   assign ofl_flit_sent_ip
 		     = gnt_ip & {num_ports{~oal_flit_sent}};
-		   assign ofl_flit_sent = |req_ip & ~oal_flit_sent;
+		   assign ofl_flit_sent = flit_sent & ~oal_flit_sent;
 		   assign ofl_flit_head
-		     = |(gnt_ip & flit_head_fast_in_ip) & ~oal_flit_sent;
+		     = |(req_ip & flit_head_fast_in_ip) & ~oal_flit_sent;
 		   assign ofl_flit_tail
-		     = |(gnt_ip & flit_tail_fast_in_ip) & ~oal_flit_sent;
+		     = |(req_ip & flit_tail_fast_in_ip) & ~oal_flit_sent;
 		   assign ofl_flit_sel_ovc
 		     = flit_sel_ovc & {num_vcs{~oal_flit_sent}};
 		   
