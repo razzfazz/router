@@ -795,22 +795,6 @@ module rtr_ip_ctrl_mac
 		 .d(la_route_info_s),
 		 .q(la_route_info_q));
 	      
-	      wire [0:route_info_width-1]    route_info;
-	      assign route_info
-		= reload_from_fb ? fb_route_info : chi_route_info;
-	      
-	      wire [0:route_info_width-1]    route_info_s, route_info_q;
-	      assign route_info_s = capture ? route_info : route_info_q;
-	      c_dff
-		#(.width(route_info_width),
-		  .reset_type(reset_type))
-	      route_infoq
-		(.clk(clk),
-		 .reset(1'b0),
-		 .active(active),
-		 .d(route_info_s),
-		 .q(route_info_q));
-	      
 	      wire [0:port_idx_width-1]      route_port;
 	      assign route_port = la_route_info_q[0:port_idx_width-1];
 	      
@@ -841,6 +825,22 @@ module rtr_ip_ctrl_mac
 		      .data_out(route_orc));
 		   
 		end
+	      
+	      wire [0:route_info_width-1]    route_info;
+	      assign route_info
+		= reload_from_fb ? fb_route_info : chi_route_info;
+	      
+	      wire [0:route_info_width-1]    route_info_s, route_info_q;
+	      assign route_info_s = capture ? route_info : route_info_q;
+	      c_dff
+		#(.width(route_info_width),
+		  .reset_type(reset_type))
+	      route_infoq
+		(.clk(clk),
+		 .reset(1'b0),
+		 .active(active),
+		 .d(route_info_s),
+		 .q(route_info_q));
 	      
 	      assign hit_valid = valid_q;
 	      assign hit_route_op = route_op;
