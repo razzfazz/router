@@ -778,13 +778,13 @@ module rtr_ip_ctrl_mac
 	      wire reload_from_fb;
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire [0:la_route_info_width-1] la_route_info;
-	      assign la_route_info
+	      wire [0:la_route_info_width-1] next_la_route_info;
+	      assign next_la_route_info
 		= reload_from_fb ? fb_la_route_info : chi_la_route_info;
 	      
 	      wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
 	      assign la_route_info_s
-		= capture ? la_route_info : la_route_info_q;
+		= capture ? next_la_route_info : la_route_info_q;
 	      c_dff
 		#(.width(la_route_info_width),
 		  .reset_type(reset_type))
@@ -826,12 +826,12 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      wire [0:route_info_width-1]    route_info;
-	      assign route_info
+	      wire [0:route_info_width-1]    next_route_info;
+	      assign next_route_info
 		= reload_from_fb ? fb_route_info : chi_route_info;
 	      
 	      wire [0:route_info_width-1]    route_info_s, route_info_q;
-	      assign route_info_s = capture ? route_info : route_info_q;
+	      assign route_info_s = capture ? next_route_info : route_info_q;
 	      c_dff
 		#(.width(route_info_width),
 		  .reset_type(reset_type))
