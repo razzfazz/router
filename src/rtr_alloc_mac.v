@@ -1198,9 +1198,6 @@ module rtr_alloc_mac
 	   wire empty_out;
 	   assign empty_out_op[op] = empty_out;
 	   
-	   wire [0:num_vcs-1] ovs_full_ovc;
-	   assign ovs_full_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = ovs_full_ovc;
-	   
 	   wire [0:num_vcs-1] nvs_next_elig_ovc;
 	   assign nvs_next_elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
 		    = nvs_next_elig_ovc;
@@ -1367,10 +1364,9 @@ module rtr_alloc_mac
 			assign flit_head_fast_in = flit_head_fast_in_ip[ip];
 			
 			wire [0:num_vcs-1] flit_sel_ovc;
-			assign flit_sel_ovc = ifl_flit_sel_ovc & 
-					      (flit_head_fast_in ? 
-					       nvs_next_elig_ovc : 
-					       ~ovs_full_ovc);
+			assign flit_sel_ovc
+			  = ifl_flit_sel_ovc & 
+			    ({num_vcs{~flit_head_fast_in}} | nvs_next_elig_ovc);
 			
 			assign flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1]
 			  = flit_sel_ovc;
@@ -1543,7 +1539,7 @@ module rtr_alloc_mac
 		assign ovs_almost_full_op_ovc[op*num_vcs+ovc] = ovs_almost_full;
 		
 		wire ovs_full;
-		assign ovs_full_ovc[ovc] = ovs_full;
+		assign ovs_full_op_ovc[op*num_vcs+ovc] = ovs_full;
 		
 		wire [0:1] ovs_errors;
 		assign ovs_errors_op_ovc[(op*num_vcs+ovc)*2:
