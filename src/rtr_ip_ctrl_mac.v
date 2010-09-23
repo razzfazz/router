@@ -874,47 +874,142 @@ module rtr_ip_ctrl_mac
 	      assign next_la_route_info
 		= reload_from_fb ? fb_la_route_info : chi_la_route_info;
 	      
-	      wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
-	      assign la_route_info_s
-		= capture ? next_la_route_info : la_route_info_q;
-	      c_dff
-		#(.width(la_route_info_width),
-		  .reset_type(reset_type))
-	      la_route_infoq
-		(.clk(clk),
-		 .reset(1'b0),
-		 .active(active),
-		 .d(la_route_info_s),
-		 .q(la_route_info_q));
-	      
-	      wire [0:port_idx_width-1]      route_port;
-	      assign route_port = la_route_info_q[0:port_idx_width-1];
-	      
 	      wire [0:num_ports-1] 	     route_op;
-	      c_decode
-		#(.num_ports(num_ports))
-	      route_op_dec
-		(.data_in(route_port),
-		 .data_out(route_op));
-	      
 	      wire [0:num_resource_classes-1] route_orc;
+	      wire [0:la_route_info_width-1]  la_route_info;
 	      
-	      if(num_resource_classes == 1)
-		assign route_orc = 1'b1;
-	      else if(num_resource_classes > 1)
+	      if(dual_path_alloc)
 		begin
 		   
-		   wire [0:resource_class_idx_width-1] route_rcsel;
-		   assign route_rcsel
-		     = la_route_info_q[port_idx_width:
-				       port_idx_width+
-				       resource_class_idx_width-1];
+		   wire [0:port_idx_width-1] next_route_port;
+		   assign next_route_port
+		     = next_la_route_info[0:port_idx_width-1];
+		   
+		   wire [0:num_ports-1]      next_route_op;
+		   c_decode
+		     #(.num_ports(num_ports))
+		   next_route_op_dec
+		     (.data_in(next_route_port),
+		      .data_out(next_route_op));
+		   
+		   wire [0:num_ports-1]      route_op_s, route_op_q;
+		   assign route_op_s = capture ? next_route_op : route_op_q;
+		   c_dff
+		     #(.width(num_ports),
+		       .reset_type(reset_type))
+		   next_route_opq
+		     (.clk(clk),
+		      .reset(1'b0),
+		      .active(active),
+		      .d(route_op_s),
+		      .q(route_op_q));
+		   
+		   assign route_op = route_op_q;
+		   
+		   wire [0:port_idx_width-1] route_port;
+		   c_encode
+		     #(.num_ports(num_ports))
+		   route_port_enc
+		     (.data_in(route_op_q),
+		      .data_out(route_port));
+		   
+		   assign la_route_info[0:port_idx_width-1] = route_port;
+		   
+		   if(num_resource_classes == 1)
+		     assign route_orc = 1'b1;
+		   else if(num_resource_classes > 1)
+		     begin
+			
+			wire [0:resource_class_idx_width-1] next_route_rcsel;
+			assign next_route_rcsel
+			  = next_la_route_info[port_idx_width:
+					       port_idx_width+
+					       resource_class_idx_width-1];
+			
+			wire [0:num_resource_classes-1]     next_route_orc;
+			c_decode
+			  #(.num_ports(num_resource_classes))
+			next_route_orc_dec
+			  (.data_in(next_route_rcsel),
+			   .data_out(next_route_orc));
+			
+			wire [0:num_resource_classes-1]     route_orc_s;
+			wire [0:num_resource_classes-1]     route_orc_q;
+			assign route_orc_s
+			  = capture ? next_route_orc : route_orc_q;
+			c_dff
+			  #(.width(num_resource_classes),
+			    .reset_type(reset_type))
+			route_orcq
+			  (.clk(clk),
+			   .reset(1'b0),
+			   .active(active),
+			   .d(route_orc_s),
+			   .q(route_orc_q));
+			
+			assign route_orc = route_orc_q;
+			
+			wire [0:resource_class_idx_width-1] route_rcsel;
+			c_encode
+			  #(.num_ports(num_resource_classes))
+			route_rcsel_enc
+			  (.data_in(route_orc_q),
+			   .data_out(route_rcsel));
+			
+			assign la_route_info[port_idx_width:
+					     port_idx_width+
+					     resource_class_idx_width-1]
+			  = route_rcsel;
+			
+		     end
+		   
+		end
+	      else
+		begin
+		   
+		   wire [0:la_route_info_width-1] la_route_info_s;
+		   wire [0:la_route_info_width-1] la_route_info_q;
+		   assign la_route_info_s
+		     = capture ? next_la_route_info : la_route_info_q;
+		   c_dff
+		     #(.width(la_route_info_width),
+		       .reset_type(reset_type))
+		   la_route_infoq
+		     (.clk(clk),
+		      .reset(1'b0),
+		      .active(active),
+		      .d(la_route_info_s),
+		      .q(la_route_info_q));
+		   
+		   assign la_route_info = la_route_info_q;
+		   
+		   wire [0:port_idx_width-1] 	  route_port;
+		   assign route_port = la_route_info_q[0:port_idx_width-1];
 		   
 		   c_decode
-		     #(.num_ports(num_resource_classes))
-		   route_orc_dec
-		     (.data_in(route_rcsel),
-		      .data_out(route_orc));
+		     #(.num_ports(num_ports))
+		   route_op_dec
+		     (.data_in(route_port),
+		      .data_out(route_op));
+		   
+		   if(num_resource_classes == 1)
+		     assign route_orc = 1'b1;
+		   else if(num_resource_classes > 1)
+		     begin
+			
+			wire [0:resource_class_idx_width-1] route_rcsel;
+			assign route_rcsel
+			  = la_route_info_q[port_idx_width:
+					    port_idx_width+
+					    resource_class_idx_width-1];
+			
+			c_decode
+			  #(.num_ports(num_resource_classes))
+			route_orc_dec
+			  (.data_in(route_rcsel),
+			   .data_out(route_orc));
+			
+		     end
 		   
 		end
 	      
@@ -937,7 +1032,7 @@ module rtr_ip_ctrl_mac
 	      assign hit_valid = valid_q;
 	      assign hit_route_op = route_op;
 	      assign hit_route_orc = route_orc;
-	      assign hit_la_route_info = la_route_info_q;
+	      assign hit_la_route_info = la_route_info;
 	      assign hit_route_info = route_info_q;
 	      
 	      assign error_no_header
