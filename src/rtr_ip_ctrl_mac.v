@@ -817,10 +817,12 @@ module rtr_ip_ctrl_mac
 	   //-------------------------------------------------------------------
 	   
 	   wire hit_valid;
-	   wire [0:la_route_info_width-1] hit_la_route_info;
-	   wire [0:route_info_width-1] 	  hit_route_info;
+	   wire [0:num_ports-1] hit_route_op;
+	   wire [0:num_resource_classes-1] hit_route_orc;
+	   wire [0:la_route_info_width-1]  hit_la_route_info;
+	   wire [0:route_info_width-1] 	   hit_route_info;
 	   
-	   wire 			  error_no_header;
+	   wire 			   error_no_header;
 	   
 	   begin:hit
 	      
@@ -868,13 +870,13 @@ module rtr_ip_ctrl_mac
 	      wire reload_from_fb;
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire [0:la_route_info_width-1] la_route_info;
-	      assign la_route_info
+	      wire [0:la_route_info_width-1] next_la_route_info;
+	      assign next_la_route_info
 		= reload_from_fb ? fb_la_route_info : chi_la_route_info;
 	      
 	      wire [0:la_route_info_width-1] la_route_info_s, la_route_info_q;
 	      assign la_route_info_s
-		= capture ? la_route_info : la_route_info_q;
+		= capture ? next_la_route_info : la_route_info_q;
 	      c_dff
 		#(.width(la_route_info_width),
 		  .reset_type(reset_type))
@@ -885,45 +887,10 @@ module rtr_ip_ctrl_mac
 		 .d(la_route_info_s),
 		 .q(la_route_info_q));
 	      
-	      wire [0:route_info_width-1]    route_info;
-	      assign route_info
-		= reload_from_fb ? fb_route_info : chi_route_info;
+	      wire [0:port_idx_width-1]      route_port;
+	      assign route_port = la_route_info_q[0:port_idx_width-1];
 	      
-	      wire [0:route_info_width-1]    route_info_s, route_info_q;
-	      assign route_info_s = capture ? route_info : route_info_q;
-	      c_dff
-		#(.width(route_info_width),
-		  .reset_type(reset_type))
-	      route_infoq
-		(.clk(clk),
-		 .reset(1'b0),
-		 .active(active),
-		 .d(route_info_s),
-		 .q(route_info_q));
-	      
-	      assign hit_valid = valid_q;
-	      assign hit_la_route_info = la_route_info_q;
-	      assign hit_route_info = route_info_q;
-	      
-	      assign error_no_header
-		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
-	      
-	   end
-	   
-	   
-	   //-------------------------------------------------------------------
-	   // local lookahead routing information decoder
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_ports-1] 	  lld_route_op;
-	   wire [0:num_resource_classes-1] lld_route_orc;
-	   
-	   begin:lld
-	      
-	      wire [0:port_idx_width-1] route_port;
-	      assign route_port = hit_la_route_info[0:port_idx_width-1];
-	      
-	      wire [0:num_ports-1] 	route_op;
+	      wire [0:num_ports-1] 	     route_op;
 	      c_decode
 		#(.num_ports(num_ports))
 	      route_op_dec
@@ -939,9 +906,9 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:resource_class_idx_width-1] route_rcsel;
 		   assign route_rcsel
-		     = hit_la_route_info[port_idx_width:
-					 port_idx_width+
-					 resource_class_idx_width-1];
+		     = la_route_info_q[port_idx_width:
+				       port_idx_width+
+				       resource_class_idx_width-1];
 		   
 		   c_decode
 		     #(.num_ports(num_resource_classes))
@@ -951,8 +918,30 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      assign lld_route_op = route_op;
-	      assign lld_route_orc = route_orc;
+	      wire [0:route_info_width-1]    next_route_info;
+	      assign next_route_info
+		= reload_from_fb ? fb_route_info : chi_route_info;
+	      
+	      wire [0:route_info_width-1]    route_info_s, route_info_q;
+	      assign route_info_s = capture ? next_route_info : route_info_q;
+	      c_dff
+		#(.width(route_info_width),
+		  .reset_type(reset_type))
+	      route_infoq
+		(.clk(clk),
+		 .reset(1'b0),
+		 .active(active),
+		 .d(route_info_s),
+		 .q(route_info_q));
+	      
+	      assign hit_valid = valid_q;
+	      assign hit_route_op = route_op;
+	      assign hit_route_orc = route_orc;
+	      assign hit_la_route_info = la_route_info_q;
+	      assign hit_route_info = route_info_q;
+	      
+	      assign error_no_header
+		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
 	      
 	   end
 	   
@@ -967,16 +956,16 @@ module rtr_ip_ctrl_mac
 	   if(dual_path_alloc)
 	     begin
 		assign route_valid_out = hit_valid;
-		assign route_unmasked_op = lld_route_op;
-		assign route_unmasked_orc = lld_route_orc;
+		assign route_unmasked_op = hit_route_op;
+		assign route_unmasked_orc = hit_route_orc;
 	     end
 	   else
 	     begin
 		assign route_valid_out = hit_valid | chi_flit_valid;
 		assign route_unmasked_op
-		  = hit_valid ? lld_route_op : gld_route_op;
+		  = hit_valid ? hit_route_op : gld_route_op;
 		assign route_unmasked_orc
-		  = hit_valid ? lld_route_orc : gld_route_orc;
+		  = hit_valid ? hit_route_orc : gld_route_orc;
 	     end
 	   
 	   wire [0:1] rf_errors;
@@ -1053,7 +1042,7 @@ module rtr_ip_ctrl_mac
 	      rtl
 		(.router_address(next_router_address),
 		 .sel_mc(sel_mc),
-		 .sel_irc(lld_route_orc),
+		 .sel_irc(hit_route_orc),
 		 .route_info(hit_route_info),
 		 .route_op(route_op),
 		 .route_orc(route_orc));
