@@ -772,8 +772,7 @@ module rtr_ip_ctrl_mac
 	      
 	      wire capture;
 	      assign capture = (~valid_q & chi_flit_valid) |
-			       (flit_sent_in & ~fb_empty & htt_flit_tail & 
-				(~fb_almost_empty | chi_flit_valid));
+			       (flit_sent_in & ~fb_empty & htt_flit_tail);
 	      
 	      wire reload_from_fb;
 	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
