@@ -1333,21 +1333,52 @@ module rtr_alloc_mac
 		   assign req_ip = ifl_flit_valid_ip;
 		   
 		   wire [0:num_ports-1] gnt_ip;
-		   c_one_hot_filter
-		     #(.width(num_ports))
-		   oohf
-		     (.data_in(req_ip),
-		      .data_out(gnt_ip));
-		   
-		   wire 		multi_hot;
-		   c_multi_hot_det
-		     #(.width(num_ports))
-		   omhd
-		     (.data(req_ip),
-		      .multi_hot(multi_hot));
-		   
 		   wire 		flit_sent;
-		   assign flit_sent = |req_ip & ~multi_hot;
+		   
+		   if(dual_path_alloc == 1)
+		     begin
+			
+			c_one_hot_filter
+			  #(.width(num_ports))
+			oohf
+			  (.data_in(req_ip),
+			   .data_out(gnt_ip));
+			
+			wire 		multi_hot;
+			c_multi_hot_det
+			  #(.width(num_ports))
+			omhd
+			  (.data(req_ip),
+			   .multi_hot(multi_hot));
+			
+			assign flit_sent = |req_ip & ~multi_hot;
+			
+		     end
+		   else if(dual_path_alloc > 1)
+		     begin
+			
+			// NOTE: If a head flit wins output arbitration, but 
+			// the subsequent check for an eligible output VC to go 
+			// to fails, we still update the arbiter.
+			
+			assign flit_sent = |req_ip;
+			
+			wire update;
+			assign update = flit_sent;
+			
+			c_arbiter
+			  #(.num_ports(num_ports),
+			    .arbiter_type(sw_alloc_arbiter_type),
+			    .reset_type(reset_type))
+			oarb
+			  (.clk(clk),
+			   .reset(reset),
+			   .active(active),
+			   .req(req_ip),
+			   .gnt(gnt_ip),
+			   .update(update));
+			
+		     end
 		   
 		   wire [0:num_ports*num_vcs-1] flit_sel_ip_ovc;
 		   
