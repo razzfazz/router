@@ -194,6 +194,7 @@ module rtr_alloc_mac
    wire [0:num_ports*num_vcs-1] 		      ovs_full_op_ovc;
    
    wire [0:num_ports*num_vcs-1] 		      nvs_next_elig_op_ovc;
+   wire [0:num_ports*num_packet_classes-1] 	      nvs_any_elig_op_opc;
    
    wire [0:num_ports*num_ports-1] 		      active_ip_op;
    
@@ -436,20 +437,33 @@ module rtr_alloc_mac
 		      .d(allocated_s),
 		      .q(allocated_q));
 		   
-		   wire [0:num_vcs_per_class-1]   next_elig_ocvc;
-		   rtr_vc_flags_mux
+		   wire 			  any_elig;
+		   rtr_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
-		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports))
+		       .num_ports(num_ports),
+		       .width(1))
+		   any_elig_fmux
+		     (.sel_mc(sel_mc),
+		      .route_op(rf_route_op),
+		      .route_orc(rf_route_orc),
+		      .flags_op_opc(nvs_any_elig_op_opc),
+		      .flags(any_elig));
+		   
+		   assign flit_kill = ~allocated_q & ~any_elig;
+		   
+		   wire [0:num_vcs_per_class-1]   next_elig_ocvc;
+		   rtr_flags_mux
+		     #(.num_message_classes(num_message_classes),
+		       .num_resource_classes(num_resource_classes),
+		       .num_ports(num_ports),
+		       .width(num_vcs_per_class))
 		   next_elig_ocvc_fmux
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
-		      .flags_op_ovc(nvs_next_elig_op_ovc),
-		      .flags_ocvc(next_elig_ocvc));
-		   
-		   assign flit_kill = ~allocated_q & ~|next_elig_ocvc;
+		      .flags_op_opc(nvs_next_elig_op_ovc),
+		      .flags(next_elig_ocvc));
 		   
 		   wire [0:num_vcs_per_class-1]   allocated_next_ocvc;
 		   wire [0:num_vcs_per_class-1]   allocated_ocvc;
@@ -518,34 +532,34 @@ module rtr_alloc_mac
 		   //-----------------------------------------------------------
 		   
 		   wire [0:num_vcs_per_class-1]      almost_full_ocvc;
-		   rtr_vc_flags_mux
+		   rtr_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
-		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports))
+		       .num_ports(num_ports),
+		       .width(num_vcs_per_class))
 		   almost_full_ocvc_fmux
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
-		      .flags_op_ovc(ovs_almost_full_op_ovc),
-		      .flags_ocvc(almost_full_ocvc));
+		      .flags_op_opc(ovs_almost_full_op_ovc),
+		      .flags(almost_full_ocvc));
 		   
 		   wire 			     almost_full;
 		   assign almost_full
 		     = |(allocated_next_ocvc & almost_full_ocvc);
 		   
 		   wire [0:num_vcs_per_class-1]      full_ocvc;
-		   rtr_vc_flags_mux
+		   rtr_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
-		       .num_vcs_per_class(num_vcs_per_class),
-		       .num_ports(num_ports))
+		       .num_ports(num_ports),
+		       .width(num_vcs_per_class))
 		   full_ocvc_fmux
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
-		      .flags_op_ovc(ovs_full_op_ovc),
-		      .flags_ocvc(full_ocvc));
+		      .flags_op_opc(ovs_full_op_ovc),
+		      .flags(full_ocvc));
 		   
 		   wire 			     full;
 		   assign full = |(allocated_next_ocvc & full_ocvc);
@@ -856,26 +870,31 @@ module rtr_alloc_mac
 	   
 	   wire [0:num_vcs-1] nvs_next_elig_ovc;
 	   assign nvs_next_elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
-		    = nvs_next_elig_ovc;
+	     = nvs_next_elig_ovc;
 	   
-	   wire [0:num_ports-1] oal_flit_sent_ip;
+	   wire [0:num_packet_classes-1] nvs_any_elig_opc;
+	   assign nvs_any_elig_op_opc[op*num_packet_classes:
+				      (op+1)*num_packet_classes-1]
+	     = nvs_any_elig_opc;
+	   
+	   wire [0:num_ports-1] 	 oal_flit_sent_ip;
 	   assign oal_flit_sent_op_ip[op*num_ports:(op+1)*num_ports-1]
 	     = oal_flit_sent_ip;
 	   
-	   wire 		flit_valid_out;
+	   wire 			 flit_valid_out;
 	   assign flit_valid_out_op[op] = flit_valid_out;
 	   
-	   wire 		flit_head_out;
+	   wire 			 flit_head_out;
 	   assign flit_head_out_op[op] = flit_head_out;
 	   
-	   wire 		flit_tail_out;
+	   wire 			 flit_tail_out;
 	   assign flit_tail_out_op[op] = flit_tail_out;
 	   
-	   wire [0:num_vcs-1] 	flit_sel_out_ovc;
+	   wire [0:num_vcs-1] 		 flit_sel_out_ovc;
 	   assign flit_sel_out_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
 	     = flit_sel_out_ovc;
 	   
-	   wire [0:num_ports-1] flit_sel_out_ip;
+	   wire [0:num_ports-1] 	 flit_sel_out_ip;
 	   assign flit_sel_out_op_ip[op*num_ports:(op+1)*num_ports-1]
 	     = flit_sel_out_ip;
 	   
@@ -884,11 +903,11 @@ module rtr_alloc_mac
 	   // arbitration
 	   //-------------------------------------------------------------------
 	   
-	   wire 		oal_allocated;
-	   wire 		oal_flit_sent;
-	   wire 		oal_flit_head;
-	   wire 		oal_flit_tail;
-	   wire [0:num_vcs-1] 	oal_flit_sel_ovc;
+	   wire 			 oal_allocated;
+	   wire 			 oal_flit_sent;
+	   wire 			 oal_flit_head;
+	   wire 			 oal_flit_tail;
+	   wire [0:num_vcs-1] 		 oal_flit_sel_ovc;
 	   
 	   begin:oal
 	      
@@ -1145,7 +1164,10 @@ module rtr_alloc_mac
 	   begin:nvs
 	      
 	      if(num_vcs_per_class == 1)
-		assign nvs_next_elig_ovc = ovs_elig_ovc;
+		begin
+		   assign nvs_next_elig_ovc = ovs_elig_ovc;
+		   assign nvs_any_elig_opc = ovs_elig_ovc;
+		end
 	      else if(num_vcs_per_class > 1)
 		begin
 		   
@@ -1196,6 +1218,8 @@ module rtr_alloc_mac
 			assign nvs_next_elig_ovc[opc*num_vcs_per_class:
 						 (opc+1)*num_vcs_per_class-1]
 			  = gnt_ocvc;
+			
+			assign nvs_any_elig_opc[opc] = |ovs_elig_ocvc;
 			
 		     end
 		   

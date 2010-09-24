@@ -29,12 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 //==============================================================================
-// module for extracting the flags for a given port and resource class
+// module for extracting the flags for a given port and packet class
 //==============================================================================
 
-module rtr_vc_flags_mux
-  (sel_mc, route_op, route_orc, flags_op_ovc, flags_ocvc);
-      
+module rtr_flags_mux
+  (sel_mc, route_op, route_orc, flags_op_opc, flags);
+   
 `include "c_functions.v"
 `include "c_constants.v"
    
@@ -49,11 +49,11 @@ module rtr_vc_flags_mux
    // number of resource classes (e.g. minimal, adaptive)
    parameter num_resource_classes = 2;
    
-   // number of VCs per class
-   parameter num_vcs_per_class = 1;
-   
    // number of input and output ports on router
    parameter num_ports = 5;
+   
+   // width of flags
+   parameter width = 1;
    
    
    //---------------------------------------------------------------------------
@@ -62,9 +62,6 @@ module rtr_vc_flags_mux
    
    // total number of packet classes
    localparam num_packet_classes = num_message_classes * num_resource_classes;
-   
-   // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
    
    //---------------------------------------------------------------------------
@@ -81,57 +78,57 @@ module rtr_vc_flags_mux
    input [0:num_resource_classes-1] route_orc;
    
    // bit field of output VC flags of interest
-   input [0:num_ports*num_vcs-1]    flags_op_ovc;
+   input [0:num_ports*num_packet_classes*width-1] flags_op_opc;
    
    // subset of bits that we are interested in
-   output [0:num_vcs_per_class-1]   flags_ocvc;
-   wire [0:num_vcs_per_class-1]     flags_ocvc;
+   output [0:width-1] 				  flags;
+   wire [0:width-1] 				  flags;
    
    
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 		    flags_ovc;
+   wire [0:num_packet_classes*width-1] 		  flags_opc;
    c_select_1ofn
      #(.num_ports(num_ports),
-       .width(num_vcs))
-   flags_ovc_sel
+       .width(num_packet_classes*width))
+   flags_opc_sel
      (.select(route_op),
-      .data_in(flags_op_ovc),
-      .data_out(flags_ovc));
+      .data_in(flags_op_opc),
+      .data_out(flags_opc));
    
-   wire [0:num_resource_classes*num_vcs_per_class-1] flags_orc_ocvc;
+   wire [0:num_resource_classes*width-1] 	  flags_orc;
    
    generate
       
       if(num_message_classes == 1)
-	assign flags_orc_ocvc = flags_ovc;
-      else
+	assign flags_orc = flags_opc;
+      else if(num_message_classes > 1)
 	begin
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_message_classes),
-	       .width(num_resource_classes*num_vcs_per_class))
-	   flags_orc_ocvc_sel
+	       .width(num_resource_classes*width))
+	   flags_orc_sel
 	     (.select(sel_mc),
-	      .data_in(flags_ovc),
-	      .data_out(flags_orc_ocvc));
+	      .data_in(flags_opc),
+	      .data_out(flags_orc));
 	   
 	end
       
       if(num_resource_classes == 1)
-	assign flags_ocvc = flags_orc_ocvc;
+	assign flags = flags_orc;
       else if(num_resource_classes > 1)
 	begin
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_resource_classes),
-	       .width(num_vcs_per_class))
-	   flags_ocvc_sel
+	       .width(width))
+	   flags_sel
 	     (.select(route_orc),
-	      .data_in(flags_orc_ocvc),
-	      .data_out(flags_ocvc));
+	      .data_in(flags_orc),
+	      .data_out(flags));
 	   
 	end
       
