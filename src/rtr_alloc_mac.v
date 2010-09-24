@@ -943,44 +943,33 @@ module rtr_alloc_mac
 		 .gnt(gnt_ip),
 		 .update(update));
 	      
-	      wire [0:num_ports*num_vcs-1] flit_sel_ip_ovc;
+	      wire 		   allocated;
+	      assign allocated = |req_hi_ip;
 	      
-	      genvar 			   ip;
+	      wire 		   flit_head;
+	      assign flit_head = |(gnt_ip & ial_flit_head_ip);
 	      
-	      for(ip = 0; ip < num_ports; ip = ip + 1)
-		begin:ips
-		   
-		   wire [0:num_vcs-1] ial_flit_sel_ovc;
-		   assign ial_flit_sel_ovc
-		     = ial_flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1];
-		   
-		   wire 	      ial_allocated;
-		   assign ial_allocated = ial_allocated_ip[ip];
-		   
-		   wire [0:num_vcs-1] flit_sel_ovc;
-		   assign flit_sel_ovc
-		     = ial_flit_sel_ovc & 
-		       ({num_vcs{ial_allocated}} | nvs_next_elig_ovc);
-		   
-		   assign flit_sel_ip_ovc[ip*num_vcs:(ip+1)*num_vcs-1]
-		     = flit_sel_ovc;
-		   
-		end
+	      wire 		   flit_tail;
+	      assign flit_tail = |(gnt_ip & ial_flit_tail_ip);
 	      
-	      wire [0:num_vcs-1]      flit_sel_ovc;
+	      wire [0:num_vcs-1]   ial_flit_sel_ovc;
 	      c_select_1ofn
 		#(.num_ports(num_ports),
 		  .width(num_vcs))
-	      flit_sel_ovc_sel
+	      ial_flit_sel_ovc_sel
 		(.select(gnt_ip),
-		 .data_in(flit_sel_ip_ovc),
-		 .data_out(flit_sel_ovc));
+		 .data_in(ial_flit_sel_ip_ovc),
+		 .data_out(ial_flit_sel_ovc));
 	      
-	      assign oal_allocated = |req_hi_ip;
+	      wire [0:num_vcs-1]   flit_sel_ovc;
+	      assign flit_sel_ovc
+		= ial_flit_sel_ovc & ({num_vcs{allocated}} | nvs_next_elig_ovc);
+	      
+	      assign oal_allocated = allocated;
 	      assign oal_flit_sent_ip = gnt_ip;
 	      assign oal_flit_sent = flit_sent;
-	      assign oal_flit_head = |(gnt_ip & ial_flit_head_ip);
-	      assign oal_flit_tail = |(gnt_ip & ial_flit_tail_ip);
+	      assign oal_flit_head = flit_head;
+	      assign oal_flit_tail = flit_tail;
 	      assign oal_flit_sel_ovc = flit_sel_ovc;
 	      
 	   end
