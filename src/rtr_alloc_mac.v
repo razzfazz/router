@@ -270,6 +270,10 @@ module rtr_alloc_mac
 	   assign flit_tail_in_ivc
 	     = flit_tail_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
+	   wire [0:num_vcs-1] route_valid_in_ivc;
+	   assign route_valid_in_ivc
+	     = route_valid_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
 	   wire [0:num_ports-1] oal_flit_sent_op;
 	   assign oal_flit_sent_op
 	     = oal_flit_sent_ip_op[ip*num_ports:(ip+1)*num_ports-1];
@@ -561,7 +565,7 @@ module rtr_alloc_mac
 		//--------------------------------------------------------------
 		
 		wire route_valid_in;
-		assign route_valid_in = route_valid_in_ip_ivc[ip*num_vcs+ivc];
+		assign route_valid_in = route_valid_in_ivc[ivc];
 		
 		wire [0:num_ports-1] route_in_op;
 		assign route_in_op
@@ -634,7 +638,7 @@ module rtr_alloc_mac
 		    .port_id(ip),
 		    .vc_id(ivc))
 		rf
-		  (.route_valid(flit_valid_in),
+		  (.route_valid(route_valid_in),
 		   .route_in_op(route_in_op),
 		   .route_in_orc(route_in_orc),
 		   .route_out_op(rf_route_op),
@@ -959,9 +963,6 @@ module rtr_alloc_mac
 			
 			wire update;
 			
-			wire [0:num_vcs-1] req_all_ivc;
-			assign req_all_ivc = flit_valid_in_ivc;
-			
 			wire [0:num_vcs-1] mgnt_ivc;
 			c_arbiter
 			  #(.num_ports(num_vcs),
@@ -972,7 +973,7 @@ module rtr_alloc_mac
 			  (.clk(clk),
 			   .reset(reset),
 			   .active(active),
-			   .req({req_hi_ivc, req_lo_ivc, req_all_ivc}),
+			   .req({req_hi_ivc, req_lo_ivc, route_valid_in_ivc}),
 			   .gnt(mgnt_ivc),
 			   .update(update));
 			
@@ -1003,7 +1004,7 @@ module rtr_alloc_mac
 			  = oal_flit_sent | 
 			    (|req_hi_ivc & ~|(req_hi_ivc & mask_ivc_q)) | 
 			    (|req_ivc & ~|(req_ivc & mask_ivc_q)) | 
-			    (|req_all_ivc & (&mask_ivc_q));
+			    (|flit_valid_in_ivc & (&mask_ivc_q));
 			
 			assign gnt_ivc = req_ivc & mask_ivc_q;
 			
@@ -1109,7 +1110,7 @@ module rtr_alloc_mac
 	     begin
 		
 		assign active_ivc
-		  = flit_valid_in_ivc | 
+		  = route_valid_in_ivc | 
 		    ({num_vcs{flit_valid_fast_in & ~flit_head_fast_in}} &
 		     flit_sel_fast_in_ivc);
 		
@@ -1120,7 +1121,7 @@ module rtr_alloc_mac
 	     end
 	   else
 	     begin
-		assign active_ivc = flit_valid_in_ivc;
+		assign active_ivc = route_valid_in_ivc;
 		assign route_fast_op = {num_ports{1'b0}};
 	     end
 	   
