@@ -33,11 +33,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_alloc_mac
-  (clk, reset, route_in_ip_ivc_op, route_in_ip_ivc_orc, flit_valid_in_ip_ivc, 
-   flit_last_in_ip_ivc, flit_head_in_ip_ivc, flit_tail_in_ip_ivc, 
-   flit_sel_out_ip_ivc, flit_sent_out_ip, flit_sel_out_op_ip, empty_out_op, 
-   flit_valid_out_op, flit_head_out_op, flit_tail_out_op, flit_sel_out_op_ovc, 
-   fc_event_valid_in_op, fc_event_sel_in_op_ovc, error);
+  (clk, reset, route_valid_in_ip_ivc, route_in_ip_ivc_op, route_in_ip_ivc_orc, 
+   flit_valid_in_ip_ivc, flit_last_in_ip_ivc, flit_head_in_ip_ivc, 
+   flit_tail_in_ip_ivc, flit_sel_out_ip_ivc, flit_sent_out_ip, 
+   flit_sel_out_op_ip, empty_out_op, flit_valid_out_op, flit_head_out_op, 
+   flit_tail_out_op, flit_sel_out_op_ovc, fc_event_valid_in_op, 
+   fc_event_sel_in_op_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -134,6 +135,9 @@ module rtr_alloc_mac
    
    input clk;
    input reset;
+   
+   // routing information valid
+   input [0:num_ports*num_vcs-1] route_valid_in_ip_ivc;
    
    // output port select signals for each input port and VC
    input [0:num_ports*num_vcs*num_ports-1] route_in_ip_ivc_op;
@@ -237,6 +241,10 @@ module rtr_alloc_mac
 	   assign flit_tail_in_ivc
 	     = flit_tail_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
+	   wire [0:num_vcs-1] route_valid_in_ivc;
+	   assign route_valid_in_ivc
+	     = route_valid_in_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
 	   wire [0:num_ports-1] oal_flit_sent_op;
 	   assign oal_flit_sent_op
 	     = oal_flit_sent_ip_op[ip*num_ports:(ip+1)*num_ports-1];
@@ -299,6 +307,9 @@ module rtr_alloc_mac
 		//--------------------------------------------------------------
 		// connect inputs
 		//--------------------------------------------------------------
+		
+		wire route_valid_in;
+		assign route_valid_in = route_valid_in_ivc[ivc];
 		
 		wire [0:num_ports-1] route_in_op;
 		assign route_in_op
@@ -368,7 +379,7 @@ module rtr_alloc_mac
 		    .port_id(ip),
 		    .vc_id(ivc))
 		rf
-		  (.route_valid(flit_valid_in),
+		  (.route_valid(route_valid_in),
 		   .route_in_op(route_in_op),
 		   .route_in_orc(route_in_orc),
 		   .route_out_op(rf_route_op),
@@ -646,9 +657,6 @@ module rtr_alloc_mac
 			
 			wire update;
 			
-			wire [0:num_vcs-1] req_all_ivc;
-			assign req_all_ivc = flit_valid_in_ivc;
-			
 			wire [0:num_vcs-1] mgnt_ivc;
 			c_arbiter
 			  #(.num_ports(num_vcs),
@@ -659,7 +667,7 @@ module rtr_alloc_mac
 			  (.clk(clk),
 			   .reset(reset),
 			   .active(active),
-			   .req({req_hi_ivc, req_lo_ivc, req_all_ivc}),
+			   .req({req_hi_ivc, req_lo_ivc, route_valid_in_ivc}),
 			   .gnt(mgnt_ivc),
 			   .update(update));
 			
@@ -690,7 +698,7 @@ module rtr_alloc_mac
 			  = oal_flit_sent | 
 			    (|req_hi_ivc & ~|(req_hi_ivc & mask_ivc_q)) | 
 			    (|req_ivc & ~|(req_ivc & mask_ivc_q)) | 
-			    (|req_all_ivc & (&mask_ivc_q));
+			    (|flit_valid_in_ivc & (&mask_ivc_q));
 			
 			assign gnt_ivc = req_ivc & mask_ivc_q;
 			
@@ -782,7 +790,7 @@ module rtr_alloc_mac
 	     #(.num_ports(num_vcs),
 	       .width(num_ports))
 	   active_op_sel
-	     (.select(flit_valid_in_ivc),
+	     (.select(route_valid_in_ivc),
 	      .data_in(rf_route_ivc_op),
 	      .data_out(active_op));
 	   

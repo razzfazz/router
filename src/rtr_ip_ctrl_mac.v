@@ -33,9 +33,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_ip_ctrl_mac
-  (clk, reset, router_address, channel_in, route_out_ivc_op, route_out_ivc_orc, 
-   flit_valid_out_ivc, flit_last_out_ivc, flit_head_out_ivc, flit_tail_out_ivc, 
-   flit_data_out, flit_sel_in_ivc, flit_sent_in, flow_ctrl_out, error);
+  (clk, reset, router_address, channel_in, route_valid_out_ivc, 
+   route_out_ivc_op, route_out_ivc_orc, flit_valid_out_ivc, flit_last_out_ivc, 
+   flit_head_out_ivc, flit_tail_out_ivc, flit_data_out, flit_sel_in_ivc, 
+   flit_sent_in, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -213,6 +214,10 @@ module rtr_ip_ctrl_mac
    
    // incoming channel
    input [0:channel_width-1] 	 channel_in;
+   
+   // routing information is valid
+   output [0:num_vcs-1] 	 route_valid_out_ivc;
+   wire [0:num_vcs-1] 		 route_valid_out_ivc;
    
    // selected output port
    output [0:num_vcs*num_ports-1] route_out_ivc_op;
@@ -510,7 +515,10 @@ module rtr_ip_ctrl_mac
 	   assign llu_flit_data_ivc[ivc*flit_data_width:
 				    (ivc+1)*flit_data_width-1] = llu_flit_data;
 	   
-	   wire [0:num_ports-1]      route_out_op;
+	   wire 		      route_valid_out;
+	   assign route_valid_out_ivc[ivc] = route_valid_out;
+	   
+	   wire [0:num_ports-1]       route_out_op;
 	   assign route_out_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 	     = route_out_op;
 	   
@@ -857,15 +865,14 @@ module rtr_ip_ctrl_mac
 	   // generate routing control signals
 	   //-------------------------------------------------------------------
 	   
+	   assign route_valid_out = hit_valid | chi_flit_valid;
+	   
 	   wire [0:num_ports-1] 		       route_unmasked_op;
 	   assign route_unmasked_op = hit_valid ? hit_route_op : gld_route_op;
 	   
 	   wire [0:num_resource_classes-1] 	       route_unmasked_orc;
 	   assign route_unmasked_orc
 	     = hit_valid ? hit_route_orc : gld_route_orc;
-	   
-	   wire 				       route_valid;
-	   assign route_valid = hit_valid | chi_flit_valid;
 	   
 	   wire [0:1] 				       rf_errors;
 	   rtr_route_filter
@@ -882,7 +889,7 @@ module rtr_ip_ctrl_mac
 	       .port_id(port_id),
 	       .vc_id(ivc))
 	   rf
-	     (.route_valid(route_valid),
+	     (.route_valid(route_valid_out),
 	      .route_in_op(route_unmasked_op),
 	      .route_in_orc(route_unmasked_orc),
 	      .route_out_op(route_out_op),
