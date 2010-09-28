@@ -437,6 +437,7 @@ module tc_router_wrap
        .fb_regfile_type(fb_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .precomp_ivc_sel(precomp_ivc_sel),
+       .precomp_ip_sel(precomp_ip_sel),
        .vc_alloc_type(vc_alloc_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .vc_alloc_requires_credit(vc_alloc_requires_credit),
