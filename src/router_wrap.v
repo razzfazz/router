@@ -241,6 +241,7 @@ module router_wrap
 		 .explicit_pipeline_register(explicit_pipeline_register),
 		 .dual_path_alloc(dual_path_alloc),
 		 .precomp_ivc_sel(precomp_ivc_sel),
+		 .precomp_ip_sel(precomp_ip_sel),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
 		 .crossbar_type(crossbar_type),

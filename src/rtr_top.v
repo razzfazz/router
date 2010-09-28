@@ -112,6 +112,9 @@ module rtr_top
    // precompute input-side arbitration decision one cycle ahead
    parameter precomp_ivc_sel = 1;
    
+   // precompute output-side arbitration decision one cycle ahead
+   parameter precomp_ip_sel = 1;
+   
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -394,6 +397,7 @@ module rtr_top
        .routing_type(routing_type),
        .dim_order(dim_order),
        .precomp_ivc_sel(precomp_ivc_sel),
+       .precomp_ip_sel(precomp_ip_sel),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .dual_path_alloc(dual_path_alloc),

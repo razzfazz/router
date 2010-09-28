@@ -92,6 +92,9 @@ module rtr_alloc_mac
    // precompute input-side arbitration decision one cycle ahead
    parameter precomp_ivc_sel = 1;
    
+   // precompute output-side arbitration decision one cycle ahead
+   parameter precomp_ip_sel = 1;
+   
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -1273,45 +1276,117 @@ module rtr_alloc_mac
 	      wire [0:num_ports-1] req_hi_ip;
 	      assign req_hi_ip = ial_flit_valid_ip & ial_allocated_ip;
 	      
-	      wire [0:num_ports-1] req_lo_ip;
-	      assign req_lo_ip = ial_flit_valid_ip;
-	      
-	      // NOTE: If a head flit wins output arbitration, but the 
-	      // subsequent check for an eligible output VC to go to fails, we 
-	      // still update the arbiter. This is so  we don't get stuck on a 
-	      // single VC that is unable to acquire an output VC trying over 
-	      // and over again to the exclusion of all others.
-	      
-	      wire 		   flit_sent;
-	      assign flit_sent = |ial_flit_valid_ip;
-	      
-	      wire 		   update;
-	      assign update = flit_sent;
+	      wire [0:num_ports-1] req_ip;
+	      assign req_ip = ial_flit_valid_ip;
 	      
 	      wire [0:num_ports-1] gnt_ip;
-	      c_arbiter
-		#(.num_ports(num_ports),
-		  .num_priorities(2),
-		  .arbiter_type(sw_alloc_arbiter_type),
-		  .reset_type(reset_type))
-	      oarb
-		(.clk(clk),
-		 .reset(reset),
-		 .active(active),
-		 .req({req_hi_ip, req_lo_ip}),
-		 .gnt(gnt_ip),
-		 .update(update));
-	      
+	      wire 		   flit_sent;
 	      wire 		   allocated;
-	      assign allocated = |req_hi_ip;
 	      
-	      wire 		   flit_head;
+	      if(precomp_ip_sel)
+		begin
+		   
+		   wire update;
+		   
+		   wire [0:num_ports-1] mgnt_ip;
+		   c_arbiter
+		     #(.num_ports(num_ports),
+		       .num_priorities(2),
+		       .arbiter_type(sw_alloc_arbiter_type),
+		       .reset_type(reset_type))
+		   marb
+		     (.clk(clk),
+		      .reset(reset),
+		      .active(active),
+		      .req({req_hi_ip, req_ip}),
+		      .gnt(mgnt_ip),
+		      .update(update));
+		   
+		   wire [0:num_ports-1] mask_ip_s, mask_ip_q;
+		   assign mask_ip_s = update ? mgnt_ip : mask_ip_q;
+		   c_dff
+		     #(.width(num_ports),
+		       .reset_type(reset_type))
+		   mask_ipq
+		     (.clk(clk),
+		      .reset(reset),
+		      .active(active),
+		      .d(mask_ip_s),
+		      .q(mask_ip_q));
+		   
+		   wire [0:num_ports-1] gnt_presel_ip;
+		   assign gnt_presel_ip = req_ip & mask_ip_q;
+		   
+		   wire [0:num_ports-1] gnt_onehot_ip;
+		   c_one_hot_filter
+		     #(.width(num_ports))
+		   oohf
+		     (.data_in(req_ip),
+		      .data_out(gnt_onehot_ip));
+		   
+		   wire 		multi_hot;
+		   c_multi_hot_det
+		     #(.width(num_ports))
+		   omhd
+		     (.data(req_ip),
+		      .multi_hot(multi_hot));
+		   
+		   // NOTE: If the request vector is one-hot, either both 
+		   // methods will agree, or preselection will not generate a
+		   // grant; on the other hand, if it is not one-hot, the one-
+		   // hot filter will return a zero vector. In both cases, we
+		   // can safely just OR the results together.
+		   
+		   assign gnt_ip = gnt_presel_ip | gnt_onehot_ip;
+		   
+		   assign flit_sent = (|req_ip & ~multi_hot) | (|gnt_presel_ip);
+		   
+		   assign allocated = |(gnt_ip & ial_allocated_ip);
+
+		   assign update = flit_sent |
+				   (|req_hi_ip & ~|(req_hi_ip & mask_ip_q)) |
+				   (|req_ip & ~|(req_ip & mask_ip_q));
+		   
+		end
+	      else
+		begin
+		   
+		   // NOTE: If a head flit wins output arbitration, but the 
+		   // subsequent check for an eligible output VC to go to 
+		   // fails, we still update the arbiter. This is so  we don't 
+		   // get stuck on a single VC that is unable to acquire an 
+		   // output VC trying over and over again to the exclusion of 
+		   // all others.
+		   
+		   assign flit_sent = |ial_flit_valid_ip;
+		   
+		   wire 		   update;
+		   assign update = flit_sent;
+		   
+		   c_arbiter
+		     #(.num_ports(num_ports),
+		       .num_priorities(2),
+		       .arbiter_type(sw_alloc_arbiter_type),
+		       .reset_type(reset_type))
+		   oarb
+		     (.clk(clk),
+		      .reset(reset),
+		      .active(active),
+		      .req({req_hi_ip, req_ip}),
+		      .gnt(gnt_ip),
+		      .update(update));
+		   
+		   assign allocated = |req_hi_ip;
+		   
+		end
+	      
+	      wire 			   flit_head;
 	      assign flit_head = |(gnt_ip & ial_flit_head_ip);
 	      
-	      wire 		   flit_tail;
+	      wire 			   flit_tail;
 	      assign flit_tail = |(gnt_ip & ial_flit_tail_ip);
 	      
-	      wire [0:num_vcs-1]   ial_flit_sel_ovc;
+	      wire [0:num_vcs-1] 	   ial_flit_sel_ovc;
 	      c_select_mofn
 		#(.num_ports(num_ports),
 		  .width(num_vcs))
@@ -1320,7 +1395,7 @@ module rtr_alloc_mac
 		 .data_in(ial_flit_sel_ip_ovc),
 		 .data_out(ial_flit_sel_ovc));
 	      
-	      wire [0:num_vcs-1]   flit_sel_ovc;
+	      wire [0:num_vcs-1] 	   flit_sel_ovc;
 	      assign flit_sel_ovc
 		= ial_flit_sel_ovc & ({num_vcs{allocated}} | nvs_next_elig_ovc);
 	      
