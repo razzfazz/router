@@ -800,20 +800,6 @@ module rtr_alloc_mac
    
    
    //---------------------------------------------------------------------------
-   // combine activity signals for output side
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_ports-1] active_op;
-   c_binary_op
-     #(.num_ports(num_ports),
-       .width(num_ports),
-       .op(`BINARY_OP_OR))
-   active_op_or
-     (.data_in(active_ip_op),
-      .data_out(active_op));
-   
-   
-   //---------------------------------------------------------------------------
    // connect input and output side
    //---------------------------------------------------------------------------
    
@@ -832,6 +818,14 @@ module rtr_alloc_mac
    oal_flit_sent_ip_op_intl
      (.data_in(oal_flit_sent_op_ip),
       .data_out(oal_flit_sent_ip_op));
+   
+   wire [0:num_ports*num_ports-1] active_op_ip;
+   c_interleave
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   active_op_ip_intl
+     (.data_in(active_ip_op),
+      .data_out(active_op_ip));
    
    
    //---------------------------------------------------------------------------
@@ -855,14 +849,14 @@ module rtr_alloc_mac
 	   // connect inputs
 	   //-------------------------------------------------------------------
 	   
-	   wire active;
-	   assign active = active_op[op];
+	   wire [0:num_ports-1] active_ip;
+	   assign active_ip = active_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] ial_flit_valid_ip;
 	   assign ial_flit_valid_ip
 	     = ial_flit_valid_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire fc_event_valid_in;
+	   wire 		fc_event_valid_in;
 	   assign fc_event_valid_in = fc_event_valid_in_op[op];
 	   
 	   
@@ -870,13 +864,13 @@ module rtr_alloc_mac
 	   // connect outputs
 	   //-------------------------------------------------------------------
 	   
-	   wire empty_out;
+	   wire 		empty_out;
 	   assign empty_out_op[op] = empty_out;
 	   
-	   wire [0:num_vcs-1] ovs_full_ovc;
+	   wire [0:num_vcs-1] 	ovs_full_ovc;
 	   assign ovs_full_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = ovs_full_ovc;
 	   
-	   wire [0:num_vcs-1] nvs_next_elig_ovc;
+	   wire [0:num_vcs-1] 	nvs_next_elig_ovc;
 	   assign nvs_next_elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
 	     = nvs_next_elig_ovc;
 	   
@@ -910,6 +904,9 @@ module rtr_alloc_mac
 	   //-------------------------------------------------------------------
 	   // arbitration
 	   //-------------------------------------------------------------------
+	   
+	   wire 			 active;
+	   assign active = |active_ip;
 	   
 	   wire 			 oal_allocated;
 	   wire 			 oal_flit_sent;
