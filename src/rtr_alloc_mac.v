@@ -657,9 +657,6 @@ module rtr_alloc_mac
 			
 			wire update;
 			
-			wire [0:num_vcs-1] req_all_ivc;
-			assign req_all_ivc = route_valid_in_ivc;
-			
 			wire [0:num_vcs-1] mgnt_ivc;
 			c_arbiter
 			  #(.num_ports(num_vcs),
@@ -670,7 +667,7 @@ module rtr_alloc_mac
 			  (.clk(clk),
 			   .reset(reset),
 			   .active(active),
-			   .req({req_hi_ivc, req_lo_ivc, req_all_ivc}),
+			   .req({req_hi_ivc, req_lo_ivc, flit_valid_in_ivc}),
 			   .gnt(mgnt_ivc),
 			   .update(update));
 			
