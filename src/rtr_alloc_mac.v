@@ -658,21 +658,20 @@ module rtr_alloc_mac
 		   else if(num_vcs > 1)
 		     begin
 			
-			wire update;
+			wire [0:num_vcs-1] mask_ivc;
 			
 			wire [0:num_vcs-1] mgnt_ivc;
-			c_arbiter
-			  #(.num_ports(num_vcs),
-			    .num_priorities(3),
-			    .arbiter_type(sw_alloc_arbiter_type),
-			    .reset_type(reset_type))
-			marb
-			  (.clk(clk),
-			   .reset(reset),
-			   .active(active),
-			   .req({req_hi_ivc, req_lo_ivc, flit_valid_in_ivc}),
-			   .gnt(mgnt_ivc),
-			   .update(update));
+			c_lod
+			  #(.width(num_vcs),
+			    .num_priorities(6))
+			ilod
+			  (.data_in({req_hi_ivc & mask_ivc, 
+				     req_hi_ivc, 
+				     req_lo_ivc & mask_ivc,
+				     req_lo_ivc, 
+				     flit_valid_in_ivc & mask_ivc, 
+				     flit_valid_in_ivc}),
+			   .data_out(mgnt_ivc));
 			
 			wire [0:num_vcs-1] flit_sent_ivc;
 			assign flit_sent_ivc = {num_vcs{oal_flit_sent}} & 
@@ -681,6 +680,8 @@ module rtr_alloc_mac
 			wire [0:num_vcs-1] rem_ivc;
 			assign rem_ivc = flit_valid_in_ivc & 
 					 ~(flit_sent_ivc & flit_last_in_ivc);
+			
+			wire 		   update;
 			
 			wire [0:num_vcs-1] mask_ivc_s, mask_ivc_q;
 			assign mask_ivc_s = update ? 
@@ -696,6 +697,8 @@ module rtr_alloc_mac
 			   .active(active),
 			   .d(mask_ivc_s),
 			   .q(mask_ivc_q));
+			
+			assign mask_ivc = mask_ivc_q - 1'b1;
 			
 			assign update
 			  = oal_flit_sent | 
@@ -929,21 +932,20 @@ module rtr_alloc_mac
 	      if(precomp_ip_sel)
 		begin
 		   
-		   wire update;
+		   wire [0:num_ports-1] mask_ip;
 		   
 		   wire [0:num_ports-1] mgnt_ip;
-		   c_arbiter
-		     #(.num_ports(num_ports),
-		       .num_priorities(2),
-		       .arbiter_type(sw_alloc_arbiter_type),
-		       .reset_type(reset_type))
-		   marb
-		     (.clk(clk),
-		      .reset(reset),
-		      .active(active),
-		      .req({req_hi_ip, req_ip}),
-		      .gnt(mgnt_ip),
-		      .update(update));
+		   c_lod
+		     #(.width(num_ports),
+		       .num_priorities(4))
+		   olod
+		     (.data_in({req_hi_ip & mask_ip,
+				req_hi_ip, 
+				req_ip & mask_ip, 
+				req_ip}),
+		      .data_out(mgnt_ip));
+		   
+		   wire 		update;
 		   
 		   wire [0:num_ports-1] mask_ip_s, mask_ip_q;
 		   assign mask_ip_s = update ? mgnt_ip : mask_ip_q;
@@ -956,6 +958,8 @@ module rtr_alloc_mac
 		      .active(active),
 		      .d(mask_ip_s),
 		      .q(mask_ip_q));
+		   
+		   assign mask_ip = mask_ip_q - 1'b1;
 		   
 		   wire [0:num_ports-1] gnt_presel_ip;
 		   assign gnt_presel_ip = req_ip & mask_ip_q;
@@ -985,7 +989,7 @@ module rtr_alloc_mac
 		   assign flit_sent = (|req_ip & ~multi_hot) | (|gnt_presel_ip);
 		   
 		   assign allocated = |(gnt_ip & ial_allocated_ip);
-
+		   
 		   assign update = flit_sent |
 				   (|req_hi_ip & ~|(req_hi_ip & mask_ip_q)) |
 				   (|req_ip & ~|(req_ip & mask_ip_q));
