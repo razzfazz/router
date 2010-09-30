@@ -216,6 +216,20 @@ module c_fifo_ctrl
 	   
 	end
       
+      // synopsys translate_off
+      
+      else
+	begin
+	   initial
+	   begin
+	      $display({"ERROR: FIFO controller module %m requires a depth ", 
+			"of at least one entry."});
+	      $stop;
+	   end
+	end
+      
+      // synopsys translate_on
+      
    endgenerate
    
    wire 			 error_underflow;
