@@ -128,11 +128,6 @@ module rtr_vc_state
 	     // track number of flits the VC can still accept
 	     //-----------------------------------------------------------------
 	     
-	     wire ft_empty;
-	     
-	     wire track_active;
-	     assign track_active = active | ~ft_empty;
-	     
 	     wire ft_debit;
 	     assign ft_debit = flit_sent;
 	     
@@ -140,6 +135,7 @@ module rtr_vc_state
 	     assign ft_credit = fc_event_valid;
 	     
 	     wire ft_almost_empty;
+	     wire ft_empty;
 	     wire ft_almost_full;
 	     wire [0:flit_count_width-1] ft_free;
 	     wire [0:1] 		 ft_errors;
@@ -149,7 +145,7 @@ module rtr_vc_state
 	     ft
 	       (.clk(clk),
 		.reset(reset),
-		.active(track_active),
+		.active(active),
 		.push(ft_debit),
 		.pop(ft_credit),
 		.almost_empty(ft_almost_empty),

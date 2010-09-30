@@ -229,6 +229,9 @@ module whr_op_ctrl_mac
    // track state of downstream buffer
    //---------------------------------------------------------------------------
    
+   wire 		       vs_active;
+   assign vs_active = arb_active | fc_event_valid;
+   
    wire 		       almost_full;
    wire [0:1] 		       vs_errors;
    rtr_vc_state
@@ -238,7 +241,7 @@ module whr_op_ctrl_mac
    vs
      (.clk(clk),
       .reset(reset),
-      .active(arb_active),
+      .active(vs_active),
       .flit_sent(gnt),
       .flit_tail(gnt_tail),
       .fc_event_valid(fc_event_valid),
