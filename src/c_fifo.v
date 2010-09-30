@@ -153,7 +153,10 @@ module c_fifo
 	      .d(empty_s),
 	      .q(empty_q));
 	   
+	   assign almost_empty = ~empty_q;
 	   assign empty = empty_q;
+	   assign almost_full = empty_q;
+	   assign full = ~empty_q;
 	   
 	   wire 	    error_underflow;
 	   assign error_underflow = empty_q & pop & ~push;

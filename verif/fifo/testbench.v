@@ -139,12 +139,18 @@ module testbench
 	if(pop)
 	  $display($time, " READ:  %x.", pop_data);
 	if(pop & (^pop_data === 1'bx))
-	  $display($time, " ERROR: read X value");
+	  begin
+	     $display($time, " ERROR: read X value");
+	     $stop;
+	  end
 	if((ff_almost_empty ^ ft_almost_empty) |
 	   (ff_empty ^ ft_empty) |
 	   (ff_almost_full ^ ft_almost_full) |
 	   (ff_full ^ ft_full))
-	  $display($time, " ERROR: c_fifo and c_fifo_tracker mismatch");
+	  begin
+	     $display($time, " ERROR: c_fifo and c_fifo_tracker mismatch");
+	     $stop;
+	  end
      end
    
    initial
