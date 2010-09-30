@@ -128,9 +128,6 @@ module rtr_alloc_mac
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // required address width for tail FIFO
-   localparam tff_addr_width = clogb(num_flits_per_vc);
-   
    
    //---------------------------------------------------------------------------
    // interface
