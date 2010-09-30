@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module whr_alloc_mac
-  (clk, reset, route_ip_op, arb_active_op, req_ip, req_head_ip, req_tail_ip, 
-   gnt_ip, gnt_op, gnt_head_op, gnt_tail_op, xbr_ctrl_op_ip, elig_op, full_op);
+  (clk, reset, route_ip_op, req_ip, req_head_ip, req_tail_ip, gnt_ip, 
+   flit_valid_op, flit_head_op, flit_tail_op, xbr_ctrl_op_ip, full_op);
    
 `include "c_constants.v"
    
@@ -52,10 +52,6 @@ module whr_alloc_mac
    // destination port selects from input ports
    input [0:num_ports*num_ports-1] route_ip_op;
    
-   // 
-   output [0:num_ports-1] 	   arb_active_op;
-   wire [0:num_ports-1] 	   arb_active_op;
-   
    // requests from input ports
    input [0:num_ports-1] 	   req_ip;
    
@@ -70,23 +66,20 @@ module whr_alloc_mac
    wire [0:num_ports-1] 	   gnt_ip;
    
    // grant to output port
-   output [0:num_ports-1] 	   gnt_op;
-   wire [0:num_ports-1] 	   gnt_op;
+   output [0:num_ports-1] 	   flit_valid_op;
+   wire [0:num_ports-1] 	   flit_valid_op;
    
    // granted flit is head flit
-   output [0:num_ports-1] 	   gnt_head_op;
-   wire [0:num_ports-1] 	   gnt_head_op;
+   output [0:num_ports-1] 	   flit_head_op;
+   wire [0:num_ports-1] 	   flit_head_op;
    
    // granted flit is tail flit
-   output [0:num_ports-1] 	   gnt_tail_op;
-   wire [0:num_ports-1] 	   gnt_tail_op;
+   output [0:num_ports-1] 	   flit_tail_op;
+   wire [0:num_ports-1] 	   flit_tail_op;
    
    // crossbar control signals
    output [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
    wire [0:num_ports*num_ports-1]   xbr_ctrl_op_ip;
-   
-   // can output port accept a new packet?
-   input [0:num_ports-1] 	    elig_op;
    
    // is output port full?
    input [0:num_ports-1] 	    full_op;
@@ -121,26 +114,20 @@ module whr_alloc_mac
 	   wire [0:num_ports-1] route_ip;
 	   assign route_ip = route_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire 		arb_active;
-	   assign arb_active_op[op] = arb_active;
-	   
-	   wire 		elig;
-	   assign elig = elig_op[op];
-	   
 	   wire 		full;
 	   assign full = full_op[op];
 	   
 	   wire [0:num_ports-1] gnt_ip;
 	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
 	   
-	   wire 		gnt;
-	   assign gnt_op[op] = gnt;
+	   wire 		flit_valid;
+	   assign flit_valid_op[op] = flit_valid;
 	   
-	   wire 		gnt_head;
-	   assign gnt_head_op[op] = gnt_head;
+	   wire 		flit_head;
+	   assign flit_head_op[op] = flit_head;
 	   
-	   wire 		gnt_tail;
-	   assign gnt_tail_op[op] = gnt_tail;
+	   wire 		flit_tail;
+	   assign flit_tail_op[op] = flit_tail;
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip;
 	   assign xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1] = xbr_ctrl_ip;
@@ -149,6 +136,8 @@ module whr_alloc_mac
 	   //-------------------------------------------------------------------
 	   // arbitration
 	   //-------------------------------------------------------------------
+	   
+	   wire 		elig;
 	   
 	   wire [0:num_ports-1] arb_req_ip;
 	   assign arb_req_ip
@@ -164,6 +153,7 @@ module whr_alloc_mac
 	   // be timing-critical, we could just enable all output controllers 
 	   // whenever any input controller has data available.
 	   
+	   wire 		arb_active;
 	   assign arb_active = |(req_ip & route_ip);
 	   
 	   wire 		arb_update;
@@ -186,8 +176,10 @@ module whr_alloc_mac
 	   
 	   assign gnt_ip = arb_gnt_ip & {num_ports{~full}};
 	   
+	   wire 		gnt;
 	   assign gnt = arb_gnt & ~full;
 	   
+	   wire 		gnt_head;
 	   c_select_1ofn
 	     #(.num_ports(num_ports),
 	       .width(1))
@@ -196,6 +188,7 @@ module whr_alloc_mac
 	      .data_in(req_head_ip),
 	      .data_out(gnt_head));
 	   
+	   wire 		gnt_tail;
 	   c_select_1ofn
 	     #(.num_ports(num_ports),
 	       .width(1))
@@ -203,6 +196,21 @@ module whr_alloc_mac
 	     (.select(arb_gnt_ip),
 	      .data_in(req_tail_ip),
 	      .data_out(gnt_tail));
+	   
+	   wire 		elig_s, elig_q;
+	   assign elig_s = gnt ? gnt_tail : elig_q;
+	   c_dff
+	     #(.width(1),
+	       .reset_value(1'b1),
+	       .reset_type(reset_type))
+	   eligq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(arb_active),
+	      .d(elig_s),
+	      .q(elig_q));
+	   
+	   assign elig = elig_q;
 	   
 	   wire 		xbr_ctrl_active;
 	   assign xbr_ctrl_active = arb_active | (|xbr_ctrl_ip);
@@ -220,6 +228,48 @@ module whr_alloc_mac
 	      .q(xbr_ctrl_ip_q));
 	   
 	   assign xbr_ctrl_ip = xbr_ctrl_ip_q;
+	   
+	   wire 		flit_valid_s, flit_valid_q;
+	   assign flit_valid_s = gnt;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_validq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(xbr_ctrl_active),
+	      .d(flit_valid_s),
+	      .q(flit_valid_q));
+	   
+	   assign flit_valid = flit_valid_q;
+	   
+	   wire 		flit_head_s, flit_head_q;
+	   assign flit_head_s = gnt_head;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_headq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(arb_active),
+	      .d(flit_head_s),
+	      .q(flit_head_q));
+	   
+	   assign flit_head = flit_head_q;
+	   
+	   wire 		flit_tail_s, flit_tail_q;
+	   assign flit_tail_s = gnt_tail;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_tailq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(arb_active),
+	      .d(flit_tail_s),
+	      .q(flit_tail_q));
+	   
+	   assign flit_tail = flit_tail_q;
 	   
 	end
       

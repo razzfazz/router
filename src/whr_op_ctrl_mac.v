@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module whr_op_ctrl_mac
-  (clk, reset, arb_active, flow_ctrl_in, gnt, gnt_head, gnt_tail, flit_data_in, 
-   channel_out, elig, full, error);
+  (clk, reset, flow_ctrl_in, flit_valid_in, flit_head_in, flit_tail_in, 
+   flit_data_in, channel_out, full, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -101,20 +101,17 @@ module whr_op_ctrl_mac
    input clk;
    input reset;
    
-   // clock enable for arbitration results
-   input arb_active;
-   
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
    // grant from allocator module
-   input 		       gnt;
+   input 		       flit_valid_in;
    
    // grant is for head flit
-   input 		       gnt_head;
+   input 		       flit_head_in;
    
    // grant is for tail flit
-   input 		       gnt_tail;
+   input 		       flit_tail_in;
    
    // incoming flit data
    input [0:flit_data_width-1] flit_data_in;
@@ -122,10 +119,6 @@ module whr_op_ctrl_mac
    // outgoing channel
    output [0:channel_width-1]  channel_out;
    wire [0:channel_width-1]    channel_out;
-   
-   // output can accept a new packet
-   output 		       elig;
-   wire 		       elig;
    
    // output is full
    output 		       full;
@@ -140,10 +133,10 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire 		       empty;
+   wire 		       vs_empty;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = ~empty;
+   assign flow_ctrl_active = ~vs_empty;
    
    wire 		       fc_event_valid;
    wire 		       fc_event_sel_ovc;
@@ -161,78 +154,15 @@ module whr_op_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // staging for flit control signals
-   //---------------------------------------------------------------------------
-   
-   // NOTE: Because we need to clear it in the cycle after a flit has been 
-   // received, this register currently cannot be included in any of the 
-   // other clock gating domains. If we could change this to transmit flits 
-   // using edge-based signaling (i.e., transitions), it could be included in 
-   // the clock gating domain controlled by arb_active.
-   // Alternatively, we could include the flit_valid_in term in arb_active; 
-   // this would allow us to include flit_valid_inq in the gating domain at the 
-   // cost of some unnecessary activity. As synthesis will probably not create 
-   // a clock gating domain for just this register, it currently will most 
-   // likely end up being free-running, so this may be a good tradeoff.
-   
-   wire 		       flit_valid_in;
-   
-   wire 		       flit_valid_in_active;
-   assign flit_valid_in_active = arb_active | flit_valid_in;
-   
-   wire 		       flit_valid_in_s, flit_valid_in_q;
-   assign flit_valid_in_s = gnt;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_valid_inq
-     (.clk(clk),
-      .reset(reset),
-      .active(flit_valid_in_active),
-      .d(flit_valid_in_s),
-      .q(flit_valid_in_q));
-   
-   assign flit_valid_in = flit_valid_in_q;
-   
-   wire 		       flit_head_s, flit_head_q;
-   assign flit_head_s = gnt_head;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_headq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(arb_active),
-      .d(flit_head_s),
-      .q(flit_head_q));
-   
-   wire 		       flit_head_in;
-   assign flit_head_in = flit_head_q;
-   
-   wire 		       flit_tail_s, flit_tail_q;
-   assign flit_tail_s = gnt_tail;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_tailq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(arb_active),
-      .d(flit_tail_s),
-      .q(flit_tail_q));
-   
-   wire 		       flit_tail_in;
-   assign flit_tail_in = flit_tail_q;
-   
-   
-   //---------------------------------------------------------------------------
    // track state of downstream buffer
    //---------------------------------------------------------------------------
    
    wire 		       vs_active;
-   assign vs_active = arb_active | fc_event_valid;
+   assign vs_active = flit_valid_in | fc_event_valid;
    
-   wire 		       almost_full;
+   wire 		       vs_elig;
+   wire 		       vs_almost_full;
+   wire 		       vs_full;
    wire [0:1] 		       vs_errors;
    rtr_vc_state
      #(.num_flits_per_vc(num_flits_per_vc),
@@ -242,14 +172,16 @@ module whr_op_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(vs_active),
-      .flit_sent(gnt),
-      .flit_tail(gnt_tail),
+      .flit_sent(flit_valid_in),
+      .flit_tail(flit_tail_in),
       .fc_event_valid(fc_event_valid),
-      .elig(elig),
-      .empty(empty),
-      .almost_full(almost_full),
-      .full(full),
+      .elig(vs_elig),
+      .empty(vs_empty),
+      .almost_full(vs_almost_full),
+      .full(vs_full),
       .errors(vs_errors));
+   
+   assign full = vs_full | (vs_almost_full & flit_valid_in);
    
    
    //---------------------------------------------------------------------------
