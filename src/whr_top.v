@@ -272,13 +272,10 @@ module whr_top
    // allocation
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] 	      arb_active_op;
+   wire [0:num_ports-1] 	      flit_valid_op;
+   wire [0:num_ports-1] 	      flit_head_op;
+   wire [0:num_ports-1] 	      flit_tail_op;
    
-   wire [0:num_ports-1] 	      gnt_op;
-   wire [0:num_ports-1] 	      gnt_head_op;
-   wire [0:num_ports-1] 	      gnt_tail_op;
-   
-   wire [0:num_ports-1] 	      elig_op;
    wire [0:num_ports-1] 	      full_op;
    
    wire [0:num_ports*num_ports-1]     xbr_ctrl_op_ip;
@@ -291,16 +288,14 @@ module whr_top
      (.clk(clk),
       .reset(reset),
       .route_ip_op(route_ip_op),
-      .arb_active_op(arb_active_op),
       .req_ip(req_ip),
       .req_head_ip(req_head_ip),
       .req_tail_ip(req_tail_ip),
       .gnt_ip(gnt_ip),
-      .gnt_op(gnt_op),
-      .gnt_head_op(gnt_head_op),
-      .gnt_tail_op(gnt_tail_op),
+      .flit_valid_op(flit_valid_op),
+      .flit_head_op(flit_head_op),
+      .flit_tail_op(flit_tail_op),
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip),
-      .elig_op(elig_op),
       .full_op(full_op));
    
    
@@ -340,20 +335,16 @@ module whr_top
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire 		      arb_active;
-	   assign arb_active = arb_active_op[op];
+	   wire 		      flit_valid_in;
+	   assign flit_valid_in = flit_valid_op[op];
 	   
-	   wire 		      gnt;
-	   assign gnt = gnt_op[op];
+	   wire 		      flit_head_in;
+	   assign flit_head_in = flit_head_op[op];
 	   
-	   wire 		      gnt_head;
-	   assign gnt_head = gnt_head_op[op];
-	   
-	   wire 		      gnt_tail;
-	   assign gnt_tail = gnt_tail_op[op];
+	   wire 		      flit_tail_in;
+	   assign flit_tail_in = flit_tail_op[op];
 	   
 	   wire [0:channel_width-1]   channel_out;
-	   wire 		      elig;
 	   wire 		      full;
 	   wire 		      opc_error;
 	   whr_op_ctrl_mac
@@ -370,21 +361,18 @@ module whr_top
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
-	      .arb_active(arb_active),
 	      .flow_ctrl_in(flow_ctrl_in),
-	      .gnt(gnt),
-	      .gnt_head(gnt_head),
-	      .gnt_tail(gnt_tail),
+	      .flit_valid_in(flit_valid_in),
+	      .flit_head_in(flit_head_in),
+	      .flit_tail_in(flit_tail_in),
 	      .flit_data_in(flit_data_in),
 	      .channel_out(channel_out),
-	      .elig(elig),
 	      .full(full),
 	      .error(opc_error));
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
 	   
-	   assign elig_op[op] = elig;
 	   assign full_op[op] = full;
 	   
 	   assign opc_error_op[op] = opc_error;
