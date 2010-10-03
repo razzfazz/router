@@ -442,37 +442,7 @@ module vcr_ovc_ctrl
    generate
       
       if(vc_alloc_requires_credit)
-	begin
-	   
-	   // Instead of just computing this as the reduction of of the updated 
-	   // credit count sum, we can optimize a bit. In particular, we have 
-	   // one or more credits available iff...
-	   //  a) ... we just received a credit. In this case, we either had 
-	   //     credits available to begin with, or there cannot be a debit 
-	   //     at the same time.
-	   //  b) ... we currently have at least two credits available. In this 
-	   //     case, even if there is a debit and no credit, we will still 
-	   //     have at least one credit left.
-	   //  c) ... we currently have a single credit available, and did not 
-	   //     just receive a debit.
-	   // This only leaves out the case where we are not receiving a credit,
-	   // do not currently have two or more credits and either have no 
-	   // credits left or have a single credit left and receive a debit.
-	   wire cred_s, cred_q;
-	   assign cred_s = credit | (~ft_full & (~ft_almost_full | ~debit));
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   credq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(flags_active),
-	      .d(cred_s),
-	      .q(cred_q));
-	   
-	   assign elig = ~allocated_q & cred_q;
-	   
-	end
+	assign elig = ~allocated_q & (~ft_full | credit);
       else
 	assign elig = ~allocated_q;
       
