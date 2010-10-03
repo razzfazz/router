@@ -472,11 +472,7 @@ module vcr_vc_alloc_sep_if
 	   for (op = 0; op < num_ports; op = op + 1)
 	     begin:ops
 		
-		wire [0:num_vcs-1] gnt_ovc;
-		wire [0:num_vcs*num_ports-1] gnt_ovc_ip;
-		wire [0:num_vcs*num_vcs-1]   gnt_ovc_ivc;
-		
-		genvar 			     orc;
+		genvar orc;
 		
 		for(orc = 0; orc < num_resource_classes; orc = orc + 1)
 		  begin:orcs
