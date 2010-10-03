@@ -234,20 +234,30 @@ module vcr_vc_alloc_wf
 				  .input_b({num_vcs_per_class{1'b1}}),
 				  .result(sel_orc_ocvc));
 			       
+			       wire [0:num_vcs-1] 	       sel_ovc;
+			       c_align
+				 #(.in_width(num_resource_classes*
+					     num_vcs_per_class),
+				   .out_width(num_vcs),
+				   .offset(mc*num_resource_classes*
+					   num_vcs_per_class))
+			       sel_ovc_agn
+				 (.data_in(sel_orc_ocvc),
+				  .dest_in({num_vcs{1'b0}}),
+				  .data_out(sel_ovc));
+			       
 			       assign req_ip_ivc_op_ovc
-				 [(((((ip*num_message_classes+mc)*
-				      num_resource_classes+irc)*
-				     num_vcs_per_class+icvc)*
-				    num_ports+op)*
-				   num_message_classes+mc)*
-				  num_resource_classes*num_vcs_per_class:
-				  (((((ip*num_message_classes+mc)*
-				      num_resource_classes+irc)*
-				     num_vcs_per_class+icvc)*
-				    num_ports+op)*
-				   num_message_classes+mc+1)*
-				  num_resource_classes*num_vcs_per_class-1]
-				 = sel_orc_ocvc;
+				 [((((ip*num_message_classes+mc)*
+				     num_resource_classes+irc)*
+				    num_vcs_per_class+icvc)*
+				   num_ports+op)*
+				  num_vcs:
+				  ((((ip*num_message_classes+mc)*
+				     num_resource_classes+irc)*
+				    num_vcs_per_class+icvc)*
+				   num_ports+op+1)*
+				  num_vcs-1]
+				 = sel_ovc;
 			       
 			       wire [0:num_resource_classes*
 				     num_vcs_per_class-1]      elig_orc_ocvc;
