@@ -342,9 +342,6 @@ module vcr_vc_alloc_wf
 	     (.data_in(gnt_wf_ip_irc_icvc_op_orc_ocvc),
 	      .data_out(gnt_wf_op_orc_ocvc_ip_irc_icvc));
 	   
-	   wire [0:num_ports*num_resource_classes*
-		 num_vcs_per_class-1] gnt_op_orc_ocvc;
-	   
 	   genvar 		      op;
 	   
 	   for(op = 0; op < num_ports; op = op + 1)
