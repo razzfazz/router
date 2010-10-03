@@ -351,7 +351,7 @@ module vcr_ip_ctrl_mac
 	   if(vc_alloc_requires_credit)
 	     assign flit_sent
 	       = sw_gnt_nonspec | 
-		 (sw_gnt_spec & (sw_sel_spec_ivc & vc_gnt_ivc));
+		 (sw_gnt_spec & |(sw_sel_spec_ivc & vc_gnt_ivc));
 	   else
 	     assign flit_sent
 	       = sw_gnt_nonspec | 
