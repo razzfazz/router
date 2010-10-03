@@ -523,9 +523,6 @@ module vcr_vc_alloc_sep_of
 			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] gnt_out_ip_irc_icvc;
 			  
-			  wire [0:num_ports*num_resource_classes*
-				num_vcs_per_class-1] gnt_ip_irc_icvc;
-			  
 			  genvar 		     ip;
 			  
 			  for(ip = 0; ip < num_ports; ip = ip + 1)
