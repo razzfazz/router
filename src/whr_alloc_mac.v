@@ -177,7 +177,8 @@ module whr_alloc_mac
 	   assign gnt_ip = raw_gnt_ip & {num_ports{~full}};
 	   
 	   wire 		gnt;
-	   assign gnt = |raw_gnt_ip & ~full;
+	   assign gnt
+	     = |(arb_req_ip & (~req_head_ip | {num_ports{elig}})) & ~full;
 	   
 	   wire 		gnt_head;
 	   assign gnt_head = elig;
