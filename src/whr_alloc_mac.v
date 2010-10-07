@@ -172,7 +172,7 @@ module whr_alloc_mac
 	      .gnt(arb_gnt_ip));
 	   
 	   // update arbiter priorities any time a new packet is granted
-	   assign arb_update = |(arb_gnt_ip & req_head_ip) & ~full;
+	   assign arb_update = arb_gnt & elig & ~full;
 	   
 	   assign gnt_ip = arb_gnt_ip & {num_ports{~full}};
 	   
