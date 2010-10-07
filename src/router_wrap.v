@@ -155,6 +155,7 @@ module router_wrap
 		 .input_stage_can_hold(input_stage_can_hold),
 		 .fb_regfile_type(fb_regfile_type),
 		 .explicit_pipeline_register(explicit_pipeline_register),
+		 .precomp_ip_sel(precomp_ip_sel),
 		 .arbiter_type(sw_alloc_arbiter_type),
 		 .crossbar_type(crossbar_type),
 		 .reset_type(reset_type))

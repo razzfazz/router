@@ -41,6 +41,9 @@ module whr_alloc_mac
    // number of input and output ports on router
    parameter num_ports = 5;
    
+   // precompute output-side arbitration decision one cycle ahead
+   parameter precomp_ip_sel = 1;
+   
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -140,11 +143,7 @@ module whr_alloc_mac
 	   wire 		elig;
 	   
 	   wire [0:num_ports-1] arb_req_ip;
-	   assign arb_req_ip
-	     = req_ip & route_ip & (~req_head_ip | {num_ports{elig}});
-	   
-	   wire 		arb_gnt;
-	   assign arb_gnt = |arb_req_ip;
+	   assign arb_req_ip = req_ip & route_ip;
 	   
 	   
 	   // NOTE: For the wormhole router, credit and eligibility checking is 
@@ -154,46 +153,105 @@ module whr_alloc_mac
 	   // whenever any input controller has data available.
 	   
 	   wire 		arb_active;
-	   assign arb_active = |(req_ip & route_ip);
-	   
-	   wire 		arb_update;
+	   assign arb_active = |arb_req_ip;
 	   
 	   wire [0:num_ports-1] arb_gnt_ip;
-	   c_arbiter
-	     #(.num_ports(num_ports),
-	       .arbiter_type(arbiter_type),
-	       .reset_type(reset_type))
-	   arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(arb_active),
-	      .update(arb_update),
-	      .req(arb_req_ip),
-	      .gnt(arb_gnt_ip));
-	   
-	   // update arbiter priorities any time a new packet is granted
-	   assign arb_update = |(arb_gnt_ip & req_head_ip) & ~full;
-	   
-	   assign gnt_ip = arb_gnt_ip & {num_ports{~full}};
 	   
 	   wire 		gnt;
-	   assign gnt = arb_gnt & ~full;
+	   
+	   if(precomp_ip_sel)
+	     begin
+		
+		wire [0:num_ports-1] mask_ip;
+		
+		wire [0:num_ports-1] mgnt_ip;
+		c_lod
+		  #(.width(num_ports),
+		    .num_priorities(2))
+		olod
+		  (.data_in({arb_req_ip & mask_ip,
+			     arb_req_ip}),
+		   .data_out(mgnt_ip));
+		
+		wire 		     update;
+		assign update = |arb_req_ip;
+		
+		wire [0:num_ports-1] mask_ip_s, mask_ip_q;
+		assign mask_ip_s = update ? mgnt_ip : mask_ip_q;
+		c_dff
+		  #(.width(num_ports),
+		    .reset_type(reset_type))
+		mask_ipq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(arb_active),
+		   .d(mask_ip_s),
+		   .q(mask_ip_q));
+		
+		assign mask_ip = mask_ip_q - 1'b1;
+		
+		wire [0:num_ports-1] gnt_presel_ip;
+		assign gnt_presel_ip = arb_req_ip & mask_ip_q;
+		
+		wire [0:num_ports-1] gnt_onehot_ip;
+		c_one_hot_filter
+		  #(.width(num_ports))
+		oohf
+		  (.data_in(arb_req_ip),
+		   .data_out(gnt_onehot_ip));
+		
+		// NOTE: If the request vector is one-hot, either both methods 
+		// will agree, or preselection will not generate a grant; on 
+		// the other hand, if it is not one-hot, the one-hot filter 
+		// will return a zero vector. In both cases, we can safely just 
+		// OR the results together.
+		
+		assign arb_gnt_ip = gnt_presel_ip | gnt_onehot_ip;
+		
+		assign gnt
+		  = (elig ? |arb_gnt_ip : |(arb_req_ip & ~req_head_ip)) & ~full;
+		
+	     end
+	   else
+	     begin
+		
+		wire arb_update;
+		assign arb_update = |arb_req_ip & elig;
+		
+		c_arbiter
+		  #(.num_ports(num_ports),
+		    .arbiter_type(arbiter_type),
+		    .reset_type(reset_type))
+		arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(arb_active),
+		   .update(arb_update),
+		   .req(arb_req_ip),
+		   .gnt(arb_gnt_ip));
+		
+		assign gnt
+		  = |(arb_req_ip & (~req_head_ip | {num_ports{elig}})) & ~full;
+		
+	     end
+	   
+	   wire [0:num_ports-1] hold_gnt_ip;
+	   assign hold_gnt_ip = arb_req_ip & ~req_head_ip;
+	   
+	   wire [0:num_ports-1] raw_gnt_ip;
+	   assign raw_gnt_ip = elig ? arb_gnt_ip : hold_gnt_ip;
+	   
+	   assign gnt_ip = raw_gnt_ip & {num_ports{~full}};
 	   
 	   wire 		gnt_head;
-	   c_select_1ofn
-	     #(.num_ports(num_ports),
-	       .width(1))
-	   gnt_head_sel
-	     (.select(arb_gnt_ip),
-	      .data_in(req_head_ip),
-	      .data_out(gnt_head));
+	   assign gnt_head = elig;
 	   
 	   wire 		gnt_tail;
 	   c_select_1ofn
 	     #(.num_ports(num_ports),
 	       .width(1))
 	   gnt_tail_sel
-	     (.select(arb_gnt_ip),
+	     (.select(raw_gnt_ip),
 	      .data_in(req_tail_ip),
 	      .data_out(gnt_tail));
 	   
@@ -216,7 +274,7 @@ module whr_alloc_mac
 	   assign xbr_ctrl_active = arb_active | (|xbr_ctrl_ip);
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
-	   assign xbr_ctrl_ip_s = arb_gnt_ip;
+	   assign xbr_ctrl_ip_s = raw_gnt_ip;
 	   c_dff
 	     #(.width(num_ports),
 	       .reset_type(reset_type))
