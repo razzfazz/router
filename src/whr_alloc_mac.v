@@ -180,13 +180,7 @@ module whr_alloc_mac
 	   assign gnt = arb_gnt & ~full;
 	   
 	   wire 		gnt_head;
-	   c_select_1ofn
-	     #(.num_ports(num_ports),
-	       .width(1))
-	   gnt_head_sel
-	     (.select(arb_gnt_ip),
-	      .data_in(req_head_ip),
-	      .data_out(gnt_head));
+	   assign gnt_head = elig;
 	   
 	   wire 		gnt_tail;
 	   c_select_1ofn
