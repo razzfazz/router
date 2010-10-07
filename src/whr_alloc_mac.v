@@ -140,11 +140,7 @@ module whr_alloc_mac
 	   wire 		elig;
 	   
 	   wire [0:num_ports-1] arb_req_ip;
-	   assign arb_req_ip
-	     = req_ip & route_ip & (~req_head_ip | {num_ports{elig}});
-	   
-	   wire 		arb_gnt;
-	   assign arb_gnt = |arb_req_ip;
+	   assign arb_req_ip = req_ip & route_ip;
 	   
 	   
 	   // NOTE: For the wormhole router, credit and eligibility checking is 
@@ -154,9 +150,10 @@ module whr_alloc_mac
 	   // whenever any input controller has data available.
 	   
 	   wire 		arb_active;
-	   assign arb_active = |(req_ip & route_ip);
+	   assign arb_active = |arb_req_ip;
 	   
 	   wire 		arb_update;
+	   assign arb_update = |arb_req_ip & elig;
 	   
 	   wire [0:num_ports-1] arb_gnt_ip;
 	   c_arbiter
@@ -171,13 +168,16 @@ module whr_alloc_mac
 	      .req(arb_req_ip),
 	      .gnt(arb_gnt_ip));
 	   
-	   // update arbiter priorities any time a new packet is granted
-	   assign arb_update = arb_gnt & elig & ~full;
+	   wire [0:num_ports-1] hold_gnt_ip;
+	   assign hold_gnt_ip = arb_req_ip & ~req_head_ip;
 	   
-	   assign gnt_ip = arb_gnt_ip & {num_ports{~full}};
+	   wire [0:num_ports-1] raw_gnt_ip;
+	   assign raw_gnt_ip = elig ? arb_gnt_ip : hold_gnt_ip;
+	   
+	   assign gnt_ip = raw_gnt_ip & {num_ports{~full}};
 	   
 	   wire 		gnt;
-	   assign gnt = arb_gnt & ~full;
+	   assign gnt = |raw_gnt_ip & ~full;
 	   
 	   wire 		gnt_head;
 	   assign gnt_head = elig;
@@ -187,7 +187,7 @@ module whr_alloc_mac
 	     #(.num_ports(num_ports),
 	       .width(1))
 	   gnt_tail_sel
-	     (.select(arb_gnt_ip),
+	     (.select(raw_gnt_ip),
 	      .data_in(req_tail_ip),
 	      .data_out(gnt_tail));
 	   
@@ -210,7 +210,7 @@ module whr_alloc_mac
 	   assign xbr_ctrl_active = arb_active | (|xbr_ctrl_ip);
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
-	   assign xbr_ctrl_ip_s = arb_gnt_ip;
+	   assign xbr_ctrl_ip_s = raw_gnt_ip;
 	   c_dff
 	     #(.width(num_ports),
 	       .reset_type(reset_type))
