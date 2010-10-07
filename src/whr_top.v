@@ -144,6 +144,9 @@ module whr_top
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // precompute output-side arbitration decision one cycle ahead
+   parameter precomp_ip_sel = 1;
+   
    // select which arbiter type to use for switch allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
@@ -282,6 +285,7 @@ module whr_top
    
    whr_alloc_mac
      #(.num_ports(num_ports),
+       .precomp_ip_sel(precomp_ip_sel),
        .arbiter_type(arbiter_type),
        .reset_type(reset_type))
    all
