@@ -106,8 +106,8 @@ module c_fifo_ctrl
       if(depth == 1)
 	begin
 	   
-	   assign pop_addr = min_value;
 	   assign push_addr = min_value;
+	   assign pop_addr = min_value;
 	   
 	   wire empty_s, empty_q;
 	   assign empty_s = empty_q ? (~push | pop) : (~push & pop);
@@ -131,31 +131,9 @@ module c_fifo_ctrl
       else if(depth > 1)
 	begin
 	   
-	   wire [0:addr_width-1] pop_addr_next, pop_addr_q;
-	   c_incr
-	     #(.width(addr_width),
-	       .min_value(min_value),
-	       .max_value(max_value))
-	   pop_addr_incr
-	     (.data_in(pop_addr_q),
-	      .data_out(pop_addr_next));
+	   wire [0:addr_width-1] push_addr_q;
 	   
-	   wire [0:addr_width-1] pop_addr_s;
-	   assign pop_addr_s = pop ? pop_addr_next : pop_addr_q;
-	   c_dff
-	     #(.width(addr_width),
-	       .reset_value(min_value),
-	       .reset_type(reset_type))
-	   pop_addrq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(pop_active),
-	      .d(pop_addr_s),
-	      .q(pop_addr_q));
-	   
-	   assign pop_addr = pop_addr_q;
-	   
-	   wire [0:addr_width-1] push_addr_next, push_addr_q;
+	   wire [0:addr_width-1] push_addr_next;
 	   c_incr
 	     #(.width(addr_width),
 	       .min_value(min_value),
@@ -163,6 +141,15 @@ module c_fifo_ctrl
 	   push_addr_incr
 	     (.data_in(push_addr_q),
 	      .data_out(push_addr_next));
+	   
+	   wire [0:addr_width-1] push_addr_prev;
+	   c_decr
+	     #(.width(addr_width),
+	       .min_value(min_value),
+	       .max_value(max_value))
+	   push_addr_decr
+	     (.data_in(push_addr_q),
+	      .data_out(push_addr_prev));
 	   
 	   wire [0:addr_width-1] push_addr_s;
 	   assign push_addr_s = push ? push_addr_next : push_addr_q;
@@ -179,11 +166,69 @@ module c_fifo_ctrl
 	   
 	   assign push_addr = push_addr_q;
 	   
-	   assign almost_empty = (pop_addr_next == push_addr_q);
+	   wire [0:addr_width-1] pop_addr_q;
+	   
+	   wire [0:addr_width-1] pop_addr_next;
+	   c_incr
+	     #(.width(addr_width),
+	       .min_value(min_value),
+	       .max_value(max_value))
+	   pop_addr_incr
+	     (.data_in(pop_addr_q),
+	      .data_out(pop_addr_next));
+	   
+	   wire [0:addr_width-1] pop_addr_prev;
+	   c_decr
+	     #(.width(addr_width),
+	       .min_value(min_value),
+	       .max_value(max_value))
+	   pop_addr_decr
+	     (.data_in(pop_addr_q),
+	      .data_out(pop_addr_prev));
+	   
+	   wire [0:addr_width-1] pop_addr_s;
+	   assign pop_addr_s = pop ? pop_addr_next : pop_addr_q;
+	   c_dff
+	     #(.width(addr_width),
+	       .reset_value(min_value),
+	       .reset_type(reset_type))
+	   pop_addrq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(pop_active),
+	      .d(pop_addr_s),
+	      .q(pop_addr_q));
+	   
+	   assign pop_addr = pop_addr_q;
+	   
+	   wire 		 equal;
+	   assign equal = (push_addr_q == pop_addr_q);
+	   
+	   wire 		 next_almost_empty;
+	   assign next_almost_empty = (push_addr_prev == pop_addr_next);
+	   
+	   wire 		 almost_empty_s, almost_empty_q;
+	   assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+				   (next_almost_empty & (~push & pop)) |
+				   (equal & (push & ~pop));
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   almost_emptyq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(almost_empty_s),
+	      .q(almost_empty_q));
+	   
+	   assign almost_empty = almost_empty_q;
+	   
+	   wire 		 next_empty;
+	   assign next_empty = (push_addr_q == pop_addr_next);
 	   
 	   wire 		 empty_s, empty_q;
-	   assign empty_s
-	     = (empty_q | (almost_empty & pop & ~push)) & ~(push & ~pop);
+	   assign empty_s = (empty & ~(push & ~pop)) | 
+			    (next_empty & (~push & pop));
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -197,11 +242,38 @@ module c_fifo_ctrl
 	   
 	   assign empty = empty_q;
 	   
-	   assign almost_full = (push_addr_next == pop_addr_q);
+	   if(depth == 2)
+	     assign almost_full = almost_empty;
+	   else if(depth > 2)
+	     begin
+		
+		wire next_almost_full;
+		assign next_almost_full = (push_addr_next == pop_addr_prev);
+		
+		wire almost_full_s, almost_full_q;
+		assign almost_full_s = (almost_full & ~(push ^ pop)) |
+				       (next_almost_full & (push & ~pop)) |
+				       (equal & (~push & pop));
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		almost_fullq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .d(almost_full_s),
+		   .q(almost_full_q));
+		
+		assign almost_full = almost_full_q;
+		
+	     end
 	   
-	   wire 		 full_s, full_q;
-	   assign full_s
-	     = (full_q | (almost_full & push & ~pop)) & ~(pop & ~push);
+	   wire      next_full;
+	   assign next_full = (push_addr_next == pop_addr_q);
+	   
+	   wire      full_s, full_q;
+	   assign full_s = (full & ~(~push & pop)) | 
+			   (next_full & (push & ~pop));
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -233,7 +305,7 @@ module c_fifo_ctrl
    endgenerate
    
    wire 			 error_underflow;
-   assign error_underflow = empty & pop & ~push;
+   assign error_underflow = empty & ~push & pop;
    
    wire 			 error_overflow;
    assign error_overflow = full & push & ~pop;

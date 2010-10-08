@@ -44,9 +44,6 @@ module c_fifo_tracker
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
-   // width required to select an individual credit
-   localparam idx_width = clogb(depth);
-   
    // width required to represent full range of credit count (0..depth)
    localparam free_width = clogb(depth+1);
    
@@ -84,101 +81,144 @@ module c_fifo_tracker
    output [0:1] 	   errors;
    wire [0:1] 		   errors;
    
-   wire 		   full_push;
-   wire 		   full_nopush;
-   
-   wire 		   full_s, full_q;
-   assign full_s = push ? full_push : full_nopush;
+   wire [0:free_width-1]   free_s, free_q;
    c_dff
-     #(.width(1),
+     #(.width(free_width),
+       .reset_value(depth),
        .reset_type(reset_type))
-   fullq
+   freeq
      (.clk(clk),
       .reset(reset),
       .active(active),
-      .d(full_s),
-      .q(full_q));
+      .d(free_s),
+      .q(free_q));
    
-   assign full = full_q;
+   assign free = free_q;
    
    wire 		   error_underflow;
+   assign error_underflow = empty & ~push & pop;
+   
    wire 		   error_overflow;
+   assign error_overflow = full & push & ~pop;
    
    generate
       
-      // if we only have a single entry, we don't need an explicit counter
       if(depth == 1)
 	begin
 	   
-	   assign full_push = full_q | ~pop;
-	   assign full_nopush = full_q & ~pop;
+	   assign free_s = free_q ? (~push | pop) : (~push & pop);
 	   
-	   assign error_underflow = pop & ~push & ~full_q;
-	   assign error_overflow = push & ~pop & full_q;
-	   
-	   assign almost_full = ~full_q;
-	   assign almost_empty = full_q;
-	   assign empty = ~full_q;
-	   
-	   assign free = ~full_q;
+	   assign almost_empty = ~free_q;
+	   assign empty = free_q;
+	   assign almost_full = free_q;
+	   assign full = ~free_q;
 	   
 	end
       
-      // if we have more than one entry, we need an extra counter to keep track
       else if(depth > 1)
 	begin
 	   
-	   wire [0:idx_width-1] free_count_q;
-	   wire 		free_count_zero;
-	   assign free_count_zero = ~|free_count_q;
+	   wire decr_push;
+	   assign decr_push = ~pop;
 	   
-	   wire 		decr_free_count;
-	   assign decr_free_count = ~pop & ~free_count_zero;
+	   wire [0:free_width-1] free_push;
+	   assign free_push = free_q - decr_push;
 	   
-	   wire [0:idx_width-1] free_count_push;
-	   assign free_count_push = free_count_q - decr_free_count;
+	   wire 		 incr_nopush;
+	   assign incr_nopush = pop;
 	   
-	   wire 		incr_free_count;
-	   assign incr_free_count = pop & ~full_q;
+	   wire [0:free_width-1] free_nopush;
+	   assign free_nopush = free_q + incr_nopush;
 	   
-	   wire [0:idx_width-1] free_count_nopush;
-	   assign free_count_nopush = free_count_q + incr_free_count;
+	   assign free_s = push ? free_push : free_nopush;
 	   
-	   wire [0:idx_width-1] free_count_s;
-	   assign free_count_s = push ? free_count_push : free_count_nopush;
+	   wire 		 free_max;
+	   assign free_max = (free_q == depth);
+	   
+	   wire 		 next_almost_empty;
+	   assign next_almost_empty = (free_q == (depth - 2));
+	   
+	   wire 		 almost_empty_s, almost_empty_q;
+	   assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+				   (next_almost_empty & (~push & pop)) | 
+				   (free_max & (push & ~pop));
 	   c_dff
-	     #(.width(idx_width),
-	       .reset_type(reset_type),
-	       .reset_value(depth-1))
-	   free_countq
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   almost_emptyq
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(active),
-	      .d(free_count_s),
-	      .q(free_count_q));
+	      .d(almost_empty_s),
+	      .q(almost_empty_q));
 	   
-	   assign full_push = free_count_zero & (full_q | ~pop);
-	   assign full_nopush = full_q & ~pop;
+	   assign almost_empty = almost_empty_q;
 	   
-	   wire 		free_count_max;
-	   assign free_count_max = (free_count_q == (depth - 1));
+	   wire 		 next_empty;
+	   assign next_empty = (free_q == (depth - 1));
 	   
-	   assign error_underflow = pop & ~push & free_count_max;
-	   assign error_overflow = push & ~pop & full_q;
+	   wire 		 empty_s, empty_q;
+	   assign empty_s = (empty & ~(push & ~pop)) |
+			    (next_empty & (~push & pop));
+	   c_dff
+	     #(.width(1),
+	       .reset_value(1'b1),
+	       .reset_type(reset_type))
+	   emptyq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(empty_s),
+	      .q(empty_q));
 	   
-	   assign almost_full = free_count_zero & ~full_q;
+	   assign empty = empty_q;
+	   
+	   wire 		 free_zero;
+	   assign free_zero = ~|free_q;
 	   
 	   if(depth == 2)
-	     assign almost_empty = almost_full;
-	   else
-	     assign almost_empty = (free_count_q == (depth - 2));
+	     assign almost_full = almost_empty;
+	   else if(depth > 2)
+	     begin
+		
+		wire next_almost_full;
+		assign next_almost_full = (free_q == 2);
+		
+		wire almost_full_s, almost_full_q;
+		assign almost_full_s = (almost_full & ~(push ^ pop)) |
+				       (next_almost_full & (push & ~pop)) |
+				       (free_zero & (~push & pop));
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		almost_fullq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .d(almost_full_s),
+		   .q(almost_full_q));
+		
+		assign almost_full = almost_full_q;
+		
+	     end
 	   
-	   assign empty = free_count_max;
+	   wire      next_full;
+	   assign next_full = (free_q == 1);
 
-	   if(depth == 2)
-	     assign free = {free_count_q, ~free_count_q & full_q};
-	   else
-	     assign free = free_count_q + !full_q;
+	   wire      full_s, full_q;
+	   assign full_s = (full & ~(~push & pop)) | 
+			   (next_full & (push & ~pop));
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   fullq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(full_s),
+	      .q(full_q));
+	   
+	   assign full = full_q;
 	   
 	end
       
