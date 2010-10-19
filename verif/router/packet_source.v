@@ -666,7 +666,6 @@ module packet_source
    
    reg [0:router_addr_width-1] random_router_address;
    
-   integer 		       offset;
    integer 		       d;
    
    generate
