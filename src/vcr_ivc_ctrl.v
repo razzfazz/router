@@ -35,9 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
-   vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_sent_prev, flit_head_prev, flit_head, flit_tail, flit_data, fbc_empty, 
-   fbc_full, allocated, allocated_ovc, free_spec, errors);
+   vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt, flit_sent_prev, 
+   flit_head_prev, flit_head, flit_tail, flit_data, fbc_empty, fbc_full, 
+   allocated, allocated_ovc, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -265,11 +265,8 @@ module vcr_ivc_ctrl
    output 					     sw_req_spec;
    wire 					     sw_req_spec;
    
-   // non-speculative switch allocator grants
-   input 					     sw_gnt_nonspec;
-   
-   // speculative switch allocator grants
-   input 					     sw_gnt_spec;
+   // switch allocator grants
+   input 					     sw_gnt;
    
    // did this VC send a flit in the previous cycle?
    input 					     flit_sent_prev;

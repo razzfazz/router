@@ -56,9 +56,6 @@ module vcr_sw_alloc_mac
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
-   // select speculation type
-   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -148,7 +145,6 @@ module vcr_sw_alloc_mac
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .arbiter_type(arbiter_type),
-	       .spec_type(spec_type),
 	       .reset_type(reset_type))
 	   core_sep_if
 	     (.clk(clk),
@@ -172,7 +168,6 @@ module vcr_sw_alloc_mac
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .arbiter_type(arbiter_type),
-	       .spec_type(spec_type),
 	       .reset_type(reset_type))
 	   core_sep_of
 	     (.clk(clk),
@@ -198,7 +193,6 @@ module vcr_sw_alloc_mac
 	       .num_ports(num_ports),
 	       .wf_alloc_type(allocator_type - `SW_ALLOC_TYPE_WF_BASE),
 	       .arbiter_type(arbiter_type),
-	       .spec_type(spec_type),
 	       .reset_type(reset_type))
 	   core_wf
 	     (.clk(clk),

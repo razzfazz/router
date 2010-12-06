@@ -443,7 +443,6 @@ module tc_router_wrap
        .vc_alloc_requires_credit(vc_alloc_requires_credit),
        .sw_alloc_type(sw_alloc_type),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
-       .sw_alloc_spec_type(sw_alloc_spec_type),
        .crossbar_type(crossbar_type),
        .reset_type(reset_type))
    rtr
