@@ -61,9 +61,6 @@ module rtr_vc_state
    // width required to express number of flits in a VC
    localparam flit_count_width = clogb(num_flits_per_vc + 1);
    
-   // required address width for tail FIFO
-   localparam tff_addr_width = clogb(num_flits_per_vc);
-   
    
    //---------------------------------------------------------------------------
    // interface
