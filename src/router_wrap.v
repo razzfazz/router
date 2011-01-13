@@ -189,7 +189,6 @@ module router_wrap
 		 .min_payload_length(min_payload_length),
 		 .flit_data_width(flit_data_width),
 		 .error_capture_mode(error_capture_mode),
-		 .track_vcs_at_output(track_vcs_at_output),
 		 .restrict_turns(restrict_turns),
 		 .routing_type(routing_type),
 		 .dim_order(dim_order),

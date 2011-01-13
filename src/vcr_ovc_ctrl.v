@@ -34,7 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
-   xbr_ctrl_ip, int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
+   xbr_ctrl_ip, flit_valid, flit_tail, elig, empty, int_flow_ctrl, 
+   errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -74,10 +75,6 @@ module vcr_ovc_ctrl
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
    
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 0;
-   
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
@@ -86,9 +83,6 @@ module vcr_ovc_ctrl
    
    // required address width for tail flit FIFO
    localparam tff_addr_width = clogb(num_flits_per_vc);
-   
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
@@ -128,13 +122,11 @@ module vcr_ovc_ctrl
    // was this output granted to an input port?
    input [0:num_ports-1] xbr_ctrl_ip;
    
-   // incoming flit control signals
-   input [0:int_flit_ctrl_width-1] int_flit_ctrl;
+   // incoming flit is valid
+   input flit_valid;
    
-   // output VC owns the current flit
-   // (NOTE: only valid if track_vcs_at_output=1)
-   output match;
-   wire match;
+   // incoming flit is a tail flit
+   input flit_tail;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output elig;
@@ -158,39 +150,27 @@ module vcr_ovc_ctrl
    // decode control signals
    //---------------------------------------------------------------------------
    
-   wire 			  flit_valid;
-   assign flit_valid = int_flit_ctrl[0] & |xbr_ctrl_ip;
-   
-   wire 			  flit_head;
-   assign flit_head = int_flit_ctrl[1+vc_idx_width];
-   
-   wire 			  flit_tail;
-   assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
-   
    wire 			  credit;
    assign credit = fc_event_valid;
    
-   wire 			   flit_valid_qual;
-   assign flit_valid_qual = flit_valid & match;
-   
-   wire 			   debit;
-   assign debit = flit_valid_qual;
+   wire 			  debit;
+   assign debit = flit_valid;
    
    
    //---------------------------------------------------------------------------
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
    
-   wire 			   alloc_active;
+   wire 			  alloc_active;
    assign alloc_active = vc_req | (|xbr_ctrl_ip);
    
-   wire 			   allocated_q;
+   wire 			  allocated_q;
    
-   wire 			   next_allocated;   
+   wire 			  next_allocated;   
    assign next_allocated = vc_gnt | allocated_q;
    
-   wire 			   allocated_s;
-   assign allocated_s = next_allocated & ~(flit_valid_qual & flit_tail);
+   wire 			  allocated_s;
+   assign allocated_s = next_allocated & ~(flit_valid & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -201,84 +181,20 @@ module vcr_ovc_ctrl
       .d(allocated_s),
       .q(allocated_q));
    
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc;
-	   assign flit_vc = int_flit_ctrl[1:1+vc_idx_width-1];
-	   
-	   // if VC assignment is tracked at the output, each output VC needs to
-	   // check if it is currently assigned to the incoming VC ID at the 
-	   // selected input port
-	   if(track_vcs_at_output)
-	     begin
-		
-		wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
-		assign allocated_ip_s = vc_gnt ? vc_gnt_ip : allocated_ip_q;
-		c_dff
-		  #(.width(num_ports),
-		    .reset_type(reset_type))
-		allocated_ipq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(allocated_ip_s),
-		   .q(allocated_ip_q));
-		
-		wire [0:vc_idx_width-1] vc_gnt_vc;
-		c_encode
-		  #(.num_ports(num_vcs))
-		vc_gnt_vc_enc
-		  (.data_in(vc_gnt_ivc),
-		   .data_out(vc_gnt_vc));
-		
-		wire [0:vc_idx_width-1] allocated_vc_s, allocated_vc_q;
-		assign allocated_vc_s = vc_gnt ? vc_gnt_vc : allocated_vc_q;
-		c_dff
-		  #(.width(vc_idx_width),
-		    .reset_type(reset_type))
-		allocated_vcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(allocated_vc_s),
-		   .q(allocated_vc_q));
-		
-		assign match = allocated_q &&
-			       |(allocated_ip_q & xbr_ctrl_ip) &&
-			       (allocated_vc_q == flit_vc);
-		
-	     end
-	   
-	   // if VC assignments are tracked at the input side, we can just check
-	   // for our own VC ID
-	   else
-	     assign match = (flit_vc == vc_id);
-	   
-	end
-      
-      // if we only have a single VC to begin with, it is always selected
-      else
-	assign match = 1'b1;
-      
-   endgenerate
-   
    
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 				flags_active;
+   wire 			  flags_active;
    assign flags_active = alloc_active | credit;
    
-   wire 				ft_almost_empty;
-   wire 				ft_empty;
-   wire 				ft_almost_full;
-   wire 				ft_full;
-   wire [0:flit_count_width-1] 		ft_free;
-   wire [0:1] 				ft_errors;
+   wire 			  ft_almost_empty;
+   wire 			  ft_empty;
+   wire 			  ft_almost_full;
+   wire 			  ft_full;
+   wire [0:flit_count_width-1] 	  ft_free;
+   wire [0:1] 			  ft_errors;
    c_fifo_tracker
      #(.depth(num_flits_per_vc),
        .reset_type(reset_type))
@@ -297,10 +213,10 @@ module vcr_ovc_ctrl
    
    assign empty = ft_empty;
    
-   wire 				error_ct_underflow;
+   wire 			  error_ct_underflow;
    assign error_ct_underflow = ft_errors[0];
    
-   wire 				error_ct_overflow;
+   wire 			  error_ct_overflow;
    assign error_ct_overflow = ft_errors[1];
    
    

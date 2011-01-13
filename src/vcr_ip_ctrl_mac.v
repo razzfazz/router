@@ -145,10 +145,6 @@ module vcr_ip_ctrl_mac
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 0;
-   
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
@@ -443,7 +439,6 @@ module vcr_ip_ctrl_mac
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
-	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
@@ -653,53 +648,35 @@ module vcr_ip_ctrl_mac
 	   assign flit_sent_prev_ivc
 	     = {num_vcs{flit_valid_out_q}} & vc_sel_ivc_q;
 	   
-	   if(track_vcs_at_output)
-	     begin
-		
-		wire [0:vc_idx_width-1] vc_sel;
-		c_encode
-		  #(.num_ports(num_vcs))
-		vc_sel_enc
-		  (.data_in(vc_sel_ivc_q),
-		   .data_out(vc_sel));
-		
-		assign int_flit_ctrl_out[1:1+vc_idx_width-1] = vc_sel;
-		
-	     end
-	   else
-	     begin
-		
-		wire [0:num_vcs-1] allocated_ovc;
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(num_vcs))
-		allocated_ovc_sel
-		  (.select(vc_sel_ivc),
-		   .data_in(allocated_ivc_ovc),
-		   .data_out(allocated_ovc));
-		
-		wire [0:num_vcs-1] allocated_ovc_s, allocated_ovc_q;
-		assign allocated_ovc_s = allocated_ovc;
-		c_dff
-		  #(.width(num_vcs),
-		    .reset_type(reset_type))
-		allocated_ovcq
-		  (.clk(clk),
-		   .reset(1'b0),
-		   .active(alloc_active),
-		   .d(allocated_ovc_s),
-		   .q(allocated_ovc_q));
-		
-		wire [0:vc_idx_width-1] dest_vc_sel;
-		c_encode
-		  #(.num_ports(num_vcs))
-		dest_vc_sel_enc
-		  (.data_in(allocated_ovc_q),
-		   .data_out(dest_vc_sel));
-		
-		assign int_flit_ctrl_out[1:1+vc_idx_width-1] = dest_vc_sel;
-		
-	     end
+	   wire [0:num_vcs-1] allocated_ovc;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(num_vcs))
+	   allocated_ovc_sel
+	     (.select(vc_sel_ivc),
+	      .data_in(allocated_ivc_ovc),
+	      .data_out(allocated_ovc));
+	   
+	   wire [0:num_vcs-1] allocated_ovc_s, allocated_ovc_q;
+	   assign allocated_ovc_s = allocated_ovc;
+	   c_dff
+	     #(.width(num_vcs),
+	       .reset_type(reset_type))
+	   allocated_ovcq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(alloc_active),
+	      .d(allocated_ovc_s),
+	      .q(allocated_ovc_q));
+	   
+	   wire [0:vc_idx_width-1] dest_vc_sel;
+	   c_encode
+	     #(.num_ports(num_vcs))
+	   dest_vc_sel_enc
+	     (.data_in(allocated_ovc_q),
+	      .data_out(dest_vc_sel));
+	   
+	   assign int_flit_ctrl_out[1:1+vc_idx_width-1] = dest_vc_sel;
 	   
 	end
       

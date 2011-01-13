@@ -77,10 +77,6 @@ parameter flit_data_width = 32;
 // configure error checking logic
 parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 
-// select whether to set a packet's outgoing VC ID at the input or output 
-// controller
-parameter track_vcs_at_output = 0;
-
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
 // such turns)

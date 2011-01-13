@@ -141,10 +141,6 @@ module vcr_ivc_ctrl
    // width of flit payload data
    parameter flit_data_width = 64;
    
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 0;
-   
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)

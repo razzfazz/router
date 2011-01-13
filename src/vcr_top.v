@@ -129,10 +129,6 @@ module vcr_top
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 0;
-   
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
@@ -300,7 +296,6 @@ module vcr_top
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
-	       .track_vcs_at_output(track_vcs_at_output),
 	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
@@ -508,7 +503,6 @@ module vcr_top
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
-	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .port_id(op),
