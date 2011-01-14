@@ -81,9 +81,6 @@ module vcr_ovc_ctrl
    // select implementation variant for tail sent tracker register file
    parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
    
-   // required address width for tail flit FIFO
-   localparam tff_addr_width = clogb(num_flits_per_vc);
-   
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
      = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
