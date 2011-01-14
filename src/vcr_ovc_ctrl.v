@@ -240,8 +240,29 @@ module vcr_ovc_ctrl
 	     // eligible for allocation in the current cycle, and thus cannot 
 	     // be assigned to another input VC.
 	     
-	     assign int_flow_ctrl[0] = ~ft_full & (~ft_almost_full | credit);
-	     assign int_flow_ctrl[1] = ft_almost_full | (ft_full & credit);
+	     if(num_flits_per_vc == 2)
+	       begin
+		  assign int_flow_ctrl[0]
+			   = ~ft_full & (~ft_almost_full | credit);
+		  assign int_flow_ctrl[1]
+			   = ft_almost_full | (ft_full & credit);
+	       end
+	     else if(num_flits_per_vc > 2)
+	       begin
+		  
+		  wire [0:1] sum;
+		  assign sum
+		    = ft_free[flit_count_width-2:flit_count_width-1] + credit;
+		  
+		  // NOTE: if num_flits_per_vc > 2, then flit_count_width >= 3
+		  
+		  wire 	     cap;
+		  assign cap = |ft_free[0:flit_count_width-3] | 
+			       &ft_free[flit_count_width-2:flit_count_width-1];
+		  
+		  assign int_flow_ctrl = sum | {2{cap}};
+		  
+	       end
 	     
 	  end
 	
