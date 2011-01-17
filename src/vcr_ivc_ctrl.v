@@ -492,7 +492,7 @@ module vcr_ivc_ctrl
 	   
 	   assign fbf_write_enable = flit_valid_in;
 	   
-	   // NOTE: fbf_read_active is generated later on in the file
+	   assign fbf_read_active = flit_sent_prev;
 	   
 	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
