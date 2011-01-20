@@ -89,12 +89,8 @@ module vcr_ovc_ctrl
    
    // width of counter for credits waiting to be sent to input controller
    localparam cred_hold_width = vc_alloc_requires_credit ? 
-				clogb(num_flits_per_vc) : 
-				flit_count_width;
-   
-   // initial value for credit hold counter
-   localparam [0:cred_hold_width-1] cred_hold_reset_value
-     = vc_alloc_requires_credit ? (num_flits_per_vc - 1) : num_flits_per_vc;
+				clogb(num_flits_per_vc-1) : 
+				clogb(num_flits_per_vc);
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -177,6 +173,9 @@ module vcr_ovc_ctrl
       .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
+
+   wire 			  error_stray_flit;
+   assign error_stray_flit = debit & ~allocated_q;
    
    wire 			  error_stray_flit;
    assign error_stray_flit = debit & ~allocated_q;
@@ -272,98 +271,107 @@ module vcr_ovc_ctrl
 	`INT_FLOW_CTRL_TYPE_PUSH:
 	  begin
 	     
-	     wire [0:cred_hold_width-1] cred_hold_base;
-	     assign cred_hold_base
-	       = ft_free[flit_count_width-cred_hold_width:flit_count_width-1];
-	     
-	     wire [0:cred_hold_width-1] cred_hold_copy;
+	     wire int_flow_ctrl_unallocated;
+	     wire flit_count_force_zero;
+	     wire [0:flit_count_width-1] flit_count_adjusted;
 	     
 	     if(vc_alloc_requires_credit)
 	       begin
 		  
-		  // If the VC is currently full, of if there is only a single 
-		  // credit left in the VC and we don't receive another one in 
-		  // this cycle, we know that there cannot be any credits left 
-		  // for the next cycle.
+		  // Send one credit explicitly via internal flow control iff 
+		  // we have two or more credits available (i.e., if we have a 
+		  // credit in addition to the one sent implicitly via VC 
+		  // allocation).
+
+		  // Note that while the VC is not allocated, 'debit' must be 
+		  // zero, as VCs don't become eligible for reallocation until 
+		  // after the current packet's tail flit has traversed the 
+		  // crossbar.
 		  
-		  wire force_zero;
-		  assign force_zero = ft_full | (ft_almost_full & ~credit);
+		  assign int_flow_ctrl_unallocated
+		    = ~ft_full & (~ft_almost_full | credit);
 		  
-		  // Otherwise we must subtract one from the current credit
-		  // count, and then add 'credit' and subtract 'debit'; note
-		  // that this can potentially cause underflows, so we will
-		  // use 'force_zero' later to mask out such incorrect results.
+		  // To initialize the credit hold register for the next cycle,
+		  // we have to subtract one from the current number of credits
+		  // for the one that was sent implicitly via VC allocation,
+		  // subtract one if a credit was sent explicitly via internal 
+		  // flow control, and add one if a new credit arrived from the 
+		  // downstream router.
 		  
-		  // First we adjust the credit count by adding 'credit' and 
-		  // subtracting one.
-		  // (NOTE: -1+x = -(1-x) = -(~x) for single-bit x)
+		  // Note that in two's complement,
+		  //
+		  //  -2 = 'b[...]1110,
+		  //
+		  // and thus for single-bit x,
+		  //
+		  //  -2 + x = 'b[...]1110 + 'b[...]000x = 'b[...]111x.
 		  
-		  wire [0:cred_hold_width-1] cred_hold_step1;
-		  assign cred_hold_step1 = cred_hold_base - !credit;
+		  wire [0:flit_count_width-1] flit_count_delta;
+		  assign flit_count_delta
+		    = {{(flit_count_width-1){1'b1}}, credit};
 		  
-		  // Then we subtract the incoming 'debit' signal.
+		  // In order to avoid underflow, we initialize the credit hold 
+		  // register to zero if zero or one credits were available. 
 		  
-		  wire [0:cred_hold_width-1] cred_hold_step2;
-		  assign cred_hold_step2 = cred_hold_step1 - debit;
+		  assign flit_count_force_zero = ft_full | ft_almost_full;
 		  
-		  // Forcing the result to zero in this case allows us to 
-		  // avoid a potential underflow when unconditionally 
-		  // subtracting the incoming 'debit' signal.
-		  
-		  assign cred_hold_copy
-		    = cred_hold_step2 & {cred_hold_width{~force_zero}};
+		  assign flit_count_adjusted = ft_free + flit_count_delta;
 		  
 	       end
 	     else
 	       begin
 		  
-		  wire [0:cred_hold_width-1] cred_hold_plus_credit;
-		  assign cred_hold_plus_credit = cred_hold_base + credit;
+		  assign int_flow_ctrl_unallocated = ~ft_full | credit;
+		  assign flit_count_force_zero = ft_full;
 		  
-		  assign cred_hold_copy = cred_hold_plus_credit - debit;
+		  // Note that in two's complement, for single-bit x,
+		  //
+		  //  -1 + x = -(1 - x) = -(!x).
+		  
+		  assign flit_count_adjusted = ft_free - !credit;
 		  
 	       end
 	     
-	     if(cred_hold_width >= 2)
-	       begin
-		  
-		  wire cred_hold_any;
-		  
-		  // NOTE: This doesn't fit in well with any of the other clock
-		  // gating domains, as the register needs to be kept active 
-		  // until all credits have been sent; the register is probably 
-		  // not wide enough to end up in a clock gating domain of its 
-		  // own, so it will most likely end up being free-running.
-		  
-		  wire cred_hold_active;
-		  assign cred_hold_active = flags_active | cred_hold_any;
-		  
-		  wire [0:cred_hold_width-1] cred_hold_s, cred_hold_q;
-		  assign cred_hold_s
-		    = next_allocated ?
-		      (cred_hold_q - (cred_hold_any & ~credit)) :
-		      cred_hold_copy;
-		  c_dff
-		    #(.width(cred_hold_width),
-		      .reset_type(reset_type),
-		      .reset_value(cred_hold_reset_value))
-		  cred_holdq
-		    (.clk(clk),
-		     .reset(reset),
-		     .active(cred_hold_active),
-		     .d(cred_hold_s),
-		     .q(cred_hold_q));
-		  
-		  assign cred_hold_any = |cred_hold_q;
-		  
-		  assign int_flow_ctrl
-		    = next_allocated ?
-		      (|cred_hold_q[0:cred_hold_width-2] | credit) :
-		      |cred_hold_copy;
-		  
-	       end
-	     else
-	       assign int_flow_ctrl = next_allocated ? credit : |cred_hold_copy;
+	     wire [0:cred_hold_width-1] cred_hold_copy;
+	     assign cred_hold_copy
+	       = {cred_hold_width{~flit_count_force_zero}} &
+		 flit_count_adjusted[flit_count_width-cred_hold_width:
+				     flit_count_width-1];
+	     
+	     wire 			cred_hold_any;
+	     
+	     // NOTE: This doesn't fit in well with any of the other clock
+	     // gating domains, as the register needs to be kept active until 
+	     // all credits have been sent; the register is probably not wide 
+	     // enough to end up in a clock gating domain of its own, so it 
+	     // will most likely end up being free-running.
+	     
+	     wire 			cred_hold_active;
+	     assign cred_hold_active = flags_active | cred_hold_any;
+	     
+	     wire [0:cred_hold_width-1] cred_hold_s, cred_hold_q;
+	     assign cred_hold_s
+	       = allocated_q ?
+		 ((cred_hold_q - !credit) & {cred_hold_width{cred_hold_any}}) :
+		 cred_hold_copy;
+	     c_dff
+	       #(.width(cred_hold_width),
+		 .reset_type(reset_type))
+	     cred_holdq
+	       (.clk(clk),
+		.reset(1'b0),
+		.active(cred_hold_active),
+		.d(cred_hold_s),
+		.q(cred_hold_q));
+	     
+	     assign cred_hold_any = |cred_hold_q;
+	     
+	     wire 			int_flow_ctrl_allocated;
+	     assign int_flow_ctrl_allocated = cred_hold_any | credit;
+	     
+	     assign int_flow_ctrl = allocated_q ? 
+				    int_flow_ctrl_allocated : 
+				    int_flow_ctrl_unallocated;
 	     
 	  end
 	
