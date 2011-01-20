@@ -195,7 +195,7 @@ module vcr_op_ctrl_mac
    wire [0:num_vcs-1] 			    flit_valid_in_ovc;
    assign flit_valid_in_ovc = {num_vcs{flit_valid_in}} & flit_sel_in_ovc;
    
-   wire [0:num_vcs*2-1] 		    ovcc_errors_ovc;
+   wire [0:num_vcs*3-1] 		    ovcc_errors_ovc;
    
    generate
       
@@ -241,7 +241,7 @@ module vcr_op_ctrl_mac
 	   wire 		elig;
 	   wire 		empty;
 	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
-	   wire [0:1] 			  ovcc_errors;
+	   wire [0:2] 			  ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
@@ -273,7 +273,7 @@ module vcr_op_ctrl_mac
 	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
 				    (ovc+1)*int_flow_ctrl_width-1]
 		    = int_flow_ctrl;
-	   assign ovcc_errors_ovc[ovc*2:(ovc+1)*2-1] = ovcc_errors;
+	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
 	   
 	end
       
@@ -313,10 +313,10 @@ module vcr_op_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*2-1] errors_s, errors_q;
+	   wire [0:num_vcs*3-1] errors_s, errors_q;
 	   assign errors_s = ovcc_errors_ovc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*2),
+	     #(.num_errors(num_vcs*3),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

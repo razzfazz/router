@@ -139,8 +139,8 @@ module vcr_ovc_ctrl
    wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
    
    // internal error condition detected
-   output [0:1] errors;
-   wire [0:1] 			  errors;
+   output [0:2] errors;
+   wire [0:2] 			  errors;
    
    
    //---------------------------------------------------------------------------
@@ -177,6 +177,9 @@ module vcr_ovc_ctrl
       .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
+   
+   wire 			  error_stray_flit;
+   assign error_stray_flit = debit & ~allocated_q;
    
    
    //---------------------------------------------------------------------------
@@ -392,6 +395,9 @@ module vcr_ovc_ctrl
    always @(posedge clk)
      begin
 	
+	if(error_stray_flit)
+	  $display("ERROR: Stray flit in module %m.");
+	
 	if(error_ct_underflow)
 	  $display("ERROR: Credit tracker underflow in module %m.");
 	
@@ -402,7 +408,8 @@ module vcr_ovc_ctrl
    
    // synopsys translate_on
    
-   assign errors[0] = error_ct_underflow;
-   assign errors[1] = error_ct_overflow;
+   assign errors[0] = error_stray_flit;
+   assign errors[1] = error_ct_underflow;
+   assign errors[2] = error_ct_overflow;
    
 endmodule
