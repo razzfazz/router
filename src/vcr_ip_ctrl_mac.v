@@ -324,8 +324,7 @@ module vcr_ip_ctrl_mac
       
       if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
-	   assign sw_gnt_spec_ivc
-	     = {num_vcs{sw_gnt_spec}} & sw_sel_spec_ivc & free_spec_ivc;
+	   assign sw_gnt_spec_ivc = {num_vcs{sw_gnt_spec}} & sw_sel_spec_ivc;
 	   
 	   case(sw_alloc_spec_type)
 	     
@@ -347,7 +346,8 @@ module vcr_ip_ctrl_mac
 	   if(vc_alloc_requires_credit)
 	     assign flit_sent
 	       = sw_gnt_nonspec | 
-		 (sw_gnt_spec & |(sw_sel_spec_ivc & vc_gnt_ivc));
+		 (sw_gnt_spec & 
+		  |(sw_sel_spec_ivc & vc_gnt_ivc));
 	   else
 	     assign flit_sent
 	       = sw_gnt_nonspec | 

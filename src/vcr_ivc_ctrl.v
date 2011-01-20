@@ -377,11 +377,18 @@ module vcr_ivc_ctrl
       if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
 	   assign flit_sent = sw_gnt_nonspec;
+	   
 	   assign allocated_ocvc = vc_allocated_ocvc;
 	end
       else
 	begin
-	   assign flit_sent = (vc_gnt & sw_gnt_spec) | sw_gnt_nonspec;
+	   if(vc_alloc_requires_credit)
+	     assign flit_sent
+	       = sw_gnt_nonspec | (sw_gnt_spec & vc_gnt);
+	   else
+	     assign flit_sent
+	       = sw_gnt_nonspec | (sw_gnt_spec & vc_gnt & free_spec);
+				 
 	   assign allocated_ocvc = vc_allocated_next_ocvc;
 	end
       
