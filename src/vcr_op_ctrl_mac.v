@@ -195,7 +195,6 @@ module vcr_op_ctrl_mac
    wire [0:num_vcs-1] 			    flit_valid_in_ovc;
    assign flit_valid_in_ovc = {num_vcs{flit_valid_in}} & flit_sel_in_ovc;
    
-   wire [0:num_vcs-1] 			    next_cred_ovc;
    wire [0:num_vcs*2-1] 		    ovcc_errors_ovc;
    
    generate
