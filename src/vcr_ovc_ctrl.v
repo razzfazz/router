@@ -177,9 +177,6 @@ module vcr_ovc_ctrl
    wire 			  error_stray_flit;
    assign error_stray_flit = debit & ~allocated_q;
    
-   wire 			  error_stray_flit;
-   assign error_stray_flit = debit & ~allocated_q;
-   
    
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
