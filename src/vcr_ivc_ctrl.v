@@ -965,12 +965,6 @@ module vcr_ivc_ctrl
 	`INT_FLOW_CTRL_TYPE_LEVEL:
 	  begin
 	     
-	     wire [0:num_vcs_per_class*2-1] free_ocvc;
-	     assign free_ocvc = int_flow_ctrl_ocvc;
-	     
-	     wire [0:1] 		    flit_sent_count;
-	     assign flit_sent_count = flit_sent_prev + flit_sent;
-	     
 	     wire [0:num_vcs_per_class-1]   next_free_ocvc;
 	     wire [0:num_vcs_per_class-1]   free_spec_ocvc;
 	     
@@ -979,18 +973,21 @@ module vcr_ivc_ctrl
 	     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
 	       begin:ocvcs
 		  
-		  wire [0:1] free;
-		  assign free = free_ocvc[ocvc*2:(ocvc+1)*2-1];
+		  wire [0:1] int_flow_ctrl;
+		  assign int_flow_ctrl
+		    = int_flow_ctrl_ocvc[ocvc*2:(ocvc+1)*2-1];
 		  
-		  wire [0:2] free_by_count;
-		  assign free_by_count = {|free, free[0], &free};
+		  wire 	     two_or_more_credits;
+		  assign two_or_more_credits
+		    = int_flow_ctrl[0] & (int_flow_ctrl[1] | ~flit_sent_prev);
 		  
-		  // NOTE: For allocated VCs, the free state must be updated 
-		  // depending on how many flits were sent to the VC that are 
-		  // not already reflected in the incoming credit count.
+		  wire 	     one_or_more_credits;
+		  assign one_or_more_credits
+		    = int_flow_ctrl[0] | (int_flow_ctrl[1] & ~flit_sent_prev);
 		  
-		  wire       next_free;
-		  assign next_free = free_by_count[flit_sent_count];
+		  wire 	     next_free;
+		  assign next_free
+		    = flit_sent ? two_or_more_credits : one_or_more_credits;
 		  
 		  assign next_free_ocvc[ocvc] = next_free;
 		  
@@ -1001,7 +998,7 @@ module vcr_ivc_ctrl
 		  // the previous cycle.
 		  
 		  wire 	     free_spec;
-		  assign free_spec = |free;
+		  assign free_spec = |int_flow_ctrl;
 		  
 		  assign free_spec_ocvc[ocvc] = free_spec;
 		  
