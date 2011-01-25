@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_vc_state
-  (clk, reset, active, flit_sent, flit_tail, fc_event_valid, elig, empty, 
-   almost_full, full, errors);
+  (clk, reset, active, flit_sent, flit_tail, fc_event_valid, elig, 
+   almost_empty, empty, almost_full, full, free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -85,10 +85,14 @@ module rtr_vc_state
    output elig;
    wire   elig;
    
+   // VC has one flit left
+   output almost_empty;
+   wire   almost_empty;
+   
    // VC is empty
    output empty;
    wire   empty;
-   
+
    // VC has one slot left
    output almost_full;
    wire   almost_full;
@@ -97,22 +101,21 @@ module rtr_vc_state
    output full;
    wire   full;
    
+   // VC fill level indicator
+   output [0:flit_count_width-1] free;
+   wire [0:flit_count_width-1] 	 free;
+   
    // internal error condition detected
-   output [0:1] errors;
-   wire [0:1] 	errors;
+   output [0:1] 		 errors;
+   wire [0:1] 			 errors;
    
    
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
    
-   wire 	allocated;
-   wire 	ft_full;
-   
-   assign elig = ~allocated & ~ft_full;
-   
-   wire 	error_ft_underflow;
-   wire 	error_ft_overflow;
+   wire 			 error_ft_underflow;
+   wire 			 error_ft_overflow;
    
    generate
       
@@ -134,6 +137,7 @@ module rtr_vc_state
 	     wire ft_almost_empty;
 	     wire ft_empty;
 	     wire ft_almost_full;
+	     wire ft_full;
 	     wire [0:flit_count_width-1] ft_free;
 	     wire [0:1] 		 ft_errors;
 	     c_fifo_tracker
@@ -152,9 +156,11 @@ module rtr_vc_state
 		.free(ft_free),
 		.errors(ft_errors));
 	     
+	     assign almost_empty = ft_almost_empty;
 	     assign empty = ft_empty;
 	     assign almost_full = ft_almost_full;
 	     assign full = ft_full;
+	     assign free = ft_free;
 	     
 	     assign error_ft_underflow = ft_errors[0];
 	     assign error_ft_overflow = ft_errors[1];
@@ -178,7 +184,7 @@ module rtr_vc_state
    // have any effect.
    
    wire 					allocated_s, allocated_q;
-   assign allocated_s = (allocated | flit_sent) & ~(flit_sent & flit_tail);
+   assign allocated_s = (allocated_q | flit_sent) & ~(flit_sent & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -189,7 +195,7 @@ module rtr_vc_state
       .d(allocated_s),
       .q(allocated_q));
    
-   assign allocated = allocated_q;
+   assign elig = ~allocated_q;
    
    
    //---------------------------------------------------------------------------

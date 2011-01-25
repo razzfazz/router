@@ -62,6 +62,9 @@ parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
 // select type of flow control
 parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
 
+// make incoming flow control signals bypass the output VC state tracking logic
+parameter flow_ctrl_bypass = 0;
+
 // maximum payload length (in flits)
 parameter max_payload_length = 4;
 

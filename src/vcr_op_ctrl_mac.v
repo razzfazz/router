@@ -60,6 +60,10 @@ module vcr_op_ctrl_mac
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
    
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
+   
    // width of flow control signals
    localparam flow_ctrl_width
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
@@ -247,6 +251,8 @@ module vcr_op_ctrl_mac
 	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
+	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .vc_id(ovc),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),

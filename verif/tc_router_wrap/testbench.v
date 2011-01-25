@@ -220,6 +220,7 @@ module testbench
        .num_nodes_per_router(num_nodes_per_router),
        .packet_format(packet_format),
        .flow_ctrl_type(flow_ctrl_type),
+       .flow_ctrl_bypass(flow_ctrl_bypass),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),

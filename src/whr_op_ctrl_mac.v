@@ -44,6 +44,9 @@ module whr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
@@ -55,6 +58,10 @@ module whr_op_ctrl_mac
    
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
    
    // width of flow control signals
    localparam flow_ctrl_width
@@ -133,10 +140,10 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire 		       vs_empty;
+   wire [0:flit_count_width-1] vs_free;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = ~vs_empty;
+   assign flow_ctrl_active = (vs_free != num_flits_per_vc);
    
    wire 		       fc_event_valid;
    wire 		       fc_event_sel_ovc;
@@ -161,6 +168,8 @@ module whr_op_ctrl_mac
    assign vs_active = flit_valid_in | fc_event_valid;
    
    wire 		       vs_elig;
+   wire 		       vs_almost_empty;
+   wire 		       vs_empty;
    wire 		       vs_almost_full;
    wire 		       vs_full;
    wire [0:1] 		       vs_errors;
@@ -176,12 +185,22 @@ module whr_op_ctrl_mac
       .flit_tail(flit_tail_in),
       .fc_event_valid(fc_event_valid),
       .elig(vs_elig),
+      .almost_empty(vs_almost_empty),
       .empty(vs_empty),
       .almost_full(vs_almost_full),
       .full(vs_full),
+      .free(vs_free),
       .errors(vs_errors));
    
-   assign full = vs_full | (vs_almost_full & flit_valid_in);
+   generate
+      
+      if(flow_ctrl_bypass)
+	assign full = (vs_full | (vs_almost_full & flit_valid_in)) &
+		      ~fc_event_valid;
+      else
+	assign full = vs_full | (vs_almost_full & flit_valid_in);
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
