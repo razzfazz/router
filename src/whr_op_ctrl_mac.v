@@ -140,10 +140,10 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:flit_count_width-1] vs_free;
+   wire 		       vs_empty;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = (vs_free != num_flits_per_vc);
+   assign flow_ctrl_active = ~vs_empty;
    
    wire 		       fc_event_valid;
    wire 		       fc_event_sel_ovc;
@@ -169,9 +169,9 @@ module whr_op_ctrl_mac
    
    wire 		       vs_elig;
    wire 		       vs_almost_empty;
-   wire 		       vs_empty;
    wire 		       vs_almost_full;
    wire 		       vs_full;
+   wire [0:flit_count_width-1] vs_free;
    wire [0:1] 		       vs_errors;
    rtr_vc_state
      #(.num_flits_per_vc(num_flits_per_vc),
