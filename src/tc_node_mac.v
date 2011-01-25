@@ -45,6 +45,9 @@ module tc_node_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -114,6 +117,10 @@ module tc_node_mac
    
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
    
    // width of flow control signals
    localparam flow_ctrl_width
@@ -729,10 +736,10 @@ module tc_node_mac
    wire [0:num_vcs-1] 				      next_elig_ovc;
    wire [0:num_resource_classes*num_vcs_per_class-1]  next_elig_orc_ocvc;
    
-   wire [0:num_vcs-1] 				      free_ovc;
-   wire [0:num_resource_classes*num_vcs_per_class-1]  free_orc_ocvc;
-   wire [0:num_vcs_per_class-1] 		      free_ocvc;
-   wire 					      free;
+   wire [0:num_vcs-1] 				      full_ovc;
+   wire [0:num_resource_classes*num_vcs_per_class-1]  full_orc_ocvc;
+   wire [0:num_vcs_per_class-1] 		      full_ocvc;
+   wire 					      full;
    
    generate
       
@@ -824,10 +831,10 @@ module tc_node_mac
 	   c_select_1ofn
 	     #(.num_ports(num_message_classes),
 	       .width(num_resource_classes*num_vcs_per_class))
-	   free_orc_ocvc_sel
+	   full_orc_ocvc_sel
 	     (.select(sel_mc_rv),
-	      .data_in(free_ovc),
-	      .data_out(free_orc_ocvc));
+	      .data_in(full_ovc),
+	      .data_out(full_orc_ocvc));
 	   
 	end
       else
@@ -835,7 +842,7 @@ module tc_node_mac
 	   assign sel_mc_rv = 1'b1;
 	   assign elig_orc = elig_opc;
 	   assign next_elig_orc_ocvc = next_elig_ovc;
-	   assign free_orc_ocvc = free_ovc;
+	   assign full_orc_ocvc = full_ovc;
 	end
       
       if(num_resource_classes > 1)
@@ -928,10 +935,10 @@ module tc_node_mac
 	   c_select_1ofn
 	     #(.num_ports(num_resource_classes),
 	       .width(num_vcs_per_class))
-	   free_ocvc_sel
+	   full_ocvc_sel
 	     (.select(sel_orc_rv),
-	      .data_in(free_orc_ocvc),
-	      .data_out(free_ocvc));
+	      .data_in(full_orc_ocvc),
+	      .data_out(full_ocvc));
 	   
 	end
       else
@@ -939,7 +946,7 @@ module tc_node_mac
 	   assign sel_orc_rv = 1'b1;
 	   assign elig = elig_orc;
 	   assign next_elig_ocvc = next_elig_orc_ocvc;
-	   assign free_ocvc = free_orc_ocvc;
+	   assign full_ocvc = full_orc_ocvc;
 	end
       
       if(num_vcs_per_class > 1)
@@ -948,10 +955,10 @@ module tc_node_mac
 	   c_select_1ofn
 	     #(.width(1),
 	       .num_ports(num_vcs_per_class))
-	   free_sel
+	   full_sel
 	     (.select(sel_ocvc),
-	      .data_in(free_ocvc),
-	      .data_out(free));
+	      .data_in(full_ocvc),
+	      .data_out(full));
 	   
 	   genvar opc;
 	   
@@ -960,6 +967,10 @@ module tc_node_mac
 		
 		wire [0:num_vcs_per_class-1] elig_ocvc;
 		assign elig_ocvc = elig_ovc[opc*num_vcs_per_class:
+					    (opc+1)*num_vcs_per_class-1];
+		
+		wire [0:num_vcs_per_class-1] full_ocvc;
+		assign full_ocvc = full_ovc[opc*num_vcs_per_class:
 					    (opc+1)*num_vcs_per_class-1];
 		
 		wire [0:num_vcs_per_class-1] empty_ocvc;
@@ -972,7 +983,7 @@ module tc_node_mac
 		assign req_hi_ocvc = elig_ocvc & empty_ocvc;
 		
 		wire [0:num_vcs_per_class-1] req_lo_ocvc;
-		assign req_lo_ocvc = elig_ocvc;
+		assign req_lo_ocvc = elig_ocvc & ~full_ocvc;
 		
 		wire 			     update;
 		assign update = flit_sent & flit_head_out;
@@ -1004,8 +1015,8 @@ module tc_node_mac
       else
 	begin
 	   assign elig_opc = elig_ovc;
-	   assign next_elig_ovc = elig_ovc;
-	   assign free = free_ocvc;
+	   assign next_elig_ovc = elig_ovc & ~full_ovc;
+	   assign full = full_ocvc;
 	end
       
    endgenerate
@@ -1089,6 +1100,9 @@ module tc_node_mac
    
    wire packet_to_self;
    
+   wire [0:num_vcs-1] flit_valid_out_ovc;
+   assign flit_valid_out_ovc = {num_vcs{flit_valid_out}} & sel_ovc;
+   
    wire [0:num_vcs*2-1] 	  vs_errors_ovc;
    
    genvar 			  ovc;
@@ -1098,17 +1112,19 @@ module tc_node_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire flit_sent_out;
-	   assign flit_sent_out = flit_sent & sel_ovc[ovc];
+	   wire flit_valid_out;
+	   assign flit_valid_out = flit_valid_out_ovc[ovc];
 	   
 	   wire fc_event_valid_in;
 	   assign fc_event_valid_in = fc_event_valid_in_ovc[ovc];
 	   
-	   wire elig;
-	   wire empty;
-	   wire almost_full;
-	   wire full;
-	   wire [0:1] vs_errors;
+	   wire vs_elig;
+	   wire vs_almost_empty;
+	   wire vs_empty;
+	   wire vs_almost_full;
+	   wire vs_full;
+	   wire [0:flit_count_width-1] vs_free;
+	   wire [0:1] 		       vs_errors;
 	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
@@ -1117,21 +1133,33 @@ module tc_node_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(active_q),
-	      .flit_sent(flit_sent_out),
+	      .flit_sent(flit_valid_out),
 	      .flit_tail(flit_tail_out),
 	      .fc_event_valid(fc_event_valid_in),
-	      .elig(elig),
-	      .empty(empty),
-	      .almost_full(almost_full),
-	      .full(full),
+	      .elig(vs_elig),
+	      .almost_empty(vs_almost_empty),
+	      .empty(vs_empty),
+	      .almost_full(vs_almost_full),
+	      .full(vs_full),
+	      .free(vs_free),
 	      .errors(vs_errors));
 	   
-	   wire       free;
-	   assign free = ~full;
+	   wire 		       elig;
+	   assign elig = vs_elig;
 	   
+	   wire 		       empty;
+	   assign empty = vs_empty;
+	   
+	   wire 		       full;
+	   
+	   if(flow_ctrl_bypass)
+	     assign full = vs_full & ~fc_event_valid_in;
+	   else
+	     assign full = vs_full;
+	   	   
 	   assign elig_ovc[ovc] = elig;
 	   assign empty_ovc[ovc] = empty;
-	   assign free_ovc[ovc] = free;
+	   assign full_ovc[ovc] = full;
 	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
 	   
 	end
@@ -1601,7 +1629,7 @@ module tc_node_mac
       .q(packet_valid_q));
    
    assign flit_sent
-     = packet_valid_q & (vc_alloc_q ? free : elig) & ~packet_to_self;
+     = packet_valid_q & ((vc_alloc_q | elig) & ~full) & ~packet_to_self;
    
    assign flit_valid_out = flit_sent;
    
@@ -1631,7 +1659,7 @@ module tc_node_mac
    
    wire 					 vc_alloc_s;
    assign vc_alloc_s
-     = (vc_alloc_q | (packet_valid_q & elig)) & ~start_q & ~packet_sent;
+     = (vc_alloc_q | (packet_valid_q & elig & ~full)) & ~start_q & ~packet_sent;
    c_dff
      #(.width(1),
        .reset_type(reset_type))

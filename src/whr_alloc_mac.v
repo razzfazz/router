@@ -216,7 +216,7 @@ module whr_alloc_mac
 	     begin
 		
 		wire arb_update;
-		assign arb_update = |arb_req_ip & elig;
+		assign arb_update = |arb_req_ip & elig & ~full;
 		
 		c_arbiter
 		  #(.num_ports(num_ports),
