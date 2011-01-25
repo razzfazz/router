@@ -75,6 +75,10 @@ module rtr_top
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
    
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -372,20 +376,19 @@ module rtr_top
    // allocator logic
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports-1] 			   opc_fc_event_valid_op;
-   wire [0:num_ports*num_vcs-1] 		   opc_fc_event_sel_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		   opc_elig_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		   opc_empty_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		   opc_almost_full_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		   opc_full_op_ovc;
    
    wire [0:num_ports*num_ports-1] 		   alo_flit_sel_op_ip;
-   wire [0:num_ports-1] 			   alo_empty_op;
    wire [0:num_ports-1] 			   alo_flit_valid_op;
    wire [0:num_ports-1] 			   alo_flit_head_op;
    wire [0:num_ports-1] 			   alo_flit_tail_op;
    wire [0:num_ports*num_vcs-1] 		   alo_flit_sel_op_ovc;
-   wire 					   alo_error;
    
    rtr_alloc_mac
-     #(.num_flits_per_vc(num_flits_per_vc),
-       .num_message_classes(num_message_classes),
+     #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
        .num_routers_per_dim(num_routers_per_dim),
@@ -401,7 +404,6 @@ module rtr_top
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .dual_path_alloc(dual_path_alloc),
-       .error_capture_mode(error_capture_mode),
        .reset_type(reset_type))
    alo
      (.clk(clk),
@@ -424,14 +426,14 @@ module rtr_top
       .flit_sel_fast_out_ip(alo_flit_sel_fast_ip),
       .flit_sent_fast_out_ip(alo_flit_sent_fast_ip),
       .flit_sel_out_op_ip(alo_flit_sel_op_ip),
-      .empty_out_op(alo_empty_op),
       .flit_valid_out_op(alo_flit_valid_op),
       .flit_head_out_op(alo_flit_head_op),
       .flit_tail_out_op(alo_flit_tail_op),
       .flit_sel_out_op_ovc(alo_flit_sel_op_ovc),
-      .fc_event_valid_in_op(opc_fc_event_valid_op),
-      .fc_event_sel_in_op_ovc(opc_fc_event_sel_op_ovc),
-      .error(alo_error));
+      .elig_in_op_ovc(opc_elig_op_ovc),
+      .empty_in_op_ovc(opc_empty_op_ovc),
+      .almost_full_in_op_ovc(opc_almost_full_op_ovc),
+      .full_in_op_ovc(opc_full_op_ovc));
    
    
    //---------------------------------------------------------------------------
@@ -453,6 +455,8 @@ module rtr_top
    // output ports
    //---------------------------------------------------------------------------
    
+   wire [0:num_ports-1] 			   opc_error_op;
+   
    generate
       
       genvar 					   op;
@@ -464,9 +468,6 @@ module rtr_top
 	   //-------------------------------------------------------------------
 	   // output controller
 	   //-------------------------------------------------------------------
-	   
-	   wire alo_empty;
-	   assign alo_empty = alo_empty_op[op];
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
 	   assign flow_ctrl_in
@@ -490,19 +491,23 @@ module rtr_top
 	     = xbd_flit_data_op[op*flit_data_width:(op+1)*flit_data_width-1];
 	   
 	   wire [0:channel_width-1]   channel_out;
-	   wire 		      opc_fc_event_valid;
-	   wire [0:num_vcs-1] 	      opc_fc_event_sel_ovc;
+	   wire [0:num_vcs-1] 	      opc_elig_ovc;
+	   wire [0:num_vcs-1] 	      opc_empty_ovc;
+	   wire [0:num_vcs-1] 	      opc_almost_full_ovc;
+	   wire [0:num_vcs-1] 	      opc_full_ovc;
+	   wire 		      opc_error;
 	   rtr_op_ctrl_mac
-	     #(.num_vcs(num_vcs),
+	     #(.num_flits_per_vc(num_flits_per_vc),
+	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
+	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   opc
 	     (.clk(clk),
 	      .reset(reset),
-	      .empty_in(alo_empty),
 	      .flow_ctrl_in(flow_ctrl_in),
 	      .flit_valid_in(alo_flit_valid),
 	      .flit_head_in(alo_flit_head),
@@ -510,15 +515,22 @@ module rtr_top
 	      .flit_sel_in_ovc(alo_flit_sel_ovc),
 	      .flit_data_in(xbd_flit_data),
 	      .channel_out(channel_out),
-	      .fc_event_valid_out(opc_fc_event_valid),
-	      .fc_event_sel_out_ovc(opc_fc_event_sel_ovc));
+	      .elig_out_ovc(opc_elig_ovc),
+	      .empty_out_ovc(opc_empty_ovc),
+	      .almost_full_out_ovc(opc_almost_full_ovc),
+	      .full_out_ovc(opc_full_ovc),
+	      .error(opc_error));
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
 	   
-	   assign opc_fc_event_valid_op[op] = opc_fc_event_valid;
-	   assign opc_fc_event_sel_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
-	     = opc_fc_event_sel_ovc;
+	   assign opc_elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = opc_elig_ovc;
+	   assign opc_empty_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = opc_empty_ovc;
+	   assign opc_almost_full_op_ovc[op*num_vcs:(op+1)*num_vcs-1] 
+		    = opc_almost_full_ovc;
+	   assign opc_full_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = opc_full_ovc;
+	   
+	   assign opc_error_op[op] = opc_error;
 	   
 	end
       
@@ -534,10 +546,10 @@ module rtr_top
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_ports+1-1] errors_s, errors_q;
-	   assign errors_s = {ipc_error_ip, alo_error};
+	   wire [0:2*num_ports-1] errors_s, errors_q;
+	   assign errors_s = {ipc_error_ip, opc_error_op};
 	   c_err_rpt
-	     #(.num_errors(num_ports+1),
+	     #(.num_errors(2*num_ports),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

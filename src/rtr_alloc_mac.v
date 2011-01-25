@@ -39,8 +39,8 @@ module rtr_alloc_mac
    flit_valid_fast_in_ip, flit_head_fast_in_ip, flit_tail_fast_in_ip, 
    flit_sel_fast_in_ip_ivc, flit_sel_out_ip_ivc, flit_sent_out_ip, 
    flit_sel_fast_out_ip, flit_sent_fast_out_ip, flit_sel_out_op_ip, 
-   empty_out_op, flit_valid_out_op, flit_head_out_op, flit_tail_out_op, 
-   flit_sel_out_op_ovc, fc_event_valid_in_op, fc_event_sel_in_op_ovc, error);
+   flit_valid_out_op, flit_head_out_op, flit_tail_out_op, flit_sel_out_op_ovc, 
+   elig_in_op_ovc, empty_in_op_ovc, almost_full_in_op_ovc, full_in_op_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -50,9 +50,6 @@ module rtr_alloc_mac
    //---------------------------------------------------------------------------
    // parameters
    //---------------------------------------------------------------------------
-   
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -103,9 +100,6 @@ module rtr_alloc_mac
    
    // enable dual-path allocation
    parameter dual_path_alloc = 1;
-   
-   // configure error checking logic
-   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -188,10 +182,6 @@ module rtr_alloc_mac
    output [0:num_ports*num_ports-1] 		      flit_sel_out_op_ip;
    wire [0:num_ports*num_ports-1] 		      flit_sel_out_op_ip;
    
-   // all VCs at given port empty?
-   output [0:num_ports-1] 			      empty_out_op;
-   wire [0:num_ports-1] 			      empty_out_op;
-   
    // outgoing flit control signals
    output [0:num_ports-1] 			      flit_valid_out_op;
    wire [0:num_ports-1] 			      flit_valid_out_op;
@@ -204,23 +194,22 @@ module rtr_alloc_mac
    output [0:num_ports*num_vcs-1] 		      flit_sel_out_op_ovc;
    wire [0:num_ports*num_vcs-1] 		      flit_sel_out_op_ovc;
    
-   // flow control event occurred
-   input [0:num_ports-1] 			      fc_event_valid_in_op;
+   // which output VCs are eligible for VC allocation?
+   input [0:num_ports*num_vcs-1] 		      elig_in_op_ovc;
    
-   // output VC to which flow control event belongs
-   input [0:num_ports*num_vcs-1] 		      fc_event_sel_in_op_ovc;
+   // with output VCs contain no flits?
+   input [0:num_ports*num_vcs-1] 		      empty_in_op_ovc;
    
-   // internal error condition detected
-   output 					      error;
-   wire 					      error;
+   // which output VC have only a single credit left?
+   input [0:num_ports*num_vcs-1] 		      almost_full_in_op_ovc;
+   
+   // which output VCs have no credits left?
+   input [0:num_ports*num_vcs-1] 		      full_in_op_ovc;
    
    
    //---------------------------------------------------------------------------
    // input side
    //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_vcs-1] 		      ovs_almost_full_op_ovc;
-   wire [0:num_ports*num_vcs-1] 		      ovs_full_op_ovc;
    
    wire [0:num_ports*num_vcs-1] 		      nvs_next_elig_op_ovc;
    wire [0:num_ports*num_packet_classes-1] 	      nvs_any_elig_op_opc;
@@ -430,7 +419,7 @@ module rtr_alloc_mac
 		     (.sel_mc(sel_mc),
 		      .route_op(route_fast_in_op),
 		      .route_orc(route_fast_in_orc),
-		      .flags_op_opc(ovs_almost_full_op_ovc),
+		      .flags_op_opc(almost_full_in_op_ovc),
 		      .flags(almost_full_ocvc));
 		   
 		   wire 			  almost_full;
@@ -450,7 +439,7 @@ module rtr_alloc_mac
 		     (.sel_mc(sel_mc),
 		      .route_op(route_fast_in_op),
 		      .route_orc(route_fast_in_orc),
-		      .flags_op_opc(ovs_full_op_ovc),
+		      .flags_op_opc(full_in_op_ovc),
 		      .flags(full_ocvc));
 		   
 		   wire 			  full;
@@ -836,7 +825,7 @@ module rtr_alloc_mac
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
-		      .flags_op_opc(ovs_almost_full_op_ovc),
+		      .flags_op_opc(almost_full_in_op_ovc),
 		      .flags(almost_full_ocvc));
 		   
 		   wire 			     almost_full;
@@ -860,7 +849,7 @@ module rtr_alloc_mac
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
-		      .flags_op_opc(ovs_full_op_ovc),
+		      .flags_op_opc(full_in_op_ovc),
 		      .flags(full_ocvc));
 		   
 		   wire 			     full;
@@ -1184,8 +1173,6 @@ module rtr_alloc_mac
    // output side
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_vcs*2-1] ovs_errors_op_ovc;
-   
    generate
       
       //------------------------------------------------------------------------
@@ -1204,6 +1191,15 @@ module rtr_alloc_mac
 	   wire [0:num_ports-1] active_ip;
 	   assign active_ip = active_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
+	   wire [0:num_vcs-1] 	elig_in_ovc;
+	   assign elig_in_ovc = elig_in_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 	empty_in_ovc;
+	   assign empty_in_ovc = empty_in_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] 	full_in_ovc;
+	   assign full_in_ovc = full_in_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   
 	   wire [0:num_ports-1] ial_flit_valid_ip;
 	   assign ial_flit_valid_ip
 	     = ial_flit_valid_op_ip[op*num_ports:(op+1)*num_ports-1];
@@ -1212,16 +1208,10 @@ module rtr_alloc_mac
 	   assign ifl_flit_valid_ip
 	     = ifl_flit_valid_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire 		fc_event_valid_in;
-	   assign fc_event_valid_in = fc_event_valid_in_op[op];
-	   
 	   
 	   //-------------------------------------------------------------------
 	   // connect outputs
 	   //-------------------------------------------------------------------
-	   
-	   wire 		empty_out;
-	   assign empty_out_op[op] = empty_out;
 	   
 	   wire [0:num_vcs-1] 	nvs_next_elig_ovc;
 	   assign nvs_next_elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
@@ -1609,92 +1599,6 @@ module rtr_alloc_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // output VCs
-	   //-------------------------------------------------------------------
-	   
-	   wire [0:num_vcs-1] 	   ovs_elig_ovc;
-	   
-	   wire [0:num_vcs-1] 	   ovs_empty_ovc;
-	   assign empty_out = &ovs_empty_ovc;
-	   
-	   genvar 		   ovc;
-	   
-	   for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	     begin:ovcs
-		
-		//--------------------------------------------------------------
-		// connect inputs
-		//--------------------------------------------------------------
-		
-		wire oal_flit_sel;
-		assign oal_flit_sel = oal_flit_sel_ovc[ovc];
-		
-		wire ofl_flit_sel;
-		assign ofl_flit_sel = ofl_flit_sel_ovc[ovc];
-		
-		wire fc_event_sel_in;
-		assign fc_event_sel_in = fc_event_sel_in_op_ovc[op*num_vcs+ovc];
-		
-		
-		//--------------------------------------------------------------
-		// connect outputs
-		//--------------------------------------------------------------
-		
-		wire ovs_elig;
-		assign ovs_elig_ovc[ovc] = ovs_elig;
-		
-		wire ovs_empty;
-		assign ovs_empty_ovc[ovc] = ovs_empty;
-		
-		wire ovs_almost_full;
-		assign ovs_almost_full_op_ovc[op*num_vcs+ovc] = ovs_almost_full;
-		
-		wire ovs_full;
-		assign ovs_full_op_ovc[op*num_vcs+ovc] = ovs_full;
-		
-		wire [0:1] ovs_errors;
-		assign ovs_errors_op_ovc[(op*num_vcs+ovc)*2:
-					 (op*num_vcs+ovc+1)*2-1] = ovs_errors;
-		
-		
-		//--------------------------------------------------------------
-		// VC state tracking
-		//--------------------------------------------------------------
-		
-		wire 	   ovs_active;
-		assign ovs_active = active | fc_event_valid_in;
-		
-		wire 	   flit_sent;
-		assign flit_sent = (oal_flit_sent & oal_flit_sel) | 
-				   (ofl_flit_sent & ofl_flit_sel);
-		
-		wire 	   flit_tail;
-		assign flit_tail = oal_flit_tail | ofl_flit_tail;
-		
-		wire 	   fc_event_valid;
-		assign fc_event_valid = fc_event_valid_in & fc_event_sel_in;
-		
-		rtr_vc_state
-		  #(.num_flits_per_vc(num_flits_per_vc),
-		    .flow_ctrl_type(flow_ctrl_type),
-		    .reset_type(reset_type))
-		ovs
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(ovs_active),
-		   .flit_sent(flit_sent),
-		   .flit_tail(flit_tail),
-		   .fc_event_valid(fc_event_valid),
-		   .elig(ovs_elig),
-		   .empty(ovs_empty),
-		   .almost_full(ovs_almost_full),
-		   .full(ovs_full),
-		   .errors(ovs_errors));
-		
-	     end
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // determine next free VC for each class
 	   //-------------------------------------------------------------------
 	   
@@ -1702,8 +1606,8 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs_per_class == 1)
 		begin
-		   assign nvs_next_elig_ovc = ovs_elig_ovc;
-		   assign nvs_any_elig_opc = ovs_elig_ovc;
+		   assign nvs_next_elig_ovc = elig_in_ovc & ~full_in_ovc;
+		   assign nvs_any_elig_opc = elig_in_ovc & ~full_in_ovc;
 		end
 	      else if(num_vcs_per_class > 1)
 		begin
@@ -1729,21 +1633,26 @@ module rtr_alloc_mac
 					(ofl_flit_sent & ofl_flit_head & 
 					 |ofl_flit_sel_ocvc);
 			
-			wire [0:num_vcs_per_class-1] ovs_elig_ocvc;
-			assign ovs_elig_ocvc
-			  = ovs_elig_ovc[opc*num_vcs_per_class:
+			wire [0:num_vcs_per_class-1] elig_in_ocvc;
+			assign elig_in_ocvc
+			  = elig_in_ovc[opc*num_vcs_per_class:
+					(opc+1)*num_vcs_per_class-1];
+			
+			wire [0:num_vcs_per_class-1] empty_in_ocvc;
+			assign empty_in_ocvc
+			  = empty_in_ovc[opc*num_vcs_per_class:
 					 (opc+1)*num_vcs_per_class-1];
 			
-			wire [0:num_vcs_per_class-1] ovs_empty_ocvc;
-			assign ovs_empty_ocvc
-			  = ovs_empty_ovc[opc*num_vcs_per_class:
-					  (opc+1)*num_vcs_per_class-1];
+			wire [0:num_vcs_per_class-1] full_in_ocvc;
+			assign full_in_ocvc
+			  = full_in_ovc[opc*num_vcs_per_class:
+					(opc+1)*num_vcs_per_class-1];
 			
 			wire [0:num_vcs_per_class-1] req_hi_ocvc;
-			assign req_hi_ocvc = ovs_elig_ocvc & ovs_empty_ocvc;
+			assign req_hi_ocvc = elig_in_ocvc & empty_in_ocvc;
 			
 			wire [0:num_vcs_per_class-1] req_lo_ocvc;
-			assign req_lo_ocvc = ovs_elig_ocvc;
+			assign req_lo_ocvc = elig_in_ocvc & ~full_in_ocvc;
 			
 			wire [0:num_vcs_per_class-1] gnt_ocvc;
 			c_arbiter
@@ -1763,7 +1672,8 @@ module rtr_alloc_mac
 						 (opc+1)*num_vcs_per_class-1]
 			  = gnt_ocvc;
 			
-			assign nvs_any_elig_opc[opc] = |ovs_elig_ocvc;
+			assign nvs_any_elig_opc[opc]
+			  = |(elig_in_ocvc & ~full_in_ocvc);
 			
 		     end
 		   
@@ -1772,37 +1682,6 @@ module rtr_alloc_mac
 	   end
 	   
 	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // error checker logic
-   //---------------------------------------------------------------------------
-   
-   generate
-      
-      if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
-	begin
-	   
-	   wire [0:num_ports*num_vcs*2-1] errors_s, errors_q;
-	   assign errors_s = ovs_errors_op_ovc;
-	   c_err_rpt
-	     #(.num_errors(num_ports*num_vcs*2),
-	       .capture_mode(error_capture_mode),
-	       .reset_type(reset_type))
-	   chk
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .errors_in(errors_s),
-	      .errors_out(errors_q));
-	   
-	   assign error = |errors_q;
-	   
-	end
-      else
-	assign error = 1'b0;
       
    endgenerate
    
