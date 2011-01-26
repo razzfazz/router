@@ -104,13 +104,13 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 parameter explicit_pipeline_register = 0;
 
 // enable dual-path allocation
-parameter dual_path_alloc = 1;
+parameter dual_path_alloc = 0;
 
 // precompute input-side arbitration decision one cycle ahead
-parameter precomp_ivc_sel = 1;
+parameter precomp_ivc_sel = 0;
 
 // precompute output-side arbitration decision one cycle ahead
-parameter precomp_ip_sel = 1;
+parameter precomp_ip_sel = 0;
 
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
