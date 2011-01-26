@@ -60,6 +60,10 @@ module vcr_op_ctrl_mac
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
    
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
+   
    // width of flow control signals
    localparam flow_ctrl_width
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
@@ -85,10 +89,6 @@ module vcr_op_ctrl_mac
    // select whether VCs must have credits available in order to be considered 
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
-   
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 0;
    
    // select implementation variant for tail sent tracker register file
    parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -194,17 +194,32 @@ module vcr_op_ctrl_mac
    wire 				    flit_tail_in;
    assign flit_tail_in = int_flit_ctrl_in[1+vc_idx_width+1];
    
-   wire [0:num_vcs-1] 			    match_ovc;
+   wire [0:num_vcs-1] 			    flit_sel_in_ovc;
    
-   wire 				    error_unmatched;
-   assign error_unmatched = flit_valid_in & ~|match_ovc;
+   wire [0:num_vcs-1] 			    flit_valid_in_ovc;
+   assign flit_valid_in_ovc = {num_vcs{flit_valid_in}} & flit_sel_in_ovc;
    
-   wire [0:num_vcs-1] 			    next_cred_ovc;
-   wire [0:num_vcs*2-1] 		    ovcc_errors_ovc;
+   wire [0:num_vcs*3-1] 		    ovcc_errors_ovc;
    
    generate
       
-      genvar 				    ovc;
+      if(num_vcs > 1)
+	begin
+	   
+	   wire [0:vc_idx_width-1] flit_vc_in;
+	   assign flit_vc_in = int_flit_ctrl_in[1:1+vc_idx_width-1];
+	   
+	   c_decode
+	     #(.num_ports(num_vcs))
+	   flit_sel_in_ovc_dec
+	     (.data_in(flit_vc_in),
+	      .data_out(flit_sel_in_ovc));
+	   
+	end
+      else if(num_vcs == 1)
+	assign flit_sel_in_ovc = 1'b1;
+      
+      genvar 			   ovc;
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
@@ -224,19 +239,22 @@ module vcr_op_ctrl_mac
 	   wire 		cred_valid;
 	   assign cred_valid = cred_valid_ovc[ovc];
 	   
-	   wire 		match;
+	   wire 		flit_valid_in;
+	   assign flit_valid_in = flit_valid_in_ovc[ovc];
+	   
 	   wire 		elig;
 	   wire 		empty;
 	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
-	   wire [0:1] 			  ovcc_errors;
+	   wire [0:2] 			  ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
+	       .flow_ctrl_type(flow_ctrl_type),
+	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .vc_id(ovc),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
-	       .track_vcs_at_output(track_vcs_at_output),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .tst_regfile_type(tst_regfile_type),
 	       .reset_type(reset_type))
@@ -249,20 +267,19 @@ module vcr_op_ctrl_mac
 	      .vc_gnt_ip(vc_gnt_ip),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
-	      .int_flit_ctrl(int_flit_ctrl_in),
-	      .match(match),
+	      .flit_valid(flit_valid_in),
+	      .flit_tail(flit_tail_in),
 	      .elig(elig),
 	      .empty(empty),
 	      .int_flow_ctrl(int_flow_ctrl),
 	      .errors(ovcc_errors));
 
-	   assign match_ovc[ovc] = match;
 	   assign empty_ovc[ovc] = empty;
 	   assign elig_ovc[ovc] = elig;
 	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
 				    (ovc+1)*int_flow_ctrl_width-1]
 		    = int_flow_ctrl;
-	   assign ovcc_errors_ovc[ovc*2:(ovc+1)*2-1] = ovcc_errors;
+	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
 	   
 	end
       
@@ -275,35 +292,6 @@ module vcr_op_ctrl_mac
    
    wire 				  flit_out_active;
    assign flit_out_active = |xbr_ctrl_ip;
-   
-   wire [0:num_vcs-1] 			  flit_sel_in_ovc;
-   
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   if(track_vcs_at_output)
-	     assign flit_sel_in_ovc = match_ovc;
-	   else
-	     begin
-		
-		wire [0:vc_idx_width-1] flit_vc_in;
-		assign flit_vc_in = int_flit_ctrl_in[1:1+vc_idx_width-1];
-		
-		c_decode
-		  #(.num_ports(num_vcs))
-		flit_sel_in_ovc_dec
-		  (.data_in(flit_vc_in),
-		   .data_out(flit_sel_in_ovc));
-		
-	     end
-	   
-	end
-      else
-	assign flit_sel_in_ovc = 1'b1;
-      
-   endgenerate
    
    rtr_channel_output
      #(.num_vcs(num_vcs),
@@ -326,27 +314,15 @@ module vcr_op_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   // synopsys translate_off
-   
-   always @(posedge clk)
-     begin
-	
-	if(error_unmatched)
-	  $display("ERROR: Unmatched flit in module %m.");
-	
-     end
-   
-   // synopsys translate_on
-   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:1+num_vcs*2-1] errors_s, errors_q;
-	   assign errors_s = {error_unmatched, ovcc_errors_ovc};
+	   wire [0:num_vcs*3-1] errors_s, errors_q;
+	   assign errors_s = ovcc_errors_ovc;
 	   c_err_rpt
-	     #(.num_errors(1+num_vcs*2),
+	     #(.num_errors(num_vcs*3),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

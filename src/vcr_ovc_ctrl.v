@@ -34,7 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
-   xbr_ctrl_ip, int_flit_ctrl, match, elig, empty, int_flow_ctrl, errors);
+   xbr_ctrl_ip, flit_valid, flit_tail, elig, empty, int_flow_ctrl, 
+   errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -59,6 +60,13 @@ module vcr_ovc_ctrl
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // select type of flow control
+   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -74,21 +82,11 @@ module vcr_ovc_ctrl
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
    
-   // select whether to set a packet's outgoing VC ID at the input or output 
-   // controller
-   parameter track_vcs_at_output = 0;
-   
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
    // select implementation variant for tail sent tracker register file
    parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
-   
-   // required address width for tail flit FIFO
-   localparam tff_addr_width = clogb(num_flits_per_vc);
-   
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
@@ -98,12 +96,8 @@ module vcr_ovc_ctrl
    
    // width of counter for credits waiting to be sent to input controller
    localparam cred_hold_width = vc_alloc_requires_credit ? 
-				clogb(num_flits_per_vc) : 
-				flit_count_width;
-   
-   // initial value for credit hold counter
-   localparam [0:cred_hold_width-1] cred_hold_reset_value
-     = vc_alloc_requires_credit ? (num_flits_per_vc - 1) : num_flits_per_vc;
+				clogb(num_flits_per_vc-1) : 
+				clogb(num_flits_per_vc);
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -128,13 +122,11 @@ module vcr_ovc_ctrl
    // was this output granted to an input port?
    input [0:num_ports-1] xbr_ctrl_ip;
    
-   // incoming flit control signals
-   input [0:int_flit_ctrl_width-1] int_flit_ctrl;
+   // incoming flit is valid
+   input flit_valid;
    
-   // output VC owns the current flit
-   // (NOTE: only valid if track_vcs_at_output=1)
-   output match;
-   wire match;
+   // incoming flit is a tail flit
+   input flit_tail;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output elig;
@@ -150,47 +142,35 @@ module vcr_ovc_ctrl
    wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
    
    // internal error condition detected
-   output [0:1] errors;
-   wire [0:1] 			  errors;
+   output [0:2] errors;
+   wire [0:2] 			  errors;
    
    
    //---------------------------------------------------------------------------
    // decode control signals
    //---------------------------------------------------------------------------
    
-   wire 			  flit_valid;
-   assign flit_valid = int_flit_ctrl[0] & |xbr_ctrl_ip;
-   
-   wire 			  flit_head;
-   assign flit_head = int_flit_ctrl[1+vc_idx_width];
-   
-   wire 			  flit_tail;
-   assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
-   
    wire 			  credit;
    assign credit = fc_event_valid;
    
-   wire 			   flit_valid_qual;
-   assign flit_valid_qual = flit_valid & match;
-   
-   wire 			   debit;
-   assign debit = flit_valid_qual;
+   wire 			  debit;
+   assign debit = flit_valid;
    
    
    //---------------------------------------------------------------------------
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
    
-   wire 			   alloc_active;
+   wire 			  alloc_active;
    assign alloc_active = vc_req | (|xbr_ctrl_ip);
    
-   wire 			   allocated_q;
+   wire 			  allocated_q;
    
-   wire 			   next_allocated;   
+   wire 			  next_allocated;   
    assign next_allocated = vc_gnt | allocated_q;
    
-   wire 			   allocated_s;
-   assign allocated_s = next_allocated & ~(flit_valid_qual & flit_tail);
+   wire 			  allocated_s;
+   assign allocated_s = next_allocated & ~(flit_valid & flit_tail);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -200,85 +180,24 @@ module vcr_ovc_ctrl
       .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
-   
-   generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc;
-	   assign flit_vc = int_flit_ctrl[1:1+vc_idx_width-1];
-	   
-	   // if VC assignment is tracked at the output, each output VC needs to
-	   // check if it is currently assigned to the incoming VC ID at the 
-	   // selected input port
-	   if(track_vcs_at_output)
-	     begin
-		
-		wire [0:num_ports-1] allocated_ip_s, allocated_ip_q;
-		assign allocated_ip_s = vc_gnt ? vc_gnt_ip : allocated_ip_q;
-		c_dff
-		  #(.width(num_ports),
-		    .reset_type(reset_type))
-		allocated_ipq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(allocated_ip_s),
-		   .q(allocated_ip_q));
-		
-		wire [0:vc_idx_width-1] vc_gnt_vc;
-		c_encode
-		  #(.num_ports(num_vcs))
-		vc_gnt_vc_enc
-		  (.data_in(vc_gnt_ivc),
-		   .data_out(vc_gnt_vc));
-		
-		wire [0:vc_idx_width-1] allocated_vc_s, allocated_vc_q;
-		assign allocated_vc_s = vc_gnt ? vc_gnt_vc : allocated_vc_q;
-		c_dff
-		  #(.width(vc_idx_width),
-		    .reset_type(reset_type))
-		allocated_vcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(allocated_vc_s),
-		   .q(allocated_vc_q));
-		
-		assign match = allocated_q &&
-			       |(allocated_ip_q & xbr_ctrl_ip) &&
-			       (allocated_vc_q == flit_vc);
-		
-	     end
-	   
-	   // if VC assignments are tracked at the input side, we can just check
-	   // for our own VC ID
-	   else
-	     assign match = (flit_vc == vc_id);
-	   
-	end
-      
-      // if we only have a single VC to begin with, it is always selected
-      else
-	assign match = 1'b1;
-      
-   endgenerate
+
+   wire 			  error_stray_flit;
+   assign error_stray_flit = debit & ~allocated_q;
    
    
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 				flags_active;
+   wire 			  flags_active;
    assign flags_active = alloc_active | credit;
    
-   wire 				ft_almost_empty;
-   wire 				ft_empty;
-   wire 				ft_almost_full;
-   wire 				ft_full;
-   wire [0:flit_count_width-1] 		ft_free;
-   wire [0:1] 				ft_errors;
+   wire 			  ft_almost_empty;
+   wire 			  ft_empty;
+   wire 			  ft_almost_full;
+   wire 			  ft_full;
+   wire [0:flit_count_width-1] 	  ft_free;
+   wire [0:1] 			  ft_errors;
    c_fifo_tracker
      #(.depth(num_flits_per_vc),
        .reset_type(reset_type))
@@ -297,10 +216,10 @@ module vcr_ovc_ctrl
    
    assign empty = ft_empty;
    
-   wire 				error_ct_underflow;
+   wire 			  error_ct_underflow;
    assign error_ct_underflow = ft_errors[0];
    
-   wire 				error_ct_overflow;
+   wire 			  error_ct_overflow;
    assign error_ct_overflow = ft_errors[1];
    
    
@@ -327,106 +246,202 @@ module vcr_ovc_ctrl
 	     // eligible for allocation in the current cycle, and thus cannot 
 	     // be assigned to another input VC.
 	     
-	     assign int_flow_ctrl[0] = ~ft_full & (~ft_almost_full | credit);
-	     assign int_flow_ctrl[1] = ft_almost_full | (ft_full & credit);
+	     if(num_flits_per_vc == 2)
+	       begin
+		  
+		  // in this case, we can only have zero, one or two credits 
+		  // available, so the "3 or more" encoding cannot occur
+
+		  if(flow_ctrl_bypass)
+		    begin
+		       assign int_flow_ctrl[0]
+				= ~ft_full & (~ft_almost_full | credit);
+		       assign int_flow_ctrl[1]
+				= ft_almost_full | (ft_full & credit);
+		    end
+		  else
+		    begin
+		       assign int_flow_ctrl[0] = ~ft_full & ~ft_almost_full;
+		       assign int_flow_ctrl[1] = ft_almost_full;
+		    end
+		  
+	       end
+	     else if(num_flits_per_vc == 3)
+	       begin
+		  
+		  // here, we can have at most three credits; consequently, we 
+		  // can simply add the incoming credit (if any) to the current 
+		  // credit count without having to worry about overflow
+		  
+		  if(flow_ctrl_bypass)
+		    assign int_flow_ctrl = ft_free + credit;
+		  else
+		    assign int_flow_ctrl = ft_free;
+		  
+	       end
+	     else if(num_flits_per_vc > 3)
+	       begin
+		  
+		  // in the general case, the two-bit addition may overflow, or 
+		  // the credit count may have non-zero higher-order bits; in
+		  // both cases, we must saturate the two-bit result to 2'b11
+		  
+		  wire [0:1] sum;
+		  wire 	     cap;
+		  
+		  if(flow_ctrl_bypass)
+		    begin
+		       assign sum
+			 = ft_free[flit_count_width-2:flit_count_width-1] + 
+			   credit;
+		       assign cap = |ft_free[0:flit_count_width-3] | 
+				    &ft_free[flit_count_width-2:
+					     flit_count_width-1];
+		       end
+		  else
+		    begin
+		       assign sum = ft_free[flit_count_width-2:
+					    flit_count_width-1];
+		       assign cap = |ft_free[0:flit_count_width-3];
+		    end
+		  
+		  assign int_flow_ctrl = sum | {2{cap}};
+		  
+	       end
 	     
 	  end
 	
 	`INT_FLOW_CTRL_TYPE_PUSH:
 	  begin
 	     
-	     wire [0:cred_hold_width-1] cred_hold_base;
-	     assign cred_hold_base
-	       = ft_free[flit_count_width-cred_hold_width:flit_count_width-1];
-	     
-	     wire [0:cred_hold_width-1] cred_hold_copy;
+	     wire int_flow_ctrl_unallocated;
+	     wire flit_count_force_zero;
+	     wire [0:flit_count_width-1] flit_count_adjusted;
 	     
 	     if(vc_alloc_requires_credit)
 	       begin
 		  
-		  // If the VC is currently full, of if there is only a single 
-		  // credit left in the VC and we don't receive another one in 
-		  // this cycle, we know that there cannot be any credits left 
-		  // for the next cycle.
+		  // Send one credit explicitly via internal flow control iff 
+		  // we have two or more credits available (i.e., if we have a 
+		  // credit in addition to the one sent implicitly via VC 
+		  // allocation).
 		  
-		  wire force_zero;
-		  assign force_zero = ft_full | (ft_almost_full & ~credit);
+		  // Note that while the VC is not allocated, 'debit' must be 
+		  // zero, as VCs don't become eligible for reallocation until 
+		  // after the current packet's tail flit has traversed the 
+		  // crossbar.
 		  
-		  // Otherwise we must subtract one from the current credit
-		  // count, and then add 'credit' and subtract 'debit'; note
-		  // that this can potentially cause underflows, so we will
-		  // use 'force_zero' later to mask out such incorrect results.
+		  if(flow_ctrl_bypass)
+		    assign int_flow_ctrl_unallocated
+		      = ~ft_full & (~ft_almost_full | credit);
+		  else
+		    assign int_flow_ctrl_unallocated
+		      = ~ft_full & ~ft_almost_full;
 		  
-		  // First we adjust the credit count by adding 'credit' and 
-		  // subtracting one.
-		  // (NOTE: -1+x = -(1-x) = -(~x) for single-bit x)
+		  // To initialize the credit hold register for the next cycle,
+		  // we have to subtract one from the current number of credits
+		  // for the one that was sent implicitly via VC allocation,
+		  // subtract one if a credit was sent explicitly via internal 
+		  // flow control, and add one if a new credit arrived from the 
+		  // downstream router.
 		  
-		  wire [0:cred_hold_width-1] cred_hold_step1;
-		  assign cred_hold_step1 = cred_hold_base - !credit;
+		  // Note that in two's complement,
+		  //
+		  //  -2 = 'b[...]1110,
+		  //
+		  // and thus for single-bit x,
+		  //
+		  //  -2 + x = 'b[...]1110 + 'b[...]000x = 'b[...]111x.
 		  
-		  // Then we subtract the incoming 'debit' signal.
+		  wire [0:flit_count_width-1] flit_count_delta;
 		  
-		  wire [0:cred_hold_width-1] cred_hold_step2;
-		  assign cred_hold_step2 = cred_hold_step1 - debit;
+		  if(flow_ctrl_bypass)
+		    assign flit_count_delta
+		      = {{(flit_count_width-1){1'b1}}, credit};
+		  else
+		    assign flit_count_delta
+		      = {{(flit_count_width-1){1'b1}}, 1'b0};
 		  
-		  // Forcing the result to zero in this case allows us to 
-		  // avoid a potential underflow when unconditionally 
-		  // subtracting the incoming 'debit' signal.
+		  // In order to avoid underflow, we initialize the credit hold 
+		  // register to zero if zero or one credits were available. 
 		  
-		  assign cred_hold_copy
-		    = cred_hold_step2 & {cred_hold_width{~force_zero}};
+		  assign flit_count_force_zero = ft_full | ft_almost_full;
+		  
+		  assign flit_count_adjusted = ft_free + flit_count_delta;
 		  
 	       end
 	     else
 	       begin
 		  
-		  wire [0:cred_hold_width-1] cred_hold_plus_credit;
-		  assign cred_hold_plus_credit = cred_hold_base + credit;
+		  if(flow_ctrl_bypass)
+		    assign int_flow_ctrl_unallocated = ~ft_full | credit;
+		  else
+		    assign int_flow_ctrl_unallocated = ~ft_full;
 		  
-		  assign cred_hold_copy = cred_hold_plus_credit - debit;
+		  assign flit_count_force_zero = ft_full;
+		  
+		  // Note that in two's complement, for single-bit x,
+		  //
+		  //  -1 + x = -(1 - x) = -(!x).
+
+		  if(flow_ctrl_bypass)
+		    assign flit_count_adjusted = ft_free - !credit;
+		  else
+		    assign flit_count_adjusted = ft_free - 1'd1;
 		  
 	       end
 	     
-	     if(cred_hold_width >= 2)
-	       begin
-		  
-		  wire cred_hold_any;
-		  
-		  // NOTE: This doesn't fit in well with any of the other clock
-		  // gating domains, as the register needs to be kept active 
-		  // until all credits have been sent; the register is probably 
-		  // not wide enough to end up in a clock gating domain of its 
-		  // own, so it will most likely end up being free-running.
-		  
-		  wire cred_hold_active;
-		  assign cred_hold_active = flags_active | cred_hold_any;
-		  
-		  wire [0:cred_hold_width-1] cred_hold_s, cred_hold_q;
-		  assign cred_hold_s
-		    = next_allocated ?
-		      (cred_hold_q - (cred_hold_any & ~credit)) :
-		      cred_hold_copy;
-		  c_dff
-		    #(.width(cred_hold_width),
-		      .reset_type(reset_type),
-		      .reset_value(cred_hold_reset_value))
-		  cred_holdq
-		    (.clk(clk),
-		     .reset(reset),
-		     .active(cred_hold_active),
-		     .d(cred_hold_s),
-		     .q(cred_hold_q));
-		  
-		  assign cred_hold_any = |cred_hold_q;
-		  
-		  assign int_flow_ctrl
-		    = next_allocated ?
-		      (|cred_hold_q[0:cred_hold_width-2] | credit) :
-		      |cred_hold_copy;
-		  
-	       end
+	     wire [0:cred_hold_width-1] cred_hold_copy;
+	     assign cred_hold_copy
+	       = {cred_hold_width{~flit_count_force_zero}} &
+		 flit_count_adjusted[flit_count_width-cred_hold_width:
+				     flit_count_width-1];
+	     
+	     wire 			cred_hold_any;
+	     
+	     // NOTE: This doesn't fit in well with any of the other clock
+	     // gating domains, as the register needs to be kept active until 
+	     // all credits have been sent; the register is probably not wide 
+	     // enough to end up in a clock gating domain of its own, so it 
+	     // will most likely end up being free-running.
+	     
+	     wire 			cred_hold_active;
+	     assign cred_hold_active = flags_active | cred_hold_any;
+	     
+	     wire [0:cred_hold_width-1] cred_hold_s, cred_hold_q;
+	     
+	     if(flow_ctrl_bypass)
+	       assign cred_hold_s = allocated_q ?
+				    ((cred_hold_q - !credit) & 
+				     {cred_hold_width{cred_hold_any}}) :
+				    cred_hold_copy;
 	     else
-	       assign int_flow_ctrl = next_allocated ? credit : |cred_hold_copy;
+	       assign cred_hold_s = allocated_q ?
+				    ((cred_hold_q - cred_hold_any) + credit) :
+				    cred_hold_copy;
+	     
+	     c_dff
+	       #(.width(cred_hold_width),
+		 .reset_type(reset_type))
+	     cred_holdq
+	       (.clk(clk),
+		.reset(1'b0),
+		.active(cred_hold_active),
+		.d(cred_hold_s),
+		.q(cred_hold_q));
+	     
+	     assign cred_hold_any = |cred_hold_q;
+	     
+	     wire 			int_flow_ctrl_allocated;
+
+	     if(flow_ctrl_bypass)
+	       assign int_flow_ctrl_allocated = cred_hold_any | credit;
+	     else
+	       assign int_flow_ctrl_allocated = cred_hold_any;
+	     
+	     assign int_flow_ctrl = allocated_q ? 
+				    int_flow_ctrl_allocated : 
+				    int_flow_ctrl_unallocated;
 	     
 	  end
 	
@@ -458,6 +473,9 @@ module vcr_ovc_ctrl
    always @(posedge clk)
      begin
 	
+	if(error_stray_flit)
+	  $display("ERROR: Stray flit in module %m.");
+	
 	if(error_ct_underflow)
 	  $display("ERROR: Credit tracker underflow in module %m.");
 	
@@ -468,7 +486,8 @@ module vcr_ovc_ctrl
    
    // synopsys translate_on
    
-   assign errors[0] = error_ct_underflow;
-   assign errors[1] = error_ct_overflow;
+   assign errors[0] = error_stray_flit;
+   assign errors[1] = error_ct_underflow;
+   assign errors[2] = error_ct_overflow;
    
 endmodule

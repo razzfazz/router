@@ -147,6 +147,10 @@ module packet_source
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
    
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
+   
    // width of flow control signals
    localparam flow_ctrl_width
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
@@ -355,11 +359,13 @@ module packet_source
 	   wire flit_valid;
 	   assign flit_valid = flit_valid_ovc[ovc];
 	   
-	   wire elig;
-	   wire empty;
-	   wire almost_full;
-	   wire full;
-	   wire [0:1] vs_errors;
+	   wire vs_elig;
+	   wire vs_almost_empty;
+	   wire vs_empty;
+	   wire vs_almost_full;
+	   wire vs_full;
+	   wire [0:flit_count_width-1] vs_free;
+	   wire [0:1] 		       vs_errors;
 	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
@@ -371,15 +377,26 @@ module packet_source
 	      .flit_sent(flit_valid),
 	      .flit_tail(flit_tail),
 	      .fc_event_valid(fc_event_valid),
-	      .elig(elig),
-	      .empty(empty),
-	      .almost_full(almost_full),
-	      .full(full),
+	      .elig(vs_elig),
+	      .almost_empty(vs_almost_empty),
+	      .empty(vs_empty),
+	      .almost_full(vs_almost_full),
+	      .full(vs_full),
+	      .free(vs_free),
 	      .errors(vs_errors));
+	   
+	   wire 		       elig;
+	   assign elig = vs_elig;
+	   
+	   wire 		       full;
+
+	   if(flow_ctrl_bypass)
+	     assign full = vs_full & ~fc_event_valid;
+	   else
+	     assign full = vs_full;
 	   
 	   assign elig_ovc[ovc] = elig;
 	   assign full_ovc[ovc] = full;
-	   
 	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
 	   
 	end
