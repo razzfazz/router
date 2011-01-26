@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_op_ctrl_mac
-  (clk, reset, flow_ctrl_in, vc_req_ovc, vc_gnt_ovc, vc_gnt_ovc_ip, 
+  (clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, vc_gnt_ovc_ip, 
    vc_gnt_ovc_ivc, xbr_ctrl_ip, int_flit_ctrl_in, flit_data_in, channel_out, 
    int_flow_ctrl_ovc, elig_ovc, error);
    
@@ -116,8 +116,8 @@ module vcr_op_ctrl_mac
    // incoming flow control signals
    input [0:flow_ctrl_width-1] flow_ctrl_in;
    
-   // output VC was requested by an input VC
-   input [0:num_vcs-1] 	       vc_req_ovc;
+   // VC allocation activity indicator
+   input 		       vc_active;
    
    // output VC was granted to an input VC
    input [0:num_vcs-1] 	       vc_gnt_ovc;
@@ -224,9 +224,6 @@ module vcr_op_ctrl_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire vc_req;
-	   assign vc_req = vc_req_ovc[ovc];
-	   
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc];
 	   
@@ -262,7 +259,7 @@ module vcr_op_ctrl_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .fc_event_valid(cred_valid),
-	      .vc_req(vc_req),
+	      .vc_active(vc_active),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ip(vc_gnt_ip),
 	      .vc_gnt_ivc(vc_gnt_ivc),

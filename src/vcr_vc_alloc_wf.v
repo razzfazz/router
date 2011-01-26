@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_vc_alloc_wf
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, 
-   gnt_op_ovc_ivc);
+   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -80,10 +79,6 @@ module vcr_vc_alloc_wf
    // request VC allocation
    input [0:num_ports*num_vcs-1] 		      req_ip_ivc;
    
-   // VC allocation requested (to output controller)
-   output [0:num_ports*num_vcs-1] 		      req_op_ovc;
-   wire [0:num_ports*num_vcs-1] 		      req_op_ovc;
-   
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] 		      gnt_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		      gnt_ip_ivc;
@@ -104,8 +99,6 @@ module vcr_vc_alloc_wf
    output [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    
-   
-   wire [0:num_ports*num_vcs*num_ports*num_vcs-1]     req_ip_ivc_op_ovc;
    
    generate
       
@@ -245,19 +238,6 @@ module vcr_vc_alloc_wf
 				 (.data_in(sel_orc_ocvc),
 				  .dest_in({num_vcs{1'b0}}),
 				  .data_out(sel_ovc));
-			       
-			       assign req_ip_ivc_op_ovc
-				 [((((ip*num_message_classes+mc)*
-				     num_resource_classes+irc)*
-				    num_vcs_per_class+icvc)*
-				   num_ports+op)*
-				  num_vcs:
-				  ((((ip*num_message_classes+mc)*
-				     num_resource_classes+irc)*
-				    num_vcs_per_class+icvc)*
-				   num_ports+op+1)*
-				  num_vcs-1]
-				 = sel_ovc;
 			       
 			       wire [0:num_resource_classes*
 				     num_vcs_per_class-1]      elig_orc_ocvc;
@@ -449,18 +429,5 @@ module vcr_vc_alloc_wf
 	end
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate activity signals for output controllers
-   //---------------------------------------------------------------------------
-   
-   c_binary_op
-     #(.num_ports(num_ports*num_vcs),
-       .width(num_ports*num_vcs),
-       .op(`BINARY_OP_OR))
-   req_op_ovc_or
-     (.data_in(req_ip_ivc_op_ovc),
-      .data_out(req_op_ovc));
    
 endmodule

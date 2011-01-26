@@ -370,7 +370,8 @@ module vcr_top
    
    wire [0:num_ports*num_vcs-1] 		elig_op_ovc;
    
-   wire [0:num_ports*num_vcs-1] 		vc_req_op_ovc;
+   wire [0:num_ports-1] 			vc_active_op;
+   
    wire [0:num_ports*num_vcs-1] 		vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] 	vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1] 	vc_gnt_op_ovc_ivc;
@@ -389,7 +390,7 @@ module vcr_top
       .route_ip_ivc_orc(route_ip_ivc_orc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),
-      .req_op_ovc(vc_req_op_ovc),
+      .active_op(vc_active_op),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
       .gnt_op_ovc(vc_gnt_op_ovc),
@@ -478,8 +479,8 @@ module vcr_top
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire [0:num_vcs-1] 	      vc_req_ovc;
-	   assign vc_req_ovc = vc_req_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   wire 		      vc_active;
+	   assign vc_active = vc_active_op[op];
 	   
 	   wire [0:num_vcs-1] 	      vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
@@ -516,7 +517,7 @@ module vcr_top
 	     (.clk(clk),
 	      .reset(reset),
 	      .flow_ctrl_in(flow_ctrl_in),
-	      .vc_req_ovc(vc_req_ovc),
+	      .vc_active(vc_active),
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
