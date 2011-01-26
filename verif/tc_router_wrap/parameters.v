@@ -103,8 +103,11 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 
+// enable dual-path allocation
+parameter dual_path_alloc = 1;
+
 // precompute input-side arbitration decision one cycle ahead
-parameter precomp_ivc_sel = 0;
+parameter precomp_ivc_sel = 1;
 
 // precompute output-side arbitration decision one cycle ahead
 parameter precomp_ip_sel = 0;
