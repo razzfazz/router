@@ -1098,14 +1098,24 @@ module tc_node_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
-   wire packet_to_self;
+   wire 		      flit_tail_s, flit_tail_q;
+   assign flit_tail_s = flit_tail_out;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_tailq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(active_q),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
    
-   wire [0:num_vcs-1] flit_valid_out_ovc;
+   wire [0:num_vcs-1] 	      flit_valid_out_ovc;
    assign flit_valid_out_ovc = {num_vcs{flit_valid_out}} & sel_ovc;
    
-   wire [0:num_vcs*2-1] 	  vs_errors_ovc;
+   wire [0:num_vcs*2-1]       vs_errors_ovc;
    
-   genvar 			  ovc;
+   genvar 		      ovc;
    
    generate
       
@@ -1117,6 +1127,18 @@ module tc_node_mac
 	   
 	   wire fc_event_valid_in;
 	   assign fc_event_valid_in = fc_event_valid_in_ovc[ovc];
+	   
+	   wire flit_sent_s, flit_sent_q;
+	   assign flit_sent_s = flit_valid_out;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   flit_sentq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active_q),
+	      .d(flit_sent_s),
+	      .q(flit_sent_q));
 	   
 	   wire vs_elig;
 	   wire vs_almost_empty;
@@ -1133,8 +1155,8 @@ module tc_node_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(active_q),
-	      .flit_sent(flit_valid_out),
-	      .flit_tail(flit_tail_out),
+	      .flit_sent(flit_sent_q),
+	      .flit_tail(flit_tail_q),
 	      .fc_event_valid(fc_event_valid_in),
 	      .elig(vs_elig),
 	      .almost_empty(vs_almost_empty),
@@ -1145,17 +1167,18 @@ module tc_node_mac
 	      .errors(vs_errors));
 	   
 	   wire 		       elig;
-	   assign elig = vs_elig;
+	   assign elig = vs_elig & (~flit_sent_q | flit_tail_q);
 	   
 	   wire 		       empty;
-	   assign empty = vs_empty;
+	   assign empty = vs_empty & ~flit_sent_q;
 	   
 	   wire 		       full;
 	   
 	   if(flow_ctrl_bypass)
-	     assign full = vs_full & ~fc_event_valid_in;
+	     assign full = (vs_full | (vs_almost_full & flit_sent_q)) & 
+			   ~fc_event_valid_in;
 	   else
-	     assign full = vs_full;
+	     assign full = vs_full | (vs_almost_full & flit_sent_q);
 	   	   
 	   assign elig_ovc[ovc] = elig;
 	   assign empty_ovc[ovc] = empty;
@@ -1176,6 +1199,7 @@ module tc_node_mac
    wire 			first_addr_match;
    assign first_addr_match = (dest_addr_1_rv == address);
    
+   wire 			packet_to_self;
    assign packet_to_self = first_addr_match & suppress_q;
    
    wire [0:addr_width-1] 	dest_addr_2_rv;
