@@ -36,8 +36,8 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_sent_prev, flit_head_prev, flit_head, flit_tail, flit_data, fbc_empty, 
-   fbc_full, allocated, allocated_ovc, free_spec, errors);
+   flit_sent_prev, flit_head_prev, flit_head, flit_tail, flit_data, empty, 
+   full, allocated, allocated_ovc, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -286,12 +286,12 @@ module vcr_ivc_ctrl
    wire [0:flit_data_width-1] 			     flit_data;
    
    // flit buffer does not have any valid entries
-   output 					     fbc_empty;
-   wire 					     fbc_empty;
+   output 					     empty;
+   wire 					     empty;
    
    // flit buffer is full
-   output 					     fbc_full;
-   wire 					     fbc_full;
+   output 					     full;
+   wire 					     full;
    
    // has an output VC been assigned to this input VC?
    output 					     allocated;
@@ -313,6 +313,8 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
+   
+   wire 					     fbc_empty;
    
    wire 					     flit_valid;
    assign flit_valid = flit_valid_in | ~fbc_empty;
@@ -433,6 +435,7 @@ module vcr_ivc_ctrl
    wire [0:fb_addr_width-1] 			     fbc_pop_addr;
    wire 					     fbc_almost_empty;
    wire 					     fbc_almost_full;
+   wire 					     fbc_full;
    wire [0:1] 					     fbc_errors;
    c_fifo_ctrl
      #(.depth(num_flits_per_vc),
@@ -451,6 +454,9 @@ module vcr_ivc_ctrl
       .almost_full(fbc_almost_full),
       .full(fbc_full),
       .errors(fbc_errors));
+   
+   assign empty = fbc_empty;
+   assign full = fbc_full;
    
    wire 					     error_fbc_underflow;
    assign error_fbc_underflow = fbc_errors[0];

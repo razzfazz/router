@@ -275,10 +275,10 @@ module vcr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				     fbc_full_ivc;
+   wire [0:num_vcs-1] 				     full_ivc;
    
    wire 					     input_stage_active;
-   assign input_stage_active = ~&fbc_full_ivc;
+   assign input_stage_active = ~&full_ivc;
    
    wire 					     flit_valid_in;
    wire 					     flit_head_in;
@@ -381,7 +381,7 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 				     flit_head_ivc;
    wire [0:num_vcs-1] 				     flit_tail_ivc;
    wire [0:num_vcs*flit_data_width-1] 		     flit_data_ivc;
-   wire [0:num_vcs-1] 				     fbc_empty_ivc;
+   wire [0:num_vcs-1] 				     empty_ivc;
    wire [0:num_vcs-1] 				     allocated_ivc;
    wire [0:num_vcs*num_vcs-1] 			     allocated_ivc_ovc;
    wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
@@ -420,8 +420,8 @@ module vcr_ip_ctrl_mac
 	   wire 			   flit_head;
 	   wire 			   flit_tail;
 	   wire [0:flit_data_width-1] 	   flit_data;
-	   wire 			   fbc_empty;
-	   wire 			   fbc_full;
+	   wire 			   empty;
+	   wire 			   full;
 	   wire 			   allocated;
 	   wire [0:num_vcs-1] 		   allocated_ovc;
 	   wire 			   free_spec;
@@ -473,8 +473,8 @@ module vcr_ip_ctrl_mac
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .flit_data(flit_data),
-	      .fbc_empty(fbc_empty),
-	      .fbc_full(fbc_full),
+	      .empty(empty),
+	      .full(full),
 	      .allocated(allocated),
 	      .allocated_ovc(allocated_ovc),
 	      .free_spec(free_spec),
@@ -492,8 +492,8 @@ module vcr_ip_ctrl_mac
 	   assign flit_tail_ivc[ivc] = flit_tail;
 	   assign flit_data_ivc[ivc*flit_data_width:(ivc+1)*flit_data_width-1]
 	     = flit_data;
-	   assign fbc_empty_ivc[ivc] = fbc_empty;
-	   assign fbc_full_ivc[ivc] = fbc_full;
+	   assign empty_ivc[ivc] = empty;
+	   assign full_ivc[ivc] = full;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign allocated_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
 	     = allocated_ovc;
@@ -510,7 +510,7 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 				   alloc_active;
-   assign alloc_active = flit_valid_in | ~&fbc_empty_ivc;
+   assign alloc_active = flit_valid_in | ~&empty_ivc;
    
    wire [0:num_vcs-1] 			   prev_vc_sel_ivc;
    
