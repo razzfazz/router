@@ -420,27 +420,6 @@ module vcr_sw_alloc_sep_if
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_TYPE_INT:
-	  begin
-	     
-	     c_binary_op
-	       #(.width(num_ports),
-		 .num_ports(num_ports),
-		 .op(`BINARY_OP_NOR))
-	     unused_by_nonspec_op_nor
-	       (.data_in(req_in_nonspec_ip_op),
-		.data_out(unused_by_nonspec_op));
-	     
-	     c_binary_op
-	       #(.width(num_ports),
-		 .num_ports(num_ports),
-		 .op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_nor
-	       (.data_in(req_in_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
-	     
-	  end
-	
       endcase
       
    endgenerate
@@ -518,36 +497,15 @@ module vcr_sw_alloc_sep_if
 		wire 		     unused_by_nonspec;
 		assign unused_by_nonspec = unused_by_nonspec_op[op];
 		
-		wire 		     update_arb_spec;
 		wire [0:num_ports-1] req_out_spec_int_ip;
-		wire [0:num_ports-1] gnt_out_spec_int_ip;
-		wire [0:num_ports-1] gnt_out_spec_ip;
+		assign req_out_spec_int_ip = req_out_spec_ip;
 		
-		if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-		  begin
-		     
-		     assign req_out_spec_int_ip
-		       = req_out_spec_ip & unused_by_nonspec_ip;
-		     
-		     assign gnt_out_spec_ip
-		       = gnt_out_spec_int_ip & {num_ports{unused_by_nonspec}};
-		     
-		  end
-		else
-		  begin
-		     
-		     assign req_out_spec_int_ip = req_out_spec_ip;
-		     
-		     assign gnt_out_spec_ip
-		       = gnt_out_spec_int_ip & unused_by_nonspec_ip &
-			 {num_ports{unused_by_nonspec}};
-		     
-		  end
-		
+		wire 		     update_arb_spec;
 		assign update_arb_spec
 		  = |(req_out_spec_int_ip & unused_by_nonspec_ip) & 
 		    unused_by_nonspec;
 		
+		wire [0:num_ports-1] gnt_out_spec_int_ip;
 		c_arbiter
 		  #(.num_ports(num_ports),
 		    .arbiter_type(arbiter_type),
@@ -559,6 +517,11 @@ module vcr_sw_alloc_sep_if
 		   .update(update_arb_spec),
 		   .req(req_out_spec_int_ip),
 		   .gnt(gnt_out_spec_int_ip));
+		
+		wire [0:num_ports-1] gnt_out_spec_ip;
+		assign gnt_out_spec_ip
+		  = gnt_out_spec_int_ip & unused_by_nonspec_ip &
+		    {num_ports{unused_by_nonspec}};
 		
 		
 		//--------------------------------------------------------------

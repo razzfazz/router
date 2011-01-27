@@ -314,29 +314,9 @@ module vcr_sw_alloc_sep_of
 		assign update_arb_spec = gnt_spec;
 		
 		wire [0:num_vcs-1] 	     req_in_spec_int_ivc;
-		wire [0:num_vcs-1] 	     gnt_in_spec_int_ivc;
-		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
-		if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-		  begin
-		     
-		     assign req_in_spec_int_ivc
-		       = req_in_spec_ivc & unused_by_nonspec_ivc;
-		     
-		     assign gnt_in_spec_ivc
-		       = gnt_in_spec_int_ivc & {num_vcs{unused_by_nonspec}};
-		     
-		  end
-		else
-		  begin
-		     
-		     assign req_in_spec_int_ivc = req_in_spec_ivc;
-		     
-		     assign gnt_in_spec_ivc
-		       = gnt_in_spec_int_ivc & unused_by_nonspec_ivc &
-			 {num_vcs{unused_by_nonspec}};
-		     
-		  end
+		assign req_in_spec_int_ivc = req_in_spec_ivc;
 		
+		wire [0:num_vcs-1] 	     gnt_in_spec_int_ivc;
 		c_arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
@@ -348,6 +328,11 @@ module vcr_sw_alloc_sep_of
 		   .update(update_arb_spec),
 		   .req(req_in_spec_int_ivc),
 		   .gnt(gnt_in_spec_int_ivc));
+		
+		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
+		assign gnt_in_spec_ivc
+		  = gnt_in_spec_int_ivc & unused_by_nonspec_ivc &
+		    {num_vcs{unused_by_nonspec}};
 		
 		assign sel_spec_ivc = gnt_in_spec_ivc;
 		assign gnt_spec = |(gnt_out_spec_op & unused_by_nonspec_op) & 
@@ -476,8 +461,7 @@ module vcr_sw_alloc_sep_of
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_TYPE_REQ,
-	`SW_ALLOC_SPEC_TYPE_INT:
+	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
 	     c_binary_op

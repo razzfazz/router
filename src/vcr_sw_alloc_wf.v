@@ -392,8 +392,7 @@ module vcr_sw_alloc_wf
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_TYPE_REQ,
-	`SW_ALLOC_SPEC_TYPE_INT:
+	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
 	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
@@ -506,11 +505,7 @@ module vcr_sw_alloc_wf
 	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
 	   wire [0:num_ports*num_ports-1] req_wf_spec_int_ip_op;
-	   if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-	     assign req_wf_spec_int_ip_op
-	       = req_wf_spec_ip_op & spec_mask_ip_op;
-	   else
-	     assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
+	   assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
 	   
 	   wire [0:num_ports*num_ports-1] gnt_wf_spec_int_ip_op;
 	   c_wf_alloc
@@ -525,11 +520,7 @@ module vcr_sw_alloc_wf
 	      .req(req_wf_spec_int_ip_op),
 	      .gnt(gnt_wf_spec_int_ip_op));
 	   
-	   if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-	     assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op;
-	   else
-	     assign gnt_wf_spec_ip_op
-	       = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
+	   assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
 	   
 	end
       else
