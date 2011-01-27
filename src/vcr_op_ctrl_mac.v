@@ -97,7 +97,7 @@ module vcr_op_ctrl_mac
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
    // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
@@ -189,12 +189,21 @@ module vcr_op_ctrl_mac
    assign flit_valid = int_flit_ctrl[0] & |xbr_ctrl_ip;
    
    wire 				    flit_head;
-   assign flit_head = int_flit_ctrl[1+vc_idx_width];
+   assign flit_head = int_flit_ctrl[1+0];
    
    wire 				    flit_tail;
-   assign flit_tail = int_flit_ctrl[1+vc_idx_width+1];
+   assign flit_tail = int_flit_ctrl[1+1];
    
    wire [0:num_vcs-1] 			    flit_sel_ovc;
+   
+   generate
+      
+      if(num_vcs == 1)
+	assign flit_sel_ovc = 1'b1;
+      else if(num_vcs > 1)
+	assign flit_sel_ovc = int_flit_ctrl[1+2+0:1+2+num_vcs-1];
+      
+   endgenerate
    
    wire [0:num_vcs-1] 			    flit_valid_ovc;
    assign flit_valid_ovc = {num_vcs{flit_valid}} & flit_sel_ovc;
@@ -202,22 +211,6 @@ module vcr_op_ctrl_mac
    wire [0:num_vcs*3-1] 		    ovcc_errors_ovc;
    
    generate
-      
-      if(num_vcs > 1)
-	begin
-	   
-	   wire [0:vc_idx_width-1] flit_vc;
-	   assign flit_vc = int_flit_ctrl[1:1+vc_idx_width-1];
-	   
-	   c_decode
-	     #(.num_ports(num_vcs))
-	   flit_sel_ovc_dec
-	     (.data_in(flit_vc),
-	      .data_out(flit_sel_ovc));
-	   
-	end
-      else if(num_vcs == 1)
-	assign flit_sel_ovc = 1'b1;
       
       genvar 			   ovc;
       

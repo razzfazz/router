@@ -169,7 +169,7 @@ module vcr_ip_ctrl_mac
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
    // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
@@ -619,8 +619,68 @@ module vcr_ip_ctrl_mac
       
       if(num_vcs == 1)
 	begin
+	   assign flit_head_muxed = flit_head_ivc;
+	   assign flit_tail_muxed = flit_tail_ivc;
+	end
+      else if(num_vcs > 1)
+	begin
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_head_muxed_sel
+	     (.select(vc_sel_ivc),
+	      .data_in(flit_head_ivc),
+	      .data_out(flit_head_muxed));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_tail_muxed_sel
+	     (.select(vc_sel_ivc),
+	      .data_in(flit_tail_ivc),
+	      .data_out(flit_tail_muxed));
+	   
+	end
+      
+   endgenerate
+   
+   wire 				flit_head_s, flit_head_q;
+   assign flit_head_s = flit_head_muxed;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_headq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(flit_head_s),
+      .q(flit_head_q));
+   
+   assign flit_head_prev = flit_head_q;
+   assign int_flit_ctrl[1+0] = flit_head_q;
+   
+   wire 				flit_tail_s, flit_tail_q;
+   assign flit_tail_s = flit_tail_muxed;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_tailq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+   
+   assign int_flit_ctrl[1+1] = flit_tail_q;
+   
+   generate
+      
+      if(num_vcs == 1)
+	begin
 	   assign prev_vc_sel_ivc = 1'b1;
 	   assign flit_sent_prev_ivc = flit_valid_q;
+	   assign int_flit_ctrl[1+2+0] = 1'b1;
 	end
       else if(num_vcs > 1)
 	begin
@@ -663,73 +723,11 @@ module vcr_ip_ctrl_mac
 	      .d(allocated_ovc_s),
 	      .q(allocated_ovc_q));
 	   
-	   wire [0:vc_idx_width-1] dest_vc_sel;
-	   c_encode
-	     #(.num_ports(num_vcs))
-	   dest_vc_sel_enc
-	     (.data_in(allocated_ovc_q),
-	      .data_out(dest_vc_sel));
-	   
-	   assign int_flit_ctrl[1:1+vc_idx_width-1] = dest_vc_sel;
-	   
-	end
-      
-      if(num_vcs == 1)
-	begin
-	   assign flit_head_muxed = flit_head_ivc;
-	   assign flit_tail_muxed = flit_tail_ivc;
-	end
-      else if(num_vcs > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_head_muxed_sel
-	     (.select(vc_sel_ivc),
-	      .data_in(flit_head_ivc),
-	      .data_out(flit_head_muxed));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_tail_muxed_sel
-	     (.select(vc_sel_ivc),
-	      .data_in(flit_tail_ivc),
-	      .data_out(flit_tail_muxed));
+	   assign int_flit_ctrl[1+2+0:1+2+num_vcs-1] = allocated_ovc_q;
 	   
 	end
       
    endgenerate
-   
-   wire 				flit_head_s, flit_head_q;
-   assign flit_head_s = flit_head_muxed;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_headq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(alloc_active),
-      .d(flit_head_s),
-      .q(flit_head_q));
-   
-   assign flit_head_prev = flit_head_q;
-   assign int_flit_ctrl[1+vc_idx_width] = flit_head_q;
-   
-   wire 				flit_tail_s, flit_tail_q;
-   assign flit_tail_s = flit_tail_muxed;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_tailq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(alloc_active),
-      .d(flit_tail_s),
-      .q(flit_tail_q));
-   
-   assign int_flit_ctrl[1+vc_idx_width+1] = flit_tail_q;
    
    
    //---------------------------------------------------------------------------

@@ -148,7 +148,7 @@ module vcr_top
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
    // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
