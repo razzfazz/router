@@ -36,8 +36,8 @@ module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
    vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_req_nonspec_ivc, 
    sw_req_spec_ivc, sw_sel_nonspec_ivc, sw_sel_spec_ivc, sw_gnt_nonspec, 
-   sw_gnt_spec, int_flow_ctrl_op_ovc, int_flit_ctrl_out, flit_data_out, 
-   flow_ctrl_out, error);
+   sw_gnt_spec, int_flow_ctrl_op_ovc, int_flit_ctrl, flit_data, flow_ctrl_out, 
+   error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -255,12 +255,12 @@ module vcr_ip_ctrl_mac
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
    
    // outgoing flit control signals
-   output [0:int_flit_ctrl_width-1] 		     int_flit_ctrl_out;
-   wire [0:int_flit_ctrl_width-1] 		     int_flit_ctrl_out;
+   output [0:int_flit_ctrl_width-1] 		     int_flit_ctrl;
+   wire [0:int_flit_ctrl_width-1] 		     int_flit_ctrl;
    
    // outgoing flit data
-   output [0:flit_data_width-1] 		     flit_data_out;
-   wire [0:flit_data_width-1] 			     flit_data_out;
+   output [0:flit_data_width-1] 		     flit_data;
+   wire [0:flit_data_width-1] 			     flit_data;
    
    // outgoing flow control signals
    output [0:flow_ctrl_width-1] 		     flow_ctrl_out;
@@ -519,25 +519,23 @@ module vcr_ip_ctrl_mac
       if(explicit_pipeline_register)
 	begin
 	   
-	   wire [0:flit_data_width-1] flit_data;
-	   
+	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
+
 	   if(num_vcs == 1)
-	     assign flit_data = flit_data_ivc;
+	     assign flit_data_s = flit_data_ivc;
 	   else if(num_vcs > 1)
 	     begin
 		
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
-		flit_data_sel
+		flit_data_s_sel
 		  (.select(vc_sel_ivc),
 		   .data_in(flit_data_ivc),
-		   .data_out(flit_data));
+		   .data_out(flit_data_s));
 		
 	     end
 	   
-	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = flit_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -548,13 +546,11 @@ module vcr_ip_ctrl_mac
 	      .d(flit_data_s),
 	      .q(flit_data_q));
 	   
-	   assign flit_data_out = flit_data_q;
+	   assign flit_data = flit_data_q;
 	   
 	end
       else
 	begin
-	   
-	   wire [0:flit_data_width-1] flit_data;
 	   
 	   if(num_vcs == 1)
 	     assign flit_data = flit_data_ivc;
@@ -576,8 +572,6 @@ module vcr_ip_ctrl_mac
 		
 	     end
 	   
-	   assign flit_data_out = flit_data;
-	   
 	end
       
    endgenerate
@@ -592,31 +586,31 @@ module vcr_ip_ctrl_mac
    // clock gating domains. If we could change things such that flits are 
    // transmitted using edge-based signaling (i.e., transitions), they could be 
    // included in the clock gating domain controlled by alloc_active.
-   // Alternatively, we could include the flit_valid_out_q term in alloc_active;
-   // this would allow us to include flit_valid_outq in the gating domain at 
+   // Alternatively, we could include the flit_valid_q term in alloc_active;
+   // this would allow us to include flit_validq in the gating domain at 
    // the cost of some unnecessary activity. As synthesis will probably not 
    // create a clock gating domain for just these two registers, they currently 
    // will most likely end up being free-running, so this may be a reasonable 
    // tradeoff.
    
-   wire 			     flit_valid_out_q;
+   wire 			     flit_valid_q;
    
-   wire 			     valid_out_active;
-   assign valid_out_active = alloc_active | flit_valid_out_q;
+   wire 			     flit_valid_active;
+   assign flit_valid_active = alloc_active | flit_valid_q;
    
-   wire 			     flit_valid_out_s;
-   assign flit_valid_out_s = flit_sent;
+   wire 			     flit_valid_s;
+   assign flit_valid_s = flit_sent;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   flit_valid_outq
+   flit_validq
      (.clk(clk),
       .reset(reset),
-      .active(valid_out_active),
-      .d(flit_valid_out_s),
-      .q(flit_valid_out_q));
+      .active(flit_valid_active),
+      .d(flit_valid_s),
+      .q(flit_valid_q));
    
-   assign int_flit_ctrl_out[0] = flit_valid_out_q;
+   assign int_flit_ctrl[0] = flit_valid_q;
    
    wire 			     flit_head_muxed;
    wire 			     flit_tail_muxed;
@@ -626,7 +620,7 @@ module vcr_ip_ctrl_mac
       if(num_vcs == 1)
 	begin
 	   assign prev_vc_sel_ivc = 1'b1;
-	   assign flit_sent_prev_ivc = flit_valid_out_q;
+	   assign flit_sent_prev_ivc = flit_valid_q;
 	end
       else if(num_vcs > 1)
 	begin
@@ -646,7 +640,7 @@ module vcr_ip_ctrl_mac
 	   assign prev_vc_sel_ivc = vc_sel_ivc_q;
 	   
 	   assign flit_sent_prev_ivc
-	     = {num_vcs{flit_valid_out_q}} & vc_sel_ivc_q;
+	     = {num_vcs{flit_valid_q}} & vc_sel_ivc_q;
 	   
 	   wire [0:num_vcs-1] allocated_ovc;
 	   c_select_1ofn
@@ -676,7 +670,7 @@ module vcr_ip_ctrl_mac
 	     (.data_in(allocated_ovc_q),
 	      .data_out(dest_vc_sel));
 	   
-	   assign int_flit_ctrl_out[1:1+vc_idx_width-1] = dest_vc_sel;
+	   assign int_flit_ctrl[1:1+vc_idx_width-1] = dest_vc_sel;
 	   
 	end
       
@@ -708,34 +702,34 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   wire 				flit_head_out_s, flit_head_out_q;
-   assign flit_head_out_s = flit_head_muxed;
+   wire 				flit_head_s, flit_head_q;
+   assign flit_head_s = flit_head_muxed;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   flit_head_outq
+   flit_headq
      (.clk(clk),
       .reset(1'b0),
       .active(alloc_active),
-      .d(flit_head_out_s),
-      .q(flit_head_out_q));
+      .d(flit_head_s),
+      .q(flit_head_q));
    
-   assign flit_head_prev = flit_head_out_q;
-   assign int_flit_ctrl_out[1+vc_idx_width] = flit_head_out_q;
+   assign flit_head_prev = flit_head_q;
+   assign int_flit_ctrl[1+vc_idx_width] = flit_head_q;
    
-   wire 				flit_tail_out_s, flit_tail_out_q;
-   assign flit_tail_out_s = flit_tail_muxed;
+   wire 				flit_tail_s, flit_tail_q;
+   assign flit_tail_s = flit_tail_muxed;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   flit_tail_outq
+   flit_tailq
      (.clk(clk),
       .reset(1'b0),
       .active(alloc_active),
-      .d(flit_tail_out_s),
-      .q(flit_tail_out_q));
+      .d(flit_tail_s),
+      .q(flit_tail_q));
    
-   assign int_flit_ctrl_out[1+vc_idx_width+1] = flit_tail_out_q;
+   assign int_flit_ctrl[1+vc_idx_width+1] = flit_tail_q;
    
    
    //---------------------------------------------------------------------------

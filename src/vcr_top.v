@@ -282,8 +282,8 @@ module vcr_top
 	   wire [0:num_vcs-1] 			   vc_req_ivc;
 	   wire [0:num_vcs-1] 			   sw_req_nonspec_ivc;
 	   wire [0:num_vcs-1] 			   sw_req_spec_ivc;
-	   wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl_out;
-	   wire [0:flit_data_width-1] 		   flit_data_out;
+	   wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl;
+	   wire [0:flit_data_width-1] 		   flit_data;
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
 	   wire 				   ipc_error;
 	   vcr_ip_ctrl_mac
@@ -328,8 +328,8 @@ module vcr_top
 	      .sw_gnt_nonspec(sw_gnt_nonspec),
 	      .sw_gnt_spec(sw_gnt_spec),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .int_flit_ctrl_out(int_flit_ctrl_out),
-	      .flit_data_out(flit_data_out),
+	      .int_flit_ctrl(int_flit_ctrl),
+	      .flit_data(flit_data),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
@@ -349,9 +349,9 @@ module vcr_top
 	   
 	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
 				 (ip+1)*int_flit_ctrl_width-1]
-	     = int_flit_ctrl_out;
+	     = int_flit_ctrl;
 	   assign xbd_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
-	     = flit_data_out;
+	     = flit_data;
 	   
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
 				   (ip+1)*flow_ctrl_width-1]
@@ -466,13 +466,13 @@ module vcr_top
 	   // output controller
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
-	   assign int_flit_ctrl_in
+	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
+	   assign int_flit_ctrl
 	     = xbc_data_out_op[op*int_flit_ctrl_width:
 			       (op+1)*int_flit_ctrl_width-1];
 	   
-	   wire [0:flit_data_width-1] flit_data_in;
-	   assign flit_data_in
+	   wire [0:flit_data_width-1] flit_data;
+	   assign flit_data
 	     = xbd_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1];
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
@@ -522,8 +522,8 @@ module vcr_top
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
-	      .int_flit_ctrl_in(int_flit_ctrl_in),
-	      .flit_data_in(flit_data_in),
+	      .int_flit_ctrl(int_flit_ctrl),
+	      .flit_data(flit_data),
 	      .channel_out(channel_out),
 	      .int_flow_ctrl_ovc(int_flow_ctrl_ovc),
 	      .elig_ovc(elig_ovc),
