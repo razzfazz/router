@@ -36,8 +36,8 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
    vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_sent_prev, flit_head_prev, flit_head, flit_tail, flit_data, empty, 
-   full, allocated, allocated_ovc, free_spec, errors);
+   flit_sent_prev, flit_head_prev, flit_head, flit_tail, flit_sel_ovc, 
+   flit_data, empty, full, allocated, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -277,9 +277,13 @@ module vcr_ivc_ctrl
    output 					     flit_head;
    wire 					     flit_head;
    
-   // outgoign flit is tail flit
+   // outgoing flit is tail flit
    output 					     flit_tail;
    wire 					     flit_tail;
+   
+   // destination VC for outgoing flit
+   output [0:num_vcs-1] 			     flit_sel_ovc;
+   wire [0:num_vcs-1] 				     flit_sel_ovc;
    
    // payload data for outgoing flit
    output [0:flit_data_width-1] 		     flit_data;
@@ -296,10 +300,6 @@ module vcr_ivc_ctrl
    // has an output VC been assigned to this input VC?
    output 					     allocated;
    wire 					     allocated;
-   
-   // if so, which output VC has been assigned?
-   output [0:num_vcs-1] 			     allocated_ovc;
-   wire [0:num_vcs-1] 				     allocated_ovc;
    
    // credit availability if no VC has been assigned yet
    output 					     free_spec;
@@ -408,6 +408,7 @@ module vcr_ivc_ctrl
       .input_b(allocated_ocvc),
       .result(allocated_orc_ocvc));
    
+   wire [0:num_vcs-1] 				     allocated_ovc;
    c_align
      #(.in_width(num_resource_classes*num_vcs_per_class),
        .out_width(num_vcs),
@@ -416,6 +417,8 @@ module vcr_ivc_ctrl
      (.data_in(allocated_orc_ocvc),
       .dest_in({num_vcs{1'b0}}),
       .data_out(allocated_ovc));
+   
+   assign flit_sel_ovc = allocated_ovc;
    
    
    //---------------------------------------------------------------------------
