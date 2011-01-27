@@ -1132,7 +1132,7 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   assign vc_req = header_valid & ~vc_allocated_q;
+   assign vc_req = flit_valid & ~vc_allocated_q;
    
    
    //---------------------------------------------------------------------------
