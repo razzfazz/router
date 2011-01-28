@@ -124,8 +124,6 @@ module vcr_sw_alloc_wf
 	   assign route_ivc_op
 	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
 	   
-	   genvar 			ivc;
-	   
 	   wire [0:num_ports*num_vcs-1] route_op_ivc;
 	   c_interleave
 	     #(.width(num_vcs*num_ports),
@@ -133,6 +131,7 @@ module vcr_sw_alloc_wf
 	   route_op_ivc_intl
 	     (.data_in(route_ivc_op),
 	      .data_out(route_op_ivc));
+	   
 	   
 	   //-------------------------------------------------------------------
 	   // combine requests from all VCs
