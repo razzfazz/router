@@ -213,21 +213,16 @@ module vcr_sw_alloc_wf
 	   assign sel_nonspec_ivc_op
 	     = {num_vcs{gnt_wf_nonspec_op}} & gnt_in_nonspec_ivc_op;
 	   
-	   wire [0:num_ports*num_vcs-1] sel_nonspec_op_ivc;
-	   c_interleave
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   sel_nonspec_op_ivc_intl
-	     (.data_in(sel_nonspec_ivc_op),
-	      .data_out(sel_nonspec_op_ivc));
-	   
 	   wire [0:num_vcs-1] 		sel_nonspec_ivc;
-	   c_binary_op
-	     #(.width(num_vcs),
-	       .num_ports(num_ports),
-	       .op(`BINARY_OP_OR))
-	   sel_nonspec_ivc_or
-	     (.data_in(sel_nonspec_op_ivc),
+	   c_mat_mult
+	     #(.dim1_width(num_vcs),
+	       .dim2_width(num_ports),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   sel_nonspec_ivc_mmult
+	     (.input_a(sel_nonspec_ivc_op),
+	      .input_b({num_ports{1'b1}}),
 	      .data_out(sel_nonspec_ivc));
 	   
 	   wire 			gnt_nonspec;
@@ -326,21 +321,16 @@ module vcr_sw_alloc_wf
 		assign sel_spec_ivc_op
 		  = {num_vcs{gnt_wf_spec_op}} & gnt_in_spec_ivc_op;
 		
-		wire [0:num_ports*num_vcs-1] sel_spec_op_ivc;
-		c_interleave
-		  #(.width(num_vcs*num_ports),
-		    .num_blocks(num_vcs))
-		sel_spec_op_ivc_intl
-		  (.data_in(sel_spec_ivc_op),
-		   .data_out(sel_spec_op_ivc));
-		
-		c_binary_op
-		  #(.width(num_vcs),
-		    .num_ports(num_ports),
-		    .op(`BINARY_OP_OR))
-		sel_spec_ivc_or
-		  (.data_in(sel_spec_op_ivc),
-		   .data_out(sel_spec_ivc));
+		c_mat_mult
+		  #(.dim1_width(num_vcs),
+		    .dim2_width(num_ports),
+		    .dim3_width(1),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		sel_spec_ivc_mmult
+		  (.input_a(sel_spec_ivc_op),
+		   .input_b({num_ports{1'b1}}),
+		   .result(sel_spec_ivc));
 		
 		assign gnt_spec = |gnt_wf_spec_op;
 		
