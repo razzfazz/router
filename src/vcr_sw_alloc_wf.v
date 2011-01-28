@@ -223,7 +223,7 @@ module vcr_sw_alloc_wf
 	   sel_nonspec_ivc_mmult
 	     (.input_a(sel_nonspec_ivc_op),
 	      .input_b({num_ports{1'b1}}),
-	      .data_out(sel_nonspec_ivc));
+	      .result(sel_nonspec_ivc));
 	   
 	   wire 			gnt_nonspec;
 	   assign gnt_nonspec = |gnt_wf_nonspec_op;
@@ -384,21 +384,16 @@ module vcr_sw_alloc_wf
 	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
-	     c_interleave
-	       #(.width(num_ports*num_ports),
-		 .num_blocks(num_ports))
-	     req_wf_nonspec_op_ip_intl
-	       (.data_in(req_wf_nonspec_ip_op),
-		.data_out(req_wf_nonspec_op_ip));
-	     
-	     c_binary_op
-	       #(.width(num_ports),
-		 .num_ports(num_ports),
-		 .op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_nor
-	       (.data_in(req_wf_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
+	     c_mat_mult
+	       #(.dim1_width(num_ports),
+		 .dim2_width(num_ports),
+		 .dim3_width(1),
+		 .prod_op(`BINARY_OP_AND),
+		 .sum_op(`BINARY_OP_NOR))
+	     unused_by_nonspec_ip_mmult
+	       (.input_a(req_wf_nonspec_ip_op),
+		.input_b({num_ports{1'b1}}),
+		.result(unused_by_nonspec_ip));
 	     
 	     c_binary_op
 	       #(.width(num_ports),
@@ -413,21 +408,16 @@ module vcr_sw_alloc_wf
 	`SW_ALLOC_SPEC_TYPE_GNT:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] gnt_wf_nonspec_op_ip;
-	     c_interleave
-	       #(.width(num_ports*num_ports),
-		 .num_blocks(num_ports))
-	     gnt_wf_nonspec_op_ip_intl
-	       (.data_in(gnt_wf_nonspec_ip_op),
-		.data_out(gnt_wf_nonspec_op_ip));
-	     
-	     c_binary_op
-	       #(.width(num_ports),
-		 .num_ports(num_ports),
-		 .op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_nor
-	       (.data_in(gnt_wf_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
+	     c_mat_mult
+	       #(.dim1_width(num_ports),
+		 .dim2_width(num_ports),
+		 .dim3_width(1),
+		 .prod_op(`BINARY_OP_AND),
+		 .sum_op(`BINARY_OP_NOR))
+	     unused_by_nonspec_ip_mmult
+	       (.input_a(gnt_wf_nonspec_ip_op),
+		.input_b({num_ports{1'b1}}),
+		.result(unused_by_nonspec_ip));
 	     
 	     c_binary_op
 	       #(.width(num_ports),
