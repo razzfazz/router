@@ -148,7 +148,7 @@ module vcr_top
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
    // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + vc_idx_width + 1 + 1;
+   localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
    
    // width required for internal flow control signalling
    localparam int_flow_ctrl_width
@@ -224,10 +224,8 @@ module vcr_top
    
    wire [0:num_ports*num_vcs-1] 		     sw_req_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		     sw_req_spec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		     sw_sel_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		     sw_sel_spec_ip_ivc;
-   wire [0:num_ports-1] 			     sw_gnt_nonspec_ip;
-   wire [0:num_ports-1] 			     sw_gnt_spec_ip;
+   wire [0:num_ports*num_vcs-1] 		     sw_sel_ip_ivc;
+   wire [0:num_ports-1] 			     sw_gnt_ip;
    
    wire [0:num_ports*int_flit_ctrl_width-1] 	     xbc_data_in_ip;
    wire [0:num_ports*flit_data_width-1] 	     xbd_data_in_ip;
@@ -260,27 +258,19 @@ module vcr_top
 	     = vc_gnt_ip_ivc_ocvc[ip*num_vcs*num_vcs_per_class:
 				  (ip+1)*num_vcs*num_vcs_per_class-1];
 	   
-	   wire [0:num_vcs-1] 			sw_sel_nonspec_ivc;
-	   assign sw_sel_nonspec_ivc
-	     = sw_sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   wire [0:num_vcs-1] 			sw_sel_ivc;
+	   assign sw_sel_ivc = sw_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs-1] 			sw_sel_spec_ivc;
-	   assign sw_sel_spec_ivc
-	     = sw_sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire 				sw_gnt_nonspec;
-	   assign sw_gnt_nonspec = sw_gnt_nonspec_ip[ip];
-	   
-	   wire 				sw_gnt_spec;
-	   assign sw_gnt_spec = sw_gnt_spec_ip[ip];
+	   wire 				sw_gnt;
+	   assign sw_gnt = sw_gnt_ip[ip];
 	   
 	   wire [0:num_vcs*num_ports-1] 	route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] route_ivc_orc;
 	   wire [0:num_vcs-1] 			   vc_req_ivc;
 	   wire [0:num_vcs-1] 			   sw_req_nonspec_ivc;
 	   wire [0:num_vcs-1] 			   sw_req_spec_ivc;
-	   wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl_out;
-	   wire [0:flit_data_width-1] 		   flit_data_out;
+	   wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl;
+	   wire [0:flit_data_width-1] 		   flit_data;
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
 	   wire 				   ipc_error;
 	   vcr_ip_ctrl_mac
@@ -319,13 +309,11 @@ module vcr_top
 	      .vc_gnt_ivc_ocvc(vc_gnt_ivc_ocvc),
 	      .sw_req_nonspec_ivc(sw_req_nonspec_ivc),
 	      .sw_req_spec_ivc(sw_req_spec_ivc),
-	      .sw_sel_nonspec_ivc(sw_sel_nonspec_ivc),
-	      .sw_sel_spec_ivc(sw_sel_spec_ivc),
-	      .sw_gnt_nonspec(sw_gnt_nonspec),
-	      .sw_gnt_spec(sw_gnt_spec),
+	      .sw_sel_ivc(sw_sel_ivc),
+	      .sw_gnt(sw_gnt),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .int_flit_ctrl_out(int_flit_ctrl_out),
-	      .flit_data_out(flit_data_out),
+	      .int_flit_ctrl(int_flit_ctrl),
+	      .flit_data(flit_data),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
@@ -345,9 +333,9 @@ module vcr_top
 	   
 	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
 				 (ip+1)*int_flit_ctrl_width-1]
-	     = int_flit_ctrl_out;
+	     = int_flit_ctrl;
 	   assign xbd_data_in_ip[ip*flit_data_width:(ip+1)*flit_data_width-1]
-	     = flit_data_out;
+	     = flit_data;
 	   
 	   assign flow_ctrl_out_ip[ip*flow_ctrl_width:
 				   (ip+1)*flow_ctrl_width-1]
@@ -366,7 +354,8 @@ module vcr_top
    
    wire [0:num_ports*num_vcs-1] 		elig_op_ovc;
    
-   wire [0:num_ports*num_vcs-1] 		vc_req_op_ovc;
+   wire [0:num_ports-1] 			vc_active_op;
+   
    wire [0:num_ports*num_vcs-1] 		vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] 	vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1] 	vc_gnt_op_ovc_ivc;
@@ -385,7 +374,7 @@ module vcr_top
       .route_ip_ivc_orc(route_ip_ivc_orc),
       .elig_op_ovc(elig_op_ovc),
       .req_ip_ivc(vc_req_ip_ivc),
-      .req_op_ovc(vc_req_op_ovc),
+      .active_op(vc_active_op),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
       .gnt_op_ovc(vc_gnt_op_ovc),
@@ -410,10 +399,8 @@ module vcr_top
       .route_ip_ivc_op(route_ip_ivc_op),
       .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
       .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-      .sel_nonspec_ip_ivc(sw_sel_nonspec_ip_ivc),
-      .sel_spec_ip_ivc(sw_sel_spec_ip_ivc),
-      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
-      .gnt_spec_ip(sw_gnt_spec_ip),
+      .sel_ip_ivc(sw_sel_ip_ivc),
+      .gnt_ip(sw_gnt_ip),
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip));
    
    
@@ -460,21 +447,21 @@ module vcr_top
 	   // output controller
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl_in;
-	   assign int_flit_ctrl_in
+	   wire [0:int_flit_ctrl_width-1] int_flit_ctrl;
+	   assign int_flit_ctrl
 	     = xbc_data_out_op[op*int_flit_ctrl_width:
 			       (op+1)*int_flit_ctrl_width-1];
 	   
-	   wire [0:flit_data_width-1] flit_data_in;
-	   assign flit_data_in
+	   wire [0:flit_data_width-1] flit_data;
+	   assign flit_data
 	     = xbd_data_out_op[op*flit_data_width:(op+1)*flit_data_width-1];
 	   
 	   wire [0:flow_ctrl_width-1] flow_ctrl_in;
 	   assign flow_ctrl_in
 	     = flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1];
 	   
-	   wire [0:num_vcs-1] 	      vc_req_ovc;
-	   assign vc_req_ovc = vc_req_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
+	   wire 		      vc_active;
+	   assign vc_active = vc_active_op[op];
 	   
 	   wire [0:num_vcs-1] 	      vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
@@ -511,13 +498,13 @@ module vcr_top
 	     (.clk(clk),
 	      .reset(reset),
 	      .flow_ctrl_in(flow_ctrl_in),
-	      .vc_req_ovc(vc_req_ovc),
+	      .vc_active(vc_active),
 	      .vc_gnt_ovc(vc_gnt_ovc),
 	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
 	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
-	      .int_flit_ctrl_in(int_flit_ctrl_in),
-	      .flit_data_in(flit_data_in),
+	      .int_flit_ctrl(int_flit_ctrl),
+	      .flit_data(flit_data),
 	      .channel_out(channel_out),
 	      .int_flow_ctrl_ovc(int_flow_ctrl_ovc),
 	      .elig_ovc(elig_ovc),

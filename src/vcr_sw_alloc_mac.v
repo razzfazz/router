@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_sw_alloc_mac
   (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip, 
-   xbr_ctrl_op_ip);
+   sel_ip_ivc, gnt_ip, xbr_ctrl_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -56,6 +55,9 @@ module vcr_sw_alloc_mac
    // select which arbiter type to use in allocator
    parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
+   // select speculation type
+   parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -70,21 +72,13 @@ module vcr_sw_alloc_mac
    // speculative switch requests
    input [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
    
-   // indicate which VC at a given port is granted non-speculatively
-   output [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
+   // indicate which VC at a given port is granted
+   output [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
    
-   // indicate which VC at a given port is granted speculatively
-   output [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
-   
-   // non-speculative grants
-   output [0:num_ports-1] 		   gnt_nonspec_ip;
-   wire [0:num_ports-1] 		   gnt_nonspec_ip;
-   
-   // speculative grants
-   output [0:num_ports-1] 		   gnt_spec_ip;
-   wire [0:num_ports-1] 		   gnt_spec_ip;
+   // port grants
+   output [0:num_ports-1] 		   gnt_ip;
+   wire [0:num_ports-1] 		   gnt_ip;
    
    // crossbar control signals
    output [0:num_ports*num_ports-1] 	   xbr_ctrl_op_ip;
@@ -133,6 +127,10 @@ module vcr_sw_alloc_mac
       .data_in(route_ip_ivc_op),
       .data_out(active_spec_op));
    
+   wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
+   wire [0:num_ports-1] 		   gnt_nonspec_ip;
+   wire [0:num_ports-1] 		   gnt_spec_ip;
    wire [0:num_ports*num_ports-1] 	   gnt_op_ip;
    
    genvar 				   op;
@@ -145,6 +143,7 @@ module vcr_sw_alloc_mac
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .arbiter_type(arbiter_type),
+	       .spec_type(spec_type),
 	       .reset_type(reset_type))
 	   core_sep_if
 	     (.clk(clk),
@@ -168,6 +167,7 @@ module vcr_sw_alloc_mac
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .arbiter_type(arbiter_type),
+	       .spec_type(spec_type),
 	       .reset_type(reset_type))
 	   core_sep_of
 	     (.clk(clk),
@@ -193,6 +193,7 @@ module vcr_sw_alloc_mac
 	       .num_ports(num_ports),
 	       .wf_alloc_type(allocator_type - `SW_ALLOC_TYPE_WF_BASE),
 	       .arbiter_type(arbiter_type),
+	       .spec_type(spec_type),
 	       .reset_type(reset_type))
 	   core_wf
 	     (.clk(clk),
@@ -208,6 +209,71 @@ module vcr_sw_alloc_mac
 	      .gnt_spec_ip(gnt_spec_ip),
 	      .gnt_op_ip(gnt_op_ip));
 	end
+      
+   endgenerate
+   
+   generate
+      
+      if(spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
+	begin
+	   assign gnt_ip = gnt_nonspec_ip;
+	   assign sel_ip_ivc = sel_nonspec_ip_ivc;
+	end
+      else
+	begin
+	   
+	   assign gnt_ip = gnt_nonspec_ip | gnt_spec_ip;
+	   
+	   genvar ip;
+
+	   for(ip = 0; ip < num_ports; ip = ip + 1)
+	     begin:ips
+		
+		wire [0:num_vcs-1] req_nonspec_ivc;
+		assign req_nonspec_ivc
+		  = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		
+		wire 		   req_nonspec;
+		assign req_nonspec = |req_nonspec_ivc;
+		
+		wire 		   gnt_nonspec;
+		assign gnt_nonspec = gnt_nonspec_ip[ip];
+		
+		wire [0:num_vcs-1] sel_nonspec_ivc;
+		assign sel_nonspec_ivc
+		  = sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		
+		wire [0:num_vcs-1] sel_spec_ivc;
+		assign sel_spec_ivc
+		  = sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+		
+		wire [0:num_vcs-1] sel_ivc;
+		
+		case(spec_type)
+		  
+		  `SW_ALLOC_SPEC_TYPE_REQ:
+		    begin
+		       assign sel_ivc
+			 = req_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
+		    end
+		  
+		  `SW_ALLOC_SPEC_TYPE_GNT:
+		    begin
+		       assign sel_ivc
+			 = gnt_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
+		    end
+		  
+		endcase
+		
+		assign sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = sel_ivc;
+		
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   generate
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops

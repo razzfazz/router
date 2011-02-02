@@ -124,8 +124,6 @@ module vcr_sw_alloc_wf
 	   assign route_ivc_op
 	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
 	   
-	   genvar 			ivc;
-	   
 	   wire [0:num_ports*num_vcs-1] route_op_ivc;
 	   c_interleave
 	     #(.width(num_vcs*num_ports),
@@ -133,6 +131,7 @@ module vcr_sw_alloc_wf
 	   route_op_ivc_intl
 	     (.data_in(route_ivc_op),
 	      .data_out(route_op_ivc));
+	   
 	   
 	   //-------------------------------------------------------------------
 	   // combine requests from all VCs
@@ -214,22 +213,17 @@ module vcr_sw_alloc_wf
 	   assign sel_nonspec_ivc_op
 	     = {num_vcs{gnt_wf_nonspec_op}} & gnt_in_nonspec_ivc_op;
 	   
-	   wire [0:num_ports*num_vcs-1] sel_nonspec_op_ivc;
-	   c_interleave
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   sel_nonspec_op_ivc_intl
-	     (.data_in(sel_nonspec_ivc_op),
-	      .data_out(sel_nonspec_op_ivc));
-	   
 	   wire [0:num_vcs-1] 		sel_nonspec_ivc;
-	   c_binary_op
-	     #(.width(num_vcs),
-	       .num_ports(num_ports),
-	       .op(`BINARY_OP_OR))
-	   sel_nonspec_ivc_or
-	     (.data_in(sel_nonspec_op_ivc),
-	      .data_out(sel_nonspec_ivc));
+	   c_mat_mult
+	     #(.dim1_width(num_vcs),
+	       .dim2_width(num_ports),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   sel_nonspec_ivc_mmult
+	     (.input_a(sel_nonspec_ivc_op),
+	      .input_b({num_ports{1'b1}}),
+	      .result(sel_nonspec_ivc));
 	   
 	   wire 			gnt_nonspec;
 	   assign gnt_nonspec = |gnt_wf_nonspec_op;
@@ -327,21 +321,16 @@ module vcr_sw_alloc_wf
 		assign sel_spec_ivc_op
 		  = {num_vcs{gnt_wf_spec_op}} & gnt_in_spec_ivc_op;
 		
-		wire [0:num_ports*num_vcs-1] sel_spec_op_ivc;
-		c_interleave
-		  #(.width(num_vcs*num_ports),
-		    .num_blocks(num_vcs))
-		sel_spec_op_ivc_intl
-		  (.data_in(sel_spec_ivc_op),
-		   .data_out(sel_spec_op_ivc));
-		
-		c_binary_op
-		  #(.width(num_vcs),
-		    .num_ports(num_ports),
-		    .op(`BINARY_OP_OR))
-		sel_spec_ivc_or
-		  (.data_in(sel_spec_op_ivc),
-		   .data_out(sel_spec_ivc));
+		c_mat_mult
+		  #(.dim1_width(num_vcs),
+		    .dim2_width(num_ports),
+		    .dim3_width(1),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		sel_spec_ivc_mmult
+		  (.input_a(sel_spec_ivc_op),
+		   .input_b({num_ports{1'b1}}),
+		   .result(sel_spec_ivc));
 		
 		assign gnt_spec = |gnt_wf_spec_op;
 		
@@ -392,25 +381,19 @@ module vcr_sw_alloc_wf
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_TYPE_REQ,
-	`SW_ALLOC_SPEC_TYPE_INT:
+	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] req_wf_nonspec_op_ip;
-	     c_interleave
-	       #(.width(num_ports*num_ports),
-		 .num_blocks(num_ports))
-	     req_wf_nonspec_op_ip_intl
-	       (.data_in(req_wf_nonspec_ip_op),
-		.data_out(req_wf_nonspec_op_ip));
-	     
-	     c_binary_op
-	       #(.width(num_ports),
-		 .num_ports(num_ports),
-		 .op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_nor
-	       (.data_in(req_wf_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
+	     c_mat_mult
+	       #(.dim1_width(num_ports),
+		 .dim2_width(num_ports),
+		 .dim3_width(1),
+		 .prod_op(`BINARY_OP_AND),
+		 .sum_op(`BINARY_OP_NOR))
+	     unused_by_nonspec_ip_mmult
+	       (.input_a(req_wf_nonspec_ip_op),
+		.input_b({num_ports{1'b1}}),
+		.result(unused_by_nonspec_ip));
 	     
 	     c_binary_op
 	       #(.width(num_ports),
@@ -425,21 +408,16 @@ module vcr_sw_alloc_wf
 	`SW_ALLOC_SPEC_TYPE_GNT:
 	  begin
 	     
-	     wire [0:num_ports*num_ports-1] gnt_wf_nonspec_op_ip;
-	     c_interleave
-	       #(.width(num_ports*num_ports),
-		 .num_blocks(num_ports))
-	     gnt_wf_nonspec_op_ip_intl
-	       (.data_in(gnt_wf_nonspec_ip_op),
-		.data_out(gnt_wf_nonspec_op_ip));
-	     
-	     c_binary_op
-	       #(.width(num_ports),
-		 .num_ports(num_ports),
-		 .op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_nor
-	       (.data_in(gnt_wf_nonspec_op_ip),
-		.data_out(unused_by_nonspec_ip));
+	     c_mat_mult
+	       #(.dim1_width(num_ports),
+		 .dim2_width(num_ports),
+		 .dim3_width(1),
+		 .prod_op(`BINARY_OP_AND),
+		 .sum_op(`BINARY_OP_NOR))
+	     unused_by_nonspec_ip_mmult
+	       (.input_a(gnt_wf_nonspec_ip_op),
+		.input_b({num_ports{1'b1}}),
+		.result(unused_by_nonspec_ip));
 	     
 	     c_binary_op
 	       #(.width(num_ports),
@@ -506,11 +484,7 @@ module vcr_sw_alloc_wf
 	   assign update_alloc_spec = |(req_wf_spec_ip_op & spec_mask_ip_op);
 	   
 	   wire [0:num_ports*num_ports-1] req_wf_spec_int_ip_op;
-	   if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-	     assign req_wf_spec_int_ip_op
-	       = req_wf_spec_ip_op & spec_mask_ip_op;
-	   else
-	     assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
+	   assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
 	   
 	   wire [0:num_ports*num_ports-1] gnt_wf_spec_int_ip_op;
 	   c_wf_alloc
@@ -525,11 +499,7 @@ module vcr_sw_alloc_wf
 	      .req(req_wf_spec_int_ip_op),
 	      .gnt(gnt_wf_spec_int_ip_op));
 	   
-	   if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-	     assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op;
-	   else
-	     assign gnt_wf_spec_ip_op
-	       = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
+	   assign gnt_wf_spec_ip_op = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
 	   
 	end
       else

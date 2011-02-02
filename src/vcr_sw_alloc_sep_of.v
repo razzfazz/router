@@ -130,14 +130,6 @@ module vcr_sw_alloc_sep_of
 	   assign route_ivc_op
 	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
 	   
-	   wire [0:num_ports*num_vcs-1] route_op_ivc;
-	   c_interleave
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   route_op_ivc_intl
-	     (.data_in(route_ivc_op),
-	      .data_out(route_op_ivc));
-	   
 	   
 	   //-------------------------------------------------------------------
 	   // combine requests from all VCs
@@ -169,13 +161,16 @@ module vcr_sw_alloc_sep_of
 	     = gnt_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
 	   wire [0:num_vcs-1] 		mask_nonspec_ivc;
-	   c_select_mofn
-	     #(.width(num_vcs),
-	       .num_ports(num_ports))
-	   mask_nonspec_ivc_sel
-	     (.select(gnt_out_nonspec_op),
-	      .data_in(route_op_ivc),
-	      .data_out(mask_nonspec_ivc));
+	   c_mat_mult
+	     #(.dim1_width(num_vcs),
+	       .dim2_width(num_ports),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   mask_nonspec_ivc_mmult
+	     (.input_a(route_ivc_op),
+	      .input_b(gnt_out_nonspec_op),
+	      .result(mask_nonspec_ivc));
 	   
 	   wire [0:num_vcs-1] 		req_in_nonspec_ivc;
 	   assign req_in_nonspec_ivc = req_nonspec_ivc & mask_nonspec_ivc;
@@ -277,13 +272,16 @@ module vcr_sw_alloc_sep_of
 		  = gnt_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 		
 		wire [0:num_vcs-1] 	     mask_spec_ivc;
-		c_select_mofn
-		  #(.width(num_vcs),
-		    .num_ports(num_ports))
-		mask_spec_ivc_sel
-		  (.select(gnt_out_spec_op),
-		   .data_in(route_op_ivc),
-		   .data_out(mask_spec_ivc));
+		c_mat_mult
+		  #(.dim1_width(num_vcs),
+		    .dim2_width(num_ports),
+		    .dim3_width(1),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		mask_spec_ivc_mmult
+		  (.input_a(route_ivc_op),
+		   .input_b(gnt_out_spec_op),
+		   .result(mask_spec_ivc));
 		
 		wire [0:num_vcs-1] 	     req_in_spec_ivc;
 		assign req_in_spec_ivc = req_spec_ivc & mask_spec_ivc;
@@ -294,13 +292,16 @@ module vcr_sw_alloc_sep_of
 		//--------------------------------------------------------------
 		
 		wire [0:num_vcs-1] 	     unused_by_nonspec_ivc;
-		c_select_mofn
-		  #(.width(num_vcs),
-		    .num_ports(num_ports))
-		unused_by_nonspec_ivc_sel
-		  (.select(unused_by_nonspec_op),
-		   .data_in(route_op_ivc),
-		   .data_out(unused_by_nonspec_ivc));
+		c_mat_mult
+		  #(.dim1_width(num_vcs),
+		    .dim2_width(num_ports),
+		    .dim3_width(1),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		unused_by_nonspec_ivc_mmult
+		  (.input_a(route_ivc_op),
+		   .input_b(unused_by_nonspec_op),
+		   .result(unused_by_nonspec_ivc));
 		
 		
 		//--------------------------------------------------------------
@@ -314,29 +315,9 @@ module vcr_sw_alloc_sep_of
 		assign update_arb_spec = gnt_spec;
 		
 		wire [0:num_vcs-1] 	     req_in_spec_int_ivc;
-		wire [0:num_vcs-1] 	     gnt_in_spec_int_ivc;
-		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
-		if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
-		  begin
-		     
-		     assign req_in_spec_int_ivc
-		       = req_in_spec_ivc & unused_by_nonspec_ivc;
-		     
-		     assign gnt_in_spec_ivc
-		       = gnt_in_spec_int_ivc & {num_vcs{unused_by_nonspec}};
-		     
-		  end
-		else
-		  begin
-		     
-		     assign req_in_spec_int_ivc = req_in_spec_ivc;
-		     
-		     assign gnt_in_spec_ivc
-		       = gnt_in_spec_int_ivc & unused_by_nonspec_ivc &
-			 {num_vcs{unused_by_nonspec}};
-		     
-		  end
+		assign req_in_spec_int_ivc = req_in_spec_ivc;
 		
+		wire [0:num_vcs-1] 	     gnt_in_spec_int_ivc;
 		c_arbiter
 		  #(.num_ports(num_vcs),
 		    .reset_type(reset_type),
@@ -348,6 +329,11 @@ module vcr_sw_alloc_sep_of
 		   .update(update_arb_spec),
 		   .req(req_in_spec_int_ivc),
 		   .gnt(gnt_in_spec_int_ivc));
+		
+		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
+		assign gnt_in_spec_ivc
+		  = gnt_in_spec_int_ivc & unused_by_nonspec_ivc &
+		    {num_vcs{unused_by_nonspec}};
 		
 		assign sel_spec_ivc = gnt_in_spec_ivc;
 		assign gnt_spec = |(gnt_out_spec_op & unused_by_nonspec_op) & 
@@ -476,8 +462,7 @@ module vcr_sw_alloc_sep_of
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_TYPE_REQ,
-	`SW_ALLOC_SPEC_TYPE_INT:
+	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
 	     c_binary_op
