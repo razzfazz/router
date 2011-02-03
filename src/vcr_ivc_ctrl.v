@@ -519,11 +519,8 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   wire 			     bypass_peek;
-   assign bypass_peek = fbc_empty | fbc_almost_empty;
-   
    wire 			     fbf_peek_active;
-   assign fbf_peek_active = ~bypass_peek;
+   assign fbf_peek_active = ~fbc_empty & ~fbc_almost_empty;
    
    wire [0:fb_addr_width-1] 	     fbf_peek_addr;
    c_incr
@@ -559,14 +556,13 @@ module vcr_ivc_ctrl
    assign fbf_flit_data = fbf_read_data[2:2+flit_data_width-1];
    
    wire 			     peek_flit_head;
-   assign peek_flit_head = bypass_peek ? flit_head_in : fbf_peek_data[0];
+   assign peek_flit_head = fbf_peek_data[0];
 
    wire 			     peek_flit_tail;
-   assign peek_flit_tail = bypass_peek ? flit_tail_in : fbf_peek_data[1];
+   assign peek_flit_tail = fbf_peek_data[1];
    
    wire [0:header_info_width-1]      peek_header_info;
-   assign peek_header_info
-     = bypass_peek ? header_info_in : fbf_peek_data[2:2+header_info_width-1];
+   assign peek_header_info = fbf_peek_data[2:2+header_info_width-1];
    
    wire [0:la_route_info_width-1]    peek_la_route_info;
    assign peek_la_route_info = peek_header_info[0:la_route_info_width-1];
@@ -581,11 +577,10 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 			     htr_capture;
-   assign htr_capture = (fbc_empty & flit_valid_in) | flit_sent;
-   
    wire 			     htr_flit_head_s, htr_flit_head_q;
-   assign htr_flit_head_s = htr_capture ? peek_flit_head : htr_flit_head_q;
+   assign htr_flit_head_s = flit_sent ?
+			    (fbc_almost_empty ? flit_head_in : peek_flit_head) :
+			    (fbc_empty ? flit_head_in : htr_flit_head_q);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -599,7 +594,9 @@ module vcr_ivc_ctrl
    assign flit_head = fbc_empty ? flit_head_in : htr_flit_head_q;
    
    wire 			     htr_flit_tail_s, htr_flit_tail_q;
-   assign htr_flit_tail_s = htr_capture ? peek_flit_tail : htr_flit_tail_q;
+   assign htr_flit_tail_s = flit_sent ?
+			    (fbc_almost_empty ? flit_tail_in : peek_flit_tail) :
+			    (fbc_empty ? flit_tail_in : htr_flit_tail_q);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -617,16 +614,13 @@ module vcr_ivc_ctrl
    // head register
    //---------------------------------------------------------------------------
    
-   wire 			     head_received;
-   assign head_received = flit_valid_in & flit_head_in;
-   
-   wire 			     tail_sent;
-   assign tail_sent = flit_sent & flit_tail;
-   
    wire 			     hdr_valid_s, hdr_valid_q;
-   assign hdr_valid_s = hdr_valid_q ?
-			(~tail_sent | ~bypass_peek | head_received) : 
-			(flit_valid_in & ~tail_sent);
+   assign hdr_valid_s
+     = flit_sent ?
+       (fbc_empty ? 
+	~flit_tail_in : 
+	(~htr_flit_tail_q | ~fbc_almost_empty | flit_valid_in)) : 
+       (hdr_valid_q | flit_valid_in);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -638,15 +632,13 @@ module vcr_ivc_ctrl
       .q(hdr_valid_q));
    
    wire 			     hdr_active;
-   assign hdr_active = hdr_valid_q ? (~fbc_empty & flit_tail) : flit_valid_in;
-   
-   wire 			     hdr_capture;
-   assign hdr_capture = (~hdr_valid_q & flit_valid_in) | 
-			(tail_sent & (~bypass_peek | flit_valid_in));
+   assign hdr_active = ~hdr_valid_q | (~fbc_empty & htr_flit_tail_q);
    
    wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
    assign hdr_la_route_info_s
-     = hdr_capture ? peek_la_route_info : hdr_la_route_info_q;
+     = (flit_sent & flit_tail) ? 
+       (fbc_almost_empty ? la_route_info_in : peek_la_route_info) : 
+       (hdr_valid_q ? hdr_la_route_info_q : la_route_info_in);
    c_dff
      #(.width(la_route_info_width),
        .reset_type(reset_type))
@@ -658,7 +650,10 @@ module vcr_ivc_ctrl
       .q(hdr_la_route_info_q));
    
    wire [0:route_info_width-1] 	     hdr_route_info_s, hdr_route_info_q;
-   assign hdr_route_info_s = hdr_capture ? peek_route_info : hdr_route_info_q;
+   assign hdr_route_info_s
+     = (flit_sent & flit_tail) ?
+       (fbc_almost_empty ? route_info_in : peek_route_info) :
+       (hdr_valid_q ? hdr_route_info_q : route_info_in);
    c_dff
      #(.width(route_info_width),
        .reset_type(reset_type))
