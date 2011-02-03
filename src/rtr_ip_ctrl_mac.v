@@ -827,20 +827,18 @@ module rtr_ip_ctrl_mac
 	      
 	      if(dual_path_alloc)
 		assign valid_s
-		  = valid_q ?
-		    (fb_empty ? 
-		     (~flit_sent_fast_in | ~chi_flit_tail) : 
-		     (~flit_sent_in | ~htt_flit_tail | ~fb_almost_empty | 
-		      chi_flit_valid)) : 
-		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent_fast_in));
+		  = flit_sent_in ?
+		    (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid) :
+		    (flit_sent_fast_in ? 
+		     ~chi_flit_tail : 
+		     (valid_q | chi_flit_valid));
 	      else
 		assign valid_s
-		  = valid_q ?
-		    (~flit_sent_in |
-		     (fb_empty ?
-		      ~chi_flit_tail :
-		      (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) :
-		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent_in));
+		  = flit_sent_in ? 
+		    (fb_empty ?
+		     ~chi_flit_tail :
+		     (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid)) :
+		    (valid_q | chi_flit_valid);
 	      
 	      c_dff
 		#(.width(1),
