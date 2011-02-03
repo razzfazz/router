@@ -568,10 +568,10 @@ module vcr_ivc_ctrl
    assign fbf_flit_data = fbf_read_data[2:2+flit_data_width-1];
    
    wire 			     peek_flit_head;
-   assign peek_flit_head = bypass_peek ? flit_head_in : fbf_peek_data[0];
+   assign peek_flit_head = fbf_peek_data[0];
 
    wire 			     peek_flit_tail;
-   assign peek_flit_tail = bypass_peek ? flit_tail_in : fbf_peek_data[1];
+   assign peek_flit_tail = fbf_peek_data[1];
    
    wire [0:header_info_width-1]      peek_header_info;
    assign peek_header_info
@@ -590,11 +590,10 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 			     htr_capture;
-   assign htr_capture = (fbc_empty & flit_valid_in) | flit_sent;
-   
    wire 			     htr_flit_head_s, htr_flit_head_q;
-   assign htr_flit_head_s = htr_capture ? peek_flit_head : htr_flit_head_q;
+   assign htr_flit_head_s = flit_sent ?
+			    (fbc_almost_empty ? flit_head_in : peek_flit_head) :
+			    (fbc_empty ? flit_head_in : htr_flit_head_q);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -608,7 +607,9 @@ module vcr_ivc_ctrl
    assign flit_head = fbc_empty ? flit_head_in : htr_flit_head_q;
    
    wire 			     htr_flit_tail_s, htr_flit_tail_q;
-   assign htr_flit_tail_s = htr_capture ? peek_flit_tail : htr_flit_tail_q;
+   assign htr_flit_tail_s = flit_sent ?
+			    (fbc_almost_empty ? flit_tail_in : peek_flit_tail) :
+			    (fbc_empty ? flit_tail_in : htr_flit_tail_q);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
