@@ -34,9 +34,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
-   vc_req_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc, sw_req_nonspec_ivc, 
-   sw_req_spec_ivc, sw_sel_ivc, sw_gnt, int_flow_ctrl_op_ovc, int_flit_ctrl, 
-   flit_data, flow_ctrl_out, error);
+   allocated_ivc, flit_valid_ivc, free_nonspec_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc,
+   sw_sel_ivc, sw_gnt, int_flow_ctrl_op_ovc, int_flit_ctrl, flit_data, 
+   flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -220,23 +220,23 @@ module vcr_ip_ctrl_mac
    output [0:num_vcs*num_resource_classes-1] route_ivc_orc;
    wire [0:num_vcs*num_resource_classes-1]   route_ivc_orc;
    
-   // request VC allocation
-   output [0:num_vcs-1] 		     vc_req_ivc;
-   wire [0:num_vcs-1] 			     vc_req_ivc;
+   // VC has an output VC allocated to it
+   output [0:num_vcs-1] 		     allocated_ivc;
+   wire [0:num_vcs-1] 			     allocated_ivc;
+   
+   // VC has a flit available
+   output [0:num_vcs-1] 		     flit_valid_ivc;
+   wire [0:num_vcs-1] 			     flit_valid_ivc;
+   
+   // credit availability if output VC has been allocated
+   output [0:num_vcs-1] 		     free_nonspec_ivc;
+   wire [0:num_vcs-1] 			     free_nonspec_ivc;
    
    // VC allocation successful
    input [0:num_vcs-1] 			     vc_gnt_ivc;
    
    // granted output VC
    input [0:num_vcs*num_vcs_per_class-1]     vc_gnt_ivc_ocvc;
-   
-   // non-speculative switch allocator requests
-   output [0:num_vcs-1] 		     sw_req_nonspec_ivc;
-   wire [0:num_vcs-1] 			     sw_req_nonspec_ivc;
-   
-   // speculative switch allocator requests
-   output [0:num_vcs-1] 		     sw_req_spec_ivc;
-   wire [0:num_vcs-1] 			     sw_req_spec_ivc;
    
    // select VC for switch grant
    input [0:num_vcs-1] 			     sw_sel_ivc;
@@ -303,7 +303,6 @@ module vcr_ip_ctrl_mac
    // switch allocation
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				     allocated_ivc;
    wire [0:num_vcs-1] 				     free_spec_ivc;
    
    wire 					     flit_sent;
@@ -373,9 +372,7 @@ module vcr_ip_ctrl_mac
 	   
 	   wire [0:num_ports-1] 	route_op;
 	   wire [0:num_resource_classes-1] route_orc;
-	   wire 			   vc_req;
-	   wire 			   sw_req_nonspec;
-	   wire 			   sw_req_spec;	   
+	   wire 			   flit_valid;
 	   wire 			   flit_head;
 	   wire 			   flit_tail;
 	   wire [0:num_vcs-1] 		   flit_sel_ovc;
@@ -383,6 +380,7 @@ module vcr_ip_ctrl_mac
 	   wire 			   empty;
 	   wire 			   full;
 	   wire 			   allocated;
+	   wire 			   free_nonspec;
 	   wire 			   free_spec;
 	   wire [0:5] 			   ivcc_errors;
 	   vcr_ivc_ctrl
@@ -420,14 +418,12 @@ module vcr_ip_ctrl_mac
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_op(route_op),
 	      .route_orc(route_orc),
-	      .vc_req(vc_req),
 	      .vc_gnt(vc_gnt),
 	      .vc_gnt_ocvc(vc_gnt_ocvc),
-	      .sw_req_nonspec(sw_req_nonspec),
-	      .sw_req_spec(sw_req_spec),
 	      .sw_gnt(sw_gnt),
 	      .flit_sent_prev(flit_sent_prev),
 	      .flit_head_prev(flit_head_prev),
+	      .flit_valid(flit_valid),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .flit_sel_ovc(flit_sel_ovc),
@@ -435,6 +431,7 @@ module vcr_ip_ctrl_mac
 	      .empty(empty),
 	      .full(full),
 	      .allocated(allocated),
+	      .free_nonspec(free_nonspec),
 	      .free_spec(free_spec),
 	      .errors(ivcc_errors));
 	   
@@ -443,9 +440,7 @@ module vcr_ip_ctrl_mac
 	   assign route_ivc_orc[ivc*num_resource_classes:
 				(ivc+1)*num_resource_classes-1]
 	     = route_orc;
-	   assign vc_req_ivc[ivc] = vc_req;
-	   assign sw_req_nonspec_ivc[ivc] = sw_req_nonspec;
-	   assign sw_req_spec_ivc[ivc] = sw_req_spec;
+	   assign flit_valid_ivc[ivc] = flit_valid;
 	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
 	   assign flit_sel_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
@@ -455,6 +450,7 @@ module vcr_ip_ctrl_mac
 	   assign empty_ivc[ivc] = empty;
 	   assign full_ivc[ivc] = full;
 	   assign allocated_ivc[ivc] = allocated;
+	   assign free_nonspec_ivc[ivc] = free_nonspec;
 	   assign free_spec_ivc[ivc] = free_spec;
 	   assign ivcc_errors_ivc[ivc*6:(ivc+1)*6-1] = ivcc_errors;
 	   

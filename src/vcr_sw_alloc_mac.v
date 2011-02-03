@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_sw_alloc_mac
-  (clk, reset, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   sel_ip_ivc, gnt_ip, xbr_ctrl_op_ip);
+  (clk, reset, route_ip_ivc_op, allocated_ip_ivc, flit_valid_ip_ivc, 
+   free_nonspec_ip_ivc, sel_ip_ivc, gnt_ip, xbr_ctrl_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -66,11 +66,14 @@ module vcr_sw_alloc_mac
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
-   // non-speculative switch requests
-   input [0:num_ports*num_vcs-1] 	   req_nonspec_ip_ivc;
+   // VC has output VC allocated to it
+   input [0:num_ports*num_vcs-1] 	   allocated_ip_ivc;
    
-   // speculative switch requests
-   input [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
+   // VC has flit available
+   input [0:num_ports*num_vcs-1] 	   flit_valid_ip_ivc;
+   
+   // credit availability if output VC has been allocated
+   input [0:num_ports*num_vcs-1] 	   free_nonspec_ip_ivc;
    
    // indicate which VC at a given port is granted
    output [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
@@ -84,6 +87,12 @@ module vcr_sw_alloc_mac
    output [0:num_ports*num_ports-1] 	   xbr_ctrl_op_ip;
    wire [0:num_ports*num_ports-1] 	   xbr_ctrl_op_ip;
    
+   wire [0:num_ports*num_vcs-1] 	   req_nonspec_ip_ivc;
+   assign req_nonspec_ip_ivc
+     = allocated_ip_ivc & flit_valid_ip_ivc & free_nonspec_ip_ivc;
+   
+   wire [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
+   assign req_spec_ip_ivc = ~allocated_ip_ivc & flit_valid_ip_ivc;
    
    wire [0:num_ports-1] 		   active_nonspec_ip;
    c_mat_mult
