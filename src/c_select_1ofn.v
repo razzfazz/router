@@ -35,6 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_select_1ofn
   (select, data_in, data_out);
    
+`include "c_constants.v"
+   
    // number of input ports
    parameter num_ports = 4;
    
@@ -91,7 +93,7 @@ module c_select_1ofn
 		c_binary_op
 		   #(.num_ports(2),
 		     .width(1),
-		     .op(prod_op))
+		     .op(`BINARY_OP_AND))
 		prod
 		   (.data_in({data_in[i+j*width], select[j]}),
 		    .data_out(port_bits[j]));
@@ -101,7 +103,7 @@ module c_select_1ofn
 	   c_binary_op
 	     #(.num_ports(num_ports),
 	       .width(1),
-	       .op(sum_op))
+	       .op(`BINARY_OP_OR))
 	   sum
 	     (.data_in(port_bits),
 	      .data_out(data_out[i]));
