@@ -51,10 +51,18 @@ module c_select_1ofn
    output [0:width-1] 	       data_out;
    wire [0:width-1] 	       data_out;
    
-   genvar 		       p;
-   
    generate
       
+      // NOTE: This module was intended to represent something like a pass-gate
+      // or other multiplexer that requires that no more than one bit in the 
+      // 'select' input is high at any given time. As Design Compiler appears 
+      // to not like prolific use of tri-state logic, it is currently 
+      // functionally identical to 'c_select_mofn' (which ORs all selected 
+      // inputs); however, 'c_select_1ofn' should be preferred wherever the 
+      // 'select' input is known to be one-hot.
+      
+      /*
+      genvar p;
       for(p = 0; p < num_ports; p = p + 1)
 	begin:ports
 	   
@@ -65,6 +73,38 @@ module c_select_1ofn
 	   assign data = data_in[p*width:(p+1)*width-1];
 	   
 	   assign data_out = sel ? data : {width{1'bz}};
+	   
+	end
+      */
+      
+      genvar 		       i;
+      for(i = 0; i < width; i = i + 1)
+	begin:width_loop
+	   
+	   wire [0:num_ports-1] port_bits;
+	   
+	   genvar 		j;
+	   
+	   for(j = 0; j < num_ports; j = j + 1)
+	     begin:ports_loop
+		
+		c_binary_op
+		   #(.num_ports(2),
+		     .width(1),
+		     .op(prod_op))
+		prod
+		   (.data_in({data_in[i+j*width], select[j]}),
+		    .data_out(port_bits[j]));
+		
+	     end
+	   
+	   c_binary_op
+	     #(.num_ports(num_ports),
+	       .width(1),
+	       .op(sum_op))
+	   sum
+	     (.data_in(port_bits),
+	      .data_out(data_out[i]));
 	   
 	end
       
