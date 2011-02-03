@@ -860,6 +860,12 @@ module rtr_ip_ctrl_mac
 	      if(dual_path_alloc)
 		begin
 		   
+		   // NOTE: For dual-path routing, we never have to bypass the
+		   // selected output port from the channel input (which would
+		   // have to go through a decoder first); thus, it makes sense
+		   // to store the port in one-hot form here in order to improve
+		   // timing.
+		   
 		   wire [0:port_idx_width-1] fb_route_port;
 		   assign fb_route_port = fb_la_route_info[0:port_idx_width-1];
 		   
