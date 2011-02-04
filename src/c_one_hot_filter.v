@@ -38,63 +38,35 @@ module c_one_hot_filter
    // width of input vector
    parameter width = 8;
    
-   // number of priority levels
-   parameter num_priorities = 1;
-   
    // input data
-   input [0:num_priorities*width-1] data_in;
+   input [0:width-1] data_in;
    
    // output data
-   output [0:width-1] 		    data_out;
-   wire [0:width-1] 		    data_out;
+   output [0:width-1] data_out;
+   wire [0:width-1]   data_out;
    
    generate
       
       if(width == 1)
-	assign data_out = |data_in;
+	assign data_out = data_in;
       else
 	begin
 	   
-	   wire [0:num_priorities-1] enable_prio;
-	   assign enable_prio[0] = 1'b1;
+	   genvar 		 pos;
 	   
-	   wire [0:num_priorities*width-1] data_by_prio;
-	   
-	   genvar 			   prio;
-	   
-	   for(prio = 0; prio < num_priorities; prio = prio + 1)
-	     begin:prios
+	   for(pos = 0; pos < width; pos = pos + 1)
+	     begin:poss
 		
-		wire [0:width-1] data = data_in[prio*width:(prio+1)*width-1];
+		wire [0:(width-1)-1] others;
 		
-		if(prio < (num_priorities - 1))
-		  assign enable_prio[prio+1] = enable_prio[prio] & ~|data;
-		     
-		genvar 		 pos;
+		if(pos > 0)
+		  assign others[0:pos-1] = data_in[0:pos-1];
+		if(pos < (width - 1))
+		  assign others[pos:(width-1)-1] = data_in[(pos+1):width-1];
 		
-		for(pos = 0; pos < width; pos = pos + 1)
-		  begin:poss
-		     
-		     wire [0:(width-1)-1] others;
-		     
-		     if(pos > 0)
-		       assign others[0:pos-1] = data[0:pos-1];
-		     if(pos < (width - 1))
-		       assign others[pos:(width-1)-1] = data[(pos+1):width-1];
-		     
-		     assign data_by_prio[prio*width+pos] = data[pos] & ~|others;
-		     
-		  end
+		assign data_out[pos] = data_in[pos] & ~|others;
 		
 	     end
-	   
-	   c_select_mofn
-	     #(.num_ports(num_priorities),
-	       .width(width))
-	   data_out_sel
-	     (.select(enable_prio),
-	      .data_in(data_by_prio),
-	      .data_out(data_out));
 	   
 	end
       
