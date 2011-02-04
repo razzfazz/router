@@ -178,6 +178,9 @@ module vcr_top
    // select which arbiter type to use for switch allocator
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
+   // select speculation type for switch allocator
+   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   
    // select implementation variant for control crossbar
    parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
    
@@ -294,6 +297,7 @@ module vcr_top
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
+	       .sw_alloc_spec_type(sw_alloc_spec_type),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
 	       .reset_type(reset_type))
@@ -392,6 +396,7 @@ module vcr_top
        .num_ports(num_ports),
        .allocator_type(sw_alloc_type),
        .arbiter_type(sw_alloc_arbiter_type),
+       .spec_type(sw_alloc_spec_type),
        .reset_type(reset_type))
    swa
      (.clk(clk),

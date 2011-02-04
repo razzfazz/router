@@ -128,6 +128,9 @@ parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 // select which arbiter type to use for switch allocator
 parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
+// select speculation type for switch allocator
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+
 // select implementation variant for control crossbar
 parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
