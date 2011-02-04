@@ -33,9 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_sw_alloc_wf
-  (clk, reset, active_nonspec_ip, active_spec_ip, route_ip_ivc_op, 
-   req_nonspec_ip_ivc, req_spec_ip_ivc, sel_nonspec_ip_ivc, sel_spec_ip_ivc, 
-   gnt_nonspec_ip, gnt_spec_ip, gnt_op_ip);
+  (clk, reset, active_ip, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
+   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip, gnt_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -62,8 +61,7 @@ module vcr_sw_alloc_wf
    input reset;
    
    // clock enable signals
-   input [0:num_ports-1] active_nonspec_ip;
-   input [0:num_ports-1] active_spec_ip;
+   input [0:num_ports-1] active_ip;
    
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
@@ -117,8 +115,8 @@ module vcr_sw_alloc_wf
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire active_nonspec;
-	   assign active_nonspec = active_nonspec_ip[ip];
+	   wire active;
+	   assign active = active_ip[ip];
 	   
 	   wire [0:num_vcs*num_ports-1] route_ivc_op;
 	   assign route_ivc_op
@@ -186,7 +184,7 @@ module vcr_sw_alloc_wf
 		gnt_in_nonspec_ivc_arb
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(active_nonspec),
+		   .active(active),
 		   .update(update_arb_nonspec),
 		   .req(req_in_nonspec_ivc),
 		   .gnt(gnt_in_nonspec_ivc));
@@ -264,9 +262,6 @@ module vcr_sw_alloc_wf
 		// pre-select winning VC for each output
 		//--------------------------------------------------------------
 		
-		wire 			     active_spec;
-		assign active_spec = active_spec_ip[ip];
-		
 		wire [0:num_ports-1] 	     gnt_wf_spec_op;
 		assign gnt_wf_spec_op
 		  = gnt_wf_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
@@ -294,7 +289,7 @@ module vcr_sw_alloc_wf
 		     gnt_in_spec_ivc_arb
 		       (.clk(clk),
 			.reset(reset),
-			.active(active_spec),
+			.active(active),
 			.update(update_arb_spec),
 			.req(req_in_spec_ivc),
 			.gnt(gnt_in_spec_ivc));
@@ -450,8 +445,8 @@ module vcr_sw_alloc_wf
    // output stage (match first-stage requests to output ports)
    //---------------------------------------------------------------------------
    
-   wire 				    active_nonspec;
-   assign active_nonspec = |active_nonspec_ip;
+   wire 				    active;
+   assign active = |active_ip;
    
    // if there are any requests at all in a cycle, at least one of them will
    // eventually be granted, so update priorities
@@ -465,7 +460,7 @@ module vcr_sw_alloc_wf
    gnt_wf_nonspec_ip_op_alloc
      (.clk(clk),
       .reset(reset),
-      .active(active_nonspec),
+      .active(active),
       .update(update_alloc_nonspec),
       .req(req_wf_nonspec_ip_op),
       .gnt(gnt_wf_nonspec_ip_op));
@@ -474,9 +469,6 @@ module vcr_sw_alloc_wf
       
       if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	begin
-	   
-	   wire active_spec;
-	   assign active_spec = |active_spec_ip;
 	   
 	   // only update priorities if there is no conflicting non-
 	   // speculative request
@@ -494,7 +486,7 @@ module vcr_sw_alloc_wf
 	   gnt_wf_spec_int_ip_op_alloc
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(active_spec),
+	      .active(active),
 	      .update(update_alloc_spec),
 	      .req(req_wf_spec_int_ip_op),
 	      .gnt(gnt_wf_spec_int_ip_op));

@@ -33,9 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_sw_alloc_sep_of
-  (clk, reset, active_nonspec_ip, active_spec_ip, active_nonspec_op, 
-   active_spec_op, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip, gnt_op_ip);
+  (clk, reset, active_ip, active_op, route_ip_ivc_op, req_nonspec_ip_ivc, 
+   req_spec_ip_ivc, sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, 
+   gnt_spec_ip, gnt_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -59,10 +59,8 @@ module vcr_sw_alloc_sep_of
    input reset;
    
    // clock enable signals
-   input [0:num_ports-1] active_nonspec_ip;
-   input [0:num_ports-1] active_spec_ip;
-   input [0:num_ports-1] active_nonspec_op;
-   input [0:num_ports-1] active_spec_op;
+   input [0:num_ports-1] active_ip;
+   input [0:num_ports-1] active_op;
    
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
@@ -123,8 +121,8 @@ module vcr_sw_alloc_sep_of
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire active_nonspec;
-	   assign active_nonspec = active_nonspec_ip[ip];
+	   wire active;
+	   assign active = active_ip[ip];
 	   
 	   wire [0:num_vcs*num_ports-1] route_ivc_op;
 	   assign route_ivc_op
@@ -191,7 +189,7 @@ module vcr_sw_alloc_sep_of
 	   gnt_in_nonspec_ivc_arb
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(active_nonspec),
+	      .active(active),
 	      .update(update_arb_nonspec),
 	      .req(req_in_nonspec_ivc),
 	      .gnt(gnt_in_nonspec_ivc));
@@ -308,9 +306,6 @@ module vcr_sw_alloc_sep_of
 		// perform input-side arbitration
 		//--------------------------------------------------------------
 		
-		wire 			     active_spec;
-		assign active_spec = active_spec_ip[ip];
-		
 		wire 			     update_arb_spec;
 		assign update_arb_spec = gnt_spec;
 		
@@ -325,7 +320,7 @@ module vcr_sw_alloc_sep_of
 		gnt_in_spec_int_ivc_arb
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(active_spec),
+		   .active(active),
 		   .update(update_arb_spec),
 		   .req(req_in_spec_int_ivc),
 		   .gnt(gnt_in_spec_int_ivc));
@@ -527,8 +522,8 @@ module vcr_sw_alloc_sep_of
       for (op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire active_nonspec;
-	   assign active_nonspec = active_nonspec_op[op];
+	   wire active;
+	   assign active = active_op[op];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -557,7 +552,7 @@ module vcr_sw_alloc_sep_of
 	   gnt_out_nonspec_ip_arb
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(active_nonspec),
+	      .active(active),
 	      .update(update_arb_nonspec),
 	      .req(req_out_nonspec_ip),
 	      .gnt(gnt_out_nonspec_ip));
@@ -576,9 +571,6 @@ module vcr_sw_alloc_sep_of
 		//--------------------------------------------------------------
 		// output-side arbitration stage (select input port)
 		//--------------------------------------------------------------
-		
-		wire active_spec;
-		assign active_spec = active_spec_op[op];
 		
 		wire [0:num_ports-1] req_out_spec_ip;
 		assign req_out_spec_ip
@@ -603,7 +595,7 @@ module vcr_sw_alloc_sep_of
 		gnt_out_spec_ip_arb
 		  (.clk(clk),
 		   .reset(reset),
-		   .active(active_spec),
+		   .active(active),
 		   .update(update_arb_spec),
 		   .req(req_out_spec_ip),
 		   .gnt(gnt_out_spec_ip));

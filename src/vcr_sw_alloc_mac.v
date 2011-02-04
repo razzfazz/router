@@ -94,47 +94,26 @@ module vcr_sw_alloc_mac
    wire [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
    assign req_spec_ip_ivc = ~allocated_ip_ivc & flit_valid_ip_ivc;
    
-   wire [0:num_ports-1] 		   active_nonspec_ip;
+   wire [0:num_ports-1] 		   active_ip;
    c_mat_mult
      #(.dim1_width(num_ports),
        .dim2_width(num_vcs),
        .dim3_width(1),
        .prod_op(`BINARY_OP_AND),
        .sum_op(`BINARY_OP_OR))
-   active_nonspec_ip_mmult
-     (.input_a(req_nonspec_ip_ivc),
+   active_ip_mmult
+     (.input_a(flit_valid_ip_ivc),
       .input_b({num_vcs{1'b1}}),
-      .result(active_nonspec_ip));
+      .result(active_ip));
    
-   wire [0:num_ports-1] 		   active_spec_ip;
-   c_mat_mult
-     #(.dim1_width(num_ports),
-       .dim2_width(num_vcs),
-       .dim3_width(1),
-       .prod_op(`BINARY_OP_AND),
-       .sum_op(`BINARY_OP_OR))
-   active_spec_ip_mmult
-     (.input_a(req_spec_ip_ivc),
-      .input_b({num_vcs{1'b1}}),
-      .result(active_spec_ip));
-   
-   wire [0:num_ports-1] 		   active_nonspec_op;
+   wire [0:num_ports-1] 		   active_op;
    c_select_mofn
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports))
-   active_nonspec_op_sel
-     (.select(req_nonspec_ip_ivc),
+   active_op_sel
+     (.select(flit_valid_ip_ivc),
       .data_in(route_ip_ivc_op),
-      .data_out(active_nonspec_op));
-   
-   wire [0:num_ports-1] 		   active_spec_op;
-   c_select_mofn
-     #(.num_ports(num_ports*num_vcs),
-       .width(num_ports))
-   active_spec_op_sel
-     (.select(req_spec_ip_ivc),
-      .data_in(route_ip_ivc_op),
-      .data_out(active_spec_op));
+      .data_out(active_op));
    
    wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
@@ -157,10 +136,8 @@ module vcr_sw_alloc_mac
 	   core_sep_if
 	     (.clk(clk),
 	      .reset(reset),
-	      .active_nonspec_ip(active_nonspec_ip),
-	      .active_spec_ip(active_spec_ip),
-	      .active_nonspec_op(active_nonspec_op),
-	      .active_spec_op(active_spec_op),
+	      .active_ip(active_ip),
+	      .active_op(active_op),
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 	      .req_spec_ip_ivc(req_spec_ip_ivc),
@@ -181,10 +158,8 @@ module vcr_sw_alloc_mac
 	   core_sep_of
 	     (.clk(clk),
 	      .reset(reset),
-	      .active_nonspec_ip(active_nonspec_ip),
-	      .active_spec_ip(active_spec_ip),
-	      .active_nonspec_op(active_nonspec_op),
-	      .active_spec_op(active_spec_op),
+	      .active_ip(active_ip),
+	      .active_op(active_op),
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 	      .req_spec_ip_ivc(req_spec_ip_ivc),
@@ -207,8 +182,7 @@ module vcr_sw_alloc_mac
 	   core_wf
 	     (.clk(clk),
 	      .reset(reset),
-	      .active_nonspec_ip(active_nonspec_ip),
-	      .active_spec_ip(active_spec_ip),
+	      .active_ip(active_ip),
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .req_nonspec_ip_ivc(req_nonspec_ip_ivc),
 	      .req_spec_ip_ivc(req_spec_ip_ivc),
@@ -290,8 +264,7 @@ module vcr_sw_alloc_mac
 	   wire [0:num_ports-1] xbr_ctrl_ip;
 	   
 	   wire 		active;
-	   assign active
-	     = active_nonspec_op[op] | active_spec_op[op] | (|xbr_ctrl_ip);
+	   assign active = active_op[op] | (|xbr_ctrl_ip);
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
 	   assign xbr_ctrl_ip_s = gnt_op_ip[op*num_ports:(op+1)*num_ports-1];
