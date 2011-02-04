@@ -216,8 +216,8 @@ module rtr_alloc_mac
    
    wire [0:num_ports*num_ports-1] 		      active_ip_op;
    
-   wire [0:num_ports-1] 			      ial_allocated_ip;
-   wire [0:num_ports*num_ports-1] 		      ial_flit_valid_ip_op;
+   wire [0:num_ports*num_ports-1] 		      ial_flit_valid_hi_ip_op;
+   wire [0:num_ports*num_ports-1] 		      ial_flit_valid_lo_ip_op;
    wire [0:num_ports-1] 			      ial_flit_head_ip;
    wire [0:num_ports-1] 			      ial_flit_tail_ip;
    wire [0:num_ports*num_vcs-1] 		      ial_flit_sel_ip_ovc;
@@ -301,12 +301,13 @@ module rtr_alloc_mac
 	   wire [0:num_ports-1] 	   active_op;
 	   assign active_ip_op[ip*num_ports:(ip+1)*num_ports-1] = active_op;
 	   
-	   wire 			   ial_allocated;
-	   assign ial_allocated_ip[ip] = ial_allocated;
+	   wire [0:num_ports-1] 	   ial_flit_valid_hi_op;
+	   assign ial_flit_valid_hi_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+	     = ial_flit_valid_hi_op;
 	   
-	   wire [0:num_ports-1] 	   ial_flit_valid_op;
-	   assign ial_flit_valid_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-	     = ial_flit_valid_op;
+	   wire [0:num_ports-1] 	   ial_flit_valid_lo_op;
+	   assign ial_flit_valid_lo_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+	     = ial_flit_valid_lo_op;
 	   
 	   wire 			   ial_flit_head;
 	   assign ial_flit_head_ip[ip] = ial_flit_head;
@@ -936,6 +937,7 @@ module rtr_alloc_mac
 	      else
 		assign flit_sel_fast = 1'b0;
 	      
+	      wire [0:num_vcs-1] gnt_hi_ivc, gnt_lo_ivc;
 	      wire [0:num_vcs-1] gnt_ivc;
 	      wire 		 allocated;
 	      
@@ -944,6 +946,8 @@ module rtr_alloc_mac
 		   
 		   if(num_vcs == 1)
 		     begin
+			assign gnt_hi_ivc = req_hi_ivc;
+			assign gnt_lo_ivc = req_lo_ivc;
 			assign gnt_ivc = req_ivc;
 			assign allocated = ivs_allocated_ivc;
 		     end
@@ -998,6 +1002,8 @@ module rtr_alloc_mac
 			    (|req_ivc & ~|(req_ivc & mask_ivc_q)) | 
 			    (|flit_valid_in_ivc & (&mask_ivc_q));
 			
+			assign gnt_hi_ivc = req_hi_ivc & mask_ivc_q;
+			assign gnt_lo_ivc = req_lo_ivc & mask_ivc_q;
 			assign gnt_ivc = req_ivc & mask_ivc_q;
 			
 			assign allocated = |(gnt_ivc & ivs_allocated_ivc);
@@ -1021,21 +1027,32 @@ module rtr_alloc_mac
 		      .reset(reset),
 		      .active(active),
 		      .req({req_hi_ivc, req_lo_ivc}),
-		      .gnt(gnt_ivc),
+		      .gnt({gnt_hi_ivc, gnt_lo_ivc}),
 		      .update(update));
+		   
+		   assign gnt_ivc = gnt_hi_ivc | gnt_lo_ivc;
 		   
 		   assign allocated = |req_hi_ivc;
 		   
 		end
 	      
-	      wire [0:num_ports-1] flit_valid_op;
+	      wire [0:num_ports-1] flit_valid_hi_op;
 	      c_select_mofn
 		#(.num_ports(num_vcs),
 		  .width(num_ports))
-	      flit_valid_op_sel
-		(.select(gnt_ivc),
+	      flit_valid_hi_op_sel
+		(.select(gnt_hi_ivc),
 		 .data_in(rf_route_ivc_op),
-		 .data_out(flit_valid_op));
+		 .data_out(flit_valid_hi_op));
+	      
+	      wire [0:num_ports-1] flit_valid_lo_op;
+	      c_select_mofn
+		#(.num_ports(num_vcs),
+		  .width(num_ports))
+	      flit_valid_lo_op_sel
+		(.select(gnt_lo_ivc),
+		 .data_in(rf_route_ivc_op),
+		 .data_out(flit_valid_lo_op));
 	      
 	      wire 		   flit_head;
 	      wire 		   flit_tail;
@@ -1067,8 +1084,8 @@ module rtr_alloc_mac
 		   
 		end
 	      
-	      assign ial_allocated = allocated;
-	      assign ial_flit_valid_op = flit_valid_op;
+	      assign ial_flit_valid_hi_op = flit_valid_hi_op;
+	      assign ial_flit_valid_lo_op = flit_valid_lo_op;
 	      assign ial_flit_sel_ivc = gnt_ivc;
 	      assign ial_flit_head = flit_head;
 	      assign ial_flit_tail = flit_tail;
@@ -1128,13 +1145,21 @@ module rtr_alloc_mac
    // connect input and output side
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*num_ports-1] ial_flit_valid_op_ip;
+   wire [0:num_ports*num_ports-1] ial_flit_valid_hi_op_ip;
    c_interleave
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
-   ial_flit_valid_op_ip_intl
-     (.data_in(ial_flit_valid_ip_op),
-      .data_out(ial_flit_valid_op_ip));
+   ial_flit_valid_hi_op_ip_intl
+     (.data_in(ial_flit_valid_hi_ip_op),
+      .data_out(ial_flit_valid_hi_op_ip));
+   
+   wire [0:num_ports*num_ports-1] ial_flit_valid_lo_op_ip;
+   c_interleave
+     #(.width(num_ports*num_ports),
+       .num_blocks(num_ports))
+   ial_flit_valid_lo_op_ip_intl
+     (.data_in(ial_flit_valid_lo_ip_op),
+      .data_out(ial_flit_valid_lo_op_ip));
    
    wire [0:num_ports*num_ports-1] ifl_flit_valid_op_ip;
    c_interleave
@@ -1200,9 +1225,13 @@ module rtr_alloc_mac
 	   wire [0:num_vcs-1] 	full_in_ovc;
 	   assign full_in_ovc = full_in_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
-	   wire [0:num_ports-1] ial_flit_valid_ip;
-	   assign ial_flit_valid_ip
-	     = ial_flit_valid_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   wire [0:num_ports-1] ial_flit_valid_hi_ip;
+	   assign ial_flit_valid_hi_ip
+	     = ial_flit_valid_hi_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   
+	   wire [0:num_ports-1] ial_flit_valid_lo_ip;
+	   assign ial_flit_valid_lo_ip
+	     = ial_flit_valid_lo_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] ifl_flit_valid_ip;
 	   assign ifl_flit_valid_ip
@@ -1264,10 +1293,10 @@ module rtr_alloc_mac
 	   begin:oal
 	      
 	      wire [0:num_ports-1] req_hi_ip;
-	      assign req_hi_ip = ial_flit_valid_ip & ial_allocated_ip;
+	      assign req_hi_ip = ial_flit_valid_hi_ip;
 	      
-	      wire [0:num_ports-1] req_ip;
-	      assign req_ip = ial_flit_valid_ip;
+	      wire [0:num_ports-1] req_lo_ip;
+	      assign req_lo_ip = ial_flit_valid_lo_ip;
 	      
 	      wire [0:num_ports-1] gnt_ip;
 	      wire 		   flit_sent;
@@ -1285,8 +1314,8 @@ module rtr_alloc_mac
 		   olod
 		     (.data_in({req_hi_ip & mask_ip,
 				req_hi_ip, 
-				req_ip & mask_ip, 
-				req_ip}),
+				req_lo_ip & mask_ip, 
+				req_lo_ip}),
 		      .data_out(mgnt_ip));
 		   
 		   wire 		update;
@@ -1304,6 +1333,9 @@ module rtr_alloc_mac
 		      .q(mask_ip_q));
 		   
 		   assign mask_ip = mask_ip_q - 1'b1;
+		   
+		   wire [0:num_ports-1] req_ip;
+		   assign req_ip = req_hi_ip | req_lo_ip;
 		   
 		   wire [0:num_ports-1] gnt_presel_ip;
 		   assign gnt_presel_ip = req_ip & mask_ip_q;
@@ -1332,7 +1364,7 @@ module rtr_alloc_mac
 		   
 		   assign flit_sent = (|req_ip & ~multi_hot) | (|gnt_presel_ip);
 		   
-		   assign allocated = |(gnt_ip & ial_allocated_ip);
+		   assign allocated = |(gnt_ip & req_hi_ip);
 		   
 		   assign update = flit_sent |
 				   (|req_hi_ip & ~|(req_hi_ip & mask_ip_q)) |
@@ -1349,11 +1381,12 @@ module rtr_alloc_mac
 		   // output VC trying over and over again to the exclusion of 
 		   // all others.
 		   
-		   assign flit_sent = |ial_flit_valid_ip;
+		   assign flit_sent = |(req_hi_ip | req_lo_ip);
 		   
 		   wire 		   update;
 		   assign update = flit_sent;
 		   
+		   wire [0:num_ports-1]    gnt_hi_ip, gnt_lo_ip;
 		   c_arbiter
 		     #(.num_ports(num_ports),
 		       .num_priorities(2),
@@ -1363,9 +1396,11 @@ module rtr_alloc_mac
 		     (.clk(clk),
 		      .reset(reset),
 		      .active(active),
-		      .req({req_hi_ip, req_ip}),
-		      .gnt(gnt_ip),
+		      .req({req_hi_ip, req_lo_ip}),
+		      .gnt({gnt_hi_ip, gnt_lo_ip}),
 		      .update(update));
+		   
+		   assign gnt_ip = gnt_hi_ip | gnt_lo_ip;
 		   
 		   assign allocated = |req_hi_ip;
 		   
@@ -1654,7 +1689,7 @@ module rtr_alloc_mac
 			wire [0:num_vcs_per_class-1] req_lo_ocvc;
 			assign req_lo_ocvc = elig_in_ocvc & ~full_in_ocvc;
 			
-			wire [0:num_vcs_per_class-1] gnt_ocvc;
+			wire [0:num_vcs_per_class-1] gnt_hi_ocvc, gnt_lo_ocvc;
 			c_arbiter
 			  #(.num_ports(num_vcs_per_class),
 			    .num_priorities(2),
@@ -1665,8 +1700,11 @@ module rtr_alloc_mac
 			   .reset(reset),
 			   .active(active),
 			   .req({req_hi_ocvc, req_lo_ocvc}),
-			   .gnt(gnt_ocvc),
+			   .gnt({gnt_hi_ocvc, gnt_lo_ocvc}),
 			   .update(update));
+			
+			wire [0:num_vcs_per_class-1] gnt_ocvc;
+			assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
 			
 			assign nvs_next_elig_ovc[opc*num_vcs_per_class:
 						 (opc+1)*num_vcs_per_class-1]

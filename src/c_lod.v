@@ -48,29 +48,30 @@ module c_lod
    output [0:width-1] 		    data_out;
    wire [0:width-1] 		    data_out;
    
+   wire [0:num_priorities-1] 	    enable_prio;
+   assign enable_prio[0] = 1'b1;
+   
+   wire [0:num_priorities*width-1]  data_out_by_prio;
+   
+   genvar 			    prio;
+   
    generate
       
-      if(width == 1)
-	assign data_out = |data_in;
-      else if(width > 1)
-	begin
+      for(prio = 0; prio < num_priorities; prio = prio + 1)
+	begin:prios
 	   
-	   wire [0:num_priorities-1] enable_prio;
-	   assign enable_prio[0] = 1'b1;
+	   wire [0:width-1] prio_data_in;
+	   assign prio_data_in = data_in[prio*width:(prio+1)*width-1];
 	   
-	   wire [0:num_priorities*width-1] data_out_by_prio;
+	   if(prio < (num_priorities - 1))
+	     assign enable_prio[prio+1] = enable_prio[prio] & ~|prio_data_in;
 	   
-	   genvar 			   prio;
+	   wire [0:width-1] prio_data_out;
 	   
-	   for(prio = 0; prio < num_priorities; prio = prio + 1)
-	     begin:prios
-		
-		wire [0:width-1] prio_data_in;
-		assign prio_data_in = data_in[prio*width:(prio+1)*width-1];
-		
-		if(prio < (num_priorities - 1))
-		  assign enable_prio[prio+1]
-			   = enable_prio[prio] & ~|prio_data_in;
+	   if(width == 1)
+	     assign prio_data_out = prio_data_in;
+	   else
+	     begin
 		
 		// To find the first non-zero bit from the left, we must 
 		// reverse the input and output vectors.
@@ -85,28 +86,26 @@ module c_lod
 		wire [0:width-1] prio_data_out_rev;
 		assign prio_data_out_rev = prio_data_in_rev & -prio_data_in_rev;
 		
-		wire [0:width-1] prio_data_out;
 		c_reverse
 		  #(.width(width))
 		prio_data_out_revr
 		  (.data_in(prio_data_out_rev),
 		   .data_out(prio_data_out));
 		
-		assign data_out_by_prio[prio*width:(prio+1)*width-1]
-			 = prio_data_out;
-		
 	     end
 	   
-	   c_select_mofn
-	     #(.num_ports(num_priorities),
-	       .width(width))
-	   data_out_sel
-	     (.select(enable_prio),
-	      .data_in(data_out_by_prio),
-	      .data_out(data_out));
+	   assign data_out_by_prio[prio*width:(prio+1)*width-1] = prio_data_out;
 	   
 	end
       
    endgenerate
+   
+   c_select_mofn
+     #(.num_ports(num_priorities),
+       .width(width))
+   data_out_sel
+     (.select(enable_prio),
+      .data_in(data_out_by_prio),
+      .data_out(data_out));
    
 endmodule
