@@ -60,11 +60,11 @@ module c_arbiter
    input [0:num_priorities*num_ports-1] req;
    
    // grant vector
-   output [0:num_ports-1] 		gnt;
-   wire [0:num_ports-1] 		gnt;
+   output [0:num_priorities*num_ports-1] gnt;
+   wire [0:num_priorities*num_ports-1] 	 gnt;
    
    // update port priorities
-   input 				update;
+   input 				 update;
    
    generate
       
@@ -121,7 +121,7 @@ module c_arbiter
 	     // synopsys translate_on
 	     
 	     if(num_ports == 1)
-	       assign gnt = |req;
+	       assign gnt = req;
 	     else if(num_ports > 1)
 	       begin
 		  

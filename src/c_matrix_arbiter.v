@@ -53,25 +53,52 @@ module c_matrix_arbiter
    input [0:num_priorities*num_ports-1] req;
    
    // grant vector
-   output [0:num_ports-1] 		gnt;
-   wire [0:num_ports-1] 		gnt;
+   output [0:num_priorities*num_ports-1] gnt;
+   wire [0:num_priorities*num_ports-1] 	 gnt;
    
    // update port priorities
-   input 				update;
+   input 				 update;
    
    generate
       
       if(num_ports == 1)
-	assign gnt = |req;
+	begin
+	   
+	   c_lod
+	     #(.width(num_priorities))
+	   gnt_lod
+	     (.data_in(req),
+	      .data_out(gnt));
+	   
+	end
       else if(num_ports > 1)
 	begin
 	   
+	   wire [0:num_priorities-1] enable_prio;
+	   assign enable_prio[0] = 1'b1;
+	   
+	   genvar 		     prio;
+	   
+	   for(prio = 0; prio < (num_priorities - 1); prio = prio + 1)
+	     begin:prios
+		assign enable_prio[prio+1]
+		  = enable_prio[prio] & 
+		    ~|req[prio*num_ports:(prio+1)*num_ports-1];
+	     end
+	   
+	   wire [0:num_ports-1] gnt_any;
+	   c_select_mofn
+	     #(.num_ports(num_priorities),
+	       .width(num_ports))
+	   gnt_all_sel
+	     (.select(enable_prio),
+	      .data_in(gnt),
+	      .data_out(gnt_any));
+	   
 	   // port priority matrix
-	   wire [0:num_ports*num_ports-1] 	state;
+	   wire [0:num_ports*num_ports-1] state;
 	   
-	   wire [0:num_priorities*num_ports-1] 	gnt_by_prio;
-	   
-	   genvar 				row;
+	   genvar 			  row;
 	   
 	   for(row = 0; row < num_ports; row = row + 1)
 	     begin:rows
@@ -83,10 +110,11 @@ module c_matrix_arbiter
 		     
 		     // grant requests if we have precedence over all other 
 		     // requestors
-		     assign gnt_by_prio[prio*num_ports+row] 
+		     assign gnt[prio*num_ports+row] 
 		       = req[prio*num_ports+row] &
 			 (&(state[row*num_ports:(row+1)*num_ports-1] | 
-			    ~req[prio*num_ports:(prio+1)*num_ports-1]));
+			    ~req[prio*num_ports:(prio+1)*num_ports-1])) &
+			 enable_prio[prio];
 		     
 		  end
 		
@@ -106,13 +134,14 @@ module c_matrix_arbiter
 		       assign state[row*num_ports+col] = 1'b1;
 		     
 		     // upper triangle has actual registers
-		     else
+		     else if(col > row)
 		       begin
 			  
 			  wire state_s, state_q;
-			  assign state_s = update ? 
-					   ((state_q | gnt[col]) & ~gnt[row]) : 
-					   state_q;
+			  assign state_s
+			    = update ? 
+			      ((state_q | gnt_any[col]) & ~gnt_any[row]) : 
+			      state_q;
 			  c_dff
 			    #(.width(1),
 			      .reset_type(reset_type),
@@ -131,26 +160,6 @@ module c_matrix_arbiter
 		  end
 		
 	     end
-	   
-	   wire [0:num_priorities-1] enable_prio;
-	   assign enable_prio[0] = 1'b1;
-	   
-	   genvar 		     prio;
-	   
-	   for(prio = 0; prio < (num_priorities - 1); prio = prio + 1)
-	     begin:prios
-		assign enable_prio[prio+1]
-		  = enable_prio[prio] & 
-		    ~|req[prio*num_ports:(prio+1)*num_ports-1];
-	     end
-	   
-	   c_select_mofn
-	     #(.num_ports(num_priorities),
-	       .width(num_ports))
-	   gnt_sel
-	     (.select(enable_prio),
-	      .data_in(gnt_by_prio),
-	      .data_out(gnt));
 	   
 	end
       
