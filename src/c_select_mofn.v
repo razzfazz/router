@@ -35,6 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 module c_select_mofn
   (select, data_in, data_out);
    
+`include "c_constants.v"
+   
    // number of input ports
    parameter num_ports = 4;
    
