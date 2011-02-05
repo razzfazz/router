@@ -189,7 +189,7 @@ module vcr_ip_ctrl_mac
    parameter explicit_pipeline_register = 0;
    
    // select speculation type
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter sw_alloc_spec = 1;
    
    // select whether VCs must have credits available in order to be considered 
    // for VC allocation
@@ -309,7 +309,7 @@ module vcr_ip_ctrl_mac
    
    generate
       
-      if(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
+      if(sw_alloc_spec)
 	begin
 	   if(vc_alloc_requires_credit)
 	     assign flit_sent
@@ -401,7 +401,7 @@ module vcr_ip_ctrl_mac
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
-	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .sw_alloc_spec(sw_alloc_spec),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_id(ivc),

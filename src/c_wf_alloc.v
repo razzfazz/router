@@ -41,6 +41,9 @@ module c_wf_alloc
    // each input can bid for any combination of outputs
    parameter num_ports = 8;
    
+   // number of priority levels
+   parameter num_priorities = 1;
+   
    // select implementation variant
    parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
@@ -61,6 +64,22 @@ module c_wf_alloc
    input update;
    
    generate
+      
+      // synopsys translate_off
+      
+      if(num_priorities > 1)
+	begin
+	   
+	   initial
+	     begin
+		$display({"ERROR: Wavefront allocator does not yet support ", 
+			  "multiple priorities."});
+		$stop;
+	     end
+	   
+	end
+      
+      // synopsys translate_on
       
       case(wf_alloc_type)
 	`WF_ALLOC_TYPE_MUX:

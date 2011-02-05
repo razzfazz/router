@@ -182,8 +182,8 @@ module vcr_ivc_ctrl
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
    
-   // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   // enable speculative switch allocation
+   parameter sw_alloc_spec = 1;
    
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -368,13 +368,7 @@ module vcr_ivc_ctrl
 	   
 	end
       
-      if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	begin
-	   assign flit_sent = sw_gnt;
-	   
-	   assign allocated_ocvc = vc_allocated_ocvc;
-	end
-      else
+      if(sw_alloc_spec)
 	begin
 	   if(vc_alloc_requires_credit)
 	     assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
@@ -383,6 +377,12 @@ module vcr_ivc_ctrl
 	       = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
 	   
 	   assign allocated_ocvc = vc_allocated_next_ocvc;
+	end
+      else
+	begin
+	   assign flit_sent = sw_gnt;
+	   
+	   assign allocated_ocvc = vc_allocated_ocvc;
 	end
       
    endgenerate

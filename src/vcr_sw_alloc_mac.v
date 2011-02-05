@@ -246,6 +246,11 @@ module vcr_sw_alloc_mac
 			 = gnt_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
 		    end
 		  
+		  `SW_ALLOC_SPEC_TYPE_PRIO:
+		    begin
+		       assign sel_ivc = sel_nonspec_ivc | sel_spec_ivc;
+		    end
+		  
 		endcase
 		
 		assign sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = sel_ivc;
