@@ -33,9 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_vc_alloc_mac
-  (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   active_op, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, 
-   gnt_op_ovc_ivc);
+  (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, allocated_ip_ivc, 
+   flit_valid_ip_ivc, elig_op_ovc, active_op, gnt_ip_ivc, gnt_ip_ivc_ocvc, 
+   gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -77,11 +77,14 @@ module vcr_vc_alloc_mac
    // select next resource class
    input [0:num_ports*num_vcs*num_resource_classes-1] route_ip_ivc_orc;
    
+   // VC has an output VC allocated to it
+   input [0:num_ports*num_vcs-1] 		      allocated_ip_ivc;
+   
+   // VC has a flit available
+   input [0:num_ports*num_vcs-1] 		      flit_valid_ip_ivc;
+   
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] 		      elig_op_ovc;
-   
-   // request VC allocation
-   input [0:num_ports*num_vcs-1] 		      req_ip_ivc;
    
    // VC allocation activity (to output controller)
    output [0:num_ports-1] 			      active_op;
@@ -106,6 +109,9 @@ module vcr_vc_alloc_mac
    // input VC that each output VC was granted to (to output controller)
    output [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
+   
+   wire [0:num_ports*num_vcs-1] 		      req_ip_ivc;
+   assign req_ip_ivc = flit_valid_ip_ivc & ~allocated_ip_ivc;
    
    generate
       

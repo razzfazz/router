@@ -34,10 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_req, vc_gnt, 
-   vc_gnt_ocvc, sw_req_nonspec, sw_req_spec, sw_gnt_nonspec, sw_gnt_spec, 
-   flit_sent_prev, flit_head_prev, flit_head, flit_tail, flit_sel_ovc, 
-   flit_data, empty, full, allocated, free_spec, errors);
+   flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_gnt, 
+   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_head_prev, flit_valid, flit_head, 
+   flit_tail, flit_sel_ovc, flit_data, empty, full, allocated, free_nonspec, 
+   free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -182,8 +182,8 @@ module vcr_ivc_ctrl
    // for VC allocation
    parameter vc_alloc_requires_credit = 0;
    
-   // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   // enable speculative switch allocation
+   parameter sw_alloc_spec = 1;
    
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -243,35 +243,24 @@ module vcr_ivc_ctrl
    output [0:num_resource_classes-1] 		     route_orc;
    wire [0:num_resource_classes-1] 		     route_orc;
    
-   // request VC allocation
-   output 					     vc_req;
-   wire 					     vc_req;
-   
    // VC allocation successful
    input 					     vc_gnt;
    
    // granted output VC
    input [0:num_vcs_per_class-1] 		     vc_gnt_ocvc;
    
-   // non-speculative switch allocator requests
-   output 					     sw_req_nonspec;
-   wire 					     sw_req_nonspec;
-   
-   // speculative switch allocator requests
-   output 					     sw_req_spec;
-   wire 					     sw_req_spec;
-   
-   // non-speculative switch allocator grants
-   input 					     sw_gnt_nonspec;
-   
-   // speculative switch allocator grants
-   input 					     sw_gnt_spec;
+   // switch allocator grants
+   input 					     sw_gnt;
    
    // did this VC send a flit in the previous cycle?
    input 					     flit_sent_prev;
    
    // if we sent a flit in the previous cycle, was it a head flit?
    input 					     flit_head_prev;
+   
+   // outgoing flit is available
+   output 					     flit_valid;
+   wire 					     flit_valid;
    
    // outgoing flit is head flit
    output 					     flit_head;
@@ -301,6 +290,10 @@ module vcr_ivc_ctrl
    output 					     allocated;
    wire 					     allocated;
    
+   // credit availability if VC has been assigned
+   output 					     free_nonspec;
+   wire 					     free_nonspec;
+   
    // credit availability if no VC has been assigned yet
    output 					     free_spec;
    wire 					     free_spec;
@@ -316,7 +309,6 @@ module vcr_ivc_ctrl
    
    wire 					     fbc_empty;
    
-   wire 					     flit_valid;
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
    wire 					     pop_active;
@@ -376,22 +368,21 @@ module vcr_ivc_ctrl
 	   
 	end
       
-      if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
+      if(sw_alloc_spec)
 	begin
-	   assign flit_sent = sw_gnt_nonspec;
+	   if(vc_alloc_requires_credit)
+	     assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
+	   else
+	     assign flit_sent
+	       = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
 	   
-	   assign allocated_ocvc = vc_allocated_ocvc;
+	   assign allocated_ocvc = vc_allocated_next_ocvc;
 	end
       else
 	begin
-	   if(vc_alloc_requires_credit)
-	     assign flit_sent
-	       = sw_gnt_nonspec | (sw_gnt_spec & vc_gnt);
-	   else
-	     assign flit_sent
-	       = sw_gnt_nonspec | (sw_gnt_spec & vc_gnt & free_spec);
-				 
-	   assign allocated_ocvc = vc_allocated_next_ocvc;
+	   assign flit_sent = sw_gnt;
+	   
+	   assign allocated_ocvc = vc_allocated_ocvc;
 	end
       
    endgenerate
@@ -943,7 +934,6 @@ module vcr_ivc_ctrl
 						     int_flow_ctrl_width-1];
    
    wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
-   wire 					    free_allocated;
    wire 					    error_ct_overflow;
    
    generate
@@ -1008,21 +998,20 @@ module vcr_ivc_ctrl
 		  
 	       end
 	     
-	     wire 	     free_allocated_s, free_allocated_q;
-	     assign free_allocated_s
-	       = |(next_free_ocvc & vc_allocated_next_ocvc);
+	     wire 	     free_nonspec_s, free_nonspec_q;
+	     assign free_nonspec_s = |(next_free_ocvc & vc_allocated_next_ocvc);
 	     c_dff
 	       #(.width(1),
 		 .reset_value(1'b1),
 		 .reset_type(reset_type))
-	     free_allocatedq
+	     free_nonspecq
 	       (.clk(clk),
 		.reset(reset),
 		.active(cred_track_active),
-		.d(free_allocated_s),
-		.q(free_allocated_q));
+		.d(free_nonspec_s),
+		.q(free_nonspec_q));
 	     
-	     assign free_allocated = free_allocated_q;
+	     assign free_nonspec = free_nonspec_q;
 	     
 	     if(num_vcs_per_class == 1)
 	       assign free_spec = free_spec_ocvc;
@@ -1058,15 +1047,13 @@ module vcr_ivc_ctrl
 	     if(vc_alloc_requires_credit)
 	       assign has_cred_s 
 		 = vc_allocated_q ? 
-		   ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q) | 
-		    cred_allocated) :
-		   (~sw_gnt_spec | cred_unallocated);
+		   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
+		   (~sw_gnt | cred_unallocated);
 	     else
 	       assign has_cred_s
 		 = vc_allocated_q ?
-		   ((has_cred_q & ~sw_gnt_nonspec) | (|cred_hold_q) | 
-		    cred_allocated) :
-		   (~sw_gnt_spec & cred_unallocated);
+		   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
+		   (~sw_gnt & cred_unallocated);
 	     c_dff
 	       #(.width(1),
 		 .reset_type(reset_type))
@@ -1077,21 +1064,19 @@ module vcr_ivc_ctrl
 		.d(has_cred_s),
 		.q(has_cred_q));
 	     
-	     assign free_allocated = has_cred_q;
+	     assign free_nonspec = has_cred_q;
 	     
 	     assign free_spec = cred_unallocated;
 	     
 	     wire 			  incr_cred_hold;
-	     assign incr_cred_hold
-	       = cred_allocated & ~sw_gnt_nonspec & has_cred_q;
+	     assign incr_cred_hold = cred_allocated & has_cred_q & ~sw_gnt;
 	     
 	     wire 			  decr_cred_hold;
-	     assign decr_cred_hold
-	       = ~cred_allocated & sw_gnt_nonspec & |cred_hold_q;
+	     assign decr_cred_hold = ~cred_allocated & |cred_hold_q & sw_gnt;
 	     
 	     wire [0:cred_hold_width-1]   cred_hold_new;
 	     if(vc_alloc_requires_credit)
-	       assign cred_hold_new = ~sw_gnt_spec & cred_unallocated;
+	       assign cred_hold_new = cred_unallocated & ~sw_gnt;
 	     else
 	       assign cred_hold_new = {cred_hold_width{1'b0}};
 	     
@@ -1119,24 +1104,6 @@ module vcr_ivc_ctrl
       endcase
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate allocator control signals
-   //---------------------------------------------------------------------------
-   
-   assign sw_req_nonspec = flit_valid & vc_allocated_q & free_allocated;
-   
-   generate
-      
-      if(sw_alloc_spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	assign sw_req_spec = 1'b0;
-      else
-	assign sw_req_spec = flit_valid & ~vc_allocated_q;
-      
-   endgenerate
-   
-   assign vc_req = flit_valid & ~vc_allocated_q;
    
    
    //---------------------------------------------------------------------------

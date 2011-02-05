@@ -220,17 +220,15 @@ module vcr_top
    
    wire [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_resource_classes-1] route_ip_ivc_orc;
+   wire [0:num_ports*num_vcs-1] 		     allocated_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		     flit_valid_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		     free_nonspec_ip_ivc;
    
-   wire [0:num_ports*num_vcs-1] 		     vc_req_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		     vc_gnt_ip_ivc;
    wire [0:num_ports*num_vcs*num_vcs_per_class-1]    vc_gnt_ip_ivc_ocvc;
    
-   wire [0:num_ports*num_vcs-1] 		     sw_req_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		     sw_req_spec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		     sw_sel_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		     sw_sel_spec_ip_ivc;
-   wire [0:num_ports-1] 			     sw_gnt_nonspec_ip;
-   wire [0:num_ports-1] 			     sw_gnt_spec_ip;
+   wire [0:num_ports*num_vcs-1] 		     sw_sel_ip_ivc;
+   wire [0:num_ports-1] 			     sw_gnt_ip;
    
    wire [0:num_ports*int_flit_ctrl_width-1] 	     xbc_data_in_ip;
    wire [0:num_ports*flit_data_width-1] 	     xbd_data_in_ip;
@@ -263,25 +261,17 @@ module vcr_top
 	     = vc_gnt_ip_ivc_ocvc[ip*num_vcs*num_vcs_per_class:
 				  (ip+1)*num_vcs*num_vcs_per_class-1];
 	   
-	   wire [0:num_vcs-1] 			sw_sel_nonspec_ivc;
-	   assign sw_sel_nonspec_ivc
-	     = sw_sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   wire [0:num_vcs-1] 			sw_sel_ivc;
+	   assign sw_sel_ivc = sw_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs-1] 			sw_sel_spec_ivc;
-	   assign sw_sel_spec_ivc
-	     = sw_sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire 				sw_gnt_nonspec;
-	   assign sw_gnt_nonspec = sw_gnt_nonspec_ip[ip];
-	   
-	   wire 				sw_gnt_spec;
-	   assign sw_gnt_spec = sw_gnt_spec_ip[ip];
+	   wire 				sw_gnt;
+	   assign sw_gnt = sw_gnt_ip[ip];
 	   
 	   wire [0:num_vcs*num_ports-1] 	route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] route_ivc_orc;
-	   wire [0:num_vcs-1] 			   vc_req_ivc;
-	   wire [0:num_vcs-1] 			   sw_req_nonspec_ivc;
-	   wire [0:num_vcs-1] 			   sw_req_spec_ivc;
+	   wire [0:num_vcs-1] 			   allocated_ivc;
+	   wire [0:num_vcs-1] 			   flit_valid_ivc;
+	   wire [0:num_vcs-1] 			   free_nonspec_ivc;
 	   wire [0:int_flit_ctrl_width-1] 	   int_flit_ctrl;
 	   wire [0:flit_data_width-1] 		   flit_data;
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
@@ -307,7 +297,7 @@ module vcr_top
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
-	       .sw_alloc_spec_type(sw_alloc_spec_type),
+	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
 	       .reset_type(reset_type))
@@ -318,15 +308,13 @@ module vcr_top
 	      .channel_in(channel_in),
 	      .route_ivc_op(route_ivc_op),
 	      .route_ivc_orc(route_ivc_orc),
-	      .vc_req_ivc(vc_req_ivc),
+	      .allocated_ivc(allocated_ivc),
+	      .flit_valid_ivc(flit_valid_ivc),
+	      .free_nonspec_ivc(free_nonspec_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .vc_gnt_ivc_ocvc(vc_gnt_ivc_ocvc),
-	      .sw_req_nonspec_ivc(sw_req_nonspec_ivc),
-	      .sw_req_spec_ivc(sw_req_spec_ivc),
-	      .sw_sel_nonspec_ivc(sw_sel_nonspec_ivc),
-	      .sw_sel_spec_ivc(sw_sel_spec_ivc),
-	      .sw_gnt_nonspec(sw_gnt_nonspec),
-	      .sw_gnt_spec(sw_gnt_spec),
+	      .sw_sel_ivc(sw_sel_ivc),
+	      .sw_gnt(sw_gnt),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .flit_data(flit_data),
@@ -339,13 +327,12 @@ module vcr_top
 	   assign route_ip_ivc_orc[ip*num_vcs*num_resource_classes:
 				   (ip+1)*num_vcs*num_resource_classes-1]
 	     = route_ivc_orc;
-	   
-	   assign vc_req_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = vc_req_ivc;
-	   
-	   assign sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-	     = sw_req_nonspec_ivc;
-	   assign sw_req_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-	     = sw_req_spec_ivc;
+	   assign allocated_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = allocated_ivc;
+	   assign flit_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = flit_valid_ivc;
+	   assign free_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
+	     = free_nonspec_ivc;
 	   
 	   assign xbc_data_in_ip[ip*int_flit_ctrl_width:
 				 (ip+1)*int_flit_ctrl_width-1]
@@ -388,8 +375,9 @@ module vcr_top
       .reset(reset),
       .route_ip_ivc_op(route_ip_ivc_op),
       .route_ip_ivc_orc(route_ip_ivc_orc),
+      .allocated_ip_ivc(allocated_ip_ivc),
+      .flit_valid_ip_ivc(flit_valid_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
-      .req_ip_ivc(vc_req_ip_ivc),
       .active_op(vc_active_op),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
@@ -414,12 +402,11 @@ module vcr_top
      (.clk(clk),
       .reset(reset),
       .route_ip_ivc_op(route_ip_ivc_op),
-      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
-      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-      .sel_nonspec_ip_ivc(sw_sel_nonspec_ip_ivc),
-      .sel_spec_ip_ivc(sw_sel_spec_ip_ivc),
-      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
-      .gnt_spec_ip(sw_gnt_spec_ip),
+      .allocated_ip_ivc(allocated_ip_ivc),
+      .flit_valid_ip_ivc(flit_valid_ip_ivc),
+      .free_nonspec_ip_ivc(free_nonspec_ip_ivc),
+      .sel_ip_ivc(sw_sel_ip_ivc),
+      .gnt_ip(sw_gnt_ip),
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip));
    
    
