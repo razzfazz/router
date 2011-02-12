@@ -33,9 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_sw_alloc_sep_of
-  (clk, reset, active_nonspec_ip, active_spec_ip, active_nonspec_op, 
-   active_spec_op, route_ip_ivc_op, req_nonspec_ip_ivc, req_spec_ip_ivc, 
-   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip, gnt_op_ip);
+  (clk, reset, active_ip, active_op, route_ip_ivc_op, req_nonspec_ip_ivc, 
+   req_spec_ip_ivc, sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, 
+   gnt_spec_ip, gnt_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -59,10 +59,8 @@ module vcr_sw_alloc_sep_of
    input reset;
    
    // clock enable signals
-   input [0:num_ports-1] active_nonspec_ip;
-   input [0:num_ports-1] active_spec_ip;
-   input [0:num_ports-1] active_nonspec_op;
-   input [0:num_ports-1] active_spec_op;
+   input [0:num_ports-1] active_ip;
+   input [0:num_ports-1] active_op;
    
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
@@ -123,20 +121,12 @@ module vcr_sw_alloc_sep_of
       for(ip = 0; ip < num_ports; ip = ip + 1)
 	begin:ips
 	   
-	   wire active_nonspec;
-	   assign active_nonspec = active_nonspec_ip[ip];
+	   wire active;
+	   assign active = active_ip[ip];
 	   
 	   wire [0:num_vcs*num_ports-1] route_ivc_op;
 	   assign route_ivc_op
 	     = route_ip_ivc_op[ip*num_vcs*num_ports:(ip+1)*num_vcs*num_ports-1];
-	   
-	   wire [0:num_ports*num_vcs-1] route_op_ivc;
-	   c_interleave
-	     #(.width(num_vcs*num_ports),
-	       .num_blocks(num_vcs))
-	   route_op_ivc_intl
-	     (.data_in(route_ivc_op),
-	      .data_out(route_op_ivc));
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -169,13 +159,16 @@ module vcr_sw_alloc_sep_of
 	     = gnt_out_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 	   
 	   wire [0:num_vcs-1] 		mask_nonspec_ivc;
-	   c_select_mofn
-	     #(.width(num_vcs),
-	       .num_ports(num_ports))
-	   mask_nonspec_ivc_sel
-	     (.select(gnt_out_nonspec_op),
-	      .data_in(route_op_ivc),
-	      .data_out(mask_nonspec_ivc));
+	   c_mat_mult
+	     #(.dim1_width(num_vcs),
+	       .dim2_width(num_ports),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   mask_nonspec_ivc_mmult
+	     (.input_a(route_ivc_op),
+	      .input_b(gnt_out_nonspec_op),
+	      .result(mask_nonspec_ivc));
 	   
 	   wire [0:num_vcs-1] 		req_in_nonspec_ivc;
 	   assign req_in_nonspec_ivc = req_nonspec_ivc & mask_nonspec_ivc;
@@ -189,18 +182,24 @@ module vcr_sw_alloc_sep_of
 	   assign update_arb_nonspec = |gnt_out_nonspec_op;
 	   
 	   wire [0:num_vcs-1] 		gnt_in_nonspec_ivc;
-	   c_arbiter
-	     #(.num_ports(num_vcs),
-	       .reset_type(reset_type),
-	       .arbiter_type(arbiter_type))
-	   gnt_in_nonspec_ivc_arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(active_nonspec),
-	      .update(update_arb_nonspec),
-	      .req(req_in_nonspec_ivc),
-	      .gnt(gnt_in_nonspec_ivc));
 	   
+	   if(spec_type != `SW_ALLOC_SPEC_TYPE_PRIO)
+	     begin
+		
+		c_arbiter
+		  #(.num_ports(num_vcs),
+		    .reset_type(reset_type),
+		    .arbiter_type(arbiter_type))
+		gnt_in_nonspec_ivc_arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .update(update_arb_nonspec),
+		   .req(req_in_nonspec_ivc),
+		   .gnt(gnt_in_nonspec_ivc));
+		
+	     end
+	   	   
 	   wire [0:num_vcs-1] 		sel_nonspec_ivc;
 	   assign sel_nonspec_ivc = gnt_in_nonspec_ivc;
 	   
@@ -243,10 +242,6 @@ module vcr_sw_alloc_sep_of
 	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
 		
-		wire unused_by_nonspec;
-		assign unused_by_nonspec = unused_by_nonspec_ip[ip];
-		
-		
 		//--------------------------------------------------------------
 		// combine requests from all VCs
 		//--------------------------------------------------------------
@@ -277,81 +272,97 @@ module vcr_sw_alloc_sep_of
 		  = gnt_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 		
 		wire [0:num_vcs-1] 	     mask_spec_ivc;
-		c_select_mofn
-		  #(.width(num_vcs),
-		    .num_ports(num_ports))
-		mask_spec_ivc_sel
-		  (.select(gnt_out_spec_op),
-		   .data_in(route_op_ivc),
-		   .data_out(mask_spec_ivc));
+		c_mat_mult
+		  #(.dim1_width(num_vcs),
+		    .dim2_width(num_ports),
+		    .dim3_width(1),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		mask_spec_ivc_mmult
+		  (.input_a(route_ivc_op),
+		   .input_b(gnt_out_spec_op),
+		   .result(mask_spec_ivc));
 		
 		wire [0:num_vcs-1] 	     req_in_spec_ivc;
 		assign req_in_spec_ivc = req_spec_ivc & mask_spec_ivc;
 		
 		
 		//--------------------------------------------------------------
-		// determine which input VCs' requests need to be masked out
-		//--------------------------------------------------------------
-		
-		wire [0:num_vcs-1] 	     unused_by_nonspec_ivc;
-		c_select_mofn
-		  #(.width(num_vcs),
-		    .num_ports(num_ports))
-		unused_by_nonspec_ivc_sel
-		  (.select(unused_by_nonspec_op),
-		   .data_in(route_op_ivc),
-		   .data_out(unused_by_nonspec_ivc));
-		
-		
-		//--------------------------------------------------------------
 		// perform input-side arbitration
 		//--------------------------------------------------------------
-		
-		wire 			     active_spec;
-		assign active_spec = active_spec_ip[ip];
 		
 		wire 			     update_arb_spec;
 		assign update_arb_spec = gnt_spec;
 		
-		wire [0:num_vcs-1] 	     req_in_spec_int_ivc;
-		wire [0:num_vcs-1] 	     gnt_in_spec_int_ivc;
 		wire [0:num_vcs-1] 	     gnt_in_spec_ivc;
-		if(spec_type == `SW_ALLOC_SPEC_TYPE_INT)
+		
+		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
 		     
-		     assign req_in_spec_int_ivc
-		       = req_in_spec_ivc & unused_by_nonspec_ivc;
+		     wire update_arb;
+		     assign update_arb = update_arb_nonspec | update_arb_spec;
 		     
-		     assign gnt_in_spec_ivc
-		       = gnt_in_spec_int_ivc & {num_vcs{unused_by_nonspec}};
+		     c_arbiter
+		       #(.num_ports(num_vcs),
+			 .num_priorities(2),
+			 .reset_type(reset_type),
+			 .arbiter_type(arbiter_type))
+		     gnt_in_spec_ivc_arb
+		       (.clk(clk),
+			.reset(reset),
+			.active(active),
+			.update(update_arb),
+			.req({req_in_nonspec_ivc, req_in_spec_ivc}),
+			.gnt({gnt_in_nonspec_ivc, gnt_in_spec_ivc}));
+		     
+		     assign gnt_spec = |gnt_in_spec_ivc;
 		     
 		  end
 		else
 		  begin
 		     
+		     wire [0:num_vcs-1] req_in_spec_int_ivc;
 		     assign req_in_spec_int_ivc = req_in_spec_ivc;
+		     
+		     wire [0:num_vcs-1] gnt_in_spec_int_ivc;
+		     c_arbiter
+		       #(.num_ports(num_vcs),
+			 .reset_type(reset_type),
+			 .arbiter_type(arbiter_type))
+		     gnt_in_spec_int_ivc_arb
+		       (.clk(clk),
+			.reset(reset),
+			.active(active),
+			.update(update_arb_spec),
+			.req(req_in_spec_int_ivc),
+			.gnt(gnt_in_spec_int_ivc));
+		     
+		     wire 		unused_by_nonspec;
+		     assign unused_by_nonspec = unused_by_nonspec_ip[ip];
+		     
+		     wire [0:num_vcs-1] unused_by_nonspec_ivc;
+		     c_mat_mult
+		       #(.dim1_width(num_vcs),
+			 .dim2_width(num_ports),
+			 .dim3_width(1),
+			 .prod_op(`BINARY_OP_AND),
+			 .sum_op(`BINARY_OP_OR))
+		     unused_by_nonspec_ivc_mmult
+		       (.input_a(route_ivc_op),
+			.input_b(unused_by_nonspec_op),
+			.result(unused_by_nonspec_ivc));
 		     
 		     assign gnt_in_spec_ivc
 		       = gnt_in_spec_int_ivc & unused_by_nonspec_ivc &
 			 {num_vcs{unused_by_nonspec}};
 		     
+		     assign gnt_spec
+		       = |(gnt_out_spec_op & unused_by_nonspec_op) & 
+			 unused_by_nonspec;
+		     
 		  end
 		
-		c_arbiter
-		  #(.num_ports(num_vcs),
-		    .reset_type(reset_type),
-		    .arbiter_type(arbiter_type))
-		gnt_in_spec_int_ivc_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(active_spec),
-		   .update(update_arb_spec),
-		   .req(req_in_spec_int_ivc),
-		   .gnt(gnt_in_spec_int_ivc));
-		
 		assign sel_spec_ivc = gnt_in_spec_ivc;
-		assign gnt_spec = |(gnt_out_spec_op & unused_by_nonspec_op) & 
-				  unused_by_nonspec;
 		
 		
 		//--------------------------------------------------------------
@@ -468,7 +479,7 @@ module vcr_sw_alloc_sep_of
       
       case(spec_type)
 	
-	`SW_ALLOC_SPEC_TYPE_NONE:
+	`SW_ALLOC_SPEC_TYPE_NONE, `SW_ALLOC_SPEC_TYPE_PRIO:
 	  begin
 	     
 	     assign unused_by_nonspec_ip = {num_ports{1'b0}};
@@ -476,8 +487,7 @@ module vcr_sw_alloc_sep_of
 	     
 	  end
 	
-	`SW_ALLOC_SPEC_TYPE_REQ,
-	`SW_ALLOC_SPEC_TYPE_INT:
+	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
 	     c_binary_op
@@ -542,8 +552,8 @@ module vcr_sw_alloc_sep_of
       for (op = 0; op < num_ports; op = op + 1)
 	begin:ops
 	   
-	   wire active_nonspec;
-	   assign active_nonspec = active_nonspec_op[op];
+	   wire active;
+	   assign active = active_op[op];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -565,17 +575,23 @@ module vcr_sw_alloc_sep_of
 	   assign update_arb_nonspec = |gnt_in_nonspec_ip;
 	   
 	   wire [0:num_ports-1] gnt_out_nonspec_ip;
-	   c_arbiter
-	     #(.num_ports(num_ports),
-	       .arbiter_type(arbiter_type),
-	       .reset_type(reset_type))
-	   gnt_out_nonspec_ip_arb
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(active_nonspec),
-	      .update(update_arb_nonspec),
-	      .req(req_out_nonspec_ip),
-	      .gnt(gnt_out_nonspec_ip));
+	   
+	   if(spec_type != `SW_ALLOC_SPEC_TYPE_PRIO)
+	     begin
+		
+		c_arbiter
+		  #(.num_ports(num_ports),
+		    .arbiter_type(arbiter_type),
+		    .reset_type(reset_type))
+		gnt_out_nonspec_ip_arb
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .update(update_arb_nonspec),
+		   .req(req_out_nonspec_ip),
+		   .gnt(gnt_out_nonspec_ip));
+		
+	     end
 	   
 	   assign gnt_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
 		    = gnt_out_nonspec_ip;
@@ -591,9 +607,6 @@ module vcr_sw_alloc_sep_of
 		//--------------------------------------------------------------
 		// output-side arbitration stage (select input port)
 		//--------------------------------------------------------------
-		
-		wire active_spec;
-		assign active_spec = active_spec_op[op];
 		
 		wire [0:num_ports-1] req_out_spec_ip;
 		assign req_out_spec_ip
@@ -611,17 +624,43 @@ module vcr_sw_alloc_sep_of
 		assign update_arb_spec = |gnt_in_spec_ip;
 		
 		wire [0:num_ports-1] gnt_out_spec_ip;
-		c_arbiter
-		  #(.num_ports(num_ports),
-		    .arbiter_type(arbiter_type),
-		    .reset_type(reset_type))
-		gnt_out_spec_ip_arb
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(active_spec),
-		   .update(update_arb_spec),
-		   .req(req_out_spec_ip),
-		   .gnt(gnt_out_spec_ip));
+
+		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
+		  begin
+		     
+		     wire update_arb;
+		     assign update_arb = update_arb_nonspec | update_arb_spec;
+		     
+		     c_arbiter
+		       #(.num_ports(num_ports),
+			 .num_priorities(2),
+			 .arbiter_type(arbiter_type),
+			 .reset_type(reset_type))
+		     gnt_out_ip_arb
+		       (.clk(clk),
+			.reset(reset),
+			.active(active),
+			.update(update_arb),
+			.req({req_out_nonspec_ip, req_out_spec_ip}),
+			.gnt({gnt_out_nonspec_ip, gnt_out_spec_ip}));
+		     
+		  end
+		else
+		  begin
+		     
+		     c_arbiter
+		       #(.num_ports(num_ports),
+			 .arbiter_type(arbiter_type),
+			 .reset_type(reset_type))
+		     gnt_out_spec_ip_arb
+		       (.clk(clk),
+			.reset(reset),
+			.active(active),
+			.update(update_arb_spec),
+			.req(req_out_spec_ip),
+			.gnt(gnt_out_spec_ip));
+		     
+		  end
 		
 		assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
 			 = gnt_out_spec_ip;

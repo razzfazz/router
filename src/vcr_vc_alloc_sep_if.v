@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module vcr_vc_alloc_sep_if
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   req_op_ovc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, 
-   gnt_op_ovc_ivc);
+   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -80,10 +79,6 @@ module vcr_vc_alloc_sep_if
    // request VC allocation
    input [0:num_ports*num_vcs-1] 		      req_ip_ivc;
    
-   // VC allocation requested (to output controller)
-   output [0:num_ports*num_vcs-1] 		      req_op_ovc;
-   wire [0:num_ports*num_vcs-1] 		      req_op_ovc;
-   
    // VC allocation successful (to input controller)
    output [0:num_ports*num_vcs-1] 		      gnt_ip_ivc;
    wire [0:num_ports*num_vcs-1] 		      gnt_ip_ivc;
@@ -104,8 +99,6 @@ module vcr_vc_alloc_sep_if
    output [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    
-   
-   wire [0:num_ports*num_vcs*num_ports*num_vcs-1]     req_ip_ivc_op_ovc;   
    
    generate
       
@@ -354,19 +347,6 @@ module vcr_vc_alloc_sep_if
 				  .dest_in({num_vcs{1'b0}}),
 				  .data_out(active_ovc));
 			       
-			       assign req_ip_ivc_op_ovc
-				 [((((ip*num_message_classes+mc)*
-				     num_resource_classes+irc)*
-				    num_vcs_per_class+icvc)*
-				   num_ports+op)*
-				  num_vcs:
-				  ((((ip*num_message_classes+mc)*
-				     num_resource_classes+irc)*
-				    num_vcs_per_class+icvc)*
-				   num_ports+op+1)*
-				  num_vcs-1]
-				 = active_ovc;
-			       
 			       assign req_out_op_orc_ocvc
 				 [op*num_resource_classes*
 				  num_vcs_per_class:
@@ -521,25 +501,19 @@ module vcr_vc_alloc_sep_if
 			       num_ports*num_resource_classes*
 			       num_vcs_per_class-1];
 			  
-			  wire [0:num_resource_classes*num_vcs_per_class*
-				num_ports-1] 	     req_out_irc_icvc_ip;
-			  c_interleave
-			    #(.width(num_ports*num_resource_classes*
-				     num_vcs_per_class),
-			      .num_blocks(num_ports))
-			  req_out_irc_icvc_op_intl
-			    (.data_in(req_out_ip_irc_icvc),
-			     .data_out(req_out_irc_icvc_ip));
-			  
 			  wire [0:num_ports-1] 	     req_out_ip;
-			  c_binary_op
-			    #(.width(num_ports),
-			      .num_ports(num_resource_classes*
-					 num_vcs_per_class),
-			      .op(`BINARY_OP_OR))
-			  req_out_ip_or
-			    (.data_in(req_out_irc_icvc_ip),
-			     .data_out(req_out_ip));
+			  c_mat_mult
+			    #(.dim1_width(num_ports),
+			      .dim2_width(num_resource_classes*
+					  num_vcs_per_class),
+			      .dim3_width(1),
+			      .prod_op(`BINARY_OP_AND),
+			      .sum_op(`BINARY_OP_OR))
+			  req_out_ip_mmult
+			    (.input_a(req_out_ip_irc_icvc),
+			     .input_b({(num_resource_classes*
+					num_vcs_per_class){1'b1}}),
+			     .result(req_out_ip));
 			  
 			  wire [0:num_ports-1] 	     gnt_out_ip;
 			  wire [0:num_ports*num_resource_classes*
@@ -689,18 +663,5 @@ module vcr_vc_alloc_sep_if
 	end
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate activity signals for output controllers
-   //---------------------------------------------------------------------------
-   
-   c_binary_op
-     #(.num_ports(num_ports*num_vcs),
-       .width(num_ports*num_vcs),
-       .op(`BINARY_OP_OR))
-   req_op_ovc_or
-     (.data_in(req_ip_ivc_op_ovc),
-      .data_out(req_op_ovc));
    
 endmodule

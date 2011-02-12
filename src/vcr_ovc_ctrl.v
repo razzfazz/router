@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module vcr_ovc_ctrl
-  (clk, reset, fc_event_valid, vc_req, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
+  (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_gnt_ip, vc_gnt_ivc, 
    xbr_ctrl_ip, flit_valid, flit_tail, elig, empty, int_flow_ctrl, 
    errors);
    
@@ -107,8 +107,8 @@ module vcr_ovc_ctrl
    // incoming flow control event
    input fc_event_valid;
    
-   // output VC was requested by an input VC
-   input vc_req;
+   // VC allocation activity indicator
+   input vc_active;
    
    // output VC was granted to an input VC
    input vc_gnt;
@@ -162,7 +162,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			  alloc_active;
-   assign alloc_active = vc_req | (|xbr_ctrl_ip);
+   assign alloc_active = vc_active | (|xbr_ctrl_ip);
    
    wire 			  allocated_q;
    

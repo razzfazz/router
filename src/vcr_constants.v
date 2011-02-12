@@ -100,10 +100,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // use speculative grants when not conflicting with non-spec grants
 `define SW_ALLOC_SPEC_TYPE_GNT  2
 
-// use speculative grants when not conflicting with intermediate non-spec grants
-`define SW_ALLOC_SPEC_TYPE_INT  3
+// use single allocator, but prioritize non-speculative requrests
+`define SW_ALLOC_SPEC_TYPE_PRIO 3
 
-`define SW_ALLOC_SPEC_TYPE_LAST `SW_ALLOC_SPEC_TYPE_INT
+`define SW_ALLOC_SPEC_TYPE_LAST `SW_ALLOC_SPEC_TYPE_PRIO
 
 
 `endif

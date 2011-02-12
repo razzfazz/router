@@ -339,7 +339,7 @@ module rtr_ip_ctrl_mac
 
    wire [0:la_route_info_width-1] 	     chi_la_route_info;
    assign chi_la_route_info = chi_header_info[0:la_route_info_width-1];
-
+   
    wire [0:route_info_width-1] 		     chi_route_info;
    assign chi_route_info
      = chi_header_info[la_route_info_width:
@@ -759,20 +759,11 @@ module rtr_ip_ctrl_mac
 	      wire active;
 	      assign active = chi_flit_valid | ~fb_empty;
 	      
-	      wire reload_from_fb;
-	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
-	      
-	      wire flit_head;
-	      assign flit_head = reload_from_fb ? fb_flit_head : chi_flit_head;
-	      
-	      wire flit_tail;
-	      assign flit_tail = reload_from_fb ? fb_flit_tail : chi_flit_tail;
-	      
-	      wire capture;
-	      assign capture = (fb_empty & chi_flit_valid) | flit_sent_in;
-	      
 	      wire flit_head_s, flit_head_q;
-	      assign flit_head_s = capture ? flit_head : flit_head_q;
+	      assign flit_head_s
+		= flit_sent_in ?
+		  (fb_almost_empty ? chi_flit_head : fb_flit_head) : 
+		  (fb_empty ? chi_flit_head : flit_head_q);
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type))
@@ -784,7 +775,10 @@ module rtr_ip_ctrl_mac
 		 .q(flit_head_q));
 	      
 	      wire flit_tail_s, flit_tail_q;
-	      assign flit_tail_s = capture ? flit_tail : flit_tail_q;
+	      assign flit_tail_s
+		= flit_sent_in ?
+		  (fb_almost_empty ? chi_flit_tail : fb_flit_tail) : 
+		  (fb_empty ? chi_flit_tail : flit_tail_q);
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type))
@@ -833,20 +827,18 @@ module rtr_ip_ctrl_mac
 	      
 	      if(dual_path_alloc)
 		assign valid_s
-		  = valid_q ?
-		    (fb_empty ? 
-		     (~flit_sent_fast_in | ~chi_flit_tail) : 
-		     (~flit_sent_in | ~htt_flit_tail | ~fb_almost_empty | 
-		      chi_flit_valid)) : 
-		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent_fast_in));
+		  = flit_sent_in ?
+		    (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid) :
+		    (flit_sent_fast_in ? 
+		     ~chi_flit_tail : 
+		     (valid_q | chi_flit_valid));
 	      else
 		assign valid_s
-		  = valid_q ?
-		    (~flit_sent_in |
-		     (fb_empty ?
-		      ~chi_flit_tail :
-		      (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid))) :
-		    (chi_flit_valid & (~chi_flit_tail | ~flit_sent_in));
+		  = flit_sent_in ? 
+		    (fb_empty ?
+		     ~chi_flit_tail :
+		     (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid)) :
+		    (valid_q | chi_flit_valid);
 	      
 	      c_dff
 		#(.width(1),
@@ -859,44 +851,40 @@ module rtr_ip_ctrl_mac
 		 .q(valid_q));
 	      
 	      wire active;
-	      assign active
-		= valid_q ? (~fb_empty & htt_flit_tail) : chi_flit_valid;
+	      assign active = ~valid_q | (~fb_empty & htt_flit_tail);
 	      
-	      wire capture;
-	      assign capture = (~valid_q & chi_flit_valid) |
-			       (flit_sent_in & ~fb_empty & htt_flit_tail);
-	      
-	      wire reload_from_fb;
-	      assign reload_from_fb = ~fb_empty & ~fb_almost_empty;
-	      
-	      wire [0:la_route_info_width-1] next_la_route_info;
-	      assign next_la_route_info
-		= reload_from_fb ? fb_la_route_info : chi_la_route_info;
-	      
-	      wire [0:num_ports-1] 	     route_op;
+	      wire [0:num_ports-1] route_op;
 	      wire [0:num_resource_classes-1] route_orc;
 	      wire [0:la_route_info_width-1]  la_route_info;
 	      
 	      if(dual_path_alloc)
 		begin
 		   
-		   wire [0:port_idx_width-1] next_route_port;
-		   assign next_route_port
-		     = next_la_route_info[0:port_idx_width-1];
+		   // NOTE: For dual-path routing, we never have to bypass the
+		   // selected output port from the channel input (which would
+		   // have to go through a decoder first); thus, it makes sense
+		   // to store the port in one-hot form here in order to improve
+		   // timing.
 		   
-		   wire [0:num_ports-1]      next_route_op;
+		   wire [0:port_idx_width-1] fb_route_port;
+		   assign fb_route_port = fb_la_route_info[0:port_idx_width-1];
+		   
+		   wire [0:num_ports-1]      fb_route_op;
 		   c_decode
 		     #(.num_ports(num_ports))
-		   next_route_op_dec
-		     (.data_in(next_route_port),
-		      .data_out(next_route_op));
+		   fb_route_op_dec
+		     (.data_in(fb_route_port),
+		      .data_out(fb_route_op));
 		   
 		   wire [0:num_ports-1]      route_op_s, route_op_q;
-		   assign route_op_s = capture ? next_route_op : route_op_q;
+		   assign route_op_s
+		     = (flit_sent_in & htt_flit_tail) ?
+		       (fb_almost_empty ? gld_route_op : fb_route_op) :
+		       (valid_q ? route_op_q : gld_route_op);
 		   c_dff
 		     #(.width(num_ports),
 		       .reset_type(reset_type))
-		   next_route_opq
+		   route_opq
 		     (.clk(clk),
 		      .reset(1'b0),
 		      .active(active),
@@ -919,23 +907,25 @@ module rtr_ip_ctrl_mac
 		   else if(num_resource_classes > 1)
 		     begin
 			
-			wire [0:resource_class_idx_width-1] next_route_rcsel;
-			assign next_route_rcsel
-			  = next_la_route_info[port_idx_width:
-					       port_idx_width+
-					       resource_class_idx_width-1];
+			wire [0:resource_class_idx_width-1] fb_route_rcsel;
+			assign fb_route_rcsel
+			  = fb_la_route_info[port_idx_width:
+					     port_idx_width+
+					     resource_class_idx_width-1];
 			
-			wire [0:num_resource_classes-1]     next_route_orc;
+			wire [0:num_resource_classes-1]     fb_route_orc;
 			c_decode
 			  #(.num_ports(num_resource_classes))
-			next_route_orc_dec
-			  (.data_in(next_route_rcsel),
-			   .data_out(next_route_orc));
+			fb_route_orc_dec
+			  (.data_in(fb_route_rcsel),
+			   .data_out(fb_route_orc));
 			
 			wire [0:num_resource_classes-1]     route_orc_s;
 			wire [0:num_resource_classes-1]     route_orc_q;
 			assign route_orc_s
-			  = capture ? next_route_orc : route_orc_q;
+			  = (flit_sent_in & htt_flit_tail) ?
+			    (fb_almost_empty ? gld_route_orc : fb_route_orc) :
+			    (valid_q ? route_orc_q : gld_route_orc);
 			c_dff
 			  #(.width(num_resource_classes),
 			    .reset_type(reset_type))
@@ -969,7 +959,11 @@ module rtr_ip_ctrl_mac
 		   wire [0:la_route_info_width-1] la_route_info_s;
 		   wire [0:la_route_info_width-1] la_route_info_q;
 		   assign la_route_info_s
-		     = capture ? next_la_route_info : la_route_info_q;
+		     = (flit_sent_in & flit_tail_out) ?
+		       (fb_almost_empty ? 
+			chi_la_route_info : 
+			fb_la_route_info) :
+		       (valid_q ? la_route_info_q : chi_la_route_info);
 		   c_dff
 		     #(.width(la_route_info_width),
 		       .reset_type(reset_type))
@@ -1012,12 +1006,18 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      wire [0:route_info_width-1]    next_route_info;
-	      assign next_route_info
-		= reload_from_fb ? fb_route_info : chi_route_info;
-	      
 	      wire [0:route_info_width-1]    route_info_s, route_info_q;
-	      assign route_info_s = capture ? next_route_info : route_info_q;
+
+	      if(dual_path_alloc)
+		assign route_info_s
+		  = (flit_sent_in & htt_flit_tail) ?
+		    (fb_almost_empty ? chi_route_info : fb_route_info) :
+		    (valid_q ? route_info_q : chi_route_info);
+	      else
+		assign route_info_s
+		  = (flit_sent_in & flit_tail_out) ?
+		    (fb_almost_empty ? chi_route_info : fb_route_info) :
+		    (valid_q ? route_info_q : chi_route_info);
 	      c_dff
 		#(.width(route_info_width),
 		  .reset_type(reset_type))
