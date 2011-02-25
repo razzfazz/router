@@ -310,6 +310,22 @@ module c_fifo_ctrl
    wire 			 error_overflow;
    assign error_overflow = full & push & ~pop;
    
-   assign errors = {error_underflow, error_overflow};
+   // synopsys translate_off
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_underflow)
+	  $display("ERROR: FIFO underflow in module %m.");
+	
+	if(error_overflow)
+	  $display("ERROR: FIFO overflow in module %m.");
+	
+     end
+   
+   // synopsys translate_on
+   
+   assign errors[0] = error_underflow;
+   assign errors[1] = error_overflow;
    
 endmodule

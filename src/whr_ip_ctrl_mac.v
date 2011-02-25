@@ -595,8 +595,11 @@ module whr_ip_ctrl_mac
    wire 			     header_valid;
    assign header_valid = hdr_valid_q | flit_valid_in;
    
+   wire 			     rf_active;
+   assign rf_active = header_valid;
+   
    wire 			     route_orc;
-   wire [0:1] 			     rfl_errors;
+   wire [0:1] 			     rf_errors;
    rtr_route_filter
      #(.num_message_classes(1),
        .num_resource_classes(1),
@@ -610,19 +613,22 @@ module whr_ip_ctrl_mac
        .dim_order(dim_order),
        .port_id(port_id),
        .vc_id(0))
-   rfl
-     (.route_valid(header_valid),
+   rf
+     (.clk(clk),
+      .reset(reset),
+      .active(rf_active),
+      .route_valid(header_valid),
       .route_in_op(route_unmasked_op),
       .route_in_orc(1'b1),
       .route_out_op(route_op),
       .route_out_orc(route_orc),
-      .errors(rfl_errors));
+      .errors(rf_errors));
    
    wire 			     error_invalid_port;
-   assign error_invalid_port = rfl_errors[0];
+   assign error_invalid_port = rf_errors[0];
    
    wire 			     error_invalid_class;
-   assign error_invalid_class = rfl_errors[1];
+   assign error_invalid_class = rf_errors[1];
    
    
    //---------------------------------------------------------------------------
@@ -818,23 +824,15 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    // synopsys translate_off
+   
    always @(posedge clk)
      begin
-	
-	if(error_fbc_underflow)
-	  $display("ERROR: Flit buffer controller underflow in module %m.");
-	
-	if(error_fbc_overflow)
-	  $display("ERROR: Flit buffer controller overflow in module %m.");
 	
 	if(error_no_header)
 	  $display("ERROR: Stray flit received in module %m.");
 	
-	if(error_invalid_port)
-	  $display({"ERROR: Received flit's destination port does not match ",
-		    "constraints in module %m."});
-	
      end
+   
    // synopsys translate_on
    
    generate

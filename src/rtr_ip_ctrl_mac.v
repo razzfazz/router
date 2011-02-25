@@ -1062,6 +1062,9 @@ module rtr_ip_ctrl_mac
 		  = hit_valid ? hit_route_orc : gld_route_orc;
 	     end
 	   
+	   wire rf_active;
+	   assign rf_active = route_valid_out;
+	   
 	   wire [0:1] rf_errors;
 	   rtr_route_filter
 	     #(.num_message_classes(num_message_classes),
@@ -1077,7 +1080,10 @@ module rtr_ip_ctrl_mac
 	       .port_id(port_id),
 	       .vc_id(ivc))
 	   rf
-	     (.route_valid(route_valid_out),
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(rf_active),
+	      .route_valid(route_valid_out),
 	      .route_in_op(route_unmasked_op),
 	      .route_in_orc(route_unmasked_orc),
 	      .route_out_op(route_out_op),
@@ -1216,22 +1222,8 @@ module rtr_ip_ctrl_mac
 	   always @(posedge clk)
 	     begin
 		
-		if(error_fb_underflow)
-		  $display("ERROR: Flit buffer underflow in module %m.");
-		
-		if(error_fb_overflow)
-		  $display("ERROR: Flit buffer overflow in module %m.");
-		
 		if(error_no_header)
 		  $display("ERROR: Stray flit received in module %m.");
-		
-		if(error_invalid_port)
-		  $display({"ERROR: Received flit's destination does not ",
-			    "match port constraints in module %m."});
-		
-		if(error_invalid_class)
-		  $display({"ERROR: Received flit's destination does not ",
-			    "match class constraints in module %m."});
 		
 	     end
 	   
