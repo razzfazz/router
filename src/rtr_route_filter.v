@@ -34,7 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_route_filter
-  (route_valid, route_in_op, route_in_orc, route_out_op, route_out_orc, errors);
+  (clk, reset, active, route_valid, route_in_op, route_in_orc, route_out_op, 
+   route_out_orc, errors);
    
 `include "c_constants.v"
    
@@ -98,6 +99,10 @@ module rtr_route_filter
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
+   
+   input clk;
+   input reset;
+   input active;
    
    // route information is valid
    input route_valid;
@@ -282,11 +287,26 @@ module rtr_route_filter
    wire error_invalid_port;
    assign error_invalid_port = route_valid & ((|error_op) | (~|route_in_op));
    
-   assign errors[0] = error_invalid_port;
-   
    wire error_invalid_class;
    assign error_invalid_class = route_valid & ((|error_orc) | (~|route_in_orc));
    
+   // synopsys translate_off
+   always @(posedge clk)
+     begin
+	
+	if(error_invalid_port)
+	  $display({"ERROR: Received flit's destination port violates ",
+		    "constraints in module %m."});
+	
+	if(error_invalid_class)
+	  $display({"ERROR: Received flit's destination class violates ",
+		    "constraints in module %m."});
+	
+     end
+   
+   // synopsys translate_on
+   
+   assign errors[0] = error_invalid_port;
    assign errors[1] = error_invalid_class;
    
 endmodule
