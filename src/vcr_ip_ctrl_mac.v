@@ -566,17 +566,17 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl[0] = flit_valid_q;
    
-   wire 			     flit_head_s;
-   wire 			     flit_tail_s;
-   wire [0:num_vcs-1] 		     flit_sel_ovc_s;
+   wire 			     flit_head;
+   wire 			     flit_tail;
+   wire [0:num_vcs-1] 		     flit_sel_ovc;
    
    generate
       
       if(num_vcs == 1)
 	begin
-	   assign flit_head_s = flit_head_ivc;
-	   assign flit_tail_s = flit_tail_ivc;
-	   assign flit_sel_ovc_s = flit_sel_ivc_ovc;
+	   assign flit_head = flit_head_ivc;
+	   assign flit_tail = flit_tail_ivc;
+	   assign flit_sel_ovc = flit_sel_ivc_ovc;
 	end
       else if(num_vcs > 1)
 	begin
@@ -584,32 +584,33 @@ module vcr_ip_ctrl_mac
 	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(1))
-	   flit_head_s_sel
+	   flit_head_sel
 	     (.select(sw_sel_ivc),
 	      .data_in(flit_head_ivc),
-	      .data_out(flit_head_s));
+	      .data_out(flit_head));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(1))
-	   flit_tail_s_sel
+	   flit_tail_sel
 	     (.select(sw_sel_ivc),
 	      .data_in(flit_tail_ivc),
-	      .data_out(flit_tail_s));
+	      .data_out(flit_tail));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_vcs),
 	       .width(num_vcs))
-	   flit_sel_ovc_s_sel
+	   flit_sel_ovc_sel
 	     (.select(sw_sel_ivc),
 	      .data_in(flit_sel_ivc_ovc),
-	      .data_out(flit_sel_ovc_s));
+	      .data_out(flit_sel_ovc));
 	   
 	end
       
    endgenerate
    
-   wire 				flit_head_q;
+   wire 				flit_head_s, flit_head_q;
+   assign flit_head_s = flit_head;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -623,7 +624,8 @@ module vcr_ip_ctrl_mac
    assign flit_head_prev = flit_head_q;
    assign int_flit_ctrl[1+0] = flit_head_q;
    
-   wire 				flit_tail_q;
+   wire 				flit_tail_s, flit_tail_q;
+   assign flit_tail_s = flit_tail;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -636,7 +638,8 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl[1+1] = flit_tail_q;
    
-   wire [0:num_vcs-1] 			flit_sel_ovc_q;
+   wire [0:num_vcs-1] 			flit_sel_ovc_s, flit_sel_ovc_q;
+   assign flit_sel_ovc_s = flit_sel_ovc;
    c_dff
      #(.width(num_vcs),
        .reset_type(reset_type))
