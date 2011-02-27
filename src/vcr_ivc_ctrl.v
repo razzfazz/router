@@ -463,17 +463,6 @@ module vcr_ivc_ctrl
    // flit buffer
    //---------------------------------------------------------------------------
    
-   wire [0:header_info_width-1] 		     header_info_in;
-   assign header_info_in = flit_data_in[0:header_info_width-1];
-   
-   wire [0:la_route_info_width-1] 		     la_route_info_in;
-   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
-   
-   wire [0:route_info_width-1] 			     route_info_in;
-   assign route_info_in
-     = header_info_in[la_route_info_width:
-		      la_route_info_width+route_info_width-1];
-   
    wire 					     fbf_write_enable;
    wire 					     fbf_read_active;
    wire [0:fb_addr_width-1] 			     fbf_read_addr;
@@ -630,6 +619,17 @@ module vcr_ivc_ctrl
       .active(pop_active),
       .d(hdr_valid_s),
       .q(hdr_valid_q));
+   
+   wire [0:header_info_width-1]      header_info_in;
+   assign header_info_in = flit_data_in[0:header_info_width-1];
+   
+   wire [0:la_route_info_width-1]    la_route_info_in;
+   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
+   
+   wire [0:route_info_width-1] 	     route_info_in;
+   assign route_info_in
+     = header_info_in[la_route_info_width:
+		      la_route_info_width+route_info_width-1];
    
    wire 			     hdr_active;
    assign hdr_active = ~hdr_valid_q | (~fbc_empty & htr_flit_tail_q);
