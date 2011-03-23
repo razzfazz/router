@@ -355,7 +355,7 @@ module rtr_ip_ctrl_mac
    
    generate
       
-      begin:gld
+      if(1) begin:gld
 	 
 	 wire [0:port_idx_width-1] route_port;
 	 assign route_port = chi_la_route_info[0:port_idx_width-1];
@@ -404,7 +404,7 @@ module rtr_ip_ctrl_mac
    
    generate
       
-      begin:glu
+      if(1) begin:glu
 	 
 	 wire [0:router_addr_width-1] next_router_address;
 	 rtr_next_hop_addr
@@ -595,7 +595,7 @@ module rtr_ip_ctrl_mac
 	   wire [0:la_route_info_width-1]  fb_la_route_info;
 	   wire [0:route_info_width-1] 	   fb_route_info;
 	   
-	   begin:fb
+	   if(1) begin:fb
 	      
 	      wire push_active;
 	      assign push_active = chi_flit_valid;
@@ -754,7 +754,7 @@ module rtr_ip_ctrl_mac
 	   wire 			     htt_flit_head;
 	   wire 			     htt_flit_tail;
 	   
-	   begin:htt
+	   if(1) begin:htt
 	      
 	      wire active;
 	      assign active = chi_flit_valid | ~fb_empty;
@@ -818,7 +818,7 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   error_no_header;
 	   
-	   begin:hit
+	   if(1) begin:hit
 	      
 	      wire valid_active;
 	      assign valid_active = chi_flit_valid | ~fb_empty;
@@ -1101,7 +1101,7 @@ module rtr_ip_ctrl_mac
 	   // local lookahead routing information update logic
 	   //-------------------------------------------------------------------
 	   
-	   begin:llu
+	   if(1) begin:llu
 	      
 	      wire [0:router_addr_width-1] next_router_address;
 	      rtr_next_hop_addr

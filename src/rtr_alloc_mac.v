@@ -363,7 +363,7 @@ module rtr_alloc_mac
 	   wire 			   ifl_almost_full;
 	   wire 			   ifl_full;
 	   
-	   begin:ifl
+	   if(1) begin:ifl
 	      
 	      if(dual_path_alloc)
 		begin
@@ -646,7 +646,7 @@ module rtr_alloc_mac
 		// input VC state tracking
 		//--------------------------------------------------------------
 		
-		begin:ivs
+		if(1) begin:ivs
 		   
 		   wire flit_valid;
 		   
@@ -910,7 +910,7 @@ module rtr_alloc_mac
 	   // switch allocation
 	   //-------------------------------------------------------------------
 	   
-	   begin:ial
+	   if(1) begin:ial
 	      
 	      wire active;
 	      assign active = |flit_valid_in_ivc;
@@ -1290,7 +1290,7 @@ module rtr_alloc_mac
 	   wire 			 oal_flit_tail;
 	   wire [0:num_vcs-1] 		 oal_flit_sel_ovc;
 	   
-	   begin:oal
+	   if(1) begin:oal
 	      
 	      wire [0:num_ports-1] req_hi_ip;
 	      assign req_hi_ip = ial_flit_valid_hi_ip;
@@ -1444,7 +1444,7 @@ module rtr_alloc_mac
 	   wire 		      ofl_flit_tail;
 	   wire [0:num_vcs-1] 	      ofl_flit_sel_ovc;
 	   
-	   begin:ofl
+	   if(1) begin:ofl
 	      
 	      if(dual_path_alloc)
 		begin
@@ -1548,7 +1548,7 @@ module rtr_alloc_mac
 	   wire 		      valid_active;
 	   assign valid_active = active | flit_valid_out;
 	   
-	   begin:xcl
+	   if(1) begin:xcl
 	      
 	      wire [0:num_ports-1] flit_sel_ip_s, flit_sel_ip_q;
 	      assign flit_sel_ip_s = oal_flit_sent_ip | ofl_flit_sent_ip;
@@ -1637,7 +1637,7 @@ module rtr_alloc_mac
 	   // determine next free VC for each class
 	   //-------------------------------------------------------------------
 	   
-	   begin:nvs
+	   if(1) begin:nvs
 	      
 	      if(num_vcs_per_class == 1)
 		begin
