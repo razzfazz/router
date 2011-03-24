@@ -32,9 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // global constant definitions
 //==============================================================================
 
-`ifndef _C_CONSTANTS_V_
-`define _C_CONSTANTS_V_
-
 
 //------------------------------------------------------------------------------
 // reset handling
@@ -177,6 +174,3 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define BINARY_OP_XNOR 5
 
 `define BINARY_OP_LAST `BINARY_OP_XNOR
-
-
-`endif

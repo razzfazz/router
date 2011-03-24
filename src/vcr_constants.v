@@ -32,11 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // VC router related constant definitions
 //==============================================================================
 
-`ifndef _VCR_CONSTANTS_V_
-`define _VCR_CONSTANTS_V_
-
-`include "c_constants.v"
-
 
 //------------------------------------------------------------------------------
 // credit handling implementation variants
@@ -104,6 +99,3 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define SW_ALLOC_SPEC_TYPE_PRIO 3
 
 `define SW_ALLOC_SPEC_TYPE_LAST `SW_ALLOC_SPEC_TYPE_PRIO
-
-
-`endif

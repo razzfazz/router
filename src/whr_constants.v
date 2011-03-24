@@ -31,9 +31,3 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 // wormhole router related constant definitions
 //==============================================================================
-
-`ifndef _WHR_CONSTANTS_V_
-`define _WHR_CONSTANTS_V_
-
-
-`endif

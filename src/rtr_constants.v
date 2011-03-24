@@ -32,9 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // router related constant definitions
 //==============================================================================
 
-`ifndef _RTR_CONSTANTS_V_
-`define _RTR_CONSTANTS_V_
-
 
 //------------------------------------------------------------------------------
 // network topologies
@@ -131,6 +128,3 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define FLOW_CTRL_TYPE_CREDIT 0
 
 `define FLOW_CTRL_TYPE_LAST `FLOW_CTRL_TYPE_CREDIT
-
-
-`endif
