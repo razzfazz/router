@@ -97,7 +97,7 @@ module testbench
 	
      end
    
-   wire [0:num_ports-1] 	  sel;
+   wire [0:num_ports-1] sel;
    c_prio_sel
      #(.num_ports(num_ports),
        .num_priorities(num_priorities))
@@ -121,10 +121,10 @@ module testbench
 	
      end
    
-   wire 			  update;
+   wire update;
    assign update = |req;
    
-   wire [0:num_ports-1] 	  gnt;
+   wire [0:num_priorities*num_ports-1] gnt;
    c_arbiter
      #(.num_ports(num_ports),
        .num_priorities(num_priorities),
@@ -138,8 +138,17 @@ module testbench
       .req(req),
       .gnt(gnt));
    
+   wire [0:num_ports-1] 	       granted;
+   c_binary_op
+     #(.num_ports(num_priorities),
+       .width(num_ports),
+       .op(`BINARY_OP_OR))
+   granted_oc
+     (.data_in(gnt),
+      .data_out(granted));
+   
    wire [0:num_ports-1] 	  error;
-   assign error = gnt & ~sel;
+   assign error = granted & ~sel;
    
    always @(negedge clk)
      begin
