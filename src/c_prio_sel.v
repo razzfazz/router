@@ -56,43 +56,6 @@ module c_prio_sel
    output [0:num_ports-1] 	    select;
    wire [0:num_ports-1] 	    select;
    
-   wire [0:prio_width-1] 	    prio_some_set;
-   c_select_mofn
-     #(.num_ports(num_ports),
-       .width(prio_width),
-       .prod_op(`BINARY_OP_AND),
-       .sum_op(`BINARY_OP_OR))
-   prio_some_set_or
-     (.select(enable),
-      .data_in(priorities),
-      .data_out(prio_some_set));
-   
-   // port enable signals
-   wire [0:num_ports-1] 	    enable_b;
-   assign enable_b = ~enable;
-   
-   wire [0:prio_width-1] 	    prio_some_unset;
-   c_select_mofn
-     #(.num_ports(num_ports),
-       .width(prio_width),
-       .prod_op(`BINARY_OP_OR),
-       .sum_op(`BINARY_OP_NAND))
-   prio_some_unset_nand
-     (.select(enable_b),
-      .data_in(priorities),
-      .data_out(prio_some_unset));
-   
-   // find bit positions that are not identical for all ports
-   wire [0:prio_width-1] 	    prio_diffs;
-   assign prio_diffs = prio_some_set & prio_some_unset;
-   
-   wire [0:prio_width-1] 	    first_prio_diff;
-   c_lod
-     #(.width(prio_width))
-   first_prio_diff_lod
-     (.data_in(prio_diffs),
-      .data_out(first_prio_diff));
-   
    // for each priority bit, list all ports that have this bit set
    wire [0:prio_width*num_ports-1]  prio_ports;
    c_interleave
@@ -102,21 +65,32 @@ module c_prio_sel
      (.data_in(priorities),
       .data_out(prio_ports));
    
-   // select all those ports who have the first differing bit set
-   wire [0:num_ports-1] 	    max_ports;
-   c_select_1ofn
-     #(.num_ports(prio_width),
-       .width(num_ports))
-   max_ports_sel
-     (.select(first_prio_diff),
-      .data_in(prio_ports),
-      .data_out(max_ports));
+   wire [0:(prio_width+1)*num_ports-1]  mask;
    
-   // check if all inputs have the same priority
-   wire 			    all_same_prio;
-   assign all_same_prio = ~|prio_diffs;
+   assign mask[0:num_ports-1] = enable;
    
-   // if so, we must override the result
-   assign select = max_ports | {num_ports{all_same_prio}};
+   generate
+      
+      genvar 				i;
+      
+      for(i = 0; i < prio_width; i = i + 1)
+	begin:is
+	   
+	   wire [0:num_ports-1] mask_in;
+	   assign mask_in = mask[i*num_ports:(i+1)*num_ports-1];
+	   
+	   wire [0:num_ports-1] prio;
+	   assign prio = prio_ports[i*num_ports:(i+1)*num_ports-1];
+	   
+	   wire [0:num_ports-1] mask_out;
+	   assign mask_out = mask_in & (prio | {num_ports{~|(mask_in & prio)}});
+	   
+	   assign mask[(i+1)*num_ports:(i+2)*num_ports-1] = mask_out;
+	   
+	end
+      
+   endgenerate
+   
+   assign select = mask[prio_width*num_ports:(prio_width+1)*num_ports-1];
    
 endmodule
