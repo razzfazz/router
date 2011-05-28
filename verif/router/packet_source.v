@@ -436,7 +436,7 @@ module packet_source
    reg [0:flit_data_width-1] 		 data_q;
    always @(posedge clk, posedge reset)
      begin
-	if(reset | flit_sent)
+	if(reset | flit_valid)
 	  for(i = 0; i < flit_data_width; i = i + 1)
 	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
