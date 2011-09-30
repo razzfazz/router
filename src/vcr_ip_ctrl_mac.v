@@ -161,6 +161,14 @@ module vcr_ip_ctrl_mac
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
    
+   // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (la_route_info_width + route_info_width + payload_length_width) : 
+       -1;
+   
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
@@ -268,10 +276,10 @@ module vcr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				     full_ivc;
+   wire 					     fb_full;
    
    wire 					     input_stage_active;
-   assign input_stage_active = ~&full_ivc;
+   assign input_stage_active = ~fb_full;
    
    wire 					     flit_valid_in;
    wire 					     flit_head_in;
@@ -338,13 +346,21 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 				     flit_valid_in_ivc;
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
+   wire [0:header_info_width-1] 		     header_info_in;
+   assign header_info_in = flit_data_in[0:header_info_width-1];
+   
+   wire 					     peek_flit_head;
+   wire 					     peek_flit_tail;
+   wire [0:header_info_width-1] 		     peek_header_info;
+   
    wire [0:num_vcs-1] 				     flit_sent_prev_ivc;
    wire 					     flit_head_prev;
    wire [0:num_vcs-1] 				     flit_head_ivc;
    wire [0:num_vcs-1] 				     flit_tail_ivc;
    wire [0:num_vcs*num_vcs-1] 			     flit_sel_ivc_ovc;
-   wire [0:num_vcs*flit_data_width-1] 		     flit_data_ivc;
-   wire [0:num_vcs-1] 				     empty_ivc;
+   wire [0:num_vcs*header_info_width-1] 	     header_info_ivc;
+   wire [0:num_vcs-1] 				     fb_almost_empty_ivc;
+   wire [0:num_vcs-1] 				     fb_empty_ivc;
    wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
    
    genvar 					     ivc;
@@ -357,7 +373,7 @@ module vcr_ip_ctrl_mac
 	   wire flit_valid_in;
 	   assign flit_valid_in = flit_valid_in_ivc[ivc];
 	   
-	   wire vc_gnt;
+	   wire 			vc_gnt;
 	   assign vc_gnt = vc_gnt_ivc[ivc];
 	   
 	   wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
@@ -370,15 +386,19 @@ module vcr_ip_ctrl_mac
 	   wire 			flit_sent_prev;
 	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
 	   
+	   wire 			fb_empty;
+	   assign fb_empty = fb_empty_ivc[ivc];
+	   
+	   wire 			fb_almost_empty;
+	   assign fb_almost_empty = fb_almost_empty_ivc[ivc];
+	   
 	   wire [0:num_ports-1] 	route_op;
 	   wire [0:num_resource_classes-1] route_orc;
 	   wire 			   flit_valid;
 	   wire 			   flit_head;
 	   wire 			   flit_tail;
 	   wire [0:num_vcs-1] 		   flit_sel_ovc;
-	   wire [0:flit_data_width-1] 	   flit_data;
-	   wire 			   empty;
-	   wire 			   full;
+	   wire [0:header_info_width-1]    header_info;
 	   wire 			   allocated;
 	   wire 			   free_nonspec;
 	   wire 			   free_spec;
@@ -414,7 +434,7 @@ module vcr_ip_ctrl_mac
 	      .flit_valid_in(flit_valid_in),
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
-	      .flit_data_in(flit_data_in),
+	      .header_info_in(header_info_in),
 	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
 	      .route_op(route_op),
 	      .route_orc(route_orc),
@@ -422,14 +442,16 @@ module vcr_ip_ctrl_mac
 	      .vc_gnt_ocvc(vc_gnt_ocvc),
 	      .sw_gnt(sw_gnt),
 	      .flit_sent_prev(flit_sent_prev),
-	      .flit_head_prev(flit_head_prev),
+	      .peek_header_info(peek_header_info),
+	      .peek_flit_head(peek_flit_head),
+	      .peek_flit_tail(peek_flit_tail),
 	      .flit_valid(flit_valid),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .flit_sel_ovc(flit_sel_ovc),
-	      .flit_data(flit_data),
-	      .empty(empty),
-	      .full(full),
+	      .header_info(header_info),
+	      .fb_almost_empty(fb_almost_empty),
+	      .fb_empty(fb_empty),
 	      .allocated(allocated),
 	      .free_nonspec(free_nonspec),
 	      .free_spec(free_spec),
@@ -445,10 +467,9 @@ module vcr_ip_ctrl_mac
 	   assign flit_tail_ivc[ivc] = flit_tail;
 	   assign flit_sel_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1]
 	     = flit_sel_ovc;
-	   assign flit_data_ivc[ivc*flit_data_width:(ivc+1)*flit_data_width-1]
-	     = flit_data;
-	   assign empty_ivc[ivc] = empty;
-	   assign full_ivc[ivc] = full;
+	   assign header_info_ivc[ivc*header_info_width:
+				  (ivc+1)*header_info_width-1]
+	     = header_info;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign free_nonspec_ivc[ivc] = free_nonspec;
 	   assign free_spec_ivc[ivc] = free_spec;
@@ -460,36 +481,80 @@ module vcr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
+   // flit buffer
+   //---------------------------------------------------------------------------
+   
+   wire 				   fb_push_valid;
+   assign fb_push_valid = flit_valid_in;
+   
+   wire [0:num_vcs-1] 			   fb_push_ivc;
+   assign fb_push_ivc = flit_sel_in_ivc;
+   
+   wire 				   fb_pop_valid;
+   assign fb_pop_valid = flit_sent;
+   
+   wire [0:num_vcs-1] 			   fb_pop_ivc;
+   assign fb_pop_ivc = sw_sel_ivc;
+   
+   wire [0:flit_data_width-1] 		   fb_push_data;
+   assign fbf_push_data[0] = flit_head_in;
+   assign fbf_push_data[1] = flit_tail_in;
+   assign fbf_push_data[2:2+flit_data_width-1] = flit_data_in;
+   
+   wire [0:flit_data_width-1] 		   fb_pop_data;
+   wire [0:flit_data_width-1] 		   fb_peek_data;
+   wire [0:1] 				   fb_errors;
+   rtr_flit_buffer
+     #(.num_vcs(num_vcs),
+       .num_flits_per_vc(num_flits_per_vc),
+       .flit_data_width(flit_data_width),
+       .explicit_pipeline_register(explicit_pipeline_register),
+       .reset_type(reset_type))
+   fb
+     (.clk(clk),
+      .reset(reset),
+      .push_valid(fb_push_valid),
+      .push_ivc(fb_push_ivc),
+      .pop_valid(fb_pop_valid),
+      .pop_ivc(fb_pop_ivc),
+      .push_data(fb_push_data),
+      .pop_data(fb_pop_data),
+      .peek_data(fb_peek_data),
+      .almost_empty_ivc(fb_almost_empty_ivc),
+      .empty_ivc(fb_empty_ivc),
+      .full(fb_full),
+      .errors(fb_errors));
+   
+   assign peek_flit_head = fb_peek_data[0];
+   assign peek_flit_tail = fb_peek_data[1];
+   assign peek_header_info = fb_peek_data[2:2+header_info_width-1];
+   
+   
+   //---------------------------------------------------------------------------
    // flit buffer read path
    //---------------------------------------------------------------------------
    
    wire 				   alloc_active;
-   assign alloc_active = flit_valid_in | ~&empty_ivc;
-   
-   wire [0:num_vcs-1] 			   prev_sw_sel_ivc;
+   assign alloc_active = flit_valid_in | ~&fb_empty_ivc;
    
    generate
       
       if(explicit_pipeline_register)
 	begin
 	   
-	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-
-	   if(num_vcs == 1)
-	     assign flit_data_s = flit_data_ivc;
-	   else if(num_vcs > 1)
-	     begin
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_data_width))
-		flit_data_s_sel
-		  (.select(sw_sel_ivc),
-		   .data_in(flit_data_ivc),
-		   .data_out(flit_data_s));
-		
-	     end
 	   
+	   // FIXME
+	   
+	   assign flit_data[0:la_route_info_width-1]
+	     = flit_head ? 
+	       next_la_route_info : 
+	       flit_data_muxed[0:la_route_info_width-1];
+	   assign flit_data[la_route_info_width:flit_data_width-1]
+	     = flit_data_muxed[la_route_info_width:flit_data_width-1];
+	   
+	   
+	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
+	   assign flit_data_s = XXX;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -506,25 +571,35 @@ module vcr_ip_ctrl_mac
       else
 	begin
 	   
-	   if(num_vcs == 1)
-	     assign flit_data = flit_data_ivc;
-	   else if(num_vcs > 1)
-	     begin
-		
-		// In the absence of an explicit pipeline register between flit 
-		// buffer and crossbar, buffer read is delayed by one clock 
-		// cycle such as to line up the flit data with the crossbar 
-		// control signals.
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_data_width))
-		flit_data_sel
-		  (.select(prev_sw_sel_ivc),
-		   .data_in(flit_data_ivc),
-		   .data_out(flit_data));
-		
-	     end
+	   
+	   // FIXME
+	   
+	   wire active;
+	   assign active = flit_valid & flit_head;
+	   
+	   wire update_next_la_route_info;
+	   assign update_next_la_route_info = flit_sent_prev & flit_head_prev;
+	   
+	   wire [0:la_route_info_width-1] next_la_route_info_s;
+	   wire [0:la_route_info_width-1] next_la_route_info_q;
+	   assign next_la_route_info_s = next_la_route_info;
+	   c_dff
+	     #(.width(la_route_info_width),
+	       .reset_type(reset_type))
+	   next_la_route_infoq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(active),
+	      .d(next_la_route_info_s),
+	      .q(next_la_route_info_q));
+	   
+	   assign flit_data[0:la_route_info_width-1]
+	     = update_next_la_route_info ? 
+	       next_la_route_info_q : 
+	       fbf_flit_data[0:la_route_info_width-1];
+	   assign flit_data[la_route_info_width:flit_data_width-1]
+	     = fbf_flit_data[la_route_info_width:flit_data_width-1];
+	   
 	   
 	end
       
