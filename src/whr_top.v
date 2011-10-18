@@ -148,6 +148,10 @@ module whr_top
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // precompute output-side arbitration decision one cycle ahead
    parameter precomp_ip_sel = 1;
    
@@ -242,6 +246,7 @@ module whr_top
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
+	       .gate_buffer_write(gate_buffer_write),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
 	       .reset_type(reset_type))

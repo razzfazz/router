@@ -188,6 +188,10 @@ module vcr_ip_ctrl_mac
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // select speculation type
    parameter sw_alloc_spec = 1;
    
@@ -404,6 +408,7 @@ module vcr_ip_ctrl_mac
 	       .sw_alloc_spec(sw_alloc_spec),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
+	       .gate_buffer_write(gate_buffer_write),
 	       .vc_id(ivc),
 	       .port_id(port_id),
 	       .reset_type(reset_type))

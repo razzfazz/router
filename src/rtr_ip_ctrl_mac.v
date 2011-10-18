@@ -107,6 +107,10 @@ module rtr_ip_ctrl_mac
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 1;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // enable dual-path allocation
    parameter dual_path_alloc = 0;
    
@@ -641,9 +645,7 @@ module rtr_ip_ctrl_mac
 	      if(explicit_pipeline_register)
 		begin
 		   
-		   if(explicit_pipeline_register == 1)
-		     assign write_enable = chi_flit_valid;
-		   else if(explicit_pipeline_register > 1)
+		   if(gate_buffer_write)
 		     begin
 			if(dual_path_alloc)
 			  assign write_enable
@@ -652,6 +654,8 @@ module rtr_ip_ctrl_mac
 			  assign write_enable
 			    = chi_flit_valid & ~(empty & flit_sent_in);
 		     end
+		   else
+		     assign write_enable = chi_flit_valid;
 		   
 		   assign read_active = ~empty;
 		   

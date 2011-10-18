@@ -110,6 +110,10 @@ module rtr_top
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // enable dual-path allocation
    parameter dual_path_alloc = 1;
    
@@ -298,6 +302,7 @@ module rtr_top
 	       .dim_order(dim_order),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
+	       .gate_buffer_write(gate_buffer_write),
 	       .dual_path_alloc(dual_path_alloc),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),

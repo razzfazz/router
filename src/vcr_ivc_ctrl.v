@@ -191,6 +191,10 @@ module vcr_ivc_ctrl
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // ID of current input VC
    parameter vc_id = 0;
    
@@ -472,11 +476,11 @@ module vcr_ivc_ctrl
       if(explicit_pipeline_register)
 	begin
 	   
-	   if(explicit_pipeline_register == 1)
-	     assign fbf_write_enable = flit_valid_in;
-	   else if(explicit_pipeline_register > 1)
+	   if(gate_buffer_write)
 	     assign fbf_write_enable
 	       = flit_valid_in & ~(fbc_empty & flit_sent);
+	   else
+	     assign fbf_write_enable = flit_valid_in;
 	   
 	   assign fbf_read_active = ~fbc_empty;
 	   

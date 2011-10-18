@@ -162,6 +162,10 @@ module vcr_top
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // select implementation variant for VC allocator
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
@@ -296,6 +300,7 @@ module vcr_top
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
+	       .gate_buffer_write(gate_buffer_write),
 	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
 	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .error_capture_mode(error_capture_mode),

@@ -103,6 +103,10 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 
+// gate flit buffer write port if bypass succeeds
+// (may increase cycle time)
+parameter gate_buffer_write = 0;
+   
 // enable dual-path allocation
 parameter dual_path_alloc = 1;
 

@@ -171,6 +171,10 @@ module whr_ip_ctrl_mac
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
+   // gate flit buffer write port if bypass succeeds
+   // (requires explicit pipeline register; may increase cycle time)
+   parameter gate_buffer_write = 0;
+   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
@@ -376,11 +380,11 @@ module whr_ip_ctrl_mac
       if(explicit_pipeline_register)
 	begin
 	   
-	   if(explicit_pipeline_register == 1)
-	     assign fbf_write_enable = flit_valid_in;
-	   else if(explicit_pipeline_register > 1)
+	   if(gate_buffer_write)
 	     assign fbf_write_enable
 	       = flit_valid_in & ~(fbc_empty & flit_valid_out);
+	   else
+	     assign fbf_write_enable = flit_valid_in;
 	   
 	   assign fbf_read_active = ~fbc_empty;
 	   
