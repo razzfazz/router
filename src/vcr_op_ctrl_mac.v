@@ -86,9 +86,8 @@ module vcr_op_ctrl_mac
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
-   // select whether VCs must have credits available in order to be considered 
-   // for VC allocation
-   parameter vc_alloc_requires_credit = 0;
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
    
    // select implementation variant for tail sent tracker register file
    parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -244,7 +243,7 @@ module vcr_op_ctrl_mac
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .vc_id(ovc),
-	       .vc_alloc_requires_credit(vc_alloc_requires_credit),
+	       .vc_alloc_mask(vc_alloc_mask),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .tst_regfile_type(tst_regfile_type),
 	       .reset_type(reset_type))

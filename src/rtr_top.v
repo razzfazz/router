@@ -129,6 +129,12 @@ module rtr_top
    // select which arbiter type to use for VC allocation
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
+   
+   // prefer empty VCs over non-empty ones in VC allocation
+   parameter vc_alloc_prefer_empty = 0;
+   
    // select implementation variant for crossbar
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;
    
@@ -408,6 +414,8 @@ module rtr_top
        .precomp_ip_sel(precomp_ip_sel),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+       .vc_alloc_mask(vc_alloc_mask),
+       .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
        .dual_path_alloc(dual_path_alloc),
        .reset_type(reset_type))
    alo

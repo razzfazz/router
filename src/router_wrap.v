@@ -201,7 +201,7 @@ module router_wrap
 		 .gate_buffer_write(gate_buffer_write),
 		 .vc_alloc_type(vc_alloc_type),
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
-		 .vc_alloc_requires_credit(vc_alloc_requires_credit),
+		 .vc_alloc_mask(vc_alloc_mask),
 		 .sw_alloc_type(sw_alloc_type),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .sw_alloc_spec_type(sw_alloc_spec_type),
@@ -250,6 +250,8 @@ module router_wrap
 		 .precomp_ip_sel(precomp_ip_sel),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
+		 .vc_alloc_mask(vc_alloc_mask),
+		 .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
 		 .crossbar_type(crossbar_type),
 		 .reset_type(reset_type))
 	     rtr

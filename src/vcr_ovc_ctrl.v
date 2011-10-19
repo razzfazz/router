@@ -78,9 +78,8 @@ module vcr_ovc_ctrl
    // ID of current input VC
    parameter vc_id = 0;
    
-   // select whether VCs must have credits available in order to be considered 
-   // for VC allocation
-   parameter vc_alloc_requires_credit = 0;
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
    
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
@@ -95,9 +94,9 @@ module vcr_ovc_ctrl
        -1;
    
    // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width = vc_alloc_requires_credit ? 
-				clogb(num_flits_per_vc-1) : 
-				clogb(num_flits_per_vc);
+   localparam cred_hold_width = (vc_alloc_mask == `VC_ALLOC_MASK_NONE) ? 
+				clogb(num_flits_per_vc) :
+				clogb(num_flits_per_vc-1);
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -318,7 +317,27 @@ module vcr_ovc_ctrl
 	     wire flit_count_force_zero;
 	     wire [0:flit_count_width-1] flit_count_adjusted;
 	     
-	     if(vc_alloc_requires_credit)
+	     if(vc_alloc_mask == `VC_ALLOC_MASK_NONE)
+	       begin
+		  
+		  if(flow_ctrl_bypass)
+		    assign int_flow_ctrl_unallocated = ~ft_full | credit;
+		  else
+		    assign int_flow_ctrl_unallocated = ~ft_full;
+		  
+		  assign flit_count_force_zero = ft_full;
+		  
+		  // Note that in two's complement, for single-bit x,
+		  //
+		  //  -1 + x = -(1 - x) = -(!x).
+
+		  if(flow_ctrl_bypass)
+		    assign flit_count_adjusted = ft_free - !credit;
+		  else
+		    assign flit_count_adjusted = ft_free - 1'd1;
+		  
+	       end
+	     else
 	       begin
 		  
 		  // Send one credit explicitly via internal flow control iff 
@@ -368,26 +387,6 @@ module vcr_ovc_ctrl
 		  assign flit_count_force_zero = ft_full | ft_almost_full;
 		  
 		  assign flit_count_adjusted = ft_free + flit_count_delta;
-		  
-	       end
-	     else
-	       begin
-		  
-		  if(flow_ctrl_bypass)
-		    assign int_flow_ctrl_unallocated = ~ft_full | credit;
-		  else
-		    assign int_flow_ctrl_unallocated = ~ft_full;
-		  
-		  assign flit_count_force_zero = ft_full;
-		  
-		  // Note that in two's complement, for single-bit x,
-		  //
-		  //  -1 + x = -(1 - x) = -(!x).
-
-		  if(flow_ctrl_bypass)
-		    assign flit_count_adjusted = ft_free - !credit;
-		  else
-		    assign flit_count_adjusted = ft_free - 1'd1;
 		  
 	       end
 	     
@@ -456,15 +455,27 @@ module vcr_ovc_ctrl
    
    generate
       
-      if(vc_alloc_requires_credit)
-	begin
-	   if(flow_ctrl_bypass)
-	     assign elig = ~allocated_q & (~ft_full | credit);
-	   else
-	     assign elig = ~allocated_q & ~ft_full;
-	end
-      else
-	assign elig = ~allocated_q;
+      case(vc_alloc_mask)
+
+	`VC_ALLOC_MASK_NONE:
+	  begin
+	     assign elig = ~allocated_q;
+	  end
+
+	`VC_ALLOC_MASK_FULL:
+	  begin
+	     if(flow_ctrl_bypass)
+	       assign elig = ~allocated_q & (~ft_full | credit);
+	     else
+	       assign elig = ~allocated_q & ~ft_full;
+	  end
+
+	`VC_ALLOC_MASK_USED:
+	  begin
+	     assign elig = ~allocated_q & ft_empty;
+	  end
+	
+      endcase
       
    endgenerate
    
