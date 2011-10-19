@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 // select network topology
-parameter topology = `TOPOLOGY_FBFLY;
+parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
 parameter num_flits_per_vc = 8;
@@ -42,7 +42,7 @@ parameter num_flits_per_vc = 8;
 parameter num_message_classes = 2;
 
 // number of resource classes (e.g. minimal, adaptive)
-parameter num_resource_classes = 2;
+parameter num_resource_classes = 1;
 
 // number of VCs per class
 parameter num_vcs_per_class = 1;
@@ -54,7 +54,7 @@ parameter num_nodes = 64;
 parameter num_dimensions = 2;
 
 // number of nodes per router (a.k.a. concentration factor)
-parameter num_nodes_per_router = 4;
+parameter num_nodes_per_router = 1;
 
 // select packet format
 parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -95,7 +95,7 @@ parameter dim_order = `DIM_ORDER_ASCENDING;
 parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_LEVEL;
 
 // use input register as part of the flit buffer (wormhole router only)
-parameter input_stage_can_hold = 1;
+parameter input_stage_can_hold = 0;
 
 // select implementation variant for flit buffer register file
 parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -138,4 +138,4 @@ parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
 // select implementation variant for crossbar
 parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
-parameter reset_type = `RESET_TYPE_ASYNC;  
+parameter reset_type = `RESET_TYPE_ASYNC;

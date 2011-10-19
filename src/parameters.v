@@ -72,10 +72,10 @@ parameter max_payload_length = 4;
 parameter min_payload_length = 0;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_VC;
+parameter router_type = `ROUTER_TYPE_COMBINED;
 
 // width of flit payload data
-parameter flit_data_width = 32;
+parameter flit_data_width = 64;
 
 // configure error checking logic
 parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -83,7 +83,7 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
 // such turns)
-parameter restrict_turns = 0;
+parameter restrict_turns = 1;
 
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -104,17 +104,17 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 parameter explicit_pipeline_register = 0;
 
 // gate flit buffer write port if bypass succeeds
-// (may increase cycle time)
+// (requires explicit pipeline register; may increase cycle time)
 parameter gate_buffer_write = 0;
-   
+
 // enable dual-path allocation
-parameter dual_path_alloc = 1;
+parameter dual_path_alloc = 0;
 
 // precompute input-side arbitration decision one cycle ahead
-parameter precomp_ivc_sel = 1;
+parameter precomp_ivc_sel = 0;
 
 // precompute output-side arbitration decision one cycle ahead
-parameter precomp_ip_sel = 1;
+parameter precomp_ip_sel = 0;
 
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
