@@ -205,7 +205,7 @@ module rtr_ip_ctrl_mac
        -1;
    
    // width of flit buffer
-   localparam fb_width = 1 + 1 + flit_data_width;
+   localparam fb_width = 1 + flit_data_width;
    
    // required address size for a single VC's buffer
    localparam fb_addr_width = clogb(num_flits_per_vc);
@@ -594,7 +594,6 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   fb_almost_empty;
 	   wire [0:flit_data_width-1] 	   fb_flit_data;
-	   wire 			   fb_flit_head;
 	   wire 			   fb_flit_tail;
 	   wire [0:la_route_info_width-1]  fb_la_route_info;
 	   wire [0:route_info_width-1] 	   fb_route_info;
@@ -697,9 +696,8 @@ module rtr_ip_ctrl_mac
 		 .data_out(peek_addr));
 	      
 	      wire [0:fb_width-1] 	    write_data;
-	      assign write_data[0] = chi_flit_head;
-	      assign write_data[1] = chi_flit_tail;
-	      assign write_data[2:2+flit_data_width-1] = chi_flit_data;
+	      assign write_data[0] = chi_flit_tail;
+	      assign write_data[1:1+flit_data_width-1] = chi_flit_data;
 	      
 	      wire [0:fb_width-1] 	    read_data;
 	      wire [0:fb_width-1] 	    peek_data;
@@ -719,7 +717,7 @@ module rtr_ip_ctrl_mac
 		 .read_data({read_data, peek_data}));
 	      
 	      wire [0:header_info_width-1]  peek_header_info;
-	      assign peek_header_info = peek_data[2:2+header_info_width-1];
+	      assign peek_header_info = peek_data[1:1+header_info_width-1];
 	      
 	      assign error_fb_underflow = errors[0];
 	      assign error_fb_overflow = errors[1];
@@ -727,9 +725,8 @@ module rtr_ip_ctrl_mac
 	      assign fb_almost_empty = almost_empty;
 	      assign fb_empty = empty;
 	      assign fb_full = full;
-	      assign fb_flit_data = read_data[2:2+flit_data_width-1];
-	      assign fb_flit_head = peek_data[0];
-	      assign fb_flit_tail = peek_data[1];
+	      assign fb_flit_data = read_data[1:1+flit_data_width-1];
+	      assign fb_flit_tail = peek_data[0];
 	      assign fb_la_route_info
 		= peek_header_info[0:la_route_info_width-1];
 	      assign fb_route_info
@@ -764,13 +761,17 @@ module rtr_ip_ctrl_mac
 	      assign active = chi_flit_valid | ~fb_empty;
 	      
 	      wire flit_head_s, flit_head_q;
-	      assign flit_head_s
-		= flit_sent_in ?
-		  (fb_almost_empty ? chi_flit_head : fb_flit_head) : 
-		  (fb_empty ? chi_flit_head : flit_head_q);
+	      if(dual_path_alloc)
+		assign flit_head_s
+		  = flit_sent_in ? flit_tail_out : 
+		    flit_sent_fast_in ? flit_tail_fast_out :
+		    flit_head_q;
+	      else
+		assign flit_head_s = flit_sent_in ? flit_tail_out : flit_head_q;
 	      c_dff
 		#(.width(1),
-		  .reset_type(reset_type))
+		  .reset_type(reset_type),
+		  .reset_value(1'b1))
 	      flit_headq
 		(.clk(clk),
 		 .reset(1'b0),

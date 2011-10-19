@@ -160,7 +160,7 @@ module whr_ip_ctrl_mac
      = input_stage_can_hold ? (num_flits_per_vc - 1) : num_flits_per_vc;
    
    // width of flit buffer
-   localparam fb_width = 1 + 1 + flit_data_width;
+   localparam fb_width = 1 + flit_data_width;
    
    // required address width for flit buffer
    localparam fb_addr_width = clogb(fb_depth);
@@ -428,9 +428,8 @@ module whr_ip_ctrl_mac
       .data_out(fbf_peek_addr));
    
    wire [0:fb_width-1] 		     fbf_write_data;
-   assign fbf_write_data[0] = flit_head_in;
-   assign fbf_write_data[1] = flit_tail_in;
-   assign fbf_write_data[2:2+flit_data_width-1] = flit_data_in;
+   assign fbf_write_data[0] = flit_tail_in;
+   assign fbf_write_data[1:1+flit_data_width-1] = flit_data_in;
    
    wire [0:fb_width-1] 		     fbf_read_data;
    wire [0:fb_width-1] 		     fbf_peek_data;
@@ -451,16 +450,13 @@ module whr_ip_ctrl_mac
       .read_data({fbf_read_data, fbf_peek_data}));
    
    wire [0:flit_data_width-1] 	     fbf_flit_data;
-   assign fbf_flit_data = fbf_read_data[2:2+flit_data_width-1];
+   assign fbf_flit_data = fbf_read_data[1:1+flit_data_width-1];
    
-   wire 			     peek_flit_head;
-   assign peek_flit_head = fbf_peek_data[0];
-
    wire 			     peek_flit_tail;
-   assign peek_flit_tail = fbf_peek_data[1];
+   assign peek_flit_tail = fbf_peek_data[0];
    
    wire [0:header_info_width-1]      peek_header_info;
-   assign peek_header_info = fbf_peek_data[2:2+header_info_width-1];
+   assign peek_header_info = fbf_peek_data[1:1+header_info_width-1];
    
    wire [0:la_route_info_width-1]    peek_la_route_info;
    assign peek_la_route_info = peek_header_info[0:la_route_info_width-1];
@@ -476,12 +472,11 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 			     htr_flit_head_s, htr_flit_head_q;
-   assign htr_flit_head_s = flit_valid_out ?
-			    (fbc_almost_empty ? flit_head_in : peek_flit_head) :
-			    (fbc_empty ? flit_head_in : htr_flit_head_q);
+   assign htr_flit_head_s = flit_valid_out ? flit_tail_out : htr_flit_head_q;
    c_dff
      #(.width(1),
-       .reset_type(reset_type))
+       .reset_type(reset_type),
+       .reset_value(1'b1))
    htr_flit_headq
      (.clk(clk),
       .reset(1'b0),
