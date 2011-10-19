@@ -457,7 +457,12 @@ module vcr_ovc_ctrl
    generate
       
       if(vc_alloc_requires_credit)
-	assign elig = ~allocated_q & (~ft_full | credit);
+	begin
+	   if(flow_ctrl_bypass)
+	     assign elig = ~allocated_q & (~ft_full | credit);
+	   else
+	     assign elig = ~allocated_q & ~ft_full;
+	end
       else
 	assign elig = ~allocated_q;
       
