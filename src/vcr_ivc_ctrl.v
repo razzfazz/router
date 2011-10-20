@@ -866,7 +866,7 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   wire [0:flit_data_width-1] flit_data_muxed;
-	   assign flit_data_muxed = fbc_empty ? flit_data_in : fbf_flit_data;
+	   assign flit_data_muxed = empty ? flit_data_in : fbf_flit_data;
 	   
 	   assign flit_data[0:la_route_info_width-1]
 	     = flit_head ? 
