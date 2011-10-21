@@ -199,7 +199,7 @@ module rtr_channel_output
 		  wire [0:vc_idx_width-1] flit_vc;
 		  c_encode
 		    #(.num_ports(num_vcs))
-		  flit_vc_dec
+		  flit_vc_enc
 		    (.data_in(flit_sel_in_ovc),
 		     .data_out(flit_vc));
 		  
