@@ -33,8 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
 module rtr_channel_input
-  (clk, reset, active, channel_in, flit_valid_out, flit_head_out, flit_tail_out,
-   flit_data_out, flit_sel_out_ivc);
+  (clk, reset, active, channel_in, flit_valid_out, flit_head_out, 
+   flit_head_out_ivc, flit_tail_out, flit_tail_out_ivc, flit_data_out, 
+   flit_sel_out_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -127,10 +128,14 @@ module rtr_channel_input
    // flit is head flit
    output 		     flit_head_out;
    wire 		     flit_head_out;
+   output [0:num_vcs-1]      flit_head_out_ivc;
+   wire [0:num_vcs-1] 	     flit_head_out_ivc;
    
    // flit is tail flit
    output 		     flit_tail_out;
    wire 		     flit_tail_out;
+   output [0:num_vcs-1]      flit_tail_out_ivc;
+   wire [0:num_vcs-1] 	     flit_tail_out_ivc;
    
    // payload data
    output [0:flit_data_width-1] flit_data_out;
@@ -234,16 +239,17 @@ module rtr_channel_input
 		 begin
 		    
 		    assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
+		    assign flit_head_out_ivc = {num_vcs{flit_head_out}};
 		    assign flit_tail_out = flit_ctrl_q[1+vc_idx_width+1];
-		    
+		    assign flit_tail_out_ivc = {num_vcs{flit_tail_out}};
+		    		    
 		 end
 	       
 	       `PACKET_FORMAT_TAIL_ONLY:
 		 begin
 		    
 		    assign flit_tail_out = flit_ctrl_q[1+vc_idx_width+0];
-
-		    wire [0:num_vcs-1] flit_head_ivc;
+		    assign flit_tail_out_ivc = {num_vcs{flit_tail_out}};
 		    
 		    genvar ivc;
 		    
@@ -266,7 +272,7 @@ module rtr_channel_input
 			    .d(flit_head_s),
 			    .q(flit_head_q));
 			 
-			 assign flit_head_ivc[ivc] = flit_head_q;
+			 assign flit_head_out_ivc[ivc] = flit_head_q;
 			 
 		      end
 		    
@@ -275,7 +281,7 @@ module rtr_channel_input
 			.width(1))
 		    flit_head_out_sel
 		      (.select(flit_sel_out_ivc),
-		       .data_in(flit_head_ivc),
+		       .data_in(flit_head_out_ivc),
 		       .data_out(flit_head_out));
 		    
 		 end
@@ -284,12 +290,16 @@ module rtr_channel_input
 		 begin
 		    
 		    assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
-
+		    assign flit_head_out_ivc = {num_vcs{flit_head_out}};
+		    
 		    if(max_payload_length == 0)
 		      begin
 			 
 			 if(max_payload_length == min_payload_length)
-			   assign flit_tail_out = flit_head_out;
+			   begin
+			      assign flit_tail_out = flit_head_out;
+			      assign flit_tail_out_ivc = flit_head_out_ivc;
+			   end
 			 
 			 // synopsys translate_off
 			 else
@@ -341,12 +351,11 @@ module rtr_channel_input
 			 // synopsys translate_on
 			 
 			 assign flit_tail_out = ~flit_head_out | ~has_payload;
-			 
+			 assign flit_tail_out_ivc = {num_vcs{flit_tail_out}};
+			 			 
 		      end
 		    else
 		      begin
-			 
-			 wire [0:num_vcs-1] flit_tail_out_ivc;
 			 
 			 genvar ivc;
 			 
@@ -428,8 +437,13 @@ module rtr_channel_input
 			      
 			   end
 			 
-			 assign flit_tail_out
-			   = |(flit_sel_out_ivc & flit_tail_out_ivc);
+			 c_select_1ofn
+			   #(.num_ports(num_vcs),
+			     .width(1))
+			 flit_tail_out_sel
+			   (.select(flit_sel_out_ivc),
+			    .data_in(flit_tail_out_ivc),
+			    .data_out(flit_tail_out));
 			 
 		      end
 		    

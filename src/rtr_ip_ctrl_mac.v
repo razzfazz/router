@@ -316,7 +316,9 @@ module rtr_ip_ctrl_mac
    
    wire 				     chi_flit_valid;
    wire 				     chi_flit_head;
+   wire [0:num_vcs-1] 			     chi_flit_head_ivc;
    wire 				     chi_flit_tail;
+   wire [0:num_vcs-1] 			     chi_flit_tail_ivc;
    wire [0:flit_data_width-1] 		     chi_flit_data;
    wire [0:num_vcs-1] 			     chi_flit_sel_ivc;
    rtr_channel_input
@@ -335,7 +337,9 @@ module rtr_ip_ctrl_mac
       .channel_in(channel_in),
       .flit_valid_out(chi_flit_valid),
       .flit_head_out(chi_flit_head),
+      .flit_head_out_ivc(chi_flit_head_ivc),
       .flit_tail_out(chi_flit_tail),
+      .flit_tail_out_ivc(chi_flit_tail_ivc),
       .flit_data_out(chi_flit_data),
       .flit_sel_out_ivc(chi_flit_sel_ivc));
    
@@ -536,6 +540,12 @@ module rtr_ip_ctrl_mac
 	   
 	   wire chi_flit_valid;
 	   assign chi_flit_valid = chi_flit_valid_ivc[ivc];
+
+	   wire chi_flit_head;
+	   assign chi_flit_head = chi_flit_head_ivc[ivc];
+	   
+	   wire chi_flit_tail;
+	   assign chi_flit_tail = chi_flit_tail_ivc[ivc];
 	   
 	   wire flit_sent_in;
 	   assign flit_sent_in = flit_sent_in_ivc[ivc];

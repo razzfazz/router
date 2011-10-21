@@ -124,7 +124,9 @@ module flit_sink
    
    wire 			flit_valid;
    wire 			flit_head;
+   wire [0:num_vcs-1] 		flit_head_ivc;
    wire 			flit_tail;
+   wire [0:num_vcs-1] 		flit_tail_ivc;
    wire [0:flit_data_width-1] 	flit_data;
    wire [0:num_vcs-1] 		flit_sel_ivc;
    rtr_channel_input
@@ -143,7 +145,9 @@ module flit_sink
       .channel_in(channel),
       .flit_valid_out(flit_valid),
       .flit_head_out(flit_head),
+      .flit_head_out_ivc(flit_head_ivc),
       .flit_tail_out(flit_tail),
+      .flit_tail_out_ivc(flit_tail_ivc),
       .flit_data_out(flit_data),
       .flit_sel_out_ivc(flit_sel_ivc));
    

@@ -1035,7 +1035,9 @@ module tc_node_mac
    
    wire flit_valid_in;
    wire flit_head_in;
-   wire flit_tail_in;
+   wire [0:num_vcs-1] flit_head_in_ivc;
+   wire 	      flit_tail_in;
+   wire [0:num_vcs-1] flit_tail_in_ivc;
    wire [0:flit_data_width-1] flit_data_in;
    wire [0:num_vcs-1] 	      flit_sel_in_ivc;
    rtr_channel_input
@@ -1054,7 +1056,9 @@ module tc_node_mac
       .channel_in(channel_muxed),
       .flit_valid_out(flit_valid_in),
       .flit_head_out(flit_head_in),
+      .flit_head_out_ivc(flit_head_in_ivc),
       .flit_tail_out(flit_tail_in),
+      .flit_tail_out_ivc(flit_tail_out_ivc),
       .flit_data_out(flit_data_in),
       .flit_sel_out_ivc(flit_sel_in_ivc));
    
