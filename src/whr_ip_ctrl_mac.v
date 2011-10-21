@@ -535,7 +535,8 @@ module whr_ip_ctrl_mac
       .q(hdr_valid_q));
    
    wire 			     hdr_active;
-   assign hdr_active = ~hdr_valid_q | (~fbc_empty & htr_flit_tail_q);
+   assign hdr_active
+     = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & htr_flit_tail_q);
    
    wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
    assign hdr_la_route_info_s
