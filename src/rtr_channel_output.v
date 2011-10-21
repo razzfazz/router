@@ -68,6 +68,8 @@ module rtr_channel_output
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       (1 + vc_idx_width + 1) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (1 + vc_idx_width + 1) : 
        -1;
@@ -134,7 +136,8 @@ module rtr_channel_output
       
       case(packet_format)
 	
-	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_HEAD_TAIL, 
+	`PACKET_FORMAT_TAIL_ONLY, 
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
@@ -203,23 +206,28 @@ module rtr_channel_output
 		  assign flit_ctrl_s[1:1+vc_idx_width-1] = flit_vc;
 		  
 	       end
-	     
-	     assign flit_ctrl_s[1+vc_idx_width+0] = flit_head_in;
-	     
+
 	     case(packet_format)
 	       
 	       `PACKET_FORMAT_HEAD_TAIL:
 		 begin
 		    
+		    assign flit_ctrl_s[1+vc_idx_width+0] = flit_head_in;
 		    assign flit_ctrl_s[1+vc_idx_width+1] = flit_tail_in;
+		    
+		 end
+	       
+	       `PACKET_FORMAT_TAIL_ONLY:
+		 begin
+		    
+		    assign flit_ctrl_s[1+vc_idx_width+0] = flit_tail_in;
 		    
 		 end
 	       
 	       `PACKET_FORMAT_EXPLICIT_LENGTH:
 		 begin
 		    
-		    // packet length information in the header stays intact, so
-		    // no need to do anything here
+		    assign flit_ctrl_s[1+vc_idx_width+0] = flit_head_in;
 		    
 		 end
 	       

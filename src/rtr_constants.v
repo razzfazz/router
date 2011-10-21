@@ -114,8 +114,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // packets are delimited by head and tail bits
 `define PACKET_FORMAT_HEAD_TAIL       0
 
+// the last flit in each packet is marked by having its tail bit set; head bits 
+// are inferred by checking if the preceding flit was a tail flit
+`define PACKET_FORMAT_TAIL_ONLY       1
+
 // head flits are identified by header bit, and contain encoded packet length
-`define PACKET_FORMAT_EXPLICIT_LENGTH 1
+`define PACKET_FORMAT_EXPLICIT_LENGTH 2
 
 `define PACKET_FORMAT_LAST `PACKET_FORMAT_EXPLICIT_LENGTH
 

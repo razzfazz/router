@@ -89,6 +89,8 @@ module rtr_channel_input
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (la_route_info_width + route_info_width) : 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       (la_route_info_width + route_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
@@ -97,6 +99,8 @@ module rtr_channel_input
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       (1 + vc_idx_width + 1) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (1 + vc_idx_width + 1) : 
        -1;
@@ -169,7 +173,8 @@ module rtr_channel_input
       
       case(packet_format)
 	
-	`PACKET_FORMAT_HEAD_TAIL,
+	`PACKET_FORMAT_HEAD_TAIL, 
+	`PACKET_FORMAT_TAIL_ONLY, 
 	`PACKET_FORMAT_EXPLICIT_LENGTH:
 	  begin
 	     
@@ -223,20 +228,63 @@ module rtr_channel_input
 	     else
 	       assign flit_sel_out_ivc = 1'b1;
 	     
-	     assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
-	     
 	     case(packet_format)
 	       
 	       `PACKET_FORMAT_HEAD_TAIL:
 		 begin
 		    
+		    assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
 		    assign flit_tail_out = flit_ctrl_q[1+vc_idx_width+1];
+		    
+		 end
+	       
+	       `PACKET_FORMAT_TAIL_ONLY:
+		 begin
+		    
+		    assign flit_tail_out = flit_ctrl_q[1+vc_idx_width+0];
+
+		    wire [0:num_vcs-1] flit_head_ivc;
+		    
+		    genvar ivc;
+		    
+		    for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+		      begin:ivcs
+			 
+			 wire [0:num_vcs-1] flit_head_s, flit_head_q;
+			 assign flit_head_s
+			   = (flit_valid_out & flit_sel_out_ivc[ivc]) ? 
+			     flit_tail_out : 
+			     flit_head_q;
+			 c_dff
+			   #(.width(1),
+			     .reset_type(reset_type),
+			     .reset_value(1'b1))
+			 flit_headq
+			   (.clk(clk),
+			    .reset(reset),
+			    .active(active),
+			    .d(flit_head_s),
+			    .q(flit_head_q));
+			 
+			 assign flit_head_ivc[ivc] = flit_head_q;
+			 
+		      end
+		    
+		    c_select_1ofn
+		      #(.num_ports(num_vcs),
+			.width(1))
+		    flit_head_out_sel
+		      (.select(flit_sel_out_ivc),
+		       .data_in(flit_head_ivc),
+		       .data_out(flit_head_out));
 		    
 		 end
 	       
 	       `PACKET_FORMAT_EXPLICIT_LENGTH:
 		 begin
 		    
+		    assign flit_head_out = flit_ctrl_q[1+vc_idx_width+0];
+
 		    if(max_payload_length == 0)
 		      begin
 			 

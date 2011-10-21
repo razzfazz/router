@@ -58,7 +58,7 @@ module testbench
    parameter channel_latency = 1;
    
    // only inject traffic at the node ports
-   parameter inject_node_ports_only = 0;
+   parameter inject_node_ports_only = 1;
    
    // warmup time in cycles
    parameter warmup_time = 100;
@@ -142,6 +142,8 @@ module testbench
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       (1 + vc_idx_width + 1) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (1 + vc_idx_width + 1) : 
        -1;

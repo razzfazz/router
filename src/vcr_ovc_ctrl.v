@@ -71,6 +71,8 @@ module vcr_ovc_ctrl
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (1 + vc_idx_width + 1 + 1) : 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       (1 + vc_idx_width + 1) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (1 + vc_idx_width + 1) : 
        -1;
