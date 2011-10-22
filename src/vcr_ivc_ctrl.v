@@ -209,9 +209,6 @@ module vcr_ivc_ctrl
    localparam resource_class
      = (vc_id / num_vcs_per_class) % num_resource_classes;
    
-   // width of flit buffer
-   localparam fb_width = 1 + flit_data_width;
-   
    // required address size for a single VC's buffer
    localparam fb_addr_width = clogb(num_flits_per_vc);
    
@@ -526,15 +523,14 @@ module vcr_ivc_ctrl
      (.data_in(fbc_pop_addr),
       .data_out(fbf_peek_addr));
     
-   wire [0:fb_width-1] 		     fbf_write_data;
-   assign fbf_write_data[0] = flit_tail_in;
-   assign fbf_write_data[1:1+flit_data_width-1] = flit_data_in;
+   wire [0:flit_data_width-1] 	     fbf_write_data;
+   assign fbf_write_data = flit_data_in;
    
-   wire [0:fb_width-1] 		     fbf_read_data;
-   wire [0:fb_width-1] 		     fbf_peek_data;
+   wire [0:flit_data_width-1] 	     fbf_read_data;
+   wire [0:flit_data_width-1] 	     fbf_peek_data;
    c_regfile
      #(.depth(num_flits_per_vc),
-       .width(fb_width),
+       .width(flit_data_width),
        .num_read_ports(2),
        .regfile_type(fb_regfile_type))
    fbf
@@ -548,13 +544,10 @@ module vcr_ivc_ctrl
       .read_data({fbf_read_data, fbf_peek_data}));
    
    wire [0:flit_data_width-1] 	     fbf_flit_data;
-   assign fbf_flit_data = fbf_read_data[1:1+flit_data_width-1];
-   
-   wire 			     peek_flit_tail;
-   assign peek_flit_tail = fbf_peek_data[0];
+   assign fbf_flit_data = fbf_read_data;
    
    wire [0:header_info_width-1]      peek_header_info;
-   assign peek_header_info = fbf_peek_data[1:1+header_info_width-1];
+   assign peek_header_info = fbf_peek_data[0:header_info_width-1];
    
    wire [0:la_route_info_width-1]    peek_la_route_info;
    assign peek_la_route_info = peek_header_info[0:la_route_info_width-1];
@@ -568,6 +561,33 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
+   
+   wire [0:num_flits_per_vc-1] 	     push_mask;
+   c_decode
+     #(.num_ports(num_flits_per_vc))
+   push_addr_dec
+     (.data_in(fbc_push_addr),
+      .data_out(push_mask));
+   
+   wire [0:num_flits_per_vc-1] 	     flit_tail_s, flit_tail_q;
+   assign flit_tail_s
+     = fbf_write_enable ? 
+       {num_flits_per_vc{flit_tail_in}} & push_mask | flit_tail_q & ~push_mask :
+       flit_tail_q;
+   c_dff
+     #(.width(num_flits_per_vc),
+       .reset_type(reset_type))
+   flit_tailq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(push_active),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+   
+   wire 			     flit_tail_muxed;
+   assign flit_tail_muxed = flit_tail_q[fbc_pop_addr];
+   
+   assign flit_tail = fbc_empty ? flit_tail_in : flit_tail_muxed;
    
    wire 			     htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
@@ -584,22 +604,6 @@ module vcr_ivc_ctrl
    
    assign flit_head = fbc_empty ? flit_head_in : htr_flit_head_q;
    
-   wire 			     htr_flit_tail_s, htr_flit_tail_q;
-   assign htr_flit_tail_s = flit_sent ?
-			    (fbc_almost_empty ? flit_tail_in : peek_flit_tail) :
-			    (fbc_empty ? flit_tail_in : htr_flit_tail_q);
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   htr_flit_tailq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(pop_active),
-      .d(htr_flit_tail_s),
-      .q(htr_flit_tail_q));
-   
-   assign flit_tail = fbc_empty ? flit_tail_in : htr_flit_tail_q;
-   
    
    //---------------------------------------------------------------------------
    // head register
@@ -610,7 +614,7 @@ module vcr_ivc_ctrl
      = flit_sent ?
        (fbc_empty ? 
 	~flit_tail_in : 
-	(~htr_flit_tail_q | ~fbc_almost_empty | flit_valid_in)) : 
+	(~flit_tail_muxed | ~fbc_almost_empty | flit_valid_in)) : 
        (hdr_valid_q | flit_valid_in);
    c_dff
      #(.width(1),
@@ -633,8 +637,11 @@ module vcr_ivc_ctrl
      = header_info_in[la_route_info_width:
 		      la_route_info_width+route_info_width-1];
    
+   // NOTE: If this ends up being timing-critical, we can simply eliminate the 
+   // flit_tail_muxed term at the expense of slightly worse gating under load.
+   // For relatively short packets, this is probably a good tradeoff.
    wire 			     hdr_active;
-   assign hdr_active = ~hdr_valid_q | (~fbc_empty & htr_flit_tail_q);
+   assign hdr_active = ~hdr_valid_q | (~fbc_empty & flit_tail_muxed);
    
    wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
    assign hdr_la_route_info_s

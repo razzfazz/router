@@ -208,9 +208,6 @@ module rtr_ip_ctrl_mac
        (la_route_info_width + route_info_width + payload_length_width) : 
        -1;
    
-   // width of flit buffer
-   localparam fb_width = 1 + flit_data_width;
-   
    // required address size for a single VC's buffer
    localparam fb_addr_width = clogb(num_flits_per_vc);
    
@@ -608,9 +605,10 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   fb_almost_empty;
 	   wire [0:flit_data_width-1] 	   fb_flit_data;
-	   wire 			   fb_flit_tail;
 	   wire [0:la_route_info_width-1]  fb_la_route_info;
 	   wire [0:route_info_width-1] 	   fb_route_info;
+	   wire [0:fb_addr_width-1] 	   fb_push_addr;
+	   wire [0:fb_addr_width-1] 	   fb_pop_addr;
 	   
 	   if(1) begin:fb
 	      
@@ -709,15 +707,14 @@ module rtr_ip_ctrl_mac
 		(.data_in(pop_addr),
 		 .data_out(peek_addr));
 	      
-	      wire [0:fb_width-1] 	    write_data;
-	      assign write_data[0] = chi_flit_tail;
-	      assign write_data[1:1+flit_data_width-1] = chi_flit_data;
+	      wire [0:flit_data_width-1]    write_data;
+	      assign write_data[0:flit_data_width-1] = chi_flit_data;
 	      
-	      wire [0:fb_width-1] 	    read_data;
-	      wire [0:fb_width-1] 	    peek_data;
+	      wire [0:flit_data_width-1]    read_data;
+	      wire [0:flit_data_width-1]    peek_data;
 	      c_regfile
 		#(.depth(num_flits_per_vc),
-		  .width(fb_width),
+		  .width(flit_data_width),
 		  .num_read_ports(2),
 		  .regfile_type(fb_regfile_type))
 	      rf
@@ -731,7 +728,7 @@ module rtr_ip_ctrl_mac
 		 .read_data({read_data, peek_data}));
 	      
 	      wire [0:header_info_width-1]  peek_header_info;
-	      assign peek_header_info = peek_data[1:1+header_info_width-1];
+	      assign peek_header_info = peek_data[0:header_info_width-1];
 	      
 	      assign error_fb_underflow = errors[0];
 	      assign error_fb_overflow = errors[1];
@@ -739,13 +736,14 @@ module rtr_ip_ctrl_mac
 	      assign fb_almost_empty = almost_empty;
 	      assign fb_empty = empty;
 	      assign fb_full = full;
-	      assign fb_flit_data = read_data[1:1+flit_data_width-1];
-	      assign fb_flit_tail = peek_data[0];
+	      assign fb_flit_data = read_data;
 	      assign fb_la_route_info
 		= peek_header_info[0:la_route_info_width-1];
 	      assign fb_route_info
 		= peek_header_info[la_route_info_width:
 				   la_route_info_width+route_info_width-1];
+	      assign fb_push_addr = push_addr;
+	      assign fb_pop_addr = pop_addr;
 	      
 	   end
 	   
@@ -793,23 +791,37 @@ module rtr_ip_ctrl_mac
 		 .d(flit_head_s),
 		 .q(flit_head_q));
 	      
-	      wire flit_tail_s, flit_tail_q;
+	      wire push_active;
+	      assign push_active = chi_flit_valid;
+	      
+	      wire [0:num_flits_per_vc-1] push_mask;
+	      c_decode
+		#(.num_ports(num_flits_per_vc))
+	      push_mask_dec
+		(.data_in(fb_push_addr),
+		 .data_out(push_mask));
+	      
+	      wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
 	      assign flit_tail_s
-		= flit_sent_in ?
-		  (fb_almost_empty ? chi_flit_tail : fb_flit_tail) : 
-		  (fb_empty ? chi_flit_tail : flit_tail_q);
+		= chi_flit_valid ? 
+		  ({num_flits_per_vc{chi_flit_tail}} & push_mask | 
+		   flit_tail_q & ~push_mask) :
+		  flit_tail_q;
 	      c_dff
-		#(.width(1),
+		#(.width(num_flits_per_vc),
 		  .reset_type(reset_type))
 	      flit_tailq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(active),
+		 .active(push_active),
 		 .d(flit_tail_s),
 		 .q(flit_tail_q));
 	      
+	      wire 			  flit_tail_muxed;
+	      assign flit_tail_muxed = flit_tail_q[fb_pop_addr];
+	      
 	      assign htt_flit_head = flit_head_q;
-	      assign htt_flit_tail = flit_tail_q;
+	      assign htt_flit_tail = flit_tail_muxed;
 	      
 	   end
 	   
