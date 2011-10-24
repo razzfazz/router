@@ -1173,7 +1173,6 @@ module tc_node_mac
 	   wire       elig;
 	   assign elig = flit_sent_q ? flit_tail_q : vs_elig;
 	   
-	   assign vs_fc_active_ovc[ovc] = vs_fc_active;
 	   assign elig_ovc[ovc] = elig;
 	   assign empty_ovc[ovc] = vs_empty;
 	   assign full_ovc[ovc] = vs_full;

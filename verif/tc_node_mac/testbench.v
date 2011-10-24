@@ -115,7 +115,7 @@ module testbench
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        (la_route_info_width + route_info_width) : 
-     = (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
        (la_route_info_width + route_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (la_route_info_width + route_info_width + payload_length_width) : 
