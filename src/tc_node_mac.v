@@ -1052,7 +1052,7 @@ module tc_node_mac
       .flit_head_out(flit_head_in),
       .flit_head_out_ivc(flit_head_in_ivc),
       .flit_tail_out(flit_tail_in),
-      .flit_tail_out_ivc(flit_tail_out_ivc),
+      .flit_tail_out_ivc(flit_tail_in_ivc),
       .flit_data_out(flit_data_in),
       .flit_sel_out_ivc(flit_sel_in_ivc));
    
@@ -1170,10 +1170,7 @@ module tc_node_mac
 	      .full(vs_full),
 	      .errors(vs_errors));
 	   
-	   wire       elig;
-	   assign elig = flit_sent_q ? flit_tail_q : vs_elig;
-	   
-	   assign elig_ovc[ovc] = elig;
+	   assign elig_ovc[ovc] = vs_elig;
 	   assign empty_ovc[ovc] = vs_empty;
 	   assign full_ovc[ovc] = vs_full;
 	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;

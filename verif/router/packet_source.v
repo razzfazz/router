@@ -406,10 +406,7 @@ module packet_source
 	      .full(vs_full),
 	      .errors(vs_errors));
 	   
-	   wire 		       elig;
-	   assign elig = flit_valid_q ? flit_tail_q : vs_elig;
-	   
-	   assign elig_ovc[ovc] = elig;
+	   assign elig_ovc[ovc] = vs_elig;
 	   assign full_ovc[ovc] = vs_full;
 	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
 	   

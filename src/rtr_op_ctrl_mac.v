@@ -255,10 +255,7 @@ module rtr_op_ctrl_mac
 	      .full(ovs_full),
 	      .errors(ovs_errors));
 	   
-	   wire       elig_out;
-	   assign elig_out = flit_valid_in ? flit_tail_in : ovs_elig;
-	   
-	   assign elig_out_ovc[ovc] = elig_out;
+	   assign elig_out_ovc[ovc] = ovs_elig;
 	   assign empty_out_ovc[ovc] = ovs_empty;
 	   assign almost_full_out_ovc[ovc] = ovs_almost_full;
 	   assign full_out_ovc[ovc] = ovs_full;	   
