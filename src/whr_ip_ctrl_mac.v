@@ -493,35 +493,65 @@ module whr_ip_ctrl_mac
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire [0:fb_depth-1] 		     push_mask;
-   c_decode
-     #(.num_ports(fb_depth))
-   push_addr_dec
-     (.data_in(fbc_push_addr),
-      .data_out(push_mask));
+   wire 			fb_flit_tail;
    
-   wire [0:fb_depth-1] 		     flit_tail_s, flit_tail_q;
-   assign flit_tail_s
-     = fbf_write_enable ? 
-       {fb_depth{flit_tail_in}} & push_mask | flit_tail_q & ~push_mask : 
-       flit_tail_q;
-   c_dff
-     #(.width(fb_depth),
-       .reset_type(reset_type))
-   flit_tailq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(push_active),
-      .d(flit_tail_s),
-      .q(flit_tail_q));
+   wire 			flit_tail_out;
+   assign flit_tail_out = fbc_empty ? flit_tail_in : fb_flit_tail;
    
-   wire 			     flit_tail_muxed;
-   assign flit_tail_muxed = flit_tail_q[fbc_pop_addr];
+   generate
+      
+      if(elig_mask == `ELIG_MASK_USED)
+	begin
+	   
+	   wire has_tail_s, has_tail_q;
+	   assign has_tail_s = (has_tail_q | (flit_valid_in & flit_tail_in)) &
+			       ~(flit_valid_out & flit_tail_out);
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   has_tailq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(pop_active),
+	      .d(has_tail_s),
+	      .q(has_tail_q));
+	   
+	   assign fb_flit_tail = fbc_almost_empty & has_tail_q;
+	   
+	end
+      else
+	begin
+	   
+	   wire [0:fb_depth-1] 	push_mask;
+	   c_decode
+	     #(.num_ports(fb_depth))
+	   push_addr_dec
+	     (.data_in(fbc_push_addr),
+	      .data_out(push_mask));
+	   
+	   wire [0:fb_depth-1] 	flit_tail_s, flit_tail_q;
+	   assign flit_tail_s
+	     = fbf_write_enable ? 
+	       ({fb_depth{flit_tail_in}} & push_mask) | 
+	       (flit_tail_q & ~push_mask) : 
+	       flit_tail_q;
+	   c_dff
+	     #(.width(fb_depth),
+	       .reset_type(reset_type))
+	   flit_tailq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(push_active),
+	      .d(flit_tail_s),
+	      .q(flit_tail_q));
+	   
+	   assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
+	   
+	end
+      
+   endgenerate
    
-   wire 			     flit_tail_out;
-   assign flit_tail_out = fbc_empty ? flit_tail_in : flit_tail_muxed;
-   
-   wire 			     htr_flit_head_s, htr_flit_head_q;
+   wire 			htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_valid_out ? flit_tail_out : htr_flit_head_q;
    c_dff
      #(.width(1),
@@ -534,7 +564,7 @@ module whr_ip_ctrl_mac
       .d(htr_flit_head_s),
       .q(htr_flit_head_q));
    
-   wire 			     flit_head_out;
+   wire 			flit_head_out;
    assign flit_head_out = fbc_empty ? flit_head_in : htr_flit_head_q;
    
    
@@ -542,7 +572,7 @@ module whr_ip_ctrl_mac
    // head register
    //---------------------------------------------------------------------------
    
-   wire 			     hdr_valid_s, hdr_valid_q;
+   wire 			hdr_valid_s, hdr_valid_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_valid_s
@@ -552,7 +582,7 @@ module whr_ip_ctrl_mac
 	  = flit_valid_out ?
 	    (fbc_empty ?
 	     ~flit_tail_in :
-	     (~flit_tail_muxed | ~fbc_almost_empty | flit_valid_in)) :
+	     (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) :
 	    (hdr_valid_q | flit_valid_in);
    endgenerate
    c_dff
@@ -565,20 +595,20 @@ module whr_ip_ctrl_mac
       .d(hdr_valid_s),
       .q(hdr_valid_q));
    
-   wire 			     hdr_active;
+   wire 			hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_active = ~hdr_valid_q;
       else
 	// NOTE: If this ends up being timing-critical, we can simply eliminate 
-	// the flit_tail_muxed term at the expense of slightly worse gating 
-	// under load.
+	// the fb_flit_tail term at the expense of slightly worse gating under 
+	// load.
 	// For relatively short packets, this is probably a good tradeoff.
 	assign hdr_active
-	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & flit_tail_muxed);
+	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
    endgenerate
    
-   wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
+   wire [0:la_route_info_width-1] hdr_la_route_info_s, hdr_la_route_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_la_route_info_s
@@ -607,7 +637,7 @@ module whr_ip_ctrl_mac
       .d(hdr_la_route_info_s),
       .q(hdr_la_route_info_q));
    
-   wire [0:route_info_width-1] 	     hdr_route_info_s, hdr_route_info_q;
+   wire [0:route_info_width-1] 		  hdr_route_info_s, hdr_route_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_route_info_s
@@ -637,7 +667,7 @@ module whr_ip_ctrl_mac
       .d(hdr_route_info_s),
       .q(hdr_route_info_q));
    
-   wire 			     error_no_header;
+   wire 			       error_no_header;
    assign error_no_header
      = ~hdr_valid_q & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
@@ -646,37 +676,37 @@ module whr_ip_ctrl_mac
    // decode lookahead routing information
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 	     route_port_in;
+   wire [0:port_idx_width-1] 	       route_port_in;
    assign route_port_in = la_route_info_in[0:port_idx_width-1];
    
-   wire [0:num_ports-1] 	     route_in_op;
+   wire [0:num_ports-1] 	       route_in_op;
    c_decode
      #(.num_ports(num_ports))
    route_in_op_dec
      (.data_in(route_port_in),
       .data_out(route_in_op));
    
-   wire [0:port_idx_width-1] 	     hdr_route_port;
+   wire [0:port_idx_width-1] 	       hdr_route_port;
    assign hdr_route_port = hdr_la_route_info_q[0:port_idx_width-1];
    
-   wire [0:num_ports-1] 	     hdr_route_op;
+   wire [0:num_ports-1] 	       hdr_route_op;
    c_decode
      #(.num_ports(num_ports))
    hdr_route_op_dec
      (.data_in(hdr_route_port),
       .data_out(hdr_route_op));
    
-   wire [0:num_ports-1] 	     route_unmasked_op;
+   wire [0:num_ports-1] 	       route_unmasked_op;
    assign route_unmasked_op = hdr_valid_q ? hdr_route_op : route_in_op;
    
-   wire 			     header_valid;
+   wire 			       header_valid;
    assign header_valid = hdr_valid_q | flit_valid_in;
    
-   wire 			     rf_active;
+   wire 			       rf_active;
    assign rf_active = header_valid;
    
-   wire 			     route_orc;
-   wire [0:1] 			     rf_errors;
+   wire 			       route_orc;
+   wire [0:1] 			       rf_errors;
    rtr_route_filter
      #(.num_message_classes(1),
        .num_resource_classes(1),
@@ -701,10 +731,10 @@ module whr_ip_ctrl_mac
       .route_out_orc(route_orc),
       .errors(rf_errors));
    
-   wire 			     error_invalid_port;
+   wire 			       error_invalid_port;
    assign error_invalid_port = rf_errors[0];
    
-   wire 			     error_invalid_class;
+   wire 			       error_invalid_class;
    assign error_invalid_class = rf_errors[1];
    
    
@@ -712,13 +742,13 @@ module whr_ip_ctrl_mac
    // update lookahead routing information for next hop
    //---------------------------------------------------------------------------
    
-   wire [0:route_info_width-1] 	     route_info;
+   wire [0:route_info_width-1] 	       route_info;
    assign route_info = hdr_valid_q ? hdr_route_info_q : route_info_in;
    
-   wire [0:la_route_info_width-1]    la_route_info;
+   wire [0:la_route_info_width-1]      la_route_info;
    assign la_route_info = hdr_valid_q ? hdr_la_route_info_q : la_route_info_in;
    
-   wire [0:router_addr_width-1]      next_router_address;
+   wire [0:router_addr_width-1]        next_router_address;
    rtr_next_hop_addr
      #(.num_resource_classes(1),
        .num_routers_per_dim(num_routers_per_dim),
@@ -732,8 +762,8 @@ module whr_ip_ctrl_mac
       .la_route_info(la_route_info),
       .next_router_address(next_router_address));
    
-   wire [0:num_ports-1] 	     next_route_op;
-   wire 			     next_route_orc;
+   wire [0:num_ports-1] 	       next_route_op;
+   wire 			       next_route_orc;
    rtr_routing_logic
      #(.num_message_classes(1),
        .num_resource_classes(1),
@@ -751,14 +781,14 @@ module whr_ip_ctrl_mac
       .route_op(next_route_op),
       .route_orc(next_route_orc));
    
-   wire [0:port_idx_width-1] 	     next_route_port;
+   wire [0:port_idx_width-1] 	       next_route_port;
    c_encode
      #(.num_ports(num_ports))
    next_route_port_enc
      (.data_in(next_route_op),
       .data_out(next_route_port));
    
-   wire [0:la_route_info_width-1]    next_la_route_info;
+   wire [0:la_route_info_width-1]      next_la_route_info;
    assign next_la_route_info[0:port_idx_width-1] = next_route_port;
    
    

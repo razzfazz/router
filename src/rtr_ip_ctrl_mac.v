@@ -812,37 +812,69 @@ module rtr_ip_ctrl_mac
 		 .d(flit_head_s),
 		 .q(flit_head_q));
 	      
-	      wire push_active;
-	      assign push_active = chi_flit_valid;
+	      wire flit_tail;
 	      
-	      wire [0:num_flits_per_vc-1] push_mask;
-	      c_decode
-		#(.num_ports(num_flits_per_vc))
-	      push_mask_dec
-		(.data_in(fb_push_addr),
-		 .data_out(push_mask));
-	      
-	      wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
-	      assign flit_tail_s
-		= chi_flit_valid ? 
-		  ({num_flits_per_vc{chi_flit_tail}} & push_mask | 
-		   flit_tail_q & ~push_mask) :
-		  flit_tail_q;
-	      c_dff
-		#(.width(num_flits_per_vc),
-		  .reset_type(reset_type))
-	      flit_tailq
-		(.clk(clk),
-		 .reset(1'b0),
-		 .active(push_active),
-		 .d(flit_tail_s),
-		 .q(flit_tail_q));
-	      
-	      wire 			  flit_tail_muxed;
-	      assign flit_tail_muxed = flit_tail_q[fb_pop_addr];
+	      if(elig_mask == `ELIG_MASK_USED)
+		begin
+		   
+		   wire has_tail_s, has_tail_q;
+		   if(dual_path_alloc)
+		     assign has_tail_s
+		       = (has_tail_q | (chi_flit_valid & chi_flit_tail)) & 
+			 ~(flit_sent_in & flit_tail_out) &
+			 ~(flit_sent_fast_in & flit_tail_fast_out);
+		   else
+		     assign has_tail_s
+		       = (has_tail_q | (chi_flit_valid & chi_flit_tail)) &
+			 ~(flit_sent_in & flit_tail_out);
+		   c_dff
+		     #(.width(1),
+		       .reset_type(reset_type))
+		   has_tailq
+		     (.clk(clk),
+		      .reset(reset),
+		      .active(active),
+		      .d(has_tail_s),
+		      .q(has_tail_q));
+		   
+		   assign flit_tail = fb_almost_empty & has_tail_q;
+	   
+		end
+	      else
+		begin
+		   
+		   wire push_active;
+		   assign push_active = chi_flit_valid;
+		   
+		   wire [0:num_flits_per_vc-1] push_mask;
+		   c_decode
+		     #(.num_ports(num_flits_per_vc))
+		   push_mask_dec
+		     (.data_in(fb_push_addr),
+		      .data_out(push_mask));
+		   
+		   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
+		   assign flit_tail_s
+		     = chi_flit_valid ? 
+		       ({num_flits_per_vc{chi_flit_tail}} & push_mask | 
+			flit_tail_q & ~push_mask) :
+		       flit_tail_q;
+		   c_dff
+		     #(.width(num_flits_per_vc),
+		       .reset_type(reset_type))
+		   flit_tailq
+		     (.clk(clk),
+		      .reset(1'b0),
+		      .active(push_active),
+		      .d(flit_tail_s),
+		      .q(flit_tail_q));
+		   
+		   assign flit_tail = flit_tail_q[fb_pop_addr];
+		   
+		end
 	      
 	      assign htt_flit_head = flit_head_q;
-	      assign htt_flit_tail = flit_tail_muxed;
+	      assign htt_flit_tail = flit_tail;
 	      
 	   end
 	   

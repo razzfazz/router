@@ -580,32 +580,62 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire [0:num_flits_per_vc-1] 	     push_mask;
-   c_decode
-     #(.num_ports(num_flits_per_vc))
-   push_addr_dec
-     (.data_in(fbc_push_addr),
-      .data_out(push_mask));
+   wire 			fb_flit_tail;
    
-   wire [0:num_flits_per_vc-1] 	     flit_tail_s, flit_tail_q;
-   assign flit_tail_s
-     = fbf_write_enable ? 
-       {num_flits_per_vc{flit_tail_in}} & push_mask | flit_tail_q & ~push_mask :
-       flit_tail_q;
-   c_dff
-     #(.width(num_flits_per_vc),
-       .reset_type(reset_type))
-   flit_tailq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(push_active),
-      .d(flit_tail_s),
-      .q(flit_tail_q));
+   generate
+      
+      if(elig_mask == `ELIG_MASK_USED)
+	begin
+	   
+	   wire has_tail_s, has_tail_q;
+	   assign has_tail_s
+	     = (has_tail_q | (flit_valid_in & flit_tail_in)) & ~packet_done;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   has_tailq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(pop_active),
+	      .d(has_tail_s),
+	      .q(has_tail_q));
+	   
+	   assign fb_flit_tail = fbc_almost_empty & has_tail_q;
+	   
+	end
+      else
+	begin
+	   
+	   wire [0:num_flits_per_vc-1] push_mask;
+	   c_decode
+	     #(.num_ports(num_flits_per_vc))
+	   push_addr_dec
+	     (.data_in(fbc_push_addr),
+	      .data_out(push_mask));
+	   
+	   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
+	   assign flit_tail_s
+	     = fbf_write_enable ? 
+	       ({num_flits_per_vc{flit_tail_in}} & push_mask) | 
+	       (flit_tail_q & ~push_mask) :
+	       flit_tail_q;
+	   c_dff
+	     #(.width(num_flits_per_vc),
+	       .reset_type(reset_type))
+	   flit_tailq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(push_active),
+	      .d(flit_tail_s),
+	      .q(flit_tail_q));
+	   
+	   assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
+	   
+	end
+      
+   endgenerate
    
-   wire 			     flit_tail_muxed;
-   assign flit_tail_muxed = flit_tail_q[fbc_pop_addr];
-   
-   assign flit_tail = fbc_empty ? flit_tail_in : flit_tail_muxed;
+   assign flit_tail = fbc_empty ? flit_tail_in : fb_flit_tail;
    
    wire 			     htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
@@ -630,14 +660,13 @@ module vcr_ivc_ctrl
    wire 			     hdr_valid_s, hdr_valid_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_valid_s
-	  = (hdr_valid_q | flit_valid_in) & ~(flit_sent & flit_tail);
+	assign hdr_valid_s = (hdr_valid_q | flit_valid_in) & ~packet_done;
       else
 	assign hdr_valid_s
 	  = flit_sent ?
 	    (fbc_empty ? 
 	     ~flit_tail_in : 
-	     (~flit_tail_muxed | ~fbc_almost_empty | flit_valid_in)) : 
+	     (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
 	    (hdr_valid_q | flit_valid_in);
    endgenerate
    c_dff
@@ -667,10 +696,10 @@ module vcr_ivc_ctrl
 	assign hdr_active = ~hdr_valid_q;
       else
 	// NOTE: If this ends up being timing-critical, we can simply eliminate 
-	// the flit_tail_muxed term at the expense of slightly worse gating 
-	// under load.
+	// the fb_flit_tail term at the expense of slightly worse gating under 
+	// load.
 	// For relatively short packets, this is probably a good tradeoff.
-	assign hdr_active = ~hdr_valid_q | (~fbc_empty & flit_tail_muxed);
+	assign hdr_active = ~hdr_valid_q | (~fbc_empty & fb_flit_tail);
    endgenerate
    
    wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
@@ -686,7 +715,7 @@ module vcr_ivc_ctrl
 	     = peek_header_info[0:la_route_info_width-1];
 	   
 	   assign hdr_la_route_info_s
-	     = (flit_sent & flit_tail) ? 
+	     = packet_done ? 
 	       (fbc_almost_empty ? la_route_info_in : peek_la_route_info) : 
 	       (hdr_valid_q ? hdr_la_route_info_q : la_route_info_in);
 	   
@@ -716,7 +745,7 @@ module vcr_ivc_ctrl
 						     route_info_width-1];
 	   
 	   assign hdr_route_info_s
-	     = (flit_sent & flit_tail) ?
+	     = packet_done ?
 	       (fbc_almost_empty ? route_info_in : peek_route_info) :
 	       (hdr_valid_q ? hdr_route_info_q : route_info_in);
 	   
