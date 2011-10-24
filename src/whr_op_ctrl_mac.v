@@ -191,7 +191,7 @@ module whr_op_ctrl_mac
       .full(vs_full),
       .errors(vs_errors));
    
-   assign elig = vs_elig & (~flit_valid_in | flit_tail_in);
+   assign elig = flit_valid_in ? flit_tail_in : vs_elig;
    assign full = vs_full;
    
    

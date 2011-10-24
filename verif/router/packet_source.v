@@ -407,7 +407,7 @@ module packet_source
 	      .errors(vs_errors));
 	   
 	   wire 		       elig;
-	   assign elig = vs_elig & (~flit_valid_q | flit_tail_q);
+	   assign elig = flit_valid_q ? flit_tail_q : vs_elig;
 	   
 	   assign elig_ovc[ovc] = elig;
 	   assign full_ovc[ovc] = vs_full;

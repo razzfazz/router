@@ -229,7 +229,7 @@ module rtr_vc_state
    // allocated, 'allocated_q' is zero, and thus the reset condition does not 
    // have any effect.
    
-   wire 					allocated_s, allocated_q;
+   wire allocated_s, allocated_q;
    assign allocated_s = (allocated_q | flit_sent) & ~(flit_sent & flit_tail);
    c_dff
      #(.width(1),

@@ -1171,7 +1171,7 @@ module tc_node_mac
 	      .errors(vs_errors));
 	   
 	   wire       elig;
-	   assign elig = vs_elig & (~flit_sent_q | flit_tail_q);
+	   assign elig = flit_sent_q ? flit_tail_q : vs_elig;
 	   
 	   assign vs_fc_active_ovc[ovc] = vs_fc_active;
 	   assign elig_ovc[ovc] = elig;
