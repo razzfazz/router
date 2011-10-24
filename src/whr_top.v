@@ -239,6 +239,7 @@ module whr_top
 	       .connectivity(connectivity),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
+	       .elig_mask(elig_mask),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),

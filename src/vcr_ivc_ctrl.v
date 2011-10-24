@@ -509,50 +509,71 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   wire 			     fbf_peek_active;
-   assign fbf_peek_active = ~fbc_empty & ~fbc_almost_empty;
-   
-   wire [0:fb_addr_width-1] 	     fbf_peek_addr;
-   c_incr
-     #(.width(fb_addr_width),
-       .max_value(num_flits_per_vc - 1))
-   fbf_peek_addr_incr
-     (.data_in(fbc_pop_addr),
-      .data_out(fbf_peek_addr));
-    
    wire [0:flit_data_width-1] 	     fbf_write_data;
    assign fbf_write_data = flit_data_in;
    
    wire [0:flit_data_width-1] 	     fbf_read_data;
    wire [0:flit_data_width-1] 	     fbf_peek_data;
-   c_regfile
-     #(.depth(num_flits_per_vc),
-       .width(flit_data_width),
-       .num_read_ports(2),
-       .regfile_type(fb_regfile_type))
-   fbf
-     (.clk(clk),
-      .write_active(push_active),
-      .write_enable(fbf_write_enable),
-      .write_address(fbc_push_addr),
-      .write_data(fbf_write_data),
-      .read_active({fbf_read_active, fbf_peek_active}),
-      .read_address({fbf_read_addr, fbf_peek_addr}),
-      .read_data({fbf_read_data, fbf_peek_data}));
+
+   generate
+
+      if(elig_mask == `ELIG_MASK_USED)
+	begin
+	   
+	   c_regfile
+	     #(.depth(num_flits_per_vc),
+	       .width(flit_data_width),
+	       .regfile_type(fb_regfile_type))
+	   fbf
+	     (.clk(clk),
+	      .write_active(push_active),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbc_push_addr),
+	      .write_data(fbf_write_data),
+	      .read_active(fbf_read_active),
+	      .read_address(fbf_read_addr),
+	      .read_data(fbf_read_data));
+	   
+	   assign fbf_peek_data = {flit_data_width{1'b0}};
+	   
+	end
+      else
+	begin
+	   
+	   wire fbf_peek_active;
+	   assign fbf_peek_active = ~fbc_empty & ~fbc_almost_empty;
+	   
+	   wire [0:fb_addr_width-1] fbf_peek_addr;
+	   c_incr
+	     #(.width(fb_addr_width),
+	       .max_value(num_flits_per_vc - 1))
+	   fbf_peek_addr_incr
+	     (.data_in(fbc_pop_addr),
+	      .data_out(fbf_peek_addr));
+	   
+	   c_regfile
+	     #(.depth(num_flits_per_vc),
+	       .width(flit_data_width),
+	       .num_read_ports(2),
+	       .regfile_type(fb_regfile_type))
+	   fbf
+	     (.clk(clk),
+	      .write_active(push_active),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbc_push_addr),
+	      .write_data(fbf_write_data),
+	      .read_active({fbf_read_active, fbf_peek_active}),
+	      .read_address({fbf_read_addr, fbf_peek_addr}),
+	      .read_data({fbf_read_data, fbf_peek_data}));
+
+	end
+   endgenerate
    
-   wire [0:flit_data_width-1] 	     fbf_flit_data;
+   wire [0:flit_data_width-1] fbf_flit_data;
    assign fbf_flit_data = fbf_read_data;
    
-   wire [0:header_info_width-1]      peek_header_info;
+   wire [0:header_info_width-1] peek_header_info;
    assign peek_header_info = fbf_peek_data[0:header_info_width-1];
-   
-   wire [0:la_route_info_width-1]    peek_la_route_info;
-   assign peek_la_route_info = peek_header_info[0:la_route_info_width-1];
-   
-   wire [0:route_info_width-1] 	     peek_route_info;
-   assign peek_route_info = peek_header_info[la_route_info_width:
-					     la_route_info_width+
-					     route_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -607,12 +628,18 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 			     hdr_valid_s, hdr_valid_q;
-   assign hdr_valid_s
-     = flit_sent ?
-       (fbc_empty ? 
-	~flit_tail_in : 
-	(~flit_tail_muxed | ~fbc_almost_empty | flit_valid_in)) : 
-       (hdr_valid_q | flit_valid_in);
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign hdr_valid_s
+	  = (hdr_valid_q | flit_valid_in) & ~(flit_sent & flit_tail);
+      else
+	assign hdr_valid_s
+	  = flit_sent ?
+	    (fbc_empty ? 
+	     ~flit_tail_in : 
+	     (~flit_tail_muxed | ~fbc_almost_empty | flit_valid_in)) : 
+	    (hdr_valid_q | flit_valid_in);
+   endgenerate
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -634,17 +661,37 @@ module vcr_ivc_ctrl
      = header_info_in[la_route_info_width:
 		      la_route_info_width+route_info_width-1];
    
-   // NOTE: If this ends up being timing-critical, we can simply eliminate the 
-   // flit_tail_muxed term at the expense of slightly worse gating under load.
-   // For relatively short packets, this is probably a good tradeoff.
    wire 			     hdr_active;
-   assign hdr_active = ~hdr_valid_q | (~fbc_empty & flit_tail_muxed);
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign hdr_active = ~hdr_valid_q;
+      else
+	// NOTE: If this ends up being timing-critical, we can simply eliminate 
+	// the flit_tail_muxed term at the expense of slightly worse gating 
+	// under load.
+	// For relatively short packets, this is probably a good tradeoff.
+	assign hdr_active = ~hdr_valid_q | (~fbc_empty & flit_tail_muxed);
+   endgenerate
    
    wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
-   assign hdr_la_route_info_s
-     = (flit_sent & flit_tail) ? 
-       (fbc_almost_empty ? la_route_info_in : peek_la_route_info) : 
-       (hdr_valid_q ? hdr_la_route_info_q : la_route_info_in);
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign hdr_la_route_info_s
+	  = hdr_valid_q ? hdr_la_route_info_q : la_route_info_in;
+      else
+	begin
+	   
+	   wire [0:la_route_info_width-1] peek_la_route_info;
+	   assign peek_la_route_info
+	     = peek_header_info[0:la_route_info_width-1];
+	   
+	   assign hdr_la_route_info_s
+	     = (flit_sent & flit_tail) ? 
+	       (fbc_almost_empty ? la_route_info_in : peek_la_route_info) : 
+	       (hdr_valid_q ? hdr_la_route_info_q : la_route_info_in);
+	   
+	end
+   endgenerate
    c_dff
      #(.width(la_route_info_width),
        .reset_type(reset_type))
@@ -656,10 +703,25 @@ module vcr_ivc_ctrl
       .q(hdr_la_route_info_q));
    
    wire [0:route_info_width-1] 	     hdr_route_info_s, hdr_route_info_q;
-   assign hdr_route_info_s
-     = (flit_sent & flit_tail) ?
-       (fbc_almost_empty ? route_info_in : peek_route_info) :
-       (hdr_valid_q ? hdr_route_info_q : route_info_in);
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign hdr_route_info_s
+	  = hdr_valid_q ? hdr_route_info_q : route_info_in;
+      else
+	begin
+	   
+	   wire [0:route_info_width-1] peek_route_info;
+	   assign peek_route_info = peek_header_info[la_route_info_width:
+						     la_route_info_width+
+						     route_info_width-1];
+	   
+	   assign hdr_route_info_s
+	     = (flit_sent & flit_tail) ?
+	       (fbc_almost_empty ? route_info_in : peek_route_info) :
+	       (hdr_valid_q ? hdr_route_info_q : route_info_in);
+	   
+	end
+   endgenerate
    c_dff
      #(.width(route_info_width),
        .reset_type(reset_type))

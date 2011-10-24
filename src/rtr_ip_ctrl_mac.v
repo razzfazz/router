@@ -695,36 +695,62 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      wire 			    peek_active;
-	      assign peek_active = ~empty & ~almost_empty;
-	      
-	      wire [0:fb_addr_width-1] 	    peek_addr;
-	      c_incr
-		#(.width(fb_addr_width),
-		  .max_value(num_flits_per_vc - 1))
-	      peek_addr_incr
-		(.data_in(pop_addr),
-		 .data_out(peek_addr));
-	      
 	      wire [0:flit_data_width-1]    write_data;
 	      assign write_data[0:flit_data_width-1] = chi_flit_data;
 	      
 	      wire [0:flit_data_width-1]    read_data;
 	      wire [0:flit_data_width-1]    peek_data;
-	      c_regfile
-		#(.depth(num_flits_per_vc),
-		  .width(flit_data_width),
-		  .num_read_ports(2),
-		  .regfile_type(fb_regfile_type))
-	      rf
-		(.clk(clk),
-		 .write_active(push_active),
-		 .write_enable(write_enable),
-		 .write_address(push_addr),
-		 .write_data(write_data),
-		 .read_active({read_active, peek_active}),
-		 .read_address({read_addr, peek_addr}),
-		 .read_data({read_data, peek_data}));
+	      
+	      if(elig_mask == `ELIG_MASK_USED)
+		begin
+		   
+		   c_regfile
+		     #(.depth(num_flits_per_vc),
+		       .width(flit_data_width),
+		       .regfile_type(fb_regfile_type))
+		   rf
+		     (.clk(clk),
+		      .write_active(push_active),
+		      .write_enable(write_enable),
+		      .write_address(push_addr),
+		      .write_data(write_data),
+		      .read_active(read_active),
+		      .read_address(read_addr),
+		      .read_data(read_data));
+		   
+		   assign peek_data = {flit_data_width{1'b0}};
+		   
+		end
+	      else
+		begin
+		   
+		   wire peek_active;
+		   assign peek_active = ~empty & ~almost_empty;
+		   
+		   wire [0:fb_addr_width-1] peek_addr;
+		   c_incr
+		     #(.width(fb_addr_width),
+		       .max_value(num_flits_per_vc - 1))
+		   peek_addr_incr
+		     (.data_in(pop_addr),
+		      .data_out(peek_addr));
+		   
+		   c_regfile
+		     #(.depth(num_flits_per_vc),
+		       .width(flit_data_width),
+		       .num_read_ports(2),
+		       .regfile_type(fb_regfile_type))
+		   rf
+		     (.clk(clk),
+		      .write_active(push_active),
+		      .write_enable(write_enable),
+		      .write_address(push_addr),
+		      .write_data(write_data),
+		      .read_active({read_active, peek_active}),
+		      .read_address({read_addr, peek_addr}),
+		      .read_data({read_data, peek_data}));
+		   
+		end
 	      
 	      wire [0:header_info_width-1]  peek_header_info;
 	      assign peek_header_info = peek_data[0:header_info_width-1];
@@ -850,22 +876,34 @@ module rtr_ip_ctrl_mac
 	      assign valid_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire valid_s, valid_q;
-	      
-	      if(dual_path_alloc)
-		assign valid_s
-		  = flit_sent_in ?
-		    (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid) :
-		    (flit_sent_fast_in ? 
-		     ~chi_flit_tail : 
-		     (valid_q | chi_flit_valid));
+	      if(elig_mask == `ELIG_MASK_USED)
+		begin
+		   if(dual_path_alloc)
+		     assign valid_s = (valid_q | chi_flit_valid) &
+				      ~(flit_sent_in & htt_flit_tail) &
+				      ~(flit_sent_fast_in & chi_flit_tail);
+		   else
+		     assign valid_s = (valid_q | chi_flit_valid) & 
+				      ~(flit_sent_in & flit_tail_out);
+		end
 	      else
-		assign valid_s
-		  = flit_sent_in ? 
-		    (fb_empty ?
-		     ~chi_flit_tail :
-		     (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid)) :
-		    (valid_q | chi_flit_valid);
-	      
+		begin
+		   if(dual_path_alloc)
+		     assign valid_s
+		       = flit_sent_in ?
+			 (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid) :
+			 (flit_sent_fast_in ? 
+			  ~chi_flit_tail : 
+			  (valid_q | chi_flit_valid));
+		   else
+		     assign valid_s
+		       = flit_sent_in ? 
+			 (fb_empty ?
+			  ~chi_flit_tail :
+			  (~htt_flit_tail | ~fb_almost_empty | 
+			   chi_flit_valid)) :
+			 (valid_q | chi_flit_valid);
+		end
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type))
@@ -877,7 +915,10 @@ module rtr_ip_ctrl_mac
 		 .q(valid_q));
 	      
 	      wire active;
-	      assign active = ~valid_q | (~fb_empty & htt_flit_tail);
+	      if(elig_mask == `ELIG_MASK_USED)
+		assign active = ~valid_q;
+	      else
+		assign active = ~valid_q | (~fb_empty & htt_flit_tail);
 	      
 	      wire [0:la_route_info_width-1] peek_la_route_info;
 	      assign peek_la_route_info
@@ -886,7 +927,6 @@ module rtr_ip_ctrl_mac
 	      wire [0:num_ports-1] route_op;
 	      wire [0:num_resource_classes-1] route_orc;
 	      wire [0:la_route_info_width-1]  la_route_info;
-	      wire [0:route_info_width-1]     route_info;
 	      
 	      if(dual_path_alloc)
 		begin
@@ -897,22 +937,29 @@ module rtr_ip_ctrl_mac
 		   // to store the port in one-hot form here in order to improve
 		   // timing.
 		   
-		   wire [0:port_idx_width-1] peek_route_port;
-		   assign peek_route_port
-		     = peek_la_route_info[0:port_idx_width-1];
-		   
-		   wire [0:num_ports-1]      peek_route_op;
-		   c_decode
-		     #(.num_ports(num_ports))
-		   peek_route_op_dec
-		     (.data_in(peek_route_port),
-		      .data_out(peek_route_op));
-		   
-		   wire [0:num_ports-1]      route_op_s, route_op_q;
-		   assign route_op_s
-		     = (flit_sent_in & htt_flit_tail) ?
-		       (fb_almost_empty ? gld_route_op : peek_route_op) :
-		       (valid_q ? route_op_q : gld_route_op);
+		   wire [0:num_ports-1] route_op_s, route_op_q;
+		   if(elig_mask == `ELIG_MASK_USED)
+		     assign route_op_s = valid_q ? route_op_q : gld_route_op;
+		   else
+		     begin
+			
+			wire [0:port_idx_width-1] peek_route_port;
+			assign peek_route_port
+			  = peek_la_route_info[0:port_idx_width-1];
+			
+			wire [0:num_ports-1] 	  peek_route_op;
+			c_decode
+			  #(.num_ports(num_ports))
+			peek_route_op_dec
+			  (.data_in(peek_route_port),
+			   .data_out(peek_route_op));
+			
+			assign route_op_s
+			  = (flit_sent_in & htt_flit_tail) ?
+			    (fb_almost_empty ? gld_route_op : peek_route_op) :
+			    (valid_q ? route_op_q : gld_route_op);
+
+		     end
 		   c_dff
 		     #(.width(num_ports),
 		       .reset_type(reset_type))
@@ -939,25 +986,36 @@ module rtr_ip_ctrl_mac
 		   else if(num_resource_classes > 1)
 		     begin
 			
-			wire [0:resource_class_idx_width-1] peek_route_rcsel;
-			assign peek_route_rcsel
-			  = peek_la_route_info[port_idx_width:
-					       port_idx_width+
-					       resource_class_idx_width-1];
-			
-			wire [0:num_resource_classes-1]     peek_route_orc;
-			c_decode
-			  #(.num_ports(num_resource_classes))
-			peek_route_orc_dec
-			  (.data_in(peek_route_rcsel),
-			   .data_out(peek_route_orc));
-			
-			wire [0:num_resource_classes-1]     route_orc_s;
-			wire [0:num_resource_classes-1]     route_orc_q;
-			assign route_orc_s
-			  = (flit_sent_in & htt_flit_tail) ?
-			    (fb_almost_empty ? gld_route_orc : peek_route_orc) :
-			    (valid_q ? route_orc_q : gld_route_orc);
+			wire [0:num_resource_classes-1] route_orc_s;
+			wire [0:num_resource_classes-1] route_orc_q;
+			if(elig_mask == `ELIG_MASK_USED)
+			  assign route_orc_s
+			    = valid_q ? route_orc_q : gld_route_orc;
+			else
+			  begin
+			     
+			     wire [0:resource_class_idx_width-1] 
+			       peek_route_rcsel;
+			     assign peek_route_rcsel
+			       = peek_la_route_info[port_idx_width:
+						    port_idx_width+
+						    resource_class_idx_width-1];
+			     
+			     wire [0:num_resource_classes-1] peek_route_orc;
+			     c_decode
+			       #(.num_ports(num_resource_classes))
+			     peek_route_orc_dec
+			       (.data_in(peek_route_rcsel),
+				.data_out(peek_route_orc));
+			     
+			     assign route_orc_s
+			       = (flit_sent_in & htt_flit_tail) ?
+				 (fb_almost_empty ? 
+				  gld_route_orc : 
+				  peek_route_orc) :
+				 (valid_q ? route_orc_q : gld_route_orc);
+
+			  end
 			c_dff
 			  #(.width(num_resource_classes),
 			    .reset_type(reset_type))
@@ -990,12 +1048,16 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:la_route_info_width-1] la_route_info_s;
 		   wire [0:la_route_info_width-1] la_route_info_q;
-		   assign la_route_info_s
-		     = (flit_sent_in & flit_tail_out) ?
-		       (fb_almost_empty ? 
-			chi_la_route_info : 
-			peek_la_route_info) :
-		       (valid_q ? la_route_info_q : chi_la_route_info);
+		   if(elig_mask == `ELIG_MASK_USED)
+		     assign la_route_info_s
+		       = valid_q ? la_route_info_q : chi_la_route_info;
+		   else
+		     assign la_route_info_s
+		       = (flit_sent_in & flit_tail_out) ?
+			 (fb_almost_empty ? 
+			  chi_la_route_info : 
+			  peek_la_route_info) :
+			 (valid_q ? la_route_info_q : chi_la_route_info);
 		   c_dff
 		     #(.width(la_route_info_width),
 		       .reset_type(reset_type))
@@ -1038,23 +1100,31 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      wire [0:route_info_width-1]    peek_route_info;
-	      assign peek_route_info
-		= fb_peek_header_info[la_route_info_width:
-				      la_route_info_width+route_info_width-1];
-	      
-	      wire [0:route_info_width-1]    route_info_s, route_info_q;
-
-	      if(dual_path_alloc)
+	      wire [0:route_info_width-1] route_info_s, route_info_q;
+	      if(elig_mask == `ELIG_MASK_USED)
 		assign route_info_s
-		  = (flit_sent_in & htt_flit_tail) ?
-		    (fb_almost_empty ? chi_route_info : peek_route_info) :
-		    (valid_q ? route_info_q : chi_route_info);
+		  = valid_q ? route_info_q : chi_route_info;
 	      else
-		assign route_info_s
-		  = (flit_sent_in & flit_tail_out) ?
-		    (fb_almost_empty ? chi_route_info : peek_route_info) :
-		    (valid_q ? route_info_q : chi_route_info);
+		begin
+		   
+		   wire [0:route_info_width-1] peek_route_info;
+		   assign peek_route_info
+		     = fb_peek_header_info[la_route_info_width:
+					   la_route_info_width+
+					   route_info_width-1];
+	      
+		   if(dual_path_alloc)
+		     assign route_info_s
+		       = (flit_sent_in & htt_flit_tail) ?
+			 (fb_almost_empty ? chi_route_info : peek_route_info) :
+			 (valid_q ? route_info_q : chi_route_info);
+		   else
+		     assign route_info_s
+		       = (flit_sent_in & flit_tail_out) ?
+			 (fb_almost_empty ? chi_route_info : peek_route_info) :
+			 (valid_q ? route_info_q : chi_route_info);
+
+		end
 	      c_dff
 		#(.width(route_info_width),
 		  .reset_type(reset_type))
