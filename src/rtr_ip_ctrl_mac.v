@@ -98,6 +98,9 @@ module rtr_ip_ctrl_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -602,8 +605,7 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   fb_almost_empty;
 	   wire [0:flit_data_width-1] 	   fb_flit_data;
-	   wire [0:la_route_info_width-1]  fb_la_route_info;
-	   wire [0:route_info_width-1] 	   fb_route_info;
+	   wire [0:header_info_width-1]    fb_peek_header_info;
 	   wire [0:fb_addr_width-1] 	   fb_push_addr;
 	   wire [0:fb_addr_width-1] 	   fb_pop_addr;
 	   
@@ -730,15 +732,11 @@ module rtr_ip_ctrl_mac
 	      assign error_fb_underflow = errors[0];
 	      assign error_fb_overflow = errors[1];
 	      
+	      assign fb_peek_header_info = peek_header_info;
 	      assign fb_almost_empty = almost_empty;
 	      assign fb_empty = empty;
 	      assign fb_full = full;
 	      assign fb_flit_data = read_data;
-	      assign fb_la_route_info
-		= peek_header_info[0:la_route_info_width-1];
-	      assign fb_route_info
-		= peek_header_info[la_route_info_width:
-				   la_route_info_width+route_info_width-1];
 	      assign fb_push_addr = push_addr;
 	      assign fb_pop_addr = pop_addr;
 	      
@@ -881,9 +879,14 @@ module rtr_ip_ctrl_mac
 	      wire active;
 	      assign active = ~valid_q | (~fb_empty & htt_flit_tail);
 	      
+	      wire [0:la_route_info_width-1] peek_la_route_info;
+	      assign peek_la_route_info
+		= fb_peek_header_info[0:la_route_info_width-1];
+	      
 	      wire [0:num_ports-1] route_op;
 	      wire [0:num_resource_classes-1] route_orc;
 	      wire [0:la_route_info_width-1]  la_route_info;
+	      wire [0:route_info_width-1]     route_info;
 	      
 	      if(dual_path_alloc)
 		begin
@@ -894,20 +897,21 @@ module rtr_ip_ctrl_mac
 		   // to store the port in one-hot form here in order to improve
 		   // timing.
 		   
-		   wire [0:port_idx_width-1] fb_route_port;
-		   assign fb_route_port = fb_la_route_info[0:port_idx_width-1];
+		   wire [0:port_idx_width-1] peek_route_port;
+		   assign peek_route_port
+		     = peek_la_route_info[0:port_idx_width-1];
 		   
-		   wire [0:num_ports-1]      fb_route_op;
+		   wire [0:num_ports-1]      peek_route_op;
 		   c_decode
 		     #(.num_ports(num_ports))
-		   fb_route_op_dec
-		     (.data_in(fb_route_port),
-		      .data_out(fb_route_op));
+		   peek_route_op_dec
+		     (.data_in(peek_route_port),
+		      .data_out(peek_route_op));
 		   
 		   wire [0:num_ports-1]      route_op_s, route_op_q;
 		   assign route_op_s
 		     = (flit_sent_in & htt_flit_tail) ?
-		       (fb_almost_empty ? gld_route_op : fb_route_op) :
+		       (fb_almost_empty ? gld_route_op : peek_route_op) :
 		       (valid_q ? route_op_q : gld_route_op);
 		   c_dff
 		     #(.width(num_ports),
@@ -935,24 +939,24 @@ module rtr_ip_ctrl_mac
 		   else if(num_resource_classes > 1)
 		     begin
 			
-			wire [0:resource_class_idx_width-1] fb_route_rcsel;
-			assign fb_route_rcsel
-			  = fb_la_route_info[port_idx_width:
-					     port_idx_width+
-					     resource_class_idx_width-1];
+			wire [0:resource_class_idx_width-1] peek_route_rcsel;
+			assign peek_route_rcsel
+			  = peek_la_route_info[port_idx_width:
+					       port_idx_width+
+					       resource_class_idx_width-1];
 			
-			wire [0:num_resource_classes-1]     fb_route_orc;
+			wire [0:num_resource_classes-1]     peek_route_orc;
 			c_decode
 			  #(.num_ports(num_resource_classes))
-			fb_route_orc_dec
-			  (.data_in(fb_route_rcsel),
-			   .data_out(fb_route_orc));
+			peek_route_orc_dec
+			  (.data_in(peek_route_rcsel),
+			   .data_out(peek_route_orc));
 			
 			wire [0:num_resource_classes-1]     route_orc_s;
 			wire [0:num_resource_classes-1]     route_orc_q;
 			assign route_orc_s
 			  = (flit_sent_in & htt_flit_tail) ?
-			    (fb_almost_empty ? gld_route_orc : fb_route_orc) :
+			    (fb_almost_empty ? gld_route_orc : peek_route_orc) :
 			    (valid_q ? route_orc_q : gld_route_orc);
 			c_dff
 			  #(.width(num_resource_classes),
@@ -990,7 +994,7 @@ module rtr_ip_ctrl_mac
 		     = (flit_sent_in & flit_tail_out) ?
 		       (fb_almost_empty ? 
 			chi_la_route_info : 
-			fb_la_route_info) :
+			peek_la_route_info) :
 		       (valid_q ? la_route_info_q : chi_la_route_info);
 		   c_dff
 		     #(.width(la_route_info_width),
@@ -1034,17 +1038,22 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
+	      wire [0:route_info_width-1]    peek_route_info;
+	      assign peek_route_info
+		= fb_peek_header_info[la_route_info_width:
+				      la_route_info_width+route_info_width-1];
+	      
 	      wire [0:route_info_width-1]    route_info_s, route_info_q;
 
 	      if(dual_path_alloc)
 		assign route_info_s
 		  = (flit_sent_in & htt_flit_tail) ?
-		    (fb_almost_empty ? chi_route_info : fb_route_info) :
+		    (fb_almost_empty ? chi_route_info : peek_route_info) :
 		    (valid_q ? route_info_q : chi_route_info);
 	      else
 		assign route_info_s
 		  = (flit_sent_in & flit_tail_out) ?
-		    (fb_almost_empty ? chi_route_info : fb_route_info) :
+		    (fb_almost_empty ? chi_route_info : peek_route_info) :
 		    (valid_q ? route_info_q : chi_route_info);
 	      c_dff
 		#(.width(route_info_width),
