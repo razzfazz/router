@@ -31,7 +31,7 @@
 
 module whr_alloc_mac
   (clk, reset, route_ip_op, req_ip, req_head_ip, req_tail_ip, gnt_ip, 
-   flit_valid_op, flit_head_op, flit_tail_op, xbr_ctrl_op_ip, full_op);
+   flit_valid_op, flit_head_op, flit_tail_op, xbr_ctrl_op_ip, elig_op, full_op);
    
 `include "c_constants.v"
    
@@ -81,6 +81,9 @@ module whr_alloc_mac
    output [0:num_ports*num_ports-1] xbr_ctrl_op_ip;
    wire [0:num_ports*num_ports-1]   xbr_ctrl_op_ip;
    
+   // is output port eligible for allocation?
+   input [0:num_ports-1] 	    elig_op;
+   
    // is output port full?
    input [0:num_ports-1] 	    full_op;
    
@@ -114,6 +117,9 @@ module whr_alloc_mac
 	   wire [0:num_ports-1] route_ip;
 	   assign route_ip = route_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
+	   wire 		elig;
+	   assign elig = elig_op[op];
+	   
 	   wire 		full;
 	   assign full = full_op[op];
 	   
@@ -136,8 +142,6 @@ module whr_alloc_mac
 	   //-------------------------------------------------------------------
 	   // arbitration
 	   //-------------------------------------------------------------------
-	   
-	   wire 		elig;
 	   
 	   wire [0:num_ports-1] arb_req_ip;
 	   assign arb_req_ip = req_ip & route_ip;
@@ -251,21 +255,6 @@ module whr_alloc_mac
 	     (.select(raw_gnt_ip),
 	      .data_in(req_tail_ip),
 	      .data_out(gnt_tail));
-	   
-	   wire 		elig_s, elig_q;
-	   assign elig_s = gnt ? gnt_tail : elig_q;
-	   c_dff
-	     #(.width(1),
-	       .reset_value(1'b1),
-	       .reset_type(reset_type))
-	   eligq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(arb_active),
-	      .d(elig_s),
-	      .q(elig_q));
-	   
-	   assign elig = elig_q;
 	   
 	   wire 		xbr_ctrl_active;
 	   assign xbr_ctrl_active = arb_active | (|xbr_ctrl_ip);

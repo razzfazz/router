@@ -31,7 +31,7 @@
 
 module whr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, flit_valid_in, flit_head_in, flit_tail_in, 
-   flit_data_in, channel_out, full, error);
+   flit_data_in, channel_out, elig, full, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -123,6 +123,10 @@ module whr_op_ctrl_mac
    output [0:channel_width-1]  channel_out;
    wire [0:channel_width-1]    channel_out;
    
+   // output is available for allocation
+   output 		       elig;
+   wire 		       elig;
+   
    // output is full
    output 		       full;
    wire 		       full;
@@ -187,6 +191,7 @@ module whr_op_ctrl_mac
       .full(vs_full),
       .errors(vs_errors));
    
+   assign elig = vs_elig & (~flit_valid_in | flit_tail_in);
    assign full = vs_full;
    
    
