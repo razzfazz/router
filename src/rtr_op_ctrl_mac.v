@@ -75,9 +75,6 @@ module rtr_op_ctrl_mac
    // derived parameters
    //---------------------------------------------------------------------------
    
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
-   
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
@@ -154,10 +151,10 @@ module rtr_op_ctrl_mac
    // flow control input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       ovs_empty_ovc;
+   wire [0:num_vcs-1] 	       ovs_fc_active_ovc;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = ~&ovs_empty_ovc;
+   assign flow_ctrl_active = |ovs_fc_active_ovc;
    
    wire 		       fc_event_valid;
    wire [0:num_vcs-1] 	       fc_event_sel_ovc;
@@ -233,16 +230,16 @@ module rtr_op_ctrl_mac
 	   wire fc_event_valid;
 	   assign fc_event_valid = fc_event_valid_ovc[ovc];
 	   
+	   wire ovs_fc_active;
 	   wire ovs_elig;
-	   wire ovs_almost_empty;
 	   wire ovs_empty;
 	   wire ovs_almost_full;
 	   wire ovs_full;
-	   wire [0:flit_count_width-1] ovs_free;
-	   wire [0:1] 		       ovs_errors;
+	   wire [0:1] ovs_errors;
 	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
+	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .reset_type(reset_type))
 	   ovs
 	     (.clk(clk),
@@ -251,85 +248,21 @@ module rtr_op_ctrl_mac
 	      .flit_sent(flit_valid_in),
 	      .flit_tail(flit_tail_in),
 	      .fc_event_valid(fc_event_valid),
+	      .fc_active(ovs_fc_active),
 	      .elig(ovs_elig),
-	      .almost_empty(ovs_almost_empty),
 	      .empty(ovs_empty),
 	      .almost_full(ovs_almost_full),
 	      .full(ovs_full),
-	      .free(ovs_free),
 	      .errors(ovs_errors));
 	   
-	   wire 		       elig_out;
+	   wire       elig_out;
 	   assign elig_out = flit_valid_in ? flit_tail_in : ovs_elig;
 	   
-	   wire 		       empty_out;
-	   
-	   if(flow_ctrl_bypass)
-	     assign empty_out
-	       = (ovs_empty | (ovs_almost_empty & fc_event_valid)) &
-		 ~flit_valid_in;
-	   else
-	     assign empty_out = ovs_empty & ~flit_valid_in;
-	   
-	   wire 		       two_credits_left_s, two_credits_left_q;
-	   
-	   if(num_flits_per_vc == 2)
-	     assign two_credits_left_s
-	       = (ovs_almost_full & ~flit_valid_in & fc_event_valid) | 
-		 (two_credits_left_q & (flit_valid_in ~^ fc_event_valid));
-	   else if(num_flits_per_vc == 3)
-	     assign two_credits_left_s
-	       = (ovs_almost_full & ~flit_valid_in & fc_event_valid) | 
-		 (two_credits_left_q & (flit_valid_in ~^ fc_event_valid)) |
-		 (ovs_empty & flit_valid_in);
-	   else if(num_flits_per_vc == 4)
-	     assign two_credits_left_s
-	       = (ovs_almost_full & ~flit_valid_in & fc_event_valid) | 
-		 (two_credits_left_q & (flit_valid_in ~^ fc_event_valid)) |
-		 (ovs_almost_empty & flit_valid_in & ~fc_event_valid);
-	   else if(num_flits_per_vc > 4)
-	     assign two_credits_left_s
-	       = (ovs_almost_full & ~flit_valid_in & fc_event_valid) | 
-		 (two_credits_left_q & (flit_valid_in ~^ fc_event_valid)) |
-		 (~|ovs_free[0:flit_count_width-3] &
-		  &ovs_free[flit_count_width-2:flit_count_width-1] &
-		  flit_valid_in & ~fc_event_valid);
-	   
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type),
-	       .reset_value((num_flits_per_vc == 2) ? 1'b1 : 1'b0))
-	   two_credits_leftq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(ovs_active),
-	      .d(two_credits_left_s),
-	      .q(two_credits_left_q));
-	   
-	   wire 		       almost_full_out;
-
-	   if(flow_ctrl_bypass)
-	     assign almost_full_out
-	       = (ovs_full & fc_event_valid) | 
-		 (ovs_almost_full & (flit_valid_in ~^ fc_event_valid)) |
-		 (two_credits_left_q & flit_valid_in & ~fc_event_valid);
-	   else
-	     assign almost_full_out
-	       = flit_valid_in ? two_credits_left_q : ovs_almost_full;
-	   
-	   wire 		       full_out;
-	   
-	   if(flow_ctrl_bypass)
-	     assign full_out = (ovs_full | (ovs_almost_full & flit_valid_in)) &
-			       ~fc_event_valid;
-	   else
-	     assign full_out = ovs_full | (ovs_almost_full & flit_valid_in);
-	   
 	   assign elig_out_ovc[ovc] = elig_out;
-	   assign empty_out_ovc[ovc] = empty_out;
-	   assign almost_full_out_ovc[ovc] = almost_full_out;
-	   assign full_out_ovc[ovc] = full_out;	   
-	   assign ovs_empty_ovc[ovc] = ovs_empty;
+	   assign empty_out_ovc[ovc] = ovs_empty;
+	   assign almost_full_out_ovc[ovc] = ovs_almost_full;
+	   assign full_out_ovc[ovc] = ovs_full;	   
+	   assign ovs_fc_active_ovc[ovc] = ovs_fc_active;
 	   assign ovs_errors_ovc[ovc*2:(ovc+1)*2-1] = ovs_errors;
 	   
 	end

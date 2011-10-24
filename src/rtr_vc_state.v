@@ -30,8 +30,8 @@
 //==============================================================================
 
 module rtr_vc_state
-  (clk, reset, active, flit_sent, flit_tail, fc_event_valid, elig, 
-   almost_empty, empty, almost_full, full, free, errors);
+  (clk, reset, active, flit_sent, flit_tail, fc_event_valid, fc_active, elig, 
+   empty, almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -47,6 +47,10 @@ module rtr_vc_state
    
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
+   
+   // make incoming flow control signals bypass the output VC state tracking 
+   // logic
+   parameter flow_ctrl_bypass = 1;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -78,13 +82,13 @@ module rtr_vc_state
    // flow control event occurred
    input fc_event_valid;
    
+   // activate flow control input logic
+   output fc_active;
+   wire   fc_active;
+   
    // VC is eligible for allocation
    output elig;
    wire   elig;
-   
-   // VC has one flit left
-   output almost_empty;
-   wire   almost_empty;
    
    // VC is empty
    output empty;
@@ -98,21 +102,17 @@ module rtr_vc_state
    output full;
    wire   full;
    
-   // VC fill level indicator
-   output [0:flit_count_width-1] free;
-   wire [0:flit_count_width-1] 	 free;
-   
    // internal error condition detected
-   output [0:1] 		 errors;
-   wire [0:1] 			 errors;
+   output [0:1] errors;
+   wire [0:1] 	errors;
    
    
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
    
-   wire 			 error_ft_underflow;
-   wire 			 error_ft_overflow;
+   wire 	error_ft_underflow;
+   wire 	error_ft_overflow;
    
    generate
       
@@ -153,12 +153,61 @@ module rtr_vc_state
 		.free(ft_free),
 		.errors(ft_errors));
 	     
-	     assign almost_empty = ft_almost_empty;
-	     assign empty = ft_empty;
-	     assign almost_full = ft_almost_full;
-	     assign full = ft_full;
-	     assign free = ft_free;
+	     assign fc_active = ~ft_empty;
 	     
+	     wire 			 two_credits_left_s, two_credits_left_q;
+	     if(num_flits_per_vc == 2)
+	       assign two_credits_left_s
+		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
+		   (two_credits_left_q & (flit_sent ~^ fc_event_valid));
+	     else if(num_flits_per_vc == 3)
+	       assign two_credits_left_s
+		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
+		   (two_credits_left_q & (flit_sent ~^ fc_event_valid)) |
+		   (ft_empty & flit_sent);
+	     else if(num_flits_per_vc == 4)
+	       assign two_credits_left_s
+		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
+		   (two_credits_left_q & (flit_sent ~^ fc_event_valid)) |
+		   (ft_almost_empty & flit_sent & ~fc_event_valid);
+	     else if(num_flits_per_vc > 4)
+	       assign two_credits_left_s
+		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
+		   (two_credits_left_q & (flit_sent ~^ fc_event_valid)) |
+		   (~|ft_free[0:flit_count_width-3] &
+		    &ft_free[flit_count_width-2:flit_count_width-1] &
+		    flit_sent & ~fc_event_valid);
+	     c_dff
+	       #(.width(1),
+		 .reset_type(reset_type),
+		 .reset_value((num_flits_per_vc == 2) ? 1'b1 : 1'b0))
+	     two_credits_leftq
+	       (.clk(clk),
+		.reset(reset),
+		.active(active),
+		.d(two_credits_left_s),
+		.q(two_credits_left_q));
+	     
+	     if(flow_ctrl_bypass)
+	       begin
+		  assign empty
+		    = (ft_empty | (ft_almost_empty & fc_event_valid)) &
+		      ~flit_sent;	
+		  assign almost_full
+		    = (ft_full & fc_event_valid) | 
+		      (ft_almost_full & (flit_sent ~^ fc_event_valid)) |
+		      (two_credits_left_q & flit_sent & ~fc_event_valid);
+		  assign full = (ft_full | (ft_almost_full & flit_sent)) &
+				~fc_event_valid;
+	       end
+	     else
+	       begin
+		  assign empty = ft_empty & ~flit_sent;
+		  assign almost_full
+		    = flit_sent ? two_credits_left_q : ft_almost_full;
+		  assign full = ft_full | (ft_almost_full & flit_sent);
+	       end
+
 	     assign error_ft_underflow = ft_errors[0];
 	     assign error_ft_overflow = ft_errors[1];
 	     	     

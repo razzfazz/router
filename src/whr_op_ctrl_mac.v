@@ -41,9 +41,6 @@ module whr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
-   
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
    
@@ -139,10 +136,10 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire 		       vs_empty;
+   wire 		       vs_fc_active;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = ~vs_empty;
+   assign flow_ctrl_active = vs_fc_active;
    
    wire 		       fc_event_valid;
    wire 		       fc_event_sel_ovc;
@@ -167,14 +164,14 @@ module whr_op_ctrl_mac
    assign vs_active = flit_valid_in | fc_event_valid;
    
    wire 		       vs_elig;
-   wire 		       vs_almost_empty;
+   wire 		       vs_empty;
    wire 		       vs_almost_full;
    wire 		       vs_full;
-   wire [0:flit_count_width-1] vs_free;
    wire [0:1] 		       vs_errors;
    rtr_vc_state
      #(.num_flits_per_vc(num_flits_per_vc),
        .flow_ctrl_type(flow_ctrl_type),
+       .flow_ctrl_bypass(flow_ctrl_bypass),
        .reset_type(reset_type))
    vs
      (.clk(clk),
@@ -183,23 +180,14 @@ module whr_op_ctrl_mac
       .flit_sent(flit_valid_in),
       .flit_tail(flit_tail_in),
       .fc_event_valid(fc_event_valid),
+      .fc_active(vs_fc_active),
       .elig(vs_elig),
-      .almost_empty(vs_almost_empty),
       .empty(vs_empty),
       .almost_full(vs_almost_full),
       .full(vs_full),
-      .free(vs_free),
       .errors(vs_errors));
    
-   generate
-      
-      if(flow_ctrl_bypass)
-	assign full = (vs_full | (vs_almost_full & flit_valid_in)) &
-		      ~fc_event_valid;
-      else
-	assign full = vs_full | (vs_almost_full & flit_valid_in);
-      
-   endgenerate
+   assign full = vs_full;
    
    
    //---------------------------------------------------------------------------

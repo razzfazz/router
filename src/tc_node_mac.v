@@ -42,9 +42,6 @@ module tc_node_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
@@ -1148,16 +1145,16 @@ module tc_node_mac
 	      .d(flit_sent_s),
 	      .q(flit_sent_q));
 	   
+	   wire vs_fc_active;
 	   wire vs_elig;
-	   wire vs_almost_empty;
 	   wire vs_empty;
 	   wire vs_almost_full;
 	   wire vs_full;
-	   wire [0:flit_count_width-1] vs_free;
-	   wire [0:1] 		       vs_errors;
+	   wire [0:1] vs_errors;
 	   rtr_vc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
+	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .reset_type(reset_type))
 	   vs
 	     (.clk(clk),
@@ -1166,31 +1163,20 @@ module tc_node_mac
 	      .flit_sent(flit_sent_q),
 	      .flit_tail(flit_tail_q),
 	      .fc_event_valid(fc_event_valid_in),
+	      .fc_active(vs_fc_active),
 	      .elig(vs_elig),
-	      .almost_empty(vs_almost_empty),
 	      .empty(vs_empty),
 	      .almost_full(vs_almost_full),
 	      .full(vs_full),
-	      .free(vs_free),
 	      .errors(vs_errors));
 	   
-	   wire 		       elig;
+	   wire       elig;
 	   assign elig = vs_elig & (~flit_sent_q | flit_tail_q);
 	   
-	   wire 		       empty;
-	   assign empty = vs_empty & ~flit_sent_q;
-	   
-	   wire 		       full;
-	   
-	   if(flow_ctrl_bypass)
-	     assign full = (vs_full | (vs_almost_full & flit_sent_q)) & 
-			   ~fc_event_valid_in;
-	   else
-	     assign full = vs_full | (vs_almost_full & flit_sent_q);
-	   	   
+	   assign vs_fc_active_ovc[ovc] = vs_fc_active;
 	   assign elig_ovc[ovc] = elig;
-	   assign empty_ovc[ovc] = empty;
-	   assign full_ovc[ovc] = full;
+	   assign empty_ovc[ovc] = vs_empty;
+	   assign full_ovc[ovc] = vs_full;
 	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
 	   
 	end
