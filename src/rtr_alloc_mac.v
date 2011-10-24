@@ -1738,7 +1738,6 @@ module rtr_alloc_mac
 			     else
 			       assign req_ocvc = elig_in_ocvc;
 			     
-			     wire [0:num_vcs_per_class-1] gnt_ocvc;
 			     c_arbiter
 			       #(.num_ports(num_vcs_per_class),
 				 .arbiter_type(vc_alloc_arbiter_type),
