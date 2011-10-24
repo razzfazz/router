@@ -345,6 +345,7 @@ module tc_router_wrap
 		    .error_capture_mode(error_capture_mode),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
+		    .elig_mask(elig_mask),
 		    .lfsr_index(/*num_ports * */ lfsr_index /*+ port*/),
 		    .cfg_node_addr_width(cfg_node_addr_width),
 		    .cfg_reg_addr_width(cfg_reg_addr_width),

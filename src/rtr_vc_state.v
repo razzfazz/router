@@ -52,6 +52,9 @@ module rtr_vc_state
    // logic
    parameter flow_ctrl_bypass = 1;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -231,8 +234,6 @@ module rtr_vc_state
    
    wire allocated;
    
-   assign elig = ~allocated;
-   
    wire allocated_s, allocated_q;
    assign allocated_s = allocated;
    c_dff
@@ -246,6 +247,23 @@ module rtr_vc_state
       .q(allocated_q));
    
    assign allocated = flit_sent ? ~flit_tail : allocated_q;
+   
+   generate
+      
+      case(elig_mask)
+	
+	`ELIG_MASK_NONE:
+	  assign elig = ~allocated;
+	
+	`ELIG_MASK_FULL:
+	  assign elig = ~allocated & ~full;
+	
+	`ELIG_MASK_USED:
+	  assign elig = ~allocated & empty;
+	
+      endcase
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------

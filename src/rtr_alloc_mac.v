@@ -1644,21 +1644,16 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs_per_class == 1)
 		begin
-		   case(elig_mask)
-
-		     `ELIG_MASK_NONE, `ELIG_MASK_FULL:
-		       begin
-			  assign nvs_next_elig_ovc = elig_in_ovc & ~full_in_ovc;
-			  assign nvs_any_elig_opc = elig_in_ovc & ~full_in_ovc;
-		       end
-
-		     `ELIG_MASK_USED:
-		       begin
-			  assign nvs_next_elig_ovc = elig_in_ovc & empty_in_ovc;
-			  assign nvs_any_elig_opc = elig_in_ovc & empty_in_ovc;
-		       end
-
-		   endcase
+		   if(elig_mask == `ELIG_MASK_NONE)
+		     begin
+			assign nvs_next_elig_ovc = elig_in_ovc & ~full_in_ovc;
+			assign nvs_any_elig_opc = elig_in_ovc & ~full_in_ovc;
+		     end
+		   else
+		     begin
+			assign nvs_next_elig_ovc = elig_in_ovc;
+			assign nvs_any_elig_opc = elig_in_ovc;
+		     end
 		end
 	      else if(num_vcs_per_class > 1)
 		begin
@@ -1701,97 +1696,72 @@ module rtr_alloc_mac
 			
 			wire [0:num_vcs_per_class-1] gnt_ocvc;
 			
-			case(elig_mask)
-			  
-			  `ELIG_MASK_NONE, `ELIG_MASK_FULL:
-			    begin
-			       
-			       if(vc_alloc_prefer_empty)
-				 begin
-				    
-				    wire [0:num_vcs_per_class-1] req_hi_ocvc;
-				    assign req_hi_ocvc
-				      = elig_in_ocvc & empty_in_ocvc;
-				    
-				    wire [0:num_vcs_per_class-1] req_lo_ocvc;
-				    assign req_lo_ocvc
-				      = elig_in_ocvc & ~full_in_ocvc;
-				    
-				    wire [0:num_vcs_per_class-1] gnt_hi_ocvc;
-				    wire [0:num_vcs_per_class-1] gnt_lo_ocvc;
-				    c_arbiter
-				      #(.num_ports(num_vcs_per_class),
-					.num_priorities(2),
-					.arbiter_type(vc_alloc_arbiter_type),
-					.reset_type(reset_type))
-				    arb
-				      (.clk(clk),
-				       .reset(reset),
-				       .active(active),
-				       .req({req_hi_ocvc, req_lo_ocvc}),
-				       .gnt({gnt_hi_ocvc, gnt_lo_ocvc}),
-				       .update(update));
-				    
-				    assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
-
-				 end
-			       else
-				 begin
-
-				    wire [0:num_vcs_per_class-1] req_ocvc;
-				    assign req_ocvc
-				      = elig_in_ocvc & ~full_in_ocvc;
-				    
-				    wire [0:num_vcs_per_class-1] gnt_ocvc;
-				    c_arbiter
-				      #(.num_ports(num_vcs_per_class),
-					.arbiter_type(vc_alloc_arbiter_type),
-					.reset_type(reset_type))
-				    arb
-				      (.clk(clk),
-				       .reset(reset),
-				       .active(active),
-				       .req(req_ocvc),
-				       .gnt(gnt_ocvc),
-				       .update(update));
-
-				 end
-			       
-			       assign nvs_any_elig_opc[opc]
-				 = |(elig_in_ocvc & ~full_in_ocvc);
-			       
-			    end
-
-			  `ELIG_MASK_USED:
-			    begin
-			       
-			       wire [0:num_vcs_per_class-1] req_ocvc;
-			       assign req_ocvc
-				 = elig_in_ocvc & empty_in_ocvc;
-			       
-			       wire [0:num_vcs_per_class-1] gnt_ocvc;
-			       c_arbiter
-				 #(.num_ports(num_vcs_per_class),
-				   .arbiter_type(vc_alloc_arbiter_type),
-				   .reset_type(reset_type))
-			       arb
-				 (.clk(clk),
-				  .reset(reset),
-				  .active(active),
-				  .req(req_ocvc),
-				  .gnt(gnt_ocvc),
-				  .update(update));
-			       
-			       assign nvs_any_elig_opc[opc]
-				 = |(elig_in_ocvc & empty_in_ocvc);
-			       
-			    end
-			  
-			endcase
+			if(((elig_mask == `ELIG_MASK_NONE) ||
+			    (elig_mask == `ELIG_MASK_FULL)) &&
+			   vc_alloc_prefer_empty)
+			  begin
+			     
+			     wire [0:num_vcs_per_class-1] req_hi_ocvc;
+			     assign req_hi_ocvc = elig_in_ocvc & empty_in_ocvc;
+			     
+			     wire [0:num_vcs_per_class-1] req_lo_ocvc;
+			     if(elig_mask == `ELIG_MASK_NONE)
+			       assign req_lo_ocvc
+				 = elig_in_ocvc & ~full_in_ocvc;
+			     else
+			       assign req_lo_ocvc = elig_in_ocvc;
+			     
+			     wire [0:num_vcs_per_class-1] gnt_hi_ocvc;
+			     wire [0:num_vcs_per_class-1] gnt_lo_ocvc;
+			     c_arbiter
+			       #(.num_ports(num_vcs_per_class),
+				 .num_priorities(2),
+				 .arbiter_type(vc_alloc_arbiter_type),
+				 .reset_type(reset_type))
+			     arb
+			       (.clk(clk),
+				.reset(reset),
+				.active(active),
+				.req({req_hi_ocvc, req_lo_ocvc}),
+				.gnt({gnt_hi_ocvc, gnt_lo_ocvc}),
+				.update(update));
+			     
+			     assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
+			     
+			  end
+			else
+			  begin
+			     
+			     wire [0:num_vcs_per_class-1] req_ocvc;
+			     if(elig_mask == `ELIG_MASK_NONE)
+			       assign req_ocvc = elig_in_ocvc & ~full_in_ocvc;
+			     else
+			       assign req_ocvc = elig_in_ocvc;
+			     
+			     wire [0:num_vcs_per_class-1] gnt_ocvc;
+			     c_arbiter
+			       #(.num_ports(num_vcs_per_class),
+				 .arbiter_type(vc_alloc_arbiter_type),
+				 .reset_type(reset_type))
+			     arb
+			       (.clk(clk),
+				.reset(reset),
+				.active(active),
+				.req(req_ocvc),
+				.gnt(gnt_ocvc),
+				.update(update));
+			     
+			  end
 			
 			assign nvs_next_elig_ovc[opc*num_vcs_per_class:
 						 (opc+1)*num_vcs_per_class-1]
 			  = gnt_ocvc;
+			
+			if(elig_mask == `ELIG_MASK_NONE)
+			  assign nvs_any_elig_opc[opc]
+			    = |(elig_in_ocvc & ~full_in_ocvc);
+			else
+			  assign nvs_any_elig_opc[opc] = |elig_in_ocvc;
 			
 		     end
 		   

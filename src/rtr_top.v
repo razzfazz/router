@@ -515,6 +515,7 @@ module rtr_top
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .elig_mask(elig_mask),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   opc

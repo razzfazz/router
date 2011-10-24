@@ -96,6 +96,9 @@ module whr_top
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? 1 :
        -1;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -368,6 +371,7 @@ module whr_top
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .elig_mask(elig_mask),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),

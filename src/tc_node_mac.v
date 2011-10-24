@@ -183,6 +183,9 @@ module tc_node_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
    
@@ -1155,6 +1158,7 @@ module tc_node_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
 	   vs
 	     (.clk(clk),

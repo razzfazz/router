@@ -201,6 +201,9 @@ module packet_source
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
 
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // which router port is this packet source attached to?
    parameter port_id = 0;
    
@@ -391,6 +394,7 @@ module packet_source
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
 	   vs
 	     (.clk(clk),

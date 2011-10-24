@@ -62,6 +62,9 @@ module rtr_op_ctrl_mac
    // logic
    parameter flow_ctrl_bypass = 1;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // width of flit payload data
    parameter flit_data_width = 64;
    
@@ -240,6 +243,7 @@ module rtr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
 	   ovs
 	     (.clk(clk),

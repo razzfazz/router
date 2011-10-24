@@ -233,6 +233,7 @@ module testbench
 		    .flit_data_width(flit_data_width),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
+		    .elig_mask(elig_mask),
 		    .port_id(ip),
 		    .reset_type(reset_type))
 		ps
