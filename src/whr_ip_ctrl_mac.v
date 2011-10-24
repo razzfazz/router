@@ -432,6 +432,26 @@ module whr_ip_ctrl_mac
       if(elig_mask == `ELIG_MASK_USED)
 	begin
 	   
+	   c_regfile
+	     #(.depth(fb_depth),
+	       .width(flit_data_width),
+	       .regfile_type(fb_regfile_type))
+	   fbf
+	     (.clk(clk),
+	      .write_active(push_active),
+	      .write_enable(fbf_write_enable),
+	      .write_address(fbc_push_addr),
+	      .write_data(fbf_write_data),
+	      .read_active(fbf_read_active),
+	      .read_address(fbf_read_addr),
+	      .read_data(fbf_read_data));
+	   
+	   assign fbf_peek_data = {flit_data_width{1'b0}};
+	   
+	end
+      else
+	begin
+	   
 	   wire fbf_peek_active;
 	   assign fbf_peek_active = ~fbc_empty & ~fbc_almost_empty;
 	   
@@ -457,26 +477,6 @@ module whr_ip_ctrl_mac
 	      .read_active({fbf_read_active, fbf_peek_active}),
 	      .read_address({fbf_read_addr, fbf_peek_addr}),
 	      .read_data({fbf_read_data, fbf_peek_data}));
-	   
-	end
-      else
-	begin
-	   
-	   c_regfile
-	     #(.depth(fb_depth),
-	       .width(flit_data_width),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(push_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbc_push_addr),
-	      .write_data(fbf_write_data),
-	      .read_active(fbf_read_active),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
-	   
-	   assign fbf_peek_data = {flit_data_width{1'b0}};
 	   
 	end
       
