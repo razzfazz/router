@@ -36,7 +36,7 @@ parameter topology = `TOPOLOGY_MESH;
 parameter num_flits_per_vc = 8;
 
 // number of message classes (e.g. request, reply)
-parameter num_message_classes = 1;
+parameter num_message_classes = 2;
 
 // number of resource classes (e.g. minimal, adaptive)
 parameter num_resource_classes = 1;
@@ -48,7 +48,7 @@ parameter num_vcs_per_class = 1;
 parameter num_nodes = 64;
 
 // number of dimensions in network
-parameter num_dimensions = 1;
+parameter num_dimensions = 2;
 
 // number of nodes per router (a.k.a. concentration factor)
 parameter num_nodes_per_router = 1;
@@ -69,18 +69,18 @@ parameter max_payload_length = 4;
 parameter min_payload_length = 0;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_VC;
+parameter router_type = `ROUTER_TYPE_COMBINED;
 
 // width of flit payload data
-parameter flit_data_width = 32;
+parameter flit_data_width = 64;
 
-// include error checking logic
+// configure error checking logic
 parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
 // such turns)
-parameter restrict_turns = 0;
+parameter restrict_turns = 1;
 
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -100,11 +100,15 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 
+// gate flit buffer write port if bypass succeeds
+// (requires explicit pipeline register; may increase cycle time)
+parameter gate_buffer_write = 0;
+
 // enable dual-path allocation
-parameter dual_path_alloc = 1;
+parameter dual_path_alloc = 0;
 
 // precompute input-side arbitration decision one cycle ahead
-parameter precomp_ivc_sel = 1;
+parameter precomp_ivc_sel = 0;
 
 // precompute output-side arbitration decision one cycle ahead
 parameter precomp_ip_sel = 0;
@@ -130,7 +134,7 @@ parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 // select speculation type for switch allocator
 parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
 
-// select implementation variant for control crossbar
+// select implementation variant for crossbar
 parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
 parameter reset_type = `RESET_TYPE_ASYNC;
