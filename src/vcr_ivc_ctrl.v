@@ -180,7 +180,7 @@ module vcr_ivc_ctrl
        -1;
    
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
+   parameter elig_mask = `ELIG_MASK_NONE;
    
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
@@ -371,7 +371,7 @@ module vcr_ivc_ctrl
       
       if(sw_alloc_spec)
 	begin
-	   if(vc_alloc_mask == `VC_ALLOC_MASK_NONE)
+	   if(elig_mask == `ELIG_MASK_NONE)
 	     assign flit_sent
 	       = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
 	   else
@@ -1056,7 +1056,7 @@ module vcr_ivc_ctrl
 	     wire [0:cred_hold_width-1]   cred_hold_q;
 	     
 	     wire 			  has_cred_s, has_cred_q;
-	     if(vc_alloc_mask == `VC_ALLOC_MASK_NONE)
+	     if(elig_mask == `ELIG_MASK_NONE)
 	       assign has_cred_s
 		 = vc_allocated_q ?
 		   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
@@ -1087,7 +1087,7 @@ module vcr_ivc_ctrl
 	     assign decr_cred_hold = ~cred_allocated & |cred_hold_q & sw_gnt;
 	     
 	     wire [0:cred_hold_width-1]   cred_hold_new;
-	     if(vc_alloc_mask == `VC_ALLOC_MASK_NONE)
+	     if(elig_mask == `ELIG_MASK_NONE)
 	       assign cred_hold_new = {cred_hold_width{1'b0}};
 	     else
 	       assign cred_hold_new = cred_unallocated & ~sw_gnt;

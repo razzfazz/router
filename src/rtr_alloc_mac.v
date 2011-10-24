@@ -89,14 +89,14 @@ module rtr_alloc_mac
    // precompute output-side arbitration decision one cycle ahead
    parameter precomp_ip_sel = 1;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select which arbiter type to use for VC allocation
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select whether to exclude full or non-empty VCs from VC allocation
-   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
    
    // prefer empty VCs over non-empty ones in VC allocation
    parameter vc_alloc_prefer_empty = 0;
@@ -1644,15 +1644,15 @@ module rtr_alloc_mac
 	      
 	      if(num_vcs_per_class == 1)
 		begin
-		   case(vc_alloc_mask)
+		   case(elig_mask)
 
-		     `VC_ALLOC_MASK_NONE, `VC_ALLOC_MASK_FULL:
+		     `ELIG_MASK_NONE, `ELIG_MASK_FULL:
 		       begin
 			  assign nvs_next_elig_ovc = elig_in_ovc & ~full_in_ovc;
 			  assign nvs_any_elig_opc = elig_in_ovc & ~full_in_ovc;
 		       end
 
-		     `VC_ALLOC_MASK_USED:
+		     `ELIG_MASK_USED:
 		       begin
 			  assign nvs_next_elig_ovc = elig_in_ovc & empty_in_ovc;
 			  assign nvs_any_elig_opc = elig_in_ovc & empty_in_ovc;
@@ -1701,9 +1701,9 @@ module rtr_alloc_mac
 			
 			wire [0:num_vcs_per_class-1] gnt_ocvc;
 			
-			case(vc_alloc_mask)
+			case(elig_mask)
 			  
-			  `VC_ALLOC_MASK_NONE, `VC_ALLOC_MASK_FULL:
+			  `ELIG_MASK_NONE, `ELIG_MASK_FULL:
 			    begin
 			       
 			       if(vc_alloc_prefer_empty)
@@ -1762,7 +1762,7 @@ module rtr_alloc_mac
 			       
 			    end
 
-			  `VC_ALLOC_MASK_USED:
+			  `ELIG_MASK_USED:
 			    begin
 			       
 			       wire [0:num_vcs_per_class-1] req_ocvc;

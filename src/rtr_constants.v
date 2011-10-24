@@ -136,12 +136,12 @@
 //------------------------------------------------------------------------------
 
 // no masking
-`define VC_ALLOC_MASK_NONE 0
+`define ELIG_MASK_NONE 0
 
 // mask VCs that have no buffer space available
-`define VC_ALLOC_MASK_FULL 1
+`define ELIG_MASK_FULL 1
 
 // mask VCs that are not completely empty
-`define VC_ALLOC_MASK_USED 2
+`define ELIG_MASK_USED 2
 
-`define VC_ALLOC_MASK_LAST `VC_ALLOC_MASK_USED
+`define ELIG_MASK_LAST `ELIG_MASK_USED

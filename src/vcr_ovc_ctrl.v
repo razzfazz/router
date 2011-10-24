@@ -78,7 +78,7 @@ module vcr_ovc_ctrl
    parameter vc_id = 0;
    
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
+   parameter elig_mask = `ELIG_MASK_NONE;
    
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
@@ -93,7 +93,7 @@ module vcr_ovc_ctrl
        -1;
    
    // width of counter for credits waiting to be sent to input controller
-   localparam cred_hold_width = (vc_alloc_mask == `VC_ALLOC_MASK_NONE) ? 
+   localparam cred_hold_width = (elig_mask == `ELIG_MASK_NONE) ? 
 				clogb(num_flits_per_vc) :
 				clogb(num_flits_per_vc-1);
    
@@ -316,7 +316,7 @@ module vcr_ovc_ctrl
 	     wire flit_count_force_zero;
 	     wire [0:flit_count_width-1] flit_count_adjusted;
 	     
-	     if(vc_alloc_mask == `VC_ALLOC_MASK_NONE)
+	     if(elig_mask == `ELIG_MASK_NONE)
 	       begin
 		  
 		  if(flow_ctrl_bypass)
@@ -454,14 +454,14 @@ module vcr_ovc_ctrl
    
    generate
       
-      case(vc_alloc_mask)
+      case(elig_mask)
 
-	`VC_ALLOC_MASK_NONE:
+	`ELIG_MASK_NONE:
 	  begin
 	     assign elig = ~allocated_q;
 	  end
 
-	`VC_ALLOC_MASK_FULL:
+	`ELIG_MASK_FULL:
 	  begin
 	     if(flow_ctrl_bypass)
 	       assign elig = ~allocated_q & (~ft_full | credit);
@@ -469,7 +469,7 @@ module vcr_ovc_ctrl
 	       assign elig = ~allocated_q & ~ft_full;
 	  end
 
-	`VC_ALLOC_MASK_USED:
+	`ELIG_MASK_USED:
 	  begin
 	     assign elig = ~allocated_q & ft_empty;
 	  end

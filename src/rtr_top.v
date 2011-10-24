@@ -120,14 +120,14 @@ module rtr_top
    // precompute output-side arbitration decision one cycle ahead
    parameter precomp_ip_sel = 1;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // select which arbiter type to use for switch allocation
    parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select which arbiter type to use for VC allocation
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select whether to exclude full or non-empty VCs from VC allocation
-   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
    
    // prefer empty VCs over non-empty ones in VC allocation
    parameter vc_alloc_prefer_empty = 0;
@@ -411,9 +411,9 @@ module rtr_top
        .dim_order(dim_order),
        .precomp_ivc_sel(precomp_ivc_sel),
        .precomp_ip_sel(precomp_ip_sel),
+       .elig_mask(elig_mask),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
-       .vc_alloc_mask(vc_alloc_mask),
        .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
        .dual_path_alloc(dual_path_alloc),
        .reset_type(reset_type))

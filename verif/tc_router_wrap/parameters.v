@@ -113,14 +113,14 @@ parameter precomp_ivc_sel = 0;
 // precompute output-side arbitration decision one cycle ahead
 parameter precomp_ip_sel = 0;
 
+// select whether to exclude full or non-empty VCs from VC allocation
+parameter elig_mask = `ELIG_MASK_FULL;
+
 // select implementation variant for VC allocator
 parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
 
 // select which arbiter type to use for VC allocator
 parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-
-// select whether to exclude full or non-empty VCs from VC allocation
-parameter vc_alloc_mask = `VC_ALLOC_MASK_FULL;
 
 // prefer empty VCs over non-empty ones in VC allocation
 parameter vc_alloc_prefer_empty = 0;

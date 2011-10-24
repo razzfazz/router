@@ -195,7 +195,7 @@ module vcr_ip_ctrl_mac
    parameter sw_alloc_spec = 1;
    
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
+   parameter elig_mask = `ELIG_MASK_NONE;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -317,7 +317,7 @@ module vcr_ip_ctrl_mac
       
       if(sw_alloc_spec)
 	begin
-	   if(vc_alloc_mask == `VC_ALLOC_MASK_NONE)
+	   if(elig_mask == `ELIG_MASK_NONE)
 	     assign flit_sent
 	       = sw_gnt & 
 		 |(sw_sel_ivc & (allocated_ivc | (vc_gnt_ivc & free_spec_ivc)));
@@ -412,7 +412,7 @@ module vcr_ip_ctrl_mac
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .vc_alloc_mask(vc_alloc_mask),
+	       .elig_mask(elig_mask),
 	       .sw_alloc_spec(sw_alloc_spec),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),

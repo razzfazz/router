@@ -165,14 +165,14 @@ module vcr_top
    // (requires explicit pipeline register; may increase cycle time)
    parameter gate_buffer_write = 0;
    
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
+   
    // select implementation variant for VC allocator
    parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
    parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
-   
-   // select whether to exclude full or non-empty VCs from VC allocation
-   parameter vc_alloc_mask = `VC_ALLOC_MASK_NONE;
    
    // select implementation variant for switch allocator
    parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
@@ -299,7 +299,7 @@ module vcr_top
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .gate_buffer_write(gate_buffer_write),
-	       .vc_alloc_mask(vc_alloc_mask),
+	       .elig_mask(elig_mask),
 	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
@@ -500,7 +500,7 @@ module vcr_top
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .vc_alloc_mask(vc_alloc_mask),
+	       .elig_mask(elig_mask),
 	       .port_id(op),
 	       .reset_type(reset_type))
 	   opc
