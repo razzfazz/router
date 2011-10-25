@@ -238,40 +238,14 @@ module whr_ip_ctrl_mac
    wire 			 flit_valid_out;
    assign flit_valid_out = gnt;
    
-   wire 			 fbc_almost_full;
+   wire 			 fbc_full;
+   
    wire 			 hold_input_enable;
    
    generate
       
       if(input_stage_can_hold)
-	begin
-	   
-	   wire hold_input_enable_active;
-	   assign hold_input_enable_active = flit_valid;
-	   
-	   wire hold_input_enable_set;
-	   assign hold_input_enable_set = fbc_almost_full & flit_valid_in;
-	   
-	   wire hold_input_enable_reset;
-	   assign hold_input_enable_reset = flit_valid_out;
-	   
-	   wire hold_input_enable_s, hold_input_enable_q;
-	   assign hold_input_enable_s
-	     = (hold_input_enable_q | hold_input_enable_set) & 
-	       ~hold_input_enable_reset;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   hold_input_enableq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(hold_input_enable_active),
-	      .d(hold_input_enable_s),
-	      .q(hold_input_enable_q));
-	   
-	   assign hold_input_enable = hold_input_enable_q;
-	   
-	end
+	assign hold_input_enable = fbc_full;
       else
 	assign hold_input_enable = 1'b0;
       
@@ -345,7 +319,7 @@ module whr_ip_ctrl_mac
    wire [0:fb_addr_width-1] 	  fbc_push_addr;
    wire [0:fb_addr_width-1] 	  fbc_pop_addr;
    wire 			  fbc_almost_empty;
-   wire 			  fbc_full;
+   wire 			  fbc_almost_full;
    wire [0:1] 			  fbc_errors;
    c_fifo_ctrl
      #(.depth(fb_depth),
