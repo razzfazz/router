@@ -818,15 +818,8 @@ module rtr_ip_ctrl_mac
 		begin
 		   
 		   wire has_tail_s, has_tail_q;
-		   if(dual_path_alloc)
-		     assign has_tail_s
-		       = (has_tail_q | (chi_flit_valid & chi_flit_tail)) & 
-			 ~(flit_sent_in & flit_tail_out) &
-			 ~(flit_sent_fast_in & flit_tail_fast_out);
-		   else
-		     assign has_tail_s
-		       = (has_tail_q | (chi_flit_valid & chi_flit_tail)) &
-			 ~(flit_sent_in & flit_tail_out);
+		   assign has_tail_s = (has_tail_q & ~fb_empty) | 
+				       (chi_flit_valid & chi_flit_tail);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))

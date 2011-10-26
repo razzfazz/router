@@ -478,8 +478,8 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire has_tail_s, has_tail_q;
-	   assign has_tail_s = (has_tail_q | (flit_valid_in & flit_tail_in)) &
-			       ~(flit_valid_out & flit_tail_out);
+	   assign has_tail_s = (has_tail_q & ~fbc_empty) | 
+			       (flit_valid_in & flit_tail_in);
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
