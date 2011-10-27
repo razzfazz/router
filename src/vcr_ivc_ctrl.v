@@ -32,9 +32,9 @@
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_gnt, 
-   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_head_prev, flit_valid, flit_head, 
-   flit_tail, flit_sel_ovc, flit_data, empty, full, allocated, free_nonspec, 
-   free_spec, errors);
+   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_head_prev, flit_tail_prev, 
+   flit_valid, flit_head, flit_tail, flit_sel_ovc, flit_data, empty, full, 
+   allocated, free_nonspec, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -259,6 +259,9 @@ module vcr_ivc_ctrl
    // if we sent a flit in the previous cycle, was it a head flit?
    input 					     flit_head_prev;
    
+   // if we sent a flit in the previous cycle, was it a tail flit?
+   input 					     flit_tail_prev;
+   
    // outgoing flit is available
    output 					     flit_valid;
    wire 					     flit_valid;
@@ -313,7 +316,12 @@ module vcr_ivc_ctrl
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
    wire 					     pop_active;
-   assign pop_active = flit_valid;
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign pop_active = flit_valid | flit_sent_prev;
+      else
+	assign pop_active = flit_valid;
+   endgenerate
    
    wire 					     flit_sent;
    
@@ -322,7 +330,13 @@ module vcr_ivc_ctrl
    
    wire 					     vc_allocated_s, 
 						     vc_allocated_q;
-   assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign vc_allocated_s
+	  = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
+      else
+	assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+   endgenerate
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -660,7 +674,8 @@ module vcr_ivc_ctrl
    wire 			     hdr_valid_s, hdr_valid_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_valid_s = (hdr_valid_q | flit_valid_in) & ~packet_done;
+	assign hdr_valid_s
+	  = (hdr_valid_q & ~(flit_sent_prev & flit_tail_prev)) | flit_valid_in;
       else
 	assign hdr_valid_s
 	  = flit_sent ?
