@@ -941,9 +941,10 @@ module rtr_ip_ctrl_mac
 	      
 	      wire active;
 	      if(elig_mask == `ELIG_MASK_USED)
-		assign active = ~valid_q;
+		assign active = ~valid_q & chi_flit_valid;
 	      else
-		assign active = ~valid_q | (~fb_empty & htt_flit_tail);
+		assign active
+		  = (~valid_q & chi_flit_valid) | (~fb_empty & htt_flit_tail);
 	      
 	      wire [0:la_route_info_width-1] peek_la_route_info;
 	      assign peek_la_route_info

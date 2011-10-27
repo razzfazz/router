@@ -572,7 +572,7 @@ module whr_ip_ctrl_mac
    wire 			hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_active = ~hdr_valid_q;
+	assign hdr_active = ~hdr_valid_q & flit_valid_in;
       else
 	// NOTE: If this ends up being timing-critical, we can simply eliminate 
 	// the fb_flit_tail term at the expense of slightly worse gating under 

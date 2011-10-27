@@ -693,13 +693,14 @@ module vcr_ivc_ctrl
    wire 			     hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_active = ~hdr_valid_q;
+	assign hdr_active = ~hdr_valid_q & flit_valid_in;
       else
 	// NOTE: If this ends up being timing-critical, we can simply eliminate 
 	// the fb_flit_tail term at the expense of slightly worse gating under 
 	// load.
 	// For relatively short packets, this is probably a good tradeoff.
-	assign hdr_active = ~hdr_valid_q | (~fbc_empty & fb_flit_tail);
+	assign hdr_active
+	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
    endgenerate
    
    wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
