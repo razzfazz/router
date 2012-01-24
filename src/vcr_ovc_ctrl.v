@@ -162,13 +162,8 @@ module vcr_ovc_ctrl
    wire 			  alloc_active;
    assign alloc_active = vc_active | (|xbr_ctrl_ip);
    
-   wire 			  allocated_q;
-   
-   wire 			  next_allocated;   
-   assign next_allocated = vc_gnt | allocated_q;
-   
-   wire 			  allocated_s;
-   assign allocated_s = next_allocated & ~(flit_valid & flit_tail);
+   wire 			  allocated_s, allocated_q;
+   assign allocated_s = vc_gnt | (allocated_q & ~(flit_valid & flit_tail));
    c_dff
      #(.width(1),
        .reset_type(reset_type))
