@@ -790,8 +790,8 @@ module rtr_ip_ctrl_mac
 	   
 	   if(1) begin:htt
 	      
-	      wire active;
-	      assign active = chi_flit_valid | ~fb_empty;
+	      wire pop_active;
+	      assign pop_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire flit_head_s, flit_head_q;
 	      if(dual_path_alloc)
@@ -808,9 +808,12 @@ module rtr_ip_ctrl_mac
 	      flit_headq
 		(.clk(clk),
 		 .reset(1'b0),
-		 .active(active),
+		 .active(pop_active),
 		 .d(flit_head_s),
 		 .q(flit_head_q));
+	      
+	      wire push_active;
+	      assign push_active = chi_flit_valid;
 	      
 	      wire flit_tail;
 	      
@@ -818,15 +821,16 @@ module rtr_ip_ctrl_mac
 		begin
 		   
 		   wire has_tail_s, has_tail_q;
-		   assign has_tail_s = (has_tail_q & ~fb_empty) | 
-				       (chi_flit_valid & chi_flit_tail);
+		   assign has_tail_s
+		     = (has_tail_q & ~(chi_flit_valid & chi_flit_head)) | 
+		       (chi_flit_valid & chi_flit_tail);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
 		   has_tailq
 		     (.clk(clk),
 		      .reset(reset),
-		      .active(active),
+		      .active(push_active),
 		      .d(has_tail_s),
 		      .q(has_tail_q));
 		   
@@ -835,9 +839,6 @@ module rtr_ip_ctrl_mac
 		end
 	      else
 		begin
-		   
-		   wire push_active;
-		   assign push_active = chi_flit_valid;
 		   
 		   wire [0:num_flits_per_vc-1] push_mask;
 		   c_decode
