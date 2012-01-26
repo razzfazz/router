@@ -602,7 +602,7 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   wire has_tail_s, has_tail_q;
-	   assign has_tail_s = (has_tail_q & ~fbc_empty) | 
+	   assign has_tail_s = (has_tail_q & ~(flit_valid_in & flit_head_in)) | 
 			       (flit_valid_in & flit_tail_in);
 	   c_dff
 	     #(.width(1),
@@ -610,7 +610,7 @@ module vcr_ivc_ctrl
 	   has_tailq
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(pop_active),
+	      .active(push_active),
 	      .d(has_tail_s),
 	      .q(has_tail_q));
 	   
