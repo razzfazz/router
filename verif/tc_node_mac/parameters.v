@@ -85,4 +85,7 @@ parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
 // select order of dimension traversal
 parameter dim_order = `DIM_ORDER_ASCENDING;
 
+// select whether to exclude full or non-empty VCs from VC allocation
+parameter elig_mask = `ELIG_MASK_FULL;
+
 parameter reset_type = `RESET_TYPE_ASYNC;  
