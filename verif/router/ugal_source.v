@@ -33,7 +33,7 @@ module ugal_source(/*autoarg*/
    // Outputs
    intm_router_address, route_min,
    // Inputs
-   clk, reset, flit_valid, flit_head, src_router_address, sel_mc, route_info,
+   clk, reset, flit_valid, flit_head, src_router_address, sel_mc, dest_info,
    credit_count
    );
    
@@ -109,7 +109,7 @@ module ugal_source(/*autoarg*/
    parameter dim_order 		   = `DIM_ORDER_ASCENDING;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -129,7 +129,7 @@ module ugal_source(/*autoarg*/
    // current message class
    input [0:num_message_classes-1] sel_mc;
    //destination address
-   input [0:addr_width-1] route_info;
+   input [0:addr_width-1] dest_info;
    
    localparam credit_count_width  = clogb(num_vcs*num_flits_per_vc)+1;
    //credit count from the ugal_sniffer
@@ -158,7 +158,7 @@ module ugal_source(/*autoarg*/
       (.router_address(src_router_address),
        .sel_mc('d1),
        .sel_irc(sel_irc),
-       .route_info({src_router_address,route_info}),
+       .dest_info({src_router_address,dest_info}),
        .route_op(min_route_unmasked),
        .route_orc(route_orc));
 
@@ -181,7 +181,7 @@ module ugal_source(/*autoarg*/
       (.router_address(src_router_address),
        .sel_mc('d1),
        .sel_irc(sel_irc_nonmin),
-       .route_info({intm_router_address,route_info}),
+       .dest_info({intm_router_address,dest_info}),
        .route_op(nonmin_route_unmasked),
        .route_orc(route_orc_nonmin));
 

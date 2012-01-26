@@ -30,7 +30,7 @@
 //==============================================================================
 
 module rtr_routing_logic
-  (router_address, sel_mc, sel_irc, route_info, route_op, route_orc);
+  (router_address, sel_mc, sel_irc, dest_info, route_op, route_orc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -84,7 +84,7 @@ module rtr_routing_logic
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -123,7 +123,7 @@ module rtr_routing_logic
    input [0:num_resource_classes-1] sel_irc;
    
    // routing data
-   input [0:route_info_width-1]     route_info;
+   input [0:dest_info_width-1]     dest_info;
    
    // output port to forward to
    output [0:num_ports-1] 	    route_op;
@@ -155,7 +155,7 @@ module rtr_routing_logic
 	     wire [0:num_resource_classes*
 		   router_addr_width-1] dest_router_addr_irc;
 	     assign dest_router_addr_irc
-	       = route_info[0:num_resource_classes*router_addr_width-1];
+	       = dest_info[0:num_resource_classes*router_addr_width-1];
 	     
 	     wire [0:num_resource_classes-1] reached_dest_irc;
 	     
@@ -426,7 +426,7 @@ module rtr_routing_logic
 	   
 	   wire [0:node_addr_width-1] dest_node_address;
 	   assign dest_node_address
-	     = route_info[route_info_width-node_addr_width:route_info_width-1];
+	     = dest_info[dest_info_width-node_addr_width:dest_info_width-1];
 	   
 	   wire [0:num_nodes_per_router-1] node_sel;
 	   c_decode

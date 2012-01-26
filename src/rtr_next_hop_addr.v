@@ -30,7 +30,7 @@
 //==============================================================================
 
 module rtr_next_hop_addr
-  (router_address, route_info, la_route_info, next_router_address);
+  (router_address, dest_info, lar_info, next_router_address);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -76,7 +76,7 @@ module rtr_next_hop_addr
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -98,7 +98,7 @@ module rtr_next_hop_addr
    localparam port_idx_width = clogb(num_ports);
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    
    //---------------------------------------------------------------------------
@@ -109,10 +109,10 @@ module rtr_next_hop_addr
    input [0:router_addr_width-1] router_address;
    
    // routing information
-   input [0:route_info_width-1]  route_info;
+   input [0:dest_info_width-1]  dest_info;
    
    // lookahead routing information
-   input [0:la_route_info_width-1] la_route_info;
+   input [0:lar_info_width-1] lar_info;
    
    // lookahead routing information for next router
    output [0:router_addr_width-1]  next_router_address;
@@ -124,7 +124,7 @@ module rtr_next_hop_addr
    //---------------------------------------------------------------------------
    
    wire [0:port_idx_width-1] 	   route_port;
-   assign route_port = la_route_info[0:port_idx_width-1];
+   assign route_port = lar_info[0:port_idx_width-1];
    
    generate
       
@@ -135,7 +135,7 @@ module rtr_next_hop_addr
 	     
 	     wire [0:num_resource_classes*router_addr_width-1] dest_addr_orc;
 	     assign dest_addr_orc
-	       = route_info[0:num_resource_classes*router_addr_width-1];
+	       = dest_info[0:num_resource_classes*router_addr_width-1];
 	     
 	     wire [0:router_addr_width-1] 		       dest_addr;
  	     
@@ -145,7 +145,7 @@ module rtr_next_hop_addr
 	       begin
 		  wire [0:resource_class_idx_width-1] route_rcsel;
 		  assign route_rcsel
-		    = la_route_info[port_idx_width:
+		    = lar_info[port_idx_width:
 				    port_idx_width+resource_class_idx_width-1];
 		  
 		  assign dest_addr

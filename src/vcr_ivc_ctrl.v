@@ -146,13 +146,13 @@ module vcr_ivc_ctrl
    parameter restrict_turns = 1;
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -160,11 +160,11 @@ module vcr_ivc_ctrl
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (lar_info_width + dest_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -697,13 +697,13 @@ module vcr_ivc_ctrl
    wire [0:header_info_width-1]      header_info_in;
    assign header_info_in = flit_data_in[0:header_info_width-1];
    
-   wire [0:la_route_info_width-1]    la_route_info_in;
-   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
+   wire [0:lar_info_width-1]    lar_info_in;
+   assign lar_info_in = header_info_in[0:lar_info_width-1];
    
-   wire [0:route_info_width-1] 	     route_info_in;
-   assign route_info_in
-     = header_info_in[la_route_info_width:
-		      la_route_info_width+route_info_width-1];
+   wire [0:dest_info_width-1] 	     dest_info_in;
+   assign dest_info_in
+     = header_info_in[lar_info_width:
+		      lar_info_width+dest_info_width-1];
    
    wire 			     hdr_active;
    generate
@@ -718,64 +718,64 @@ module vcr_ivc_ctrl
 	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
    endgenerate
    
-   wire [0:la_route_info_width-1]    hdr_la_route_info_s, hdr_la_route_info_q;
+   wire [0:lar_info_width-1]    hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_la_route_info_s
-	  = hdr_valid_q ? hdr_la_route_info_q : la_route_info_in;
+	assign hdr_lar_info_s
+	  = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
       else
 	begin
 	   
-	   wire [0:la_route_info_width-1] peek_la_route_info;
-	   assign peek_la_route_info
-	     = peek_header_info[0:la_route_info_width-1];
+	   wire [0:lar_info_width-1] peek_lar_info;
+	   assign peek_lar_info
+	     = peek_header_info[0:lar_info_width-1];
 	   
-	   assign hdr_la_route_info_s
+	   assign hdr_lar_info_s
 	     = packet_done ? 
-	       (fbc_almost_empty ? la_route_info_in : peek_la_route_info) : 
-	       (hdr_valid_q ? hdr_la_route_info_q : la_route_info_in);
+	       (fbc_almost_empty ? lar_info_in : peek_lar_info) : 
+	       (hdr_valid_q ? hdr_lar_info_q : lar_info_in);
 	   
 	end
    endgenerate
    c_dff
-     #(.width(la_route_info_width),
+     #(.width(lar_info_width),
        .reset_type(reset_type))
-   hdr_la_route_infoq
+   hdr_lar_infoq
      (.clk(clk),
       .reset(1'b0),
       .active(hdr_active),
-      .d(hdr_la_route_info_s),
-      .q(hdr_la_route_info_q));
+      .d(hdr_lar_info_s),
+      .q(hdr_lar_info_q));
    
-   wire [0:route_info_width-1] 	     hdr_route_info_s, hdr_route_info_q;
+   wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_route_info_s
-	  = hdr_valid_q ? hdr_route_info_q : route_info_in;
+	assign hdr_dest_info_s
+	  = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
       else
 	begin
 	   
-	   wire [0:route_info_width-1] peek_route_info;
-	   assign peek_route_info = peek_header_info[la_route_info_width:
-						     la_route_info_width+
-						     route_info_width-1];
+	   wire [0:dest_info_width-1] peek_dest_info;
+	   assign peek_dest_info = peek_header_info[lar_info_width:
+						     lar_info_width+
+						     dest_info_width-1];
 	   
-	   assign hdr_route_info_s
+	   assign hdr_dest_info_s
 	     = packet_done ?
-	       (fbc_almost_empty ? route_info_in : peek_route_info) :
-	       (hdr_valid_q ? hdr_route_info_q : route_info_in);
+	       (fbc_almost_empty ? dest_info_in : peek_dest_info) :
+	       (hdr_valid_q ? hdr_dest_info_q : dest_info_in);
 	   
 	end
    endgenerate
    c_dff
-     #(.width(route_info_width),
+     #(.width(dest_info_width),
        .reset_type(reset_type))
-   hdr_route_infoq
+   hdr_dest_infoq
      (.clk(clk),
       .reset(1'b0),
       .active(hdr_active),
-      .d(hdr_route_info_s),
-      .q(hdr_route_info_q));
+      .d(hdr_dest_info_s),
+      .q(hdr_dest_info_q));
    
    wire 			     error_no_header;
    assign error_no_header
@@ -787,7 +787,7 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:port_idx_width-1] 			     route_port_in;
-   assign route_port_in = la_route_info_in[0:port_idx_width-1];
+   assign route_port_in = lar_info_in[0:port_idx_width-1];
    
    wire [0:num_ports-1] 			     route_in_op;
    c_decode
@@ -797,7 +797,7 @@ module vcr_ivc_ctrl
       .data_out(route_in_op));
    
    wire [0:port_idx_width-1] 			     hdr_route_port;
-   assign hdr_route_port = hdr_la_route_info_q[0:port_idx_width-1];
+   assign hdr_route_port = hdr_lar_info_q[0:port_idx_width-1];
    
    wire [0:num_ports-1] 			     hdr_route_op;
    c_decode
@@ -820,7 +820,7 @@ module vcr_ivc_ctrl
 	   
 	   wire [0:resource_class_idx_width-1] route_rcsel_in;
 	   assign route_rcsel_in
-	     = la_route_info_in[port_idx_width:
+	     = lar_info_in[port_idx_width:
 				port_idx_width+resource_class_idx_width-1];
 	   
 	   wire [0:num_resource_classes-1]     route_in_orc;
@@ -832,7 +832,7 @@ module vcr_ivc_ctrl
 	   
 	   wire [0:resource_class_idx_width-1] hdr_route_rcsel;
 	   assign hdr_route_rcsel
-	     = hdr_la_route_info_q[port_idx_width:
+	     = hdr_lar_info_q[port_idx_width:
 				   port_idx_width+resource_class_idx_width-1];
 	   
 	   wire [0:num_resource_classes-1]     hdr_route_orc;
@@ -891,11 +891,11 @@ module vcr_ivc_ctrl
    // update lookahead routing information for next hop
    //---------------------------------------------------------------------------
    
-   wire [0:route_info_width-1] 		       route_info;
-   assign route_info = hdr_valid_q ? hdr_route_info_q : route_info_in;
+   wire [0:dest_info_width-1] 		       dest_info;
+   assign dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
    
-   wire [0:la_route_info_width-1] 	       la_route_info;
-   assign la_route_info = hdr_valid_q ? hdr_la_route_info_q : la_route_info_in;
+   wire [0:lar_info_width-1] 	       lar_info;
+   assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
    
    wire [0:router_addr_width-1] 	       next_router_address;
    rtr_next_hop_addr
@@ -907,8 +907,8 @@ module vcr_ivc_ctrl
        .routing_type(routing_type))
    nha
      (.router_address(router_address),
-      .route_info(route_info),
-      .la_route_info(la_route_info),
+      .dest_info(dest_info),
+      .lar_info(lar_info),
       .next_router_address(next_router_address));
    
    wire [0:num_message_classes-1] 	       sel_mc;
@@ -936,7 +936,7 @@ module vcr_ivc_ctrl
      (.router_address(next_router_address),
       .sel_mc(sel_mc),
       .sel_irc(route_orc),
-      .route_info(route_info),
+      .dest_info(dest_info),
       .route_op(next_route_op),
       .route_orc(next_route_orc));
    
@@ -947,8 +947,8 @@ module vcr_ivc_ctrl
      (.data_in(next_route_op),
       .data_out(next_route_port));
    
-   wire [0:la_route_info_width-1] 	       next_la_route_info;
-   assign next_la_route_info[0:port_idx_width-1] = next_route_port;
+   wire [0:lar_info_width-1] 	       next_lar_info;
+   assign next_lar_info[0:port_idx_width-1] = next_route_port;
    
    generate
       
@@ -962,7 +962,7 @@ module vcr_ivc_ctrl
 	     (.data_in(next_route_orc),
 	      .data_out(next_route_rcsel));
 	   
-	   assign next_la_route_info[port_idx_width:
+	   assign next_lar_info[port_idx_width:
 				     port_idx_width+resource_class_idx_width-1]
 	     = next_route_rcsel;
 	   
@@ -983,12 +983,12 @@ module vcr_ivc_ctrl
 	   wire [0:flit_data_width-1] flit_data_muxed;
 	   assign flit_data_muxed = empty ? flit_data_in : fbf_flit_data;
 	   
-	   assign flit_data[0:la_route_info_width-1]
+	   assign flit_data[0:lar_info_width-1]
 	     = flit_head ? 
-	       next_la_route_info : 
-	       flit_data_muxed[0:la_route_info_width-1];
-	   assign flit_data[la_route_info_width:flit_data_width-1]
-	     = flit_data_muxed[la_route_info_width:flit_data_width-1];
+	       next_lar_info : 
+	       flit_data_muxed[0:lar_info_width-1];
+	   assign flit_data[lar_info_width:flit_data_width-1]
+	     = flit_data_muxed[lar_info_width:flit_data_width-1];
 	   
 	end
       else
@@ -997,28 +997,28 @@ module vcr_ivc_ctrl
 	   wire active;
 	   assign active = flit_valid & flit_head;
 	   
-	   wire update_next_la_route_info;
-	   assign update_next_la_route_info = flit_sent_prev & flit_head_prev;
+	   wire update_next_lar_info;
+	   assign update_next_lar_info = flit_sent_prev & flit_head_prev;
 	   
-	   wire [0:la_route_info_width-1] next_la_route_info_s;
-	   wire [0:la_route_info_width-1] next_la_route_info_q;
-	   assign next_la_route_info_s = next_la_route_info;
+	   wire [0:lar_info_width-1] next_lar_info_s;
+	   wire [0:lar_info_width-1] next_lar_info_q;
+	   assign next_lar_info_s = next_lar_info;
 	   c_dff
-	     #(.width(la_route_info_width),
+	     #(.width(lar_info_width),
 	       .reset_type(reset_type))
-	   next_la_route_infoq
+	   next_lar_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
 	      .active(active),
-	      .d(next_la_route_info_s),
-	      .q(next_la_route_info_q));
+	      .d(next_lar_info_s),
+	      .q(next_lar_info_q));
 	   
-	   assign flit_data[0:la_route_info_width-1]
-	     = update_next_la_route_info ? 
-	       next_la_route_info_q : 
-	       fbf_flit_data[0:la_route_info_width-1];
-	   assign flit_data[la_route_info_width:flit_data_width-1]
-	     = fbf_flit_data[la_route_info_width:flit_data_width-1];
+	   assign flit_data[0:lar_info_width-1]
+	     = update_next_lar_info ? 
+	       next_lar_info_q : 
+	       fbf_flit_data[0:lar_info_width-1];
+	   assign flit_data[lar_info_width:flit_data_width-1]
+	     = fbf_flit_data[lar_info_width:flit_data_width-1];
 	   
 	end
       

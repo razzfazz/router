@@ -177,13 +177,13 @@ module packet_source
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -191,11 +191,11 @@ module packet_source
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (lar_info_width + dest_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -463,7 +463,7 @@ module packet_source
    assign flit_data[header_info_width:flit_data_width-1]
      = data_q[header_info_width:flit_data_width-1];
    
-   reg [0:route_info_width-1] route_info;
+   reg [0:dest_info_width-1] dest_info;
    
    wire [0:num_message_classes*num_resource_classes-1] sel_mc_orc;
    c_mat_mult
@@ -524,7 +524,7 @@ module packet_source
      (.router_address(router_address),
       .sel_mc(sel_mc),
       .sel_irc(sel_orc),
-      .route_info(route_info),
+      .dest_info(dest_info),
       .route_op(route_op),
       .route_orc(route_orc));
    
@@ -535,8 +535,8 @@ module packet_source
      (.data_in(route_op),
       .data_out(route_port));
    
-   wire [0:la_route_info_width-1] 		       la_route_info;
-   assign la_route_info[0:port_idx_width-1] = route_port;
+   wire [0:lar_info_width-1] 		       lar_info;
+   assign lar_info[0:port_idx_width-1] = route_port;
    
    generate
       
@@ -550,7 +550,7 @@ module packet_source
 	     (.data_in(route_orc),
 	      .data_out(route_rcsel));
 	   
-	   assign la_route_info[port_idx_width:
+	   assign lar_info[port_idx_width:
 				port_idx_width+resource_class_idx_width-1]
 	     = route_rcsel;
 	   
@@ -558,11 +558,11 @@ module packet_source
       
    endgenerate
    
-   assign header_info[0:la_route_info_width-1] = la_route_info;
+   assign header_info[0:lar_info_width-1] = lar_info;
    
-   wire [0:num_resource_classes*router_addr_width-1] route_info_addresses;
-   assign route_info_addresses
-     = route_info[0:num_resource_classes*router_addr_width-1];
+   wire [0:num_resource_classes*router_addr_width-1] dest_info_addresses;
+   assign dest_info_addresses
+     = dest_info[0:num_resource_classes*router_addr_width-1];
    
    wire [0:router_addr_width-1] 		     rc_dest;
    c_select_1ofn
@@ -570,7 +570,7 @@ module packet_source
        .width(router_addr_width))
    rc_dest_sel
      (.select(sel_orc),
-      .data_in(route_info_addresses),
+      .data_in(dest_info_addresses),
       .data_out(rc_dest));
    
    wire [0:addr_width-1] 			     source_address;
@@ -589,8 +589,8 @@ module packet_source
 	       begin
 		  
 		  assign flit_kill
-		    = (route_info[route_info_width-addr_width:
-				  route_info_width-1] ==
+		    = (dest_info[dest_info_width-addr_width:
+				  dest_info_width-1] ==
 		       source_address);
 		  
 	       end
@@ -734,7 +734,7 @@ module packet_source
 					  router_address)) ? 1 : 0, 
 					num_nodes_per_router - 1)) % 
 			 num_nodes_per_router;
-		     route_info[route_info_width-addr_width:route_info_width-1]
+		     dest_info[dest_info_width-addr_width:dest_info_width-1]
 		       = {random_router_address, random_node_address};
 		  end		
 	     end
@@ -766,7 +766,7 @@ module packet_source
 					  router_address)) ? 1 : 0,
 					num_routers_per_dim - 1)) %
 			 num_routers_per_dim;
-		     route_info[route_info_width-addr_width:route_info_width-1]
+		     dest_info[dest_info_width-addr_width:dest_info_width-1]
 		       = random_router_address;
 		  end
 	     end
@@ -801,16 +801,16 @@ module packet_source
 					       last_router_address) ? 1 : 0, 
 					num_routers_per_dim - 1)) % 
 			 num_routers_per_dim;
-		     route_info[i*router_addr_width +: router_addr_width]
+		     dest_info[i*router_addr_width +: router_addr_width]
 		       = random_intm_address;
 		     last_router_address = random_intm_address;
 		  end
 	     end
 	end
       
-      assign header_info[la_route_info_width:
-			 la_route_info_width+route_info_width-1]
-	       = route_info;
+      assign header_info[lar_info_width:
+			 lar_info_width+dest_info_width-1]
+	       = dest_info;
       
       if(max_payload_length > 0)
 	begin
@@ -867,8 +867,8 @@ module packet_source
 	     begin
 		wire [0:payload_length_width-1] payload_length;
 		assign payload_length = (flit_count_q - min_payload_length);
-		assign header_info[la_route_info_width+route_info_width:
-				   la_route_info_width+route_info_width+
+		assign header_info[lar_info_width+dest_info_width:
+				   lar_info_width+dest_info_width+
 				   payload_length_width-1]
 			 = payload_length;
 	     end
@@ -898,7 +898,7 @@ module packet_source
 	      .data_out(sel_ovc));
 	   
 	   assign curr_dest_addr
-	     = route_info[((random_vc / num_vcs_per_class) % 
+	     = dest_info[((random_vc / num_vcs_per_class) % 
 			   num_resource_classes)*router_addr_width +: 
 			  router_addr_width];
 	   
@@ -906,7 +906,7 @@ module packet_source
       else
 	begin
 	   assign sel_ovc = 1'b1;
-	   assign curr_dest_addr = route_info[0:router_addr_width-1];
+	   assign curr_dest_addr = dest_info[0:router_addr_width-1];
 	end
       
    endgenerate

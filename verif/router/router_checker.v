@@ -142,13 +142,13 @@ module router_checker
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -156,11 +156,11 @@ module router_checker
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (lar_info_width + dest_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -228,8 +228,8 @@ module router_checker
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
-	       .la_route_info_width(la_route_info_width),
-	       .route_info_width(route_info_width),
+	       .lar_info_width(lar_info_width),
+	       .dest_info_width(dest_info_width),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   chi
@@ -300,10 +300,10 @@ module router_checker
 	   wire [0:header_info_width-1] 		       header_info_in;
 	   assign header_info_in = flit_data[0:header_info_width-1];
 	   
-	   wire [0:route_info_width-1] 			       route_info;
-	   assign route_info = header_info_in[la_route_info_width:
-					      la_route_info_width+
-					      route_info_width-1];
+	   wire [0:dest_info_width-1] 			       dest_info;
+	   assign dest_info = header_info_in[lar_info_width:
+					      lar_info_width+
+					      dest_info_width-1];
 	   
 	   wire [0:num_ports-1] 			       route_op;
 	   wire [0:num_resource_classes-1] 		       route_orc;
@@ -320,7 +320,7 @@ module router_checker
 	     (.router_address(router_address),
 	      .sel_mc(sel_mc),
 	      .sel_irc(sel_irc),
-	      .route_info(route_info),
+	      .dest_info(dest_info),
 	      .route_op(route_op),
 	      .route_orc(route_orc));
 	   
@@ -370,8 +370,8 @@ module router_checker
 	   
 	   // generate lookahead routing information
 	   
-	   wire [0:la_route_info_width-1] la_route_info_in;
-	   assign la_route_info_in = header_info_in[0:la_route_info_width-1];
+	   wire [0:lar_info_width-1] lar_info_in;
+	   assign lar_info_in = header_info_in[0:lar_info_width-1];
 	   
 	   wire [0:router_addr_width-1]   next_router_address;
 	   rtr_next_hop_addr
@@ -383,8 +383,8 @@ module router_checker
 	       .routing_type(routing_type))
 	   nha
 	     (.router_address(router_address),
-	      .route_info(route_info),
-	      .la_route_info(la_route_info_in),
+	      .dest_info(dest_info),
+	      .lar_info(lar_info_in),
 	      .next_router_address(next_router_address));
 	   
 	   wire [0:num_ports-1] 	  next_route_op;
@@ -402,7 +402,7 @@ module router_checker
 	     (.router_address(next_router_address),
 	      .sel_mc(sel_mc),
 	      .sel_irc(sel_orc),
-	      .route_info(route_info),
+	      .dest_info(dest_info),
 	      .route_op(next_route_op),
 	      .route_orc(next_route_orc));
 	   
@@ -413,8 +413,8 @@ module router_checker
 	     (.data_in(next_route_op),
 	      .data_out(next_route_port));
 	   
-	   wire [0:la_route_info_width-1]  la_route_info_out;
-	   assign la_route_info_out[0:port_idx_width-1] = next_route_port;
+	   wire [0:lar_info_width-1]  lar_info_out;
+	   assign lar_info_out[0:port_idx_width-1] = next_route_port;
 	   
 	   if(num_resource_classes > 1)
 	     begin
@@ -426,18 +426,18 @@ module router_checker
 		  (.data_in(next_route_orc),
 		   .data_out(next_route_rcsel));
 		
-		assign la_route_info_out[port_idx_width:
+		assign lar_info_out[port_idx_width:
 					 port_idx_width+
 					 resource_class_idx_width-1]
 		  = next_route_rcsel;
 		
 	     end
 	   
-	   assign header_info_out[0:la_route_info_width-1]
-	     = la_route_info_out;
+	   assign header_info_out[0:lar_info_width-1]
+	     = lar_info_out;
 	   
-	   assign header_info_out[la_route_info_width:header_info_width-1]
-	     = header_info_in[la_route_info_width:header_info_width-1];
+	   assign header_info_out[lar_info_width:header_info_width-1]
+	     = header_info_in[lar_info_width:header_info_width-1];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -701,8 +701,8 @@ module router_checker
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
-	       .la_route_info_width(la_route_info_width),
-	       .route_info_width(route_info_width),
+	       .lar_info_width(lar_info_width),
+	       .dest_info_width(dest_info_width),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   chi

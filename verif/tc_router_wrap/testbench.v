@@ -97,10 +97,10 @@ module testbench
    localparam port_idx_width = clogb(num_ports);
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = num_resource_classes * router_addr_width + node_addr_width;
    
    // number of bits required to represent all possible payload sizes
@@ -110,11 +110,11 @@ module testbench
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (lar_info_width + dest_info_width + payload_length_width) : 
        -1;
    
    // width of counter for remaining flits

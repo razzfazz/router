@@ -122,10 +122,10 @@ module testbench
    localparam node_addr_width = clogb(num_nodes_per_router);
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -403,8 +403,8 @@ module testbench
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
-	       .la_route_info_width(la_route_info_width),
-	       .route_info_width(route_info_width),
+	       .lar_info_width(lar_info_width),
+	       .dest_info_width(dest_info_width),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   fs

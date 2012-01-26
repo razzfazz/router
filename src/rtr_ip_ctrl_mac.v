@@ -177,7 +177,7 @@ module rtr_ip_ctrl_mac
      = clogb(max_payload_length-min_payload_length+1);
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -196,16 +196,16 @@ module rtr_ip_ctrl_mac
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (lar_info_width + dest_info_width + payload_length_width) : 
        -1;
    
    // required address size for a single VC's buffer
@@ -323,8 +323,8 @@ module rtr_ip_ctrl_mac
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .la_route_info_width(la_route_info_width),
-       .route_info_width(route_info_width),
+       .lar_info_width(lar_info_width),
+       .dest_info_width(dest_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi
@@ -346,13 +346,13 @@ module rtr_ip_ctrl_mac
    wire [0:header_info_width-1] 	     chi_header_info;
    assign chi_header_info = chi_flit_data[0:header_info_width-1];
 
-   wire [0:la_route_info_width-1] 	     chi_la_route_info;
-   assign chi_la_route_info = chi_header_info[0:la_route_info_width-1];
+   wire [0:lar_info_width-1] 	     chi_lar_info;
+   assign chi_lar_info = chi_header_info[0:lar_info_width-1];
    
-   wire [0:route_info_width-1] 		     chi_route_info;
-   assign chi_route_info
-     = chi_header_info[la_route_info_width:
-		       la_route_info_width+route_info_width-1];
+   wire [0:dest_info_width-1] 		     chi_dest_info;
+   assign chi_dest_info
+     = chi_header_info[lar_info_width:
+		       lar_info_width+dest_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ module rtr_ip_ctrl_mac
       if(1) begin:gld
 	 
 	 wire [0:port_idx_width-1] route_port;
-	 assign route_port = chi_la_route_info[0:port_idx_width-1];
+	 assign route_port = chi_lar_info[0:port_idx_width-1];
 	 
 	 wire [0:num_ports-1] 	   route_op;
 	 c_decode
@@ -385,7 +385,7 @@ module rtr_ip_ctrl_mac
 	      
 	      wire [0:resource_class_idx_width-1] route_rcsel;
 	      assign route_rcsel
-		= chi_la_route_info[port_idx_width:
+		= chi_lar_info[port_idx_width:
 				    port_idx_width+resource_class_idx_width-1];
 	      
 	      c_decode
@@ -408,7 +408,7 @@ module rtr_ip_ctrl_mac
    // global lookahead routing information update logic
    //---------------------------------------------------------------------------
    
-   wire [0:la_route_info_width-1] 		  glu_la_route_info;
+   wire [0:lar_info_width-1] 		  glu_lar_info;
    wire [0:flit_data_width-1] 			  glu_flit_data;
    
    generate
@@ -425,8 +425,8 @@ module rtr_ip_ctrl_mac
 	     .routing_type(routing_type))
 	 nha
 	   (.router_address(router_address),
-	    .route_info(chi_route_info),
-	    .la_route_info(chi_la_route_info),
+	    .dest_info(chi_dest_info),
+	    .lar_info(chi_lar_info),
 	    .next_router_address(next_router_address));
 	 
 	 wire [0:num_message_classes-1] sel_mc;
@@ -456,7 +456,7 @@ module rtr_ip_ctrl_mac
 	   (.router_address(next_router_address),
 	    .sel_mc(sel_mc),
 	    .sel_irc(gld_route_orc),
-	    .route_info(chi_route_info),
+	    .dest_info(chi_dest_info),
 	    .route_op(route_op),
 	    .route_orc(route_orc));
 	 
@@ -467,8 +467,8 @@ module rtr_ip_ctrl_mac
 	   (.data_in(route_op),
 	    .data_out(route_port));
 	 
-	 wire [0:la_route_info_width-1]  la_route_info;
-	 assign la_route_info[0:port_idx_width-1] = route_port;
+	 wire [0:lar_info_width-1]  lar_info;
+	 assign lar_info[0:port_idx_width-1] = route_port;
 	 
 	 if(num_resource_classes > 1)
 	   begin
@@ -480,19 +480,19 @@ module rtr_ip_ctrl_mac
 		(.data_in(route_orc),
 		 .data_out(route_rcsel));
 	      
-	      assign la_route_info[port_idx_width:
+	      assign lar_info[port_idx_width:
 				   port_idx_width+resource_class_idx_width-1]
 		= route_rcsel;
 	      
 	   end
 	 
-	 assign glu_la_route_info = la_route_info;
-	 assign glu_flit_data[0:la_route_info_width-1]
+	 assign glu_lar_info = lar_info;
+	 assign glu_flit_data[0:lar_info_width-1]
 	   = (chi_flit_valid & chi_flit_head) ? 
-	     la_route_info : 
-	     chi_flit_data[0:la_route_info_width-1];
-	 assign glu_flit_data[la_route_info_width:flit_data_width-1]
-	   = chi_flit_data[la_route_info_width:flit_data_width-1];
+	     lar_info : 
+	     chi_flit_data[0:lar_info_width-1];
+	 assign glu_flit_data[lar_info_width:flit_data_width-1]
+	   = chi_flit_data[lar_info_width:flit_data_width-1];
 	 
       end
       
@@ -891,8 +891,8 @@ module rtr_ip_ctrl_mac
 	   wire hit_valid;
 	   wire [0:num_ports-1] hit_route_op;
 	   wire [0:num_resource_classes-1] hit_route_orc;
-	   wire [0:la_route_info_width-1]  hit_la_route_info;
-	   wire [0:route_info_width-1] 	   hit_route_info;
+	   wire [0:lar_info_width-1]  hit_lar_info;
+	   wire [0:dest_info_width-1] 	   hit_dest_info;
 	   
 	   wire 			   error_no_header;
 	   
@@ -947,13 +947,13 @@ module rtr_ip_ctrl_mac
 		assign active
 		  = (~valid_q & chi_flit_valid) | (~fb_empty & htt_flit_tail);
 	      
-	      wire [0:la_route_info_width-1] peek_la_route_info;
-	      assign peek_la_route_info
-		= fb_peek_header_info[0:la_route_info_width-1];
+	      wire [0:lar_info_width-1] peek_lar_info;
+	      assign peek_lar_info
+		= fb_peek_header_info[0:lar_info_width-1];
 	      
 	      wire [0:num_ports-1] route_op;
 	      wire [0:num_resource_classes-1] route_orc;
-	      wire [0:la_route_info_width-1]  la_route_info;
+	      wire [0:lar_info_width-1]  lar_info;
 	      
 	      if(dual_path_alloc)
 		begin
@@ -972,7 +972,7 @@ module rtr_ip_ctrl_mac
 			
 			wire [0:port_idx_width-1] peek_route_port;
 			assign peek_route_port
-			  = peek_la_route_info[0:port_idx_width-1];
+			  = peek_lar_info[0:port_idx_width-1];
 			
 			wire [0:num_ports-1] 	  peek_route_op;
 			c_decode
@@ -1006,7 +1006,7 @@ module rtr_ip_ctrl_mac
 		     (.data_in(route_op_q),
 		      .data_out(route_port));
 		   
-		   assign la_route_info[0:port_idx_width-1] = route_port;
+		   assign lar_info[0:port_idx_width-1] = route_port;
 		   
 		   if(num_resource_classes == 1)
 		     assign route_orc = 1'b1;
@@ -1024,7 +1024,7 @@ module rtr_ip_ctrl_mac
 			     wire [0:resource_class_idx_width-1] 
 			       peek_route_rcsel;
 			     assign peek_route_rcsel
-			       = peek_la_route_info[port_idx_width:
+			       = peek_lar_info[port_idx_width:
 						    port_idx_width+
 						    resource_class_idx_width-1];
 			     
@@ -1062,7 +1062,7 @@ module rtr_ip_ctrl_mac
 			  (.data_in(route_orc_q),
 			   .data_out(route_rcsel));
 			
-			assign la_route_info[port_idx_width:
+			assign lar_info[port_idx_width:
 					     port_idx_width+
 					     resource_class_idx_width-1]
 			  = route_rcsel;
@@ -1073,32 +1073,32 @@ module rtr_ip_ctrl_mac
 	      else
 		begin
 		   
-		   wire [0:la_route_info_width-1] la_route_info_s;
-		   wire [0:la_route_info_width-1] la_route_info_q;
+		   wire [0:lar_info_width-1] lar_info_s;
+		   wire [0:lar_info_width-1] lar_info_q;
 		   if(elig_mask == `ELIG_MASK_USED)
-		     assign la_route_info_s
-		       = valid_q ? la_route_info_q : chi_la_route_info;
+		     assign lar_info_s
+		       = valid_q ? lar_info_q : chi_lar_info;
 		   else
-		     assign la_route_info_s
+		     assign lar_info_s
 		       = (flit_sent_in & flit_tail_out) ?
 			 (fb_almost_empty ? 
-			  chi_la_route_info : 
-			  peek_la_route_info) :
-			 (valid_q ? la_route_info_q : chi_la_route_info);
+			  chi_lar_info : 
+			  peek_lar_info) :
+			 (valid_q ? lar_info_q : chi_lar_info);
 		   c_dff
-		     #(.width(la_route_info_width),
+		     #(.width(lar_info_width),
 		       .reset_type(reset_type))
-		   la_route_infoq
+		   lar_infoq
 		     (.clk(clk),
 		      .reset(1'b0),
 		      .active(active),
-		      .d(la_route_info_s),
-		      .q(la_route_info_q));
+		      .d(lar_info_s),
+		      .q(lar_info_q));
 		   
-		   assign la_route_info = la_route_info_q;
+		   assign lar_info = lar_info_q;
 		   
 		   wire [0:port_idx_width-1] 	  route_port;
-		   assign route_port = la_route_info_q[0:port_idx_width-1];
+		   assign route_port = lar_info_q[0:port_idx_width-1];
 		   
 		   c_decode
 		     #(.num_ports(num_ports))
@@ -1113,7 +1113,7 @@ module rtr_ip_ctrl_mac
 			
 			wire [0:resource_class_idx_width-1] route_rcsel;
 			assign route_rcsel
-			  = la_route_info_q[port_idx_width:
+			  = lar_info_q[port_idx_width:
 					    port_idx_width+
 					    resource_class_idx_width-1];
 			
@@ -1127,46 +1127,46 @@ module rtr_ip_ctrl_mac
 		   
 		end
 	      
-	      wire [0:route_info_width-1] route_info_s, route_info_q;
+	      wire [0:dest_info_width-1] dest_info_s, dest_info_q;
 	      if(elig_mask == `ELIG_MASK_USED)
-		assign route_info_s
-		  = valid_q ? route_info_q : chi_route_info;
+		assign dest_info_s
+		  = valid_q ? dest_info_q : chi_dest_info;
 	      else
 		begin
 		   
-		   wire [0:route_info_width-1] peek_route_info;
-		   assign peek_route_info
-		     = fb_peek_header_info[la_route_info_width:
-					   la_route_info_width+
-					   route_info_width-1];
+		   wire [0:dest_info_width-1] peek_dest_info;
+		   assign peek_dest_info
+		     = fb_peek_header_info[lar_info_width:
+					   lar_info_width+
+					   dest_info_width-1];
 	      
 		   if(dual_path_alloc)
-		     assign route_info_s
+		     assign dest_info_s
 		       = (flit_sent_in & htt_flit_tail) ?
-			 (fb_almost_empty ? chi_route_info : peek_route_info) :
-			 (valid_q ? route_info_q : chi_route_info);
+			 (fb_almost_empty ? chi_dest_info : peek_dest_info) :
+			 (valid_q ? dest_info_q : chi_dest_info);
 		   else
-		     assign route_info_s
+		     assign dest_info_s
 		       = (flit_sent_in & flit_tail_out) ?
-			 (fb_almost_empty ? chi_route_info : peek_route_info) :
-			 (valid_q ? route_info_q : chi_route_info);
+			 (fb_almost_empty ? chi_dest_info : peek_dest_info) :
+			 (valid_q ? dest_info_q : chi_dest_info);
 
 		end
 	      c_dff
-		#(.width(route_info_width),
+		#(.width(dest_info_width),
 		  .reset_type(reset_type))
-	      route_infoq
+	      dest_infoq
 		(.clk(clk),
 		 .reset(1'b0),
 		 .active(active),
-		 .d(route_info_s),
-		 .q(route_info_q));
+		 .d(dest_info_s),
+		 .q(dest_info_q));
 	      
 	      assign hit_valid = valid_q;
 	      assign hit_route_op = route_op;
 	      assign hit_route_orc = route_orc;
-	      assign hit_la_route_info = la_route_info;
-	      assign hit_route_info = route_info_q;
+	      assign hit_lar_info = lar_info;
+	      assign hit_dest_info = dest_info_q;
 	      
 	      assign error_no_header
 		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
@@ -1247,8 +1247,8 @@ module rtr_ip_ctrl_mac
 		  .routing_type(routing_type))
 	      nha
 		(.router_address(router_address),
-		 .route_info(hit_route_info),
-		 .la_route_info(hit_la_route_info),
+		 .dest_info(hit_dest_info),
+		 .lar_info(hit_lar_info),
 		 .next_router_address(next_router_address));
 	      
 	      wire [0:num_message_classes-1] sel_mc;
@@ -1277,7 +1277,7 @@ module rtr_ip_ctrl_mac
 		(.router_address(next_router_address),
 		 .sel_mc(sel_mc),
 		 .sel_irc(hit_route_orc),
-		 .route_info(hit_route_info),
+		 .dest_info(hit_dest_info),
 		 .route_op(route_op),
 		 .route_orc(route_orc));
 	      
@@ -1288,8 +1288,8 @@ module rtr_ip_ctrl_mac
 		(.data_in(route_op),
 		 .data_out(route_port));
 	      
-	      wire [0:la_route_info_width-1]  la_route_info;
-	      assign la_route_info[0:port_idx_width-1] = route_port;
+	      wire [0:lar_info_width-1]  lar_info;
+	      assign lar_info[0:port_idx_width-1] = route_port;
 	      
 	      if(num_resource_classes > 1)
 		begin
@@ -1301,7 +1301,7 @@ module rtr_ip_ctrl_mac
 		     (.data_in(route_orc),
 		      .data_out(route_rcsel));
 		   
-		   assign la_route_info[port_idx_width:
+		   assign lar_info[port_idx_width:
 					port_idx_width+
 					resource_class_idx_width-1]
 		     = route_rcsel;
@@ -1309,10 +1309,10 @@ module rtr_ip_ctrl_mac
 		end
 	      
 	      if(explicit_pipeline_register)
-		assign llu_flit_data[0:la_route_info_width-1]
+		assign llu_flit_data[0:lar_info_width-1]
 		  = (~fb_empty & htt_flit_head) ? 
-		    la_route_info : 
-		    fb_flit_data[0:la_route_info_width-1];
+		    lar_info : 
+		    fb_flit_data[0:lar_info_width-1];
 	      else
 		begin
 		   
@@ -1320,29 +1320,29 @@ module rtr_ip_ctrl_mac
 		   assign active = (~fb_empty & htt_flit_head) |
 				   (chi_flit_valid & chi_flit_head);
 		   
-		   wire [0:la_route_info_width-1] la_route_info_s;
-		   wire [0:la_route_info_width-1] la_route_info_q;
-		   assign la_route_info_s
-		     = hit_valid ? la_route_info : glu_la_route_info;
+		   wire [0:lar_info_width-1] lar_info_s;
+		   wire [0:lar_info_width-1] lar_info_q;
+		   assign lar_info_s
+		     = hit_valid ? lar_info : glu_lar_info;
 		   c_dff
-		     #(.width(la_route_info_width),
+		     #(.width(lar_info_width),
 		       .reset_type(reset_type))
-		   la_route_infoq
+		   lar_infoq
 		     (.clk(clk),
 		      .reset(1'b0),
 		      .active(active),
-		      .d(la_route_info_s),
-		      .q(la_route_info_q));
+		      .d(lar_info_s),
+		      .q(lar_info_q));
 		   
-		   assign llu_flit_data[0:la_route_info_width-1]
+		   assign llu_flit_data[0:lar_info_width-1]
 		     = (flit_sent_prev & flit_head_prev) ? 
-		       la_route_info_q :
-		       fb_flit_data[0:la_route_info_width-1];
+		       lar_info_q :
+		       fb_flit_data[0:lar_info_width-1];
 		   
 		end
 	      
-	      assign llu_flit_data[la_route_info_width:flit_data_width-1]
-		= fb_flit_data[la_route_info_width:flit_data_width-1];
+	      assign llu_flit_data[lar_info_width:flit_data_width-1]
+		= fb_flit_data[lar_info_width:flit_data_width-1];
 	      
 	   end
 	   

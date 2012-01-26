@@ -159,13 +159,13 @@ module tc_node_mac
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // width required for lookahead routing information
-   localparam la_route_info_width = port_idx_width + resource_class_idx_width;
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
    
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
    // total number of bits required for storing routing information
-   localparam route_info_width
+   localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
@@ -173,11 +173,11 @@ module tc_node_mac
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (la_route_info_width + route_info_width) : 
+       (lar_info_width + dest_info_width) : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (la_route_info_width + route_info_width + payload_length_width) : 
+       (lar_info_width + dest_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -241,7 +241,7 @@ module tc_node_mac
    
    // select width (and thus period) for LFSRs
    localparam packet_rvs_width
-     = mc_idx_rv_width + rc_idx_rv_width + route_info_width + 
+     = mc_idx_rv_width + rc_idx_rv_width + dest_info_width + 
        plength_idx_rv_width;
    
    // width of register that holds the number of outstanding packets
@@ -1042,8 +1042,8 @@ module tc_node_mac
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .la_route_info_width(la_route_info_width),
-       .route_info_width(route_info_width),
+       .lar_info_width(lar_info_width),
+       .dest_info_width(dest_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi
@@ -1201,9 +1201,9 @@ module tc_node_mac
    wire [0:addr_width-1] 	dest_addr_rv;
    assign dest_addr_rv = first_addr_match ? dest_addr_2_rv : dest_addr_1_rv;
    
-   wire [0:route_info_width-1] 	route_info_rv;
-   assign route_info_rv[(num_resource_classes-1)*router_addr_width:
-			route_info_width-1]
+   wire [0:dest_info_width-1] 	dest_info_rv;
+   assign dest_info_rv[(num_resource_classes-1)*router_addr_width:
+			dest_info_width-1]
 	    = dest_addr_rv;
    
    genvar 			dim;
@@ -1362,7 +1362,7 @@ module tc_node_mac
 				     (orc+1)*router_addr_width-1]
 			 = intm_addr_rv;
 		
-		assign route_info_rv[orc*router_addr_width:
+		assign dest_info_rv[orc*router_addr_width:
 				     (orc+1)*router_addr_width-1]
 			 = intm_addr_rv;
 		
@@ -1374,9 +1374,9 @@ module tc_node_mac
    
    wire [0:header_info_width-1] 	     header_info_out;
    
-   assign header_info_out[la_route_info_width:
-			  la_route_info_width+route_info_width-1]
-	    = route_info_rv;
+   assign header_info_out[lar_info_width:
+			  lar_info_width+dest_info_width-1]
+	    = dest_info_rv;
    
    
    //---------------------------------------------------------------------------
@@ -1401,7 +1401,7 @@ module tc_node_mac
      (.router_address(router_address),
       .sel_mc(sel_mc_rv),
       .sel_irc(sel_orc_rv),
-      .route_info(route_info_rv),
+      .dest_info(dest_info_rv),
       .route_op(route_op_rv),
       .route_orc(route_orc_rv));
    
@@ -1412,8 +1412,8 @@ module tc_node_mac
      (.data_in(route_op_rv),
       .data_out(route_port_rv));
    
-   wire [0:la_route_info_width-1] 	     la_route_info_rv;
-   assign la_route_info_rv[0:port_idx_width-1] = route_port_rv;
+   wire [0:lar_info_width-1] 	     lar_info_rv;
+   assign lar_info_rv[0:port_idx_width-1] = route_port_rv;
    
    generate
       
@@ -1427,7 +1427,7 @@ module tc_node_mac
 	     (.data_in(route_orc_rv),
 	      .data_out(route_rcsel_rv));
 	   
-	   assign la_route_info_rv[port_idx_width:
+	   assign lar_info_rv[port_idx_width:
 				   port_idx_width+resource_class_idx_width-1]
 	     = route_rcsel_rv;
 	   
@@ -1435,7 +1435,7 @@ module tc_node_mac
       
    endgenerate
    
-   assign header_info_out[0:la_route_info_width-1] = la_route_info_rv;
+   assign header_info_out[0:lar_info_width-1] = lar_info_rv;
    
    
    //---------------------------------------------------------------------------
@@ -1539,9 +1539,9 @@ module tc_node_mac
 		wire [0:plength_idx_rv_width-1]  plength_idx_rv;
 		assign plength_idx_rv
 		  = packet_rvs_q[mc_idx_rv_width+rc_idx_rv_width+
-				 route_info_width:
+				 dest_info_width:
 				 mc_idx_rv_width+rc_idx_rv_width+
-				 route_info_width+plength_idx_rv_width-1];
+				 dest_info_width+plength_idx_rv_width-1];
 		
 		wire [0:num_plength_vals-1] 	 plength_select_unmasked;
 		
@@ -1581,8 +1581,8 @@ module tc_node_mac
 	     assign plength_rv = plength_vals_q;
 	   
 	   if(packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH)
-	     assign header_info_out[la_route_info_width+route_info_width:
-				    la_route_info_width+route_info_width+
+	     assign header_info_out[lar_info_width+dest_info_width:
+				    lar_info_width+dest_info_width+
 				    payload_length_width-1]
 		      = plength_rv;
 	   
