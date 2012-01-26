@@ -176,11 +176,17 @@ module rtr_ip_ctrl_mac
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
    
+   // width required for lookahead routing information
+   localparam lar_info_width = port_idx_width + resource_class_idx_width;
+   
    // total number of bits required for storing routing information
    localparam dest_info_width
      = (routing_type == `ROUTING_TYPE_PHASED_DOR) ? 
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
+   
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -195,17 +201,14 @@ module rtr_ip_ctrl_mac
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   // width required for lookahead routing information
-   localparam lar_info_width = port_idx_width + resource_class_idx_width;
-   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // required address size for a single VC's buffer
@@ -323,8 +326,7 @@ module rtr_ip_ctrl_mac
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .lar_info_width(lar_info_width),
-       .dest_info_width(dest_info_width),
+       .route_info_width(route_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi
@@ -345,14 +347,16 @@ module rtr_ip_ctrl_mac
    
    wire [0:header_info_width-1] 	     chi_header_info;
    assign chi_header_info = chi_flit_data[0:header_info_width-1];
-
+   
+   wire [0:route_info_width-1] 		     chi_route_info;
+   assign chi_route_info = chi_header_info[0:route_info_width-1];
+   
    wire [0:lar_info_width-1] 	     chi_lar_info;
-   assign chi_lar_info = chi_header_info[0:lar_info_width-1];
+   assign chi_lar_info = chi_route_info[0:lar_info_width-1];
    
    wire [0:dest_info_width-1] 		     chi_dest_info;
-   assign chi_dest_info
-     = chi_header_info[lar_info_width:
-		       lar_info_width+dest_info_width-1];
+   assign chi_dest_info = chi_route_info[lar_info_width:
+					 lar_info_width+dest_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -605,7 +609,7 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   fb_almost_empty;
 	   wire [0:flit_data_width-1] 	   fb_flit_data;
-	   wire [0:header_info_width-1]    fb_peek_header_info;
+	   wire [0:route_info_width-1] 	   fb_peek_route_info;
 	   wire [0:fb_addr_width-1] 	   fb_push_addr;
 	   wire [0:fb_addr_width-1] 	   fb_pop_addr;
 	   
@@ -754,11 +758,14 @@ module rtr_ip_ctrl_mac
 	      
 	      wire [0:header_info_width-1]  peek_header_info;
 	      assign peek_header_info = peek_data[0:header_info_width-1];
+	      	      
+	      wire [0:route_info_width-1]   peek_route_info;
+	      assign peek_route_info = peek_header_info[0:route_info_width-1];
 	      
 	      assign error_fb_underflow = errors[0];
 	      assign error_fb_overflow = errors[1];
 	      
-	      assign fb_peek_header_info = peek_header_info;
+	      assign fb_peek_route_info = peek_route_info;
 	      assign fb_almost_empty = almost_empty;
 	      assign fb_empty = empty;
 	      assign fb_full = full;
@@ -949,7 +956,7 @@ module rtr_ip_ctrl_mac
 	      
 	      wire [0:lar_info_width-1] peek_lar_info;
 	      assign peek_lar_info
-		= fb_peek_header_info[0:lar_info_width-1];
+		= fb_peek_route_info[0:lar_info_width-1];
 	      
 	      wire [0:num_ports-1] route_op;
 	      wire [0:num_resource_classes-1] route_orc;
@@ -1136,9 +1143,8 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:dest_info_width-1] peek_dest_info;
 		   assign peek_dest_info
-		     = fb_peek_header_info[lar_info_width:
-					   lar_info_width+
-					   dest_info_width-1];
+		     = fb_peek_route_info[lar_info_width:
+					  lar_info_width+dest_info_width-1];
 	      
 		   if(dual_path_alloc)
 		     assign dest_info_s

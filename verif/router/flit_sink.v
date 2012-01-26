@@ -72,21 +72,8 @@ module flit_sink
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
    
-   // width required for lookahead routing information
-   parameter lar_info_width = 4;
-   
-   // total number of bits required for storing routing information
-   parameter dest_info_width = 10;
-   
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
-       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
-       -1;
+   // total number of bits required for routing-related information
+   parameter route_info_width = 14;
    
    // width of flit control signals
    localparam flit_ctrl_width
@@ -131,8 +118,7 @@ module flit_sink
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .lar_info_width(lar_info_width),
-       .dest_info_width(dest_info_width),
+       .route_info_width(route_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi

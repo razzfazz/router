@@ -188,14 +188,17 @@ module packet_source
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
    
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
+   
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -809,7 +812,7 @@ module packet_source
 	end
       
       assign header_info[lar_info_width:
-			 lar_info_width+dest_info_width-1]
+			 route_info_width-1]
 	       = dest_info;
       
       if(max_payload_length > 0)
@@ -867,8 +870,8 @@ module packet_source
 	     begin
 		wire [0:payload_length_width-1] payload_length;
 		assign payload_length = (flit_count_q - min_payload_length);
-		assign header_info[lar_info_width+dest_info_width:
-				   lar_info_width+dest_info_width+
+		assign header_info[route_info_width:
+				   route_info_width+
 				   payload_length_width-1]
 			 = payload_length;
 	     end

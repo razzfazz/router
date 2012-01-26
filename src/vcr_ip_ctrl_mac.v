@@ -160,6 +160,9 @@ module vcr_ip_ctrl_mac
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
    
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
+   
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
@@ -287,8 +290,7 @@ module vcr_ip_ctrl_mac
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .lar_info_width(lar_info_width),
-       .dest_info_width(dest_info_width),
+       .route_info_width(route_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi

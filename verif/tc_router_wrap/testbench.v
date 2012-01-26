@@ -103,6 +103,9 @@ module testbench
    localparam dest_info_width
      = num_resource_classes * router_addr_width + node_addr_width;
    
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
+   
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
@@ -110,11 +113,11 @@ module testbench
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // width of counter for remaining flits

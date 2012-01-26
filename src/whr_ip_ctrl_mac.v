@@ -143,14 +143,17 @@ module whr_ip_ctrl_mac
        (router_addr_width + node_addr_width) : 
        -1;
    
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -271,8 +274,7 @@ module whr_ip_ctrl_mac
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .lar_info_width(lar_info_width),
-       .dest_info_width(dest_info_width),
+       .route_info_width(route_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi
@@ -291,13 +293,15 @@ module whr_ip_ctrl_mac
    wire [0:header_info_width-1] header_info_in;
    assign header_info_in = flit_data_in[0:header_info_width-1];
    
+   wire [0:route_info_width-1] 	route_info_in;
+   assign route_info_in = header_info_in[0:route_info_width-1];
+   
    wire [0:lar_info_width-1] lar_info_in;
-   assign lar_info_in = header_info_in[0:lar_info_width-1];
+   assign lar_info_in = route_info_in[0:lar_info_width-1];
    
    wire [0:dest_info_width-1] 	  dest_info_in;
-   assign dest_info_in
-     = header_info_in[lar_info_width:
-		      lar_info_width+dest_info_width-1];
+   assign dest_info_in = route_info_in[lar_info_width:
+				       lar_info_width+dest_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -461,6 +465,9 @@ module whr_ip_ctrl_mac
    
    wire [0:header_info_width-1] peek_header_info;
    assign peek_header_info = fbf_peek_data[0:header_info_width-1];
+
+   wire [0:route_info_width-1] 	peek_route_info;
+   assign peek_route_info = peek_header_info[0:route_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -591,8 +598,7 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:lar_info_width-1] peek_lar_info;
-	   assign peek_lar_info
-	     = peek_header_info[0:lar_info_width-1];
+	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
 	     = (flit_valid_out & flit_tail_out) ? 
@@ -620,9 +626,8 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:dest_info_width-1] peek_dest_info;
-	   assign peek_dest_info = peek_header_info[lar_info_width:
-						     lar_info_width+
-						     dest_info_width-1];
+	   assign peek_dest_info
+	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
 	     = (flit_valid_out & flit_tail_out) ? 

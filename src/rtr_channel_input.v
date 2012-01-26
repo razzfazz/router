@@ -57,11 +57,8 @@ module rtr_channel_input
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
    
-   // width required for lookahead routing information
-   parameter lar_info_width = 4;
-   
-   // total number of bits required for storing routing information
-   parameter dest_info_width = 10;
+   // total number of bits required for routing-related information
+   parameter route_info_width = 14;
    
    // width of flit payload data
    parameter flit_data_width = 64;
@@ -86,11 +83,11 @@ module rtr_channel_input
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // width of flit control signals
@@ -323,9 +320,7 @@ module rtr_channel_input
 			 wire has_payload;
 			 
 			 if(max_payload_length > min_payload_length)
-			   assign has_payload
-			     = header_info_q[lar_info_width+
-					     dest_info_width];
+			   assign has_payload = header_info_q[route_info_width];
 			 else if(max_payload_length == min_payload_length)
 			   assign has_payload = 1'b1;
 			 
@@ -385,10 +380,8 @@ module rtr_channel_input
 				   wire [0:payload_length_width-1] 
 				     payload_length;
 				   assign payload_length
-				     = header_info_q[lar_info_width+
-						     dest_info_width:
-						     lar_info_width+
-						     dest_info_width+
+				     = header_info_q[route_info_width:
+						     route_info_width+
 						     payload_length_width-1];
 				   
 				   assign flit_ctr_next

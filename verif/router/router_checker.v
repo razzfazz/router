@@ -153,14 +153,17 @@ module router_checker
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
    
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -228,8 +231,7 @@ module router_checker
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
-	       .lar_info_width(lar_info_width),
-	       .dest_info_width(dest_info_width),
+	       .route_info_width(route_info_width),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   chi
@@ -300,10 +302,12 @@ module router_checker
 	   wire [0:header_info_width-1] 		       header_info_in;
 	   assign header_info_in = flit_data[0:header_info_width-1];
 	   
+	   wire [0:route_info_width-1] 			       route_info_in;
+	   assign route_info_in = header_info_in[0:route_info_width-1];
+	   
 	   wire [0:dest_info_width-1] 			       dest_info;
-	   assign dest_info = header_info_in[lar_info_width:
-					      lar_info_width+
-					      dest_info_width-1];
+	   assign dest_info
+	     = route_info_in[lar_info_width:lar_info_width+dest_info_width-1];
 	   
 	   wire [0:num_ports-1] 			       route_op;
 	   wire [0:num_resource_classes-1] 		       route_orc;
@@ -366,12 +370,12 @@ module router_checker
 	   // update header info
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:header_info_width-1] header_info_out;
+	   wire [0:route_info_width-1] route_info_out;
 	   
 	   // generate lookahead routing information
 	   
-	   wire [0:lar_info_width-1] lar_info_in;
-	   assign lar_info_in = header_info_in[0:lar_info_width-1];
+	   wire [0:lar_info_width-1]   lar_info_in;
+	   assign lar_info_in = route_info_in[0:lar_info_width-1];
 	   
 	   wire [0:router_addr_width-1]   next_router_address;
 	   rtr_next_hop_addr
@@ -433,11 +437,16 @@ module router_checker
 		
 	     end
 	   
-	   assign header_info_out[0:lar_info_width-1]
-	     = lar_info_out;
+	   assign route_info_out[0:lar_info_width-1] = lar_info_out;
 	   
-	   assign header_info_out[lar_info_width:header_info_width-1]
-	     = header_info_in[lar_info_width:header_info_width-1];
+	   assign route_info_out[lar_info_width:
+				 lar_info_width+dest_info_width-1]
+	     = route_info_in[lar_info_width:lar_info_width+dest_info_width-1];
+	   
+	   wire [0:header_info_width-1] 	    header_info_out;
+	   assign header_info_out[0:route_info_width-1] = route_info_out;
+	   assign header_info_out[route_info_width:header_info_width-1]
+	     = header_info_in[route_info_width:header_info_width-1];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -701,8 +710,7 @@ module router_checker
 	       .packet_format(packet_format),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
-	       .lar_info_width(lar_info_width),
-	       .dest_info_width(dest_info_width),
+	       .route_info_width(route_info_width),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   chi

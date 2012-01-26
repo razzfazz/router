@@ -170,14 +170,17 @@ module tc_node_mac
        (num_resource_classes * router_addr_width + node_addr_width) : 
        -1;
    
+   // total number of bits required for routing-related information
+   localparam route_info_width = lar_info_width + dest_info_width;
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (lar_info_width + dest_info_width) : 
+       route_info_width : 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (lar_info_width + dest_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -1042,8 +1045,7 @@ module tc_node_mac
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
-       .lar_info_width(lar_info_width),
-       .dest_info_width(dest_info_width),
+       .route_info_width(route_info_width),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi
@@ -1372,11 +1374,10 @@ module tc_node_mac
       
    endgenerate
    
-   wire [0:header_info_width-1] 	     header_info_out;
+   wire [0:route_info_width-1] 		     route_info_out;
    
-   assign header_info_out[lar_info_width:
-			  lar_info_width+dest_info_width-1]
-	    = dest_info_rv;
+   assign route_info_out[lar_info_width:lar_info_width+dest_info_width-1]
+     = dest_info_rv;
    
    
    //---------------------------------------------------------------------------
@@ -1435,7 +1436,10 @@ module tc_node_mac
       
    endgenerate
    
-   assign header_info_out[0:lar_info_width-1] = lar_info_rv;
+   assign route_info_out[0:lar_info_width-1] = lar_info_rv;
+   
+   wire [0:header_info_width-1] 	       header_info_out;
+   assign header_info_out[0:route_info_width-1] = route_info_out;
    
    
    //---------------------------------------------------------------------------
@@ -1581,8 +1585,8 @@ module tc_node_mac
 	     assign plength_rv = plength_vals_q;
 	   
 	   if(packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH)
-	     assign header_info_out[lar_info_width+dest_info_width:
-				    lar_info_width+dest_info_width+
+	     assign header_info_out[route_info_width:
+				    route_info_width+
 				    payload_length_width-1]
 		      = plength_rv;
 	   
