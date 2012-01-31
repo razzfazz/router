@@ -799,31 +799,6 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   
-	   // In the absence of an explicit pipeline register between flit 
-	   // buffer and crossbar, the read address is delayed by one clock 
-	   // cycle such as to line up the flit data read from the buffer with 
-	   // the crossbar control signals.
-	   //
-	   // NOTE: Clock gating needs to be such that this register can be 
-	   // reset once no more flits are available; this will likely force it 
-	   // to be free-running.
-	   
-	   wire read_active;
-	   
-	   wire flit_sent_prev_s, flit_sent_prev_q;
-	   assign flit_sent_prev_s = flit_valid_out;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_sent_prevq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(read_active),
-	      .d(flit_sent_prev_s),
-	      .q(flit_sent_prev_q));
-	   
-	   assign read_active = pop_active | flit_sent_prev_q;
-	   
 	   wire flit_head_prev_s, flit_head_prev_q;
 	   assign flit_head_prev_s = flit_head_out;
 	   c_dff
@@ -836,26 +811,21 @@ module whr_ip_ctrl_mac
 	      .d(flit_head_prev_s),
 	      .q(flit_head_prev_q));
 	   
-	   wire active;
-	   assign active = flit_valid_out & flit_head_out;
-	   
-	   wire update_next_lar_info;
-	   assign update_next_lar_info = flit_sent_prev_q & flit_head_prev_q;
-	   
 	   wire [0:lar_info_width-1] next_lar_info_s, next_lar_info_q;
-	   assign next_lar_info_s = next_lar_info;
+	   assign next_lar_info_s
+	     = flit_head_out ? next_lar_info : next_lar_info_q;
 	   c_dff
 	     #(.width(lar_info_width),
 	       .reset_type(reset_type))
 	   next_lar_infoq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(active),
+	      .active(pop_active),
 	      .d(next_lar_info_s),
 	      .q(next_lar_info_q));
 	   
 	   assign flit_data_out[0:lar_info_width-1]
-	     = update_next_lar_info ? 
+	     = flit_head_prev_q ? 
 	       next_lar_info_q : 
 	       fbf_flit_data[0:lar_info_width-1];
 	   assign flit_data_out[lar_info_width:flit_data_width-1]
