@@ -529,6 +529,9 @@ module vcr_ivc_ctrl
    wire [0:flit_data_width-1] 	     fbf_write_data;
    assign fbf_write_data = flit_data_in;
    
+   wire 			     two_plus_flits;
+   assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
+   
    wire [0:flit_data_width-1] 	     fbf_read_data;
    wire [0:flit_data_width-1] 	     fbf_peek_data;
 
@@ -558,7 +561,7 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   wire fbf_peek_active;
-	   assign fbf_peek_active = ~fbc_empty & ~fbc_almost_empty;
+	   assign fbf_peek_active = two_plus_flits;
 	   
 	   wire [0:fb_addr_width-1] fbf_peek_addr;
 	   c_incr
@@ -738,9 +741,9 @@ module vcr_ivc_ctrl
 	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
-	     = packet_done ? 
-	       (fbc_almost_empty ? lar_info_in : peek_lar_info) : 
-	       (hdr_valid_q ? hdr_lar_info_q : lar_info_in);
+	     = (~hdr_valid_q | packet_done) ? 
+	       (two_plus_flits ? peek_lar_info : lar_info_in) : 
+	       hdr_lar_info_q;
 	   
 	end
    endgenerate
@@ -767,9 +770,9 @@ module vcr_ivc_ctrl
 	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
-	     = packet_done ?
-	       (fbc_almost_empty ? dest_info_in : peek_dest_info) :
-	       (hdr_valid_q ? hdr_dest_info_q : dest_info_in);
+	     = (~hdr_valid_q | packet_done) ?
+	       (two_plus_flits ? peek_dest_info : dest_info_in) :
+	       hdr_dest_info_q;
 	   
 	end
    endgenerate
