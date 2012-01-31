@@ -533,7 +533,7 @@ module whr_ip_ctrl_mac
        .reset_value(1'b1))
    htr_flit_headq
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(pop_active),
       .d(htr_flit_head_s),
       .q(htr_flit_head_q));

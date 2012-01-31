@@ -807,7 +807,7 @@ module rtr_ip_ctrl_mac
 		  .reset_value(1'b1))
 	      flit_headq
 		(.clk(clk),
-		 .reset(1'b0),
+		 .reset(reset),
 		 .active(pop_active),
 		 .d(flit_head_s),
 		 .q(flit_head_q));
