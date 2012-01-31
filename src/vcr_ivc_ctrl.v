@@ -482,7 +482,6 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 					     fbf_write_enable;
-   wire 					     fbf_read_active;
    wire [0:fb_addr_width-1] 			     fbf_read_addr;
    
    generate
@@ -496,8 +495,6 @@ module vcr_ivc_ctrl
 	   else
 	     assign fbf_write_enable = flit_valid_in;
 	   
-	   assign fbf_read_active = ~fbc_empty;
-	   
 	   assign fbf_read_addr = fbc_pop_addr;
 	   
 	end
@@ -505,8 +502,6 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   assign fbf_write_enable = flit_valid_in;
-	   
-	   assign fbf_read_active = flit_sent_prev;
 	   
 	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
@@ -529,9 +524,6 @@ module vcr_ivc_ctrl
    wire [0:flit_data_width-1] 	     fbf_write_data;
    assign fbf_write_data = flit_data_in;
    
-   wire 			     two_plus_flits;
-   assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
-   
    wire [0:flit_data_width-1] 	     fbf_read_data;
    wire [0:flit_data_width-1] 	     fbf_peek_data;
 
@@ -550,7 +542,6 @@ module vcr_ivc_ctrl
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbc_push_addr),
 	      .write_data(fbf_write_data),
-	      .read_active(fbf_read_active),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   
@@ -559,9 +550,6 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
-	   
-	   wire fbf_peek_active;
-	   assign fbf_peek_active = two_plus_flits;
 	   
 	   wire [0:fb_addr_width-1] fbf_peek_addr;
 	   c_incr
@@ -582,7 +570,6 @@ module vcr_ivc_ctrl
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbc_push_addr),
 	      .write_data(fbf_write_data),
-	      .read_active({fbf_read_active, fbf_peek_active}),
 	      .read_address({fbf_read_addr, fbf_peek_addr}),
 	      .read_data({fbf_read_data, fbf_peek_data}));
 
@@ -729,7 +716,10 @@ module vcr_ivc_ctrl
 	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
    endgenerate
    
-   wire [0:lar_info_width-1]    hdr_lar_info_s, hdr_lar_info_q;
+   wire 			     two_plus_flits;
+   assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
+   
+   wire [0:lar_info_width-1] 	     hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_lar_info_s

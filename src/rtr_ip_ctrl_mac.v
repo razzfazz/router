@@ -653,7 +653,6 @@ module rtr_ip_ctrl_mac
 		 .errors(errors));
 	      
 	      wire 		       write_enable;
-	      wire 		       read_active;
 	      wire [0:fb_addr_width-1] read_addr;
 	      
 	      if(explicit_pipeline_register)
@@ -670,8 +669,6 @@ module rtr_ip_ctrl_mac
 		     end
 		   else
 		     assign write_enable = chi_flit_valid;
-		   
-		   assign read_active = ~empty;
 		   
 		   assign read_addr = pop_addr;
 		   
@@ -692,8 +689,6 @@ module rtr_ip_ctrl_mac
 		      .active(pop_active),
 		      .d(read_addr_s),
 		      .q(read_addr_q));
-		   
-		   assign read_active = flit_sent_prev;
 		   
 		   assign read_addr = read_addr_q;
 		   
@@ -718,7 +713,6 @@ module rtr_ip_ctrl_mac
 		      .write_enable(write_enable),
 		      .write_address(push_addr),
 		      .write_data(write_data),
-		      .read_active(read_active),
 		      .read_address(read_addr),
 		      .read_data(read_data));
 		   
@@ -750,7 +744,6 @@ module rtr_ip_ctrl_mac
 		      .write_enable(write_enable),
 		      .write_address(push_addr),
 		      .write_data(write_data),
-		      .read_active({read_active, peek_active}),
 		      .read_address({read_addr, peek_addr}),
 		      .read_data({read_data, peek_data}));
 		   

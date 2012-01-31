@@ -109,19 +109,7 @@
 // Synopsys DesignWare implementation using flipflips
 `define REGFILE_TYPE_FF_DW           3
 
-// 2D array implemented using flipflops
-`define REGFILE_TYPE_LAT_2D          4
-
-// 1D array of flipflops, read using a combinational mux
-`define REGFILE_TYPE_LAT_1D_MUX      5
-
-// 1D array of flipflops, read using a tristate mux
-`define REGFILE_TYPE_LAT_1D_TRISTATE 6
-
-// Synopsys DesignWare implementation using flipflips
-`define REGFILE_TYPE_LAT_DW          7
-
-`define REGFILE_TYPE_LAST `REGFILE_TYPE_LAT_DW
+`define REGFILE_TYPE_LAST `REGFILE_TYPE_FF_DW
 
 
 //------------------------------------------------------------------------------

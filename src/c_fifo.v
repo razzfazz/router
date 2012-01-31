@@ -202,7 +202,6 @@ module c_fifo
 	      .write_enable(push),
 	      .write_address(push_addr),
 	      .write_data(push_data),
-	      .read_active(pop_active),
 	      .read_address(pop_addr),
 	      .read_data(rf_data));
 	   

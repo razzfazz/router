@@ -30,8 +30,8 @@
 //==============================================================================
 
 module c_regfile
-  (clk, write_active, write_enable, write_address, write_data, read_active, 
-   read_address, read_data);
+  (clk, write_active, write_enable, write_address, write_data, read_address, 
+   read_data);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -64,8 +64,6 @@ module c_regfile
    // data to be written
    input [0:width-1] 	  write_data;
    
-   input [0:num_read_ports-1] read_active;
-   
    // entries to read out
    input [0:num_read_ports*addr_width-1] read_address;
    
@@ -73,36 +71,20 @@ module c_regfile
    output [0:num_read_ports*width-1] 	 read_data;
    wire [0:num_read_ports*width-1] 	 read_data;
    
-   wire [0:num_read_ports*width-1] 	 cell_data;
-   
    genvar 				 read_port;
    
    generate
       
       case(regfile_type)
 	
-	`REGFILE_TYPE_FF_2D, `REGFILE_TYPE_LAT_2D:
+	`REGFILE_TYPE_FF_2D:
 	  begin
 	     
 	     reg [0:width-1] storage_2d [0:depth-1];
-	     
-	     case(regfile_type)
-	       
-	       `REGFILE_TYPE_FF_2D:
-		 always @(posedge clk)
-		   if(write_active)
-		     if(write_enable)
-		       storage_2d[write_address] <= write_data;
-	       
-	       `REGFILE_TYPE_LAT_2D:
-		 always @(clk, write_active, write_enable, write_address, 
-			  write_data)
-		   if(~clk)
-		     if(write_active)
-		       if(write_enable)
-			 storage_2d[write_address] <= write_data;
-	       
-	     endcase
+	     always @(posedge clk)
+	       if(write_active)
+		 if(write_enable)
+		   storage_2d[write_address] <= write_data;
 	     
 	     for(read_port = 0; read_port < num_read_ports; 
 		 read_port = read_port + 1)
@@ -113,18 +95,17 @@ module c_regfile
 		    = read_address[read_port*addr_width:
 				   (read_port+1)*addr_width-1];
 		  
-		  wire [0:width-1] 	port_cell_data;
-		  assign port_cell_data = storage_2d[port_read_address];
+		  wire [0:width-1] 	port_read_data;
+		  assign port_read_data = storage_2d[port_read_address];
 		  
-		  assign cell_data[read_port*width:(read_port+1)*width-1]
-		    = port_cell_data;
+		  assign read_data[read_port*width:(read_port+1)*width-1]
+		    = port_read_data;
 		  
 	       end
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX,
-	`REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
+	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_TRISTATE:
 	  begin
 	     
 	     wire [0:depth*width-1] storage_1d;
@@ -138,23 +119,10 @@ module c_regfile
 		  assign write = write_enable && (write_address == level);
 		  
 		  reg [0:width-1] storage;
-		  
-		  case(regfile_type)
-		    
-		    `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_TRISTATE:
-		      always @(posedge clk)
-			if(write_active)
-			  if(write)
-			    storage <= write_data;
-		    
-		    `REGFILE_TYPE_LAT_1D_MUX, `REGFILE_TYPE_LAT_1D_TRISTATE:
-		      always @(clk, write_active, write, write_data)
-			if(~clk)
-			  if(write_active)
-			    if(write)
-			      storage <= write_data;
-		    
-		  endcase
+		  always @(posedge clk)
+		    if(write_active)
+		      if(write)
+			storage <= write_data;
 		  
 		  assign storage_1d[level*width:(level+1)*width-1] = storage;
 		  
@@ -169,11 +137,11 @@ module c_regfile
 		    = read_address[read_port*addr_width:
 				   (read_port+1)*addr_width-1];
 		  
-		  wire [0:width-1] 	port_cell_data;
+		  wire [0:width-1] 	port_read_data;
 		  
 		  case(regfile_type)
 		    
-		    `REGFILE_TYPE_FF_1D_TRISTATE, `REGFILE_TYPE_LAT_1D_TRISTATE:
+		    `REGFILE_TYPE_FF_1D_TRISTATE:
 		      begin
 			 
 			 wire [0:depth-1] port_read_sel;
@@ -186,31 +154,31 @@ module c_regfile
 			 c_select_1ofn
 			   #(.num_ports(depth),
 			     .width(width))
-			 port_cell_data_sel
+			 port_read_data_sel
 			   (.select(port_read_sel),
 			    .data_in(storage_1d),
-			    .data_out(port_cell_data));
+			    .data_out(port_read_data));
 			 
 		      end
 		    
-		    `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_LAT_1D_MUX:
+		    `REGFILE_TYPE_FF_1D_MUX:
 		      begin
 			 
-			 assign port_cell_data
+			 assign port_read_data
 			   = storage_1d[port_read_address*width +: width];
 			 
 		      end
 		    
 		  endcase
-
-		  assign cell_data[read_port*width:(read_port+1)*width-1]
-		    = port_cell_data;
+		  
+		  assign read_data[read_port*width:(read_port+1)*width-1]
+		    = port_read_data;
 		  
 	       end
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_DW, `REGFILE_TYPE_LAT_DW:
+	`REGFILE_TYPE_FF_DW:
 	  begin
 	     
 	     wire write_enable_b;
@@ -221,41 +189,19 @@ module c_regfile
 	       1:
 		 begin
 		    
-		    case(regfile_type)
-		      
-		      `REGFILE_TYPE_FF_DW:
-			begin
-			   DW_ram_r_w_s_dff
-			     #(.data_width(width),
-			       .depth(depth),
-			       .rst_mode(1))
-			   DW_rf_dff
-			     (.clk(clk),
-			      .rst_n(1'b1),
-			      .cs_n(write_enable_b),
-			      .wr_n(write_enable_b),
-			      .rd_addr(read_address),
-			      .wr_addr(write_address),
-			      .data_in(write_data),
-			      .data_out(cell_data));
-			end
-		      
-		      `REGFILE_TYPE_LAT_DW:
-			begin
-			   DW_ram_r_w_s_lat
-			     #(.data_width(width),
-			       .depth(depth))
-			   DW_rf_lat
-			     (.clk(clk),
-			      .cs_n(write_enable_b),
-			      .wr_n(write_enable_b),
-			      .rd_addr(read_address),
-			      .wr_addr(write_address),
-			      .data_in(write_data),
-			      .data_out(cell_data));
-			end
-		      
-		    endcase
+		    DW_ram_r_w_s_dff
+		      #(.data_width(width),
+			.depth(depth),
+			.rst_mode(1))
+		    DW_rf_dff
+		      (.clk(clk),
+		       .rst_n(1'b1),
+		       .cs_n(write_enable_b),
+		       .wr_n(write_enable_b),
+		       .rd_addr(read_address),
+		       .wr_addr(write_address),
+		       .data_in(write_data),
+		       .data_out(read_data));
 		    
 		 end
 	       
@@ -270,50 +216,25 @@ module c_regfile
 		    assign read_address_2
 		      = read_address[addr_width:2*addr_width-1];
 		    
-		    wire [0:width-1] 	  cell_data_1;
-		    wire [0:width-1] 	  cell_data_2;
+		    wire [0:width-1] 	  read_data_1;
+		    wire [0:width-1] 	  read_data_2;
+		    DW_ram_r_w_s_dff
+		      #(.data_width(width),
+			.depth(depth),
+			.rst_mode(1))
+		    DW_rf_dff
+		      (.clk(clk),
+		       .rst_n(1'b1),
+		       .cs_n(write_enable_b),
+		       .wr_n(write_enable_b),
+		       .rd1_addr(read_address_1),
+		       .rd2_addr(read_address_2),
+		       .wr_addr(write_address),
+		       .data_in(write_data),
+		       .data_rd1_out(read_data_1),
+		       .data_rd2_out(read_data_2));
 		    
-		    case(regfile_type)
-		      
-		      `REGFILE_TYPE_FF_DW:
-			begin
-			   DW_ram_r_w_s_dff
-			     #(.data_width(width),
-			       .depth(depth),
-			       .rst_mode(1))
-			   DW_rf_dff
-			     (.clk(clk),
-			      .rst_n(1'b1),
-			      .cs_n(write_enable_b),
-			      .wr_n(write_enable_b),
-			      .rd1_addr(read_address_1),
-			      .rd2_addr(read_address_2),
-			      .wr_addr(write_address),
-			      .data_in(write_data),
-			      .data_rd1_out(cell_data_1),
-			      .data_rd2_out(cell_data_2));
-			end
-		      
-		      `REGFILE_TYPE_LAT_DW:
-			begin
-			   DW_ram_r_w_s_lat
-			     #(.data_width(width),
-			       .depth(depth))
-			   DW_rf_lat
-			     (.clk(clk),
-			      .cs_n(write_enable_b),
-			      .wr_n(write_enable_b),
-			      .rd1_addr(read_address_1),
-			      .rd2_addr(read_address_2),
-			      .wr_addr(write_address),
-			      .data_in(write_data),
-			      .data_rd1_out(cell_data_1),
-			      .data_rd2_out(cell_data_2));
-			end
-		      
-		    endcase
-		    
-		    assign cell_data = {cell_data_1, cell_data_2};
+		    assign read_data = {read_data_1, read_data_2};
 		    
 		 end
 	       
@@ -337,49 +258,6 @@ module c_regfile
 	  end
 	
       endcase
-      
-      for(read_port = 0; read_port < num_read_ports; read_port = read_port + 1)
-	begin:read_ports
-	   
-	   wire [0:width-1] port_cell_data;
-	   assign port_cell_data
-	     = cell_data[read_port*width:(read_port+1)*width-1];
-	   
-	   wire [0:width-1] port_read_data;
-	   
-	   case(regfile_type)
-	     
-	     `REGFILE_TYPE_FF_2D, `REGFILE_TYPE_FF_1D_TRISTATE,
-	     `REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_DW:
-	       begin
-		  
-		  assign port_read_data = port_cell_data;
-		  
-	       end
-	     
-	     `REGFILE_TYPE_LAT_2D, `REGFILE_TYPE_LAT_1D_TRISTATE,
-	     `REGFILE_TYPE_LAT_1D_MUX, `REGFILE_TYPE_LAT_DW:
-	       begin
-		  
-		  wire port_read_active;
-		  assign port_read_active = read_active[read_port];
-		  
-		  reg [0:width-1] port_buffered_data;
-		  always @(clk, read_active, port_cell_data)
-		    if(clk)
-		      if(port_read_active)
-			port_buffered_data <= port_cell_data;
-		  
-		  assign port_read_data = port_buffered_data;
-		  
-	       end
-	     
-	   endcase
-	   
-	   assign read_data[read_port*width:(read_port+1)*width-1]
-	     = port_read_data;
-	   
-	end
       
       
       //----------------------------------------------------------------------

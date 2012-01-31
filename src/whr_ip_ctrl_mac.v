@@ -355,7 +355,6 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 			  fbf_write_enable;
-   wire 			  fbf_read_active;
    wire [0:fb_addr_width-1] 	  fbf_read_addr;
    
    generate
@@ -369,8 +368,6 @@ module whr_ip_ctrl_mac
 	   else
 	     assign fbf_write_enable = flit_valid_in;
 	   
-	   assign fbf_read_active = ~fbc_empty;
-	   
 	   assign fbf_read_addr = fbc_pop_addr;
 	   
 	end
@@ -378,8 +375,6 @@ module whr_ip_ctrl_mac
 	begin
 	   
 	   assign fbf_write_enable = flit_valid_in;
-	   
-	   // NOTE: fbf_read_active is generated later on in the file
 	   
 	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
 	   assign fbf_read_addr_s = fbc_pop_addr;
@@ -420,7 +415,6 @@ module whr_ip_ctrl_mac
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbc_push_addr),
 	      .write_data(fbf_write_data),
-	      .read_active(fbf_read_active),
 	      .read_address(fbf_read_addr),
 	      .read_data(fbf_read_data));
 	   
@@ -452,7 +446,6 @@ module whr_ip_ctrl_mac
 	      .write_enable(fbf_write_enable),
 	      .write_address(fbc_push_addr),
 	      .write_data(fbf_write_data),
-	      .read_active({fbf_read_active, fbf_peek_active}),
 	      .read_address({fbf_read_addr, fbf_peek_addr}),
 	      .read_data({fbf_read_data, fbf_peek_data}));
 	   
@@ -816,7 +809,6 @@ module whr_ip_ctrl_mac
 	   // to be free-running.
 	   
 	   wire read_active;
-	   assign read_active = pop_active | fbf_read_active;
 	   
 	   wire flit_sent_prev_s, flit_sent_prev_q;
 	   assign flit_sent_prev_s = flit_valid_out;
@@ -830,29 +822,27 @@ module whr_ip_ctrl_mac
 	      .d(flit_sent_prev_s),
 	      .q(flit_sent_prev_q));
 	   
-	   assign fbf_read_active = flit_sent_prev_q;
+	   assign read_active = pop_active | flit_sent_prev_q;
 	   
-	   wire flit_head_out_s, flit_head_out_q;
-	   assign flit_head_out_s = flit_head_out;
+	   wire flit_head_prev_s, flit_head_prev_q;
+	   assign flit_head_prev_s = flit_head_out;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
-	   flit_head_outq
+	   flit_head_prevq
 	     (.clk(clk),
 	      .reset(1'b0),
 	      .active(pop_active),
-	      .d(flit_head_out_s),
-	      .q(flit_head_out_q));
+	      .d(flit_head_prev_s),
+	      .q(flit_head_prev_q));
 	   
 	   wire active;
 	   assign active = flit_valid_out & flit_head_out;
 	   
 	   wire update_next_lar_info;
-	   assign update_next_lar_info
-	     = flit_sent_prev_q & flit_head_out_q;
+	   assign update_next_lar_info = flit_sent_prev_q & flit_head_prev_q;
 	   
-	   wire [0:lar_info_width-1] next_lar_info_s;
-	   wire [0:lar_info_width-1] next_lar_info_q;
+	   wire [0:lar_info_width-1] next_lar_info_s, next_lar_info_q;
 	   assign next_lar_info_s = next_lar_info;
 	   c_dff
 	     #(.width(lar_info_width),
