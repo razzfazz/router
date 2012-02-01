@@ -351,7 +351,7 @@ module rtr_ip_ctrl_mac
    wire [0:route_info_width-1] 		     chi_route_info;
    assign chi_route_info = chi_header_info[0:route_info_width-1];
    
-   wire [0:lar_info_width-1] 	     chi_lar_info;
+   wire [0:lar_info_width-1] 		     chi_lar_info;
    assign chi_lar_info = chi_route_info[0:lar_info_width-1];
    
    wire [0:dest_info_width-1] 		     chi_dest_info;
@@ -412,8 +412,7 @@ module rtr_ip_ctrl_mac
    // global lookahead routing information update logic
    //---------------------------------------------------------------------------
    
-   wire [0:lar_info_width-1] 		  glu_lar_info;
-   wire [0:flit_data_width-1] 			  glu_flit_data;
+   wire [0:lar_info_width-1] 			  glu_lar_info;
    
    generate
       
@@ -491,12 +490,6 @@ module rtr_ip_ctrl_mac
 	   end
 	 
 	 assign glu_lar_info = lar_info;
-	 assign glu_flit_data[0:lar_info_width-1]
-	   = (chi_flit_valid & chi_flit_head) ? 
-	     lar_info : 
-	     chi_flit_data[0:lar_info_width-1];
-	 assign glu_flit_data[lar_info_width:flit_data_width-1]
-	   = chi_flit_data[lar_info_width:flit_data_width-1];
 	 
       end
       
@@ -522,10 +515,9 @@ module rtr_ip_ctrl_mac
       
    endgenerate
    
-   wire [0:num_vcs-1] 				  flit_sent_prev_ivc;
-   wire 					  flit_head_prev;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
-   wire [0:num_vcs*flit_data_width-1] 		  llu_flit_data_ivc;
+   wire [0:num_vcs*flit_data_width-1] 		  fb_flit_data_ivc;
+   wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
    wire [0:num_vcs*5-1] 			  errors_ivc;
    
    genvar 					  ivc;
@@ -554,9 +546,6 @@ module rtr_ip_ctrl_mac
 	   wire flit_sent_fast_in;
 	   assign flit_sent_fast_in = flit_sent_fast_in_ivc[ivc];
 	   
-	   wire flit_sent_prev;
-	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
-	   
 	   
 	   //-------------------------------------------------------------------
 	   // connect outputs
@@ -580,9 +569,13 @@ module rtr_ip_ctrl_mac
 	   wire fb_full;
 	   assign fb_full_ivc[ivc] = fb_full;
 	   
-	   wire [0:flit_data_width-1] llu_flit_data;
-	   assign llu_flit_data_ivc[ivc*flit_data_width:
-				    (ivc+1)*flit_data_width-1] = llu_flit_data;
+	   wire [0:flit_data_width-1] fb_flit_data;
+	   assign fb_flit_data_ivc[ivc*flit_data_width:
+				   (ivc+1)*flit_data_width-1] = fb_flit_data;
+	   
+	   wire [0:lar_info_width-1]  llu_lar_info;
+	   assign llu_lar_info_ivc[ivc*lar_info_width:(ivc+1)*lar_info_width-1]
+	     = llu_lar_info;
 	   
 	   wire 		      route_valid_out;
 	   assign route_valid_out_ivc[ivc] = route_valid_out;
@@ -608,7 +601,6 @@ module rtr_ip_ctrl_mac
 	   wire 			   error_fb_overflow;
 	   
 	   wire 			   fb_almost_empty;
-	   wire [0:flit_data_width-1] 	   fb_flit_data;
 	   wire [0:route_info_width-1] 	   fb_peek_route_info;
 	   wire [0:fb_addr_width-1] 	   fb_push_addr;
 	   wire [0:fb_addr_width-1] 	   fb_pop_addr;
@@ -1287,7 +1279,7 @@ module rtr_ip_ctrl_mac
 		(.data_in(route_op),
 		 .data_out(route_port));
 	      
-	      wire [0:lar_info_width-1]  lar_info;
+	      wire [0:lar_info_width-1]       lar_info;
 	      assign lar_info[0:port_idx_width-1] = route_port;
 	      
 	      if(num_resource_classes > 1)
@@ -1301,47 +1293,12 @@ module rtr_ip_ctrl_mac
 		      .data_out(route_rcsel));
 		   
 		   assign lar_info[port_idx_width:
-					port_idx_width+
-					resource_class_idx_width-1]
+				   port_idx_width+resource_class_idx_width-1]
 		     = route_rcsel;
 		   
 		end
 	      
-	      if(explicit_pipeline_register)
-		assign llu_flit_data[0:lar_info_width-1]
-		  = (~fb_empty & htt_flit_head) ? 
-		    lar_info : 
-		    fb_flit_data[0:lar_info_width-1];
-	      else
-		begin
-		   
-		   wire active;
-		   assign active = (~fb_empty & htt_flit_head) |
-				   (chi_flit_valid & chi_flit_head);
-		   
-		   wire [0:lar_info_width-1] lar_info_s;
-		   wire [0:lar_info_width-1] lar_info_q;
-		   assign lar_info_s
-		     = hit_valid ? lar_info : glu_lar_info;
-		   c_dff
-		     #(.width(lar_info_width),
-		       .reset_type(reset_type))
-		   lar_infoq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(active),
-		      .d(lar_info_s),
-		      .q(lar_info_q));
-		   
-		   assign llu_flit_data[0:lar_info_width-1]
-		     = (flit_sent_prev & flit_head_prev) ? 
-		       lar_info_q :
-		       fb_flit_data[0:lar_info_width-1];
-		   
-		end
-	      
-	      assign llu_flit_data[lar_info_width:flit_data_width-1]
-		= fb_flit_data[lar_info_width:flit_data_width-1];
+	      assign llu_lar_info = lar_info;
 	      
 	   end
 	   
@@ -1411,11 +1368,10 @@ module rtr_ip_ctrl_mac
    // flit buffer read path
    //---------------------------------------------------------------------------
    
-   wire alloc_active;
-   assign alloc_active = chi_flit_valid | ~&fb_empty_ivc;
-   
    wire [0:num_vcs-1] flit_sel_ivc;
    wire 	      flit_sent;
+   wire 	      flit_head;
+   wire 	      bypass;
    
    generate
       
@@ -1424,42 +1380,95 @@ module rtr_ip_ctrl_mac
 	   assign flit_sel_ivc
 	     = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
 	   assign flit_sent = flit_sent_in | flit_sent_fast_in;
+	   assign flit_head = flit_sel_fast_in ? 
+			      chi_flit_head : 
+			      |(flit_sel_in_ivc & flit_head_out_ivc);
+	   assign bypass = flit_sel_fast_in;
 	end
       else
 	begin
 	   assign flit_sel_ivc = flit_sel_in_ivc;
 	   assign flit_sent = flit_sent_in;
+	   assign flit_head = |(flit_sel_in_ivc & flit_head_out_ivc);
+	   assign bypass = |(flit_sel_in_ivc & fb_empty_ivc);
 	end
+      
+   endgenerate
+   
+   wire [0:lar_info_width-1]  llu_lar_info;
+   
+   generate
+      
+      if(num_vcs == 1)
+	   assign llu_lar_info = llu_lar_info_ivc;
+      else if(num_vcs > 1)
+	begin
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(lar_info_width))
+	   llu_lar_info_sel
+	     (.select(flit_sel_in_ivc),
+	      .data_in(llu_lar_info_ivc),
+	      .data_out(llu_lar_info));
+	   
+	end
+      
+   endgenerate
+   
+   wire alloc_active;
+   assign alloc_active = chi_flit_valid | ~&fb_empty_ivc;
+   
+   wire flit_head_s, flit_head_q;
+   assign flit_head_s = flit_head;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_headq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(flit_head_s),
+      .q(flit_head_q));
+   
+   wire [0:lar_info_width-1] lar_info_s, lar_info_q;
+   assign lar_info_s
+     = flit_head ? (bypass ? glu_lar_info : llu_lar_info) : lar_info_q;
+   c_dff
+     #(.width(lar_info_width),
+       .reset_type(reset_type))
+   lar_infoq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(lar_info_s),
+      .q(lar_info_q));
+   
+   wire [0:flit_data_width-1] fb_flit_data;
+   wire [0:flit_data_width-1] flit_data_buffered;
+   
+   generate
       
       if(explicit_pipeline_register)
 	begin
 	   
-	   wire [0:flit_data_width-1] flit_data;
-	   
 	   if(num_vcs == 1)
-	     assign flit_data = llu_flit_data_ivc;
+	     assign fb_flit_data = fb_flit_data_ivc;
 	   else if(num_vcs > 1)
 	     begin
 		
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
-		flit_data_sel
+		fb_flit_data_sel
 		  (.select(flit_sel_in_ivc),
-		   .data_in(llu_flit_data_ivc),
-		   .data_out(flit_data));
+		   .data_in(fb_flit_data_ivc),
+		   .data_out(fb_flit_data));
 		
 	     end
 	   
-	   wire bypass;
-	   
-	   if(dual_path_alloc)
-	     assign bypass = flit_sel_fast_in;
-	   else
-	     assign bypass = |(flit_sel_in_ivc & fb_empty_ivc);
-	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = bypass ? glu_flit_data : flit_data;
+	   assign flit_data_s = bypass ? chi_flit_data : fb_flit_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -1470,62 +1479,14 @@ module rtr_ip_ctrl_mac
 	      .d(flit_data_s),
 	      .q(flit_data_q));
 	   
-	   assign flit_data_out = flit_data_q;
+	   assign flit_data_buffered = flit_data_q;
 	   
 	end
       else
 	begin
-	   
-	   // NOTE: We need to clock-gate this register such that it can be
-	   // turned off once no more flits are available; this will likely
-	   // cause it to end up being free-running.
-	   
-	   wire flit_sent_active;
-	   
-	   wire flit_sent_s, flit_sent_q;
-	   assign flit_sent_s = flit_sent;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_sentq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(flit_sent_active),
-	      .d(flit_sent_s),
-	      .q(flit_sent_q));
-	   
-	   assign flit_sent_active = alloc_active | flit_sent_q;
-	   
-	   wire flit_head;
-	   
-	   if(dual_path_alloc)
-	     assign flit_head = flit_sel_fast_in ? 
-				chi_flit_head : 
-				|(flit_sel_in_ivc & flit_head_out_ivc);
-	   else
-	     assign flit_head = |(flit_sel_in_ivc & flit_head_out_ivc);
-	   
-	   wire flit_head_s, flit_head_q;
-	   assign flit_head_s = flit_head;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_headq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(flit_head_s),
-	      .q(flit_head_q));
-	   
-	   assign flit_head_prev = flit_head_q;
-	   	      
-	   wire [0:flit_data_width-1] flit_data;
-	   
+
 	   if(num_vcs == 1)
-	     begin
-		assign flit_sent_prev_ivc = flit_sent_q;
-		assign flit_data = llu_flit_data_ivc;
-	     end
+	     assign fb_flit_data = fb_flit_data_ivc;
 	   else if(num_vcs > 1)
 	     begin
 		
@@ -1541,25 +1502,26 @@ module rtr_ip_ctrl_mac
 		   .d(flit_sel_ivc_s),
 		   .q(flit_sel_ivc_q));
 		
-		assign flit_sent_prev_ivc
-		  = {num_vcs{flit_sent_q}} & flit_sel_ivc_q;
-		
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
-		flit_data_sel
+		fb_flit_data_sel
 		  (.select(flit_sel_ivc_q),
-		   .data_in(llu_flit_data_ivc),
-		   .data_out(flit_data));
+		   .data_in(fb_flit_data_ivc),
+		   .data_out(fb_flit_data));
 		
 	     end
 	   
-	   assign flit_data_out = flit_data;
-	   
+	   assign flit_data_buffered = fb_flit_data;
 	end
       
    endgenerate
    
+   assign flit_data_out[0:lar_info_width-1]
+     = flit_head_q ? lar_info_q : flit_data_buffered[0:lar_info_width-1];
+   assign flit_data_out[lar_info_width:flit_data_width-1]
+     = flit_data_buffered[lar_info_width:flit_data_width-1];
+      
    
    //---------------------------------------------------------------------------
    // generate outgoing flow control signals

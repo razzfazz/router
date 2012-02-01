@@ -32,7 +32,7 @@
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_gnt, 
-   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_head_prev, flit_tail_prev, 
+   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev, next_lar_info, 
    flit_valid, flit_head, flit_tail, flit_sel_ovc, flit_data, empty, full, 
    allocated, free_nonspec, free_spec, errors);
    
@@ -259,11 +259,13 @@ module vcr_ivc_ctrl
    // did this VC send a flit in the previous cycle?
    input 					     flit_sent_prev;
    
-   // if we sent a flit in the previous cycle, was it a head flit?
-   input 					     flit_head_prev;
-   
    // if we sent a flit in the previous cycle, was it a tail flit?
    input 					     flit_tail_prev;
+   
+   // updated lookahead routing info
+   // (NOTE: only valid if the current flit is a head flit)
+   output [0:lar_info_width-1] 			     next_lar_info;
+   wire [0:lar_info_width-1] 			     next_lar_info;
    
    // outgoing flit is available
    output 					     flit_valid;
@@ -946,7 +948,6 @@ module vcr_ivc_ctrl
      (.data_in(next_route_op),
       .data_out(next_route_port));
    
-   wire [0:lar_info_width-1] 	       next_lar_info;
    assign next_lar_info[0:port_idx_width-1] = next_route_port;
    
    generate
@@ -977,49 +978,9 @@ module vcr_ivc_ctrl
    generate
       
       if(explicit_pipeline_register)
-	begin
-	   
-	   wire [0:flit_data_width-1] flit_data_muxed;
-	   assign flit_data_muxed = empty ? flit_data_in : fbf_flit_data;
-	   
-	   assign flit_data[0:lar_info_width-1]
-	     = flit_head ? 
-	       next_lar_info : 
-	       flit_data_muxed[0:lar_info_width-1];
-	   assign flit_data[lar_info_width:flit_data_width-1]
-	     = flit_data_muxed[lar_info_width:flit_data_width-1];
-	   
-	end
+	assign flit_data = empty ? flit_data_in : fbf_flit_data;
       else
-	begin
-	   
-	   wire active;
-	   assign active = flit_valid & flit_head;
-	   
-	   wire update_next_lar_info;
-	   assign update_next_lar_info = flit_sent_prev & flit_head_prev;
-	   
-	   wire [0:lar_info_width-1] next_lar_info_s;
-	   wire [0:lar_info_width-1] next_lar_info_q;
-	   assign next_lar_info_s = next_lar_info;
-	   c_dff
-	     #(.width(lar_info_width),
-	       .reset_type(reset_type))
-	   next_lar_infoq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(active),
-	      .d(next_lar_info_s),
-	      .q(next_lar_info_q));
-	   
-	   assign flit_data[0:lar_info_width-1]
-	     = update_next_lar_info ? 
-	       next_lar_info_q : 
-	       fbf_flit_data[0:lar_info_width-1];
-	   assign flit_data[lar_info_width:flit_data_width-1]
-	     = fbf_flit_data[lar_info_width:flit_data_width-1];
-	   
-	end
+	assign flit_data = fbf_flit_data;
       
    endgenerate
    
@@ -1028,10 +989,10 @@ module vcr_ivc_ctrl
    // credit tracking
    //---------------------------------------------------------------------------
    
-   wire 				   cred_track_active;
+   wire 				       cred_track_active;
    assign cred_track_active = flit_valid | vc_allocated_q;
    
-   wire [0:num_vcs*int_flow_ctrl_width-1]  int_flow_ctrl_ovc;
+   wire [0:num_vcs*int_flow_ctrl_width-1]      int_flow_ctrl_ovc;
    c_select_1ofn
      #(.num_ports(num_ports),
        .width(num_vcs*int_flow_ctrl_width))
@@ -1041,7 +1002,7 @@ module vcr_ivc_ctrl
       .data_out(int_flow_ctrl_ovc));
    
    wire [0:num_resource_classes*num_vcs_per_class*
-	 int_flow_ctrl_width-1] 	   int_flow_ctrl_orc_ocvc;
+	 int_flow_ctrl_width-1] 	       int_flow_ctrl_orc_ocvc;
    assign int_flow_ctrl_orc_ocvc = int_flow_ctrl_ovc[message_class*
 						     num_resource_classes*
 						     num_vcs_per_class*

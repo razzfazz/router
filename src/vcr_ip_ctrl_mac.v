@@ -347,8 +347,8 @@ module vcr_ip_ctrl_mac
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
    wire [0:num_vcs-1] 				     flit_sent_prev_ivc;
-   wire 					     flit_head_prev;
    wire 					     flit_tail_prev;
+   wire [0:num_vcs*lar_info_width-1] 		     next_lar_info_ivc;
    wire [0:num_vcs-1] 				     flit_head_ivc;
    wire [0:num_vcs-1] 				     flit_tail_ivc;
    wire [0:num_vcs*num_vcs-1] 			     flit_sel_ivc_ovc;
@@ -387,6 +387,7 @@ module vcr_ip_ctrl_mac
 	   
 	   wire [0:num_ports-1] 	route_op;
 	   wire [0:num_resource_classes-1] route_orc;
+	   wire [0:lar_info_width-1] 	   next_lar_info;
 	   wire 			   flit_valid;
 	   wire 			   flit_head;
 	   wire 			   flit_tail;
@@ -438,8 +439,8 @@ module vcr_ip_ctrl_mac
 	      .vc_gnt_ocvc(vc_gnt_ocvc),
 	      .sw_gnt(sw_gnt),
 	      .flit_sent_prev(flit_sent_prev),
-	      .flit_head_prev(flit_head_prev),
 	      .flit_tail_prev(flit_tail_prev),
+	      .next_lar_info(next_lar_info),
 	      .flit_valid(flit_valid),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
@@ -457,6 +458,8 @@ module vcr_ip_ctrl_mac
 	   assign route_ivc_orc[ivc*num_resource_classes:
 				(ivc+1)*num_resource_classes-1]
 	     = route_orc;
+	   assign next_lar_info_ivc[ivc*lar_info_width:
+				    (ivc+1)*lar_info_width-1] = next_lar_info;
 	   assign flit_valid_ivc[ivc] = flit_valid;
 	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
@@ -484,6 +487,8 @@ module vcr_ip_ctrl_mac
    assign alloc_active = flit_valid_in | ~&empty_ivc;
    
    wire [0:num_vcs-1] 			   prev_sw_sel_ivc;
+   
+   wire [0:flit_data_width-1] 		   flit_data_buffered;
    
    generate
       
@@ -517,14 +522,14 @@ module vcr_ip_ctrl_mac
 	      .d(flit_data_s),
 	      .q(flit_data_q));
 	   
-	   assign flit_data = flit_data_q;
+	   assign flit_data_buffered = flit_data_q;
 	   
 	end
       else
 	begin
 	   
 	   if(num_vcs == 1)
-	     assign flit_data = flit_data_ivc;
+	     assign flit_data_buffered = flit_data_ivc;
 	   else if(num_vcs > 1)
 	     begin
 		
@@ -536,16 +541,58 @@ module vcr_ip_ctrl_mac
 		c_select_1ofn
 		  #(.num_ports(num_vcs),
 		    .width(flit_data_width))
-		flit_data_sel
+		flit_data_buffered_sel
 		  (.select(prev_sw_sel_ivc),
 		   .data_in(flit_data_ivc),
-		   .data_out(flit_data));
+		   .data_out(flit_data_buffered));
 		
 	     end
 	   
 	end
       
    endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // update lookahead routing info
+   //---------------------------------------------------------------------------
+   
+   wire [0:lar_info_width-1] next_lar_info;
+   generate
+      if(num_vcs == 1)
+	assign next_lar_info = next_lar_info_ivc;
+      else
+	begin
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(lar_info_width))
+	   next_lar_info_sel
+	     (.select(sw_sel_ivc),
+	      .data_in(next_lar_info_ivc),
+	      .data_out(next_lar_info));
+	end
+   endgenerate
+   
+   wire flit_head;
+
+   wire [0:lar_info_width-1] lar_info_s, lar_info_q;
+   assign lar_info_s = flit_head ? next_lar_info : lar_info_q;
+   c_dff
+     #(.width(lar_info_width),
+       .reset_type(reset_type))
+   lar_infoq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(lar_info_s),
+      .q(lar_info_q));
+   
+   wire 		     flit_head_prev;
+   
+   assign flit_data[0:lar_info_width-1]
+     = flit_head_prev ? lar_info_q : flit_data_buffered[0:lar_info_width-1];
+   assign flit_data[lar_info_width:flit_data_width-1]
+     = flit_data_buffered[lar_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -564,12 +611,12 @@ module vcr_ip_ctrl_mac
    // will most likely end up being free-running, so this may be a reasonable 
    // tradeoff.
    
-   wire 			     flit_valid_q;
+   wire 		     flit_valid_q;
    
-   wire 			     flit_valid_active;
+   wire 		     flit_valid_active;
    assign flit_valid_active = alloc_active | flit_valid_q;
    
-   wire 			     flit_valid_s;
+   wire 		     flit_valid_s;
    assign flit_valid_s = flit_sent;
    c_dff
      #(.width(1),
@@ -583,8 +630,7 @@ module vcr_ip_ctrl_mac
    
    assign int_flit_ctrl[0] = flit_valid_q;
    
-   wire 			     flit_head;
-   wire 			     flit_tail;
+   wire 		     flit_tail;
    
    generate
       
@@ -616,7 +662,7 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   wire 				flit_head_s, flit_head_q;
+   wire flit_head_s, flit_head_q;
    assign flit_head_s = flit_head;
    c_dff
      #(.width(1),
@@ -631,7 +677,7 @@ module vcr_ip_ctrl_mac
    assign flit_head_prev = flit_head_q;
    assign int_flit_ctrl[1+0] = flit_head_q;
    
-   wire 				flit_tail_s, flit_tail_q;
+   wire flit_tail_s, flit_tail_q;
    assign flit_tail_s = flit_tail;
    c_dff
      #(.width(1),

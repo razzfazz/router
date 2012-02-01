@@ -717,7 +717,7 @@ module whr_ip_ctrl_mac
    wire [0:dest_info_width-1] 	       dest_info;
    assign dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
    
-   wire [0:lar_info_width-1]      lar_info;
+   wire [0:lar_info_width-1] 	       lar_info;
    assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
    
    wire [0:router_addr_width-1]        next_router_address;
@@ -760,29 +760,47 @@ module whr_ip_ctrl_mac
      (.data_in(next_route_op),
       .data_out(next_route_port));
    
-   wire [0:lar_info_width-1]      next_lar_info;
-   assign next_lar_info[0:port_idx_width-1] = next_route_port;
+   wire [0:lar_info_width-1] 	       next_lar_info;
+   assign next_lar_info = next_route_port;
    
    
    //---------------------------------------------------------------------------
    // generate output data
    //---------------------------------------------------------------------------
    
+   wire [0:lar_info_width-1] 	       lar_info_s, lar_info_q;
+   assign lar_info_s = flit_head_out ? next_lar_info : lar_info_q;
+   c_dff
+     #(.width(lar_info_width),
+       .reset_type(reset_type))
+   lar_infoq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(pop_active),
+      .d(lar_info_s),
+      .q(lar_info_q));
+   
+   wire 			       flit_head_prev_s, flit_head_prev_q;
+   assign flit_head_prev_s = flit_head_out;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_head_prevq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(pop_active),
+      .d(flit_head_prev_s),
+      .q(flit_head_prev_q));
+   
+   wire [0:flit_data_width-1] 	       flit_data_buffered;
+   
    generate
       
       if(explicit_pipeline_register)
 	begin
 	   
-	   wire [0:flit_data_width-1] flit_data_muxed;
-	   assign flit_data_muxed = fbc_empty ? flit_data_in : fbf_flit_data;
-	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s[0:lar_info_width-1]
-	     = flit_head_out ? 
-	       next_lar_info : 
-	       flit_data_muxed[0:lar_info_width-1];
-	   assign flit_data_s[lar_info_width:flit_data_width-1]
-	     = flit_data_muxed[lar_info_width:flit_data_width-1];
+	   assign flit_data_s = fbc_empty ? flit_data_in : fbf_flit_data;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -793,48 +811,19 @@ module whr_ip_ctrl_mac
 	      .d(flit_data_s),
 	      .q(flit_data_q));
 	   
-	   assign flit_data_out = flit_data_q;
+	   assign flit_data_buffered = flit_data_q;
 	   
 	end
       else
-	begin
-	   
-	   wire flit_head_prev_s, flit_head_prev_q;
-	   assign flit_head_prev_s = flit_head_out;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_head_prevq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(pop_active),
-	      .d(flit_head_prev_s),
-	      .q(flit_head_prev_q));
-	   
-	   wire [0:lar_info_width-1] next_lar_info_s, next_lar_info_q;
-	   assign next_lar_info_s
-	     = flit_head_out ? next_lar_info : next_lar_info_q;
-	   c_dff
-	     #(.width(lar_info_width),
-	       .reset_type(reset_type))
-	   next_lar_infoq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(pop_active),
-	      .d(next_lar_info_s),
-	      .q(next_lar_info_q));
-	   
-	   assign flit_data_out[0:lar_info_width-1]
-	     = flit_head_prev_q ? 
-	       next_lar_info_q : 
-	       fbf_flit_data[0:lar_info_width-1];
-	   assign flit_data_out[lar_info_width:flit_data_width-1]
-	     = fbf_flit_data[lar_info_width:flit_data_width-1];
-	   
-	end
+	assign flit_data_buffered = fbf_flit_data;
       
    endgenerate
    
+   assign flit_data_out[0:lar_info_width-1]
+     = flit_head_prev_q ? lar_info_q : flit_data_buffered[0:lar_info_width-1];
+   assign flit_data_out[lar_info_width:flit_data_width-1]
+     = flit_data_buffered[lar_info_width:flit_data_width-1];
+	   
    
    //---------------------------------------------------------------------------
    // generate control signals to switch allocator
