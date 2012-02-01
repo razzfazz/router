@@ -611,12 +611,12 @@ module vcr_ip_ctrl_mac
    // will most likely end up being free-running, so this may be a reasonable 
    // tradeoff.
    
-   wire 		     flit_valid_q;
+   wire 		     flit_sent_prev;
    
    wire 		     flit_valid_active;
-   assign flit_valid_active = alloc_active | flit_valid_q;
+   assign flit_valid_active = alloc_active | flit_sent_prev;
    
-   wire 		     flit_valid_s;
+   wire 		     flit_valid_s, flit_valid_q;
    assign flit_valid_s = flit_sent;
    c_dff
      #(.width(1),
@@ -628,6 +628,7 @@ module vcr_ip_ctrl_mac
       .d(flit_valid_s),
       .q(flit_valid_q));
    
+   assign flit_sent_prev = flit_valid_q;
    assign int_flit_ctrl[0] = flit_valid_q;
    
    wire 		     flit_tail;
