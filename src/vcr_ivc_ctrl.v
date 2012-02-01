@@ -724,8 +724,7 @@ module vcr_ivc_ctrl
    wire [0:lar_info_width-1] 	     hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_lar_info_s
-	  = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+	assign hdr_lar_info_s = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
       else
 	begin
 	   
@@ -752,8 +751,7 @@ module vcr_ivc_ctrl
    wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_dest_info_s
-	  = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+	assign hdr_dest_info_s = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
       else
 	begin
 	   
