@@ -29,6 +29,8 @@
 // n-input generic binary operator
 //==============================================================================
 
+`include "c_constants.v"
+
 module c_binary_op
   (data_in, data_out);
    

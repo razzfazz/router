@@ -44,7 +44,7 @@ module packet_source
    
    // packet injection rate (percentage of cycles)
    parameter packet_rate = 25;
-   
+   parameter packet_ratio = 25;
    // width of packet count register
    parameter packet_count_reg_width = 32;
 
@@ -248,7 +248,7 @@ module packet_source
    always @(posedge clk, posedge reset)
      begin
 	new_packet
-	  <= ($dist_uniform(seed, 0, 99) < packet_rate) && run && !reset;
+	  <= ($dist_uniform(seed, 0,  packet_ratio) < packet_rate) && run && !reset;
      end
    
    wire waiting_packet_count_zero;
@@ -454,17 +454,37 @@ module packet_source
    reg [0:flit_data_width-1] 		 data_q;
    always @(posedge clk, posedge reset)
      begin
-	if(reset | flit_valid)
+	
 	  for(i = 0; i < flit_data_width; i = i + 1)
 	    data_q[i] <= $dist_uniform(seed, 0, 1);
      end
+
+   wire [0:flit_data_width-1] 		 data_hold_s;
+   wire [0:flit_data_width-1] 		 data_hold_q;
+ 
+   c_dff
+     #(.width(flit_data_width),
+       .reset_type(reset_type))
+   flit_data_hold
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(data_hold_s),
+      .q(data_hold_q));
+
+   assign data_hold_s  = flit_valid?data_q:data_hold_q;
    
    wire [0:header_info_width-1] header_info;
-   
+   /*
    assign flit_data[0:header_info_width-1]
      = flit_head ? header_info : data_q[0:header_info_width-1];
    assign flit_data[header_info_width:flit_data_width-1]
      = data_q[header_info_width:flit_data_width-1];
+   */
+   assign flit_data[0:header_info_width-1]
+     = flit_head ? header_info : data_hold_s[0:header_info_width-1];
+   assign flit_data[header_info_width:flit_data_width-1]
+     = data_hold_s[header_info_width:flit_data_width-1];
    
    reg [0:dest_info_width-1] dest_info;
    

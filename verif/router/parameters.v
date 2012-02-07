@@ -63,24 +63,24 @@ parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
 parameter flow_ctrl_bypass = 0;
 
 // maximum payload length (in flits)
-parameter max_payload_length = 4;
+parameter max_payload_length = 9;
 
 // minimum payload length (in flits)
-parameter min_payload_length = 0;
+parameter min_payload_length = 1;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_COMBINED;
+parameter router_type = `ROUTER_TYPE_VC;
 
 // width of flit payload data
 parameter flit_data_width = 64;
 
 // configure error checking logic
-parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
+parameter error_capture_mode = `ERROR_CAPTURE_MODE_NONE;
 
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
 // such turns)
-parameter restrict_turns = 1;
+parameter restrict_turns = 0;
 
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -132,7 +132,7 @@ parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select speculation type for switch allocator
-parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_NONE;
 
 // select implementation variant for crossbar
 parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;

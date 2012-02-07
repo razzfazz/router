@@ -35,7 +35,7 @@ module rtr_route_filter
    route_out_orc, errors);
    
 `include "c_constants.v"
-   
+`include "rtr_constants.v"
    
    //---------------------------------------------------------------------------
    // parameters

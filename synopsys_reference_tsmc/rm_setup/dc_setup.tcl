@@ -106,11 +106,6 @@ set RTL_SOURCE_FILES  [list\
 	$rtl_dir/rtr_routing_logic.v\
 	$rtl_dir/rtr_top.v\
 	$rtl_dir/rtr_vc_state.v\
-	$rtl_dir/tc_cfg_bus_ifc.v\
-	$rtl_dir/tc_chan_test_mac.v\
-	$rtl_dir/tc_node_ctrl_mac.v\
-	$rtl_dir/tc_node_mac.v\
-	$rtl_dir/tc_router_wrap.v\
 	$rtl_dir/vcr_ip_ctrl_mac.v\
 	$rtl_dir/vcr_ivc_ctrl.v\
 	$rtl_dir/vcr_op_ctrl_mac.v\

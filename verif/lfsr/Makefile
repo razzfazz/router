@@ -38,6 +38,13 @@ DW_DIR = $(SYNOPSYS)/dw/sim_ver
 
 VCS_FLAGS = +lint=all,noVCDE +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
 
+PNR_VCS_FLAGS = +lint=all,noVCDE +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64 -v /home/shared/system/cad/pdks/ST/cmos045-4.0/CMOS045_SC_14_CORE_LS_SNPS-AVT-CDS_3.0/behaviour/verilog/CMOS045_SC_14_CORE_LS.v -v /home/shared/system/cad/pdks/ST/cmos045-4.0/cva/st_memories/SPREG_090108-27570@1.0/behaviour/verilog/SPREG_090108.v -v /home/charting/cmos045-4.0/CMOS045_SC_14_CLK_LS_SNPS-AVT-CDS_4.0/behaviour/verilog/CMOS045_SC_14_CLK_LS.v 
+
+TSMC_PNR_VCS_FLAGS =  +v2k +libext+.v -timescale=1ns/1ps -Mupdate -debug -full64 -v /home/qtedq/tsmc45/TSMCHOME/digital/Front_End/verilog/tcbn45gsbwp_120a/tcbn45gsbwp.v 
+
+# +notimingcheck
+
+
 # DUMP_CTRL may be overidden by script calling this
 DUMP_CTRL=
 INT_CTRL=
@@ -50,6 +57,12 @@ simv: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
 
 simvfast: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
 	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
+
+pnr: 
+	vcs -o simv_par $(PNR_VCS_FLAGS) $(INT_CTRL) -y . -y $(SRC_DIR)  $(TOP_SRC) $(DUMP_CTRL)
+
+tsmc:
+	vcs -o simv_par $(TSMC_PNR_VCS_FLAGS) $(INT_CTRL) -y . -y $(SRC_DIR)  $(TOP_SRC) $(DUMP_CTRL)
 
 clean:
 	rm -rf work simv simvfast simv.daidir simvfast.daidir transcript *.vcd *.vpd ucli.key vcs.key run.args csrc DVEfiles .vcsmx_rebuild *~

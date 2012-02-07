@@ -34,7 +34,7 @@ module rtr_next_hop_addr
    
 `include "c_functions.v"
 `include "c_constants.v"
-   
+`include "rtr_constants.v"
    
    //---------------------------------------------------------------------------
    // parameters

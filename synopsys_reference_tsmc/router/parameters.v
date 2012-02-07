@@ -69,7 +69,8 @@ parameter max_payload_length = 9;
 parameter min_payload_length = 1;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_VC;
+parameter router_type = `ROUTER_TYPE_COMBINED;
+
 
 // width of flit payload data
 parameter flit_data_width = 64;
@@ -132,3 +133,9 @@ parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_NONE;
 parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
 
 parameter reset_type = `RESET_TYPE_ASYNC;  
+
+
+parameter gate_buffer_write = 0;
+
+parameter vc_alloc_mask = `VC_ALLOC_MASK_FULL;
+parameter vc_alloc_prefer_empty = 0;

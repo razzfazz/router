@@ -25,18 +25,18 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-`default_nettype none
+//`default_nettype none
 
 module testbench
    ();
    
 `include "c_constants.v"
    
-   parameter width = 4;
+   parameter width = 32;
    
    parameter index = 0;
    
-   parameter Tclk = 2;
+   parameter Tclk = 1;
    
    wire [0:width-1] feedback;
    c_fbgen
@@ -66,20 +66,7 @@ module testbench
       .d(d),
       .q(lfsr_q));
    
-   wire [0:width-1] ulfsr_q;
-   c_lfsr
-     #(.width(width),
-       .iterations(width))
-   ulfsr
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .load(load),
-      .run(run),
-      .feedback(feedback),
-      .complete(complete),
-      .d(d),
-      .q(ulfsr_q));
+  
    
    always
    begin
@@ -90,10 +77,19 @@ module testbench
    end
    
    integer i;
+
+   initial begin : main
+      //$dumpfile("router.vcd");
+      //$dumpvars(0, testbench.rtr);
+      $sdf_annotate("c_lfsr.sdf",testbench.lfsr);      
+   end
+   
+   
+   
    
    initial
-   begin
-      reset = 1'b1;
+     begin
+      reset  = 1'b1;
       
       #(Tclk);
       
@@ -114,10 +110,11 @@ module testbench
       
       $display("feedback=%x, complete=%b:", feedback, complete);
       
-      for(i = 0; i < (1 << width); i = i + 1)
+      for(i = 0; i <10; i = i + 1)
 	begin
-	   $display("%8d | %b (%x) | %b (%x)", 
-		    i, lfsr_q, lfsr_q, ulfsr_q, ulfsr_q);
+	   $display("%8d | %b (%x) ",
+		    i, lfsr_q, lfsr_q);
+	   
 	   #(Tclk);
 	end
       
@@ -134,10 +131,11 @@ module testbench
       
       $display("feedback=%x, complete=%b:", feedback, complete);
       
-      for(i = 0; i < ((1 << width) + 1); i = i + 1)
+      for(i = 0; i < 10; i = i + 1)
 	begin
-	   $display("%8d | %b (%x) | %b (%x)", 
-		    i, lfsr_q, lfsr_q, ulfsr_q, ulfsr_q);
+	   $display("%8d | %b (%x) ",
+		    i, lfsr_q, lfsr_q);
+	   
 	   #(Tclk);
 	end
       

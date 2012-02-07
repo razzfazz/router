@@ -25,7 +25,7 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-`default_nettype none
+//`default_nettype none
 
 module testbench
   ();
@@ -36,17 +36,18 @@ module testbench
 `include "vcr_constants.v"
 `include "parameters.v"
    
+`include "verif_parameters.v"
    parameter Tclk = 2;
-   parameter initial_seed = 0;
+   parameter initial_seed = 99;
    
    // maximum number of packets to generate (-1 = no limit)
    parameter max_packet_count = -1;
    
    // packet injection rate (percentage of cycles)
-   parameter packet_rate = 25;
+//   parameter packet_rate = 25;
    
    // flit consumption rate (percentage of cycles)
-   parameter consume_rate = 50;
+   parameter consume_rate = 100;
    
    // width of packet count register
    parameter packet_count_reg_width = 32;
@@ -218,6 +219,7 @@ module testbench
 		  #(.initial_seed(initial_seed+ip),
 		    .max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
+		    .packet_ratio(packet_ratio),
 		    .packet_count_reg_width(packet_count_reg_width),
 		    .packet_length_mode(packet_length_mode),
 		    .topology(topology),
@@ -444,6 +446,44 @@ module testbench
    
    wire       tb_error;
    assign tb_error = |tb_errors;
+
+wire [0:31] ops_flits_s [0:num_ports-1];
+   wire [0:31] ops_flits_q [0:num_ports-1];
+   generate
+      genvar ops_count;
+      for(ops_count = 0; ops_count<num_ports; ops_count=ops_count+1)
+	begin:ops_counts
+	   assign ops_flits_s[ops_count] = ops_flits_q[ops_count] + flit_valid_out_op[ops_count];
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   ops_flitsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(ops_flits_s[ops_count]),
+	      .q(ops_flits_q[ops_count]));
+	end
+   endgenerate
+   wire [0:31] ips_flits_s [0:num_ports-1];
+   wire [0:31] ips_flits_q [0:num_ports-1];
+   generate
+      genvar ips_count;
+      for(ips_count = 0; ips_count<num_ports; ips_count=ips_count+1)
+	begin:ips_counts
+	   assign ips_flits_s[ips_count] = ips_flits_q[ips_count] + flit_valid_in_ip[ips_count];
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   ips_flitsq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(ips_flits_s[ips_count]),
+	      .q(ips_flits_q[ips_count]));
+	end
+   endgenerate
+
    
    wire [0:31] in_flits_s, in_flits_q;
    assign in_flits_s = in_flits_q + pop_count(flit_valid_in_ip);
@@ -569,7 +609,8 @@ module testbench
    
    integer cycles;
    integer d;
-   
+   integer lolz;
+
    initial
    begin
       
@@ -642,6 +683,19 @@ module testbench
       $display("simulation ended after %d cycles", cycles);
       
       $display("%d flits received, %d flits sent", in_flits, out_flits);
+        for(lolz = 0; lolz<num_ports; lolz=lolz+1)
+	begin
+	   $display("port %d eject : %d",
+		    lolz,ops_flits_q[lolz]);
+
+	   
+	   	   
+	end
+      for(lolz = 0; lolz<num_ports; lolz=lolz+1)
+	begin
+      	   $display("port %d inject: %d flits",
+		    lolz,ips_flits_q[lolz]);
+	end
       
       $finish;
       

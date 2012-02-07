@@ -25,21 +25,20 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-`default_nettype none
 
-module testbench
-  #(parameter num_ports = 4,
-    parameter width = 8,
-    parameter Tclk = 2,
-    parameter sim_cycles = 1000,
-    parameter initial_seed = 0)
-   ();
-
+module testbench;
+   
+   
 `include "c_functions.v"
 
-   localparam out_width = clogb(num_ports) + width;
-
-   wire [0:out_width-1] data_out;
+   parameter num_ports 	  = 5;
+   parameter width 	  = 3;
+   parameter Tclk 	  = 2;
+   parameter sim_cycles   = 10;
+  parameter initial_seed  = 0;
+   
+   
+   wire [0:width-1] data_out;
 
    reg [0:num_ports*width-1] data_in;
 
@@ -50,14 +49,17 @@ module testbench
    
    always @(posedge clk)
      begin
+		$display("output %b",data_out);
 	for(i = 0; i < num_ports; i = i + 1)
 	  begin
 	     data_in[i*width +: width]
-	       = $dist_uniform(seed, 0, 2**width-1);
+     = $dist_uniform(seed, 0, 2**width-1);
+	     $display("input\t\t%b",data_in[i*width +: width]);
 	  end
+	
      end
 
-   c_add_nto1
+   c_add_nto1_sat
      #(.width(width),
        .num_ports(num_ports))
    dut
@@ -65,17 +67,17 @@ module testbench
       .data_out(data_out));
    
    always
-   begin
-      clk <= 1'b1;
-      #(Tclk/2);
-      clk <= 1'b0;
-      #(Tclk/2);
-   end
+     begin
+	clk <= 1'b1;
+	#(Tclk/2);
+	clk <= 1'b0;
+	#(Tclk/2);
+     end
    
    initial
-   begin
-      #(sim_cycles*Tclk);
-      $finish;
-   end
+     begin
+	#(sim_cycles*Tclk);
+	$finish;
+     end
    
 endmodule
