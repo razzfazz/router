@@ -33,10 +33,10 @@
 parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
-parameter num_flits_per_vc = 8;
+parameter num_flits_per_vc = 32;
 
 // number of message classes (e.g. request, reply)
-parameter num_message_classes = 2;
+parameter num_message_classes = 4;
 
 // number of resource classes (e.g. minimal, adaptive)
 parameter num_resource_classes = 1;
@@ -63,10 +63,10 @@ parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
 parameter flow_ctrl_bypass = 0;
 
 // maximum payload length (in flits)
-parameter max_payload_length = 9;
+parameter max_payload_length = 7;
 
 // minimum payload length (in flits)
-parameter min_payload_length = 1;
+parameter min_payload_length = 0;
 
 // select router implementation
 parameter router_type = `ROUTER_TYPE_VC;

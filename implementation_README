@@ -1,0 +1,42 @@
+General
+	-Packet encoding
+		-6 types: normal data, spec data, reservation, grant, ack, nack
+		-Each packet is restricted to certain VCs, can use VC id as part of the packet id
+	-Establish packet structure for each of the packet types
+
+Router
+	-Input module
+		-4 VCs
+			-Reservation VC
+			-Grant/ACK/NACK VC
+			-Data VC
+				-No significant change
+			-Speculative VC
+				-Packet drop
+					-Clear packet from buffer
+						-Maybe best implmented as 1-flit per cycle
+					-Converting header flit of dropped packets to NACK
+					-Potentially mult-ibit credit update if several flits were dropped
+						-This is avoided for now
+					-Checker at the VC input for flits belonging to dropped packets
+						-This is avoided for now, write then wait for the 1flit/cycle drop
+				-Queuing time check
+					-Timer, how many bits, timer saturation
+						see (1)
+					-Timer FIFO for the speculative VC
+					-Time stamp on arrival
+					-Time check at the head of the FIFO
+					-TTW deduction before speculative packets exits the router
+					
+	-Switch allocator			
+		-Three masking allocators
+		
+	VC allocation
+		-Simple arbiters since VC allocation is based on packet type. 
+		-The exception is NACKs if we decide to rewrite the head flit of the dropped speculative packets (speculative VC bidding for control VC)
+		
+	-Output Module
+	
+(1) Speculative timer overflow
+Because the speuclative VC is inherently dynamic, timer overflow is more manageable than other situations. Hypothetically, n speculative packets [P1 to Pn] with length [psize] arrives in rapid succession right before timer overflow [P1_timestamp = tmax-(n-1)*psize-1 and Pn_timestamp = tmax-1]. For the HoL packet [P1] overflow detection is trivial as there is a timer check every cycle. After TTW cycles P1 is dropped and the worst case value for the timer is exactly tmax-(n-1)*psize-1+TTW-tmax simplifies to TTW-(n-1)*psize-1 [-tmax is due to overflow]. It takes psize cycles to drop P1, now timer =  TTW-(n-2)*psize-1. P2 is up for time check and if (P2_timestamp > timer) then overflow is again detectable. Substitute values and we get tmax > TTW.  Assume TTW on all packets are the the same or lower, then  the previous relations can be used to show that overflow will be detected on all n packets.  
+Also TTW>psize, or tmax>ttw+psize. 
