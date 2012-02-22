@@ -66,6 +66,15 @@ function integer pop_count(input integer argument);
    end
 endfunction
 
-
-
-
+// compute the length of the longest disjoint suffix among two values
+function integer suffix_length(input integer value1, input integer value2);
+   begin
+      suffix_length = 0;
+      while(value1 != value2)
+	begin
+	   suffix_length = suffix_length + 1;
+	   value1 = value1 >> 1;
+	   value2 = value2 >> 1;
+	end
+   end
+endfunction
