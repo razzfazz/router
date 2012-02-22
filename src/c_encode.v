@@ -37,6 +37,9 @@ module c_encode
    // number of input ports (i.e., decoded width)
    parameter num_ports = 8;
    
+   // start at offset
+   parameter offset = 0;
+   
    localparam width = clogb(num_ports);
    
    // one-hot input data
@@ -58,7 +61,8 @@ module c_encode
 	   for(position = 0; position < num_ports; position = position + 1)
 	     begin:positions
 		if(position & (1 << level))
-		  assign bits[position] = data_in[position];
+		  assign bits[position]
+		    = data_in[(position+num_ports-offset)%num_ports];
 		else
 		  assign bits[position] = 1'b0;
 	     end

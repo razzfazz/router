@@ -29,7 +29,7 @@
 
 module testbench
   #(parameter num_ports = 8,
-    parameter num_tests = 1000,
+    parameter offset = 0,
     parameter initial_seed = 0)
    ();
 
@@ -41,7 +41,8 @@ module testbench
    wire [0:width-1]    data_out;
 
    c_encode
-     #(.num_ports(num_ports))
+     #(.num_ports(num_ports),
+       .offset(offset))
    dut
      (.data_in(data_in),
       .data_out(data_out));
@@ -55,16 +56,17 @@ module testbench
    initial
    begin
 
-      for(test = 0; test < num_tests; test = test + 1)
+      for(test = 0; test < num_ports; test = test + 1)
 	begin
-	   i = $dist_uniform(seed, 0, num_ports-1);
 	   data_in = {num_ports{1'b0}};
-	   data_in[i] = 1'b1;
-	   data_ref = i;
+	   data_in[test] = 1'b1;
+	   data_ref = (test + offset) % num_ports;
 	   #1;
 	   if(data_out != data_ref)
 	     $display("ERROR: in=%b, out=%d, expected=%d",
 		      data_in, data_out, data_ref);
+	   else
+	     $display("OK:    in=%b, out=%d", data_in, data_out);
 	   #1;
 	end
       

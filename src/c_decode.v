@@ -37,6 +37,9 @@ module c_decode
    // number of output ports (i.e., width of decoded word)
    parameter num_ports = 8;
    
+   // start at offset
+   parameter offset = 0;
+   
    localparam width = clogb(num_ports);
    
    // encoded input data
@@ -51,7 +54,8 @@ module c_decode
       genvar 		position;
       for(position = 0; position < num_ports; position = position + 1)
 	begin:positions
-	   assign data_out[position] = (data_in == position);
+	   assign data_out[position]
+	     = (data_in == (position + offset) % num_ports);
 	end
       
    endgenerate
