@@ -41,31 +41,42 @@ module c_incr
    
    localparam num_values = max_value - min_value + 1;
    
+   localparam swidth = suffix_length(min_value, max_value);
+   
    localparam cwidth = clogb(num_values);
    
    // operand inputs
    input [0:width-1] data_in;
    
-   // sum output
+   // result output
    output [0:width-1] data_out;
    wire [0:width-1] data_out;
-   
-   wire 	    carry;
-   assign carry = &data_in[(width-cwidth):width-1];
    
    wire 	    wrap;
    assign wrap = (data_in[(width-cwidth):width-1] ==
 		  max_value[(width-cwidth):width-1]);
    
+   wire [0:cwidth-1] lsb_incr;
+   assign lsb_incr = data_in[(width-cwidth):width-1] + 1'b1;
+   
+   genvar 	     i;
+   
    generate
       
+      // all MSBs that are common to min_value and max_value can simply be 
+      // copied over from either constant
+      for(i = 0; i < (width-swidth); i = i + 1)
+	begin:prefix
+	   assign data_out[i] = min_value[i];
+	end
+      
+      // the LSBs for a modulo counter, possibly with offset
       if((1 << cwidth) == num_values)
 	begin
 	   
-	   // if the range is a power of two, we can take advantage of natural
-	   // wraparound for the LSBs
-	   assign data_out[(width-cwidth):width-1]
-		    = data_in[(width-cwidth):width-1] + 1'b1;
+	   // if the counter's range is a power of two, we can take advantage of
+	   // natural wraparound
+	   assign data_out[(width-cwidth):width-1] = lsb_incr;
 	   
 	end
       else
@@ -74,34 +85,24 @@ module c_incr
 	   // if the range is not a power of two, we need to implement 
 	   // explicit wraparound
 	   assign data_out[(width-cwidth):width-1]
-		    = wrap ?
-		      min_value[(width-cwidth):width-1] :
-		      (data_in[(width-cwidth):width-1] + 1'b1);
+	     = wrap ? min_value[(width-cwidth):width-1] : lsb_incr;
 	   
 	end
       
-      if(width > cwidth)
+      // for the remaining range of bit positions (if any), min_value and 
+      // max_value differ by one due to the carry-out from the modulo counter 
+      // that implements the LSBs; i.e., this range of bits can have two 
+      // distinct values
+      if(swidth > cwidth)
 	begin
 	   
-	   if(min_value[0:(width-cwidth)-1] == max_value[0:(width-cwidth)-1])
-	     begin
-		
-		// if the MSBs are identical for the first and last value, we 
-		// never need to change them
-		assign data_out[0:(width-cwidth)-1]
-			 = data_in[0:(width-cwidth)-1];
-		
-	     end
-	   else
-	     begin
-		
-		// if the first and last value have differing MSBs, we need to
-		// adjust them whenever either the LSBs overflow or wraparound
-		// occurs
-		assign data_out[0:(width-cwidth)-1]
-			 = data_in[0:(width-cwidth)-1] + carry - wrap;
-		
-	     end
+	   wire carry;
+	   assign carry = &data_in[(width-cwidth):width-1];
+	   
+	   assign data_out[(width-swidth):(width-cwidth)-1]
+	     = wrap ? min_value[(width-swidth):(width-cwidth)-1] :
+	       carry ? max_value[(width-swidth):(width-cwidth)-1] :
+	       data_in[(width-swidth):(width-cwidth)-1];
 	   
 	end
       
