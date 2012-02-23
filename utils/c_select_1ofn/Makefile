@@ -1,4 +1,4 @@
-MAX_WIDTH=32
+MAX_WIDTH=64
 
 c_select_1ofn.v: head body tail
 	cat head body tail > c_select_1ofn.v
