@@ -26,7 +26,7 @@ int main(int argc, char ** argv) {
     }
     std::cout
       << "               default:\n"
-      << "                 data_out = {" << size << "{1'bx}};\n"
+      << "                 data_out = {width{1'bx}};\n"
       << "             endcase\n"
       << "          end\n";
   }
