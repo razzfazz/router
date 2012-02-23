@@ -29,6 +29,8 @@
 // generic select mux (i.e., mux with one-hot control signal)
 //==============================================================================
 
+// NOTE: This file was automatically generated. Do not edit by hand!
+
 module c_select_1ofn
   (select, data_in, data_out);
    
