@@ -1011,22 +1011,17 @@ module vcr_ivc_ctrl
 						     int_flow_ctrl_width-1];
    
    wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
+   c_select_1ofn
+     #(.num_ports(num_resource_classes),
+       .width(num_vcs_per_class*int_flow_ctrl_width))
+   int_flow_ctrl_ocvc_sel
+     (.select(route_orc),
+      .data_in(int_flow_ctrl_orc_ocvc),
+      .data_out(int_flow_ctrl_ocvc));
+   
    wire 					    error_ct_overflow;
    
    generate
-      
-      if(num_resource_classes == 1)
-	assign int_flow_ctrl_ocvc = int_flow_ctrl_orc_ocvc;
-      else if(num_resource_classes > 1)
-	begin
-	   c_select_1ofn
-	     #(.num_ports(num_resource_classes),
-	       .width(num_vcs_per_class*int_flow_ctrl_width))
-	   int_flow_ctrl_ocvc_sel
-	     (.select(route_orc),
-	      .data_in(int_flow_ctrl_orc_ocvc),
-	      .data_out(int_flow_ctrl_ocvc));
-	end
       
       case(int_flow_ctrl_type)
 	
@@ -1090,10 +1085,13 @@ module vcr_ivc_ctrl
 	     
 	     assign free_nonspec = free_nonspec_q;
 	     
-	     if(num_vcs_per_class == 1)
-	       assign free_spec = free_spec_ocvc;
-	     else if(num_vcs_per_class > 1)
-	       assign free_spec = |(free_spec_ocvc & vc_gnt_ocvc);
+	     c_select_1ofn
+	       #(.num_ports(num_vcs_per_class),
+		 .width(1))
+	     free_spec_sel
+	       (.select(vc_gnt_ocvc),
+		.data_in(free_spec_ocvc),
+		.data_out(free_spec));
 	     
 	     assign error_ct_overflow = 1'b0;
 	     
@@ -1112,11 +1110,13 @@ module vcr_ivc_ctrl
 	     assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc);
 	     
 	     wire 			  cred_unallocated;
-	     
-	     if(num_vcs_per_class == 1)
-	       assign cred_unallocated = cred_ocvc;
-	     else
-	       assign cred_unallocated = |(cred_ocvc & vc_gnt_ocvc);
+	     c_select_1ofn
+	       #(.num_ports(num_vcs_per_class),
+		 .width(1))
+	     cred_unallocated_sel
+	       (.select(vc_gnt_ocvc),
+		.data_in(cred_ocvc),
+		.data_out(cred_unallocated));
 	     
 	     wire [0:cred_hold_width-1]   cred_hold_q;
 	     

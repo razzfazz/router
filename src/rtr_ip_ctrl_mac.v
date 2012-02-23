@@ -1396,25 +1396,13 @@ module rtr_ip_ctrl_mac
    endgenerate
    
    wire [0:lar_info_width-1]  llu_lar_info;
-   
-   generate
-      
-      if(num_vcs == 1)
-	   assign llu_lar_info = llu_lar_info_ivc;
-      else if(num_vcs > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(lar_info_width))
-	   llu_lar_info_sel
-	     (.select(flit_sel_in_ivc),
-	      .data_in(llu_lar_info_ivc),
-	      .data_out(llu_lar_info));
-	   
-	end
-      
-   endgenerate
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(lar_info_width))
+   llu_lar_info_sel
+     (.select(flit_sel_in_ivc),
+      .data_in(llu_lar_info_ivc),
+      .data_out(llu_lar_info));
    
    wire alloc_active;
    assign alloc_active = chi_flit_valid | ~&fb_empty_ivc;
@@ -1452,20 +1440,13 @@ module rtr_ip_ctrl_mac
       if(explicit_pipeline_register)
 	begin
 	   
-	   if(num_vcs == 1)
-	     assign fb_flit_data = fb_flit_data_ivc;
-	   else if(num_vcs > 1)
-	     begin
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_data_width))
-		fb_flit_data_sel
-		  (.select(flit_sel_in_ivc),
-		   .data_in(fb_flit_data_ivc),
-		   .data_out(fb_flit_data));
-		
-	     end
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(flit_data_width))
+	   fb_flit_data_sel
+	     (.select(flit_sel_in_ivc),
+	      .data_in(fb_flit_data_ivc),
+	      .data_out(fb_flit_data));
 	   
 	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
 	   assign flit_data_s = bypass ? chi_flit_data : fb_flit_data;

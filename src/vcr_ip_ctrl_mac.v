@@ -495,23 +495,17 @@ module vcr_ip_ctrl_mac
       if(explicit_pipeline_register)
 	begin
 	   
-	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-
-	   if(num_vcs == 1)
-	     assign flit_data_s = flit_data_ivc;
-	   else if(num_vcs > 1)
-	     begin
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_data_width))
-		flit_data_s_sel
-		  (.select(sw_sel_ivc),
-		   .data_in(flit_data_ivc),
-		   .data_out(flit_data_s));
-		
-	     end
+	   wire [0:flit_data_width-1] flit_data_muxed;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(flit_data_width))
+	   flit_data_muxed_sel
+	     (.select(sw_sel_ivc),
+	      .data_in(flit_data_ivc),
+	      .data_out(flit_data_muxed));
 	   
+	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
+	   assign flit_data_s = flit_data_muxed;
 	   c_dff
 	     #(.width(flit_data_width),
 	       .reset_type(reset_type))
@@ -528,25 +522,18 @@ module vcr_ip_ctrl_mac
       else
 	begin
 	   
-	   if(num_vcs == 1)
-	     assign flit_data_buffered = flit_data_ivc;
-	   else if(num_vcs > 1)
-	     begin
-		
-		// In the absence of an explicit pipeline register between flit 
-		// buffer and crossbar, buffer read is delayed by one clock 
-		// cycle such as to line up the flit data with the crossbar 
-		// control signals.
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_data_width))
-		flit_data_buffered_sel
-		  (.select(prev_sw_sel_ivc),
-		   .data_in(flit_data_ivc),
-		   .data_out(flit_data_buffered));
-		
-	     end
+	   // In the absence of an explicit pipeline register between flit 
+	   // buffer and crossbar, buffer read is delayed by one clock cycle 
+	   // such as to line up the flit data with the crossbar control 
+	   // signals.
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(flit_data_width))
+	   flit_data_buffered_sel
+	     (.select(prev_sw_sel_ivc),
+	      .data_in(flit_data_ivc),
+	      .data_out(flit_data_buffered));
 	   
 	end
       
@@ -558,23 +545,16 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:lar_info_width-1] next_lar_info;
-   generate
-      if(num_vcs == 1)
-	assign next_lar_info = next_lar_info_ivc;
-      else
-	begin
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(lar_info_width))
-	   next_lar_info_sel
-	     (.select(sw_sel_ivc),
-	      .data_in(next_lar_info_ivc),
-	      .data_out(next_lar_info));
-	end
-   endgenerate
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(lar_info_width))
+   next_lar_info_sel
+     (.select(sw_sel_ivc),
+      .data_in(next_lar_info_ivc),
+      .data_out(next_lar_info));
    
    wire flit_head;
-
+   
    wire [0:lar_info_width-1] lar_info_s, lar_info_q;
    assign lar_info_s = flit_head ? next_lar_info : lar_info_q;
    c_dff
@@ -631,39 +611,15 @@ module vcr_ip_ctrl_mac
    assign flit_sent_prev = flit_valid_q;
    assign int_flit_ctrl[0] = flit_valid_q;
    
-   wire 		     flit_tail;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_head_sel
+     (.select(sw_sel_ivc),
+      .data_in(flit_head_ivc),
+      .data_out(flit_head));
    
-   generate
-      
-      if(num_vcs == 1)
-	begin
-	   assign flit_head = flit_head_ivc;
-	   assign flit_tail = flit_tail_ivc;
-	end
-      else if(num_vcs > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_head_sel
-	     (.select(sw_sel_ivc),
-	      .data_in(flit_head_ivc),
-	      .data_out(flit_head));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   flit_tail_sel
-	     (.select(sw_sel_ivc),
-	      .data_in(flit_tail_ivc),
-	      .data_out(flit_tail));
-	   
-	end
-      
-   endgenerate
-   
-   wire flit_head_s, flit_head_q;
+   wire 		     flit_head_s, flit_head_q;
    assign flit_head_s = flit_head;
    c_dff
      #(.width(1),
@@ -678,7 +634,16 @@ module vcr_ip_ctrl_mac
    assign flit_head_prev = flit_head_q;
    assign int_flit_ctrl[1+0] = flit_head_q;
    
-   wire flit_tail_s, flit_tail_q;
+   wire 		     flit_tail;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_tail_sel
+     (.select(sw_sel_ivc),
+      .data_in(flit_tail_ivc),
+      .data_out(flit_tail));
+   
+   wire 		     flit_tail_s, flit_tail_q;
    assign flit_tail_s = flit_tail;
    c_dff
      #(.width(1),

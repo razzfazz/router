@@ -96,39 +96,20 @@ module rtr_flags_mux
       .data_out(flags_opc));
    
    wire [0:num_resource_classes*width-1] 	  flags_orc;
+   c_select_1ofn
+     #(.num_ports(num_message_classes),
+       .width(num_resource_classes*width))
+   flags_orc_sel
+     (.select(sel_mc),
+      .data_in(flags_opc),
+      .data_out(flags_orc));
    
-   generate
-      
-      if(num_message_classes == 1)
-	assign flags_orc = flags_opc;
-      else if(num_message_classes > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_message_classes),
-	       .width(num_resource_classes*width))
-	   flags_orc_sel
-	     (.select(sel_mc),
-	      .data_in(flags_opc),
-	      .data_out(flags_orc));
-	   
-	end
-      
-      if(num_resource_classes == 1)
-	assign flags = flags_orc;
-      else if(num_resource_classes > 1)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_resource_classes),
-	       .width(width))
-	   flags_sel
-	     (.select(route_orc),
-	      .data_in(flags_orc),
-	      .data_out(flags));
-	   
-	end
-      
-   endgenerate
+   c_select_1ofn
+     #(.num_ports(num_resource_classes),
+       .width(width))
+   flags_sel
+     (.select(route_orc),
+      .data_in(flags_orc),
+      .data_out(flags));
    
 endmodule

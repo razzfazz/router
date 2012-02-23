@@ -406,18 +406,17 @@ module rtr_routing_logic
 	
       endcase
       
-      if(num_resource_classes == 1)
-	assign route_onp = route_irc_onp;
-      else if(num_resource_classes > 1)
-	begin
-	   c_select_1ofn
-	     #(.num_ports(num_resource_classes),
-	       .width(num_network_ports))
-	   route_onp_sel
-	     (.select(sel_irc),
-	      .data_in(route_irc_onp),
-	      .data_out(route_onp));
-	end
+   endgenerate
+   
+   c_select_1ofn
+     #(.num_ports(num_resource_classes),
+       .width(num_network_ports))
+   route_onp_sel
+     (.select(sel_irc),
+      .data_in(route_irc_onp),
+      .data_out(route_onp));
+   
+   generate
       
       if(num_nodes_per_router == 1)
 	assign route_op[num_ports-1] = eject;

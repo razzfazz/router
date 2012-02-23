@@ -427,11 +427,13 @@ module rtr_alloc_mac
 		      .flags(almost_full_ocvc));
 		   
 		   wire 			  almost_full;
-		   
-		   if(num_vcs_per_class == 1)
-		     assign almost_full = almost_full_ocvc;
-		   else if(num_vcs_per_class > 1)
-		     assign almost_full = |(next_elig_ocvc & almost_full_ocvc);
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(1))
+		   almost_full_sel
+		     (.select(next_elig_ocvc),
+		      .data_in(almost_full_ocvc),
+		      .data_out(almost_full));
 		   
 		   wire [0:num_vcs_per_class-1]   full_ocvc;
 		   rtr_flags_mux
@@ -447,11 +449,13 @@ module rtr_alloc_mac
 		      .flags(full_ocvc));
 		   
 		   wire 			  full;
-		   
-		   if(num_vcs_per_class == 1)
-		     assign full = full_ocvc;
-		   else
-		     assign full = |(next_elig_ocvc & full_ocvc);
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(1))
+		   full_sel
+		     (.select(next_elig_ocvc),
+		      .data_in(full_ocvc),
+		      .data_out(full));
 		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	  flit_sel_orc_ocvc;
@@ -479,24 +483,18 @@ module rtr_alloc_mac
 		      .result(flit_sel_ovc));
 		   
 		   wire [0:num_vcs-1] 		  ivs_flit_sel_ovc;
+		   c_select_1ofn
+		     #(.num_ports(num_vcs),
+		       .width(num_vcs))
+		   ivs_flit_sel_ovc_sel
+		     (.select(flit_sel_fast_in_ivc),
+		      .data_in(ivs_flit_sel_ivc_ovc),
+		      .data_out(ivs_flit_sel_ovc));
 		   
-		   if(num_vcs == 1)
-		     assign ivs_flit_sel_ovc = 1'b1;
-		   else if(num_vcs > 1)
-		     begin
-			c_select_1ofn
-			  #(.num_ports(num_vcs),
-			    .width(num_vcs))
-			ivs_flit_sel_ovc_sel
-			  (.select(flit_sel_fast_in_ivc),
-			   .data_in(ivs_flit_sel_ivc_ovc),
-			   .data_out(ivs_flit_sel_ovc));
-		     end
-		   
-		   wire [0:num_vcs-1] flit_sel_ivc;
+		   wire [0:num_vcs-1] 		  flit_sel_ivc;
 		   assign flit_sel_ivc = flit_sel_fast_in_ivc & ivs_cred_ivc;
 		   
-		   wire [0:num_ports-1] rf_route_op;
+		   wire [0:num_ports-1] 	  rf_route_op;
 		   c_select_mofn
 		     #(.num_ports(num_vcs),
 		       .width(num_ports))
@@ -1058,34 +1056,40 @@ module rtr_alloc_mac
 		 .data_out(flit_valid_lo_op));
 	      
 	      wire 		   flit_head;
-	      wire 		   flit_tail;
-	      wire [0:num_vcs-1]   flit_sel_ovc;
-	      wire 		   flit_kill;
+	      c_select_1ofn
+		#(.num_ports(num_vcs),
+		  .width(1))
+	      flit_head_sel
+		(.select(gnt_ivc),
+		 .data_in(flit_head_in_ivc),
+		 .data_out(flit_head));
 	      
-	      if(num_vcs == 1)
-		begin
-		   assign flit_head = flit_head_in_ivc;
-		   assign flit_tail = flit_tail_in_ivc;
-		   assign flit_sel_ovc = 1'b1;
-		   assign flit_kill = ivs_flit_kill_ivc;
-		end
-	      else if(num_vcs > 1)
-		begin
-		   
-		   assign flit_head = |(gnt_ivc & flit_head_in_ivc);
-		   assign flit_tail = |(gnt_ivc & flit_tail_in_ivc);
-		   
-		   c_select_1ofn
-		     #(.num_ports(num_vcs),
-		       .width(num_vcs))
-		   flit_sel_ovc_sel
-		     (.select(gnt_ivc),
-		      .data_in(ivs_flit_sel_ivc_ovc),
-		      .data_out(flit_sel_ovc));
-		   
-		   assign flit_kill = |(gnt_ivc & ivs_flit_kill_ivc);
-		   
-		end
+	      wire 		   flit_tail;
+	      c_select_1ofn
+		#(.num_ports(num_vcs),
+		  .width(1))
+	      flit_tail_sel
+		(.select(gnt_ivc),
+		 .data_in(flit_tail_in_ivc),
+		 .data_out(flit_tail));
+	      
+	      wire [0:num_vcs-1]   flit_sel_ovc;
+	      c_select_1ofn
+		#(.num_ports(num_vcs),
+		  .width(num_vcs))
+	      flit_sel_ovc_sel
+		(.select(gnt_ivc),
+		 .data_in(ivs_flit_sel_ivc_ovc),
+		 .data_out(flit_sel_ovc));
+	      
+	      wire 		   flit_kill;
+	      c_select_1ofn
+		#(.num_ports(num_vcs),
+		  .width(1))
+	      flit_kill_sel
+		(.select(gnt_ivc),
+		 .data_in(ivs_flit_kill_ivc),
+		 .data_out(flit_kill));
 	      
 	      assign ial_flit_valid_hi_op = flit_valid_hi_op;
 	      assign ial_flit_valid_lo_op = flit_valid_lo_op;
