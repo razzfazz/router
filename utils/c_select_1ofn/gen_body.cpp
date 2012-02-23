@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdlib>
 
 int main(int argc, char ** argv) {
   int min = (argc > 1) ? atoi(argv[1]) : 2;
