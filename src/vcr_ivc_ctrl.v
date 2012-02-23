@@ -1070,8 +1070,17 @@ module vcr_ivc_ctrl
 		  
 	       end
 	     
+	     wire 	     free_nonspec_muxed;
+	     c_select_1ofn
+	       #(.num_ports(num_vcs_per_class),
+		 .width(1))
+	     free_nonspec_muxed_sel
+	       (.select(vc_allocated_next_ocvc),
+		.data_in(next_free_ocvc),
+		.data_out(free_nonspec_muxed));
+	     
 	     wire 	     free_nonspec_s, free_nonspec_q;
-	     assign free_nonspec_s = |(next_free_ocvc & vc_allocated_next_ocvc);
+	     assign free_nonspec_s = free_nonspec_muxed;
 	     c_dff
 	       #(.width(1),
 		 .reset_value(1'b1),
@@ -1107,7 +1116,13 @@ module vcr_ivc_ctrl
 	     assign cred_ocvc = int_flow_ctrl_ocvc;
 	     
 	     wire 			  cred_allocated;
-	     assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc);
+	     c_select_1ofn
+	       #(.num_ports(num_vcs_per_class),
+		 .width(1))
+	     cred_allocated_sel
+	       (.select(vc_allocated_ocvc),
+		.data_in(cred_ocvc),
+		.data_out(cred_allocated));
 	     
 	     wire 			  cred_unallocated;
 	     c_select_1ofn

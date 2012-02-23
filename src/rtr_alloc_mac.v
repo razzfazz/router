@@ -830,16 +830,23 @@ module rtr_alloc_mac
 		      .flags_op_opc(almost_full_in_op_ovc),
 		      .flags(almost_full_ocvc));
 		   
+		   wire 			     allocated_next_almost_full;
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(1))
+		   allocated_next_almost_full_sel
+		     (.select(allocated_next_ocvc),
+		      .data_in(almost_full_ocvc),
+		      .data_out(allocated_next_almost_full));
+		   
 		   wire 			     almost_full;
 		   
 		   if(dual_path_alloc)
-		     assign almost_full
-		       = route_valid_in ? 
-			 |(allocated_next_ocvc & almost_full_ocvc) : 
-			 ifl_almost_full;
+		     assign almost_full = route_valid_in ? 
+					  allocated_next_almost_full : 
+					  ifl_almost_full;
 		   else
-		     assign almost_full
-		       = |(allocated_next_ocvc & almost_full_ocvc);
+		     assign almost_full = allocated_next_almost_full;
 		   
 		   wire [0:num_vcs_per_class-1]      full_ocvc;
 		   rtr_flags_mux
@@ -854,14 +861,23 @@ module rtr_alloc_mac
 		      .flags_op_opc(full_in_op_ovc),
 		      .flags(full_ocvc));
 		   
+		   wire 			     allocated_next_full;
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(1))
+		   allocated_next_full_sel
+		     (.select(allocated_next_ocvc),
+		      .data_in(full_ocvc),
+		      .data_out(allocated_next_full));
+		   
 		   wire 			     full;
 		   
 		   if(dual_path_alloc)
-		     assign full = route_valid_in ? 
-				   |(allocated_next_ocvc & full_ocvc) : 
+		     assign full = route_valid_in ?
+				   allocated_next_full : 
 				   ifl_full;
 		   else
-		     assign full = |(allocated_next_ocvc & full_ocvc);
+		     assign full = allocated_next_full;
 		   
 		   // we need to track credits even when we temporarily run out 
 		   // of flits; otherwise, there can be a dead cycle when a new 
@@ -1371,7 +1387,13 @@ module rtr_alloc_mac
 		   
 		   assign flit_sent = (|req_ip & ~multi_hot) | (|gnt_presel_ip);
 		   
-		   assign allocated = |(gnt_ip & req_hi_ip);
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   allocated_sel
+		     (.select(gnt_ip),
+		      .data_in(req_hi_ip),
+		      .data_out(allocated));
 		   
 		   assign update = flit_sent |
 				   (|req_hi_ip & ~|(req_hi_ip & mask_ip_q)) |
@@ -1414,13 +1436,25 @@ module rtr_alloc_mac
 		end
 	      
 	      wire 			   flit_head;
-	      assign flit_head = |(gnt_ip & ial_flit_head_ip);
+	      c_select_1ofn
+		#(.num_ports(num_ports),
+		  .width(1))
+	      flit_head_sel
+		(.select(gnt_ip),
+		 .data_in(ial_flit_head_ip),
+		 .data_out(flit_head));
 	      
 	      wire 			   flit_tail;
-	      assign flit_tail = |(gnt_ip & ial_flit_tail_ip);
+	      c_select_1ofn
+		#(.num_ports(num_ports),
+		  .width(1))
+	      flit_tail_sel
+		(.select(gnt_ip),
+		 .data_in(ial_flit_tail_ip),
+		 .data_out(flit_tail));
 	      
 	      wire [0:num_vcs-1] 	   ial_flit_sel_ovc;
-	      c_select_mofn
+	      c_select_1ofn
 		#(.num_ports(num_ports),
 		  .width(num_vcs))
 	      ial_flit_sel_ovc_sel
@@ -1461,6 +1495,7 @@ module rtr_alloc_mac
 		   
 		   wire [0:num_ports-1] gnt_ip;
 		   wire 		flit_sent;
+		   wire [0:num_vcs-1] 	sel_ip;
 		   
 		   if(dual_path_alloc == 1)
 		     begin
@@ -1479,6 +1514,7 @@ module rtr_alloc_mac
 			   .multi_hot(multi_hot));
 			
 			assign flit_sent = |req_ip & ~multi_hot;
+			assign sel_ip = req_ip;
 			
 		     end
 		   else if(dual_path_alloc > 1)
@@ -1505,20 +1541,34 @@ module rtr_alloc_mac
 			   .gnt(gnt_ip),
 			   .update(update));
 			
+			assign sel_ip = gnt_ip;
+			
 		     end
 		   
 		   wire      flit_head;
-		   assign flit_head = |(req_ip & flit_head_fast_in_ip);
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   flit_head_sel
+		     (.select(sel_ip),
+		      .data_in(flit_head_fast_in_ip),
+		      .data_out(flit_head));
 		   
 		   wire      flit_tail;
-		   assign flit_tail = |(req_ip & flit_tail_fast_in_ip);
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   flit_tail_sel
+		     (.select(sel_ip),
+		      .data_in(flit_tail_fast_in_ip),
+		      .data_out(flit_tail));
 		   
 		   wire [0:num_vcs-1] ifl_flit_sel_ovc;
-		   c_select_mofn
+		   c_select_1ofn
 		     #(.num_ports(num_ports),
 		       .width(num_vcs))
 		   ifl_flit_sel_ovc_sel
-		     (.select(gnt_ip),
+		     (.select(sel_ip),
 		      .data_in(ifl_flit_sel_ip_ovc),
 		      .data_out(ifl_flit_sel_ovc));
 		   
@@ -1530,10 +1580,9 @@ module rtr_alloc_mac
 		   assign ofl_flit_sent_ip
 		     = gnt_ip & {num_ports{~oal_flit_sent}};
 		   assign ofl_flit_sent = flit_sent & ~oal_flit_sent;
-		   assign ofl_flit_head = flit_head & ~oal_flit_sent;
-		   assign ofl_flit_tail = flit_tail & ~oal_flit_sent;
-		   assign ofl_flit_sel_ovc
-		     = flit_sel_ovc & {num_vcs{~oal_flit_sent}};
+		   assign ofl_flit_head = flit_head;
+		   assign ofl_flit_tail = flit_tail;
+		   assign ofl_flit_sel_ovc = flit_sel_ovc;
 		   
 		end
 	      else
@@ -1598,7 +1647,7 @@ module rtr_alloc_mac
 	   assign flit_valid_out = flit_valid_q;
 	   
 	   wire 		   flit_head_s, flit_head_q;
-	   assign flit_head_s = oal_flit_head | ofl_flit_head;
+	   assign flit_head_s = oal_flit_sent ? oal_flit_head : ofl_flit_head;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -1612,7 +1661,7 @@ module rtr_alloc_mac
 	   assign flit_head_out = flit_head_q;
 	   
 	   wire 		   flit_tail_s, flit_tail_q;
-	   assign flit_tail_s = oal_flit_tail | ofl_flit_tail;
+	   assign flit_tail_s = oal_flit_sent ? oal_flit_tail : ofl_flit_tail;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -1626,7 +1675,8 @@ module rtr_alloc_mac
 	   assign flit_tail_out = flit_tail_q;
 	   
 	   wire [0:num_vcs-1] 	   flit_sel_ovc_s, flit_sel_ovc_q;
-	   assign flit_sel_ovc_s = oal_flit_sel_ovc | ofl_flit_sel_ovc;
+	   assign flit_sel_ovc_s
+	     = oal_flit_sent ? oal_flit_sel_ovc : ofl_flit_sel_ovc;
 	   c_dff
 	     #(.width(num_vcs),
 	       .reset_type(reset_type))
@@ -1678,8 +1728,8 @@ module rtr_alloc_mac
 					     (opc+1)*num_vcs_per_class-1];
 			
 			wire 			     update;
-			assign update = (oal_flit_sent & ~oal_allocated & 
-					 |oal_flit_sel_ocvc) |
+			assign update = oal_flit_sent ?
+					(~oal_allocated & |oal_flit_sel_ocvc) :
 					(ofl_flit_sent & ofl_flit_head & 
 					 |ofl_flit_sel_ocvc);
 			

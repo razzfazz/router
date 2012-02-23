@@ -319,13 +319,26 @@ module vcr_ip_ctrl_mac
       
       if(sw_alloc_spec)
 	begin
+	   
+	   wire [0:num_vcs-1] spec_mask_ivc;
+	   
 	   if(elig_mask == `ELIG_MASK_NONE)
-	     assign flit_sent
-	       = sw_gnt & 
-		 |(sw_sel_ivc & (allocated_ivc | (vc_gnt_ivc & free_spec_ivc)));
+	     assign spec_mask_ivc
+	       = allocated_ivc | (vc_gnt_ivc & free_spec_ivc);
 	   else
-	     assign flit_sent
-	       = sw_gnt & |(sw_sel_ivc & (allocated_ivc | vc_gnt_ivc));
+	     assign spec_mask_ivc = allocated_ivc | vc_gnt_ivc;
+
+	   wire 	      spec_mask;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   spec_mask_sel
+	     (.select(sw_sel_ivc),
+	      .data_in(spec_mask_ivc),
+	      .data_out(spec_mask));
+	   
+	   assign flit_sent = sw_gnt & spec_mask;
+	   
 	end
       else
 	assign flit_sent = sw_gnt;

@@ -1368,6 +1368,15 @@ module rtr_ip_ctrl_mac
    // flit buffer read path
    //---------------------------------------------------------------------------
    
+   wire flit_head_out;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   flit_head_out_sel
+     (.select(flit_sel_in_ivc),
+      .data_in(flit_head_out_ivc),
+      .data_out(flit_head_out));
+   
    wire [0:num_vcs-1] flit_sel_ivc;
    wire 	      flit_sent;
    wire 	      flit_head;
@@ -1380,17 +1389,23 @@ module rtr_ip_ctrl_mac
 	   assign flit_sel_ivc
 	     = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
 	   assign flit_sent = flit_sent_in | flit_sent_fast_in;
-	   assign flit_head = flit_sel_fast_in ? 
-			      chi_flit_head : 
-			      |(flit_sel_in_ivc & flit_head_out_ivc);
+	   assign flit_head = flit_sel_fast_in ? chi_flit_head : flit_head_out;
 	   assign bypass = flit_sel_fast_in;
 	end
       else
 	begin
 	   assign flit_sel_ivc = flit_sel_in_ivc;
 	   assign flit_sent = flit_sent_in;
-	   assign flit_head = |(flit_sel_in_ivc & flit_head_out_ivc);
-	   assign bypass = |(flit_sel_in_ivc & fb_empty_ivc);
+	   assign flit_head = flit_head_out;
+
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   bypass_sel
+	     (.select(flit_sel_in_ivc),
+	      .data_in(fb_empty_ivc),
+	      .data_out(bypass));
+	   
 	end
       
    endgenerate
