@@ -29,6 +29,8 @@
 // generic feedback polynomial generator
 //==============================================================================
 
+// NOTE: This file was automatically generated. Do not edit by hand!
+
 module c_fbgen
   (feedback);
    
