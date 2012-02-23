@@ -31,10 +31,11 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_gnt, 
-   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev, next_lar_info, 
-   flit_valid, flit_head, flit_tail, flit_sel_ovc, flit_data, empty, full, 
-   allocated, free_nonspec, free_spec, errors);
+   header_info_in, peek_header_info, int_flow_ctrl_op_ovc, route_op, route_orc, 
+   vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev, flit_valid, 
+   flit_head, flit_tail, flit_sel_ovc, next_lar_info, fbc_push_addr, 
+   fbc_pop_addr, fbc_peek_addr, fbc_empty, fbc_full, allocated, free_nonspec, 
+   free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -137,9 +138,6 @@ module vcr_ivc_ctrl
        (1 + vc_idx_width + 1) : 
        -1;
    
-   // width of flit payload data
-   parameter flit_data_width = 64;
-   
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
    // with such turns)
@@ -188,15 +186,8 @@ module vcr_ivc_ctrl
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
-   // select implementation variant for flit buffer register file
-   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
-   
-   // gate flit buffer write port if bypass succeeds
-   // (requires explicit pipeline register; may increase cycle time)
-   parameter gate_buffer_write = 0;
    
    // ID of current input VC
    parameter vc_id = 0;
@@ -209,8 +200,24 @@ module vcr_ivc_ctrl
    localparam resource_class
      = (vc_id / num_vcs_per_class) % num_resource_classes;
    
-   // required address size for a single VC's buffer
-   localparam fb_addr_width = clogb(num_flits_per_vc);
+   // flit buffer depth
+   localparam fb_depth = num_vcs * num_flits_per_vc;
+   
+   // required address size for selecting a flit buffer entry
+   localparam fb_addr_width = clogb(fb_depth);
+   
+   // how many address bits are required to select an entry for a VC
+   localparam fb_addr_sel_width = clogb(num_flits_per_vc);
+   
+   // number of padding bits required at the beginning of flit buffer addresses
+   localparam fb_addr_pad_width = fb_addr_width - fb_addr_sel_width;
+   
+   // starting address of range in flit buffer
+   localparam fb_addr_global_offset = vc_id * num_flits_per_vc;
+   
+   // low-order bits of first address belonging to this VC
+   localparam fb_addr_local_offset
+     = fb_addr_global_offset % (1 << fb_addr_sel_width);
    
    // ID of current input port
    parameter port_id = 0;
@@ -232,8 +239,13 @@ module vcr_ivc_ctrl
    // incoming flit is tail
    input 			 flit_tail_in;
    
-   // payload data for incoming flit
-   input [0:flit_data_width-1] 	 flit_data_in;
+   // header info for incoming flit
+   // (NOTE: only valid if flit_head_in=1)
+   input [0:header_info_width-1] header_info_in;
+   
+   // header info from next flit in buffer
+   // (NOTE: only valid if buffer contains at least two entries)
+   input [0:header_info_width-1] peek_header_info;
    
    // internal flow control signalling from output controller to input 
    // controllers
@@ -262,11 +274,6 @@ module vcr_ivc_ctrl
    // if we sent a flit in the previous cycle, was it a tail flit?
    input 					     flit_tail_prev;
    
-   // updated lookahead routing info
-   // (NOTE: only valid if the current flit is a head flit)
-   output [0:lar_info_width-1] 			     next_lar_info;
-   wire [0:lar_info_width-1] 			     next_lar_info;
-   
    // outgoing flit is available
    output 					     flit_valid;
    wire 					     flit_valid;
@@ -283,17 +290,30 @@ module vcr_ivc_ctrl
    output [0:num_vcs-1] 			     flit_sel_ovc;
    wire [0:num_vcs-1] 				     flit_sel_ovc;
    
-   // payload data for outgoing flit
-   output [0:flit_data_width-1] 		     flit_data;
-   wire [0:flit_data_width-1] 			     flit_data;
+   // updated lookahead routing info
+   // (NOTE: only valid if the current flit is a head flit)
+   output [0:lar_info_width-1] 			     next_lar_info;
+   wire [0:lar_info_width-1] 			     next_lar_info;
+   
+   // address of next buffer entry to be written to
+   output [0:fb_addr_width-1] 			     fbc_push_addr;
+   wire [0:fb_addr_width-1] 			     fbc_push_addr;
+   
+   // address of next buffer entry to be read
+   output [0:fb_addr_width-1] 			     fbc_pop_addr;
+   wire [0:fb_addr_width-1] 			     fbc_pop_addr;
+   
+   // address of buffer entry behind the one to be read next
+   output [0:fb_addr_width-1] 			     fbc_peek_addr;
+   wire [0:fb_addr_width-1] 			     fbc_peek_addr;
    
    // flit buffer does not have any valid entries
-   output 					     empty;
-   wire 					     empty;
+   output 					     fbc_empty;
+   wire 					     fbc_empty;
    
    // flit buffer is full
-   output 					     full;
-   wire 					     full;
+   output 					     fbc_full;
+   wire 					     fbc_full;
    
    // has an output VC been assigned to this input VC?
    output 					     allocated;
@@ -315,8 +335,6 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
-   
-   wire 					     fbc_empty;
    
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
@@ -445,14 +463,13 @@ module vcr_ivc_ctrl
    wire 					     fbc_pop;
    assign fbc_pop = flit_sent;
    
-   wire [0:fb_addr_width-1] 			     fbc_push_addr;
-   wire [0:fb_addr_width-1] 			     fbc_pop_addr;
    wire 					     fbc_almost_empty;
    wire 					     fbc_almost_full;
-   wire 					     fbc_full;
    wire [0:1] 					     fbc_errors;
    c_fifo_ctrl
      #(.depth(num_flits_per_vc),
+       .extra_addr_width(fb_addr_pad_width),
+       .offset(fb_addr_global_offset),
        .reset_type(reset_type))
    fbc
      (.clk(clk),
@@ -469,8 +486,13 @@ module vcr_ivc_ctrl
       .full(fbc_full),
       .errors(fbc_errors));
    
-   assign empty = fbc_empty;
-   assign full = fbc_full;
+   c_incr
+     #(.width(fb_addr_width),
+       .min_value(fb_addr_global_offset),
+       .max_value(fb_addr_global_offset + num_flits_per_vc - 1))
+   fbc_peek_addr_incr
+     (.data_in(fbc_pop_addr),
+      .data_out(fbc_peek_addr));
    
    wire 					     error_fbc_underflow;
    assign error_fbc_underflow = fbc_errors[0];
@@ -480,119 +502,10 @@ module vcr_ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // flit buffer
-   //---------------------------------------------------------------------------
-   
-   wire 					     fbf_write_enable;
-   wire [0:fb_addr_width-1] 			     fbf_read_addr;
-   
-   generate
-      
-      if(explicit_pipeline_register)
-	begin
-	   
-	   if(gate_buffer_write)
-	     assign fbf_write_enable
-	       = flit_valid_in & ~(fbc_empty & flit_sent);
-	   else
-	     assign fbf_write_enable = flit_valid_in;
-	   
-	   assign fbf_read_addr = fbc_pop_addr;
-	   
-	end
-      else
-	begin
-	   
-	   assign fbf_write_enable = flit_valid_in;
-	   
-	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s = fbc_pop_addr;
-	   c_dff
-	     #(.width(fb_addr_width),
-	       .reset_type(reset_type))
-	   fbf_read_addrq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(pop_active),
-	      .d(fbf_read_addr_s),
-	      .q(fbf_read_addr_q));
-	   
-	   assign fbf_read_addr = fbf_read_addr_q;
-	   
-	end
-      
-   endgenerate
-   
-   wire [0:flit_data_width-1] 	     fbf_write_data;
-   assign fbf_write_data = flit_data_in;
-   
-   wire [0:flit_data_width-1] 	     fbf_read_data;
-   wire [0:flit_data_width-1] 	     fbf_peek_data;
-
-   generate
-
-      if(elig_mask == `ELIG_MASK_USED)
-	begin
-	   
-	   c_regfile
-	     #(.depth(num_flits_per_vc),
-	       .width(flit_data_width),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(push_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbc_push_addr),
-	      .write_data(fbf_write_data),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
-	   
-	   assign fbf_peek_data = {flit_data_width{1'b0}};
-	   
-	end
-      else
-	begin
-	   
-	   wire [0:fb_addr_width-1] fbf_peek_addr;
-	   c_incr
-	     #(.width(fb_addr_width),
-	       .max_value(num_flits_per_vc - 1))
-	   fbf_peek_addr_incr
-	     (.data_in(fbc_pop_addr),
-	      .data_out(fbf_peek_addr));
-	   
-	   c_regfile
-	     #(.depth(num_flits_per_vc),
-	       .width(flit_data_width),
-	       .num_read_ports(2),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(push_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbc_push_addr),
-	      .write_data(fbf_write_data),
-	      .read_address({fbf_read_addr, fbf_peek_addr}),
-	      .read_data({fbf_read_data, fbf_peek_data}));
-
-	end
-   endgenerate
-   
-   wire [0:flit_data_width-1] fbf_flit_data;
-   assign fbf_flit_data = fbf_read_data;
-   
-   wire [0:header_info_width-1] peek_header_info;
-   assign peek_header_info = fbf_peek_data[0:header_info_width-1];
-   
-   wire [0:route_info_width-1] 	peek_route_info;
-   assign peek_route_info = peek_header_info[0:route_info_width-1];
-   
-   
-   //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 			fb_flit_tail;
+   wire 					     fb_flit_tail;
    
    generate
       
@@ -617,19 +530,20 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
-	   
+
 	   wire [0:num_flits_per_vc-1] push_mask;
 	   c_decode
-	     #(.num_ports(num_flits_per_vc))
-	   push_addr_dec
-	     (.data_in(fbc_push_addr),
+	     #(.num_ports(num_flits_per_vc),
+	       .offset(fb_addr_local_offset))
+	   push_mask_dec
+	     (.data_in(fbc_push_addr[fb_addr_pad_width:fb_addr_width-1]),
 	      .data_out(push_mask));
 	   
 	   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
 	   assign flit_tail_s
-	     = fbf_write_enable ? 
-	       ({num_flits_per_vc{flit_tail_in}} & push_mask) | 
-	       (flit_tail_q & ~push_mask) :
+	     = flit_valid_in ? 
+	       (({num_flits_per_vc{flit_tail_in}} & push_mask) | 
+		(flit_tail_q & ~push_mask)) :
 	       flit_tail_q;
 	   c_dff
 	     #(.width(num_flits_per_vc),
@@ -641,7 +555,21 @@ module vcr_ivc_ctrl
 	      .d(flit_tail_s),
 	      .q(flit_tail_q));
 	   
-	   assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
+	   wire [0:num_flits_per_vc-1] pop_mask;
+	   c_decode
+	     #(.num_ports(num_flits_per_vc),
+	       .offset(fb_addr_local_offset))
+	   pop_mask_dec
+	     (.data_in(fbc_pop_addr[fb_addr_pad_width:fb_addr_width-1]),
+	      .data_out(pop_mask));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_flits_per_vc),
+	       .width(1))
+	   fb_flit_tail_sel
+	     (.select(pop_mask),
+	      .data_in(flit_tail_q),
+	      .data_out(fb_flit_tail));
 	   
 	end
       
@@ -649,7 +577,7 @@ module vcr_ivc_ctrl
    
    assign flit_tail = fbc_empty ? flit_tail_in : fb_flit_tail;
    
-   wire 			     htr_flit_head_s, htr_flit_head_q;
+   wire 			       htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
    c_dff
      #(.width(1),
@@ -666,10 +594,10 @@ module vcr_ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // head register
+   // header info register
    //---------------------------------------------------------------------------
    
-   wire 			     hdr_valid_s, hdr_valid_q;
+   wire 			       hdr_valid_s, hdr_valid_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_valid_s
@@ -692,20 +620,10 @@ module vcr_ivc_ctrl
       .d(hdr_valid_s),
       .q(hdr_valid_q));
    
-   wire [0:header_info_width-1]      header_info_in;
-   assign header_info_in = flit_data_in[0:header_info_width-1];
-   
-   wire [0:route_info_width-1] 	     route_info_in;
+   wire [0:route_info_width-1] 	       route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
    
-   wire [0:lar_info_width-1]    lar_info_in;
-   assign lar_info_in = route_info_in[0:lar_info_width-1];
-   
-   wire [0:dest_info_width-1] 	     dest_info_in;
-   assign dest_info_in = route_info_in[lar_info_width:
-				       lar_info_width+dest_info_width-1];
-   
-   wire 			     hdr_active;
+   wire 			       hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_active = ~hdr_valid_q & flit_valid_in;
@@ -718,10 +636,16 @@ module vcr_ivc_ctrl
 	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
    endgenerate
    
-   wire 			     two_plus_flits;
+   wire 			       two_plus_flits;
    assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
    
-   wire [0:lar_info_width-1] 	     hdr_lar_info_s, hdr_lar_info_q;
+   wire [0:route_info_width-1] 	       peek_route_info;
+   assign peek_route_info = peek_header_info[0:route_info_width-1];
+   
+   wire [0:lar_info_width-1] 	       lar_info_in;
+   assign lar_info_in = route_info_in[0:lar_info_width-1];
+   
+   wire [0:lar_info_width-1] 	       hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_lar_info_s = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
@@ -732,8 +656,8 @@ module vcr_ivc_ctrl
 	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
-	     = (~hdr_valid_q | packet_done) ? 
-	       (two_plus_flits ? peek_lar_info : lar_info_in) : 
+	     = (~hdr_valid_q | packet_done) ?
+	       (two_plus_flits ? peek_lar_info : lar_info_in) :
 	       hdr_lar_info_q;
 	   
 	end
@@ -747,6 +671,10 @@ module vcr_ivc_ctrl
       .active(hdr_active),
       .d(hdr_lar_info_s),
       .q(hdr_lar_info_q));
+   
+   wire [0:dest_info_width-1] 	     dest_info_in;
+   assign dest_info_in = route_info_in[lar_info_width:
+				       lar_info_width+dest_info_width-1];
    
    wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
@@ -776,7 +704,7 @@ module vcr_ivc_ctrl
       .d(hdr_dest_info_s),
       .q(hdr_dest_info_q));
    
-   wire 			     error_no_header;
+   wire 			      error_no_header;
    assign error_no_header
      = ~hdr_valid_q & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
@@ -785,30 +713,30 @@ module vcr_ivc_ctrl
    // decode lookahead routing information
    //---------------------------------------------------------------------------
    
-   wire [0:port_idx_width-1] 			     route_port_in;
+   wire [0:port_idx_width-1] 	      route_port_in;
    assign route_port_in = lar_info_in[0:port_idx_width-1];
    
-   wire [0:num_ports-1] 			     route_in_op;
+   wire [0:num_ports-1] 	      route_in_op;
    c_decode
      #(.num_ports(num_ports))
    route_in_op_dec
      (.data_in(route_port_in),
       .data_out(route_in_op));
    
-   wire [0:port_idx_width-1] 			     hdr_route_port;
+   wire [0:port_idx_width-1] 	      hdr_route_port;
    assign hdr_route_port = hdr_lar_info_q[0:port_idx_width-1];
    
-   wire [0:num_ports-1] 			     hdr_route_op;
+   wire [0:num_ports-1] 	      hdr_route_op;
    c_decode
      #(.num_ports(num_ports))
    hdr_route_op_dec
      (.data_in(hdr_route_port),
       .data_out(hdr_route_op));
    
-   wire [0:num_ports-1] 			     route_unmasked_op;
+   wire [0:num_ports-1] 	      route_unmasked_op;
    assign route_unmasked_op = hdr_valid_q ? hdr_route_op : route_in_op;
    
-   wire [0:num_resource_classes-1] 		     route_unmasked_orc;
+   wire [0:num_resource_classes-1]    route_unmasked_orc;
    
    generate
       
@@ -820,7 +748,7 @@ module vcr_ivc_ctrl
 	   wire [0:resource_class_idx_width-1] route_rcsel_in;
 	   assign route_rcsel_in
 	     = lar_info_in[port_idx_width:
-				port_idx_width+resource_class_idx_width-1];
+			   port_idx_width+resource_class_idx_width-1];
 	   
 	   wire [0:num_resource_classes-1]     route_in_orc;
 	   c_decode
@@ -893,7 +821,7 @@ module vcr_ivc_ctrl
    wire [0:dest_info_width-1] 		       dest_info;
    assign dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
    
-   wire [0:lar_info_width-1] 	       lar_info;
+   wire [0:lar_info_width-1] 		       lar_info;
    assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
    
    wire [0:router_addr_width-1] 	       next_router_address;
@@ -961,24 +889,10 @@ module vcr_ivc_ctrl
 	      .data_out(next_route_rcsel));
 	   
 	   assign next_lar_info[port_idx_width:
-				     port_idx_width+resource_class_idx_width-1]
+				port_idx_width+resource_class_idx_width-1]
 	     = next_route_rcsel;
 	   
 	end
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate output data
-   //---------------------------------------------------------------------------
-   
-   generate
-      
-      if(explicit_pipeline_register)
-	assign flit_data = empty ? flit_data_in : fbf_flit_data;
-      else
-	assign flit_data = fbf_flit_data;
       
    endgenerate
    
