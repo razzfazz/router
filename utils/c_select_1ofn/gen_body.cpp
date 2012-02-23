@@ -22,11 +22,11 @@ int main(int argc, char ** argv) {
       }
       std::cout
 	<< ":\n"
-	<< "                 data_out = data_in[" << pos*size << ":" << (pos+1)*size-1 << "];\n";
+	<< "                 data_out = data_in[" << pos << "*width:" << pos + 1 << "*width-1];\n";
     }
     std::cout
       << "               default:\n"
-      << "                 data_out = " << size << "'bx;\n"
+      << "                 data_out = {width{1'bx}};\n"
       << "             endcase\n"
       << "          end\n";
   }
