@@ -608,7 +608,6 @@ module vcr_ip_ctrl_mac
    endgenerate
    
    wire [0:num_vcs-1] 		     prev_sw_sel_ivc;
-   wire [0:header_info_width-1]      peek_header_info;
    wire [0:flit_data_width-1] 	     fbf_read_data;
    
    generate
