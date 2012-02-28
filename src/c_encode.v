@@ -48,8 +48,8 @@ module c_encode
    input [0:num_ports-1] data_in;
    
    // binary encoded output data
-   output [0:width-1] data_out;
-   wire [0:width-1] data_out;
+   output [0:width-1] 	 data_out;
+   reg [0:width-1] 	 data_out;
    
    generate
       
