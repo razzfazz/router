@@ -1068,7 +1068,7 @@ module vcr_ip_ctrl_mac
 	   
 	end
       else
-	assign error = 1'b0;
+	assign error = 1'bx;
       
    endgenerate
    

@@ -561,7 +561,7 @@ module vcr_top
 	   
 	end
       else
-	assign error = 1'b0;
+	assign error = 1'bx;
       
    endgenerate
    
