@@ -395,7 +395,8 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*fb_addr_width-1] 		     fbc_pop_addr_ivc;
    wire [0:num_vcs*fb_addr_width-1] 		     fbc_peek_addr_ivc;
    wire [0:num_vcs-1] 				     fbc_empty_ivc;
-   wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
+   wire [0:num_vcs*4-1] 			     ivcc_errors_ivc;
+   wire [0:num_vcs*2-1] 			     fbc_errors_ivc;
    
    genvar 					     ivc;
    
@@ -561,12 +562,6 @@ module vcr_ip_ctrl_mac
 	     (.data_in(fbc_pop_addr),
 	      .data_out(fbc_peek_addr));
 	   
-	   wire 			    error_fbc_underflow;
-	   assign error_fbc_underflow = fbc_errors[0];
-	   
-	   wire 			    error_fbc_overflow;
-	   assign error_fbc_overflow = fbc_errors[1];
-	   
 	   
 	   //-------------------------------------------------------------------
 	   // input VC controller
@@ -664,9 +659,8 @@ module vcr_ip_ctrl_mac
 	   assign allocated_ivc[ivc] = allocated;
 	   assign free_nonspec_ivc[ivc] = free_nonspec;
 	   assign free_spec_ivc[ivc] = free_spec;
-	   assign ivcc_errors_ivc[ivc*6] = error_fbc_underflow;
-	   assign ivcc_errors_ivc[ivc*6+1] = error_fbc_overflow;
-	   assign ivcc_errors_ivc[ivc*6+2:(ivc+1)*6-1] = ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*4:(ivc+1)*4-1] = ivcc_errors;
+	   assign fbc_errors_ivc[ivc*2:(ivc+1)*2-1] = fbc_errors;
 	   
 	end
       
@@ -1051,10 +1045,10 @@ module vcr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*6-1] errors_s, errors_q;
-	   assign errors_s = ivcc_errors_ivc;
+	   wire [0:num_vcs*4+num_vcs*2-1] errors_s, errors_q;
+	   assign errors_s = {ivcc_errors_ivc, fbc_errors_ivc};
 	   c_err_rpt
-	     #(.num_errors(num_vcs*6),
+	     #(.num_errors(num_vcs*4+num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
