@@ -653,7 +653,6 @@ module packet_source
 			      
 			      // FIXME: add implementation here!
 			      
-			      // synopsys translate_off
 			      initial
 				begin
 				   $display({"ERROR: The packet source module ",
@@ -662,7 +661,6 @@ module packet_source
 					     "in the flit kill logic yet."});
 				   $stop;
 				end
-			      // synopsys translate_on
 			      
 			   end
 			 else

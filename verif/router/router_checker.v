@@ -641,8 +641,6 @@ module router_checker
 		
 	     end
 	   
-	   // synopsys translate_off
-	   
 	   integer 			     i;
 	   
 	   always @(posedge clk)
@@ -662,8 +660,6 @@ module router_checker
 		end
 	      
 	   end
-	   
-	   // synopsys translate_on
 	   
 	   assign rff_errors_ip[ip] = |rff_errors_ivc;
 	   
@@ -745,8 +741,6 @@ module router_checker
 
 	   assign x_error_op[op] = x_error;
 	   
-	   // synopsys translate_off
-	   
 	   integer 			x;
 	   
 	   always @(posedge clk)
@@ -787,14 +781,10 @@ module router_checker
 		  end
 	     end
 	   
-	   // synopsys translate_on
-   
 	end
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
-	   
-	   // synopsys translate_off
 	   
 	   integer 			  i;
 	   
@@ -809,7 +799,6 @@ module router_checker
 		  end
 		
 	     end
-	   // synopsys translate_on
 	   
 	   wire [0:3*num_ports-1] errors_s, errors_q;
 	   assign errors_s = {rff_errors_ip, check_error_op, x_error_op};
