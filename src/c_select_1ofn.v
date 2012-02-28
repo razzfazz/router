@@ -55,10 +55,7 @@ module c_select_1ofn
    generate
       
       if(num_ports == 1)
-	always@(data_in)
-	  begin
-	     data_out = data_in;
-	  end
+	assign data_out = data_in;
       else if(num_ports == 2)
         always@(select, data_in)
           begin
