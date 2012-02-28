@@ -478,7 +478,7 @@ module vcr_ovc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   // synopsys translate_off
+   // pragma translate_off
    
    always @(posedge clk)
      begin
@@ -494,7 +494,7 @@ module vcr_ovc_ctrl
 	
      end
    
-   // synopsys translate_on
+   // pragma translate_on
    
    assign errors[0] = error_stray_flit;
    assign errors[1] = error_ct_underflow;

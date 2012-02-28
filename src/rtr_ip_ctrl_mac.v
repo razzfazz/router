@@ -1307,7 +1307,7 @@ module rtr_ip_ctrl_mac
 	   // error checking
 	   //-------------------------------------------------------------------
 	   
-	   // synopsys translate_off
+	   // pragma translate_off
 	   
 	   always @(posedge clk)
 	     begin
@@ -1317,7 +1317,7 @@ module rtr_ip_ctrl_mac
 		
 	     end
 	   
-	   // synopsys translate_on
+	   // pragma translate_on
 	   
 	   assign errors[0] = error_fb_underflow;
 	   assign errors[1] = error_fb_overflow;

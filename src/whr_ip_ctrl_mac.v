@@ -858,7 +858,7 @@ module whr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   // synopsys translate_off
+   // pragma translate_off
    
    always @(posedge clk)
      begin
@@ -868,7 +868,7 @@ module whr_ip_ctrl_mac
 	
      end
    
-   // synopsys translate_on
+   // pragma translate_on
    
    generate
       

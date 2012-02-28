@@ -969,7 +969,7 @@ module vcr_ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   // synopsys translate_off
+   // pragma translate_off
    
    always @(posedge clk)
      begin
@@ -982,7 +982,7 @@ module vcr_ivc_ctrl
 	
      end
    
-   // synopsys translate_on
+   // pragma translate_on
    
    assign errors[0] = error_no_header;
    assign errors[1] = error_ct_overflow;

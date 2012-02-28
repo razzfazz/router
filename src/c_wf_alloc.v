@@ -62,7 +62,7 @@ module c_wf_alloc
    
    generate
       
-      // synopsys translate_off
+      // pragma translate_off
       
       if(num_priorities > 1)
 	begin
@@ -76,7 +76,7 @@ module c_wf_alloc
 	   
 	end
       
-      // synopsys translate_on
+      // pragma translate_on
       
       case(wf_alloc_type)
 	`WF_ALLOC_TYPE_MUX:

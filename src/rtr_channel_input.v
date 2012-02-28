@@ -295,7 +295,7 @@ module rtr_channel_input
 			      assign flit_tail_out_ivc = flit_head_out_ivc;
 			   end
 			 
-			 // synopsys translate_off
+			 // pragma translate_off
 			 else
 			   begin
 			      initial
@@ -311,7 +311,7 @@ module rtr_channel_input
 				 $stop;
 			      end
 			   end
-			 // synopsys translate_on
+			 // pragma translate_on
 			 
 		      end
 		    else if(max_payload_length == 1)
@@ -324,7 +324,7 @@ module rtr_channel_input
 			 else if(max_payload_length == min_payload_length)
 			   assign has_payload = 1'b1;
 			 
-			 // synopsys translate_off
+			 // pragma translate_off
 			 else
 			   begin
 			      initial
@@ -340,7 +340,7 @@ module rtr_channel_input
 				 $stop;
 			      end
 			   end
-			 // synopsys translate_on
+			 // pragma translate_on
 			 
 			 assign flit_tail_out = ~flit_head_out | ~has_payload;
 			 assign flit_tail_out_ivc = {num_vcs{flit_tail_out}};
@@ -405,7 +405,7 @@ module rtr_channel_input
 				     = ~flit_head_out & ~|flit_ctr_q;
 				end
 			      
-			      // synopsys translate_off
+			      // pragma translate_off
 			      else
 				begin
 				   initial
@@ -421,7 +421,7 @@ module rtr_channel_input
 				      $stop;
 				   end
 				end
-			      // synopsys translate_on
+			      // pragma translate_on
 			      
 			      assign flit_tail_out_ivc[ivc] = flit_tail_out;
 			      

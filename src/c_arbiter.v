@@ -101,7 +101,7 @@ module c_arbiter
 	`ARBITER_TYPE_DW_FCFS:
 	  begin
 	     
-	     // synopsys translate_off
+	     // pragma translate_off
 	     
 	     if(num_priorities > 1)
 	       begin
@@ -115,7 +115,7 @@ module c_arbiter
 		  
 	       end
 	     
-	     // synopsys translate_on
+	     // pragma translate_on
 	     
 	     if(num_ports == 1)
 	       assign gnt = req;

@@ -270,7 +270,7 @@ module rtr_vc_state
    // error checking
    //---------------------------------------------------------------------------
    
-   // synopsys translate_off
+   // pragma translate_off
    
    always @(posedge clk)
      begin
@@ -283,7 +283,7 @@ module rtr_vc_state
 	
      end
    
-   // synopsys translate_on
+   // pragma translate_on
    
    assign errors[0] = error_ft_underflow;
    assign errors[1] = error_ft_overflow;
