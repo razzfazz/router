@@ -31,10 +31,10 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, peek_header_info, int_flow_ctrl_op_ovc, route_op, route_orc, 
-   vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev, flit_valid, 
-   flit_head, flit_tail, flit_sel_ovc, next_lar_info, fbc_push_addr, 
-   fbc_pop_addr, fbc_peek_addr, fbc_empty, fbc_full, allocated, free_nonspec, 
+   header_info_in, peek_header_info, fb_flit_tail, int_flow_ctrl_op_ovc, 
+   route_op, route_orc, vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
+   flit_tail_prev, flit_valid, flit_head, flit_tail, flit_sel_ovc, 
+   next_lar_info, fbc_almost_empty, fbc_empty, allocated, free_nonspec, 
    free_spec, errors);
    
 `include "c_functions.v"
@@ -200,25 +200,6 @@ module vcr_ivc_ctrl
    localparam resource_class
      = (vc_id / num_vcs_per_class) % num_resource_classes;
    
-   // flit buffer depth
-   localparam fb_depth = num_vcs * num_flits_per_vc;
-   
-   // required address size for selecting a flit buffer entry
-   localparam fb_addr_width = clogb(fb_depth);
-   
-   // how many address bits are required to select an entry for a VC
-   localparam fb_addr_sel_width = clogb(num_flits_per_vc);
-   
-   // number of padding bits required at the beginning of flit buffer addresses
-   localparam fb_addr_pad_width = fb_addr_width - fb_addr_sel_width;
-   
-   // starting address of range in flit buffer
-   localparam fb_addr_global_offset = vc_id * num_flits_per_vc;
-   
-   // low-order bits of first address belonging to this VC
-   localparam fb_addr_local_offset
-     = fb_addr_global_offset % (1 << fb_addr_sel_width);
-   
    // ID of current input port
    parameter port_id = 0;
    
@@ -247,6 +228,9 @@ module vcr_ivc_ctrl
    // (NOTE: only valid if buffer contains at least two entries)
    input [0:header_info_width-1] peek_header_info;
    
+   // tail indicator for frontmost flit in buffer (if any)
+   input 			 fb_flit_tail;
+   
    // internal flow control signalling from output controller to input 
    // controllers
    input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
@@ -267,6 +251,10 @@ module vcr_ivc_ctrl
    
    // switch allocator grants
    input 					     sw_gnt;
+   
+   // did this VC send a flit in the current cycle?
+   output 					     flit_sent;
+   wire 					     flit_sent;
    
    // did this VC send a flit in the previous cycle?
    input 					     flit_sent_prev;
@@ -295,25 +283,11 @@ module vcr_ivc_ctrl
    output [0:lar_info_width-1] 			     next_lar_info;
    wire [0:lar_info_width-1] 			     next_lar_info;
    
-   // address of next buffer entry to be written to
-   output [0:fb_addr_width-1] 			     fbc_push_addr;
-   wire [0:fb_addr_width-1] 			     fbc_push_addr;
-   
-   // address of next buffer entry to be read
-   output [0:fb_addr_width-1] 			     fbc_pop_addr;
-   wire [0:fb_addr_width-1] 			     fbc_pop_addr;
-   
-   // address of buffer entry behind the one to be read next
-   output [0:fb_addr_width-1] 			     fbc_peek_addr;
-   wire [0:fb_addr_width-1] 			     fbc_peek_addr;
+   // flit buffer has a single valid entry left
+   input 					     fbc_almost_empty;
    
    // flit buffer does not have any valid entries
-   output 					     fbc_empty;
-   wire 					     fbc_empty;
-   
-   // flit buffer is full
-   output 					     fbc_full;
-   wire 					     fbc_full;
+   input 					     fbc_empty;
    
    // has an output VC been assigned to this input VC?
    output 					     allocated;
@@ -328,8 +302,8 @@ module vcr_ivc_ctrl
    wire 					     free_spec;
    
    // internal error condition detected
-   output [0:5] 				     errors;
-   wire [0:5] 					     errors;
+   output [0:3] 				     errors;
+   wire [0:3] 					     errors;
    
    
    //---------------------------------------------------------------------------
@@ -451,129 +425,8 @@ module vcr_ivc_ctrl
    
    
    //---------------------------------------------------------------------------
-   // flit buffer control
-   //---------------------------------------------------------------------------
-   
-   wire 					     push_active;
-   assign push_active = flit_valid_in;
-   
-   wire 					     fbc_push;
-   assign fbc_push = flit_valid_in;
-   
-   wire 					     fbc_pop;
-   assign fbc_pop = flit_sent;
-   
-   wire 					     fbc_almost_empty;
-   wire 					     fbc_almost_full;
-   wire [0:1] 					     fbc_errors;
-   c_fifo_ctrl
-     #(.depth(num_flits_per_vc),
-       .extra_addr_width(fb_addr_pad_width),
-       .offset(fb_addr_global_offset),
-       .reset_type(reset_type))
-   fbc
-     (.clk(clk),
-      .reset(reset),
-      .push_active(push_active),
-      .pop_active(pop_active),
-      .push(fbc_push),
-      .pop(fbc_pop),
-      .push_addr(fbc_push_addr),
-      .pop_addr(fbc_pop_addr),
-      .almost_empty(fbc_almost_empty),
-      .empty(fbc_empty),
-      .almost_full(fbc_almost_full),
-      .full(fbc_full),
-      .errors(fbc_errors));
-   
-   c_incr
-     #(.width(fb_addr_width),
-       .min_value(fb_addr_global_offset),
-       .max_value(fb_addr_global_offset + num_flits_per_vc - 1))
-   fbc_peek_addr_incr
-     (.data_in(fbc_pop_addr),
-      .data_out(fbc_peek_addr));
-   
-   wire 					     error_fbc_underflow;
-   assign error_fbc_underflow = fbc_errors[0];
-   
-   wire 					     error_fbc_overflow;
-   assign error_fbc_overflow = fbc_errors[1];
-   
-   
-   //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
-   
-   wire 					     fb_flit_tail;
-   
-   generate
-      
-      if(elig_mask == `ELIG_MASK_USED)
-	begin
-	   
-	   wire has_tail_s, has_tail_q;
-	   assign has_tail_s = (has_tail_q & ~(flit_valid_in & flit_head_in)) | 
-			       (flit_valid_in & flit_tail_in);
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   has_tailq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(push_active),
-	      .d(has_tail_s),
-	      .q(has_tail_q));
-	   
-	   assign fb_flit_tail = fbc_almost_empty & has_tail_q;
-	   
-	end
-      else
-	begin
-
-	   wire [0:num_flits_per_vc-1] push_mask;
-	   c_decode
-	     #(.num_ports(num_flits_per_vc),
-	       .offset(fb_addr_local_offset))
-	   push_mask_dec
-	     (.data_in(fbc_push_addr[fb_addr_pad_width:fb_addr_width-1]),
-	      .data_out(push_mask));
-	   
-	   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
-	   assign flit_tail_s
-	     = flit_valid_in ? 
-	       (({num_flits_per_vc{flit_tail_in}} & push_mask) | 
-		(flit_tail_q & ~push_mask)) :
-	       flit_tail_q;
-	   c_dff
-	     #(.width(num_flits_per_vc),
-	       .reset_type(reset_type))
-	   flit_tailq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(push_active),
-	      .d(flit_tail_s),
-	      .q(flit_tail_q));
-	   
-	   wire [0:num_flits_per_vc-1] pop_mask;
-	   c_decode
-	     #(.num_ports(num_flits_per_vc),
-	       .offset(fb_addr_local_offset))
-	   pop_mask_dec
-	     (.data_in(fbc_pop_addr[fb_addr_pad_width:fb_addr_width-1]),
-	      .data_out(pop_mask));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_flits_per_vc),
-	       .width(1))
-	   fb_flit_tail_sel
-	     (.select(pop_mask),
-	      .data_in(flit_tail_q),
-	      .data_out(fb_flit_tail));
-	   
-	end
-      
-   endgenerate
    
    assign flit_tail = fbc_empty ? flit_tail_in : fb_flit_tail;
    
@@ -1131,11 +984,9 @@ module vcr_ivc_ctrl
    
    // synopsys translate_on
    
-   assign errors[0] = error_fbc_underflow;
-   assign errors[1] = error_fbc_overflow;
-   assign errors[2] = error_no_header;
-   assign errors[3] = error_ct_overflow;
-   assign errors[4] = error_invalid_port;
-   assign errors[5] = error_invalid_class;
+   assign errors[0] = error_no_header;
+   assign errors[1] = error_ct_overflow;
+   assign errors[2] = error_invalid_port;
+   assign errors[3] = error_invalid_class;
    
 endmodule
