@@ -448,28 +448,9 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
-	   
-	   wire hdr_valid_s, hdr_valid_q;
-	   assign hdr_valid_s
-	     = flit_sent ?
-	       (fbc_empty ? 
-		~flit_tail_in : 
-		(~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
-	       (hdr_valid_q | flit_valid_in);
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   hdf_validq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(pop_active),
-	      .d(hdr_valid_s),
-	      .q(hdr_valid_q));
-	   
-	   assign hdr_capture = ~hdr_valid_q | packet_done;
-	   assign hdr_active = (~hdr_valid_q & flit_valid_in) | ~fbc_empty;
-	   assign hdr_valid = hdr_valid_q;
-	   
+	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
+	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
+	   assign hdr_capture = ~hdr_valid | packet_done;
 	end
       
    endgenerate
