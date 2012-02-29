@@ -286,8 +286,8 @@ module vcr_ivc_ctrl
    wire 			     free_spec;
    
    // internal error condition detected
-   output [0:3] 		     errors;
-   wire [0:3] 			     errors;
+   output [0:2] 		     errors;
+   wire [0:2] 			     errors;
    
    
    //---------------------------------------------------------------------------
