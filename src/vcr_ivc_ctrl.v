@@ -433,44 +433,43 @@ module vcr_ivc_ctrl
    // header info register
    //---------------------------------------------------------------------------
    
-   wire 			       hdr_valid_s, hdr_valid_q;
-   generate
-      if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_valid_s
-	  = (hdr_valid_q & ~(flit_sent_prev & flit_tail_prev)) | flit_valid_in;
-      else
-	assign hdr_valid_s
-	  = flit_sent ?
-	    (fbc_empty ? 
-	     ~flit_tail_in : 
-	     (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
-	    (hdr_valid_q | flit_valid_in);
-   endgenerate
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   hdf_validq
-     (.clk(clk),
-      .reset(reset),
-      .active(pop_active),
-      .d(hdr_valid_s),
-      .q(hdr_valid_q));
-   
    wire [0:route_info_width-1] 	       route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
    
    wire 			       hdr_capture;
    wire 			       hdr_active;
+   wire 			       hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
 	   assign hdr_capture = flit_valid_in & flit_head_in;
 	   assign hdr_active = hdr_capture;
+	   assign hdr_valid = ~hdr_capture;
 	end
       else
 	begin
+	   
+	   wire hdr_valid_s, hdr_valid_q;
+	   assign hdr_valid_s
+	     = flit_sent ?
+	       (fbc_empty ? 
+		~flit_tail_in : 
+		(~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
+	       (hdr_valid_q | flit_valid_in);
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   hdf_validq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(pop_active),
+	      .d(hdr_valid_s),
+	      .q(hdr_valid_q));
+	   
 	   assign hdr_capture = ~hdr_valid_q | packet_done;
 	   assign hdr_active = (~hdr_valid_q & flit_valid_in) | ~fbc_empty;
+	   assign hdr_valid = hdr_valid_q;
+	   
 	end
       
    endgenerate
@@ -545,7 +544,7 @@ module vcr_ivc_ctrl
    
    wire 			      error_no_header;
    assign error_no_header
-     = ~hdr_valid_q & (~fbc_empty | (flit_valid_in & ~flit_head_in));
+     = ~hdr_valid & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -572,8 +571,16 @@ module vcr_ivc_ctrl
      (.data_in(hdr_route_port),
       .data_out(hdr_route_op));
    
+   wire 			      bypass_route_info;
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign bypass_route_info = flit_valid_in & flit_head_in;
+      else
+	assign bypass_route_info = fbc_empty & flit_head_in;
+   endgenerate
+   
    wire [0:num_ports-1] 	      route_unmasked_op;
-   assign route_unmasked_op = hdr_valid_q ? hdr_route_op : route_in_op;
+   assign route_unmasked_op = bypass_route_info ? route_in_op : hdr_route_op;
    
    wire [0:num_resource_classes-1]    route_unmasked_orc;
    
@@ -609,17 +616,11 @@ module vcr_ivc_ctrl
 	      .data_out(hdr_route_orc));
 	   
 	   assign route_unmasked_orc
-	     = hdr_valid_q ? hdr_route_orc : route_in_orc;
+	     = bypass_route_info ? route_in_orc : hdr_route_orc;
 	   
 	end
       
    endgenerate
-   
-   wire 				       header_valid;
-   assign header_valid = hdr_valid_q | flit_valid_in;
-   
-   wire 				       rf_active;
-   assign rf_active = header_valid;
    
    wire [0:1] 				       rf_errors;
    rtr_route_filter
@@ -638,8 +639,8 @@ module vcr_ivc_ctrl
    rf
      (.clk(clk),
       .reset(reset),
-      .active(rf_active),
-      .route_valid(header_valid),
+      .active(pop_active),
+      .route_valid(flit_valid),
       .route_in_op(route_unmasked_op),
       .route_in_orc(route_unmasked_orc),
       .route_out_op(route_op),
@@ -658,10 +659,10 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:dest_info_width-1] 		       dest_info;
-   assign dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+   assign dest_info = hdr_valid ? hdr_dest_info_q : dest_info_in;
    
    wire [0:lar_info_width-1] 		       lar_info;
-   assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+   assign lar_info = hdr_valid ? hdr_lar_info_q : lar_info_in;
    
    wire [0:router_addr_width-1] 	       next_router_address;
    rtr_next_hop_addr
