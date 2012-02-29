@@ -433,7 +433,6 @@ module tc_router_wrap
        .restrict_turns(restrict_turns),
        .routing_type(routing_type),
        .dim_order(dim_order),
-       .int_flow_ctrl_type(int_flow_ctrl_type),
        .input_stage_can_hold(input_stage_can_hold),
        .fb_regfile_type(fb_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),

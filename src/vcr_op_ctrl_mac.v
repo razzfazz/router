@@ -32,7 +32,7 @@
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, vc_gnt_ovc_ip, 
    vc_gnt_ovc_ivc, xbr_ctrl_ip, int_flit_ctrl, flit_data, channel_out, 
-   int_flow_ctrl_ovc, elig_ovc, error);
+   free_ovc, elig_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -88,17 +88,8 @@ module vcr_op_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
-   // select method for credit signaling from output to input controller
-   parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
-   
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
-   
-   // width required for internal flow control signalling
-   localparam int_flow_ctrl_width
-     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
-       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
-       -1;
    
    // ID of current input port
    parameter port_id = 0;
@@ -137,29 +128,29 @@ module vcr_op_ctrl_mac
    wire [0:channel_width-1] 	   channel_out;
    
    // internal flow control signals to input controllers
-   output [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-   wire [0:num_vcs*int_flow_ctrl_width-1]   int_flow_ctrl_ovc;
+   output [0:num_vcs*2-1] 	   free_ovc;
+   wire [0:num_vcs*2-1] 	   free_ovc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
-   output [0:num_vcs-1] 		    elig_ovc;
-   wire [0:num_vcs-1] 			    elig_ovc;
+   output [0:num_vcs-1] 	   elig_ovc;
+   wire [0:num_vcs-1] 		   elig_ovc;
    
    // internal error condition detected
-   output 				    error;
-   wire 				    error;
+   output 			   error;
+   wire 			   error;
    
    
    //---------------------------------------------------------------------------
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 			    empty_ovc;
+   wire [0:num_vcs-1] 		   empty_ovc;
    
-   wire 				    flow_ctrl_active;
+   wire 			   flow_ctrl_active;
    assign flow_ctrl_active = ~&empty_ovc;
    
-   wire 				    cred_valid;
-   wire [0:num_vcs-1] 			    cred_sel_ovc;
+   wire 			   cred_valid;
+   wire [0:num_vcs-1] 		   cred_sel_ovc;
    rtr_flow_ctrl_input
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -172,7 +163,7 @@ module vcr_op_ctrl_mac
       .fc_event_valid_out(cred_valid),
       .fc_event_sel_out_ovc(cred_sel_ovc));
    
-   wire [0:num_vcs-1] 			    cred_valid_ovc;
+   wire [0:num_vcs-1] 		   cred_valid_ovc;
    assign cred_valid_ovc = {num_vcs{cred_valid}} & cred_sel_ovc;
    
    
@@ -180,16 +171,16 @@ module vcr_op_ctrl_mac
    // output VC control logic
    //---------------------------------------------------------------------------
    
-   wire 				    flit_valid;
+   wire 			   flit_valid;
    assign flit_valid = int_flit_ctrl[0] & |xbr_ctrl_ip;
    
-   wire 				    flit_head;
+   wire 			   flit_head;
    assign flit_head = int_flit_ctrl[1+0];
    
-   wire 				    flit_tail;
+   wire 			   flit_tail;
    assign flit_tail = int_flit_ctrl[1+1];
    
-   wire [0:num_vcs-1] 			    flit_sel_ovc;
+   wire [0:num_vcs-1] 		   flit_sel_ovc;
    
    generate
       
@@ -200,14 +191,14 @@ module vcr_op_ctrl_mac
       
    endgenerate
    
-   wire [0:num_vcs-1] 			    flit_valid_ovc;
+   wire [0:num_vcs-1] 		   flit_valid_ovc;
    assign flit_valid_ovc = {num_vcs{flit_valid}} & flit_sel_ovc;
    
-   wire [0:num_vcs*3-1] 		    ovcc_errors_ovc;
+   wire [0:num_vcs*3-1] 	   ovcc_errors_ovc;
+   
+   genvar 			   ovc;
    
    generate
-      
-      genvar 			   ovc;
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
@@ -229,8 +220,8 @@ module vcr_op_ctrl_mac
 	   
 	   wire 		elig;
 	   wire 		empty;
-	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
-	   wire [0:2] 			  ovcc_errors;
+	   wire [0:1] 		free;
+	   wire [0:2] 		ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
@@ -240,7 +231,6 @@ module vcr_op_ctrl_mac
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .vc_id(ovc),
 	       .elig_mask(elig_mask),
-	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .reset_type(reset_type))
 	   ovcc
 	     (.clk(clk),
@@ -255,14 +245,12 @@ module vcr_op_ctrl_mac
 	      .flit_tail(flit_tail),
 	      .elig(elig),
 	      .empty(empty),
-	      .int_flow_ctrl(int_flow_ctrl),
+	      .free(free),
 	      .errors(ovcc_errors));
 
 	   assign empty_ovc[ovc] = empty;
 	   assign elig_ovc[ovc] = elig;
-	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
-				    (ovc+1)*int_flow_ctrl_width-1]
-		    = int_flow_ctrl;
+	   assign free_ovc[ovc*2:(ovc+1)*2-1] = free;
 	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
 	   
 	end
@@ -274,7 +262,7 @@ module vcr_op_ctrl_mac
    // output staging
    //---------------------------------------------------------------------------
    
-   wire 				  flit_out_active;
+   wire 			flit_out_active;
    assign flit_out_active = |xbr_ctrl_ip;
    
    rtr_channel_output

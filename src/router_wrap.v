@@ -194,7 +194,6 @@ module router_wrap
 		 .restrict_turns(restrict_turns),
 		 .routing_type(routing_type),
 		 .dim_order(dim_order),
-		 .int_flow_ctrl_type(int_flow_ctrl_type),
 		 .fb_regfile_type(fb_regfile_type),
 		 .explicit_pipeline_register(explicit_pipeline_register),
 		 .gate_buffer_write(gate_buffer_write),

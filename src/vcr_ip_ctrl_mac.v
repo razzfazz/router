@@ -32,8 +32,8 @@
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
    allocated_ivc, flit_valid_ivc, free_nonspec_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc,
-   sw_sel_ivc, sw_gnt, int_flow_ctrl_op_ovc, int_flit_ctrl, flit_data, 
-   flow_ctrl_out, error);
+   sw_sel_ivc, sw_gnt, free_op_ovc, int_flit_ctrl, flit_data, flow_ctrl_out, 
+   error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -176,17 +176,8 @@ module vcr_ip_ctrl_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // select method for credit signaling from output to input controller
-   parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
-   
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
-   
-   // width required for internal flow control signalling
-   localparam int_flow_ctrl_width
-     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
-       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
-       -1;
    
    // number of entries in flit buffer
    localparam fb_depth = num_vcs*num_flits_per_vc;
@@ -265,42 +256,43 @@ module vcr_ip_ctrl_mac
    // switch grant
    input 				     sw_gnt;
    
-   // internal flow control signals from output controllers
-   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   // internal flow control signalling from output controller to input 
+   // controllers
+   input [0:num_ports*num_vcs*2-1] 	     free_op_ovc;
    
    // outgoing flit control signals
-   output [0:int_flit_ctrl_width-1] 		     int_flit_ctrl;
-   wire [0:int_flit_ctrl_width-1] 		     int_flit_ctrl;
+   output [0:int_flit_ctrl_width-1] 	     int_flit_ctrl;
+   wire [0:int_flit_ctrl_width-1] 	     int_flit_ctrl;
    
    // outgoing flit data
-   output [0:flit_data_width-1] 		     flit_data;
-   wire [0:flit_data_width-1] 			     flit_data;
+   output [0:flit_data_width-1] 	     flit_data;
+   wire [0:flit_data_width-1] 		     flit_data;
    
    // outgoing flow control signals
-   output [0:flow_ctrl_width-1] 		     flow_ctrl_out;
-   wire [0:flow_ctrl_width-1] 			     flow_ctrl_out;
+   output [0:flow_ctrl_width-1] 	     flow_ctrl_out;
+   wire [0:flow_ctrl_width-1] 		     flow_ctrl_out;
    
    // internal error condition detected
-   output 					     error;
-   wire 					     error;
+   output 				     error;
+   wire 				     error;
    
    
    //---------------------------------------------------------------------------
    // input stage
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				     fbc_full_ivc;
+   wire [0:num_vcs-1] 			     fbc_full_ivc;
    
-   wire 					     input_stage_active;
+   wire 				     input_stage_active;
    assign input_stage_active = ~&fbc_full_ivc;
    
-   wire 					     flit_valid_in;
-   wire 					     flit_head_in;
-   wire [0:num_vcs-1] 				     flit_head_in_ivc;
-   wire 					     flit_tail_in;
-   wire [0:num_vcs-1] 				     flit_tail_in_ivc;
-   wire [0:flit_data_width-1] 			     flit_data_in;
-   wire [0:num_vcs-1] 				     flit_sel_in_ivc;
+   wire 				     flit_valid_in;
+   wire 				     flit_head_in;
+   wire [0:num_vcs-1] 			     flit_head_in_ivc;
+   wire 				     flit_tail_in;
+   wire [0:num_vcs-1] 			     flit_tail_in_ivc;
+   wire [0:flit_data_width-1] 		     flit_data_in;
+   wire [0:num_vcs-1] 			     flit_sel_in_ivc;
    rtr_channel_input
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -322,7 +314,7 @@ module vcr_ip_ctrl_mac
       .flit_data_out(flit_data_in),
       .flit_sel_out_ivc(flit_sel_in_ivc));
    
-   wire [0:header_info_width-1] 		     header_info_in;
+   wire [0:header_info_width-1] 	     header_info_in;
    assign header_info_in = flit_data_in[0:header_info_width-1];
    
    
@@ -330,10 +322,10 @@ module vcr_ip_ctrl_mac
    // switch allocation
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				     free_spec_ivc;
+   wire [0:num_vcs-1] 			     free_spec_ivc;
    
-   wire 					     flit_sent;
-   wire [0:num_vcs-1] 				     flit_sent_ivc;
+   wire 				     flit_sent;
+   wire [0:num_vcs-1] 			     flit_sent_ivc;
    
    generate
       
@@ -370,7 +362,7 @@ module vcr_ip_ctrl_mac
       
    endgenerate
    
-   wire [0:num_vcs-1] 				     sw_gnt_ivc;
+   wire [0:num_vcs-1] sw_gnt_ivc;
    assign sw_gnt_ivc = {num_vcs{sw_gnt}} & sw_sel_ivc;
    
    
@@ -378,27 +370,27 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire 					     buffer_active;
+   wire 	      buffer_active;
    assign buffer_active = flit_valid_in;
    
-   wire [0:num_vcs-1] 				     flit_valid_in_ivc;
+   wire [0:num_vcs-1] flit_valid_in_ivc;
    assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
    
-   wire [0:header_info_width-1] 		     peek_header_info;
-   wire [0:num_vcs-1] 				     flit_sent_prev_ivc;
-   wire 					     flit_tail_prev;
-   wire [0:num_vcs-1] 				     flit_head_ivc;
-   wire [0:num_vcs-1] 				     flit_tail_ivc;
-   wire [0:num_vcs*num_vcs-1] 			     flit_sel_ivc_ovc;
-   wire [0:num_vcs*lar_info_width-1] 		     next_lar_info_ivc;
-   wire [0:num_vcs*fb_addr_width-1] 		     fbc_push_addr_ivc;
-   wire [0:num_vcs*fb_addr_width-1] 		     fbc_pop_addr_ivc;
-   wire [0:num_vcs*fb_addr_width-1] 		     fbc_peek_addr_ivc;
-   wire [0:num_vcs-1] 				     fbc_empty_ivc;
-   wire [0:num_vcs*4-1] 			     ivcc_errors_ivc;
-   wire [0:num_vcs*2-1] 			     fbc_errors_ivc;
+   wire [0:header_info_width-1] peek_header_info;
+   wire [0:num_vcs-1] 		flit_sent_prev_ivc;
+   wire 			flit_tail_prev;
+   wire [0:num_vcs-1] 		flit_head_ivc;
+   wire [0:num_vcs-1] 		flit_tail_ivc;
+   wire [0:num_vcs*num_vcs-1] 	flit_sel_ivc_ovc;
+   wire [0:num_vcs*lar_info_width-1] next_lar_info_ivc;
+   wire [0:num_vcs*fb_addr_width-1]  fbc_push_addr_ivc;
+   wire [0:num_vcs*fb_addr_width-1]  fbc_pop_addr_ivc;
+   wire [0:num_vcs*fb_addr_width-1]  fbc_peek_addr_ivc;
+   wire [0:num_vcs-1] 		     fbc_empty_ivc;
+   wire [0:num_vcs*3-1] 	     ivcc_errors_ivc;
+   wire [0:num_vcs*2-1] 	     fbc_errors_ivc;
    
-   genvar 					     ivc;
+   genvar 			     ivc;
    
    generate
       
@@ -577,10 +569,9 @@ module vcr_ip_ctrl_mac
 	   wire 			    allocated;
 	   wire 			    free_nonspec;
 	   wire 			    free_spec;
-	   wire [0:3] 			    ivcc_errors;
+	   wire [0:2] 			    ivcc_errors;
 	   vcr_ivc_ctrl
-	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_message_classes(num_message_classes),
+	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_routers_per_dim(num_routers_per_dim),
@@ -593,7 +584,6 @@ module vcr_ip_ctrl_mac
 	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
-	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .elig_mask(elig_mask),
 	       .sw_alloc_spec(sw_alloc_spec),
 	       .explicit_pipeline_register(explicit_pipeline_register),
@@ -610,7 +600,7 @@ module vcr_ip_ctrl_mac
 	      .header_info_in(header_info_in),
 	      .peek_header_info(peek_header_info),
 	      .fb_flit_tail(fb_flit_tail),
-	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+	      .free_op_ovc(free_op_ovc),
 	      .route_op(route_op),
 	      .route_orc(route_orc),
 	      .vc_gnt(vc_gnt),
@@ -659,7 +649,7 @@ module vcr_ip_ctrl_mac
 	   assign allocated_ivc[ivc] = allocated;
 	   assign free_nonspec_ivc[ivc] = free_nonspec;
 	   assign free_spec_ivc[ivc] = free_spec;
-	   assign ivcc_errors_ivc[ivc*4:(ivc+1)*4-1] = ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*3:(ivc+1)*3-1] = ivcc_errors;
 	   assign fbc_errors_ivc[ivc*2:(ivc+1)*2-1] = fbc_errors;
 	   
 	end
@@ -1045,10 +1035,10 @@ module vcr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*4+num_vcs*2-1] errors_s, errors_q;
+	   wire [0:num_vcs*3+num_vcs*2-1] errors_s, errors_q;
 	   assign errors_s = {ivcc_errors_ivc, fbc_errors_ivc};
 	   c_err_rpt
-	     #(.num_errors(num_vcs*4+num_vcs*2),
+	     #(.num_errors(num_vcs*3+num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

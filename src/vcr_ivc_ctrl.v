@@ -31,8 +31,8 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, peek_header_info, fb_flit_tail, int_flow_ctrl_op_ovc, 
-   route_op, route_orc, vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
+   header_info_in, peek_header_info, fb_flit_tail, free_op_ovc, route_op, 
+   route_orc, vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
    flit_tail_prev, flit_valid, flit_head, flit_tail, flit_sel_ovc, 
    next_lar_info, fbc_almost_empty, fbc_empty, allocated, free_nonspec, 
    free_spec, errors);
@@ -41,13 +41,6 @@ module vcr_ivc_ctrl
 `include "c_constants.v"
 `include "rtr_constants.v"
 `include "vcr_constants.v"
-   
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
-   
-   // width of credit hold register
-   // (note: this parameter is only used for INT_FLOW_CTRL_TYPE_PUSH)
-   localparam cred_hold_width = clogb(num_flits_per_vc);
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -171,15 +164,6 @@ module vcr_ivc_ctrl
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // select method for credit signaling from output to input controller
-   parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
-   
-   // width required for internal flow control signalling
-   localparam int_flow_ctrl_width
-     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
-       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
-       -1;
-   
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
@@ -233,77 +217,77 @@ module vcr_ivc_ctrl
    
    // internal flow control signalling from output controller to input 
    // controllers
-   input [0:num_ports*num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_op_ovc;
+   input [0:num_ports*num_vcs*2-1] free_op_ovc;
    
    // destination port (1-hot)
-   output [0:num_ports-1] 			     route_op;
-   wire [0:num_ports-1] 			     route_op;
+   output [0:num_ports-1] 	   route_op;
+   wire [0:num_ports-1] 	   route_op;
    
    // select next resource class
-   output [0:num_resource_classes-1] 		     route_orc;
-   wire [0:num_resource_classes-1] 		     route_orc;
+   output [0:num_resource_classes-1] route_orc;
+   wire [0:num_resource_classes-1]   route_orc;
    
    // VC allocation successful
-   input 					     vc_gnt;
+   input 			     vc_gnt;
    
    // granted output VC
-   input [0:num_vcs_per_class-1] 		     vc_gnt_ocvc;
+   input [0:num_vcs_per_class-1]     vc_gnt_ocvc;
    
    // switch allocator grants
-   input 					     sw_gnt;
+   input 			     sw_gnt;
    
    // did this VC send a flit in the current cycle?
-   output 					     flit_sent;
-   wire 					     flit_sent;
+   output 			     flit_sent;
+   wire 			     flit_sent;
    
    // did this VC send a flit in the previous cycle?
-   input 					     flit_sent_prev;
+   input 			     flit_sent_prev;
    
    // if we sent a flit in the previous cycle, was it a tail flit?
-   input 					     flit_tail_prev;
+   input 			     flit_tail_prev;
    
    // outgoing flit is available
-   output 					     flit_valid;
-   wire 					     flit_valid;
+   output 			     flit_valid;
+   wire 			     flit_valid;
    
    // outgoing flit is head flit
-   output 					     flit_head;
-   wire 					     flit_head;
+   output 			     flit_head;
+   wire 			     flit_head;
    
    // outgoing flit is tail flit
-   output 					     flit_tail;
-   wire 					     flit_tail;
+   output 			     flit_tail;
+   wire 			     flit_tail;
    
    // destination VC for outgoing flit
-   output [0:num_vcs-1] 			     flit_sel_ovc;
-   wire [0:num_vcs-1] 				     flit_sel_ovc;
+   output [0:num_vcs-1] 	     flit_sel_ovc;
+   wire [0:num_vcs-1] 		     flit_sel_ovc;
    
    // updated lookahead routing info
    // (NOTE: only valid if the current flit is a head flit)
-   output [0:lar_info_width-1] 			     next_lar_info;
-   wire [0:lar_info_width-1] 			     next_lar_info;
+   output [0:lar_info_width-1] 	     next_lar_info;
+   wire [0:lar_info_width-1] 	     next_lar_info;
    
    // flit buffer has a single valid entry left
-   input 					     fbc_almost_empty;
+   input 			     fbc_almost_empty;
    
    // flit buffer does not have any valid entries
-   input 					     fbc_empty;
+   input 			     fbc_empty;
    
    // has an output VC been assigned to this input VC?
-   output 					     allocated;
-   wire 					     allocated;
+   output 			     allocated;
+   wire 			     allocated;
    
    // credit availability if VC has been assigned
-   output 					     free_nonspec;
-   wire 					     free_nonspec;
+   output 			     free_nonspec;
+   wire 			     free_nonspec;
    
    // credit availability if no VC has been assigned yet
-   output 					     free_spec;
-   wire 					     free_spec;
+   output 			     free_spec;
+   wire 			     free_spec;
    
    // internal error condition detected
-   output [0:3] 				     errors;
-   wire [0:3] 					     errors;
+   output [0:3] 		     errors;
+   wire [0:3] 			     errors;
    
    
    //---------------------------------------------------------------------------
@@ -312,7 +296,7 @@ module vcr_ivc_ctrl
    
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
-   wire 					     pop_active;
+   wire 			     pop_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign pop_active = flit_valid | flit_sent_prev;
@@ -320,13 +304,12 @@ module vcr_ivc_ctrl
 	assign pop_active = flit_valid;
    endgenerate
    
-   wire 					     flit_sent;
+   wire 			     flit_sent;
    
-   wire 					     packet_done;
+   wire 			     packet_done;
    assign packet_done = flit_sent & flit_tail;
    
-   wire 					     vc_allocated_s, 
-						     vc_allocated_q;
+   wire 			     vc_allocated_s, vc_allocated_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign vc_allocated_s
@@ -346,9 +329,9 @@ module vcr_ivc_ctrl
    
    assign allocated = vc_allocated_q;
    
-   wire [0:num_vcs_per_class-1] 		     vc_allocated_ocvc;
-   wire [0:num_vcs_per_class-1] 		     vc_allocated_next_ocvc;
-   wire [0:num_vcs_per_class-1] 		     allocated_ocvc;
+   wire [0:num_vcs_per_class-1]      vc_allocated_ocvc;
+   wire [0:num_vcs_per_class-1]      vc_allocated_next_ocvc;
+   wire [0:num_vcs_per_class-1]      allocated_ocvc;
    
    generate
       
@@ -757,212 +740,99 @@ module vcr_ivc_ctrl
    wire 				       cred_track_active;
    assign cred_track_active = flit_valid | vc_allocated_q;
    
-   wire [0:num_vcs*int_flow_ctrl_width-1]      int_flow_ctrl_ovc;
+   wire [0:num_vcs*2-1] 		       free_ovc;
    c_select_1ofn
      #(.num_ports(num_ports),
-       .width(num_vcs*int_flow_ctrl_width))
-   int_flow_ctrl_ovc_sel
+       .width(num_vcs*2))
+   free_ovc_sel
      (.select(route_op),
-      .data_in(int_flow_ctrl_op_ovc),
-      .data_out(int_flow_ctrl_ovc));
+      .data_in(free_op_ovc),
+      .data_out(free_ovc));
    
-   wire [0:num_resource_classes*num_vcs_per_class*
-	 int_flow_ctrl_width-1] 	       int_flow_ctrl_orc_ocvc;
-   assign int_flow_ctrl_orc_ocvc = int_flow_ctrl_ovc[message_class*
-						     num_resource_classes*
-						     num_vcs_per_class*
-						     int_flow_ctrl_width:
-						     (message_class+1)*
-						     num_resource_classes*
-						     num_vcs_per_class*
-						     int_flow_ctrl_width-1];
+   wire [0:num_resource_classes*num_vcs_per_class*2-1] free_orc_ocvc;
+   assign free_orc_ocvc
+     = free_ovc[message_class*num_resource_classes*num_vcs_per_class*2:
+		(message_class+1)*num_resource_classes*num_vcs_per_class*2-1];
    
-   wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
+   wire [0:num_vcs_per_class*2-1] 		       free_ocvc;
    c_select_1ofn
      #(.num_ports(num_resource_classes),
-       .width(num_vcs_per_class*int_flow_ctrl_width))
-   int_flow_ctrl_ocvc_sel
+       .width(num_vcs_per_class*2))
+   free_ocvc_sel
      (.select(route_orc),
-      .data_in(int_flow_ctrl_orc_ocvc),
-      .data_out(int_flow_ctrl_ocvc));
+      .data_in(free_orc_ocvc),
+      .data_out(free_ocvc));
    
-   wire 					    error_ct_overflow;
+   wire [0:num_vcs_per_class-1] 		       next_free_ocvc;
+   wire [0:num_vcs_per_class-1] 		       free_spec_ocvc;
+   
+   genvar 					       ocvc;
    
    generate
       
-      case(int_flow_ctrl_type)
-	
-	// the current number of credits available are transmitted from the 
-	// output controllers as a multi-level signal (0, 1, 2 or 3+ credits
-	// currently available)
-	`INT_FLOW_CTRL_TYPE_LEVEL:
-	  begin
-	     
-	     wire [0:num_vcs_per_class-1]   next_free_ocvc;
-	     wire [0:num_vcs_per_class-1]   free_spec_ocvc;
-	     
-	     genvar 			    ocvc;
-	     
-	     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
-	       begin:ocvcs
-		  
-		  wire [0:1] int_flow_ctrl;
-		  assign int_flow_ctrl
-		    = int_flow_ctrl_ocvc[ocvc*2:(ocvc+1)*2-1];
-		  
-		  wire 	     two_or_more_credits;
-		  assign two_or_more_credits
-		    = int_flow_ctrl[0] & (int_flow_ctrl[1] | ~flit_sent_prev);
-		  
-		  wire 	     one_or_more_credits;
-		  assign one_or_more_credits
-		    = int_flow_ctrl[0] | (int_flow_ctrl[1] & ~flit_sent_prev);
-		  
-		  wire 	     next_free;
-		  assign next_free
-		    = flit_sent ? two_or_more_credits : one_or_more_credits;
-		  
-		  assign next_free_ocvc[ocvc] = next_free;
-		  
-		  // NOTE: When sending the first flit in each packet, we must 
-		  // have won VC allocation. Consequently, the destination 
-		  // output VC must have been eligible and thus not assigned to 
-		  // any input VC, so we know that nobody sent a flit to it in 
-		  // the previous cycle.
-		  
-		  wire 	     free_spec;
-		  assign free_spec = |int_flow_ctrl;
-		  
-		  assign free_spec_ocvc[ocvc] = free_spec;
-		  
-	       end
-	     
-	     wire 	     free_nonspec_muxed;
-	     c_select_1ofn
-	       #(.num_ports(num_vcs_per_class),
-		 .width(1))
-	     free_nonspec_muxed_sel
-	       (.select(vc_allocated_next_ocvc),
-		.data_in(next_free_ocvc),
-		.data_out(free_nonspec_muxed));
-	     
-	     wire 	     free_nonspec_s, free_nonspec_q;
-	     assign free_nonspec_s = free_nonspec_muxed;
-	     c_dff
-	       #(.width(1),
-		 .reset_value(1'b1),
-		 .reset_type(reset_type))
-	     free_nonspecq
-	       (.clk(clk),
-		.reset(reset),
-		.active(cred_track_active),
-		.d(free_nonspec_s),
-		.q(free_nonspec_q));
-	     
-	     assign free_nonspec = free_nonspec_q;
-	     
-	     c_select_1ofn
-	       #(.num_ports(num_vcs_per_class),
-		 .width(1))
-	     free_spec_sel
-	       (.select(vc_gnt_ocvc),
-		.data_in(free_spec_ocvc),
-		.data_out(free_spec));
-	     
-	     assign error_ct_overflow = 1'b0;
-	     
-	  end
-	
-	// credits are forwarded from the output controllers individually as 
-	// pulses, accumulated at the input controllers, and used whenever a
-	// flit is sent to the crossbar
-	`INT_FLOW_CTRL_TYPE_PUSH:
-	  begin
-	     
-	     wire [0:num_vcs_per_class-1] cred_ocvc;
-	     assign cred_ocvc = int_flow_ctrl_ocvc;
-	     
-	     wire 			  cred_allocated;
-	     c_select_1ofn
-	       #(.num_ports(num_vcs_per_class),
-		 .width(1))
-	     cred_allocated_sel
-	       (.select(vc_allocated_ocvc),
-		.data_in(cred_ocvc),
-		.data_out(cred_allocated));
-	     
-	     wire 			  cred_unallocated;
-	     c_select_1ofn
-	       #(.num_ports(num_vcs_per_class),
-		 .width(1))
-	     cred_unallocated_sel
-	       (.select(vc_gnt_ocvc),
-		.data_in(cred_ocvc),
-		.data_out(cred_unallocated));
-	     
-	     wire [0:cred_hold_width-1]   cred_hold_q;
-	     
-	     wire 			  has_cred_s, has_cred_q;
-	     if(elig_mask == `ELIG_MASK_NONE)
-	       assign has_cred_s
-		 = vc_allocated_q ?
-		   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
-		   (~sw_gnt & cred_unallocated);
-	     else
-	       assign has_cred_s 
-		 = vc_allocated_q ? 
-		   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
-		   (~sw_gnt | cred_unallocated);
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type))
-	     has_credq
-	       (.clk(clk),
-		.reset(reset),
-		.active(cred_track_active),
-		.d(has_cred_s),
-		.q(has_cred_q));
-	     
-	     assign free_nonspec = has_cred_q;
-	     
-	     assign free_spec = cred_unallocated;
-	     
-	     wire 			  incr_cred_hold;
-	     assign incr_cred_hold = cred_allocated & has_cred_q & ~sw_gnt;
-	     
-	     wire 			  decr_cred_hold;
-	     assign decr_cred_hold = ~cred_allocated & |cred_hold_q & sw_gnt;
-	     
-	     wire [0:cred_hold_width-1]   cred_hold_new;
-	     if(elig_mask == `ELIG_MASK_NONE)
-	       assign cred_hold_new = {cred_hold_width{1'b0}};
-	     else
-	       assign cred_hold_new = cred_unallocated & ~sw_gnt;
-	     
-	     wire [0:cred_hold_width-1]   cred_hold_s;
-	     assign cred_hold_s
-	       = vc_allocated_q ?
-		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
-		 cred_hold_new;
-	     c_dff
-	       #(.width(cred_hold_width),
-		 .reset_type(reset_type))
-	     cred_holdq
-	       (.clk(clk),
-		.reset(reset),
-		.active(cred_track_active),
-		.d(cred_hold_s),
-		.q(cred_hold_q));
-	     
-	     assign error_ct_overflow
-	       = vc_allocated_q && (cred_hold_q == num_flits_per_vc-1) &&
-		 incr_cred_hold;
-	     
-	  end
-	
-      endcase
+      for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
+	begin:ocvcs
+	   
+	   wire [0:1] free;
+	   assign free = free_ocvc[ocvc*2:(ocvc+1)*2-1];
+	   
+	   wire       two_or_more_credits;
+	   assign two_or_more_credits = free[0] & (free[1] | ~flit_sent_prev);
+	   
+	   wire       one_or_more_credits;
+	   assign one_or_more_credits = free[0] | (free[1] & ~flit_sent_prev);
+	   
+	   wire       next_free;
+	   assign next_free
+	     = flit_sent ? two_or_more_credits : one_or_more_credits;
+	   
+	   assign next_free_ocvc[ocvc] = next_free;
+	   
+	   // NOTE: When sending the first flit in each packet, we must have 
+	   // won VC allocation. Consequently, the destination output VC must 
+	   // have been eligible and thus not assigned to any input VC, so we 
+	   // know that nobody sent a flit to it in the previous cycle.
+	   
+	   wire       free_spec;
+	   assign free_spec = |free;
+	   
+	   assign free_spec_ocvc[ocvc] = free_spec;
+	   
+	end
       
    endgenerate
+   
+   wire 	      free_nonspec_muxed;
+   c_select_1ofn
+     #(.num_ports(num_vcs_per_class),
+       .width(1))
+   free_nonspec_muxed_sel
+     (.select(vc_allocated_next_ocvc),
+      .data_in(next_free_ocvc),
+      .data_out(free_nonspec_muxed));
+   
+   wire 	      free_nonspec_s, free_nonspec_q;
+   assign free_nonspec_s = free_nonspec_muxed;
+   c_dff
+     #(.width(1),
+       .reset_value(1'b1),
+       .reset_type(reset_type))
+   free_nonspecq
+     (.clk(clk),
+      .reset(reset),
+      .active(cred_track_active),
+      .d(free_nonspec_s),
+      .q(free_nonspec_q));
+   
+   assign free_nonspec = free_nonspec_q;
+   
+   c_select_1ofn
+     #(.num_ports(num_vcs_per_class),
+       .width(1))
+   free_spec_sel
+     (.select(vc_gnt_ocvc),
+      .data_in(free_spec_ocvc),
+      .data_out(free_spec));
    
    
    //---------------------------------------------------------------------------
@@ -977,16 +847,12 @@ module vcr_ivc_ctrl
 	if(error_no_header)
 	  $display("ERROR: Stray flit received in module %m.");
 	
-	if(error_ct_overflow)
-	  $display("ERROR: Credit tracker overflow in module %m.");
-	
      end
    
    // pragma translate_on
    
    assign errors[0] = error_no_header;
-   assign errors[1] = error_ct_overflow;
-   assign errors[2] = error_invalid_port;
-   assign errors[3] = error_invalid_class;
+   assign errors[1] = error_invalid_port;
+   assign errors[2] = error_invalid_class;
    
 endmodule

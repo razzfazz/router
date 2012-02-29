@@ -31,19 +31,6 @@
 
 
 //------------------------------------------------------------------------------
-// credit handling implementation variants
-//------------------------------------------------------------------------------
-
-// indicate credit level to input side
-`define INT_FLOW_CTRL_TYPE_LEVEL 0
-
-// push credits to input side one by one
-`define INT_FLOW_CTRL_TYPE_PUSH  1
-
-`define INT_FLOW_CTRL_TYPE_LAST `INT_FLOW_CTRL_TYPE_PUSH
-
-
-//------------------------------------------------------------------------------
 // VC allocator implementation variants
 //------------------------------------------------------------------------------
 

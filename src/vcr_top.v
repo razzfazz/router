@@ -143,17 +143,8 @@ module vcr_top
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // select method for credit signaling from output to input controller
-   parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
-   
    // width required for internal flit control signalling
    localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
-   
-   // width required for internal flow control signalling
-   localparam int_flow_ctrl_width
-     = (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_LEVEL) ? 2 :
-       (int_flow_ctrl_type == `INT_FLOW_CTRL_TYPE_PUSH) ? 1 :
-       -1;
    
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -235,7 +226,7 @@ module vcr_top
    wire [0:num_ports*int_flit_ctrl_width-1] 	     xbc_data_in_ip;
    wire [0:num_ports*flit_data_width-1] 	     xbd_data_in_ip;
    
-   wire [0:num_ports*num_vcs*int_flow_ctrl_width-1]  int_flow_ctrl_op_ovc;
+   wire [0:num_ports*num_vcs*2-1] 		     free_op_ovc;
    
    wire [0:num_ports-1] 			     ipc_error_ip;
    
@@ -295,7 +286,6 @@ module vcr_top
 	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
-	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .fb_regfile_type(fb_regfile_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .gate_buffer_write(gate_buffer_write),
@@ -318,7 +308,7 @@ module vcr_top
 	      .vc_gnt_ivc_ocvc(vc_gnt_ivc_ocvc),
 	      .sw_sel_ivc(sw_sel_ivc),
 	      .sw_gnt(sw_gnt),
-	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+	      .free_op_ovc(free_op_ovc),
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .flit_data(flit_data),
 	      .flow_ctrl_out(flow_ctrl_out),
@@ -486,10 +476,10 @@ module vcr_top
 	   wire [0:num_ports-1] 	xbr_ctrl_ip;
 	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire [0:num_vcs*int_flow_ctrl_width-1] int_flow_ctrl_ovc;
-	   wire [0:channel_width-1] 		  channel_out;
-	   wire [0:num_vcs-1] 			  elig_ovc;
-	   wire 				  opc_error;
+	   wire [0:num_vcs*2-1] 	free_ovc;
+	   wire [0:channel_width-1] 	channel_out;
+	   wire [0:num_vcs-1] 		elig_ovc;
+	   wire 			opc_error;
 	   vcr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
@@ -499,7 +489,6 @@ module vcr_top
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
-	       .int_flow_ctrl_type(int_flow_ctrl_type),
 	       .elig_mask(elig_mask),
 	       .port_id(op),
 	       .reset_type(reset_type))
@@ -515,16 +504,14 @@ module vcr_top
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .flit_data(flit_data),
 	      .channel_out(channel_out),
-	      .int_flow_ctrl_ovc(int_flow_ctrl_ovc),
+	      .free_ovc(free_ovc),
 	      .elig_ovc(elig_ovc),
 	      .error(opc_error));
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
 	   
-	   assign int_flow_ctrl_op_ovc[op*num_vcs*int_flow_ctrl_width:
-				       (op+1)*num_vcs*int_flow_ctrl_width-1]
-	     = int_flow_ctrl_ovc;
+	   assign free_op_ovc[op*num_vcs*2:(op+1)*num_vcs*2-1] = free_ovc;
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
 	   
