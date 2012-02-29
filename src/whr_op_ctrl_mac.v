@@ -93,9 +93,6 @@ module whr_op_ctrl_mac
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    

@@ -88,9 +88,6 @@ module vcr_op_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
-   // select implementation variant for tail sent tracker register file
-   parameter tst_regfile_type = `REGFILE_TYPE_FF_2D;
-   
    // select method for credit signaling from output to input controller
    parameter int_flow_ctrl_type = `INT_FLOW_CTRL_TYPE_PUSH;
    
@@ -244,7 +241,6 @@ module vcr_op_ctrl_mac
 	       .vc_id(ovc),
 	       .elig_mask(elig_mask),
 	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .tst_regfile_type(tst_regfile_type),
 	       .reset_type(reset_type))
 	   ovcc
 	     (.clk(clk),
