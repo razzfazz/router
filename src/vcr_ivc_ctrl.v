@@ -33,9 +33,8 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, peek_header_info, fb_flit_tail, free_op_ovc, route_op, 
    route_orc, vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
-   flit_tail_prev, flit_valid, flit_head, flit_tail, flit_sel_ovc, 
-   next_lar_info, fbc_almost_empty, fbc_empty, allocated, free_nonspec, 
-   free_spec, errors);
+   flit_valid, flit_head, flit_tail, flit_sel_ovc, next_lar_info, 
+   fbc_almost_empty, fbc_empty, allocated, free_nonspec, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -243,9 +242,6 @@ module vcr_ivc_ctrl
    // did this VC send a flit in the previous cycle?
    input 			     flit_sent_prev;
    
-   // if we sent a flit in the previous cycle, was it a tail flit?
-   input 			     flit_tail_prev;
-   
    // outgoing flit is available
    output 			     flit_valid;
    wire 			     flit_valid;
@@ -297,25 +293,29 @@ module vcr_ivc_ctrl
    assign flit_valid = flit_valid_in | ~fbc_empty;
    
    wire 			     pop_active;
-   generate
-      if(elig_mask == `ELIG_MASK_USED)
-	assign pop_active = flit_valid | flit_sent_prev;
-      else
-	assign pop_active = flit_valid;
-   endgenerate
+   assign pop_active = flit_valid;
    
    wire 			     flit_sent;
    
    wire 			     packet_done;
    assign packet_done = flit_sent & flit_tail;
    
+   wire 			     flit_valid_head_in;
+   assign flit_valid_head_in = flit_valid_in & flit_head_in;
+   
    wire 			     vc_allocated_s, vc_allocated_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign vc_allocated_s
-	  = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
+	begin
+	   assign vc_allocated_s
+	     = (vc_allocated_q & ~flit_valid_head_in) | vc_gnt;
+	   assign allocated = vc_allocated_q & ~flit_valid_head_in;
+	end
       else
-	assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+	begin
+	   assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+	   assign allocated = vc_allocated_q;
+	end
    endgenerate
    c_dff
      #(.width(1),
@@ -326,8 +326,6 @@ module vcr_ivc_ctrl
       .active(pop_active),
       .d(vc_allocated_s),
       .q(vc_allocated_q));
-   
-   assign allocated = vc_allocated_q;
    
    wire [0:num_vcs_per_class-1]      vc_allocated_ocvc;
    wire [0:num_vcs_per_class-1]      vc_allocated_next_ocvc;
@@ -344,7 +342,7 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   assign vc_allocated_next_ocvc
-	     = vc_allocated_q ? vc_allocated_ocvc : vc_gnt_ocvc;
+	     = allocated ? vc_allocated_ocvc : vc_gnt_ocvc;
 	   
 	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
 	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
@@ -366,10 +364,9 @@ module vcr_ivc_ctrl
       if(sw_alloc_spec)
 	begin
 	   if(elig_mask == `ELIG_MASK_NONE)
-	     assign flit_sent
-	       = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
+	     assign flit_sent = sw_gnt & ((vc_gnt & free_spec) | allocated);
 	   else
-	     assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
+	     assign flit_sent = sw_gnt & (vc_gnt | allocated);
 	   
 	   assign allocated_ocvc = vc_allocated_next_ocvc;
 	end
@@ -726,7 +723,7 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 				       cred_track_active;
-   assign cred_track_active = flit_valid | vc_allocated_q;
+   assign cred_track_active = flit_valid | allocated;
    
    wire [0:num_vcs*2-1] 		       free_ovc;
    c_select_1ofn
