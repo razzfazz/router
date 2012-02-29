@@ -436,19 +436,22 @@ module vcr_ivc_ctrl
    wire [0:route_info_width-1] 	       route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
    
+   wire 			       flit_valid_head_in;
+   assign flit_valid_head_in = flit_valid_in & flit_head_in;
+   
    wire 			       hdr_capture;
    wire 			       hdr_active;
    wire 			       hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
-	   assign hdr_capture = flit_valid_in & flit_head_in;
+	   assign hdr_capture = flit_valid_head_in;
 	   assign hdr_active = hdr_capture;
 	   assign hdr_valid = ~hdr_capture;
 	end
       else
 	begin
-	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
+	   assign hdr_active = ~fbc_empty | flit_valid_head_in;
 	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
 	   assign hdr_capture = ~hdr_valid | packet_done;
 	end
@@ -555,7 +558,7 @@ module vcr_ivc_ctrl
    wire 			      bypass_route_info;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign bypass_route_info = flit_valid_in & flit_head_in;
+	assign bypass_route_info = flit_valid_head_in;
       else
 	assign bypass_route_info = fbc_empty & flit_head_in;
    endgenerate
