@@ -459,17 +459,26 @@ module vcr_ivc_ctrl
    wire [0:route_info_width-1] 	       route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
    
+   wire 			       hdr_capture;
    wire 			       hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_active = ~hdr_valid_q & flit_valid_in;
+	begin
+	   assign hdr_capture = flit_valid_in & flit_head_in;
+	   assign hdr_active = hdr_capture;
+	end
       else
-	// NOTE: If this ends up being timing-critical, we can simply eliminate 
-	// the fb_flit_tail term at the expense of slightly worse gating under 
-	// load.
-	// For relatively short packets, this is probably a good tradeoff.
-	assign hdr_active
-	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
+	begin
+	   assign hdr_capture = ~hdr_valid_q | packet_done;
+	   
+	   // NOTE: If this ends up being timing-critical, we can simply 
+	   // eliminate the fb_flit_tail term at the expense of slightly worse 
+	   // gating under load.
+	   // For relatively short packets, this is probably a good tradeoff.
+	   assign hdr_active
+	     = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
+	end
+      
    endgenerate
    
    wire 			       two_plus_flits;
@@ -484,7 +493,7 @@ module vcr_ivc_ctrl
    wire [0:lar_info_width-1] 	       hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_lar_info_s = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+	assign hdr_lar_info_s = hdr_capture ? lar_info_in : hdr_lar_info_q;
       else
 	begin
 	   
@@ -492,7 +501,7 @@ module vcr_ivc_ctrl
 	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
-	     = (~hdr_valid_q | packet_done) ?
+	     = hdr_capture ?
 	       (two_plus_flits ? peek_lar_info : lar_info_in) :
 	       hdr_lar_info_q;
 	   
@@ -515,7 +524,7 @@ module vcr_ivc_ctrl
    wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_dest_info_s = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+	assign hdr_dest_info_s = hdr_capture ? dest_info_in : hdr_dest_info_q;
       else
 	begin
 	   
@@ -524,7 +533,7 @@ module vcr_ivc_ctrl
 	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
-	     = (~hdr_valid_q | packet_done) ?
+	     = hdr_capture ?
 	       (two_plus_flits ? peek_dest_info : dest_info_in) :
 	       hdr_dest_info_q;
 	   
