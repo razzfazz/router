@@ -470,13 +470,7 @@ module vcr_ivc_ctrl
       else
 	begin
 	   assign hdr_capture = ~hdr_valid_q | packet_done;
-	   
-	   // NOTE: If this ends up being timing-critical, we can simply 
-	   // eliminate the fb_flit_tail term at the expense of slightly worse 
-	   // gating under load.
-	   // For relatively short packets, this is probably a good tradeoff.
-	   assign hdr_active
-	     = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
+	   assign hdr_active = (~hdr_valid_q & flit_valid_in) | ~fbc_empty;
 	end
       
    endgenerate
