@@ -141,7 +141,8 @@ module c_lod
 				  mask_out_by_prio[width:2*width-1];
 		
 	     end
-	   else if((num_priorities > 2) || split_output_by_prio)
+	   else if(((num_priorities == 2) && split_output_by_prio) ||
+		    (num_priorities > 2))
 	     begin
 		
 		wire [0:num_priorities-1] valid_prio;
