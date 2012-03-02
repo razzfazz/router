@@ -45,9 +45,6 @@ module c_lod
    output [0:width-1] 		    data_out;
    wire [0:width-1] 		    data_out;
    
-   wire [0:num_priorities-1] 	    enable_prio;
-   assign enable_prio[0] = 1'b1;
-   
    wire [0:num_priorities*width-1]  data_out_by_prio;
    
    genvar 			    prio;
@@ -59,9 +56,6 @@ module c_lod
 	   
 	   wire [0:width-1] prio_data_in;
 	   assign prio_data_in = data_in[prio*width:(prio+1)*width-1];
-	   
-	   if(prio < (num_priorities - 1))
-	     assign enable_prio[prio+1] = enable_prio[prio] & ~|prio_data_in;
 	   
 	   wire [0:width-1] prio_data_out;
 	   
@@ -95,14 +89,53 @@ module c_lod
 	   
 	end
       
+      if(num_priorities == 1)
+	assign data_out = data_out_by_prio;
+      else if(num_priorities > 1)
+	begin
+	   
+	   wire [0:num_priorities-1] valid_prio;
+	   c_mat_mult
+	     #(.dim1_width(num_priorities),
+	       .dim2_width(width),
+	       .dim3_width(1),
+	       .prod_op(`BINARY_OP_AND),
+	       .sum_op(`BINARY_OP_OR))
+	   valid_prio_mmult
+	     (.input_a(data_in),
+	      .input_b({width{1'b1}}),
+	      .result(valid_prio));
+	   
+	   wire [0:num_priorities-1] req_prio;
+	   assign req_prio = {valid_prio[0:num_priorities-2], 1'b1};
+	   
+	   wire [0:num_priorities-1] req_prio_rev;
+	   c_reverse
+	     #(.width(num_priorities))
+	   req_prio_rev_revr
+	     (.data_in(req_prio),
+	      .data_out(req_prio_rev));
+	   
+	   wire [0:num_priorities-1] gnt_prio_rev;
+	   assign gnt_prio_rev = req_prio_rev & -req_prio_rev;
+	   
+	   wire [0:num_priorities-1] gnt_prio;
+	   c_reverse
+	     #(.width(num_priorities))
+	   gnt_piro_rev_revr
+	     (.data_in(gnt_prio_rev),
+	      .data_out(gnt_prio));
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_priorities),
+	       .width(width))
+	   data_out_sel
+	     (.select(req_prio),
+	      .data_in(data_out_by_prio),
+	      .data_out(data_out));
+	   
+	end
+      
    endgenerate
-   
-   c_select_mofn
-     #(.num_ports(num_priorities),
-       .width(width))
-   data_out_sel
-     (.select(enable_prio),
-      .data_in(data_out_by_prio),
-      .data_out(data_out));
    
 endmodule
