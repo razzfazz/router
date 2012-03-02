@@ -73,7 +73,7 @@ module c_encode
                2'b01:
                  data_out = (1 + offset) % 2;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {1{1'bx}};
              endcase
           end
       else if(num_ports == 3)
@@ -87,7 +87,7 @@ module c_encode
                3'b001:
                  data_out = (2 + offset) % 3;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {2{1'bx}};
              endcase
           end
       else if(num_ports == 4)
@@ -103,7 +103,7 @@ module c_encode
                4'b0001:
                  data_out = (3 + offset) % 4;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {2{1'bx}};
              endcase
           end
       else if(num_ports == 5)
@@ -121,7 +121,7 @@ module c_encode
                5'b00001:
                  data_out = (4 + offset) % 5;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {3{1'bx}};
              endcase
           end
       else if(num_ports == 6)
@@ -141,7 +141,7 @@ module c_encode
                6'b000001:
                  data_out = (5 + offset) % 6;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {3{1'bx}};
              endcase
           end
       else if(num_ports == 7)
@@ -163,7 +163,7 @@ module c_encode
                7'b0000001:
                  data_out = (6 + offset) % 7;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {3{1'bx}};
              endcase
           end
       else if(num_ports == 8)
@@ -187,7 +187,7 @@ module c_encode
                8'b00000001:
                  data_out = (7 + offset) % 8;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {3{1'bx}};
              endcase
           end
       else if(num_ports == 9)
@@ -213,7 +213,7 @@ module c_encode
                9'b000000001:
                  data_out = (8 + offset) % 9;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 10)
@@ -241,7 +241,7 @@ module c_encode
                10'b0000000001:
                  data_out = (9 + offset) % 10;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 11)
@@ -271,7 +271,7 @@ module c_encode
                11'b00000000001:
                  data_out = (10 + offset) % 11;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 12)
@@ -303,7 +303,7 @@ module c_encode
                12'b000000000001:
                  data_out = (11 + offset) % 12;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 13)
@@ -337,7 +337,7 @@ module c_encode
                13'b0000000000001:
                  data_out = (12 + offset) % 13;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 14)
@@ -373,7 +373,7 @@ module c_encode
                14'b00000000000001:
                  data_out = (13 + offset) % 14;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 15)
@@ -411,7 +411,7 @@ module c_encode
                15'b000000000000001:
                  data_out = (14 + offset) % 15;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 16)
@@ -451,7 +451,7 @@ module c_encode
                16'b0000000000000001:
                  data_out = (15 + offset) % 16;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {4{1'bx}};
              endcase
           end
       else if(num_ports == 17)
@@ -493,7 +493,7 @@ module c_encode
                17'b00000000000000001:
                  data_out = (16 + offset) % 17;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 18)
@@ -537,7 +537,7 @@ module c_encode
                18'b000000000000000001:
                  data_out = (17 + offset) % 18;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 19)
@@ -583,7 +583,7 @@ module c_encode
                19'b0000000000000000001:
                  data_out = (18 + offset) % 19;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 20)
@@ -631,7 +631,7 @@ module c_encode
                20'b00000000000000000001:
                  data_out = (19 + offset) % 20;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 21)
@@ -681,7 +681,7 @@ module c_encode
                21'b000000000000000000001:
                  data_out = (20 + offset) % 21;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 22)
@@ -733,7 +733,7 @@ module c_encode
                22'b0000000000000000000001:
                  data_out = (21 + offset) % 22;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 23)
@@ -787,7 +787,7 @@ module c_encode
                23'b00000000000000000000001:
                  data_out = (22 + offset) % 23;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 24)
@@ -843,7 +843,7 @@ module c_encode
                24'b000000000000000000000001:
                  data_out = (23 + offset) % 24;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 25)
@@ -901,7 +901,7 @@ module c_encode
                25'b0000000000000000000000001:
                  data_out = (24 + offset) % 25;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 26)
@@ -961,7 +961,7 @@ module c_encode
                26'b00000000000000000000000001:
                  data_out = (25 + offset) % 26;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 27)
@@ -1023,7 +1023,7 @@ module c_encode
                27'b000000000000000000000000001:
                  data_out = (26 + offset) % 27;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 28)
@@ -1087,7 +1087,7 @@ module c_encode
                28'b0000000000000000000000000001:
                  data_out = (27 + offset) % 28;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 29)
@@ -1153,7 +1153,7 @@ module c_encode
                29'b00000000000000000000000000001:
                  data_out = (28 + offset) % 29;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 30)
@@ -1221,7 +1221,7 @@ module c_encode
                30'b000000000000000000000000000001:
                  data_out = (29 + offset) % 30;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 31)
@@ -1291,7 +1291,7 @@ module c_encode
                31'b0000000000000000000000000000001:
                  data_out = (30 + offset) % 31;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 32)
@@ -1363,7 +1363,7 @@ module c_encode
                32'b00000000000000000000000000000001:
                  data_out = (31 + offset) % 32;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {5{1'bx}};
              endcase
           end
       else if(num_ports == 33)
@@ -1437,7 +1437,7 @@ module c_encode
                33'b000000000000000000000000000000001:
                  data_out = (32 + offset) % 33;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 34)
@@ -1513,7 +1513,7 @@ module c_encode
                34'b0000000000000000000000000000000001:
                  data_out = (33 + offset) % 34;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 35)
@@ -1591,7 +1591,7 @@ module c_encode
                35'b00000000000000000000000000000000001:
                  data_out = (34 + offset) % 35;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 36)
@@ -1671,7 +1671,7 @@ module c_encode
                36'b000000000000000000000000000000000001:
                  data_out = (35 + offset) % 36;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 37)
@@ -1753,7 +1753,7 @@ module c_encode
                37'b0000000000000000000000000000000000001:
                  data_out = (36 + offset) % 37;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 38)
@@ -1837,7 +1837,7 @@ module c_encode
                38'b00000000000000000000000000000000000001:
                  data_out = (37 + offset) % 38;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 39)
@@ -1923,7 +1923,7 @@ module c_encode
                39'b000000000000000000000000000000000000001:
                  data_out = (38 + offset) % 39;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 40)
@@ -2011,7 +2011,7 @@ module c_encode
                40'b0000000000000000000000000000000000000001:
                  data_out = (39 + offset) % 40;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 41)
@@ -2101,7 +2101,7 @@ module c_encode
                41'b00000000000000000000000000000000000000001:
                  data_out = (40 + offset) % 41;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 42)
@@ -2193,7 +2193,7 @@ module c_encode
                42'b000000000000000000000000000000000000000001:
                  data_out = (41 + offset) % 42;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 43)
@@ -2287,7 +2287,7 @@ module c_encode
                43'b0000000000000000000000000000000000000000001:
                  data_out = (42 + offset) % 43;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 44)
@@ -2383,7 +2383,7 @@ module c_encode
                44'b00000000000000000000000000000000000000000001:
                  data_out = (43 + offset) % 44;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 45)
@@ -2481,7 +2481,7 @@ module c_encode
                45'b000000000000000000000000000000000000000000001:
                  data_out = (44 + offset) % 45;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 46)
@@ -2581,7 +2581,7 @@ module c_encode
                46'b0000000000000000000000000000000000000000000001:
                  data_out = (45 + offset) % 46;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 47)
@@ -2683,7 +2683,7 @@ module c_encode
                47'b00000000000000000000000000000000000000000000001:
                  data_out = (46 + offset) % 47;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 48)
@@ -2787,7 +2787,7 @@ module c_encode
                48'b000000000000000000000000000000000000000000000001:
                  data_out = (47 + offset) % 48;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 49)
@@ -2893,7 +2893,7 @@ module c_encode
                49'b0000000000000000000000000000000000000000000000001:
                  data_out = (48 + offset) % 49;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 50)
@@ -3001,7 +3001,7 @@ module c_encode
                50'b00000000000000000000000000000000000000000000000001:
                  data_out = (49 + offset) % 50;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 51)
@@ -3111,7 +3111,7 @@ module c_encode
                51'b000000000000000000000000000000000000000000000000001:
                  data_out = (50 + offset) % 51;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 52)
@@ -3223,7 +3223,7 @@ module c_encode
                52'b0000000000000000000000000000000000000000000000000001:
                  data_out = (51 + offset) % 52;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 53)
@@ -3337,7 +3337,7 @@ module c_encode
                53'b00000000000000000000000000000000000000000000000000001:
                  data_out = (52 + offset) % 53;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 54)
@@ -3453,7 +3453,7 @@ module c_encode
                54'b000000000000000000000000000000000000000000000000000001:
                  data_out = (53 + offset) % 54;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 55)
@@ -3571,7 +3571,7 @@ module c_encode
                55'b0000000000000000000000000000000000000000000000000000001:
                  data_out = (54 + offset) % 55;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 56)
@@ -3691,7 +3691,7 @@ module c_encode
                56'b00000000000000000000000000000000000000000000000000000001:
                  data_out = (55 + offset) % 56;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 57)
@@ -3813,7 +3813,7 @@ module c_encode
                57'b000000000000000000000000000000000000000000000000000000001:
                  data_out = (56 + offset) % 57;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 58)
@@ -3937,7 +3937,7 @@ module c_encode
                58'b0000000000000000000000000000000000000000000000000000000001:
                  data_out = (57 + offset) % 58;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 59)
@@ -4063,7 +4063,7 @@ module c_encode
                59'b00000000000000000000000000000000000000000000000000000000001:
                  data_out = (58 + offset) % 59;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 60)
@@ -4191,7 +4191,7 @@ module c_encode
                60'b000000000000000000000000000000000000000000000000000000000001:
                  data_out = (59 + offset) % 60;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 61)
@@ -4321,7 +4321,7 @@ module c_encode
                61'b0000000000000000000000000000000000000000000000000000000000001:
                  data_out = (60 + offset) % 61;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 62)
@@ -4453,7 +4453,7 @@ module c_encode
                62'b00000000000000000000000000000000000000000000000000000000000001:
                  data_out = (61 + offset) % 62;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 63)
@@ -4587,7 +4587,7 @@ module c_encode
                63'b000000000000000000000000000000000000000000000000000000000000001:
                  data_out = (62 + offset) % 63;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       else if(num_ports == 64)
@@ -4723,7 +4723,7 @@ module c_encode
                64'b0000000000000000000000000000000000000000000000000000000000000001:
                  data_out = (63 + offset) % 64;
                default:
-                 data_out = {width{1'bx}};
+                 data_out = {6{1'bx}};
              endcase
           end
       
