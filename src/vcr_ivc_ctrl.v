@@ -295,8 +295,6 @@ module vcr_ivc_ctrl
    wire 			     pop_active;
    assign pop_active = flit_valid;
    
-   wire 			     flit_sent;
-   
    wire 			     packet_done;
    assign packet_done = flit_sent & flit_tail;
    
@@ -432,9 +430,6 @@ module vcr_ivc_ctrl
    
    wire [0:route_info_width-1] 	       route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
-   
-   wire 			       flit_valid_head_in;
-   assign flit_valid_head_in = flit_valid_in & flit_head_in;
    
    wire 			       hdr_capture;
    wire 			       hdr_active;
