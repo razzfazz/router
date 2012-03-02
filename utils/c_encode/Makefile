@@ -10,4 +10,4 @@ gen_body: gen_body.cpp
 	g++ -o gen_body gen_body.cpp
 
 clean:
-	rm -f c_select_1ofn.v body gen_body *~
+	rm -f c_encode.v body gen_body *~
