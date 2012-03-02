@@ -38,22 +38,30 @@ module c_lod
    // number of priority levels
    parameter num_priorities = 1;
    
-   // provide separate grant signals for each priority level
-   parameter split_output_by_prio = 0;
+   // provide separate data out signals for each priority level
+   parameter split_data_out_by_prio = 0;
    
-   // width of grant output
-   localparam out_width = (split_output_by_prio ? num_priorities : 1) * width;
+   // width of data output
+   localparam data_out_width
+     = (split_data_out_by_prio ? num_priorities : 1) * width;
+   
+   // provide separate mask out signals for each priority level
+   parameter split_mask_out_by_prio = 0;
+   
+   // width of mask output
+   localparam mask_out_width
+     = (split_mask_out_by_prio ? num_priorities : 1) * width;
    
    // vector of requests
    input [0:num_priorities*width-1] data_in;
    
    // vector of grants
-   output [0:out_width-1] 	    data_out;
-   wire [0:out_width-1] 	    data_out;
+   output [0:data_out_width-1] 	    data_out;
+   wire [0:data_out_width-1] 	    data_out;
    
    // vector of masked bits
-   output [0:out_width-1] 	    mask_out;
-   wire [0:out_width-1] 	    mask_out;
+   output [0:mask_out_width-1] 	    mask_out;
+   wire [0:mask_out_width-1] 	    mask_out;
    
    wire [0:num_priorities*width-1]  data_out_by_prio;
    wire [0:num_priorities*width-1]  mask_out_by_prio;
@@ -126,23 +134,12 @@ module c_lod
 	end
       else if(num_priorities > 1)
 	begin
-	   if((num_priorities == 2) && !split_output_by_prio)
-	     begin
-		
-		wire hi_prio_reqs;
-		assign hi_prio_reqs = |data_in[0:width-1];
-		
-		assign data_out = hi_prio_reqs ? 
-				  data_out_by_prio[0:width-1] : 
-				  data_out_by_prio[width:2*width-1];
-		
-		assign mask_out = hi_prio_reqs ?
-				  mask_out_by_prio[0:width-1] :
-				  mask_out_by_prio[width:2*width-1];
-		
-	     end
-	   else if(((num_priorities == 2) && split_output_by_prio) ||
-		    (num_priorities > 2))
+	   
+	   wire [0:num_priorities-1] sel_prio;
+	   
+	   if(num_priorities == 2)
+	     assign sel_prio = {|data_in[0:width-1], ~|data_in[0:width-1]};
+	   else if(num_priorities > 2)
 	     begin
 		
 		wire [0:num_priorities-1] valid_prio;
@@ -177,45 +174,55 @@ module c_lod
 		  (.data_in(gnt_prio_rev),
 		   .data_out(gnt_prio));
 		
-		if(split_output_by_prio)
-		  begin
-		     
-		     wire [0:num_priorities*width-1] gnt_mask_prio;
-		     c_mat_mult
-		       #(.dim1_width(1),
-			 .dim2_width(num_priorities),
-			 .dim3_width(width),
-			 .prod_op(`BINARY_OP_AND),
-			 .sum_op(`BINARY_OP_OR))
-		     gnt_mask_prio_mmult
-		       (.input_a(gnt_prio),
-			.input_b({width{1'b1}}),
-			.result(gnt_mask_prio));
-		     
-		     assign data_out = data_out_by_prio & gnt_mask_prio;
-		     assign mask_out = mask_out_by_prio & gnt_mask_prio;
-		     
-		  end
-		else
-		  begin
-		     
-		     c_select_1ofn
-		       #(.num_ports(num_priorities),
-			 .width(width))
-		     data_out_sel
-		       (.select(req_prio),
-			.data_in(data_out_by_prio),
-			.data_out(data_out));
-		     
-		     c_select_1ofn
-		       #(.num_ports(num_priorities),
-			 .width(width))
-		     mask_out_sel
-		       (.select(req_prio),
-			.data_in(mask_out_by_prio),
-			.data_out(mask_out));
-		     
-		  end
+		assign sel_prio = gnt_prio;
+		
+	     end
+	   
+	   wire [0:num_priorities*width-1] gnt_mask_prio;
+	   
+	   if(split_data_out_by_prio || split_mask_out_by_prio)
+	     begin
+		
+		c_mat_mult
+		  #(.dim1_width(1),
+		    .dim2_width(num_priorities),
+		    .dim3_width(width),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		gnt_mask_prio_mmult
+		  (.input_a(sel_prio),
+		   .input_b({width{1'b1}}),
+		   .result(gnt_mask_prio));
+		
+	      end
+	   
+	   if(split_data_out_by_prio)
+	     assign data_out = data_out_by_prio & gnt_mask_prio;
+	   else
+	     begin
+		
+		c_select_1ofn
+		  #(.num_ports(num_priorities),
+		    .width(width))
+		data_out_sel
+		  (.select(sel_prio),
+		   .data_in(data_out_by_prio),
+		   .data_out(data_out));
+		
+	     end
+	   
+	   if(split_mask_out_by_prio)
+	     assign mask_out = mask_out_by_prio & gnt_mask_prio;
+	   else
+	     begin
+		
+		c_select_1ofn
+		  #(.num_ports(num_priorities),
+		    .width(width))
+		mask_out_sel
+		  (.select(sel_prio),
+		   .data_in(mask_out_by_prio),
+		   .data_out(mask_out));
 		
 	     end
 	   
