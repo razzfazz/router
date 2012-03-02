@@ -91,7 +91,10 @@ module c_lod
       
       if(num_priorities == 1)
 	assign data_out = data_out_by_prio;
-      else if(num_priorities > 1)
+      else if(num_priorities == 2)
+	assign data_out
+	  = |data_in[0:width-1] ? data_in[0:width-1] : data_in[width:2*width-1];
+      else if(num_priorities > 2)
 	begin
 	   
 	   wire [0:num_priorities-1] valid_prio;
