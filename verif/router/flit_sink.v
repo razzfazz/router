@@ -152,6 +152,7 @@ module flit_sink
    wire [0:num_vcs-1] 		gnt_ivc;
    c_arbiter
      #(.num_ports(num_vcs),
+       .num_priorities(1),
        .arbiter_type(`ARBITER_TYPE_MATRIX),
        .reset_type(reset_type))
    gnt_ivc_arb
@@ -159,8 +160,9 @@ module flit_sink
       .reset(reset),
       .update(update),
       .active(1'b1),
-      .req(req_ivc),
-      .gnt(gnt_ivc));
+      .req_pr(req_ivc),
+      .gnt_pr(gnt_ivc),
+      .gnt());
    
    wire [0:num_vcs-1] 		buffer_push_ivc;
    assign buffer_push_ivc = {num_vcs{flit_valid}} & flit_sel_ivc;

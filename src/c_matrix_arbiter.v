@@ -30,7 +30,7 @@
 //==============================================================================
 
 module c_matrix_arbiter
-  (clk, reset, active, req, gnt, update);
+  (clk, reset, active, req_pr, gnt_pr, gnt, update);
    
 `include "c_constants.v"
    
@@ -47,11 +47,15 @@ module c_matrix_arbiter
    input active;
    
    // request vector
-   input [0:num_priorities*num_ports-1] req;
+   input [0:num_priorities*num_ports-1] req_pr;
    
    // grant vector
-   output [0:num_priorities*num_ports-1] gnt;
-   wire [0:num_priorities*num_ports-1] 	 gnt;
+   output [0:num_priorities*num_ports-1] gnt_pr;
+   wire [0:num_priorities*num_ports-1] 	 gnt_pr;
+   
+   // merged grant vector
+   output [0:num_ports-1] 		 gnt;
+   wire [0:num_ports-1] 		 gnt;
    
    // update port priorities
    input 				 update;
@@ -65,34 +69,34 @@ module c_matrix_arbiter
 	     #(.width(num_priorities),
 	       .num_priorities(1))
 	   gnt_lod
-	     (.data_in_pr(req),
-	      .data_out_pr(gnt),
-	      .data_out());
+	     (.data_in_pr(req_pr),
+	      .data_out_pr(gnt_pr),
+	      .data_out(gnt),
+	      .mask_out());
 	   
 	end
       else if(num_ports > 1)
 	begin
 	   
-	   wire [0:num_priorities-1] enable_prio;
-	   assign enable_prio[0] = 1'b1;
+	   wire [0:num_priorities-1] sel_pr;
+	   assign sel_pr[0] = 1'b1;
 	   
 	   genvar 		     prio;
 	   
 	   for(prio = 0; prio < (num_priorities - 1); prio = prio + 1)
 	     begin:prios
-		assign enable_prio[prio+1]
-		  = enable_prio[prio] & 
-		    ~|req[prio*num_ports:(prio+1)*num_ports-1];
+		assign sel_pr[prio+1]
+		  = sel_pr[prio] & 
+		    ~|req_pr[prio*num_ports:(prio+1)*num_ports-1];
 	     end
 	   
-	   wire [0:num_ports-1] gnt_any;
 	   c_select_mofn
 	     #(.num_ports(num_priorities),
 	       .width(num_ports))
-	   gnt_all_sel
-	     (.select(enable_prio),
-	      .data_in(gnt),
-	      .data_out(gnt_any));
+	   gnt_sel
+	     (.select(sel_pr),
+	      .data_in(gnt_pr),
+	      .data_out(gnt));
 	   
 	   // port priority matrix
 	   wire [0:num_ports*num_ports-1] state;
@@ -109,11 +113,11 @@ module c_matrix_arbiter
 		     
 		     // grant requests if we have precedence over all other 
 		     // requestors
-		     assign gnt[prio*num_ports+row] 
-		       = req[prio*num_ports+row] &
+		     assign gnt_pr[prio*num_ports+row] 
+		       = req_pr[prio*num_ports+row] &
 			 (&(state[row*num_ports:(row+1)*num_ports-1] | 
-			    ~req[prio*num_ports:(prio+1)*num_ports-1])) &
-			 enable_prio[prio];
+			    ~req_pr[prio*num_ports:(prio+1)*num_ports-1])) &
+			 sel_pr[prio];
 		     
 		  end
 		
@@ -139,7 +143,7 @@ module c_matrix_arbiter
 			  wire state_s, state_q;
 			  assign state_s
 			    = update ? 
-			      ((state_q | gnt_any[col]) & ~gnt_any[row]) : 
+			      ((state_q | gnt[col]) & ~gnt[row]) : 
 			      state_q;
 			  c_dff
 			    #(.width(1),

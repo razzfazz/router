@@ -309,6 +309,7 @@ module vcr_vc_alloc_sep_of
 			       wire [0:num_vcs_per_class-1] gnt_in_ocvc;
 			       c_arbiter
 				 #(.num_ports(num_vcs_per_class),
+				   .num_priorities(1),
 				   .arbiter_type(arbiter_type),
 				   .reset_type(reset_type))
 			       gnt_in_ocvc_arb
@@ -316,8 +317,9 @@ module vcr_vc_alloc_sep_of
 				  .reset(reset),
 				  .active(active),
 				  .update(update_arb),
-				  .req(req_in_ocvc),
-				  .gnt(gnt_in_ocvc));
+				  .req_pr(req_in_ocvc),
+				  .gnt_pr(gnt_in_ocvc),
+				  .gnt());
 			       
 			       assign gnt_in_orc_ocvc[orc*
 						      num_vcs_per_class:
@@ -495,6 +497,7 @@ module vcr_vc_alloc_sep_of
 			  wire [0:num_ports-1] 	     gnt_out_ip;
 			  c_arbiter
 			    #(.num_ports(num_ports),
+			      .num_priorities(1),
 			      .arbiter_type(arbiter_type),
 			      .reset_type(reset_type))
 			  gnt_out_ip_arb
@@ -502,8 +505,9 @@ module vcr_vc_alloc_sep_of
 			     .reset(reset),
 			     .active(active),
 			     .update(update_arb),
-			     .req(req_out_ip),
-			     .gnt(gnt_out_ip));
+			     .req_pr(req_out_ip),
+			     .gnt_pr(gnt_out_ip),
+			     .gnt());
 			  
 			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] gnt_raw_ip_irc_icvc;
@@ -535,6 +539,7 @@ module vcr_vc_alloc_sep_of
 			       c_arbiter
 				 #(.num_ports(num_resource_classes*
 					      num_vcs_per_class),
+				   .num_priorities(1),
 				   .arbiter_type(arbiter_type),
 				   .reset_type(reset_type))
 			       gnt_raw_irc_icvc_arb
@@ -542,8 +547,9 @@ module vcr_vc_alloc_sep_of
 				  .reset(reset),
 				  .active(active),
 				  .update(update_arb),
-				  .req(req_out_irc_icvc),
-				  .gnt(gnt_raw_irc_icvc));
+				  .req_pr(req_out_irc_icvc),
+				  .gnt_pr(gnt_raw_irc_icvc),
+				  .gnt());
 			       
 			       assign gnt_raw_ip_irc_icvc[ip*
 							  num_resource_classes*

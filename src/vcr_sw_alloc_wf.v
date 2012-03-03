@@ -209,6 +209,7 @@ module vcr_sw_alloc_wf
 		     
 		     c_arbiter
 		       #(.num_ports(num_vcs),
+			 .num_priorities(1),
 			 .reset_type(reset_type),
 			 .arbiter_type(arbiter_type))
 		     gnt_in_nonspec_ivc_arb
@@ -216,8 +217,9 @@ module vcr_sw_alloc_wf
 			.reset(reset),
 			.active(active),
 			.update(update_arb_nonspec),
-			.req(req_in_nonspec_ivc),
-			.gnt(gnt_in_nonspec_ivc));
+			.req_pr(req_in_nonspec_ivc),
+			.gnt_pr(gnt_in_nonspec_ivc),
+			.gnt());
 		     
 		  end
 		
@@ -252,8 +254,9 @@ module vcr_sw_alloc_wf
 			     .reset(reset),
 			     .active(active),
 			     .update(update_arb),
-			     .req({req_in_nonspec_ivc, req_in_spec_ivc}),
-			     .gnt({gnt_in_nonspec_ivc, gnt_in_spec_ivc}));
+			     .req_pr({req_in_nonspec_ivc, req_in_spec_ivc}),
+			     .gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
+			     .gnt());
 			  
 		       end
 		     else
@@ -261,6 +264,7 @@ module vcr_sw_alloc_wf
 			  
 			  c_arbiter
 			    #(.num_ports(num_vcs),
+			      .num_priorities(1),
 			      .reset_type(reset_type),
 			      .arbiter_type(arbiter_type))
 			  gnt_in_spec_ivc_arb
@@ -268,8 +272,9 @@ module vcr_sw_alloc_wf
 			     .reset(reset),
 			     .active(active),
 			     .update(update_arb_spec),
-			     .req(req_in_spec_ivc),
-			     .gnt(gnt_in_spec_ivc));
+			     .req_pr(req_in_spec_ivc),
+			     .gnt_pr(gnt_in_spec_ivc),
+			     .gnt());
 			  
 		       end
 		     

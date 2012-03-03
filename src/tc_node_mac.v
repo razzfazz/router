@@ -816,7 +816,8 @@ module tc_node_mac
 	   sel_mc_rv_lod
 	     (.data_in_pr(sel_mc_rv_unmasked),
 	      .data_out_pr(sel_mc_rv),
-	      .data_out());
+	      .data_out(),
+	      .mask_out());
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_message_classes),
@@ -922,7 +923,8 @@ module tc_node_mac
 	   sel_orc_rv_lod
 	     (.data_in_pr(sel_orc_rv_unmasked),
 	      .data_out_pr(sel_orc_rv),
-	      .data_out());
+	      .data_out(),
+	      .mask_out());
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_resource_classes),
@@ -1006,9 +1008,10 @@ module tc_node_mac
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(active_q),
-		   .req({req_hi_ocvc, req_lo_ocvc}),
-		   .gnt({gnt_hi_ocvc, gnt_lo_ocvc}),
-		   .update(update));
+		   .update(update),
+		   .req_pr({req_hi_ocvc, req_lo_ocvc}),
+		   .gnt_pr({gnt_hi_ocvc, gnt_lo_ocvc}),
+		   .gnt());
 		
 		wire [0:num_vcs_per_class-1] gnt_ocvc;
 		assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
@@ -1576,7 +1579,8 @@ module tc_node_mac
 		plength_select_lod
 		  (.data_in_pr(plength_select_unmasked),
 		   .data_out_pr(plength_select),
-		   .data_out());
+		   .data_out(),
+		   .mask_out());
 		
 		c_select_1ofn
 		  #(.num_ports(num_plength_vals),

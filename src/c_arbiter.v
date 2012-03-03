@@ -30,7 +30,7 @@
 //==============================================================================
 
 module c_arbiter
-  (clk, reset, active, req, gnt, update);
+  (clk, reset, active, req_pr, gnt_pr, gnt, update);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -54,11 +54,15 @@ module c_arbiter
    input active;
    
    // request vector
-   input [0:num_priorities*num_ports-1] req;
+   input [0:num_priorities*num_ports-1] req_pr;
    
    // grant vector
-   output [0:num_priorities*num_ports-1] gnt;
-   wire [0:num_priorities*num_ports-1] 	 gnt;
+   output [0:num_priorities*num_ports-1] gnt_pr;
+   wire [0:num_priorities*num_ports-1] 	 gnt_pr;
+   
+   // merged grant vector
+   output [0:num_ports-1] 		 gnt;
+   wire [0:num_ports-1] 		 gnt;
    
    // update port priorities
    input 				 update;
@@ -66,6 +70,7 @@ module c_arbiter
    generate
       
       case(arbiter_type)
+	
 	`ARBITER_TYPE_ROUND_ROBIN:
 	  begin
 	     
@@ -77,11 +82,13 @@ module c_arbiter
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
+		.req_pr(req_pr),
+		.gnt_pr(gnt_pr),
 		.gnt(gnt),
 		.update(update));
 	     
 	  end
+	
 	`ARBITER_TYPE_MATRIX:
 	  begin
 	     
@@ -93,11 +100,13 @@ module c_arbiter
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
+		.req_pr(req_pr),
+		.gnt_pr(gnt_pr),
 		.gnt(gnt),
 		.update(update));
 	     
 	  end
+	
 	`ARBITER_TYPE_DW_FCFS:
 	  begin
 	     
@@ -118,7 +127,7 @@ module c_arbiter
 	     // pragma translate_on
 	     
 	     if(num_ports == 1)
-	       assign gnt = req;
+	       assign gnt_pr = req_pr;
 	     else if(num_ports > 1)
 	       begin
 		  
@@ -149,17 +158,20 @@ module c_arbiter
 		     .rst_n(rst_n),
 		     .init_n(init_n),
 		     .enable(enable),
-		     .request(req),
+		     .request(req_pr),
 		     .lock({num_ports{1'b0}}),
 		     .mask({num_ports{1'b0}}),
 		     .parked(parked),
 		     .locked(locked),
-		     .grant(gnt),
+		     .grant(gnt_pr),
 		     .grant_index(grant_index));
 		  
 	       end
 	     
+	     assign gnt = gnt_pr;
+	     
 	  end
+	
       endcase
       
    endgenerate

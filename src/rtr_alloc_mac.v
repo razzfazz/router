@@ -985,7 +985,8 @@ module rtr_alloc_mac
 					flit_valid_in_ivc & mask_ivc, 
 					flit_valid_in_ivc}),
 			   .data_out_pr(),
-			   .data_out(mgnt_ivc));
+			   .data_out(mgnt_ivc),
+			   .mask_out());
 			
 			wire [0:num_vcs-1] flit_sent_ivc;
 			assign flit_sent_ivc = {num_vcs{oal_flit_sent}} & 
@@ -1044,9 +1045,10 @@ module rtr_alloc_mac
 		     (.clk(clk),
 		      .reset(reset),
 		      .active(active),
-		      .req({req_hi_ivc, req_lo_ivc}),
-		      .gnt({gnt_hi_ivc, gnt_lo_ivc}),
-		      .update(update));
+		      .update(update),
+		      .req_pr({req_hi_ivc, req_lo_ivc}),
+		      .gnt_pr({gnt_hi_ivc, gnt_lo_ivc}),
+		      .gnt());
 		   
 		   assign gnt_ivc = gnt_hi_ivc | gnt_lo_ivc;
 		   
@@ -1341,7 +1343,8 @@ module rtr_alloc_mac
 				   req_lo_ip & mask_ip, 
 				   req_lo_ip}),
 		      .data_out_pr(),
-		      .data_out(mgnt_ip));
+		      .data_out(mgnt_ip),
+		      .mask_out());
 		   
 		   wire 		update;
 		   
@@ -1427,9 +1430,10 @@ module rtr_alloc_mac
 		     (.clk(clk),
 		      .reset(reset),
 		      .active(active),
-		      .req({req_hi_ip, req_lo_ip}),
-		      .gnt({gnt_hi_ip, gnt_lo_ip}),
-		      .update(update));
+		      .update(update),
+		      .req_pr({req_hi_ip, req_lo_ip}),
+		      .gnt_pr({gnt_hi_ip, gnt_lo_ip}),
+		      .gnt());
 		   
 		   assign gnt_ip = gnt_hi_ip | gnt_lo_ip;
 		   
@@ -1533,15 +1537,17 @@ module rtr_alloc_mac
 			
 			c_arbiter
 			  #(.num_ports(num_ports),
+			    .num_priorities(1),
 			    .arbiter_type(sw_alloc_arbiter_type),
 			    .reset_type(reset_type))
 			oarb
 			  (.clk(clk),
 			   .reset(reset),
 			   .active(active),
-			   .req(req_ip),
-			   .gnt(gnt_ip),
-			   .update(update));
+			   .update(update),
+			   .req_pr(req_ip),
+			   .gnt_pr(gnt_ip),
+			   .gnt());
 			
 			assign sel_ip = gnt_ip;
 			
@@ -1778,9 +1784,10 @@ module rtr_alloc_mac
 			       (.clk(clk),
 				.reset(reset),
 				.active(active),
-				.req({req_hi_ocvc, req_lo_ocvc}),
-				.gnt({gnt_hi_ocvc, gnt_lo_ocvc}),
-				.update(update));
+				.update(update),
+				.req_pr({req_hi_ocvc, req_lo_ocvc}),
+				.gnt_pr({gnt_hi_ocvc, gnt_lo_ocvc}),
+				.gnt());
 			     
 			     assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
 			     
@@ -1796,15 +1803,17 @@ module rtr_alloc_mac
 			     
 			     c_arbiter
 			       #(.num_ports(num_vcs_per_class),
+				 .num_priorities(1),
 				 .arbiter_type(vc_alloc_arbiter_type),
 				 .reset_type(reset_type))
 			     arb
 			       (.clk(clk),
 				.reset(reset),
 				.active(active),
-				.req(req_ocvc),
-				.gnt(gnt_ocvc),
-				.update(update));
+				.update(update),
+				.req_pr(req_ocvc),
+				.gnt_pr(gnt_ocvc),
+				.gnt());
 			     
 			  end
 			

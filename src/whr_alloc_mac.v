@@ -172,7 +172,8 @@ module whr_alloc_mac
 		olod
 		  (.data_in_pr({arb_req_ip & mask_ip, arb_req_ip}),
 		   .data_out_pr(),
-		   .data_out(mgnt_ip));
+		   .data_out(mgnt_ip),
+		   .mask_out());
 		
 		wire 		     update;
 		assign update = |arb_req_ip;
@@ -221,6 +222,7 @@ module whr_alloc_mac
 		
 		c_arbiter
 		  #(.num_ports(num_ports),
+		    .num_priorities(1),
 		    .arbiter_type(arbiter_type),
 		    .reset_type(reset_type))
 		arb
@@ -228,8 +230,9 @@ module whr_alloc_mac
 		   .reset(reset),
 		   .active(arb_active),
 		   .update(arb_update),
-		   .req(arb_req_ip),
-		   .gnt(arb_gnt_ip));
+		   .req_pr(arb_req_ip),
+		   .gnt_pr(arb_gnt_ip),
+		   .gnt());
 		
 		assign gnt
 		  = |(arb_req_ip & (~req_head_ip | {num_ports{elig}})) & ~full;

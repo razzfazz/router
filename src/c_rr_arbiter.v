@@ -30,7 +30,7 @@
 //==============================================================================
 
 module c_rr_arbiter
-  (clk, reset, active, req, gnt, update);
+  (clk, reset, active, req_pr, gnt_pr, gnt, update);
    
 `include "c_constants.v"
    
@@ -47,11 +47,15 @@ module c_rr_arbiter
    input active;
    
    // vector of requests
-   input [0:num_priorities*num_ports-1] req;
+   input [0:num_priorities*num_ports-1] req_pr;
    
    // vector of grants
-   output [0:num_priorities*num_ports-1] gnt;
-   wire [0:num_priorities*num_ports-1] 	 gnt;
+   output [0:num_priorities*num_ports-1] gnt_pr;
+   wire [0:num_priorities*num_ports-1] 	 gnt_pr;
+   
+   // merged vector of grants
+   output [0:num_ports-1] 		 gnt;
+   wire [0:num_ports-1] 		 gnt;
    
    // update port priorities
    input 				 update;
@@ -65,9 +69,10 @@ module c_rr_arbiter
 	     #(.width(num_priorities),
 	       .num_priorities(1))
 	   gnt_lod
-	     (.data_in_pr(req),
-	      .data_out_pr(gnt),
-	      .data_out());
+	     (.data_in_pr(req_pr),
+	      .data_out_pr(gnt_pr),
+	      .data_out(gnt),
+	      .mask_out());
 	   
 	end
       else if(num_ports > 1)
@@ -75,10 +80,10 @@ module c_rr_arbiter
 	   
 	   wire [0:num_ports-1] state;
 	   
-	   wire [0:num_priorities-1] enable_prio;
-	   assign enable_prio[0] = 1'b1;
+	   wire [0:num_priorities-1] sel_pr;
+	   assign sel_pr[0] = 1'b1;
 	   
-	   wire [0:num_priorities*num_ports-1] next_state_by_prio;
+	   wire [0:num_priorities*num_ports-1] next_state_pr;
 	   
 	   genvar 		prio;
 	   
@@ -86,10 +91,10 @@ module c_rr_arbiter
 	     begin:prios
 		
 		wire [0:num_ports-1] req_unqual;
-		assign req_unqual = req[prio*num_ports:(prio+1)*num_ports-1];
+		assign req_unqual = req_pr[prio*num_ports:(prio+1)*num_ports-1];
 		
 		if(prio < (num_priorities - 1))
-		  assign enable_prio[prio+1] = enable_prio[prio] & ~|req_unqual;
+		  assign sel_pr[prio+1] = sel_pr[prio] & ~|req_unqual;
 		
 		wire [0:num_ports-1] req_unqual_rev;
 		c_reverse
@@ -155,22 +160,30 @@ module c_rr_arbiter
 		  (.data_in(next_state_qual_rev),
 		   .data_out(next_state_qual));
 		
-		assign gnt[prio*num_ports:(prio+1)*num_ports-1] 
+		assign gnt_pr[prio*num_ports:(prio+1)*num_ports-1] 
 		  = ((|req_qual) ? gnt_qual : gnt_unqual) &
-		    {num_ports{enable_prio[prio]}};
+		    {num_ports{sel_pr[prio]}};
 		
-		assign next_state_by_prio[prio*num_ports:(prio+1)*num_ports-1] 
+		assign next_state_pr[prio*num_ports:(prio+1)*num_ports-1] 
 		  = (|req_qual) ? next_state_qual : next_state_unqual;
 		
 	     end
+	   
+	   c_select_mofn
+	     #(.num_ports(num_priorities),
+	       .width(num_ports))
+	   gnt_sel
+	     (.select(sel_pr),
+	      .data_in(gnt_pr),
+	      .data_out(gnt));
 	   
 	   wire [0:num_ports-1]      next_state;
 	   c_select_mofn
 	     #(.num_ports(num_priorities),
 	       .width(num_ports))
 	   next_state_sel
-	     (.select(enable_prio),
-	      .data_in(next_state_by_prio),
+	     (.select(sel_pr),
+	      .data_in(next_state_pr),
 	      .data_out(next_state));
 	   
 	   wire [0:num_ports-1]      state_s, state_q;

@@ -148,6 +148,7 @@ module vcr_sw_alloc_sep_if
 		
 		c_arbiter
 		  #(.num_ports(num_vcs),
+		    .num_priorities(1),
 		    .reset_type(reset_type),
 		    .arbiter_type(arbiter_type))
 		gnt_in_nonspec_ivc_arb
@@ -155,8 +156,9 @@ module vcr_sw_alloc_sep_if
 		   .reset(reset),
 		   .active(active),
 		   .update(update_arb_nonspec),
-		   .req(req_in_nonspec_ivc),
-		   .gnt(gnt_in_nonspec_ivc));
+		   .req_pr(req_in_nonspec_ivc),
+		   .gnt_pr(gnt_in_nonspec_ivc),
+		   .gnt());
 		
 	     end
 	   
@@ -246,8 +248,9 @@ module vcr_sw_alloc_sep_if
 			.reset(reset),
 			.active(active),
 			.update(update_arb),
-			.req({req_in_nonspec_ivc, req_in_spec_ivc}),
-			.gnt({gnt_in_nonspec_ivc, gnt_in_spec_ivc}));
+			.req_pr({req_in_nonspec_ivc, req_in_spec_ivc}),
+			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
+			.gnt());
 		     
 		  end
 		else
@@ -255,6 +258,7 @@ module vcr_sw_alloc_sep_if
 		     
 		     c_arbiter
 		       #(.num_ports(num_vcs),
+			 .num_priorities(1),
 			 .reset_type(reset_type),
 			 .arbiter_type(arbiter_type))
 		     gnt_in_spec_ivc_arb
@@ -262,8 +266,9 @@ module vcr_sw_alloc_sep_if
 			.reset(reset),
 			.active(active),
 			.update(update_arb_spec),
-			.req(req_in_spec_ivc),
-			.gnt(gnt_in_spec_ivc));
+			.req_pr(req_in_spec_ivc),
+			.gnt_pr(gnt_in_spec_ivc),
+			.gnt());
 		     
 		  end
 		
@@ -485,6 +490,7 @@ module vcr_sw_alloc_sep_if
 		
 		c_arbiter
 		  #(.num_ports(num_ports),
+		    .num_priorities(1),
 		    .arbiter_type(arbiter_type),
 		    .reset_type(reset_type))
 		gnt_out_nonspec_ip_arb
@@ -492,8 +498,9 @@ module vcr_sw_alloc_sep_if
 		   .reset(reset),
 		   .active(active),
 		   .update(update_arb_nonspec),
-		   .req(req_out_nonspec_ip),
-		   .gnt(gnt_out_nonspec_ip));
+		   .req_pr(req_out_nonspec_ip),
+		   .gnt_pr(gnt_out_nonspec_ip),
+		   .gnt());
 		
 	     end
 	   
@@ -543,8 +550,9 @@ module vcr_sw_alloc_sep_if
 			.reset(reset),
 			.active(active),
 			.update(update_arb),
-			.req({req_out_nonspec_ip, req_out_spec_ip}),
-			.gnt({gnt_out_nonspec_ip, gnt_out_spec_ip}));
+			.req_pr({req_out_nonspec_ip, req_out_spec_ip}),
+			.gnt_pr({gnt_out_nonspec_ip, gnt_out_spec_ip}),
+			.gnt());
 
 		  end
 		else
@@ -563,6 +571,7 @@ module vcr_sw_alloc_sep_if
 		     wire [0:num_ports-1] gnt_out_spec_int_ip;
 		     c_arbiter
 		       #(.num_ports(num_ports),
+			 .num_priorities(1),
 			 .arbiter_type(arbiter_type),
 			 .reset_type(reset_type))
 		     gnt_out_spec_int_ip_arb
@@ -570,8 +579,9 @@ module vcr_sw_alloc_sep_if
 			.reset(reset),
 			.active(active),
 			.update(update_arb_spec),
-			.req(req_out_spec_int_ip),
-			.gnt(gnt_out_spec_int_ip));
+			.req_pr(req_out_spec_int_ip),
+			.gnt_pr(gnt_out_spec_int_ip),
+			.gnt());
 		     
 		     assign gnt_out_spec_ip
 		       = gnt_out_spec_int_ip & unused_by_nonspec_ip &

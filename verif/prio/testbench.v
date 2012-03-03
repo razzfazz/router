@@ -122,6 +122,7 @@ module testbench
    assign update = |req;
    
    wire [0:num_priorities*num_ports-1] gnt;
+   wire [0:num_ports-1] 	       granted;
    c_arbiter
      #(.num_ports(num_ports),
        .num_priorities(num_priorities),
@@ -132,17 +133,9 @@ module testbench
       .reset(reset),
       .active(1'b1),
       .update(update),
-      .req(req),
-      .gnt(gnt));
-   
-   wire [0:num_ports-1] 	       granted;
-   c_binary_op
-     #(.num_ports(num_priorities),
-       .width(num_ports),
-       .op(`BINARY_OP_OR))
-   granted_oc
-     (.data_in(gnt),
-      .data_out(granted));
+      .req_pr(req),
+      .gnt_pr(gnt),
+      .gnt(granted));
    
    wire [0:num_ports-1] 	  error;
    assign error = granted & ~sel;
