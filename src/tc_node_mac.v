@@ -811,10 +811,12 @@ module tc_node_mac
 	   assign sel_mc_rv_unmasked[num_message_classes-1] = 1'b1;
 	   
 	   c_lod
-	     #(.width(num_message_classes))
+	     #(.width(num_message_classes),
+	       .num_priorities(1))
 	   sel_mc_rv_lod
-	     (.data_in(sel_mc_rv_unmasked),
-	      .data_out(sel_mc_rv));
+	     (.data_in_pr(sel_mc_rv_unmasked),
+	      .data_out_pr(sel_mc_rv),
+	      .data_out());
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_message_classes),
@@ -915,10 +917,12 @@ module tc_node_mac
 	   assign sel_orc_rv_unmasked[num_resource_classes-1] = 1'b1;
 	   
 	   c_lod
-	     #(.width(num_resource_classes))
+	     #(.width(num_resource_classes),
+	       .num_priorities(1))
 	   sel_orc_rv_lod
-	     (.data_in(sel_orc_rv_unmasked),
-	      .data_out(sel_orc_rv));
+	     (.data_in_pr(sel_orc_rv_unmasked),
+	      .data_out_pr(sel_orc_rv),
+	      .data_out());
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_resource_classes),
@@ -1567,10 +1571,12 @@ module tc_node_mac
 		
 		wire [0:num_plength_vals-1] 	 plength_select;
 		c_lod
-		  #(.width(num_plength_vals))
+		  #(.width(num_plength_vals),
+		    .num_priorities(1))
 		plength_select_lod
-		  (.data_in(plength_select_unmasked),
-		   .data_out(plength_select));
+		  (.data_in_pr(plength_select_unmasked),
+		   .data_out_pr(plength_select),
+		   .data_out());
 		
 		c_select_1ofn
 		  #(.num_ports(num_plength_vals),

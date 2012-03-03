@@ -30,7 +30,7 @@
 //==============================================================================
 
 module c_lod
-  (data_in, data_out, data_out_prio, mask_out, mask_out_prio);
+  (data_in_pr, data_out_pr, data_out, mask_out);
    
    // number of input ports
    parameter width = 32;
@@ -39,26 +39,22 @@ module c_lod
    parameter num_priorities = 1;
    
    // vector of requests
-   input [0:num_priorities*width-1] data_in;
+   input [0:num_priorities*width-1] data_in_pr;
    
    // vector of grants
-   output [0:width-1] 		    data_out;
-   wire [0:width-1] 		    data_out;
+   output [0:num_priorities*width-1] data_out_pr;
+   wire [0:num_priorities*width-1]   data_out_pr;
    
-   // separate grants per priority
-   output [0:num_priorities*width-1] data_out_prio;
-   wire [0:num_priorities*width-1]   data_out_prio;
+   // merged vector of grants
+   output [0:width-1] 		     data_out;
+   wire [0:width-1] 		     data_out;
    
-   // vector of masked bits
+   // merged vector of masked bits
    output [0:width-1] 		     mask_out;
    wire [0:width-1] 		     mask_out;
    
-   // separate masks per priority
-   output [0:num_priorities*width-1] mask_out_prio;
-   wire [0:num_priorities*width-1]   mask_out_prio;
-   
-   wire [0:num_priorities*width-1]   data_out_by_prio;
-   wire [0:num_priorities*width-1]   mask_out_by_prio;
+   wire [0:num_priorities*width-1]   data_intm_pr;
+   wire [0:num_priorities*width-1]   mask_out_pr;
    
    genvar 			     prio;
    
@@ -67,16 +63,16 @@ module c_lod
       for(prio = 0; prio < num_priorities; prio = prio + 1)
 	begin:prios
 	   
-	   wire [0:width-1] prio_data_in;
-	   assign prio_data_in = data_in[prio*width:(prio+1)*width-1];
+	   wire [0:width-1] data_in;
+	   assign data_in = data_in_pr[prio*width:(prio+1)*width-1];
 	   
-	   wire [0:width-1] prio_data_out;
-	   wire [0:width-1] prio_mask_out;
+	   wire [0:width-1] data_out;
+	   wire [0:width-1] mask_out;
 	   
 	   if(width == 1)
 	     begin
-		assign prio_data_out = prio_data_in;
-		assign prio_mask_out = 1'b0;
+		assign data_out = data_in;
+		assign mask_out = 1'b0;
 	     end
 	   else
 	     begin
@@ -84,127 +80,122 @@ module c_lod
 		// To find the first non-zero bit from the left, we must 
 		// reverse the input and output vectors.
 		
-		wire [0:width-1] prio_data_in_rev;
+		wire [0:width-1] data_in_rev;
 		c_reverse
 		  #(.width(width))
-		prio_data_in_rev_revr
-		  (.data_in(prio_data_in),
-		   .data_out(prio_data_in_rev));
+		data_in_rev_revr
+		  (.data_in(data_in),
+		   .data_out(data_in_rev));
 		
-		wire [0:width-1] prio_data_in_rev_compl;
-		assign prio_data_in_rev_compl = -prio_data_in_rev;
+		wire [0:width-1] data_in_rev_compl;
+		assign data_in_rev_compl = -data_in_rev;
 		
-		wire [0:width-1] prio_data_out_rev;
-		assign prio_data_out_rev
-		  = prio_data_in_rev & prio_data_in_rev_compl;
-		
-		c_reverse
-		  #(.width(width))
-		prio_data_out_revr
-		  (.data_in(prio_data_out_rev),
-		   .data_out(prio_data_out));
-		
-		wire [0:width-1] prio_mask_out_rev;
-		assign prio_mask_out_rev
-		  = prio_data_in_rev ^ prio_data_in_rev_compl;
+		wire [0:width-1] data_out_rev;
+		assign data_out_rev = data_in_rev & data_in_rev_compl;
 		
 		c_reverse
 		  #(.width(width))
-		prio_mask_out_revr
-		  (.data_in(prio_mask_out_rev),
-		   .data_out(prio_mask_out));
+		data_out_revr
+		  (.data_in(data_out_rev),
+		   .data_out(data_out));
+		
+		wire [0:width-1] mask_out_rev;
+		assign mask_out_rev = data_in_rev ^ data_in_rev_compl;
+		
+		c_reverse
+		  #(.width(width))
+		mask_out_revr
+		  (.data_in(mask_out_rev),
+		   .data_out(mask_out));
 		
 	     end
 	   
-	   assign data_out_by_prio[prio*width:(prio+1)*width-1] = prio_data_out;
-	   assign mask_out_by_prio[prio*width:(prio+1)*width-1] = prio_mask_out;
+	   assign data_intm_pr[prio*width:(prio+1)*width-1] = data_out;
+	   assign mask_out_pr[prio*width:(prio+1)*width-1] = mask_out;
 	   
 	end
       
       if(num_priorities == 1)
 	begin
-	   assign data_out = data_out_by_prio;
-	   assign data_out_prio = data_out_by_prio;
-	   assign mask_out = mask_out_by_prio;
-	   assign mask_out_prio = mask_out_by_prio;
+	   assign data_out = data_intm_pr;
+	   assign data_out_pr = data_intm_pr;
+	   assign mask_out = mask_out_pr;
 	end
       else if(num_priorities > 1)
 	begin
 	   
-	   wire [0:num_priorities-1] sel_prio;
+	   wire [0:num_priorities-1] sel_pr;
 	   
 	   if(num_priorities == 2)
-	     assign sel_prio = {|data_in[0:width-1], ~|data_in[0:width-1]};
+	     assign sel_pr = {|data_in_pr[0:width-1], ~|data_in_pr[0:width-1]};
 	   else if(num_priorities > 2)
 	     begin
 		
-		wire [0:num_priorities-1] valid_prio;
+		wire [0:num_priorities-1] valid_pr;
 		c_mat_mult
 		  #(.dim1_width(num_priorities),
 		    .dim2_width(width),
 		    .dim3_width(1),
 		    .prod_op(`BINARY_OP_AND),
 		    .sum_op(`BINARY_OP_OR))
-		valid_prio_mmult
-		  (.input_a(data_in),
+		valid_pr_mmult
+		  (.input_a(data_in_pr),
 		   .input_b({width{1'b1}}),
-		   .result(valid_prio));
+		   .result(valid_pr));
 		
-		wire [0:num_priorities-1] req_prio;
-		assign req_prio = {valid_prio[0:num_priorities-2], 1'b1};
+		wire [0:num_priorities-1] req_pr;
+		assign req_pr = {valid_pr[0:num_priorities-2], 1'b1};
 		
-		wire [0:num_priorities-1] req_prio_rev;
+		wire [0:num_priorities-1] req_pr_rev;
 		c_reverse
 		  #(.width(num_priorities))
-		req_prio_rev_revr
-		  (.data_in(req_prio),
-		   .data_out(req_prio_rev));
+		req_pr_rev_revr
+		  (.data_in(req_pr),
+		   .data_out(req_pr_rev));
 		
-		wire [0:num_priorities-1] gnt_prio_rev;
-		assign gnt_prio_rev = req_prio_rev & -req_prio_rev;
+		wire [0:num_priorities-1] gnt_pr_rev;
+		assign gnt_pr_rev = req_pr_rev & -req_pr_rev;
 		
-		wire [0:num_priorities-1] gnt_prio;
+		wire [0:num_priorities-1] gnt_pr;
 		c_reverse
 		  #(.width(num_priorities))
 		gnt_piro_rev_revr
-		  (.data_in(gnt_prio_rev),
-		   .data_out(gnt_prio));
+		  (.data_in(gnt_pr_rev),
+		   .data_out(gnt_pr));
 		
-		assign sel_prio = gnt_prio;
+		assign sel_pr = gnt_pr;
 		
 	     end
 	   
-	   wire [0:num_priorities*width-1] gnt_mask_prio;
+	   wire [0:num_priorities*width-1] gnt_mask_pr;
 	   c_mat_mult
 	     #(.dim1_width(num_priorities),
 	       .dim2_width(1),
 	       .dim3_width(width),
 	       .prod_op(`BINARY_OP_AND),
 	       .sum_op(`BINARY_OP_OR))
-	   gnt_mask_prio_mmult
-	     (.input_a(sel_prio),
+	   gnt_mask_pr_mmult
+	     (.input_a(sel_pr),
 	      .input_b({width{1'b1}}),
-	      .result(gnt_mask_prio));
+	      .result(gnt_mask_pr));
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_priorities),
 	       .width(width))
 	   data_out_sel
-	     (.select(sel_prio),
-	      .data_in(data_out_by_prio),
+	     (.select(sel_pr),
+	      .data_in(data_intm_pr),
 	      .data_out(data_out));
 	   
-	   assign data_out_prio = data_out_by_prio & gnt_mask_prio;
+	   assign data_out_pr = data_intm_pr & gnt_mask_pr;
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_priorities),
 	       .width(width))
 	   mask_out_sel
-	     (.select(sel_prio),
-	      .data_in(mask_out_by_prio),
+	     (.select(sel_pr),
+	      .data_in(mask_out_pr),
 	      .data_out(mask_out));
-	   
-	   assign mask_out_prio = mask_out_by_prio & gnt_mask_prio;
 	   
 	end
       

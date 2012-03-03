@@ -62,10 +62,12 @@ module c_rr_arbiter
 	begin
 	   
 	   c_lod
-	     #(.width(num_priorities))
+	     #(.width(num_priorities),
+	       .num_priorities(1))
 	   gnt_lod
-	     (.data_in(req),
-	      .data_out(gnt));
+	     (.data_in_pr(req),
+	      .data_out_pr(gnt),
+	      .data_out());
 	   
 	end
       else if(num_ports > 1)

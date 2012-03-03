@@ -978,12 +978,13 @@ module rtr_alloc_mac
 			  #(.width(num_vcs),
 			    .num_priorities(6))
 			ilod
-			  (.data_in({req_hi_ivc & mask_ivc, 
-				     req_hi_ivc, 
-				     req_lo_ivc & mask_ivc,
-				     req_lo_ivc, 
-				     flit_valid_in_ivc & mask_ivc, 
-				     flit_valid_in_ivc}),
+			  (.data_in_pr({req_hi_ivc & mask_ivc, 
+					req_hi_ivc, 
+					req_lo_ivc & mask_ivc,
+					req_lo_ivc, 
+					flit_valid_in_ivc & mask_ivc, 
+					flit_valid_in_ivc}),
+			   .data_out_pr(),
 			   .data_out(mgnt_ivc));
 			
 			wire [0:num_vcs-1] flit_sent_ivc;
@@ -1335,10 +1336,11 @@ module rtr_alloc_mac
 		     #(.width(num_ports),
 		       .num_priorities(4))
 		   olod
-		     (.data_in({req_hi_ip & mask_ip,
-				req_hi_ip, 
-				req_lo_ip & mask_ip, 
-				req_lo_ip}),
+		     (.data_in_pr({req_hi_ip & mask_ip,
+				   req_hi_ip, 
+				   req_lo_ip & mask_ip, 
+				   req_lo_ip}),
+		      .data_out_pr(),
 		      .data_out(mgnt_ip));
 		   
 		   wire 		update;

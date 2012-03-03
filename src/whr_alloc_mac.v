@@ -170,8 +170,8 @@ module whr_alloc_mac
 		  #(.width(num_ports),
 		    .num_priorities(2))
 		olod
-		  (.data_in({arb_req_ip & mask_ip,
-			     arb_req_ip}),
+		  (.data_in_pr({arb_req_ip & mask_ip, arb_req_ip}),
+		   .data_out_pr(),
 		   .data_out(mgnt_ip));
 		
 		wire 		     update;
