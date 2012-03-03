@@ -176,8 +176,8 @@ module c_lod
 	   
 	   wire [0:num_priorities*width-1] gnt_mask_prio;
 	   c_mat_mult
-	     #(.dim1_width(1),
-	       .dim2_width(num_priorities),
+	     #(.dim1_width(num_priorities),
+	       .dim2_width(1),
 	       .dim3_width(width),
 	       .prod_op(`BINARY_OP_AND),
 	       .sum_op(`BINARY_OP_OR))
