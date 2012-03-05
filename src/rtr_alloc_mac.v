@@ -1048,9 +1048,7 @@ module rtr_alloc_mac
 		      .update(update),
 		      .req_pr({req_hi_ivc, req_lo_ivc}),
 		      .gnt_pr({gnt_hi_ivc, gnt_lo_ivc}),
-		      .gnt());
-		   
-		   assign gnt_ivc = gnt_hi_ivc | gnt_lo_ivc;
+		      .gnt(gnt_ivc));
 		   
 		   assign allocated = |req_hi_ivc;
 		   
@@ -1433,9 +1431,7 @@ module rtr_alloc_mac
 		      .update(update),
 		      .req_pr({req_hi_ip, req_lo_ip}),
 		      .gnt_pr({gnt_hi_ip, gnt_lo_ip}),
-		      .gnt());
-		   
-		   assign gnt_ip = gnt_hi_ip | gnt_lo_ip;
+		      .gnt(gnt_ip));
 		   
 		   assign allocated = |req_hi_ip;
 		   
@@ -1787,9 +1783,7 @@ module rtr_alloc_mac
 				.update(update),
 				.req_pr({req_hi_ocvc, req_lo_ocvc}),
 				.gnt_pr({gnt_hi_ocvc, gnt_lo_ocvc}),
-				.gnt());
-			     
-			     assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
+				.gnt(gnt_ocvc));
 			     
 			  end
 			else

@@ -473,6 +473,8 @@ module vcr_sw_alloc_sep_if
 	   // perform output-side arbitration (select input port)
 	   //-------------------------------------------------------------------
 	   
+	   wire [0:num_ports-1] gnt_ip;
+	   
 	   wire [0:num_ports-1] req_out_nonspec_ip;
 	   assign req_out_nonspec_ip
 	     = req_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1];
@@ -517,6 +519,8 @@ module vcr_sw_alloc_sep_if
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
+	   wire [0:num_ports-1] gnt_out_spec_ip;
+	   
 	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
 		
@@ -529,8 +533,6 @@ module vcr_sw_alloc_sep_if
 		  = req_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
 		
 		wire 		     update_arb_spec;
-		
-		wire [0:num_ports-1] gnt_out_spec_ip;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
@@ -552,8 +554,8 @@ module vcr_sw_alloc_sep_if
 			.update(update_arb),
 			.req_pr({req_out_nonspec_ip, req_out_spec_ip}),
 			.gnt_pr({gnt_out_nonspec_ip, gnt_out_spec_ip}),
-			.gnt());
-
+			.gnt(gnt_ip));
+		     
 		  end
 		else
 		  begin
@@ -587,6 +589,8 @@ module vcr_sw_alloc_sep_if
 		       = gnt_out_spec_int_ip & unused_by_nonspec_ip &
 			 {num_ports{unused_by_nonspec}};
 		     
+		     assign gnt_ip = gnt_out_nonspec_ip | gnt_out_spec_ip;
+		     
 		  end
 		
 		
@@ -594,23 +598,21 @@ module vcr_sw_alloc_sep_if
 		// feed grants back to input stage (speculative)
 		//--------------------------------------------------------------
 		
-		assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
-			 = gnt_out_spec_ip;
-		
 	     end
 	   else
-	     assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
-		      = {num_ports{1'b0}};
+	     begin
+		assign gnt_out_spec_ip = {num_ports{1'b0}};
+		assign gnt_ip = gnt_out_nonspec_ip;
+	     end
+	   
+	   assign gnt_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
+	     = gnt_out_nonspec_ip;
+	   assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
+	     = gnt_out_spec_ip;
+	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
 	   
 	end
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate global outputs
-   //---------------------------------------------------------------------------
-
-   assign gnt_op_ip = gnt_out_nonspec_op_ip | gnt_out_spec_op_ip;
    
 endmodule

@@ -998,7 +998,7 @@ module tc_node_mac
 		wire 			     update;
 		assign update = flit_sent & flit_head_out;
 		
-		wire [0:num_vcs_per_class-1] gnt_hi_ocvc, gnt_lo_ocvc;
+		wire [0:num_vcs_per_class-1] gnt_hi_ocvc, gnt_lo_ocvc, gnt_ocvc;
 		c_arbiter
 		  #(.num_ports(num_vcs_per_class),
 		    .num_priorities(2),
@@ -1011,10 +1011,7 @@ module tc_node_mac
 		   .update(update),
 		   .req_pr({req_hi_ocvc, req_lo_ocvc}),
 		   .gnt_pr({gnt_hi_ocvc, gnt_lo_ocvc}),
-		   .gnt());
-		
-		wire [0:num_vcs_per_class-1] gnt_ocvc;
-		assign gnt_ocvc = gnt_hi_ocvc | gnt_lo_ocvc;
+		   .gnt(gnt_ocvc));
 		
 		wire [0:num_vcs_per_class-1] next_elig_ocvc;
 		assign next_elig_ocvc = gnt_ocvc;
