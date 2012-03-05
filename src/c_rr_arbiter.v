@@ -78,14 +78,12 @@ module c_rr_arbiter
       else if(num_ports > 1)
 	begin
 	   
-	   wire [0:num_ports-1] state;
+	   wire [0:num_ports-1] mask;
 	   
-	   wire [0:num_priorities-1] sel_pr;
-	   assign sel_pr[0] = 1'b1;
+	   wire [0:num_priorities*2*num_ports-1] req_exp;
+	   wire [0:num_priorities*2*num_ports-1] gnt_exp;
 	   
-	   wire [0:num_priorities*num_ports-1] next_state_pr;
-	   
-	   genvar 		prio;
+	   genvar 				 prio;
 	   
 	   for(prio = 0; prio < num_priorities; prio = prio + 1)
 	     begin:prios
@@ -93,113 +91,48 @@ module c_rr_arbiter
 		wire [0:num_ports-1] req_unqual;
 		assign req_unqual = req_pr[prio*num_ports:(prio+1)*num_ports-1];
 		
-		if(prio < (num_priorities - 1))
-		  assign sel_pr[prio+1] = sel_pr[prio] & ~|req_unqual;
-		
-		wire [0:num_ports-1] req_unqual_rev;
-		c_reverse
-		  #(.width(num_ports))
-		req_unqual_rev_revr
-		  (.data_in(req_unqual),
-		   .data_out(req_unqual_rev));
-		
-		wire [0:num_ports-1] req_unqual_rev_compl;
-		assign req_unqual_rev_compl = -req_unqual_rev;
-		
-		wire [0:num_ports-1] gnt_unqual_rev;
-		assign gnt_unqual_rev = req_unqual_rev & req_unqual_rev_compl;
-		
-		wire [0:num_ports-1] gnt_unqual;
-		c_reverse
-		  #(.width(num_ports))
-		gnt_unqual_revr
-		  (.data_in(gnt_unqual_rev),
-		   .data_out(gnt_unqual));
-		
-		wire [0:num_ports-1] next_state_unqual_rev;
-		assign next_state_unqual_rev
-		  = req_unqual_rev ^ req_unqual_rev_compl;
-		
-		wire [0:num_ports-1] next_state_unqual;
-		c_reverse
-		  #(.width(num_ports))
-		next_state_unqual_revr
-		  (.data_in(next_state_unqual_rev),
-		   .data_out(next_state_unqual));
-		
 		wire [0:num_ports-1] req_qual;
-		assign req_qual = req_unqual & state;
+		assign req_qual = req_unqual & mask;
 		
-		wire [0:num_ports-1] req_qual_rev;
-		c_reverse
-		  #(.width(num_ports))
-		req_qual_rev_revr
-		  (.data_in(req_qual),
-		   .data_out(req_qual_rev));
-		
-		wire [0:num_ports-1] req_qual_rev_compl;
-		assign req_qual_rev_compl = -req_qual_rev;
-		
-		wire [0:num_ports-1] gnt_qual_rev;
-		assign gnt_qual_rev = req_qual_rev & req_qual_rev_compl;
+		assign req_exp[prio*2*num_ports:(prio+1)*2*num_ports-1]
+		  = {req_qual, req_unqual};
 		
 		wire [0:num_ports-1] gnt_qual;
-		c_reverse
-		  #(.width(num_ports))
-		gnt_qual_revr
-		  (.data_in(gnt_qual_rev),
-		   .data_out(gnt_qual));
+		assign gnt_qual
+		  = gnt_exp[prio*2*num_ports:(prio*2+1)*num_ports-1];
 		
-		wire [0:num_ports-1] next_state_qual_rev;
-		assign next_state_qual_rev = req_qual_rev ^ req_qual_rev_compl;
+		wire [0:num_ports-1] gnt_unqual;
+		assign gnt_unqual
+		  = gnt_exp[(prio*2+1)*num_ports:(prio*2+2)*num_ports-1];
 		
-		wire [0:num_ports-1] next_state_qual;
-		c_reverse
-		  #(.width(num_ports))
-		next_state_qual_revr
-		  (.data_in(next_state_qual_rev),
-		   .data_out(next_state_qual));
-		
-		assign gnt_pr[prio*num_ports:(prio+1)*num_ports-1] 
-		  = ((|req_qual) ? gnt_qual : gnt_unqual) &
-		    {num_ports{sel_pr[prio]}};
-		
-		assign next_state_pr[prio*num_ports:(prio+1)*num_ports-1] 
-		  = (|req_qual) ? next_state_qual : next_state_unqual;
+		assign gnt_pr[prio*num_ports:(prio+1)*num_ports-1]
+		  = gnt_qual | gnt_unqual;
 		
 	     end
 	   
-	   c_select_mofn
-	     #(.num_ports(num_priorities),
-	       .width(num_ports))
-	   gnt_sel
-	     (.select(sel_pr),
-	      .data_in(gnt_pr),
-	      .data_out(gnt));
+	   wire [0:num_ports-1]      next_mask;
+	   c_lod
+	     #(.width(num_ports),
+	       .num_priorities(num_priorities*2))
+	   gnt_lod
+	     (.data_in_pr(req_exp),
+	      .data_out_pr(gnt_exp),
+	      .data_out(gnt),
+	      .mask_out(next_mask));
 	   
-	   wire [0:num_ports-1]      next_state;
-	   c_select_mofn
-	     #(.num_ports(num_priorities),
-	       .width(num_ports))
-	   next_state_sel
-	     (.select(sel_pr),
-	      .data_in(next_state_pr),
-	      .data_out(next_state));
-	   
-	   wire [0:num_ports-1]      state_s, state_q;
-	   assign state_s = update ? next_state : state_q;
-	   assign state_q[0] = 1'b0;
+	   wire [0:num_ports-2]      mask_s, mask_q;
+	   assign mask_s = update ? next_mask[1:num_ports-1] : mask_q;
 	   c_dff
 	     #(.width(num_ports-1),
 	       .reset_type(reset_type))
-	   stateq
+	   maskq
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(active),
-	      .d(state_s[1:num_ports-1]),
-	      .q(state_q[1:num_ports-1]));
+	      .d(mask_s),
+	      .q(mask_q));
 	   
-	   assign state = state_q;
+	   assign mask = {1'b0, mask_q};
 	   
 	end	
       
