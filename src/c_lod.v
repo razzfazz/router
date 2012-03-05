@@ -66,12 +66,12 @@ module c_lod
 	   wire [0:width-1] data_in;
 	   assign data_in = data_in_pr[prio*width:(prio+1)*width-1];
 	   
-	   wire [0:width-1] data_out;
+	   wire [0:width-1] data_intm;
 	   wire [0:width-1] mask_out;
 	   
 	   if(width == 1)
 	     begin
-		assign data_out = data_in;
+		assign data_intm = data_in;
 		assign mask_out = 1'b0;
 	     end
 	   else
@@ -90,14 +90,14 @@ module c_lod
 		wire [0:width-1] data_in_rev_compl;
 		assign data_in_rev_compl = -data_in_rev;
 		
-		wire [0:width-1] data_out_rev;
-		assign data_out_rev = data_in_rev & data_in_rev_compl;
+		wire [0:width-1] data_intm_rev;
+		assign data_intm_rev = data_in_rev & data_in_rev_compl;
 		
 		c_reverse
 		  #(.width(width))
-		data_out_revr
-		  (.data_in(data_out_rev),
-		   .data_out(data_out));
+		data_intm_revr
+		  (.data_in(data_intm_rev),
+		   .data_out(data_intm));
 		
 		wire [0:width-1] mask_out_rev;
 		assign mask_out_rev = data_in_rev ^ data_in_rev_compl;
@@ -110,7 +110,7 @@ module c_lod
 		
 	     end
 	   
-	   assign data_intm_pr[prio*width:(prio+1)*width-1] = data_out;
+	   assign data_intm_pr[prio*width:(prio+1)*width-1] = data_intm;
 	   assign mask_out_pr[prio*width:(prio+1)*width-1] = mask_out;
 	   
 	end
