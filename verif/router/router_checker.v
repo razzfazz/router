@@ -445,8 +445,10 @@ module router_checker
 	   
 	   wire [0:header_info_width-1] 	    header_info_out;
 	   assign header_info_out[0:route_info_width-1] = route_info_out;
-	   assign header_info_out[route_info_width:header_info_width-1]
-	     = header_info_in[route_info_width:header_info_width-1];
+	   
+	   if(header_info_width > route_info_width)
+	     assign header_info_out[route_info_width:header_info_width-1]
+	       = header_info_in[route_info_width:header_info_width-1];
 	   
 	   
 	   //-------------------------------------------------------------------
