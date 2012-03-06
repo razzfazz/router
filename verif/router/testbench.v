@@ -151,6 +151,8 @@ module testbench
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
+   // number of pipeline stages in the channels
+   localparam num_channel_stages = channel_latency - 1;
    
    reg clk;
    reg reset;
@@ -200,7 +202,7 @@ module testbench
 		wire [0:flow_ctrl_width-1] flow_ctrl_dly;
 		c_shift_reg
 		  #(.width(flow_ctrl_width),
-		    .depth(channel_latency),
+		    .depth(num_channel_stages),
 		    .reset_type(reset_type))
 		flow_ctrl_dly_sr
 		  (.clk(clk),
@@ -254,7 +256,7 @@ module testbench
 		wire [0:channel_width-1]    channel_dly;
 		c_shift_reg
 		  #(.width(channel_width),
-		    .depth(channel_latency),
+		    .depth(num_channel_stages),
 		    .reset_type(reset_type))
 		channel_dly_sr
 		  (.clk(clk),
@@ -269,7 +271,7 @@ module testbench
 		wire 			    flit_valid_dly;
 		c_shift_reg
 		  #(.width(1),
-		    .depth(channel_latency),
+		    .depth(num_channel_stages),
 		    .reset_type(reset_type))
 		flit_valid_dly_sr
 		  (.clk(clk),
@@ -383,7 +385,7 @@ module testbench
 	   wire [0:channel_width-1] channel_dly;
 	   c_shift_reg
 	     #(.width(channel_width),
-	       .depth(channel_latency),
+	       .depth(num_channel_stages),
 	       .reset_type(reset_type))
 	   channel_dly_sr
 	     (.clk(clk),
@@ -420,7 +422,7 @@ module testbench
 	   wire [0:flow_ctrl_width-1] flow_ctrl_dly;
 	   c_shift_reg
 	     #(.width(flow_ctrl_width),
-	       .depth(channel_latency),
+	       .depth(num_channel_stages),
 	       .reset_type(reset_type))
 	   flow_ctrl_in_sr
 	     (.clk(clk),
