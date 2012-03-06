@@ -71,8 +71,10 @@ module c_rr_arbiter
 	   gnt_lod
 	     (.data_in_pr(req_pr),
 	      .data_out_pr(gnt_pr),
-	      .data_out(gnt),
+	      .data_out(),
 	      .mask_out());
+	   
+	   assign gnt = |req_pr;
 	   
 	end
       else if(num_ports > 1)
