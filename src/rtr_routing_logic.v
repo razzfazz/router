@@ -141,7 +141,7 @@ module rtr_routing_logic
    wire [0:num_network_ports-1]      route_onp;
    assign route_op[0:num_network_ports-1] = route_onp;
    
-   wire [0:num_resource_classes*num_network_ports-1] route_irc_onp;
+   wire [0:num_resource_classes*num_network_ports-1] route_orc_onp;
    wire 					     eject;
    
    generate
@@ -372,7 +372,7 @@ module rtr_routing_logic
 		       
 		    end
 		  
-		  assign route_irc_onp[irc*num_network_ports:
+		  assign route_orc_onp[irc*num_network_ports:
 				       (irc+1)*num_network_ports-1]
 		    = route_onp;
 		  
@@ -412,8 +412,8 @@ module rtr_routing_logic
      #(.num_ports(num_resource_classes),
        .width(num_network_ports))
    route_onp_sel
-     (.select(sel_irc),
-      .data_in(route_irc_onp),
+     (.select(route_orc),
+      .data_in(route_orc_onp),
       .data_out(route_onp));
    
    generate
