@@ -588,7 +588,7 @@ module vcr_vc_alloc_sep_if
 			    end
 			  
 			  wire [0:num_vcs-1] 		  gnt_ivc;
-			  c_select_mofn
+			  c_select_1ofn
 			    #(.num_ports(num_ports),
 			      .width(num_vcs))
 			  gnt_ivc_sel

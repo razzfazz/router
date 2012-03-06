@@ -391,7 +391,7 @@ module tc_node_mac
    wire [0:cfg_data_width-1] 			      ifc_read_data_flit_sig;
    wire [0:cfg_data_width-1] 			      ifc_read_data_num_packets;
    
-   c_select_mofn
+   c_select_1ofn
      #(.num_ports(3),
        .width(cfg_data_width))
    ifc_read_data_sel

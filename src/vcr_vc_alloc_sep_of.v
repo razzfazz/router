@@ -578,7 +578,7 @@ module vcr_vc_alloc_sep_of
 			  
 			  wire [0:num_resource_classes*
 				num_vcs_per_class-1] gnt_raw_irc_icvc;
-			  c_select_mofn
+			  c_select_1ofn
 			    #(.num_ports(num_ports),
 			      .width(num_resource_classes*num_vcs_per_class))
 			  gnt_raw_irc_icvc_sel

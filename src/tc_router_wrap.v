@@ -458,7 +458,7 @@ module tc_router_wrap
       .flow_ctrl_in_op(node_rtr_flow_ctrl_p),
       .error(rtr_error));
    
-   c_select_mofn
+   c_select_1ofn
      #(.num_ports(num_ports),
        .width(cfg_data_width))
    cfg_read_data_sel
