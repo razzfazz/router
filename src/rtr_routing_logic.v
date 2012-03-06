@@ -285,7 +285,7 @@ module rtr_routing_logic
 			      // simple solution is to break the tie based on 
 			      // whether the current router's address is even 
 			      // or odd.
-			      // NOTE: This can create load balance when using
+			      // NOTE: This can create load imbalance when using
 			      // concentration, as all nodes sharing a router 
 			      // will pick the same direction.
 			      wire tie_break;
