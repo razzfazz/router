@@ -495,7 +495,7 @@ module rtr_alloc_mac
 		   assign flit_sel_ivc = flit_sel_fast_in_ivc & ivs_cred_ivc;
 		   
 		   wire [0:num_ports-1] 	  rf_route_op;
-		   c_select_mofn
+		   c_select_1ofn
 		     #(.num_ports(num_vcs),
 		       .width(num_ports))
 		   rf_route_op_sel
