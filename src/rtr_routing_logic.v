@@ -199,8 +199,7 @@ module rtr_routing_logic
 		       assign {curr_lt_dest, curr_minus_dest}
 			 = curr_dim_addr - dest_dim_addr;
 		       
-		       assign addr_match_d[dim]
-			 = ~(dest_lt_curr | curr_lt_dest);
+		       assign addr_match_d[dim] = ~dest_lt_curr & ~curr_lt_dest;
 		       
 		       wire 			 dim_sel;
 		       
@@ -302,21 +301,23 @@ module rtr_routing_logic
 			      assign curr_minus_dest_x2
 				= {curr_minus_dest, ~tie_break};
 			      
+			      wire 		      dest_minus_curr_gt_half;
+			      assign dest_minus_curr_gt_half
+				= dest_minus_curr_x2 > num_routers_per_dim;
+			      
+			      wire 		      curr_minus_dest_gt_half;
+			      assign curr_minus_dest_gt_half
+				= curr_minus_dest_x2 > num_routers_per_dim;
+			      
 			      wire 		      route_down;
-			      assign route_down = (curr_lt_dest && 
-						   (dest_minus_curr_x2 > 
-						    num_routers_per_dim)) ||
-						  (dest_lt_curr && 
-						   (curr_minus_dest_x2 <= 
-						    num_routers_per_dim));
+			      assign route_down
+				= (curr_lt_dest & dest_minus_curr_gt_half) |
+				  (dest_lt_curr & ~curr_minus_dest_gt_half);
 			      
 			      wire 		      route_up;
-			      assign route_up = (curr_lt_dest && 
-						 (dest_minus_curr_x2 <= 
-						  num_routers_per_dim)) ||
-						(dest_lt_curr && 
-						 (curr_minus_dest_x2 > 
-						  num_routers_per_dim));
+			      assign route_up
+				= (curr_lt_dest && ~dest_minus_curr_gt_half) |
+				  (dest_lt_curr && curr_minus_dest_gt_half);
 			      
 			      assign port_dec = {route_down, route_up};
 			      
