@@ -316,8 +316,8 @@ module rtr_routing_logic
 			      
 			      wire 		      route_up;
 			      assign route_up
-				= (curr_lt_dest && ~dest_minus_curr_gt_half) |
-				  (dest_lt_curr && curr_minus_dest_gt_half);
+				= (curr_lt_dest & ~dest_minus_curr_gt_half) |
+				  (dest_lt_curr & curr_minus_dest_gt_half);
 			      
 			      assign port_dec = {route_down, route_up};
 			      
