@@ -141,15 +141,18 @@ module flit_sink
 	consume <= $dist_uniform(seed, 0, 99) < consume_rate;
      end
    
-   wire [0:num_vcs-1] 		buffer_empty_ivc;
+   wire [0:num_vcs-1] flit_valid_ivc;
+   assign flit_valid_ivc = {num_vcs{flit_valid}} & flit_sel_ivc;
    
-   wire 			update;
-   assign update = ~&buffer_empty_ivc & consume;
+   wire [0:num_vcs-1] buffer_empty_ivc;
    
-   wire [0:num_vcs-1] 		req_ivc;
-   assign req_ivc = ~buffer_empty_ivc;
+   wire [0:num_vcs-1] req_ivc;
+   assign req_ivc = flit_valid_ivc | ~buffer_empty_ivc;
    
-   wire [0:num_vcs-1] 		gnt_ivc;
+   wire 	      update;
+   assign update = |req_ivc & consume;
+   
+   wire [0:num_vcs-1] gnt_ivc;
    c_arbiter
      #(.num_ports(num_vcs),
        .num_priorities(1),
@@ -164,13 +167,13 @@ module flit_sink
       .gnt_pr(gnt_ivc),
       .gnt());
    
-   wire [0:num_vcs-1] 		buffer_push_ivc;
-   assign buffer_push_ivc = {num_vcs{flit_valid}} & flit_sel_ivc;
+   wire [0:num_vcs-1] buffer_push_ivc;
+   assign buffer_push_ivc = flit_valid_ivc;
    
-   wire [0:num_vcs-1] 		buffer_pop_ivc;
+   wire [0:num_vcs-1] buffer_pop_ivc;
    assign buffer_pop_ivc = {num_vcs{consume}} & gnt_ivc;
    
-   wire [0:num_vcs-1] 		buffer_error_ivc;
+   wire [0:num_vcs-1] buffer_error_ivc;
    
    rtr_flow_ctrl_output
      #(.num_vcs(num_vcs),
@@ -186,7 +189,7 @@ module flit_sink
    
    generate
       
-      genvar 		    ivc;
+      genvar 	      ivc;
       
       for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
 	begin:ivcs
