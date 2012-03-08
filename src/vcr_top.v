@@ -345,7 +345,7 @@ module vcr_top
    
    
    //---------------------------------------------------------------------------
-   // virtual channel allocator
+   // VC and switch allocator
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_vcs-1] 		elig_op_ovc;
@@ -353,15 +353,19 @@ module vcr_top
    wire [0:num_ports-1] 			vc_active_op;
    
    wire [0:num_ports*num_vcs-1] 		vc_gnt_op_ovc;
-   vcr_vc_alloc_mac
+   wire [0:num_ports*num_ports-1] 		xbr_ctrl_op_ip;
+   vcr_alloc_mac
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
        .num_ports(num_ports),
-       .allocator_type(vc_alloc_type),
-       .arbiter_type(vc_alloc_arbiter_type),
+       .vc_allocator_type(vc_alloc_type),
+       .vc_arbiter_type(vc_alloc_arbiter_type),
+       .sw_allocator_type(sw_alloc_type),
+       .sw_arbiter_type(sw_alloc_arbiter_type),
+       .spec_type(sw_alloc_spec_type),
        .reset_type(reset_type))
-   vca
+   alo
      (.clk(clk),
       .reset(reset),
       .route_ip_ivc_op(route_ip_ivc_op),
@@ -369,33 +373,13 @@ module vcr_top
       .allocated_ip_ivc(allocated_ip_ivc),
       .flit_valid_ip_ivc(flit_valid_ip_ivc),
       .elig_op_ovc(elig_op_ovc),
-      .active_op(vc_active_op),
-      .gnt_ip_ivc(vc_gnt_ip_ivc),
-      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
-      .gnt_op_ovc(vc_gnt_op_ovc));
-   
-   
-   //---------------------------------------------------------------------------
-   // switch allocator
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] 		xbr_ctrl_op_ip;
-   vcr_sw_alloc_mac
-     #(.num_vcs(num_vcs),
-       .num_ports(num_ports),
-       .allocator_type(sw_alloc_type),
-       .arbiter_type(sw_alloc_arbiter_type),
-       .spec_type(sw_alloc_spec_type),
-       .reset_type(reset_type))
-   swa
-     (.clk(clk),
-      .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
-      .allocated_ip_ivc(allocated_ip_ivc),
-      .flit_valid_ip_ivc(flit_valid_ip_ivc),
       .free_nonspec_ip_ivc(free_nonspec_ip_ivc),
-      .sel_ip_ivc(sw_sel_ip_ivc),
-      .gnt_ip(sw_gnt_ip),
+      .vc_active_op(vc_active_op),
+      .vc_gnt_ip_ivc(vc_gnt_ip_ivc),
+      .vc_gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
+      .vc_gnt_op_ovc(vc_gnt_op_ovc),
+      .sw_sel_ip_ivc(sw_sel_ip_ivc),
+      .sw_gnt_ip(sw_gnt_ip),
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip));
    
    
