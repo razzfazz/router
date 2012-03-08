@@ -30,9 +30,8 @@
 //==============================================================================
 
 module vcr_op_ctrl_mac
-  (clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, vc_gnt_ovc_ip, 
-   vc_gnt_ovc_ivc, xbr_ctrl_ip, int_flit_ctrl, flit_data, channel_out, 
-   free_ovc, elig_ovc, error);
+  (clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, xbr_ctrl_ip, int_flit_ctrl, 
+   flit_data, channel_out, free_ovc, elig_ovc, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -107,12 +106,6 @@ module vcr_op_ctrl_mac
    
    // output VC was granted to an input VC
    input [0:num_vcs-1] 	       vc_gnt_ovc;
-   
-   // input port that each output VC was granted to
-   input [0:num_vcs*num_ports-1] vc_gnt_ovc_ip;
-   
-   // input VC that each output VC was granted to
-   input [0:num_vcs*num_vcs-1] 	 vc_gnt_ovc_ivc;
    
    // was this output granted to an input port?
    input [0:num_ports-1] 	 xbr_ctrl_ip;
@@ -206,12 +199,6 @@ module vcr_op_ctrl_mac
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ovc[ovc];
 	   
-	   wire [0:num_ports-1] vc_gnt_ip;
-	   assign vc_gnt_ip = vc_gnt_ovc_ip[ovc*num_ports:(ovc+1)*num_ports-1];
-	   
-	   wire [0:num_vcs-1] 	vc_gnt_ivc;
-	   assign vc_gnt_ivc = vc_gnt_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
-	   
 	   wire 		cred_valid;
 	   assign cred_valid = cred_valid_ovc[ovc];
 	   
@@ -238,8 +225,6 @@ module vcr_op_ctrl_mac
 	      .fc_event_valid(cred_valid),
 	      .vc_active(vc_active),
 	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ip(vc_gnt_ip),
-	      .vc_gnt_ivc(vc_gnt_ivc),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
 	      .flit_valid(flit_valid),
 	      .flit_tail(flit_tail),

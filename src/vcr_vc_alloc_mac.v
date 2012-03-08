@@ -32,7 +32,7 @@
 module vcr_vc_alloc_mac
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, allocated_ip_ivc, 
    flit_valid_ip_ivc, elig_op_ovc, active_op, gnt_ip_ivc, gnt_ip_ivc_ocvc, 
-   gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
+   gnt_op_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -99,14 +99,6 @@ module vcr_vc_alloc_mac
    output [0:num_ports*num_vcs-1] 		      gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 		      gnt_op_ovc;
    
-   // input port that each output VC was granted to (to output controller)
-   output [0:num_ports*num_vcs*num_ports-1] 	      gnt_op_ovc_ip;
-   wire [0:num_ports*num_vcs*num_ports-1] 	      gnt_op_ovc_ip;
-   
-   // input VC that each output VC was granted to (to output controller)
-   output [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
-   
    wire [0:num_ports*num_vcs-1] 		      req_ip_ivc;
    assign req_ip_ivc = flit_valid_ip_ivc & ~allocated_ip_ivc;
    
@@ -130,9 +122,7 @@ module vcr_vc_alloc_mac
 	      .req_ip_ivc(req_ip_ivc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
 	      .gnt_ip_ivc_ocvc(gnt_ip_ivc_ocvc),
-	      .gnt_op_ovc(gnt_op_ovc),
-	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
-	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
+	      .gnt_op_ovc(gnt_op_ovc));
 	end
       else if(allocator_type == `VC_ALLOC_TYPE_SEP_OF)
 	begin
@@ -152,9 +142,7 @@ module vcr_vc_alloc_mac
 	      .req_ip_ivc(req_ip_ivc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
 	      .gnt_ip_ivc_ocvc(gnt_ip_ivc_ocvc),
-	      .gnt_op_ovc(gnt_op_ovc),
-	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
-	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
+	      .gnt_op_ovc(gnt_op_ovc));
 	end
       else if((allocator_type >= `VC_ALLOC_TYPE_WF_BASE) &&
 	      (allocator_type <= `VC_ALLOC_TYPE_WF_LIMIT))
@@ -175,9 +163,7 @@ module vcr_vc_alloc_mac
 	      .req_ip_ivc(req_ip_ivc),
 	      .gnt_ip_ivc(gnt_ip_ivc),
 	      .gnt_ip_ivc_ocvc(gnt_ip_ivc_ocvc),
-	      .gnt_op_ovc(gnt_op_ovc),
-	      .gnt_op_ovc_ip(gnt_op_ovc_ip),
-	      .gnt_op_ovc_ivc(gnt_op_ovc_ivc));
+	      .gnt_op_ovc(gnt_op_ovc));
 	end
       
    endgenerate

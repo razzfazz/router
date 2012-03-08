@@ -353,8 +353,6 @@ module vcr_top
    wire [0:num_ports-1] 			vc_active_op;
    
    wire [0:num_ports*num_vcs-1] 		vc_gnt_op_ovc;
-   wire [0:num_ports*num_vcs*num_ports-1] 	vc_gnt_op_ovc_ip;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	vc_gnt_op_ovc_ivc;
    vcr_vc_alloc_mac
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
@@ -374,9 +372,7 @@ module vcr_top
       .active_op(vc_active_op),
       .gnt_ip_ivc(vc_gnt_ip_ivc),
       .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
-      .gnt_op_ovc(vc_gnt_op_ovc),
-      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
-      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
+      .gnt_op_ovc(vc_gnt_op_ovc));
    
    
    //---------------------------------------------------------------------------
@@ -465,14 +461,6 @@ module vcr_top
 	   wire [0:num_vcs-1] 	      vc_gnt_ovc;
 	   assign vc_gnt_ovc = vc_gnt_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_ports-1] vc_gnt_ovc_ip;
-	   assign vc_gnt_ovc_ip = vc_gnt_op_ovc_ip[op*num_vcs*num_ports:
-						   (op+1)*num_vcs*num_ports-1];
-	   
-	   wire [0:num_vcs*num_vcs-1] 	vc_gnt_ovc_ivc;
-	   assign vc_gnt_ovc_ivc
-	     = vc_gnt_op_ovc_ivc[op*num_vcs*num_vcs:(op+1)*num_vcs*num_vcs-1];
-	   
 	   wire [0:num_ports-1] 	xbr_ctrl_ip;
 	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
@@ -498,8 +486,6 @@ module vcr_top
 	      .flow_ctrl_in(flow_ctrl_in),
 	      .vc_active(vc_active),
 	      .vc_gnt_ovc(vc_gnt_ovc),
-	      .vc_gnt_ovc_ip(vc_gnt_ovc_ip),
-	      .vc_gnt_ovc_ivc(vc_gnt_ovc_ivc),
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .flit_data(flit_data),

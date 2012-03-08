@@ -31,7 +31,7 @@
 
 module vcr_vc_alloc_sep_if
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
+   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -87,14 +87,6 @@ module vcr_vc_alloc_sep_if
    // output VC was granted (to output controller)
    output [0:num_ports*num_vcs-1] 		      gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 		      gnt_op_ovc;
-   
-   // input port that each output VC was granted to
-   output [0:num_ports*num_vcs*num_ports-1] 	      gnt_op_ovc_ip;
-   wire [0:num_ports*num_vcs*num_ports-1] 	      gnt_op_ovc_ip;
-   
-   // input VC that each output VC was granted to
-   output [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
-   wire [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    
    
    generate
@@ -587,15 +579,6 @@ module vcr_vc_alloc_sep_if
 			       
 			    end
 			  
-			  wire [0:num_vcs-1] 		  gnt_ivc;
-			  c_select_1ofn
-			    #(.num_ports(num_ports),
-			      .width(num_vcs))
-			  gnt_ivc_sel
-			    (.select(gnt_out_ip),
-			     .data_in(gnt_ip_ivc),
-			     .data_out(gnt_ivc));
-			  
 			  wire 				  req_out;
 			  assign req_out = |req_out_ip;
 			  
@@ -636,26 +619,6 @@ module vcr_vc_alloc_sep_if
 					     num_resource_classes+orc)*
 					    num_vcs_per_class+ocvc]
 			    = req_out;
-			  
-			  assign gnt_op_ovc_ip[(((op*num_message_classes+mc)*
-						 num_resource_classes+orc)*
-						num_vcs_per_class+ocvc)*
-					       num_ports:
-					       (((op*num_message_classes+mc)*
-						 num_resource_classes+orc)*
-						num_vcs_per_class+ocvc+1)*
-					       num_ports-1]
-			    = gnt_out_ip;
-			  
-			  assign gnt_op_ovc_ivc[(((op*num_message_classes+mc)*
-						  num_resource_classes+orc)*
-						 num_vcs_per_class+ocvc)*
-						num_vcs:
-						(((op*num_message_classes+mc)*
-						  num_resource_classes+orc)*
-						 num_vcs_per_class+ocvc+1)*
-						num_vcs-1]
-			    = gnt_ivc;
 			  
 		       end
 		     
