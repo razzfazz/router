@@ -234,7 +234,6 @@ module vcr_vc_alloc_sep_if
 			    begin:orcs
 			       
 			       wire [0:num_vcs_per_class-1] req_unqual_ocvc;
-			       wire [0:num_vcs_per_class-1] gnt_in_ocvc;
 			       
 			       wire [0:num_vcs_per_class-1] elig_ocvc;
 			       assign elig_ocvc
@@ -253,8 +252,8 @@ module vcr_vc_alloc_sep_if
 			       assign req_unqual_ocvc
 				 = {num_vcs_per_class{route}};
 			       
-			       wire [0:num_vcs_per_class-1] req_in_ocvc;
-			       assign req_in_ocvc = req_unqual_ocvc & elig_ocvc;
+			       wire [0:num_vcs_per_class-1] req_ocvc;
+			       assign req_ocvc = elig_ocvc;
 			       
  			       wire [0:num_vcs_per_class-1] gnt_out_ocvc;
 			       assign gnt_out_ocvc
@@ -266,19 +265,24 @@ module vcr_vc_alloc_sep_if
 			       wire 			    update_arb;
 			       assign update_arb = |gnt_out_ocvc;
 			       
+			       wire [0:num_vcs_per_class-1] gnt_ocvc;
 			       c_arbiter
 				 #(.num_ports(num_vcs_per_class),
 				   .num_priorities(1),
 				   .arbiter_type(arbiter_type),
 				   .reset_type(reset_type))
-			       gnt_in_ocvc_arb
+			       gnt_ocvc_arb
 				 (.clk(clk),
 				  .reset(reset),
 				  .active(active),
 				  .update(update_arb),
-				  .req_pr(req_in_ocvc),
-				  .gnt_pr(gnt_in_ocvc),
+				  .req_pr(req_ocvc),
+				  .gnt_pr(gnt_ocvc),
 				  .gnt());
+			       
+			       wire [0:num_vcs_per_class-1] gnt_in_ocvc;
+			       assign gnt_in_ocvc
+				 = {num_vcs_per_class{route}} & gnt_ocvc;
 			       
 			       assign req_unqual_orc_ocvc[orc*
 							  num_vcs_per_class:
