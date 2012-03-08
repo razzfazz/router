@@ -194,65 +194,60 @@ module vcr_sw_alloc_mac
    
    generate
       
-      if(spec_type == `SW_ALLOC_SPEC_TYPE_NONE)
-	begin
-	   assign gnt_ip = gnt_nonspec_ip;
-	   assign sel_ip_ivc = sel_nonspec_ip_ivc;
-	end
-      else
-	begin
+      assign gnt_ip = gnt_nonspec_ip | gnt_spec_ip;
+      
+      genvar 			ip;
+      
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
 	   
-	   assign gnt_ip = gnt_nonspec_ip | gnt_spec_ip;
+	   wire [0:num_vcs-1] req_nonspec_ivc;
+	   assign req_nonspec_ivc
+	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   genvar ip;
-
-	   for(ip = 0; ip < num_ports; ip = ip + 1)
-	     begin:ips
-		
-		wire [0:num_vcs-1] req_nonspec_ivc;
-		assign req_nonspec_ivc
-		  = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-		
-		wire 		   req_nonspec;
-		assign req_nonspec = |req_nonspec_ivc;
-		
-		wire 		   gnt_nonspec;
-		assign gnt_nonspec = gnt_nonspec_ip[ip];
-		
-		wire [0:num_vcs-1] sel_nonspec_ivc;
-		assign sel_nonspec_ivc
-		  = sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-		
-		wire [0:num_vcs-1] sel_spec_ivc;
-		assign sel_spec_ivc
-		  = sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-		
-		wire [0:num_vcs-1] sel_ivc;
-		
-		case(spec_type)
-		  
-		  `SW_ALLOC_SPEC_TYPE_REQ:
-		    begin
-		       assign sel_ivc
-			 = req_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_GNT:
-		    begin
-		       assign sel_ivc
-			 = gnt_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
-		    end
-		  
-		  `SW_ALLOC_SPEC_TYPE_PRIO:
-		    begin
-		       assign sel_ivc = sel_nonspec_ivc | sel_spec_ivc;
-		    end
-		  
-		endcase
-		
-		assign sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = sel_ivc;
-		
-	     end
+	   wire 	      req_nonspec;
+	   assign req_nonspec = |req_nonspec_ivc;
+	   
+	   wire 	      gnt_nonspec;
+	   assign gnt_nonspec = gnt_nonspec_ip[ip];
+	   
+	   wire [0:num_vcs-1] sel_nonspec_ivc;
+	   assign sel_nonspec_ivc
+	     = sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] sel_spec_ivc;
+	   assign sel_spec_ivc
+	     = sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] sel_ivc;
+	   
+	   case(spec_type)
+	     
+	     `SW_ALLOC_SPEC_TYPE_NONE:
+	       begin
+		  assign sel_ivc = sel_nonspec_ivc;
+	       end
+	     
+	     `SW_ALLOC_SPEC_TYPE_REQ:
+	       begin
+		  assign sel_ivc
+		    = req_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
+	       end
+	     
+	     `SW_ALLOC_SPEC_TYPE_GNT:
+	       begin
+		  assign sel_ivc
+		    = gnt_nonspec ? sel_nonspec_ivc : sel_spec_ivc;
+	       end
+	     
+	     `SW_ALLOC_SPEC_TYPE_PRIO:
+	       begin
+		  assign sel_ivc = sel_nonspec_ivc | sel_spec_ivc;
+	       end
+	     
+	   endcase
+	   
+	   assign sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = sel_ivc;
 	   
 	end
       
@@ -267,9 +262,12 @@ module vcr_sw_alloc_mac
 	   
 	   wire 		active;
 	   assign active = active_op[op] | (|xbr_ctrl_ip);
+
+	   wire [0:num_ports-1] gnt_ip;
+	   assign gnt_ip = gnt_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
-	   assign xbr_ctrl_ip_s = gnt_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   assign xbr_ctrl_ip_s = gnt_ip;
 	   c_dff
 	     #(.width(num_ports),
 	       .reset_type(reset_type))
