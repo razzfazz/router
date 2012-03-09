@@ -207,6 +207,9 @@ module vcr_ip_ctrl_mac
    parameter port_id = 0;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   localparam time_to_wait_width = 8;
       
    input clk;
    input reset;
@@ -306,7 +309,7 @@ module vcr_ip_ctrl_mac
       .flit_data_out(flit_data_in),
       .flit_sel_out_ivc(flit_sel_in_ivc));
    
-   
+
    //---------------------------------------------------------------------------
    // switch allocation
    //---------------------------------------------------------------------------
@@ -356,6 +359,13 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 				     empty_ivc;
    wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
    
+   
+   // test for TTW variable in vcr_ivc_ctrl_justin
+   
+   wire [0:time_to_wait_width-1] time_to_wait_in;
+   assign time_to_wait_in = 8'd100;
+   wire [0:time_to_wait_width-1] time_to_wait_out;
+   
    genvar 					     ivc;
    
    generate
@@ -384,7 +394,6 @@ module vcr_ip_ctrl_mac
 	   
 	   wire 			flit_sent_prev;
 	   assign flit_sent_prev = flit_sent_prev_ivc[ivc];
-	   
 	   wire [0:num_ports-1] 	route_op;
 	   wire [0:num_resource_classes-1] route_orc;
 	   wire [0:lar_info_width-1] 	   next_lar_info;
@@ -399,59 +408,127 @@ module vcr_ip_ctrl_mac
 	   wire 			   free_nonspec;
 	   wire 			   free_spec;
 	   wire [0:5] 			   ivcc_errors;
-	   vcr_ivc_ctrl
-	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
-	       .num_routers_per_dim(num_routers_per_dim),
-	       .num_dimensions(num_dimensions),
-	       .num_nodes_per_router(num_nodes_per_router),
-	       .connectivity(connectivity),
-	       .packet_format(packet_format),
-	       .max_payload_length(max_payload_length),
-	       .min_payload_length(min_payload_length),
-	       .flit_data_width(flit_data_width),
-	       .restrict_turns(restrict_turns),
-	       .routing_type(routing_type),
-	       .dim_order(dim_order),
-	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .elig_mask(elig_mask),
-	       .sw_alloc_spec(sw_alloc_spec),
-	       .fb_regfile_type(fb_regfile_type),
-	       .explicit_pipeline_register(explicit_pipeline_register),
-	       .gate_buffer_write(gate_buffer_write),
-	       .vc_id(ivc),
-	       .port_id(port_id),
-	       .reset_type(reset_type))
-	   ivcc
-	     (.clk(clk),
-	      .reset(reset),
-	      .router_address(router_address),
-	      .flit_valid_in(flit_valid_in),
-	      .flit_head_in(flit_head_in),
-	      .flit_tail_in(flit_tail_in),
-	      .flit_data_in(flit_data_in),
-	      .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
-	      .route_op(route_op),
-	      .route_orc(route_orc),
-	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ocvc(vc_gnt_ocvc),
-	      .sw_gnt(sw_gnt),
-	      .flit_sent_prev(flit_sent_prev),
-	      .flit_tail_prev(flit_tail_prev),
-	      .next_lar_info(next_lar_info),
-	      .flit_valid(flit_valid),
-	      .flit_head(flit_head),
-	      .flit_tail(flit_tail),
-	      .flit_sel_ovc(flit_sel_ovc),
-	      .flit_data(flit_data),
-	      .empty(empty),
-	      .full(full),
-	      .allocated(allocated),
-	      .free_nonspec(free_nonspec),
-	      .free_spec(free_spec),
-	      .errors(ivcc_errors));
+	   
+	   
+	   
+	   if (ivc == (num_vcs - 1)) begin
+	   
+	   
+	   
+	     vcr_ivc_ctrl_justin
+	       #(.num_flits_per_vc(num_flits_per_vc),
+	         .num_message_classes(num_message_classes),
+	         .num_resource_classes(num_resource_classes),
+	         .num_vcs_per_class(num_vcs_per_class),
+	         .num_routers_per_dim(num_routers_per_dim),
+	         .num_dimensions(num_dimensions),
+	         .num_nodes_per_router(num_nodes_per_router),
+	         .connectivity(connectivity),
+	         .packet_format(packet_format),
+	         .max_payload_length(max_payload_length),
+	         .min_payload_length(min_payload_length),
+	         .flit_data_width(flit_data_width),
+	         .restrict_turns(restrict_turns),
+	         .routing_type(routing_type),
+	         .dim_order(dim_order),
+	         .int_flow_ctrl_type(int_flow_ctrl_type),
+	         .elig_mask(elig_mask),
+	         .sw_alloc_spec(sw_alloc_spec),
+	         .fb_regfile_type(fb_regfile_type),
+	         .explicit_pipeline_register(explicit_pipeline_register),
+	         .gate_buffer_write(gate_buffer_write),
+	         .vc_id(ivc),
+	         .port_id(port_id),
+	         .reset_type(reset_type),
+	         .time_to_wait_width(time_to_wait_width))
+	     ivcc_justin
+	       (.clk(clk),
+	        .reset(reset),
+	        .router_address(router_address),
+	        .flit_valid_in(flit_valid_in),
+	        .flit_head_in(flit_head_in),
+	        .flit_tail_in(flit_tail_in),
+	        .flit_data_in(flit_data_in),
+	        .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+	        .route_op(route_op),
+	        .route_orc(route_orc),
+	        .vc_gnt(vc_gnt),
+	        .vc_gnt_ocvc(vc_gnt_ocvc),
+	        .sw_gnt(sw_gnt),
+	        .flit_sent_prev(flit_sent_prev),
+	        .flit_tail_prev(flit_tail_prev),
+	        .next_lar_info(next_lar_info),
+	        .flit_valid(flit_valid),
+	        .flit_head(flit_head),
+	        .flit_tail(flit_tail),
+	        .flit_sel_ovc(flit_sel_ovc),
+	        .flit_data(flit_data),
+	        .empty(empty),
+	        .full(full),
+	        .allocated(allocated),
+	        .free_nonspec(free_nonspec),
+	        .free_spec(free_spec),
+	        .errors(ivcc_errors),
+	        .time_to_wait_in(time_to_wait_in),
+	        .time_to_wait_out (time_to_wait_out));
+	        
+	   end else begin
+	     
+       vcr_ivc_ctrl
+         #(.num_flits_per_vc(num_flits_per_vc),
+           .num_message_classes(num_message_classes),
+           .num_resource_classes(num_resource_classes),
+           .num_vcs_per_class(num_vcs_per_class),
+           .num_routers_per_dim(num_routers_per_dim),
+           .num_dimensions(num_dimensions),
+           .num_nodes_per_router(num_nodes_per_router),
+           .connectivity(connectivity),
+           .packet_format(packet_format),
+           .max_payload_length(max_payload_length),
+           .min_payload_length(min_payload_length),
+           .flit_data_width(flit_data_width),
+           .restrict_turns(restrict_turns),
+           .routing_type(routing_type),
+           .dim_order(dim_order),
+           .int_flow_ctrl_type(int_flow_ctrl_type),
+           .elig_mask(elig_mask),
+           .sw_alloc_spec(sw_alloc_spec),
+           .fb_regfile_type(fb_regfile_type),
+           .explicit_pipeline_register(explicit_pipeline_register),
+           .gate_buffer_write(gate_buffer_write),
+           .vc_id(ivc),
+           .port_id(port_id),
+           .reset_type(reset_type))
+       ivcc
+         (.clk(clk),
+          .reset(reset),
+          .router_address(router_address),
+          .flit_valid_in(flit_valid_in),
+          .flit_head_in(flit_head_in),
+          .flit_tail_in(flit_tail_in),
+          .flit_data_in(flit_data_in),
+          .int_flow_ctrl_op_ovc(int_flow_ctrl_op_ovc),
+          .route_op(route_op),
+          .route_orc(route_orc),
+          .vc_gnt(vc_gnt),
+          .vc_gnt_ocvc(vc_gnt_ocvc),
+          .sw_gnt(sw_gnt),
+          .flit_sent_prev(flit_sent_prev),
+          .flit_tail_prev(flit_tail_prev),
+          .next_lar_info(next_lar_info),
+          .flit_valid(flit_valid),
+          .flit_head(flit_head),
+          .flit_tail(flit_tail),
+          .flit_sel_ovc(flit_sel_ovc),
+          .flit_data(flit_data),
+          .empty(empty),
+          .full(full),
+          .allocated(allocated),
+          .free_nonspec(free_nonspec),
+          .free_spec(free_spec),
+          .errors(ivcc_errors));
+      
+	   end
 	   
 	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 	     = route_op;
