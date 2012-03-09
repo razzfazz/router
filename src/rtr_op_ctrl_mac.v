@@ -184,13 +184,6 @@ module rtr_op_ctrl_mac
    wire 		       channel_active;
    assign channel_active = flit_valid_in;
    
-   // NOTE: For head flits that fail to acquire a VC, 'flit_valid_in' will be
-   // one, but 'flit_sel_in_ovc' will be all-zeroes. As no flit should be sent
-   // out in this case, we must qualify accordingly.
-   
-   wire 		       flit_valid;
-   assign flit_valid = flit_valid_in & (|flit_sel_in_ovc);
-   
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -200,7 +193,7 @@ module rtr_op_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(channel_active),
-      .flit_valid_in(flit_valid),
+      .flit_valid_in(flit_valid_in),
       .flit_head_in(flit_head_in),
       .flit_tail_in(flit_tail_in),
       .flit_data_in(flit_data_in),

@@ -1313,6 +1313,7 @@ module rtr_alloc_mac
 	   wire 			 oal_flit_head;
 	   wire 			 oal_flit_tail;
 	   wire [0:num_vcs-1] 		 oal_flit_sel_ovc;
+	   wire 			 oal_flit_kill;
 	   
 	   if(1) begin:oal
 	      
@@ -1468,12 +1469,17 @@ module rtr_alloc_mac
 	      assign flit_sel_ovc
 		= ial_flit_sel_ovc & ({num_vcs{allocated}} | nvs_next_elig_ovc);
 	      
+	      wire 			   flit_kill;
+	      assign flit_kill
+		= ~allocated & ~|(flit_sel_ovc & nvs_next_elig_ovc);
+	      
 	      assign oal_allocated = allocated;
 	      assign oal_flit_sent_ip = gnt_ip;
 	      assign oal_flit_sent = flit_sent;
 	      assign oal_flit_head = flit_head;
 	      assign oal_flit_tail = flit_tail;
 	      assign oal_flit_sel_ovc = flit_sel_ovc;
+	      assign oal_flit_kill = flit_kill;
 	      
 	   end
 	   
@@ -1486,6 +1492,7 @@ module rtr_alloc_mac
 	   wire 		      ofl_flit_head;
 	   wire 		      ofl_flit_tail;
 	   wire [0:num_vcs-1] 	      ofl_flit_sel_ovc;
+	   wire 		      ofl_flit_kill;
 	   
 	   if(1) begin:ofl
 	      
@@ -1581,12 +1588,17 @@ module rtr_alloc_mac
 		     = ifl_flit_sel_ovc & 
 		       ({num_vcs{~flit_head}} | nvs_next_elig_ovc);
 		   
+		   wire 	      flit_kill;
+		   assign flit_kill
+		     = flit_head & ~|(flit_sel_ovc & nvs_next_elig_ovc);
+		   
 		   assign ofl_flit_sent_ip
 		     = gnt_ip & {num_ports{~oal_flit_sent}};
 		   assign ofl_flit_sent = flit_sent & ~oal_flit_sent;
 		   assign ofl_flit_head = flit_head;
 		   assign ofl_flit_tail = flit_tail;
 		   assign ofl_flit_sel_ovc = flit_sel_ovc;
+		   assign ofl_flit_kill = flit_kill;
 		   
 		end
 	      else
@@ -1596,6 +1608,7 @@ module rtr_alloc_mac
 		   assign ofl_flit_head = 1'b0;
 		   assign ofl_flit_tail = 1'b0;
 		   assign ofl_flit_sel_ovc = {num_vcs{1'b0}};
+		   assign ofl_flit_kill = 1'b0;
 		end
 	      
 	   end
@@ -1631,13 +1644,9 @@ module rtr_alloc_mac
 	   // stage controls signals for output controllers
 	   //-------------------------------------------------------------------
 	   
-	   // NOTE: 'flit_valid_out' will be one even when a head flit fails to 
-	   // acquire a VC; however, in this case, 'flit_sel_out_ovc' will be 
-	   // all-zeroes, so we must check for this case in the output 
-	   // controller.
-	   
 	   wire 		   flit_valid_s, flit_valid_q;
-	   assign flit_valid_s = oal_flit_sent | ofl_flit_sent;
+	   assign flit_valid_s = (oal_flit_sent & ~oal_flit_kill) | 
+				 (ofl_flit_sent & ~ofl_flit_kill);
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
