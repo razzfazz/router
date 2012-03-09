@@ -32,8 +32,8 @@
 module vcr_alloc_mac
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, allocated_ip_ivc, 
    flit_valid_ip_ivc, elig_op_ovc, free_nonspec_ip_ivc, vc_active_op, 
-   vc_gnt_ip_ivc, vc_gnt_ip_ivc_ocvc, vc_gnt_op_ovc, sw_sel_ip_ivc, sw_gnt_ip, 
-   xbr_ctrl_op_ip);
+   vc_gnt_ip_ivc, vc_sel_ip_ivc_ocvc, vc_gnt_op_ovc, vc_sel_op_ovc_ip, 
+   vc_sel_op_ovc_ivc, sw_sel_ip_ivc, sw_gnt_ip, xbr_ctrl_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -107,12 +107,20 @@ module vcr_alloc_mac
    wire [0:num_ports*num_vcs-1] 		      vc_gnt_ip_ivc;
    
    // granted output VC (to input controller)
-   output [0:num_ports*num_vcs*num_vcs_per_class-1]   vc_gnt_ip_ivc_ocvc;
-   wire [0:num_ports*num_vcs*num_vcs_per_class-1]     vc_gnt_ip_ivc_ocvc;
+   output [0:num_ports*num_vcs*num_vcs_per_class-1]   vc_sel_ip_ivc_ocvc;
+   wire [0:num_ports*num_vcs*num_vcs_per_class-1]     vc_sel_ip_ivc_ocvc;
    
    // output VC was granted (to output controller)
    output [0:num_ports*num_vcs-1] 		      vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 		      vc_gnt_op_ovc;
+   
+   // input port that each output VC was granted to (to output controller)
+   output [0:num_ports*num_vcs*num_ports-1] 	      vc_sel_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_ports-1] 	      vc_sel_op_ovc_ip;
+   
+   // input VC that each output VC was granted to (to output controller)
+   output [0:num_ports*num_vcs*num_vcs-1] 	      vc_sel_op_ovc_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	      vc_sel_op_ovc_ivc;
    
    // indicate which VC at a given port is granted (to input controller)
    output [0:num_ports*num_vcs-1] 		      sw_sel_ip_ivc;
@@ -171,8 +179,10 @@ module vcr_alloc_mac
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(vc_req_ip_ivc),
 	      .gnt_ip_ivc(vc_gnt_ip_ivc),
-	      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
-	      .gnt_op_ovc(vc_gnt_op_ovc));
+	      .sel_ip_ivc_ocvc(vc_sel_ip_ivc_ocvc),
+	      .gnt_op_ovc(vc_gnt_op_ovc),
+	      .sel_op_ovc_ip(vc_sel_op_ovc_ip),
+	      .sel_op_ovc_ivc(vc_sel_op_ovc_ivc));
 	   
 	end
       else if(vc_allocator_type == `VC_ALLOC_TYPE_SEP_OF)
@@ -195,8 +205,10 @@ module vcr_alloc_mac
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(vc_req_ip_ivc),
 	      .gnt_ip_ivc(vc_gnt_ip_ivc),
-	      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
-	      .gnt_op_ovc(vc_gnt_op_ovc));
+	      .sel_ip_ivc_ocvc(vc_sel_ip_ivc_ocvc),
+	      .gnt_op_ovc(vc_gnt_op_ovc),
+	      .sel_op_ovc_ip(vc_sel_op_ovc_ip),
+	      .sel_op_ovc_ivc(vc_sel_op_ovc_ivc));
 	   
 	end
       else if((vc_allocator_type >= `VC_ALLOC_TYPE_WF_BASE) &&
@@ -222,8 +234,10 @@ module vcr_alloc_mac
 	      .elig_op_ovc(elig_op_ovc),
 	      .req_ip_ivc(vc_req_ip_ivc),
 	      .gnt_ip_ivc(vc_gnt_ip_ivc),
-	      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
-	      .gnt_op_ovc(vc_gnt_op_ovc));
+	      .sel_ip_ivc_ocvc(vc_sel_ip_ivc_ocvc),
+	      .gnt_op_ovc(vc_gnt_op_ovc),
+	      .sel_op_ovc_ip(vc_sel_op_ovc_ip),
+	      .sel_op_ovc_ivc(vc_sel_op_ovc_ivc));
 	   
 	end
       

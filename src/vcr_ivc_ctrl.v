@@ -32,7 +32,7 @@
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, peek_header_info, fb_flit_tail, free_op_ovc, route_op, 
-   route_orc, vc_gnt, vc_gnt_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
+   route_orc, vc_gnt, vc_sel_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
    flit_valid, flit_head, flit_tail, flit_sel_ovc, next_lar_info, 
    fbc_almost_empty, fbc_empty, allocated, free_nonspec, free_spec, errors);
    
@@ -230,7 +230,7 @@ module vcr_ivc_ctrl
    input 			     vc_gnt;
    
    // granted output VC
-   input [0:num_vcs_per_class-1]     vc_gnt_ocvc;
+   input [0:num_vcs_per_class-1]     vc_sel_ocvc;
    
    // switch allocator grants
    input 			     sw_gnt;
@@ -340,7 +340,7 @@ module vcr_ivc_ctrl
 	begin
 	   
 	   assign vc_allocated_next_ocvc
-	     = allocated ? vc_allocated_ocvc : vc_gnt_ocvc;
+	     = allocated ? vc_allocated_ocvc : vc_sel_ocvc;
 	   
 	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
 	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
@@ -810,7 +810,7 @@ module vcr_ivc_ctrl
      #(.num_ports(num_vcs_per_class),
        .width(1))
    free_spec_sel
-     (.select(vc_gnt_ocvc),
+     (.select(vc_sel_ocvc),
       .data_in(free_spec_ocvc),
       .data_out(free_spec));
    

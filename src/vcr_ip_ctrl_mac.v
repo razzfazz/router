@@ -31,7 +31,7 @@
 
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
-   allocated_ivc, flit_valid_ivc, free_nonspec_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc,
+   allocated_ivc, flit_valid_ivc, free_nonspec_ivc, vc_gnt_ivc, vc_sel_ivc_ocvc,
    sw_sel_ivc, sw_gnt, free_op_ovc, int_flit_ctrl, flit_data, flow_ctrl_out, 
    error);
    
@@ -248,7 +248,7 @@ module vcr_ip_ctrl_mac
    input [0:num_vcs-1] 			     vc_gnt_ivc;
    
    // granted output VC
-   input [0:num_vcs*num_vcs_per_class-1]     vc_gnt_ivc_ocvc;
+   input [0:num_vcs*num_vcs_per_class-1]     vc_sel_ivc_ocvc;
    
    // select VC for switch grant
    input [0:num_vcs-1] 			     sw_sel_ivc;
@@ -415,8 +415,8 @@ module vcr_ip_ctrl_mac
 	   wire vc_gnt;
 	   assign vc_gnt = vc_gnt_ivc[ivc];
 	   
-	   wire [0:num_vcs_per_class-1] vc_gnt_ocvc;
-	   assign vc_gnt_ocvc = vc_gnt_ivc_ocvc[ivc*num_vcs_per_class:
+	   wire [0:num_vcs_per_class-1] vc_sel_ocvc;
+	   assign vc_sel_ocvc = vc_sel_ivc_ocvc[ivc*num_vcs_per_class:
 						(ivc+1)*num_vcs_per_class-1];
 	   
 	   wire 			sw_gnt;
@@ -603,7 +603,7 @@ module vcr_ip_ctrl_mac
 	      .route_op(route_op),
 	      .route_orc(route_orc),
 	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ocvc(vc_gnt_ocvc),
+	      .vc_sel_ocvc(vc_sel_ocvc),
 	      .sw_gnt(sw_gnt),
 	      .flit_sent(flit_sent),
 	      .flit_sent_prev(flit_sent_prev),

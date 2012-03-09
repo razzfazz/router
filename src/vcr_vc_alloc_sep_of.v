@@ -31,7 +31,8 @@
 
 module vcr_vc_alloc_sep_of
   (clk, reset, active_ip, active_op, route_ip_ivc_op, route_ip_ivc_orc, 
-   elig_op_ovc, req_ip_ivc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
+   elig_op_ovc, req_ip_ivc, gnt_ip_ivc, sel_ip_ivc_ocvc, gnt_op_ovc, 
+   sel_op_ovc_ip, sel_op_ovc_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -87,12 +88,20 @@ module vcr_vc_alloc_sep_of
    wire [0:num_ports*num_vcs-1] 		      gnt_ip_ivc;
    
    // granted output VC (to input controller)
-   output [0:num_ports*num_vcs*num_vcs_per_class-1]   gnt_ip_ivc_ocvc;
-   wire [0:num_ports*num_vcs*num_vcs_per_class-1]     gnt_ip_ivc_ocvc;
+   output [0:num_ports*num_vcs*num_vcs_per_class-1]   sel_ip_ivc_ocvc;
+   wire [0:num_ports*num_vcs*num_vcs_per_class-1]     sel_ip_ivc_ocvc;
    
    // output VC was granted (to output controller)
    output [0:num_ports*num_vcs-1] 		      gnt_op_ovc;
    wire [0:num_ports*num_vcs-1] 		      gnt_op_ovc;
+   
+   // input port that each output VC was granted to
+   output [0:num_ports*num_vcs*num_ports-1] 	      sel_op_ovc_ip;
+   wire [0:num_ports*num_vcs*num_ports-1] 	      sel_op_ovc_ip;
+   
+   // input VC that each output VC was granted to
+   output [0:num_ports*num_vcs*num_vcs-1] 	      sel_op_ovc_ivc;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	      sel_op_ovc_ivc;
    
    
    generate
@@ -366,7 +375,7 @@ module vcr_vc_alloc_sep_of
 			    (.data_in(gnt_in_orc_ocvc),
 			     .data_out(gnt_in_ocvc));
 			  
-			  assign gnt_ip_ivc_ocvc[(((ip*num_message_classes+mc)*
+			  assign sel_ip_ivc_ocvc[(((ip*num_message_classes+mc)*
 						   num_resource_classes+irc)*
 						  num_vcs_per_class+icvc)*
 						 num_vcs_per_class:
@@ -584,6 +593,17 @@ module vcr_vc_alloc_sep_of
 			     .data_in(gnt_raw_ip_irc_icvc),
 			     .data_out(gnt_raw_irc_icvc));
 			  
+			  wire [0:num_vcs-1] 	     gnt_raw_ivc;
+			  c_align
+			    #(.in_width(num_resource_classes*num_vcs_per_class),
+			      .out_width(num_vcs),
+			      .offset(mc*num_resource_classes*
+				      num_vcs_per_class))
+			  gnt_raw_ivc_alg
+			    (.data_in(gnt_raw_irc_icvc),
+			     .dest_in({num_vcs{1'b0}}),
+			     .data_out(gnt_raw_ivc));
+			  
 			  assign gnt_out_op_orc_ocvc_ip_irc_icvc
 			    [((op*num_resource_classes+orc)*
 			      num_vcs_per_class+ocvc)*
@@ -604,6 +624,26 @@ module vcr_vc_alloc_sep_of
 					     num_resource_classes+orc)*
 					    num_vcs_per_class+ocvc]
 			    = gnt_in;
+			  
+			  assign sel_op_ovc_ip[(((op*num_message_classes+mc)*
+						 num_resource_classes+orc)*
+						num_vcs_per_class+ocvc)*
+					       num_ports:
+					       (((op*num_message_classes+mc)*
+						 num_resource_classes+orc)*
+						num_vcs_per_class+ocvc+1)*
+					       num_ports-1]
+			    = gnt_out_ip;
+			  
+			  assign sel_op_ovc_ivc[(((op*num_message_classes+mc)
+						  *num_resource_classes+orc)*
+						 num_vcs_per_class+ocvc)*
+						num_vcs:
+						(((op*num_message_classes+mc)*
+						  num_resource_classes+orc)*
+						 num_vcs_per_class+ocvc+1)*
+						num_vcs-1]
+			    = gnt_raw_ivc;
 			  
 		       end
 		     

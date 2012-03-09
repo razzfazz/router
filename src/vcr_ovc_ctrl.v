@@ -30,8 +30,8 @@
 //==============================================================================
 
 module vcr_ovc_ctrl
-  (clk, reset, fc_event_valid, vc_active, vc_gnt, xbr_ctrl_ip, flit_valid, 
-   flit_tail, elig, empty, free, errors);
+  (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, 
+   xbr_ctrl_ip, flit_valid, flit_tail, elig, empty, free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -92,6 +92,12 @@ module vcr_ovc_ctrl
    
    // output VC was granted to an input VC
    input vc_gnt;
+   
+   // input port that the output VC was granted to
+   input [0:num_ports-1] vc_sel_ip;
+   
+   // input VC that the output VC was granted to
+   input [0:num_vcs-1] vc_sel_ivc;
    
    // was this output granted to an input port?
    input [0:num_ports-1] xbr_ctrl_ip;
