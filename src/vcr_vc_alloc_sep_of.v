@@ -30,8 +30,8 @@
 //==============================================================================
 
 module vcr_vc_alloc_sep_of
-  (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
+  (clk, reset, active_ip, active_op, route_ip_ivc_op, route_ip_ivc_orc, 
+   elig_op_ovc, req_ip_ivc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -63,6 +63,12 @@ module vcr_vc_alloc_sep_of
    
    input clk;
    input reset;
+   
+   // input-side activity indicator
+   input [0:num_ports-1] active_ip;
+   
+   // output-side activity indicator
+   input [0:num_ports-1] active_op;
    
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
@@ -129,7 +135,7 @@ module vcr_vc_alloc_sep_of
 						 num_vcs_per_class-1];
 		
 		wire 						  active;
-		assign active = |req_irc_icvc;
+		assign active = active_ip[ip];
 		
 		genvar 						  irc;
 		
@@ -429,6 +435,9 @@ module vcr_vc_alloc_sep_of
 	   for (op = 0; op < num_ports; op = op + 1)
 	     begin:ops
 		
+		wire active;
+		assign active = active_op[op];
+			  
 		genvar orc;
 		
 		for(orc = 0; orc < num_resource_classes; orc = orc + 1)
@@ -482,9 +491,6 @@ module vcr_vc_alloc_sep_of
 			  assign update_arb = gnt_in;
 			  
 			  wire [0:num_ports-1] 	     req_out_ip;
-			  
-			  wire 			     active;
-			  assign active = |req_out_ip;
 			  
 			  wire [0:num_ports-1] 	     gnt_out_ip;
 			  c_arbiter

@@ -30,8 +30,8 @@
 //==============================================================================
 
 module vcr_vc_alloc_sep_if
-  (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
+  (clk, reset, active_ip, active_op, route_ip_ivc_op, route_ip_ivc_orc, 
+   elig_op_ovc, req_ip_ivc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -63,6 +63,12 @@ module vcr_vc_alloc_sep_if
    
    input clk;
    input reset;
+   
+   // input-side activity indicator
+   input [0:num_ports-1] active_ip;
+   
+   // output-side activity indicator
+   input [0:num_ports-1] active_op;
    
    // destination port select
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
@@ -107,10 +113,6 @@ module vcr_vc_alloc_sep_if
 		 num_ports*num_resource_classes*
 		 num_vcs_per_class-1] gnt_out_ip_irc_icvc_op_orc_ocvc;
 	   
-	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
-		 num_ports*num_resource_classes*
-		 num_vcs_per_class-1] active_ip_irc_icvc_op_orc_ocvc;
-	   
 	   
 	   //-------------------------------------------------------------------
 	   // input stage
@@ -130,7 +132,7 @@ module vcr_vc_alloc_sep_if
 						 num_vcs_per_class-1];
 		
 		wire 						  active;
-		assign active = |req_irc_icvc;
+		assign active = active_ip[ip];
 		
 		genvar 						  irc;
 		
@@ -223,8 +225,6 @@ module vcr_vc_alloc_sep_if
 			     .data_out(gnt_out_orc_ocvc));
 			  
 			  wire [0:num_resource_classes*
-				num_vcs_per_class-1] req_unqual_orc_ocvc;
-			  wire [0:num_resource_classes*
 				num_vcs_per_class-1] gnt_in_orc_ocvc;
 			  
 			  genvar 		     orc;
@@ -232,8 +232,6 @@ module vcr_vc_alloc_sep_if
 			  for(orc = 0; orc < num_resource_classes; 
 			      orc = orc + 1)
 			    begin:orcs
-			       
-			       wire [0:num_vcs_per_class-1] req_unqual_ocvc;
 			       
 			       wire [0:num_vcs_per_class-1] elig_ocvc;
 			       assign elig_ocvc
@@ -248,9 +246,6 @@ module vcr_vc_alloc_sep_if
 			       // requests are subsequently only propagated
 			       // to the output stage if there was a 
 			       // requests.
-			       
-			       assign req_unqual_ocvc
-				 = {num_vcs_per_class{route}};
 			       
 			       wire [0:num_vcs_per_class-1] req_ocvc;
 			       assign req_ocvc = elig_ocvc;
@@ -284,12 +279,6 @@ module vcr_vc_alloc_sep_if
 			       assign gnt_in_ocvc
 				 = {num_vcs_per_class{route}} & gnt_ocvc;
 			       
-			       assign req_unqual_orc_ocvc[orc*
-							  num_vcs_per_class:
-							  (orc+1)*
-							  num_vcs_per_class-1]
-				 = req_unqual_ocvc;
-			       
 			       assign gnt_in_orc_ocvc[orc*
 						      num_vcs_per_class:
 						      (orc+1)*
@@ -304,9 +293,6 @@ module vcr_vc_alloc_sep_if
 			  //----------------------------------------------------
 			  
 			  wire [0:num_ports*num_resource_classes*
-				num_vcs_per_class-1] active_op_orc_ocvc;
-			  
-			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] req_out_op_orc_ocvc;
 			  
 			  genvar 		     op;
@@ -316,31 +302,6 @@ module vcr_vc_alloc_sep_if
 			       
 			       wire route;
 			       assign route = route_op[op];
-			       
-			       wire [0:num_resource_classes*
-				     num_vcs_per_class-1] active_orc_ocvc;
-			       assign active_orc_ocvc
-				 = {(num_resource_classes*num_vcs_per_class)
-				    {req & route}} & req_unqual_orc_ocvc;
-			       
-			       assign active_op_orc_ocvc
-				 [op*num_resource_classes*
-				  num_vcs_per_class:
-				  (op+1)*num_resource_classes*
-				  num_vcs_per_class-1]
-				 = active_orc_ocvc;
-			       
-			       wire [0:num_vcs-1] 	  active_ovc;
-			       c_align
-				 #(.in_width(num_resource_classes*
-					     num_vcs_per_class),
-				   .out_width(num_vcs),
-				   .offset(mc*num_resource_classes*
-					   num_vcs_per_class))
-			       active_ovc_agn
-				 (.data_in(active_orc_ocvc),
-				  .dest_in({num_vcs{1'b0}}),
-				  .data_out(active_ovc));
 			       
 			       assign req_out_op_orc_ocvc
 				 [op*num_resource_classes*
@@ -352,17 +313,6 @@ module vcr_vc_alloc_sep_if
 				   gnt_in_orc_ocvc;
 			       
 			    end
-			  
-			  assign active_ip_irc_icvc_op_orc_ocvc
-			    [((ip*num_resource_classes+irc)*
-			      num_vcs_per_class+icvc)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class:
-			     ((ip*num_resource_classes+irc)*
-			      num_vcs_per_class+icvc+1)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class-1]
-			    = active_op_orc_ocvc;
 			  
 			  assign req_out_ip_irc_icvc_op_orc_ocvc
 			    [((ip*num_resource_classes+irc)*
@@ -410,16 +360,6 @@ module vcr_vc_alloc_sep_if
 		
 	     end
 	   
-	   wire [0:num_ports*num_resource_classes*
-		 num_vcs_per_class-1] active_op_orc_ocvc;
-	   c_binary_op
-	     #(.width(num_ports*num_resource_classes*num_vcs_per_class),
-	       .num_ports(num_ports*num_resource_classes*num_vcs_per_class),
-	       .op(`BINARY_OP_OR))
-	   active_op_orc_ocvc_or
-	     (.data_in(active_ip_irc_icvc_op_orc_ocvc),
-	      .data_out(active_op_orc_ocvc));
-	   
 	   
 	   //-------------------------------------------------------------------
 	   // bit shuffling for changing sort order
@@ -457,6 +397,9 @@ module vcr_vc_alloc_sep_if
 	   for (op = 0; op < num_ports; op = op + 1)
 	     begin:ops
 		
+		wire active;
+		assign active = active_op[op];
+		
 		genvar orc;
 		
 		for(orc = 0; orc < num_resource_classes; orc = orc + 1)
@@ -476,12 +419,6 @@ module vcr_vc_alloc_sep_if
 						      mc)*
 						     num_resource_classes+orc)*
 						    num_vcs_per_class+ocvc];
-			  
-			  wire active;
-			  assign active
-			    = active_op_orc_ocvc[(op*num_resource_classes+
-						  orc)*num_vcs_per_class+
-						 ocvc];
 			  
 			  wire [0:num_ports*num_resource_classes*
 				num_vcs_per_class-1] req_out_ip_irc_icvc;

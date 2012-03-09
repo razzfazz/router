@@ -30,8 +30,8 @@
 //==============================================================================
 
 module vcr_vc_alloc_wf
-  (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
+  (clk, reset, active, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, 
+   req_ip_ivc, gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -63,6 +63,9 @@ module vcr_vc_alloc_wf
    
    input clk;
    input reset;
+   
+   // activity indicator
+   input active;
    
    // destination port selects
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
@@ -103,9 +106,6 @@ module vcr_vc_alloc_wf
 	   wire [0:num_ports*num_resource_classes*
 		 num_vcs_per_class-1] req_ip_irc_icvc;
 	   
-	   wire 		      wf_active;
-	   assign wf_active = |req_ip_irc_icvc;
-	   
 	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*num_ports*
 		 num_resource_classes*
 		 num_vcs_per_class-1] req_wf_ip_irc_icvc_op_orc_ocvc;
@@ -123,7 +123,7 @@ module vcr_vc_alloc_wf
 	   gnt_wf_ip_irc_icvc_op_orc_ocvc_alloc
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(wf_active),
+	      .active(active),
 	      .update(update_alloc),
 	      .req(req_wf_ip_irc_icvc_op_orc_ocvc),
 	      .gnt(gnt_wf_ip_irc_icvc_op_orc_ocvc));

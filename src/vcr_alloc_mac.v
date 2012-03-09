@@ -129,6 +129,18 @@ module vcr_alloc_mac
    wire [0:num_ports*num_vcs-1] 		      vc_req_ip_ivc;
    assign vc_req_ip_ivc = flit_valid_ip_ivc & ~allocated_ip_ivc;
    
+   wire [0:num_ports-1] 			      vc_active_ip;
+   c_mat_mult
+     #(.dim1_width(num_ports),
+       .dim2_width(num_vcs),
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
+   vc_active_ip_mmult
+     (.input_a(vc_req_ip_ivc),
+      .input_b({num_vcs{1'b1}}),
+      .result(vc_active_ip));
+   
    c_select_mofn
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports))
@@ -141,6 +153,7 @@ module vcr_alloc_mac
       
       if(vc_allocator_type == `VC_ALLOC_TYPE_SEP_IF)
 	begin
+	   
 	   vcr_vc_alloc_sep_if
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -151,6 +164,8 @@ module vcr_alloc_mac
 	   vc_core_sep_if
 	     (.clk(clk),
 	      .reset(reset),
+	      .active_ip(vc_active_ip),
+	      .active_op(vc_active_op),
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .route_ip_ivc_orc(route_ip_ivc_orc),
 	      .elig_op_ovc(elig_op_ovc),
@@ -158,9 +173,11 @@ module vcr_alloc_mac
 	      .gnt_ip_ivc(vc_gnt_ip_ivc),
 	      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
 	      .gnt_op_ovc(vc_gnt_op_ovc));
+	   
 	end
       else if(vc_allocator_type == `VC_ALLOC_TYPE_SEP_OF)
 	begin
+	   
 	   vcr_vc_alloc_sep_of
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -171,6 +188,8 @@ module vcr_alloc_mac
 	   vc_core_sep_of
 	     (.clk(clk),
 	      .reset(reset),
+	      .active_ip(vc_active_ip),
+	      .active_op(vc_active_op),
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .route_ip_ivc_orc(route_ip_ivc_orc),
 	      .elig_op_ovc(elig_op_ovc),
@@ -178,10 +197,15 @@ module vcr_alloc_mac
 	      .gnt_ip_ivc(vc_gnt_ip_ivc),
 	      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
 	      .gnt_op_ovc(vc_gnt_op_ovc));
+	   
 	end
       else if((vc_allocator_type >= `VC_ALLOC_TYPE_WF_BASE) &&
 	      (vc_allocator_type <= `VC_ALLOC_TYPE_WF_LIMIT))
 	begin
+	   
+	   wire vc_active;
+	   assign vc_active = |vc_active_ip;
+	   
 	   vcr_vc_alloc_wf
 	     #(.num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
@@ -192,6 +216,7 @@ module vcr_alloc_mac
 	   vc_core_wf
 	     (.clk(clk),
 	      .reset(reset),
+	      .active(vc_active),
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .route_ip_ivc_orc(route_ip_ivc_orc),
 	      .elig_op_ovc(elig_op_ovc),
@@ -199,6 +224,7 @@ module vcr_alloc_mac
 	      .gnt_ip_ivc(vc_gnt_ip_ivc),
 	      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
 	      .gnt_op_ovc(vc_gnt_op_ovc));
+	   
 	end
       
    endgenerate
@@ -243,6 +269,7 @@ module vcr_alloc_mac
       
       if(sw_allocator_type == `SW_ALLOC_TYPE_SEP_IF)
 	begin
+	   
 	   vcr_sw_alloc_sep_if
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
@@ -262,9 +289,11 @@ module vcr_alloc_mac
 	      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
 	      .gnt_spec_ip(sw_gnt_spec_ip),
 	      .gnt_op_ip(sw_gnt_op_ip));
+	   
 	end
       else if(sw_allocator_type == `SW_ALLOC_TYPE_SEP_OF)
 	begin
+	   
 	   vcr_sw_alloc_sep_of
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
@@ -284,10 +313,12 @@ module vcr_alloc_mac
 	      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
 	      .gnt_spec_ip(sw_gnt_spec_ip),
 	      .gnt_op_ip(sw_gnt_op_ip));
+	   
 	end
       else if((sw_allocator_type >= `SW_ALLOC_TYPE_WF_BASE) &&
 	      (sw_allocator_type <= `SW_ALLOC_TYPE_WF_LIMIT))
 	begin
+	   
 	   vcr_sw_alloc_wf
 	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
@@ -307,6 +338,7 @@ module vcr_alloc_mac
 	      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
 	      .gnt_spec_ip(sw_gnt_spec_ip),
 	      .gnt_op_ip(sw_gnt_op_ip));
+	   
 	end
       
    endgenerate
