@@ -180,20 +180,18 @@ module vcr_op_ctrl_mac
    wire 			   flit_tail;
    assign flit_tail = int_flit_ctrl[1+1];
    
-   wire [0:num_vcs-1] 		   flit_sel_ovc;
+   wire [0:num_vcs-1] 		   flit_sel_ivc;
    
    generate
       
       if(num_vcs == 1)
-	assign flit_sel_ovc = 1'b1;
+	assign flit_sel_ivc = 1'b1;
       else if(num_vcs > 1)
-	assign flit_sel_ovc = int_flit_ctrl[1+2+0:1+2+num_vcs-1];
+	assign flit_sel_ivc = int_flit_ctrl[1+2+0:1+2+num_vcs-1];
       
    endgenerate
    
-   wire [0:num_vcs-1] 		   flit_valid_ovc;
-   assign flit_valid_ovc = {num_vcs{flit_valid}} & flit_sel_ovc;
-   
+   wire [0:num_vcs-1] 		   flit_sel_ovc;
    wire [0:num_vcs*3-1] 	   ovcc_errors_ovc;
    
    genvar 			   ovc;
@@ -215,9 +213,7 @@ module vcr_op_ctrl_mac
 	   wire 		cred_valid;
 	   assign cred_valid = cred_valid_ovc[ovc];
 	   
-	   wire 		flit_valid;
-	   assign flit_valid = flit_valid_ovc[ovc];
-	   
+	   wire 		flit_sel;
 	   wire 		elig;
 	   wire 		empty;
 	   wire [0:1] 		free;
@@ -243,11 +239,14 @@ module vcr_op_ctrl_mac
 	      .xbr_ctrl_ip(xbr_ctrl_ip),
 	      .flit_valid(flit_valid),
 	      .flit_tail(flit_tail),
+	      .flit_sel_ivc(flit_sel_ivc),
+	      .flit_sel(flit_sel),
 	      .elig(elig),
 	      .empty(empty),
 	      .free(free),
 	      .errors(ovcc_errors));
 
+	   assign flit_sel_ovc[ovc] = flit_sel;
 	   assign empty_ovc[ovc] = empty;
 	   assign elig_ovc[ovc] = elig;
 	   assign free_ovc[ovc*2:(ovc+1)*2-1] = free;
@@ -256,6 +255,9 @@ module vcr_op_ctrl_mac
 	end
       
    endgenerate
+   
+   wire 			error_unmatched;
+   assign error_unmatched = flit_valid & ~|flit_sel_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -286,15 +288,27 @@ module vcr_op_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
+   // pragma translate_off
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_unmatched)
+	  $display("ERROR: Unmatched flit in module %m.");
+	
+     end
+   
+   // pragma translate_on
+   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*3-1] errors_s, errors_q;
-	   assign errors_s = ovcc_errors_ovc;
+	   wire [0:1+num_vcs*3-1] errors_s, errors_q;
+	   assign errors_s = {error_unmatched, ovcc_errors_ovc};
 	   c_err_rpt
-	     #(.num_errors(num_vcs*3),
+	     #(.num_errors(1+num_vcs*3),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

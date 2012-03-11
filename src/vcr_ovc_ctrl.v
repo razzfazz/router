@@ -31,7 +31,8 @@
 
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, 
-   xbr_ctrl_ip, flit_valid, flit_tail, elig, empty, free, errors);
+   xbr_ctrl_ip, flit_valid, flit_tail, flit_sel_ivc, flit_sel, elig, empty, 
+   free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -108,6 +109,13 @@ module vcr_ovc_ctrl
    // incoming flit is a tail flit
    input flit_tail;
    
+   // which input VC does the incoming flit belong to?
+   input [0:num_vcs-1] flit_sel_ivc;
+   
+   // output VC is the owner of the incoming flit
+   output flit_sel;
+   wire   flit_sel;
+   
    // output VC is eligible for allocation (i.e., not currently allocated)
    output elig;
    wire   elig;
@@ -133,8 +141,11 @@ module vcr_ovc_ctrl
    wire 	credit;
    assign credit = fc_event_valid;
    
+   wire 	flit_valid_qual;
+   assign flit_valid_qual = flit_valid & flit_sel;
+   
    wire 	debit;
-   assign debit = flit_valid;
+   assign debit = flit_valid_qual;
    
    
    //---------------------------------------------------------------------------
@@ -145,7 +156,7 @@ module vcr_ovc_ctrl
    assign alloc_active = vc_active | (|xbr_ctrl_ip);
    
    wire 	allocated_s, allocated_q;
-   assign allocated_s = vc_gnt | (allocated_q & ~(flit_valid & flit_tail));
+   assign allocated_s = vc_gnt | (allocated_q & ~(flit_valid_qual & flit_tail));
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -155,9 +166,53 @@ module vcr_ovc_ctrl
       .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
-
+   
    wire 	error_stray_flit;
-   assign error_stray_flit = debit & ~allocated_q;
+   assign error_stray_flit = flit_valid_qual & ~allocated_q;
+   
+   wire [0:num_ports-1] flit_sel_ip_s, flit_sel_ip_q;
+   assign flit_sel_ip_s = vc_gnt ? vc_sel_ip : flit_sel_ip_q;
+   c_dff
+     #(.width(num_ports),
+       .reset_type(reset_type))
+   flit_sel_ipq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(alloc_active),
+      .d(flit_sel_ip_s),
+      .q(flit_sel_ip_q));
+
+   wire 		port_match;
+   assign port_match = (xbr_ctrl_ip == flit_sel_ip_q);
+   
+   wire 		vc_match;
+   
+   generate
+      
+      if(num_vcs == 1)
+	assign vc_match = 1'b1;
+      else if(num_vcs > 1)
+	begin
+	   
+	   wire [0:num_vcs-1] 	flit_sel_ivc_s, flit_sel_ivc_q;
+	   assign flit_sel_ivc_s = vc_gnt ? vc_sel_ivc : flit_sel_ivc_q;
+	   c_dff
+	     #(.width(num_vcs),
+	       .reset_type(reset_type))
+	   flit_sel_ivcq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(alloc_active),
+	      .d(flit_sel_ivc_s),
+	      .q(flit_sel_ivc_q));
+	   
+	   assign vc_match = (flit_sel_ivc == flit_sel_ivc_q);
+	   
+	end
+      
+   endgenerate
+   
+   assign flit_sel = allocated_q & port_match & vc_match;
    
    
    //---------------------------------------------------------------------------
