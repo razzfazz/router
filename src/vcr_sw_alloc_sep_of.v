@@ -588,6 +588,8 @@ module vcr_sw_alloc_sep_of
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
+	   wire [0:num_ports-1] gnt_out_spec_ip;
+	   
 	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
 		
@@ -610,8 +612,6 @@ module vcr_sw_alloc_sep_of
 		wire 		     update_arb_spec;
 		assign update_arb_spec = |gnt_in_spec_ip;
 		
-		wire [0:num_ports-1] gnt_out_spec_ip;
-
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
 		     
@@ -652,10 +652,12 @@ module vcr_sw_alloc_sep_of
 		     
 		  end
 		
-		assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
-		  = gnt_out_spec_ip;
-		
 	     end
+	   else
+	     assign gnt_out_spec_ip = {num_ports{1'b0}};
+	   
+	   assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
+	     = gnt_out_spec_ip;
 	   
 	end
       
