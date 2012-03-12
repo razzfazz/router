@@ -349,16 +349,6 @@ module vcr_ivc_ctrl
 	   
 	end
       
-      if(sw_alloc_spec)
-	begin
-	   if(elig_mask == `ELIG_MASK_NONE)
-	     assign flit_sent = sw_gnt & ((vc_gnt & free_spec) | allocated);
-	   else
-	     assign flit_sent = sw_gnt & (vc_gnt | allocated);
-	end
-      else
-	assign flit_sent = sw_gnt;
-      
    endgenerate
    
    
@@ -773,6 +763,20 @@ module vcr_ivc_ctrl
      (.select(vc_sel_ocvc),
       .data_in(free_spec_ocvc),
       .data_out(free_spec));
+   
+   generate
+      
+      if(sw_alloc_spec)
+	begin
+	   if(elig_mask == `ELIG_MASK_NONE)
+	     assign flit_sent = sw_gnt & ((vc_gnt & free_spec) | allocated);
+	   else
+	     assign flit_sent = sw_gnt & (vc_gnt | allocated);
+	end
+      else
+	assign flit_sent = sw_gnt;
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
