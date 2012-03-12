@@ -323,7 +323,6 @@ module vcr_ivc_ctrl
    
    wire [0:num_vcs_per_class-1]      vc_allocated_ocvc;
    wire [0:num_vcs_per_class-1]      vc_allocated_next_ocvc;
-   wire [0:num_vcs_per_class-1]      allocated_ocvc;
    
    generate
       
