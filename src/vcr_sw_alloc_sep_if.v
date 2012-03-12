@@ -31,8 +31,7 @@
 
 module vcr_sw_alloc_sep_if
   (clk, reset, active_ip, active_op, route_ip_ivc_op, req_nonspec_ip_ivc, 
-   req_spec_ip_ivc, sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, 
-   gnt_spec_ip, gnt_op_ip);
+   req_spec_ip_ivc, sel_ip_ivc, gnt_ip, gnt_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -68,21 +67,13 @@ module vcr_sw_alloc_sep_if
    // speculative switch requests
    input [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
    
-   // indicate which VC at a given port is granted non-speculatively
-   output [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
+   // indicate which VC at a given port is granted
+   output [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
    
-   // indicate which VC at a given port is granted speculatively
-   output [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
-   
-   // non-speculative grants
-   output [0:num_ports-1] 		   gnt_nonspec_ip;
-   wire [0:num_ports-1] 		   gnt_nonspec_ip;
-   
-   // speculative grants
-   output [0:num_ports-1] 		   gnt_spec_ip;
-   wire [0:num_ports-1] 		   gnt_spec_ip;
+   // grants
+   output [0:num_ports-1] 		   gnt_ip;
+   wire [0:num_ports-1] 		   gnt_ip;
    
    // crossbar control signals
    output [0:num_ports*num_ports-1] 	   gnt_op_ip;
@@ -198,9 +189,6 @@ module vcr_sw_alloc_sep_if
 	   // generate global grants
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs-1] 	sel_nonspec_ivc;
-	   assign sel_nonspec_ivc = gnt_in_nonspec_ivc;
-	   
 	   wire 		gnt_nonspec;
 	   assign gnt_nonspec = gnt_out_nonspec;
 	   
@@ -209,8 +197,9 @@ module vcr_sw_alloc_sep_if
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs-1] 	sel_spec_ivc;
-	   wire 		gnt_spec;
+	   wire [0:num_ports-1] req_out_spec_op;
+	   wire 		gnt;
+	   wire [0:num_vcs-1] 	sel_ivc;
 	   
 	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
@@ -237,6 +226,7 @@ module vcr_sw_alloc_sep_if
 		assign req_in_spec_ivc = req_spec_ivc;
 		
 		wire [0:num_vcs-1]   gnt_in_spec_ivc;
+		wire 		     gnt_spec;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
@@ -256,7 +246,7 @@ module vcr_sw_alloc_sep_if
 			.update(update_arb),
 			.req_pr({req_in_nonspec_ivc, req_in_spec_ivc}),
 			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
-			.gnt());
+			.gnt(sel_ivc));
 		     
 		     assign gnt_spec = gnt_out_spec;
 		     
@@ -288,14 +278,40 @@ module vcr_sw_alloc_sep_if
 		     
 		     assign gnt_spec = |gnt_out_spec_qual_op;
 		     
+		     case(spec_type)
+		       
+		       `SW_ALLOC_SPEC_TYPE_REQ:
+			 begin
+			    
+			    wire req_nonspec;
+			    assign req_nonspec = |req_nonspec_ivc;
+			    
+			    assign sel_ivc = req_nonspec ? 
+					     gnt_in_nonspec_ivc : 
+					     gnt_in_spec_ivc;
+			    
+			 end
+		       
+		       `SW_ALLOC_SPEC_TYPE_GNT:
+			 begin
+			    
+			    assign sel_ivc = gnt_nonspec ? 
+					     gnt_in_nonspec_ivc : 
+					     gnt_in_spec_ivc;
+			    
+			 end
+		       
+		     endcase
+		     
 		  end
+		
+		assign gnt = gnt_nonspec | gnt_spec;
 		
 		
 		//--------------------------------------------------------------
 		// generate requests for output stage (speculative)
 		//--------------------------------------------------------------
 		
-		wire [0:num_ports-1] 	req_out_spec_op;
 		c_select_mofn
 		  #(.width(num_ports),
 		    .num_ports(num_vcs))
@@ -304,25 +320,14 @@ module vcr_sw_alloc_sep_if
 		   .data_in(route_ivc_op),
 		   .data_out(req_out_spec_op));
 		
-		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-			 = req_out_spec_op;
-		
-		
-		//--------------------------------------------------------------
-		// generate global grants
-		//--------------------------------------------------------------
-		
-		assign sel_spec_ivc = gnt_in_spec_ivc;
-		
 	     end
 	   else
 	     begin
 		
-		assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-			 = {num_ports{1'b0}};
-		assign sel_spec_ivc = {num_vcs{1'b0}};
-		assign gnt_spec = 1'b0;
-				
+		assign req_out_spec_op = {num_ports{1'b0}};
+		assign sel_ivc = gnt_in_nonspec_ivc;
+		assign gnt = gnt_nonspec;
+		
 	     end
 	   
 	   
@@ -330,12 +335,10 @@ module vcr_sw_alloc_sep_if
 	   // combine global grants
 	   //-------------------------------------------------------------------
 	   
-	   assign sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-		    = sel_nonspec_ivc;
-	   assign gnt_nonspec_ip[ip] = gnt_nonspec;
-	   assign sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-		    = sel_spec_ivc;
-	   assign gnt_spec_ip[ip] = gnt_spec;
+	   assign req_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+	     = req_out_spec_op;
+	   assign sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = sel_ivc;
+	   assign gnt_ip[ip] = gnt;
 	   	   
 	end
       

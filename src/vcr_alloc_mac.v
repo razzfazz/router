@@ -271,10 +271,6 @@ module vcr_alloc_mac
       .data_in(route_ip_ivc_op),
       .data_out(sw_active_op));
    
-   wire [0:num_ports*num_vcs-1] sw_sel_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] sw_sel_spec_ip_ivc;
-   wire [0:num_ports-1] 	sw_gnt_nonspec_ip;
-   wire [0:num_ports-1] 	sw_gnt_spec_ip;
    wire [0:num_ports*num_ports-1] sw_gnt_op_ip;
    
    genvar 			  op;
@@ -298,10 +294,8 @@ module vcr_alloc_mac
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
 	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-	      .sel_nonspec_ip_ivc(sw_sel_nonspec_ip_ivc),
-	      .sel_spec_ip_ivc(sw_sel_spec_ip_ivc),
-	      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
-	      .gnt_spec_ip(sw_gnt_spec_ip),
+	      .sel_ip_ivc(sw_sel_ip_ivc),
+	      .gnt_ip(sw_gnt_ip),
 	      .gnt_op_ip(sw_gnt_op_ip));
 	   
 	end
@@ -322,10 +316,8 @@ module vcr_alloc_mac
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
 	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-	      .sel_nonspec_ip_ivc(sw_sel_nonspec_ip_ivc),
-	      .sel_spec_ip_ivc(sw_sel_spec_ip_ivc),
-	      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
-	      .gnt_spec_ip(sw_gnt_spec_ip),
+	      .sel_ip_ivc(sw_sel_ip_ivc),
+	      .gnt_ip(sw_gnt_ip),
 	      .gnt_op_ip(sw_gnt_op_ip));
 	   
 	end
@@ -347,72 +339,9 @@ module vcr_alloc_mac
 	      .route_ip_ivc_op(route_ip_ivc_op),
 	      .req_nonspec_ip_ivc(sw_req_nonspec_ip_ivc),
 	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
-	      .sel_nonspec_ip_ivc(sw_sel_nonspec_ip_ivc),
-	      .sel_spec_ip_ivc(sw_sel_spec_ip_ivc),
-	      .gnt_nonspec_ip(sw_gnt_nonspec_ip),
-	      .gnt_spec_ip(sw_gnt_spec_ip),
+	      .sel_ip_ivc(sw_sel_ip_ivc),
+	      .gnt_ip(sw_gnt_ip),
 	      .gnt_op_ip(sw_gnt_op_ip));
-	   
-	end
-      
-   endgenerate
-   
-   generate
-      
-      assign sw_gnt_ip = sw_gnt_nonspec_ip | sw_gnt_spec_ip;
-      
-      genvar ip;
-      
-      for(ip = 0; ip < num_ports; ip = ip + 1)
-	begin:ips
-	   
-	   wire [0:num_vcs-1] sw_req_nonspec_ivc;
-	   assign sw_req_nonspec_ivc
-	     = sw_req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire 	      sw_req_nonspec;
-	   assign sw_req_nonspec = |sw_req_nonspec_ivc;
-	   
-	   wire 	      sw_gnt_nonspec;
-	   assign sw_gnt_nonspec = sw_gnt_nonspec_ip[ip];
-	   
-	   wire [0:num_vcs-1] sw_sel_nonspec_ivc;
-	   assign sw_sel_nonspec_ivc
-	     = sw_sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire [0:num_vcs-1] sw_sel_spec_ivc;
-	   assign sw_sel_spec_ivc
-	     = sw_sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
-	   
-	   wire [0:num_vcs-1] sw_sel_ivc;
-	   
-	   case(spec_type)
-	     
-	     `SW_ALLOC_SPEC_TYPE_NONE:
-	       begin
-		  assign sw_sel_ivc = sw_sel_nonspec_ivc;
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_REQ:
-	       begin
-		  assign sw_sel_ivc
-		    = sw_req_nonspec ? sw_sel_nonspec_ivc : sw_sel_spec_ivc;
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_GNT:
-	       begin
-		  assign sw_sel_ivc
-		    = sw_gnt_nonspec ? sw_sel_nonspec_ivc : sw_sel_spec_ivc;
-	       end
-	     
-	     `SW_ALLOC_SPEC_TYPE_PRIO:
-	       begin
-		  assign sw_sel_ivc = sw_sel_nonspec_ivc | sw_sel_spec_ivc;
-	       end
-	     
-	   endcase
-	   
-	   assign sw_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1] = sw_sel_ivc;
 	   
 	end
       
