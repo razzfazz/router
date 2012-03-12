@@ -100,6 +100,9 @@ module vcr_sw_alloc_wf
    wire [0:num_ports*num_ports-1] 	   req_wf_spec_ip_op;
    wire [0:num_ports*num_ports-1] 	   gnt_wf_spec_ip_op;
    
+   wire [0:num_ports-1] 		   unused_by_nonspec_ip;
+   wire [0:num_ports-1] 		   unused_by_nonspec_op;
+   
    
    //---------------------------------------------------------------------------
    // input stage
@@ -348,7 +351,15 @@ module vcr_sw_alloc_wf
 		   .input_b({num_ports{1'b1}}),
 		   .result(sel_spec_ivc));
 		
-		assign gnt_spec = |gnt_wf_spec_op;
+		wire 			     unused_by_nonspec;
+		assign unused_by_nonspec = unused_by_nonspec_ip[ip];
+		
+		wire [0:num_ports-1] 	     gnt_wf_spec_qual_op;
+		assign gnt_wf_spec_qual_op
+		  = gnt_wf_spec_op & unused_by_nonspec_op & 
+		    {num_ports{unused_by_nonspec}};
+		
+		assign gnt_spec = |gnt_wf_spec_qual_op;
 		
 	     end
 	   else
@@ -377,9 +388,6 @@ module vcr_sw_alloc_wf
    //---------------------------------------------------------------------------
    // mask speculative requests that conflict with non-speculative ones
    //---------------------------------------------------------------------------
-   
-   wire [0:num_ports-1] unused_by_nonspec_ip;
-   wire [0:num_ports-1] unused_by_nonspec_op;
    
    generate
       
@@ -458,6 +466,8 @@ module vcr_sw_alloc_wf
    wire 			  update_alloc_nonspec;
    assign update_alloc_nonspec = |req_nonspec_ip_ivc;
    
+   wire [0:num_ports*num_ports-1] gnt_ip_op;
+   
    generate
       
       if(spec_type != `SW_ALLOC_SPEC_TYPE_PRIO)
@@ -481,11 +491,10 @@ module vcr_sw_alloc_wf
 	begin
 	   
 	   wire update_alloc_spec;
-
+	   assign update_alloc_spec = |req_spec_ip_ivc;
+	   
 	   if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 	     begin
-		
-		assign update_alloc_spec = |req_spec_ip_ivc;
 		
 		wire update_alloc;
 		assign update_alloc = update_alloc_nonspec | update_alloc_spec;
@@ -503,9 +512,23 @@ module vcr_sw_alloc_wf
 		   .req({req_wf_nonspec_ip_op, req_wf_spec_ip_op}),
 		   .gnt({gnt_wf_nonspec_ip_op, gnt_wf_spec_ip_op}));
 		
+		assign gnt_ip_op = gnt_wf_nonspec_ip_op | gnt_wf_spec_ip_op;
+		
 	     end
 	   else
 	     begin
+		
+		c_wf_alloc
+		  #(.num_ports(num_ports),
+		    .wf_alloc_type(wf_alloc_type),
+		    .reset_type(reset_type))
+		gnt_wf_spec_ip_op_alloc
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .update(update_alloc_spec),
+		   .req(req_wf_spec_ip_op),
+		   .gnt(gnt_wf_spec_ip_op));
 		
 		wire [0:num_ports*num_ports-1] spec_mask_ip_op;
 		c_mat_mult
@@ -519,45 +542,23 @@ module vcr_sw_alloc_wf
 		   .input_b(unused_by_nonspec_op),
 		   .result(spec_mask_ip_op));
 		
-		// only update priorities if there is no conflicting non-
-		// speculative request
-		assign update_alloc_spec
-		  = |(req_wf_spec_ip_op & spec_mask_ip_op);
+		wire [0:num_ports*num_ports-1] gnt_wf_spec_qual_ip_op;
+		assign gnt_wf_spec_qual_ip_op
+		  = gnt_wf_spec_ip_op & spec_mask_ip_op;
 		
-		wire [0:num_ports*num_ports-1] req_wf_spec_int_ip_op;
-		assign req_wf_spec_int_ip_op = req_wf_spec_ip_op;
-		
-		wire [0:num_ports*num_ports-1] gnt_wf_spec_int_ip_op;
-		c_wf_alloc
-		  #(.num_ports(num_ports),
-		    .wf_alloc_type(wf_alloc_type),
-		    .reset_type(reset_type))
-		gnt_wf_spec_int_ip_op_alloc
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(active),
-		   .update(update_alloc_spec),
-		   .req(req_wf_spec_int_ip_op),
-		   .gnt(gnt_wf_spec_int_ip_op));
-		
-		assign gnt_wf_spec_ip_op
-		  = gnt_wf_spec_int_ip_op & spec_mask_ip_op;
+		assign gnt_ip_op
+		  = gnt_wf_nonspec_ip_op | gnt_wf_spec_qual_ip_op;
 		
 	     end
 	   
 	end
       else
-	assign gnt_wf_spec_ip_op = {num_ports*num_ports{1'b0}};
+	begin
+	   assign gnt_wf_spec_ip_op = {num_ports*num_ports{1'b0}};
+	   assign gnt_ip_op = gnt_wf_nonspec_ip_op;
+	end
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate global grants
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
-   assign gnt_ip_op = gnt_wf_nonspec_ip_op | gnt_wf_spec_ip_op;
    
    c_interleave
      #(.width(num_ports*num_ports),

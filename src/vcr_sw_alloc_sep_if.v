@@ -100,6 +100,9 @@ module vcr_sw_alloc_sep_if
    wire [0:num_ports*num_ports-1] 	   req_out_spec_ip_op;
    wire [0:num_ports*num_ports-1] 	   gnt_out_spec_ip_op;
    
+   wire [0:num_ports-1] 		   unused_by_nonspec_ip;
+   wire [0:num_ports-1] 		   unused_by_nonspec_op;
+   
    
    //---------------------------------------------------------------------------
    // input stage
@@ -220,8 +223,11 @@ module vcr_sw_alloc_sep_if
 		assign gnt_out_spec_op
 		  = gnt_out_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1];
 		
+		wire 		     gnt_out_spec;
+		assign gnt_out_spec = |gnt_out_spec_op;
+		
 		wire 		     update_arb_spec;
-		assign update_arb_spec = gnt_spec;
+		assign update_arb_spec = gnt_out_spec;
 		
 		wire [0:num_vcs-1]   req_spec_ivc;
 		assign req_spec_ivc
@@ -252,6 +258,8 @@ module vcr_sw_alloc_sep_if
 			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
 			.gnt());
 		     
+		     assign gnt_spec = gnt_out_spec;
+		     
 		  end
 		else
 		  begin
@@ -269,6 +277,16 @@ module vcr_sw_alloc_sep_if
 			.req_pr(req_in_spec_ivc),
 			.gnt_pr(gnt_in_spec_ivc),
 			.gnt());
+		     
+		     wire unused_by_nonspec;
+		     assign unused_by_nonspec = unused_by_nonspec_ip[ip];
+		     
+		     wire [0:num_ports-1] gnt_out_spec_qual_op;
+		     assign gnt_out_spec_qual_op
+		       = gnt_out_spec_op & unused_by_nonspec_op &
+			 {num_ports{unused_by_nonspec}};
+		     
+		     assign gnt_spec = |gnt_out_spec_qual_op;
 		     
 		  end
 		
@@ -295,7 +313,6 @@ module vcr_sw_alloc_sep_if
 		//--------------------------------------------------------------
 		
 		assign sel_spec_ivc = gnt_in_spec_ivc;
-		assign gnt_spec = |gnt_out_spec_op;
 		
 	     end
 	   else
@@ -373,9 +390,6 @@ module vcr_sw_alloc_sep_if
    //---------------------------------------------------------------------------
    // mask speculative requests that conflict with non-speculative ones
    //---------------------------------------------------------------------------
-
-   wire [0:num_ports-1] 	  unused_by_nonspec_ip;
-   wire [0:num_ports-1] 	  unused_by_nonspec_op;
    
    generate
       
@@ -533,11 +547,10 @@ module vcr_sw_alloc_sep_if
 		  = req_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
 		
 		wire 		     update_arb_spec;
+		assign update_arb_spec = |req_out_spec_ip;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
-		     
-		     assign update_arb_spec = |req_out_spec_ip;
 		     
 		     wire update_arb;
 		     assign update_arb = update_arb_nonspec | update_arb_spec;
@@ -560,36 +573,29 @@ module vcr_sw_alloc_sep_if
 		else
 		  begin
 		     
-		     wire unused_by_nonspec;
-		     assign unused_by_nonspec = unused_by_nonspec_op[op];
-		     
-		     wire [0:num_ports-1] req_out_spec_int_ip;
-		     assign req_out_spec_int_ip = req_out_spec_ip;
-		     
-		     assign update_arb_spec
-		       = |(req_out_spec_int_ip & unused_by_nonspec_ip) & 
-			 unused_by_nonspec;
-		     
-		     wire [0:num_ports-1] gnt_out_spec_int_ip;
 		     c_arbiter
 		       #(.num_ports(num_ports),
 			 .num_priorities(1),
 			 .arbiter_type(arbiter_type),
 			 .reset_type(reset_type))
-		     gnt_out_spec_int_ip_arb
+		     gnt_out_spec_ip_arb
 		       (.clk(clk),
 			.reset(reset),
 			.active(active),
 			.update(update_arb_spec),
-			.req_pr(req_out_spec_int_ip),
-			.gnt_pr(gnt_out_spec_int_ip),
+			.req_pr(req_out_spec_ip),
+			.gnt_pr(gnt_out_spec_ip),
 			.gnt());
 		     
-		     assign gnt_out_spec_ip
-		       = gnt_out_spec_int_ip & unused_by_nonspec_ip &
+		     wire unused_by_nonspec;
+		     assign unused_by_nonspec = unused_by_nonspec_op[op];
+		     
+		     wire [0:num_ports-1] gnt_out_spec_qual_ip;
+		     assign gnt_out_spec_qual_ip
+		       = gnt_out_spec_ip & unused_by_nonspec_ip &
 			 {num_ports{unused_by_nonspec}};
 		     
-		     assign gnt_ip = gnt_out_nonspec_ip | gnt_out_spec_ip;
+		     assign gnt_ip = gnt_out_nonspec_ip | gnt_out_spec_qual_ip;
 		     
 		  end
 		
