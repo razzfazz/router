@@ -30,7 +30,7 @@
 //==============================================================================
 
 module c_wf_alloc
-  (clk, reset, active, req, gnt, update);
+  (clk, reset, active, req_pr, gnt_pr, gnt, update);
    
 `include "c_constants.v"
    
@@ -51,14 +51,18 @@ module c_wf_alloc
    input active;
    
    // request matrix
-   input [0:num_ports*num_ports-1] req;
+   input [0:num_priorities*num_ports*num_ports-1] req_pr;
    
    // grant matrix
-   output [0:num_ports*num_ports-1] gnt;
-   wire [0:num_ports*num_ports-1] gnt;
+   output [0:num_priorities*num_ports*num_ports-1] gnt_pr;
+   wire [0:num_priorities*num_ports*num_ports-1]   gnt_pr;
+   
+   // combined grant matrix
+   output [0:num_ports*num_ports-1] 		   gnt;
+   wire [0:num_ports*num_ports-1] 		   gnt;
    
    // update port priorities
-   input update;
+   input 					   update;
    
    generate
       
@@ -88,8 +92,8 @@ module c_wf_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
-		.gnt(gnt),
+		.req(req_pr),
+		.gnt(gnt_pr),
 		.update(update));
 	  end
 	`WF_ALLOC_TYPE_REP:
@@ -101,8 +105,8 @@ module c_wf_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
-		.gnt(gnt),
+		.req(req_pr),
+		.gnt(gnt_pr),
 		.update(update));
 	  end
 	`WF_ALLOC_TYPE_DPA:
@@ -114,8 +118,8 @@ module c_wf_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
-		.gnt(gnt),
+		.req(req_pr),
+		.gnt(gnt_pr),
 		.update(update));
 	  end      
 	`WF_ALLOC_TYPE_ROT:
@@ -127,8 +131,8 @@ module c_wf_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
-		.gnt(gnt),
+		.req(req_pr),
+		.gnt(gnt_pr),
 		.update(update));
 	  end
 	`WF_ALLOC_TYPE_LOOP:
@@ -140,12 +144,14 @@ module c_wf_alloc
 	       (.clk(clk),
 		.reset(reset),
 		.active(active),
-		.req(req),
-		.gnt(gnt),
+		.req(req_pr),
+		.gnt(gnt_pr),
 		.update(update));
 	  end
       endcase
       
    endgenerate
+   
+   assign gnt = gnt_pr;
    
 endmodule

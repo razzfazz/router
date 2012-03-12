@@ -454,6 +454,7 @@ module vcr_sw_alloc_wf
 	   
 	   c_wf_alloc
 	     #(.num_ports(num_ports),
+	       .num_priorities(1),
 	       .wf_alloc_type(wf_alloc_type),
 	       .reset_type(reset_type))
 	   gnt_wf_nonspec_ip_op_alloc
@@ -461,8 +462,9 @@ module vcr_sw_alloc_wf
 	      .reset(reset),
 	      .active(active),
 	      .update(update_alloc_nonspec),
-	      .req(req_wf_nonspec_ip_op),
-	      .gnt(gnt_wf_nonspec_ip_op));
+	      .req_pr(req_wf_nonspec_ip_op),
+	      .gnt_pr(gnt_wf_nonspec_ip_op),
+	      .gnt());
 	   
 	end
       
@@ -488,10 +490,9 @@ module vcr_sw_alloc_wf
 		   .reset(reset),
 		   .active(active),
 		   .update(update_alloc),
-		   .req({req_wf_nonspec_ip_op, req_wf_spec_ip_op}),
-		   .gnt({gnt_wf_nonspec_ip_op, gnt_wf_spec_ip_op}));
-		
-		assign gnt_ip_op = gnt_wf_nonspec_ip_op | gnt_wf_spec_ip_op;
+		   .req_pr({req_wf_nonspec_ip_op, req_wf_spec_ip_op}),
+		   .gnt_pr({gnt_wf_nonspec_ip_op, gnt_wf_spec_ip_op}),
+		   .gnt(gnt_ip_op));
 		
 	     end
 	   else
@@ -506,8 +507,9 @@ module vcr_sw_alloc_wf
 		   .reset(reset),
 		   .active(active),
 		   .update(update_alloc_spec),
-		   .req(req_wf_spec_ip_op),
-		   .gnt(gnt_wf_spec_ip_op));
+		   .req_pr(req_wf_spec_ip_op),
+		   .gnt_pr(gnt_wf_spec_ip_op),
+		   .gnt());
 		
 		wire [0:num_ports*num_ports-1] spec_mask_ip_op;
 		c_mat_mult

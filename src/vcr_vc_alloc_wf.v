@@ -127,6 +127,7 @@ module vcr_vc_alloc_wf
 		 num_vcs_per_class-1] gnt_wf_ip_irc_icvc_op_orc_ocvc;
 	   c_wf_alloc
 	     #(.num_ports(num_ports*num_resource_classes*num_vcs_per_class),
+	       .num_priorities(1),
 	       .wf_alloc_type(wf_alloc_type),
 	       .reset_type(reset_type))
 	   gnt_wf_ip_irc_icvc_op_orc_ocvc_alloc
@@ -134,8 +135,9 @@ module vcr_vc_alloc_wf
 	      .reset(reset),
 	      .active(active),
 	      .update(update_alloc),
-	      .req(req_wf_ip_irc_icvc_op_orc_ocvc),
-	      .gnt(gnt_wf_ip_irc_icvc_op_orc_ocvc));
+	      .req_pr(req_wf_ip_irc_icvc_op_orc_ocvc),
+	      .gnt_pr(gnt_wf_ip_irc_icvc_op_orc_ocvc),
+	      .gnt());
 	   
 	   
 	   //-------------------------------------------------------------------
