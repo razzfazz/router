@@ -318,7 +318,7 @@ module vcr_sw_alloc_sep_of
 			.gnt());
 		     
 		     assign gnt_spec_op = gnt_in_spec_op;
-		     assign gnt_spec = |gnt_in_spec_ivc;
+		     assign gnt_spec = ~|req_in_nonspec_ivc & |req_in_spec_ivc;
 		     
 		  end
 		else

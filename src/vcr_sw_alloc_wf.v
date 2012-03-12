@@ -293,7 +293,7 @@ module vcr_sw_alloc_wf
 			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
 			.gnt());
 		     
-		     assign gnt_spec = |gnt_in_spec_ivc;
+		     assign gnt_spec = ~|req_in_nonspec_ivc & |req_in_spec_ivc;
 		     
 		  end
 		else
