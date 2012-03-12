@@ -321,24 +321,21 @@ module vcr_ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
-   wire [0:num_vcs_per_class-1]      vc_allocated_ocvc;
    wire [0:num_vcs_per_class-1]      vc_allocated_next_ocvc;
    
    generate
       
       if(num_vcs_per_class == 1)
+	assign vc_allocated_next_ocvc = 1'b1;
+      else if(num_vcs_per_class > 1)
 	begin
-	   assign vc_allocated_next_ocvc = 1'b1;
-	   assign vc_allocated_ocvc = 1'b1;
-	end
-      if(num_vcs_per_class > 1)
-	begin
+	   
+	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
 	   
 	   assign vc_allocated_next_ocvc
-	     = allocated ? vc_allocated_ocvc : vc_sel_ocvc;
+	     = allocated ? vc_allocated_ocvc_q : vc_sel_ocvc;
 	   
 	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
-	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
 	   assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
 	   c_dff
 	     #(.width(num_vcs_per_class),
@@ -349,8 +346,6 @@ module vcr_ivc_ctrl
 	      .active(pop_active),
 	      .d(vc_allocated_ocvc_s),
 	      .q(vc_allocated_ocvc_q));
-	   
-	   assign vc_allocated_ocvc = vc_allocated_ocvc_q;
 	   
 	end
       
