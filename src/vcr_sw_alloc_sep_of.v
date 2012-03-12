@@ -130,7 +130,7 @@ module vcr_sw_alloc_sep_of
 	   // combine requests from all VCs
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_vcs-1] req_nonspec_ivc;
+	   wire [0:num_vcs-1] 		req_nonspec_ivc;
 	   assign req_nonspec_ivc
 	     = req_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
