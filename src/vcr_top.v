@@ -218,7 +218,7 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 		     free_nonspec_ip_ivc;
    
    wire [0:num_ports*num_vcs-1] 		     vc_gnt_ip_ivc;
-   wire [0:num_ports*num_vcs*num_vcs_per_class-1]    vc_sel_ip_ivc_ocvc;
+   wire [0:num_ports*num_vcs*num_vcs-1] 	     vc_sel_ip_ivc_ovc;
    
    wire [0:num_ports*num_vcs-1] 		     sw_sel_ip_ivc;
    wire [0:num_ports-1] 			     sw_gnt_ip;
@@ -249,18 +249,17 @@ module vcr_top
 	   wire [0:num_vcs-1] 	    vc_gnt_ivc;
 	   assign vc_gnt_ivc = vc_gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire [0:num_vcs*num_vcs_per_class-1] vc_sel_ivc_ocvc;
-	   assign vc_sel_ivc_ocvc
-	     = vc_sel_ip_ivc_ocvc[ip*num_vcs*num_vcs_per_class:
-				  (ip+1)*num_vcs*num_vcs_per_class-1];
+	   wire [0:num_vcs*num_vcs-1] vc_sel_ivc_ovc;
+	   assign vc_sel_ivc_ovc
+	     = vc_sel_ip_ivc_ovc[ip*num_vcs*num_vcs:(ip+1)*num_vcs*num_vcs-1];
 	   
-	   wire [0:num_vcs-1] 			sw_sel_ivc;
+	   wire [0:num_vcs-1] 	      sw_sel_ivc;
 	   assign sw_sel_ivc = sw_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
 	   
-	   wire 				sw_gnt;
+	   wire 		      sw_gnt;
 	   assign sw_gnt = sw_gnt_ip[ip];
 	   
-	   wire [0:num_vcs*num_ports-1] 	route_ivc_op;
+	   wire [0:num_vcs*num_ports-1] route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] route_ivc_orc;
 	   wire [0:num_vcs-1] 			   allocated_ivc;
 	   wire [0:num_vcs-1] 			   flit_valid_ivc;
@@ -305,7 +304,7 @@ module vcr_top
 	      .flit_valid_ivc(flit_valid_ivc),
 	      .free_nonspec_ivc(free_nonspec_ivc),
 	      .vc_gnt_ivc(vc_gnt_ivc),
-	      .vc_sel_ivc_ocvc(vc_sel_ivc_ocvc),
+	      .vc_sel_ivc_ovc(vc_sel_ivc_ovc),
 	      .sw_sel_ivc(sw_sel_ivc),
 	      .sw_gnt(sw_gnt),
 	      .free_op_ovc(free_op_ovc),
@@ -378,7 +377,7 @@ module vcr_top
       .free_nonspec_ip_ivc(free_nonspec_ip_ivc),
       .vc_active_op(vc_active_op),
       .vc_gnt_ip_ivc(vc_gnt_ip_ivc),
-      .vc_sel_ip_ivc_ocvc(vc_sel_ip_ivc_ocvc),
+      .vc_sel_ip_ivc_ovc(vc_sel_ip_ivc_ovc),
       .vc_gnt_op_ovc(vc_gnt_op_ovc),
       .vc_sel_op_ovc_ip(vc_sel_op_ovc_ip),
       .vc_sel_op_ovc_ivc(vc_sel_op_ovc_ivc),

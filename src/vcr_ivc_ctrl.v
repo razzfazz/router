@@ -32,7 +32,7 @@
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    header_info_in, peek_header_info, fb_flit_tail, free_op_ovc, route_op, 
-   route_orc, vc_gnt, vc_sel_ocvc, sw_gnt, flit_sent, flit_sent_prev, 
+   route_orc, vc_gnt, vc_sel_ovc, sw_gnt, flit_sent, flit_sent_prev, 
    flit_valid, flit_head, flit_tail, next_lar_info, fbc_almost_empty, 
    fbc_empty, allocated, free_nonspec, free_spec, errors);
    
@@ -55,6 +55,10 @@ module vcr_ivc_ctrl
    
    // number of VCs available for each class
    parameter num_vcs_per_class = 1;
+   
+   // number of VCs available for each message class
+   localparam num_vcs_per_message_class
+     = num_resource_classes * num_vcs_per_class;
    
    // number of VCs
    localparam num_vcs = num_packet_classes * num_vcs_per_class;
@@ -177,7 +181,7 @@ module vcr_ivc_ctrl
    
    // message class to which this VC belongs
    localparam message_class
-     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
+     = (vc_id / num_vcs_per_message_class) % num_message_classes;
    
    // resource class to which this VC belongs
    localparam resource_class
@@ -230,7 +234,7 @@ module vcr_ivc_ctrl
    input 			     vc_gnt;
    
    // granted output VC
-   input [0:num_vcs_per_class-1]     vc_sel_ocvc;
+   input [0:num_vcs-1] 		     vc_sel_ovc;
    
    // switch allocator grants
    input 			     sw_gnt;
@@ -321,35 +325,50 @@ module vcr_ivc_ctrl
       .d(vc_allocated_s),
       .q(vc_allocated_q));
    
-   wire [0:num_vcs_per_class-1]      vc_allocated_next_ocvc;
+   wire [0:num_vcs_per_message_class-1] vc_allocated_next_orc_ocvc;
    
    generate
       
-      if(num_vcs_per_class == 1)
-	assign vc_allocated_next_ocvc = 1'b1;
-      else if(num_vcs_per_class > 1)
+      if(num_vcs_per_message_class == 1)
+	assign vc_allocated_next_orc_ocvc = 1'b1;
+      else if(num_vcs_per_message_class > 1)
 	begin
 	   
-	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
+	   wire [0:num_vcs_per_message_class-1] vc_sel_orc_ocvc;
+	   assign vc_sel_orc_ocvc
+	     = vc_sel_ovc[message_class*num_vcs_per_message_class:
+	                  (message_class+1)*num_vcs_per_message_class-1];
 	   
-	   assign vc_allocated_next_ocvc
-	     = allocated ? vc_allocated_ocvc_q : vc_sel_ocvc;
+	   wire [0:num_vcs_per_message_class-1] vc_allocated_orc_ocvc_q;
 	   
-	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
-	   assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
+	   assign vc_allocated_next_orc_ocvc
+	     = allocated ? vc_allocated_orc_ocvc_q : vc_sel_orc_ocvc;
+	   
+	   wire [0:num_vcs_per_message_class-1] vc_allocated_orc_ocvc_s;
+	   assign vc_allocated_orc_ocvc_s = vc_allocated_next_orc_ocvc;
 	   c_dff
-	     #(.width(num_vcs_per_class),
+	     #(.width(num_vcs_per_message_class),
 	       .reset_type(reset_type))
-	   vc_allocated_ocvcq
+	   vc_allocated_orc_ocvcq
 	     (.clk(clk),
 	      .reset(1'b0),
 	      .active(pop_active),
-	      .d(vc_allocated_ocvc_s),
-	      .q(vc_allocated_ocvc_q));
+	      .d(vc_allocated_orc_ocvc_s),
+	      .q(vc_allocated_orc_ocvc_q));
 	   
 	end
       
    endgenerate
+   
+   wire [0:num_vcs-1] vc_allocated_next_ovc;
+   c_align
+     #(.in_width(num_vcs_per_message_class),
+       .out_width(num_vcs),
+       .offset(message_class*num_vcs_per_message_class))
+   vc_allocated_next_ovc_agn
+     (.data_in(vc_allocated_next_orc_ocvc),
+      .dest_in({num_vcs{1'b0}}),
+      .data_out(vc_allocated_next_ovc));
    
    
    //---------------------------------------------------------------------------
@@ -358,7 +377,7 @@ module vcr_ivc_ctrl
    
    assign flit_tail = fbc_empty ? flit_tail_in : fb_flit_tail;
    
-   wire 			       htr_flit_head_s, htr_flit_head_q;
+   wire 	      htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
    c_dff
      #(.width(1),
@@ -378,12 +397,12 @@ module vcr_ivc_ctrl
    // header info register
    //---------------------------------------------------------------------------
    
-   wire [0:route_info_width-1] 	       route_info_in;
+   wire [0:route_info_width-1] route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
    
-   wire 			       hdr_capture;
-   wire 			       hdr_active;
-   wire 			       hdr_valid;
+   wire 		       hdr_capture;
+   wire 		       hdr_active;
+   wire 		       hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
@@ -400,16 +419,16 @@ module vcr_ivc_ctrl
       
    endgenerate
    
-   wire 			       two_plus_flits;
+   wire two_plus_flits;
    assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
    
-   wire [0:route_info_width-1] 	       peek_route_info;
+   wire [0:route_info_width-1] peek_route_info;
    assign peek_route_info = peek_header_info[0:route_info_width-1];
    
-   wire [0:lar_info_width-1] 	       lar_info_in;
+   wire [0:lar_info_width-1]   lar_info_in;
    assign lar_info_in = route_info_in[0:lar_info_width-1];
    
-   wire [0:lar_info_width-1] 	       hdr_lar_info_s, hdr_lar_info_q;
+   wire [0:lar_info_width-1]   hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_lar_info_s = hdr_capture ? lar_info_in : hdr_lar_info_q;
@@ -679,32 +698,18 @@ module vcr_ivc_ctrl
       .data_in(free_op_ovc),
       .data_out(free_ovc));
    
-   wire [0:num_resource_classes*num_vcs_per_class*2-1] free_orc_ocvc;
-   assign free_orc_ocvc
-     = free_ovc[message_class*num_resource_classes*num_vcs_per_class*2:
-		(message_class+1)*num_resource_classes*num_vcs_per_class*2-1];
+   wire [0:num_vcs-1] 			       next_free_ovc;
+   wire [0:num_vcs-1] 			       free_spec_ovc;
    
-   wire [0:num_vcs_per_class*2-1] 		       free_ocvc;
-   c_select_1ofn
-     #(.num_ports(num_resource_classes),
-       .width(num_vcs_per_class*2))
-   free_ocvc_sel
-     (.select(route_orc),
-      .data_in(free_orc_ocvc),
-      .data_out(free_ocvc));
-   
-   wire [0:num_vcs_per_class-1] 		       next_free_ocvc;
-   wire [0:num_vcs_per_class-1] 		       free_spec_ocvc;
-   
-   genvar 					       ocvc;
+   genvar 				       ovc;
    
    generate
       
-      for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
-	begin:ocvcs
+      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+	begin:ovcs
 	   
 	   wire [0:1] free;
-	   assign free = free_ocvc[ocvc*2:(ocvc+1)*2-1];
+	   assign free = free_ovc[ovc*2:(ovc+1)*2-1];
 	   
 	   wire       two_or_more_credits;
 	   assign two_or_more_credits = free[0] & (free[1] | ~flit_sent_prev);
@@ -716,7 +721,7 @@ module vcr_ivc_ctrl
 	   assign next_free
 	     = flit_sent ? two_or_more_credits : one_or_more_credits;
 	   
-	   assign next_free_ocvc[ocvc] = next_free;
+	   assign next_free_ovc[ovc] = next_free;
 	   
 	   // NOTE: When sending the first flit in each packet, we must have 
 	   // won VC allocation. Consequently, the destination output VC must 
@@ -726,22 +731,27 @@ module vcr_ivc_ctrl
 	   wire       free_spec;
 	   assign free_spec = |free;
 	   
-	   assign free_spec_ocvc[ocvc] = free_spec;
+	   assign free_spec_ovc[ovc] = free_spec;
 	   
 	end
       
    endgenerate
    
-   wire 	      free_nonspec_muxed;
+   wire [0:num_vcs_per_message_class-1] next_free_orc_ocvc;
+   assign next_free_orc_ocvc
+     = next_free_ovc[message_class*num_vcs_per_message_class:
+		     (message_class+1)*num_vcs_per_message_class-1];
+   
+   wire 				free_nonspec_muxed;
    c_select_1ofn
-     #(.num_ports(num_vcs_per_class),
+     #(.num_ports(num_vcs_per_message_class),
        .width(1))
    free_nonspec_muxed_sel
-     (.select(vc_allocated_next_ocvc),
-      .data_in(next_free_ocvc),
+     (.select(vc_allocated_next_orc_ocvc),
+      .data_in(next_free_orc_ocvc),
       .data_out(free_nonspec_muxed));
    
-   wire 	      free_nonspec_s, free_nonspec_q;
+   wire 				free_nonspec_s, free_nonspec_q;
    assign free_nonspec_s = free_nonspec_muxed;
    c_dff
      #(.width(1),
@@ -757,11 +767,11 @@ module vcr_ivc_ctrl
    assign free_nonspec = free_nonspec_q;
    
    c_select_1ofn
-     #(.num_ports(num_vcs_per_class),
+     #(.num_ports(num_vcs),
        .width(1))
    free_spec_sel
-     (.select(vc_sel_ocvc),
-      .data_in(free_spec_ocvc),
+     (.select(vc_sel_ovc),
+      .data_in(free_spec_ovc),
       .data_out(free_spec));
    
    generate
