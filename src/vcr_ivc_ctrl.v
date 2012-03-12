@@ -342,7 +342,7 @@ module vcr_ivc_ctrl
 	       .reset_type(reset_type))
 	   vc_allocated_ocvcq
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(1'b0),
 	      .active(pop_active),
 	      .d(vc_allocated_ocvc_s),
 	      .q(vc_allocated_ocvc_q));
@@ -759,7 +759,7 @@ module vcr_ivc_ctrl
        .reset_type(reset_type))
    free_nonspecq
      (.clk(clk),
-      .reset(reset),
+      .reset(1'b0),
       .active(cred_track_active),
       .d(free_nonspec_s),
       .q(free_nonspec_q));
