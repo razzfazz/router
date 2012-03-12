@@ -466,7 +466,9 @@ module vcr_top
 	   wire 			opc_error;
 	   vcr_op_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_vcs(num_vcs),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),

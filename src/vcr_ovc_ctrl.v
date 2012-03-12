@@ -45,8 +45,20 @@ module vcr_ovc_ctrl
    // width required to express number of flits in a VC
    localparam flit_count_width = clogb(num_flits_per_vc + 1);
    
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // number of VCs available for each class
+   parameter num_vcs_per_class = 1;
+   
    // number of VCs
-   parameter num_vcs = 4;
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
@@ -76,6 +88,10 @@ module vcr_ovc_ctrl
    
    // ID of current input VC
    parameter vc_id = 0;
+   
+   // message class to which the current VC belongs
+   localparam message_class
+     = (vc_id / num_vcs_per_class) / num_resource_classes;
    
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
@@ -194,7 +210,7 @@ module vcr_ovc_ctrl
       else if(num_vcs > 1)
 	begin
 	   
-	   wire [0:num_vcs-1] 	flit_sel_ivc_s, flit_sel_ivc_q;
+	   wire [0:num_vcs-1] flit_sel_ivc_s, flit_sel_ivc_q;
 	   assign flit_sel_ivc_s = vc_gnt ? vc_sel_ivc : flit_sel_ivc_q;
 	   c_dff
 	     #(.width(num_vcs),

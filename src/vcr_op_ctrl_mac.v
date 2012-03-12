@@ -42,8 +42,20 @@ module vcr_op_ctrl_mac
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
+   // number of message classes (e.g. request, reply)
+   parameter num_message_classes = 2;
+   
+   // number of resource classes (e.g. minimal, adaptive)
+   parameter num_resource_classes = 2;
+   
+   // total number of packet classes
+   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   
+   // number of VCs available for each class
+   parameter num_vcs_per_class = 1;
+   
    // number of VCs
-   parameter num_vcs = 4;
+   localparam num_vcs = num_packet_classes * num_vcs_per_class;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
@@ -220,7 +232,9 @@ module vcr_op_ctrl_mac
 	   wire [0:2] 		ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_vcs(num_vcs),
+	       .num_message_classes(num_message_classes),
+	       .num_resource_classes(num_resource_classes),
+	       .num_vcs_per_class(num_vcs_per_class),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
