@@ -229,14 +229,6 @@ module vcr_sw_alloc_sep_of
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // feed grants back to output stage
-	   //-------------------------------------------------------------------
-	   
-	   assign gnt_in_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = gnt_in_nonspec_op;
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
@@ -368,11 +360,6 @@ module vcr_sw_alloc_sep_of
 		
 		assign sel_spec_ivc = gnt_in_spec_ivc;
 		
-		
-		//--------------------------------------------------------------
-		// feed grants back to output stage
-		//--------------------------------------------------------------
-		
 	     end
 	   else
 	     begin
@@ -389,16 +376,18 @@ module vcr_sw_alloc_sep_of
 	   // combine global grants
 	   //-------------------------------------------------------------------
 	   
+	   assign gnt_in_nonspec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
+	     = gnt_in_nonspec_op;
 	   assign sel_nonspec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-		    = sel_nonspec_ivc;
+	     = sel_nonspec_ivc;
 	   assign gnt_nonspec_ip[ip] = gnt_nonspec;
 	   assign gnt_in_spec_ip_op[ip*num_ports:(ip+1)*num_ports-1]
 	     = gnt_in_spec_op;
 	   assign sel_spec_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-		    = sel_spec_ivc;
+	     = sel_spec_ivc;
 	   assign gnt_spec_ip[ip] = gnt_spec;
 	   assign gnt_ip_op[ip*num_ports:(ip+1)*num_ports-1]
-		    = gnt_nonspec_op | gnt_spec_op;
+	     = gnt_nonspec_op | gnt_spec_op;
 	   
 	end
       

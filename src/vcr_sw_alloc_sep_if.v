@@ -522,14 +522,6 @@ module vcr_sw_alloc_sep_if
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // feed grants back to input stage
-	   //-------------------------------------------------------------------
-	   
-	   assign gnt_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
-		    = gnt_out_nonspec_ip;
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
@@ -598,11 +590,6 @@ module vcr_sw_alloc_sep_if
 		     assign gnt_ip = gnt_out_nonspec_ip | gnt_out_spec_qual_ip;
 		     
 		  end
-		
-		
-		//--------------------------------------------------------------
-		// feed grants back to input stage (speculative)
-		//--------------------------------------------------------------
 		
 	     end
 	   else
