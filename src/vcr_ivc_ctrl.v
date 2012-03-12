@@ -361,39 +361,11 @@ module vcr_ivc_ctrl
 	     assign flit_sent = sw_gnt & ((vc_gnt & free_spec) | allocated);
 	   else
 	     assign flit_sent = sw_gnt & (vc_gnt | allocated);
-	   
-	   assign allocated_ocvc = vc_allocated_next_ocvc;
 	end
       else
-	begin
-	   assign flit_sent = sw_gnt;
-	   
-	   assign allocated_ocvc = vc_allocated_ocvc;
-	end
+	assign flit_sent = sw_gnt;
       
    endgenerate
-   
-   wire [0:num_resource_classes*num_vcs_per_class-1] allocated_orc_ocvc;
-   c_mat_mult
-     #(.dim1_width(num_resource_classes),
-       .dim2_width(1),
-       .dim3_width(num_vcs_per_class),
-       .prod_op(`BINARY_OP_AND),
-       .sum_op(`BINARY_OP_OR))
-   allocated_orc_ocvc_mmult
-     (.input_a(route_orc),
-      .input_b(allocated_ocvc),
-      .result(allocated_orc_ocvc));
-   
-   wire [0:num_vcs-1] 				     allocated_ovc;
-   c_align
-     #(.in_width(num_resource_classes*num_vcs_per_class),
-       .out_width(num_vcs),
-       .offset(message_class*num_resource_classes*num_vcs_per_class))
-   allocated_ovc_alg
-     (.data_in(allocated_orc_ocvc),
-      .dest_in({num_vcs{1'b0}}),
-      .data_out(allocated_ovc));
    
    
    //---------------------------------------------------------------------------
