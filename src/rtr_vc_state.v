@@ -121,6 +121,7 @@ module rtr_vc_state
       .empty(empty),
       .almost_full(almost_full),
       .full(full),
+      .full_prev(),
       .errors(errors));
    
    

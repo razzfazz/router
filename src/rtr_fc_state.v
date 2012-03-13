@@ -31,7 +31,7 @@
 
 module rtr_fc_state
   (clk, reset, active, flit_sent, fc_event_valid, fc_active, empty, 
-   almost_full, full, errors);
+   almost_full, full, full_prev, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -95,6 +95,10 @@ module rtr_fc_state
    output full;
    wire   full;
    
+   // VC was full in previous cycle
+   output full_prev;
+   wire   full_prev;
+   
    // internal error condition detected
    output [0:1] errors;
    wire [0:1] 	errors;
@@ -145,8 +149,9 @@ module rtr_fc_state
 		.full(ft_full),
 		.free(ft_free),
 		.errors(ft_errors));
-	     
+
 	     assign fc_active = ~ft_empty;
+	     assign full_prev = ft_full;
 	     
 	     wire 			 two_credits_left_s, two_credits_left_q;
 	     if(num_flits_per_vc == 2)
