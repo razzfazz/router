@@ -31,9 +31,9 @@
 
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
-   allocated_ivc, flit_valid_ivc, free_nonspec_ivc, vc_gnt_ivc, vc_sel_ivc_ovc,
-   sw_sel_ivc, sw_gnt, free_op_ovc, int_flit_ctrl, flit_data, flow_ctrl_out, 
-   error);
+   allocated_ivc, flit_valid_ivc, flit_head_ivc, flit_tail_ivc, 
+   free_nonspec_ivc, vc_gnt_ivc, vc_sel_ivc_ovc, sw_gnt, sw_sel_ivc, 
+   free_op_ovc, flit_data, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -176,9 +176,6 @@ module vcr_ip_ctrl_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // width required for internal flit control signalling
-   localparam int_flit_ctrl_width = 1 + 2 + num_vcs;
-   
    // number of entries in flit buffer
    localparam fb_depth = num_vcs*num_flits_per_vc;
    
@@ -240,6 +237,14 @@ module vcr_ip_ctrl_mac
    output [0:num_vcs-1] 		     flit_valid_ivc;
    wire [0:num_vcs-1] 			     flit_valid_ivc;
    
+   // flit is head flit
+   output [0:num_vcs-1] 		     flit_head_ivc;
+   wire [0:num_vcs-1] 			     flit_head_ivc;
+   
+   // flit is tail flit
+   output [0:num_vcs-1] 		     flit_tail_ivc;
+   wire [0:num_vcs-1] 			     flit_tail_ivc;
+   
    // credit availability if output VC has been allocated
    output [0:num_vcs-1] 		     free_nonspec_ivc;
    wire [0:num_vcs-1] 			     free_nonspec_ivc;
@@ -250,19 +255,15 @@ module vcr_ip_ctrl_mac
    // granted output VC
    input [0:num_vcs*num_vcs-1] 		     vc_sel_ivc_ovc;
    
-   // select VC for switch grant
-   input [0:num_vcs-1] 			     sw_sel_ivc;
-   
    // switch grant
    input 				     sw_gnt;
+   
+   // select VC for switch grant
+   input [0:num_vcs-1] 			     sw_sel_ivc;
    
    // internal flow control signalling from output controller to input 
    // controllers
    input [0:num_ports*num_vcs*2-1] 	     free_op_ovc;
-   
-   // outgoing flit control signals
-   output [0:int_flit_ctrl_width-1] 	     int_flit_ctrl;
-   wire [0:int_flit_ctrl_width-1] 	     int_flit_ctrl;
    
    // outgoing flit data
    output [0:flit_data_width-1] 	     flit_data;
@@ -378,8 +379,6 @@ module vcr_ip_ctrl_mac
    
    wire [0:header_info_width-1] peek_header_info;
    wire [0:num_vcs-1] 		flit_sent_prev_ivc;
-   wire [0:num_vcs-1] 		flit_head_ivc;
-   wire [0:num_vcs-1] 		flit_tail_ivc;
    wire [0:num_vcs*lar_info_width-1] next_lar_info_ivc;
    wire [0:num_vcs*fb_addr_width-1]  fbc_push_addr_ivc;
    wire [0:num_vcs*fb_addr_width-1]  fbc_pop_addr_ivc;
@@ -896,7 +895,6 @@ module vcr_ip_ctrl_mac
       .q(flit_valid_q));
    
    assign flit_sent_prev = flit_valid_q;
-   assign int_flit_ctrl[0] = flit_valid_q;
    
    c_select_1ofn
      #(.num_ports(num_vcs),
@@ -919,36 +917,11 @@ module vcr_ip_ctrl_mac
       .q(flit_head_q));
    
    assign flit_head_prev = flit_head_q;
-   assign int_flit_ctrl[1+0] = flit_head_q;
-   
-   wire 			      flit_tail;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   flit_tail_sel
-     (.select(sw_sel_ivc),
-      .data_in(flit_tail_ivc),
-      .data_out(flit_tail));
-   
-   wire 			      flit_tail_s, flit_tail_q;
-   assign flit_tail_s = flit_tail;
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   flit_tailq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(alloc_active),
-      .d(flit_tail_s),
-      .q(flit_tail_q));
-   
-   assign int_flit_ctrl[1+1] = flit_tail_q;
    
    generate
       
       if(num_vcs == 1)
 	begin
-	   assign int_flit_ctrl[1+2+0] = 1'b1;
 	   assign prev_sw_sel_ivc = 1'b1;
 	   assign flit_sent_prev_ivc = flit_valid_q;
 	end
@@ -967,7 +940,6 @@ module vcr_ip_ctrl_mac
 	      .d(sw_sel_ivc_s),
 	      .q(sw_sel_ivc_q));
 	   
-	   assign int_flit_ctrl[1+2+0:1+2+num_vcs-1] = sw_sel_ivc_q;
 	   assign prev_sw_sel_ivc = sw_sel_ivc_q;
 	   
 	   assign flit_sent_prev_ivc

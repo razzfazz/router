@@ -203,8 +203,7 @@ module router_wrap
 		 .sw_alloc_type(sw_alloc_type),
 		 .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
 		 .sw_alloc_spec_type(sw_alloc_spec_type),
-		 .ctrl_crossbar_type(crossbar_type),
-		 .data_crossbar_type(crossbar_type),
+		 .crossbar_type(crossbar_type),
 		 .reset_type(reset_type))
 	     vcr
 	       (.clk(clk),

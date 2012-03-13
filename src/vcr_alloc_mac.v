@@ -31,9 +31,11 @@
 
 module vcr_alloc_mac
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, allocated_ip_ivc, 
-   flit_valid_ip_ivc, elig_op_ovc, free_nonspec_ip_ivc, vc_active_op, 
-   vc_gnt_ip_ivc, vc_sel_ip_ivc_ovc, vc_gnt_op_ovc, vc_sel_op_ovc_ip, 
-   vc_sel_op_ovc_ivc, sw_sel_ip_ivc, sw_gnt_ip, xbr_ctrl_op_ip);
+   flit_valid_ip_ivc, flit_head_ip_ivc, flit_tail_ip_ivc, elig_op_ovc, 
+   free_nonspec_ip_ivc, vc_active_op, vc_gnt_ip_ivc, vc_sel_ip_ivc_ovc, 
+   vc_gnt_op_ovc, vc_sel_op_ovc_ip, vc_sel_op_ovc_ivc, sw_active_op, 
+   sw_gnt_ip, sw_sel_ip_ivc, sw_gnt_op, sw_sel_op_ip, sw_sel_op_ivc, 
+   flit_head_op, flit_tail_op, xbr_ctrl_op_ip);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -92,6 +94,12 @@ module vcr_alloc_mac
    // VC has flit available
    input [0:num_ports*num_vcs-1] 		      flit_valid_ip_ivc;
    
+   // flit is head flit
+   input [0:num_ports*num_vcs-1] 		      flit_head_ip_ivc;
+   
+   // flit is tail flit
+   input [0:num_ports*num_vcs-1] 		      flit_tail_ip_ivc;
+   
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] 		      elig_op_ovc;
    
@@ -122,13 +130,37 @@ module vcr_alloc_mac
    output [0:num_ports*num_vcs*num_vcs-1] 	      vc_sel_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	      vc_sel_op_ovc_ivc;
    
-   // indicate which VC at a given port is granted (to input controller)
-   output [0:num_ports*num_vcs-1] 		      sw_sel_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 		      sw_sel_ip_ivc;
+   // switch allocation activity (to output controller)
+   output [0:num_ports-1] 			      sw_active_op;
+   wire [0:num_ports-1] 			      sw_active_op;
    
    // port grants (to input controller)
    output [0:num_ports-1] 			      sw_gnt_ip;
    wire [0:num_ports-1] 			      sw_gnt_ip;
+   
+   // indicate which VC at a given port is granted (to input controller)
+   output [0:num_ports*num_vcs-1] 		      sw_sel_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 		      sw_sel_ip_ivc;
+   
+   // output port grants
+   output [0:num_ports-1] 			      sw_gnt_op;
+   wire [0:num_ports-1] 			      sw_gnt_op;
+   
+   // selected output ports for grants
+   output [0:num_ports*num_ports-1] 		      sw_sel_op_ip;
+   wire [0:num_ports*num_ports-1] 		      sw_sel_op_ip;
+   
+   // selected output VCs for grants
+   output [0:num_ports*num_vcs-1] 		      sw_sel_op_ivc;
+   wire [0:num_ports*num_vcs-1] 		      sw_sel_op_ivc;
+   
+   // which grants are for head flits
+   output [0:num_ports-1] 			      flit_head_op;
+   wire [0:num_ports-1] 			      flit_head_op;
+   
+   // which grants are for tail flits
+   output [0:num_ports-1] 			      flit_tail_op;
+   wire [0:num_ports-1] 			      flit_tail_op;
    
    // crossbar control signals
    output [0:num_ports*num_ports-1] 		      xbr_ctrl_op_ip;
@@ -262,7 +294,6 @@ module vcr_alloc_mac
       .input_b({num_vcs{1'b1}}),
       .result(sw_active_ip));
    
-   wire [0:num_ports-1] 	sw_active_op;
    c_select_mofn
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports))
@@ -270,10 +301,6 @@ module vcr_alloc_mac
      (.select(flit_valid_ip_ivc),
       .data_in(route_ip_ivc_op),
       .data_out(sw_active_op));
-   
-   wire [0:num_ports*num_ports-1] sw_gnt_op_ip;
-   
-   genvar 			  op;
    
    generate
       
@@ -296,7 +323,9 @@ module vcr_alloc_mac
 	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
 	      .sel_ip_ivc(sw_sel_ip_ivc),
 	      .gnt_ip(sw_gnt_ip),
-	      .gnt_op_ip(sw_gnt_op_ip));
+	      .gnt_op(sw_gnt_op),
+	      .sel_op_ip(sw_sel_op_ip),
+	      .sel_op_ivc(sw_sel_op_ivc));
 	   
 	end
       else if(sw_allocator_type == `SW_ALLOC_TYPE_SEP_OF)
@@ -318,7 +347,9 @@ module vcr_alloc_mac
 	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
 	      .sel_ip_ivc(sw_sel_ip_ivc),
 	      .gnt_ip(sw_gnt_ip),
-	      .gnt_op_ip(sw_gnt_op_ip));
+	      .gnt_op(sw_gnt_op),
+	      .sel_op_ip(sw_sel_op_ip),
+	      .sel_op_ivc(sw_sel_op_ivc));
 	   
 	end
       else if((sw_allocator_type >= `SW_ALLOC_TYPE_WF_BASE) &&
@@ -341,16 +372,90 @@ module vcr_alloc_mac
 	      .req_spec_ip_ivc(sw_req_spec_ip_ivc),
 	      .sel_ip_ivc(sw_sel_ip_ivc),
 	      .gnt_ip(sw_gnt_ip),
-	      .gnt_op_ip(sw_gnt_op_ip));
+	      .gnt_op(sw_gnt_op),
+	      .sel_op_ip(sw_sel_op_ip),
+	      .sel_op_ivc(sw_sel_op_ivc));
 	   
 	end
       
    endgenerate
    
+   wire [0:num_ports-1] flit_head_ip;
+   wire [0:num_ports-1] flit_tail_ip;
+   
+   genvar ip;
+   
+   generate
+      
+      for(ip = 0; ip < num_ports; ip = ip + 1)
+	begin:ips
+	   
+	   wire [0:num_vcs-1] sw_sel_ivc;
+	   assign sw_sel_ivc = sw_sel_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire [0:num_vcs-1] flit_head_ivc;
+	   assign flit_head_ivc = flit_head_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire 	      flit_head;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_head_sel
+	     (.select(sw_sel_ivc),
+	      .data_in(flit_head_ivc),
+	      .data_out(flit_head));
+	   
+	   assign flit_head_ip[ip] = flit_head;
+	   
+	   wire [0:num_vcs-1] flit_tail_ivc;
+	   assign flit_tail_ivc = flit_tail_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1];
+	   
+	   wire 	      flit_tail;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   flit_tail_sel
+	     (.select(sw_sel_ivc),
+	      .data_in(flit_tail_ivc),
+	      .data_out(flit_tail));
+	   
+	   assign flit_tail_ip[ip] = flit_tail;
+	   
+	end
+      
+   endgenerate
+   
+   genvar op;
+   
    generate
       
       for(op = 0; op < num_ports; op = op + 1)
 	begin:ops
+	   
+	   wire [0:num_ports-1] sw_sel_ip;
+	   assign sw_sel_ip = sw_sel_op_ip[op*num_ports:(op+1)*num_ports-1];
+	   
+	   wire 		flit_head;
+	   c_select_1ofn
+	     #(.num_ports(num_ports),
+	       .width(1))
+	   flit_head_sel
+	     (.select(sw_sel_ip),
+	      .data_in(flit_head_ip),
+	      .data_out(flit_head));
+	   
+	   assign flit_head_op[op] = flit_head;
+	   
+	   wire 		flit_tail;
+	   c_select_1ofn
+	     #(.num_ports(num_ports),
+	       .width(1))
+	   flit_tail_sel
+	     (.select(sw_sel_ip),
+	      .data_in(flit_tail_ip),
+	      .data_out(flit_tail));
+	   
+	   assign flit_tail_op[op] = flit_tail;
 	   
 	   wire [0:num_ports-1] xbr_ctrl_ip;
 	   
@@ -360,11 +465,8 @@ module vcr_alloc_mac
 	   wire 		active;
 	   assign active = sw_active | (|xbr_ctrl_ip);
 	   
-	   wire [0:num_ports-1] sw_gnt_ip;
-	   assign sw_gnt_ip = sw_gnt_op_ip[op*num_ports:(op+1)*num_ports-1];
-	   
 	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
-	   assign xbr_ctrl_ip_s = sw_gnt_ip;
+	   assign xbr_ctrl_ip_s = sw_sel_ip;
 	   c_dff
 	     #(.width(num_ports),
 	       .reset_type(reset_type))

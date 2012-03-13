@@ -31,7 +31,7 @@
 
 module vcr_sw_alloc_sep_if
   (clk, reset, active_ip, active_op, route_ip_ivc_op, req_nonspec_ip_ivc, 
-   req_spec_ip_ivc, sel_ip_ivc, gnt_ip, gnt_op_ip);
+   req_spec_ip_ivc, gnt_ip, sel_ip_ivc, gnt_op, sel_op_ip, sel_op_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -67,17 +67,25 @@ module vcr_sw_alloc_sep_if
    // speculative switch requests
    input [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
    
-   // indicate which VC at a given port is granted
-   output [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
-   
    // grants
    output [0:num_ports-1] 		   gnt_ip;
    wire [0:num_ports-1] 		   gnt_ip;
    
-   // crossbar control signals
-   output [0:num_ports*num_ports-1] 	   gnt_op_ip;
-   wire [0:num_ports*num_ports-1] 	   gnt_op_ip;
+   // indicate which VC at a given port is granted
+   output [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_ip_ivc;
+   
+   // grants for output ports
+   output [0:num_ports-1] 		   gnt_op;
+   wire [0:num_ports-1] 		   gnt_op;
+   
+   // selected input ports (if any)
+   output [0:num_ports*num_ports-1] 	   sel_op_ip;
+   wire [0:num_ports*num_ports-1] 	   sel_op_ip;
+   
+   // selected input VCs (if any)
+   output [0:num_ports*num_vcs-1] 	   sel_op_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_op_ivc;
    
    
    //---------------------------------------------------------------------------
@@ -482,17 +490,20 @@ module vcr_sw_alloc_sep_if
 	   // perform output-side arbitration (select input port)
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_ports-1] gnt_ip;
+	   wire [0:num_ports-1] sel_ip;
 	   
 	   wire [0:num_ports-1] req_out_nonspec_ip;
 	   assign req_out_nonspec_ip
 	     = req_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
+	   wire req_out_nonspec;
+	   assign req_out_nonspec = |req_out_nonspec_ip;
+	   
 	   // if any VC requesting this output port was granted at any input
 	   // port in the first stage, one of these input ports will be granted
 	   // here as well, and we can thus update priorities
 	   wire 		update_arb_nonspec;
-	   assign update_arb_nonspec = |req_out_nonspec_ip;
+	   assign update_arb_nonspec = req_out_nonspec;
 	   
 	   wire [0:num_ports-1] gnt_out_nonspec_ip;
 	   
@@ -521,6 +532,7 @@ module vcr_sw_alloc_sep_if
 	   //-------------------------------------------------------------------
 	   
 	   wire [0:num_ports-1] gnt_out_spec_ip;
+	   wire 		gnt;
 	   
 	   if(spec_type != `SW_ALLOC_SPEC_TYPE_NONE)
 	     begin
@@ -532,9 +544,12 @@ module vcr_sw_alloc_sep_if
 		wire [0:num_ports-1] req_out_spec_ip;
 		assign req_out_spec_ip
 		  = req_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1];
+
+		wire 		     req_out_spec;
+		assign req_out_spec = |req_out_spec_ip;
 		
 		wire 		     update_arb_spec;
-		assign update_arb_spec = |req_out_spec_ip;
+		assign update_arb_spec = req_out_spec;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
@@ -554,7 +569,9 @@ module vcr_sw_alloc_sep_if
 			.update(update_arb),
 			.req_pr({req_out_nonspec_ip, req_out_spec_ip}),
 			.gnt_pr({gnt_out_nonspec_ip, gnt_out_spec_ip}),
-			.gnt(gnt_ip));
+			.gnt(sel_ip));
+		     
+		     assign gnt = req_out_nonspec | req_out_spec;
 		     
 		  end
 		else
@@ -582,7 +599,12 @@ module vcr_sw_alloc_sep_if
 		       = gnt_out_spec_ip & unused_by_nonspec_ip &
 			 {num_ports{unused_by_nonspec}};
 		     
-		     assign gnt_ip = gnt_out_nonspec_ip | gnt_out_spec_qual_ip;
+		     wire 		  gnt_out_spec_qual;
+		     assign gnt_out_spec_qual = |gnt_out_spec_qual_ip;
+		     
+		     assign sel_ip = gnt_out_nonspec_ip | gnt_out_spec_qual_ip;
+		     
+		     assign gnt = req_out_nonspec | gnt_out_spec_qual;
 		     
 		  end
 		
@@ -590,14 +612,26 @@ module vcr_sw_alloc_sep_if
 	   else
 	     begin
 		assign gnt_out_spec_ip = {num_ports{1'b0}};
-		assign gnt_ip = gnt_out_nonspec_ip;
+		assign gnt = req_out_nonspec;
+		assign sel_ip = gnt_out_nonspec_ip;
 	     end
+	   
+	   wire [0:num_vcs-1] sel_ivc;
+	   c_select_1ofn
+	     #(.num_ports(num_ports),
+	       .width(num_vcs))
+	   sel_ivc_sel
+	     (.select(sel_ip),
+	      .data_in(sel_ip_ivc),
+	      .data_out(sel_ivc));
 	   
 	   assign gnt_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
 	     = gnt_out_nonspec_ip;
 	   assign gnt_out_spec_op_ip[op*num_ports:(op+1)*num_ports-1]
 	     = gnt_out_spec_ip;
-	   assign gnt_op_ip[op*num_ports:(op+1)*num_ports-1] = gnt_ip;
+	   assign gnt_op[op] = gnt;
+	   assign sel_op_ip[op*num_ports:(op+1)*num_ports-1] = sel_ip;
+	   assign sel_op_ivc[op*num_vcs:(op+1)*num_vcs-1] = sel_ivc;
 	   
 	end
       
