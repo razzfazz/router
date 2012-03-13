@@ -198,9 +198,6 @@ module vcr_sw_alloc_sep_of
 	   // generate global grants
 	   //-------------------------------------------------------------------
 	   
-	   wire 			gnt_nonspec;
-	   assign gnt_nonspec = gnt_out_nonspec;
-	   
 	   // since multiple ports may have been granted in the output stage, we
 	   // must select the winning one
 	   wire [0:num_ports-1] 	gnt_in_nonspec_op;
@@ -211,9 +208,6 @@ module vcr_sw_alloc_sep_of
 	     (.select(gnt_in_nonspec_ivc),
 	      .data_in(route_ivc_op),
 	      .data_out(gnt_in_nonspec_op));
-	   
-	   wire [0:num_ports-1] 	gnt_nonspec_op;
-	   assign gnt_nonspec_op = gnt_in_nonspec_op;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -281,8 +275,6 @@ module vcr_sw_alloc_sep_of
 		assign update_arb_spec = gnt_out_spec;
 		
 		wire [0:num_vcs-1]   gnt_in_spec_ivc;
-		wire 		     gnt_spec;
-		wire [0:num_ports-1] gnt_spec_op;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
@@ -304,8 +296,8 @@ module vcr_sw_alloc_sep_of
 			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
 			.gnt(sel_ivc));
 		     
-		     assign gnt_spec = ~|req_in_nonspec_ivc & |req_in_spec_ivc;
-		     assign gnt_spec_op = gnt_in_spec_op;
+		     assign gnt = gnt_out_nonspec | gnt_out_spec;
+		     assign gnt_op = gnt_in_nonspec_op | gnt_in_spec_op;
 		     
 		  end
 		else
@@ -328,10 +320,16 @@ module vcr_sw_alloc_sep_of
 		     wire unused_by_nonspec;
 		     assign unused_by_nonspec = unused_by_nonspec_ip[ip];
 		     
-		     assign gnt_spec = |gnt_spec_op;
-		     assign gnt_spec_op
+		     wire [0:num_ports-1] gnt_in_spec_qual_op;
+		     assign gnt_in_spec_qual_op
 		       = gnt_in_spec_op & unused_by_nonspec_op & 
 			 {num_ports{unused_by_nonspec}};
+		     
+		     wire gnt_in_spec_qual;
+		     assign gnt_in_spec_qual = |gnt_in_spec_qual_op;
+		     
+		     assign gnt = gnt_out_nonspec | gnt_in_spec_qual;
+		     assign gnt_op = gnt_in_nonspec_op | gnt_in_spec_qual_op;
 		     
 		     case(spec_type)
 		       
@@ -350,7 +348,7 @@ module vcr_sw_alloc_sep_of
 		       `SW_ALLOC_SPEC_TYPE_GNT:
 			 begin
 			    
-			    assign sel_ivc = gnt_nonspec ? 
+			    assign sel_ivc = gnt_out_nonspec ? 
 					     gnt_in_nonspec_ivc : 
 					     gnt_in_spec_ivc;
 			    
@@ -370,17 +368,14 @@ module vcr_sw_alloc_sep_of
 		   .data_in(route_ivc_op),
 		   .data_out(gnt_in_spec_op));
 		
-		assign gnt = gnt_nonspec | gnt_spec;
-		assign gnt_op = gnt_nonspec_op | gnt_spec_op;
-		
 	     end
 	   else
 	     begin
 		assign req_out_spec_op = {num_ports{1'b0}};
 		assign gnt_in_spec_op = {num_ports{1'b0}};
 		assign sel_ivc = gnt_in_nonspec_ivc;
-		assign gnt = gnt_nonspec;
-		assign gnt_op = gnt_nonspec_op;
+		assign gnt = gnt_out_nonspec;
+		assign gnt_op = gnt_in_nonspec_op;
 	     end
 	   
 	   

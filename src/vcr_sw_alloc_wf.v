@@ -193,14 +193,6 @@ module vcr_sw_alloc_wf
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // generate global grants
-	   //-------------------------------------------------------------------
-	   
-	   wire gnt_nonspec;
-	   assign gnt_nonspec = gnt_wf_nonspec;
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
@@ -263,7 +255,6 @@ module vcr_sw_alloc_wf
 		assign update_arb_spec = gnt_wf_spec;
 		
 		wire [0:num_vcs-1]   gnt_in_spec_ivc;
-		wire 		     gnt_spec;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
@@ -285,7 +276,7 @@ module vcr_sw_alloc_wf
 			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
 			.gnt(sel_ivc));
 		     
-		     assign gnt_spec = ~|req_in_nonspec_ivc & |req_in_spec_ivc;
+		     assign gnt = gnt_wf_nonspec | gnt_wf_spec;
 		     
 		  end
 		else
@@ -308,9 +299,12 @@ module vcr_sw_alloc_wf
 		     wire unused_by_nonspec;
 		     assign unused_by_nonspec = unused_by_nonspec_ip[ip];
 		     
-		     assign gnt_spec
+		     wire gnt_wf_spec_qual;
+		     assign gnt_wf_spec_qual
 		       = |(gnt_wf_spec_op & unused_by_nonspec_op) & 
 			 unused_by_nonspec;
+		     
+		     assign gnt = gnt_wf_nonspec | gnt_wf_spec_qual;
 		     
 		     case(spec_type)
 		       
@@ -329,7 +323,7 @@ module vcr_sw_alloc_wf
 		       `SW_ALLOC_SPEC_TYPE_GNT:
 			 begin
 			    
-			    assign sel_ivc = gnt_nonspec ? 
+			    assign sel_ivc = gnt_wf_nonspec ? 
 					     gnt_in_nonspec_ivc : 
 					     gnt_in_spec_ivc;
 			    
@@ -339,14 +333,12 @@ module vcr_sw_alloc_wf
 		     
 		  end
 		
-		assign gnt = gnt_nonspec | gnt_spec;
-		
 	     end
 	   else
 	     begin
 		assign req_wf_spec_op = {num_ports{1'b0}};
 		assign sel_ivc = gnt_in_nonspec_ivc;
-		assign gnt = gnt_nonspec;
+		assign gnt = gnt_wf_nonspec;
 	     end
 	   
 	   

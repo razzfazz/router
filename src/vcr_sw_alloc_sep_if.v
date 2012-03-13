@@ -186,14 +186,6 @@ module vcr_sw_alloc_sep_if
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // generate global grants
-	   //-------------------------------------------------------------------
-	   
-	   wire 		gnt_nonspec;
-	   assign gnt_nonspec = gnt_out_nonspec;
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // handle speculative requests
 	   //-------------------------------------------------------------------
 	   
@@ -226,7 +218,6 @@ module vcr_sw_alloc_sep_if
 		assign req_in_spec_ivc = req_spec_ivc;
 		
 		wire [0:num_vcs-1]   gnt_in_spec_ivc;
-		wire 		     gnt_spec;
 		
 		if(spec_type == `SW_ALLOC_SPEC_TYPE_PRIO)
 		  begin
@@ -248,7 +239,7 @@ module vcr_sw_alloc_sep_if
 			.gnt_pr({gnt_in_nonspec_ivc, gnt_in_spec_ivc}),
 			.gnt(sel_ivc));
 		     
-		     assign gnt_spec = gnt_out_spec;
+		     assign gnt = gnt_out_nonspec | gnt_out_spec;
 		     
 		  end
 		else
@@ -276,7 +267,10 @@ module vcr_sw_alloc_sep_if
 		       = gnt_out_spec_op & unused_by_nonspec_op &
 			 {num_ports{unused_by_nonspec}};
 		     
-		     assign gnt_spec = |gnt_out_spec_qual_op;
+		     wire 		  gnt_out_spec_qual;
+		     assign gnt_out_spec_qual = |gnt_out_spec_qual_op;
+		     
+		     assign gnt = gnt_out_nonspec | gnt_out_spec_qual;
 		     
 		     case(spec_type)
 		       
@@ -295,7 +289,7 @@ module vcr_sw_alloc_sep_if
 		       `SW_ALLOC_SPEC_TYPE_GNT:
 			 begin
 			    
-			    assign sel_ivc = gnt_nonspec ? 
+			    assign sel_ivc = gnt_out_nonspec ? 
 					     gnt_in_nonspec_ivc : 
 					     gnt_in_spec_ivc;
 			    
@@ -304,8 +298,6 @@ module vcr_sw_alloc_sep_if
 		     endcase
 		     
 		  end
-		
-		assign gnt = gnt_nonspec | gnt_spec;
 		
 		
 		//--------------------------------------------------------------
@@ -326,7 +318,7 @@ module vcr_sw_alloc_sep_if
 		
 		assign req_out_spec_op = {num_ports{1'b0}};
 		assign sel_ivc = gnt_in_nonspec_ivc;
-		assign gnt = gnt_nonspec;
+		assign gnt = gnt_out_nonspec;
 		
 	     end
 	   
