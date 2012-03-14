@@ -32,6 +32,8 @@
 module c_binary_op
   (data_in, data_out);
    
+`include "c_constants.v"
+
    // number of inputs
    parameter num_ports = 2;
    

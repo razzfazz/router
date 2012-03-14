@@ -32,6 +32,8 @@
 module c_lod
   (data_in_pr, data_out_pr, data_out, mask_out);
    
+`include "c_constants.v"
+   
    // number of input ports
    parameter width = 32;
    
