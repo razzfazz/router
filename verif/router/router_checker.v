@@ -652,12 +652,12 @@ module router_checker
 		begin
 		   
 		   if(rff_errors_ivc[i*2])
-		     $display({"ERROR: Reference FIFO underflow at port %d, ", 
-			       "VC %d."}, ip, i);
+		     $display({"ERROR: Reference FIFO underflow in %m, ",
+			       "port %d, VC %d."}, ip, i);
 		   
 		   if(rff_errors_ivc[i*2+1])
-		     $display({"ERROR: Reference FIFO overflow at port %d, ", 
-			       "VC %d."}, ip, i);
+		     $display({"ERROR: Reference FIFO overflow in %m, ",
+			       "port %d, VC %d."}, ip, i);
 		   
 		end
 	      
@@ -749,7 +749,7 @@ module router_checker
 	     begin
 		if(check_error_op[op])
 		  begin
-		     $display("check error: op=%d, cyc=%d", op, $time);
+		     $display("check error: %m, op=%d, cyc=%d", op, $time);
 		     $display("head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_head_out,
 			      flit_tail_out,
@@ -773,7 +773,7 @@ module router_checker
 		  end
 		if(x_error)
 		  begin
-		     $display("X value error: op=%d, cyc=%d", op, $time);
+		     $display("X value error: %m, op=%d, cyc=%d", op, $time);
 		     $display("valid=%b, head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_valid_out,
 			      flit_head_out,
@@ -787,20 +787,6 @@ module router_checker
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
-	   
-	   integer 			  i;
-	   
-	   always @(posedge clk)
-	     begin
-		
-		for(i = 0; i < num_ports; i = i + 1)
-		  begin
-		     if(rff_errors_ip[i])
-		       $display({"ERROR: Reference FIFO error detected at ", 
-				 "input port %d."}, i);
-		  end
-		
-	     end
 	   
 	   wire [0:3*num_ports-1] errors_s, errors_q;
 	   assign errors_s = {rff_errors_ip, check_error_op, x_error_op};
