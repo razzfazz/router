@@ -197,7 +197,7 @@ module vcr_ovc_ctrl
    flit_sel_ipq
      (.clk(clk),
       .reset(1'b0),
-      .active(alloc_active),
+      .active(vc_active),
       .d(flit_sel_ip_s),
       .q(flit_sel_ip_q));
    
@@ -221,7 +221,7 @@ module vcr_ovc_ctrl
 	   flit_sel_ivcq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(alloc_active),
+	      .active(vc_active),
 	      .d(flit_sel_ivc_s),
 	      .q(flit_sel_ivc_q));
 	   
@@ -241,7 +241,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 	flags_active;
-   assign flags_active = alloc_active | credit;
+   assign flags_active = flit_active | credit;
    
    wire 	ft_almost_empty;
    wire 	ft_empty;

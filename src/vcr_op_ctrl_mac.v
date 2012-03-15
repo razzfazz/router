@@ -192,6 +192,10 @@ module vcr_op_ctrl_mac
    // output VC control logic
    //---------------------------------------------------------------------------
    
+   wire 			 flit_active;
+
+   wire 			 gnt_active = sw_active | flit_active;
+   
    wire 			 sw_gnt_s, sw_gnt_q;
    assign sw_gnt_s = sw_gnt;
    c_dff
@@ -200,11 +204,10 @@ module vcr_op_ctrl_mac
    sw_gntq
      (.clk(clk),
       .reset(reset),
-      .active(sw_active),
+      .active(gnt_active),
       .d(sw_gnt_s),
       .q(sw_gnt_q));
    
-   wire 			 flit_active;
    assign flit_active = sw_gnt_q;
    
    wire [0:num_vcs-1] 		 flit_sel_ovc;
@@ -351,9 +354,6 @@ module vcr_op_ctrl_mac
    // output staging
    //---------------------------------------------------------------------------
    
-   wire 			flit_out_active;
-   assign flit_out_active = |flit_sel_ip;
-   
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -362,7 +362,7 @@ module vcr_op_ctrl_mac
    cho
      (.clk(clk),
       .reset(reset),
-      .active(flit_out_active),
+      .active(flit_active),
       .flit_valid_in(flit_valid),
       .flit_head_in(flit_head_q),
       .flit_tail_in(flit_tail_q),
