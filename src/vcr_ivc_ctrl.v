@@ -521,7 +521,7 @@ module vcr_ivc_ctrl
       if(elig_mask == `ELIG_MASK_USED)
 	assign bypass_route_info = flit_valid_head_in;
       else
-	assign bypass_route_info = fbc_empty & flit_head_in;
+	assign bypass_route_info = fbc_empty & flit_valid_head_in;
    endgenerate
    
    wire [0:num_ports-1] 	      route_unmasked_op;
