@@ -170,10 +170,10 @@ module vcr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 		 empty_ovc;
+   wire [0:num_vcs-1] 		 fc_active_ovc;
    
    wire 			 flow_ctrl_active;
-   assign flow_ctrl_active = ~&empty_ovc;
+   assign flow_ctrl_active = |fc_active_ovc;
    
    wire 			 cred_valid;
    wire [0:num_vcs-1] 		 cred_sel_ovc;
@@ -307,7 +307,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire 		flit_sel;
 	   wire 		elig;
-	   wire 		empty;
+	   wire 		fc_active;
 	   wire 		almost_full;
 	   wire 		full;
 	   wire [0:2] 		ovcc_errors;
@@ -338,13 +338,13 @@ module vcr_op_ctrl_mac
 	      .flit_sel_ivc(flit_sel_ivc),
 	      .flit_sel(flit_sel),
 	      .elig(elig),
-	      .empty(empty),
+	      .fc_active(fc_active),
 	      .almost_full(almost_full),
 	      .full(full),
 	      .errors(ovcc_errors));
 
 	   assign flit_sel_ovc[ovc] = flit_sel;
-	   assign empty_ovc[ovc] = empty;
+	   assign fc_active_ovc[ovc] = fc_active;
 	   assign elig_ovc[ovc] = elig;
 	   assign almost_full_ovc[ovc] = almost_full;
 	   assign full_ovc[ovc] = full;

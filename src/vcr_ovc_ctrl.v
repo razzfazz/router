@@ -32,7 +32,7 @@
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, 
    flit_active, flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, 
-   elig, empty, almost_full, full, errors);
+   elig, fc_active, almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -139,9 +139,9 @@ module vcr_ovc_ctrl
    output 		 elig;
    wire 		 elig;
    
-   // no buffer slots in output VC are in use (i.e., all credits are present)
-   output 		 empty;
-   wire 		 empty;
+   // activity indicator for flow control receive logic
+   output 		 fc_active;
+   wire 		 fc_active;
    
    // VC has a single credit left
    output 		 almost_full;
@@ -177,8 +177,10 @@ module vcr_ovc_ctrl
    wire 		 alloc_active;
    assign alloc_active = vc_active | flit_active;
    
+   wire 		 allocated;
+   
    wire 		 allocated_s, allocated_q;
-   assign allocated_s = vc_gnt | (allocated_q & ~(flit_valid_qual & flit_tail));
+   assign allocated_s = vc_gnt | allocated;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -188,6 +190,8 @@ module vcr_ovc_ctrl
       .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
+   
+   assign allocated = allocated_q & ~(flit_valid_qual & flit_tail);
    
    wire 		 error_stray_flit;
    assign error_stray_flit = flit_valid_qual & ~allocated_q;
@@ -257,7 +261,7 @@ module vcr_ovc_ctrl
       .flit_sent(flit_valid_qual),
       .fc_event_valid(fc_event_valid),
       .fc_active(fc_active),
-      .empty(empty),
+      .empty(fc_empty),
       .almost_full(almost_full),
       .full(full),
       .full_prev(fc_full_prev),
@@ -283,17 +287,17 @@ module vcr_ovc_ctrl
 
 	`ELIG_MASK_NONE:
 	  begin
-	     assign elig = ~allocated_q;
+	     assign elig = ~allocated;
 	  end
 
 	`ELIG_MASK_FULL:
 	  begin
-	     assign elig = ~allocated_q & ~fc_full_prev;
+	     assign elig = ~allocated & ~full;
 	  end
 
 	`ELIG_MASK_USED:
 	  begin
-	     assign elig = ~allocated_q & fc_empty;
+	     assign elig = ~allocated & fc_empty;
 	  end
 	
       endcase
