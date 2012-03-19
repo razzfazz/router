@@ -779,14 +779,16 @@ module router_checker
 	     begin
 		if(no_match_error)
 		  begin
-		     $display({"unmatched flit at checker: ",
+		     $display("================================");
+		     $display({"ERROR: Unmatched flit at checker: ",
 			       "%m, op=%d, cyc=%d"}, op, $time);
+		     $display("================================");
 		     $display("head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_head_out,
 			      flit_tail_out,
 			      flit_sel_out_ovc,
 			      flit_data_out);
-		     $display("expected flits:");
+		     $display("Expected flits:");
 		     for(x = 0; x < num_ports*num_vcs; x = x + 1)
 		       begin
 			  if(ref_valid_ip_ivc[x])
@@ -804,14 +806,16 @@ module router_checker
 		  end
 		if(multi_match_error)
 		  begin
-		     $display({"multiple matched flits at checker: ",
+		     $display("================================");
+		     $display({"WARNING: multiple matched flits at checker: ",
 			       "%m, op=%d, cyc=%d"}, op, $time);
+		     $display("================================");
 		     $display("head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_head_out,
 			      flit_tail_out,
 			      flit_sel_out_ovc,
 			      flit_data_out);
-		     $display("expected flits:");
+		     $display("Expected flits:");
 		     for(x = 0; x < num_ports*num_vcs; x = x + 1)
 		       begin
 			  if(ref_valid_ip_ivc[x])
@@ -830,13 +834,16 @@ module router_checker
 		     $display({"NOTE: This is merely a limitation of the ", 
 			       "current router checker implementation; ",
 			       "it does not necessarily indicate a problem ",
-			       "with the router logic."});
+			       "with the router logic; any subsequent error ",
+			       "reports may be incorrect."});
 		     $display("================================");
 		  end
 		if(x_error)
 		  begin
-		     $display({"X value error at checker: ",
+		     $display("================================");
+		     $display({"ERROR: X value detected at checker: ",
 			       "%m, op=%d, cyc=%d"}, op, $time);
+		     $display("================================");
 		     $display("valid=%b, head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_valid_out,
 			      flit_head_out,
