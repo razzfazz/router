@@ -221,7 +221,8 @@ module vcr_top
    
    wire [0:num_ports*flit_data_width-1] 	     xbr_data_in_ip;
    
-   wire [0:num_ports*num_vcs*2-1] 		     free_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		     almost_full_op_ovc;
+   wire [0:num_ports*num_vcs-1] 		     full_op_ovc;
    
    wire [0:num_ports-1] 			     ipc_error_ip;
    
@@ -305,7 +306,8 @@ module vcr_top
 	      .vc_sel_ivc_ovc(vc_sel_ivc_ovc),
 	      .sw_gnt(sw_gnt),
 	      .sw_sel_ivc(sw_sel_ivc),
-	      .free_op_ovc(free_op_ovc),
+	      .almost_full_op_ovc(almost_full_op_ovc),
+	      .full_op_ovc(full_op_ovc),
 	      .flit_data(flit_data),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
@@ -473,7 +475,8 @@ module vcr_top
 	   wire [0:num_ports-1] 	xbr_ctrl_ip;
 	   assign xbr_ctrl_ip = xbr_ctrl_op_ip[op*num_ports:(op+1)*num_ports-1];
 	   
-	   wire [0:num_vcs*2-1] 	free_ovc;
+	   wire [0:num_vcs-1] 		almost_full_ovc;
+	   wire [0:num_vcs-1] 		full_ovc;
 	   wire [0:channel_width-1] 	channel_out;
 	   wire [0:num_vcs-1] 		elig_ovc;
 	   wire 			opc_error;
@@ -507,14 +510,17 @@ module vcr_top
 	      .flit_tail(flit_tail),
 	      .flit_data(flit_data),
 	      .channel_out(channel_out),
-	      .free_ovc(free_ovc),
+	      .almost_full_ovc(almost_full_ovc),
+	      .full_ovc(full_ovc),
 	      .elig_ovc(elig_ovc),
 	      .error(opc_error));
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
 	   
-	   assign free_op_ovc[op*num_vcs*2:(op+1)*num_vcs*2-1] = free_ovc;
+	   assign almost_full_op_ovc[op*num_vcs:(op+1)*num_vcs-1]
+	     = almost_full_ovc;
+	   assign full_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = full_ovc;
 	   
 	   assign elig_op_ovc[op*num_vcs:(op+1)*num_vcs-1] = elig_ovc;
 	   

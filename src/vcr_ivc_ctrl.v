@@ -31,8 +31,8 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, peek_header_info, fb_flit_tail, free_op_ovc, route_op, 
-   route_orc, vc_gnt, vc_sel_ovc, sw_gnt, flit_sent, flit_sent_prev, 
+   header_info_in, peek_header_info, fb_flit_tail, almost_full_op_ovc, 
+   full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, sw_gnt, flit_sent, 
    flit_valid, flit_head, flit_tail, next_lar_info, fbc_almost_empty, 
    fbc_empty, allocated, free_nonspec, free_spec, errors);
    
@@ -218,9 +218,11 @@ module vcr_ivc_ctrl
    // tail indicator for frontmost flit in buffer (if any)
    input 			 fb_flit_tail;
    
-   // internal flow control signalling from output controller to input 
-   // controllers
-   input [0:num_ports*num_vcs*2-1] free_op_ovc;
+   // which output VC have only a single credit left?
+   input [0:num_ports*num_vcs-1]   almost_full_op_ovc;
+   
+   // which output VC have no credit left?
+   input [0:num_ports*num_vcs-1]   full_op_ovc;
    
    // destination port (1-hot)
    output [0:num_ports-1] 	   route_op;
@@ -242,9 +244,6 @@ module vcr_ivc_ctrl
    // did this VC send a flit in the current cycle?
    output 			     flit_sent;
    wire 			     flit_sent;
-   
-   // did this VC send a flit in the previous cycle?
-   input 			     flit_sent_prev;
    
    // outgoing flit is available
    output 			     flit_valid;
@@ -689,14 +688,23 @@ module vcr_ivc_ctrl
    wire 				       cred_track_active;
    assign cred_track_active = flit_valid | allocated;
    
-   wire [0:num_vcs*2-1] 		       free_ovc;
+   wire [0:num_vcs-1] 			       almost_full_ovc;
    c_select_1ofn
      #(.num_ports(num_ports),
-       .width(num_vcs*2))
-   free_ovc_sel
+       .width(num_vcs))
+   almost_full_ovc_sel
      (.select(route_op),
-      .data_in(free_op_ovc),
-      .data_out(free_ovc));
+      .data_in(almost_full_op_ovc),
+      .data_out(almost_full_ovc));
+   
+   wire [0:num_vcs-1] 			       full_ovc;
+   c_select_1ofn
+     #(.num_ports(num_ports),
+       .width(num_vcs))
+   full_ovc_sel
+     (.select(route_op),
+      .data_in(full_op_ovc),
+      .data_out(full_ovc));
    
    wire [0:num_vcs-1] 			       next_free_ovc;
    wire [0:num_vcs-1] 			       free_spec_ovc;
@@ -708,18 +716,14 @@ module vcr_ivc_ctrl
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire [0:1] free;
-	   assign free = free_ovc[ovc*2:(ovc+1)*2-1];
+	   wire almost_full;
+	   assign almost_full = almost_full_ovc[ovc];
 	   
-	   wire       two_or_more_credits;
-	   assign two_or_more_credits = free[0] & (free[1] | ~flit_sent_prev);
+	   wire full;
+	   assign full = full_ovc[ovc];
 	   
-	   wire       one_or_more_credits;
-	   assign one_or_more_credits = free[0] | (free[1] & ~flit_sent_prev);
-	   
-	   wire       next_free;
-	   assign next_free
-	     = flit_sent ? two_or_more_credits : one_or_more_credits;
+	   wire next_free;
+	   assign next_free = ~full & (~almost_full | ~flit_sent);
 	   
 	   assign next_free_ovc[ovc] = next_free;
 	   
@@ -728,8 +732,8 @@ module vcr_ivc_ctrl
 	   // have been eligible and thus not assigned to any input VC, so we 
 	   // know that nobody sent a flit to it in the previous cycle.
 	   
-	   wire       free_spec;
-	   assign free_spec = |free;
+	   wire free_spec;
+	   assign free_spec = ~full;
 	   
 	   assign free_spec_ovc[ovc] = free_spec;
 	   

@@ -32,7 +32,7 @@
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, 
    flit_active, flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, 
-   elig, empty, free, errors);
+   elig, empty, almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -143,10 +143,13 @@ module vcr_ovc_ctrl
    output 		 empty;
    wire 		 empty;
    
-   // internal flow control signalling from output controller to input 
-   // controllers
-   output [0:1] 	 free;
-   wire [0:1] 		 free;
+   // VC has a single credit left
+   output 		 almost_full;
+   wire 		 almost_full;
+   
+   // VC has no credits left
+   output 		 full;
+   wire 		 full;
    
    // internal error condition detected
    output [0:2] 	 errors;
@@ -231,134 +234,41 @@ module vcr_ovc_ctrl
       
    endgenerate
 
-   wire 		      full;
+   wire 		      cred_mask;
    
-   assign flit_sel = allocated_q & port_match & vc_match & ~full;
+   assign flit_sel = allocated_q & port_match & vc_match & cred_mask;
    
    
    //---------------------------------------------------------------------------
    // track number of flits that downstream buffer can still accept
    //---------------------------------------------------------------------------
    
-   wire 	flags_active;
-   assign flags_active = flit_active | credit;
+   wire 		      flags_active;
+   assign flags_active = flit_active | fc_event_valid;
    
-   wire 	ft_almost_empty;
-   wire 	ft_empty;
-   wire 	ft_almost_full;
-   wire 	ft_full;
-   wire [0:flit_count_width-1] ft_free;
-   wire [0:1] 		       ft_errors;
-   c_fifo_tracker
-     #(.depth(num_flits_per_vc),
-       .reset_type(reset_type))
-   ft
+   wire 		      fc_active;
+   wire 		      fc_empty;
+   wire 		      fc_full_prev;
+   wire [0:1] 		      fc_errors;
+   rtr_fc_state
      (.clk(clk),
       .reset(reset),
       .active(flags_active),
-      .push(debit),
-      .pop(credit),
-      .almost_empty(ft_almost_empty),
-      .empty(ft_empty),
-      .almost_full(ft_almost_full),
-      .full(ft_full),
-      .free(ft_free),
-      .errors(ft_errors));
-   
-   assign empty = ft_empty;
-   
-   wire 		       error_ct_underflow;
-   assign error_ct_underflow = ft_errors[0];
-   
-   wire 		       error_ct_overflow;
-   assign error_ct_overflow = ft_errors[1];
+      .flit_sent(flit_valid_qual),
+      .fc_event_valid(fc_event_valid),
+      .fc_active(fc_active),
+      .empty(empty),
+      .almost_full(almost_full),
+      .full(full),
+      .full_prev(fc_full_prev),
+      .errors(fc_errors));
    
    generate
       
       if(elig_mask != `ELIG_MASK_NONE)
-	assign full = 1'b0;
-      else if(flow_ctrl_bypass)
-	assign full = ft_full & ~credit;
+	assign cred_mask = 1'b1;
       else
-	assign full = ft_full;
-      
-   endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // generate flow control signals to input controller
-   //---------------------------------------------------------------------------
-   
-   // NOTE: The debit input to this module is driven by the input VC controller.
-   // Consequently, the debit signal is already readily available at the input 
-   // controller, and we can simply pass the current credit level, incremented 
-   // by one if a credit was just received, from output to input controller, 
-   // rather having the debit signal effectively go from input to output 
-   // controller and back. Note that whenever an output VC is allocated to an 
-   // input VC, no flit can have been sent in the current cycle, as in order 
-   // for VC allocation to succeed, the output VC must be eligible for 
-   // allocation in the current cycle, and thus cannot be assigned to another 
-   // input VC.
-   
-   generate
-      
-      if(num_flits_per_vc == 2)
-	begin
-	   
-	   // in this case, we can only have zero, one or two credits available,
-	   // so the "3 or more" encoding cannot occur
-	   
-	   if(flow_ctrl_bypass)
-	     begin
-		assign free[0] = ~ft_full & (~ft_almost_full | credit);
-		assign free[1] = ft_almost_full | (ft_full & credit);
-	     end
-	   else
-	     begin
-		assign free[0] = ~ft_full & ~ft_almost_full;
-		assign free[1] = ft_almost_full;
-	     end
-	   
-	end
-      else if(num_flits_per_vc == 3)
-	begin
-	   
-	   // here, we can have at most three credits; consequently, we can 
-	   // simply add the incoming credit (if any) to the current credit 
-	   // count without having to worry about overflow
-	   
-	   if(flow_ctrl_bypass)
-	     assign free = ft_free + credit;
-	   else
-	     assign free = ft_free;
-	   
-	end
-      else if(num_flits_per_vc > 3)
-	begin
-	   
-	   // in the general case, the two-bit addition may overflow, or the 
-	   // credit count may have non-zero higher-order bits; in both cases, 
-	   // we must saturate the two-bit result to 2'b11
-	   
-	   wire [0:1] sum;
-	   wire       cap;
-	   
-	   if(flow_ctrl_bypass)
-	     begin
-		assign sum
-		  = ft_free[flit_count_width-2:flit_count_width-1] + credit;
-		assign cap = |ft_free[0:flit_count_width-3] | 
-			     &ft_free[flit_count_width-2:flit_count_width-1];
-	     end
-	   else
-	     begin
-		assign sum = ft_free[flit_count_width-2:flit_count_width-1];
-		assign cap = |ft_free[0:flit_count_width-3];
-	     end
-	   
-	   assign free = sum | {2{cap}};
-	   
-	end
+	assign cred_mask = ~fc_full_prev;
       
    endgenerate
    
@@ -378,15 +288,12 @@ module vcr_ovc_ctrl
 
 	`ELIG_MASK_FULL:
 	  begin
-	     if(flow_ctrl_bypass)
-	       assign elig = ~allocated_q & (~ft_full | credit);
-	     else
-	       assign elig = ~allocated_q & ~ft_full;
+	     assign elig = ~allocated_q & ~fc_full_prev;
 	  end
 
 	`ELIG_MASK_USED:
 	  begin
-	     assign elig = ~allocated_q & ft_empty;
+	     assign elig = ~allocated_q & fc_empty;
 	  end
 	
       endcase
@@ -406,18 +313,11 @@ module vcr_ovc_ctrl
 	if(error_stray_flit)
 	  $display("ERROR: Stray flit in module %m.");
 	
-	if(error_ct_underflow)
-	  $display("ERROR: Credit tracker underflow in module %m.");
-	
-	if(error_ct_overflow)
-	  $display("ERROR: Credit tracker overflow in module %m.");
-	
      end
    
    // pragma translate_on
    
    assign errors[0] = error_stray_flit;
-   assign errors[1] = error_ct_underflow;
-   assign errors[2] = error_ct_overflow;
+   assign errors[1:2] = fc_errors;
    
 endmodule

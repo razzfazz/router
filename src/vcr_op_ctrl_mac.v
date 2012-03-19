@@ -32,7 +32,8 @@
 module vcr_op_ctrl_mac
   (clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, vc_sel_ovc_ip, 
    vc_sel_ovc_ivc, sw_active, sw_gnt, sw_sel_ip, sw_sel_ivc, flit_head, 
-   flit_tail, flit_data, channel_out, free_ovc, elig_ovc, error);
+   flit_tail, flit_data, channel_out, almost_full_ovc, full_ovc, elig_ovc, 
+   error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -148,9 +149,13 @@ module vcr_op_ctrl_mac
    output [0:channel_width-1] 	 channel_out;
    wire [0:channel_width-1] 	 channel_out;
    
-   // internal flow control signals to input controllers
-   output [0:num_vcs*2-1] 	 free_ovc;
-   wire [0:num_vcs*2-1] 	 free_ovc;
+   // which output VC have only a single credit left?
+   output [0:num_vcs-1] 	 almost_full_ovc;
+   wire [0:num_vcs-1] 		 almost_full_ovc;
+   
+   // which output VC have no credit left?
+   output [0:num_vcs-1] 	 full_ovc;
+   wire [0:num_vcs-1] 		 full_ovc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output [0:num_vcs-1] 	 elig_ovc;
@@ -303,7 +308,8 @@ module vcr_op_ctrl_mac
 	   wire 		flit_sel;
 	   wire 		elig;
 	   wire 		empty;
-	   wire [0:1] 		free;
+	   wire 		almost_full;
+	   wire 		full;
 	   wire [0:2] 		ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
@@ -333,13 +339,15 @@ module vcr_op_ctrl_mac
 	      .flit_sel(flit_sel),
 	      .elig(elig),
 	      .empty(empty),
-	      .free(free),
+	      .almost_full(almost_full),
+	      .full(full),
 	      .errors(ovcc_errors));
 
 	   assign flit_sel_ovc[ovc] = flit_sel;
 	   assign empty_ovc[ovc] = empty;
 	   assign elig_ovc[ovc] = elig;
-	   assign free_ovc[ovc*2:(ovc+1)*2-1] = free;
+	   assign almost_full_ovc[ovc] = almost_full;
+	   assign full_ovc[ovc] = full;
 	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
 	   
 	end
