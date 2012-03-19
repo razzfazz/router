@@ -680,12 +680,23 @@ module router_checker
       .data_out(match_op));
    
    // unmatched flits indicate something went wrong
-   wire [0:num_ports-1] check_error_op;
-   assign check_error_op = (flit_valid_out_op & ~match_op);
+   wire [0:num_ports-1] no_match_error_op;
+   assign no_match_error_op = (flit_valid_out_op & ~match_op);
    
-   wire [0:num_ports-1] x_error_op;
+   wire [0:num_ports*num_ports*num_vcs-1] match_op_ip_ivc;
+   c_interleave
+     #(.width(num_ports*num_vcs*num_ports),
+       .num_blocks(num_ports*num_vcs))
+   match_op_ip_ivc_intl
+     (.data_in(match_ip_ivc_op),
+      .data_out(match_op_ip_ivc));
    
-   genvar 		op;
+   // the check cannot currently handle multiple matches
+   wire [0:num_ports-1] 		  multi_match_error_op;
+   
+   wire [0:num_ports-1] 		  x_error_op;
+   
+   genvar 				  op;
    
    generate
       
@@ -742,14 +753,34 @@ module router_checker
 		 (^flit_sel_out_ovc === 1'bx)));
 
 	   assign x_error_op[op] = x_error;
+
+	   wire 			no_match_error;
+	   assign no_match_error = no_match_error_op[op];
+	   
+	   wire [0:num_ports*num_vcs-1] match_ip_ivc;
+	   assign match_ip_ivc
+	     = match_op_ip_ivc[op*num_ports*num_vcs:(op+1)*num_ports*num_vcs-1];
+	   
+	   wire 			multi_match;
+	   c_multi_hot_det
+	     #(.width(num_ports*num_vcs))
+	   multi_match_mhd
+	     (.data(match_ip_ivc),
+	      .multi_hot(multi_match));
+	   
+	   wire 			multi_match_error;
+	   assign multi_match_error = flit_valid_out & multi_match;
+	   
+	   assign multi_match_error_op[op] = multi_match_error;
 	   
 	   integer 			x;
 	   
 	   always @(posedge clk)
 	     begin
-		if(check_error_op[op])
+		if(no_match_error)
 		  begin
-		     $display("check error: %m, op=%d, cyc=%d", op, $time);
+		     $display({"unmatched flit at checker: ",
+			       "%m, op=%d, cyc=%d"}, op, $time);
 		     $display("head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_head_out,
 			      flit_tail_out,
@@ -771,9 +802,41 @@ module router_checker
 				     ref_vcs_ip_ivc[x*num_vcs +: num_vcs]);
 		       end
 		  end
+		if(multi_match_error)
+		  begin
+		     $display({"multiple matched flits at checker: ",
+			       "%m, op=%d, cyc=%d"}, op, $time);
+		     $display("head=%b, tail=%b, vcs=%b, data=%x",
+			      flit_head_out,
+			      flit_tail_out,
+			      flit_sel_out_ovc,
+			      flit_data_out);
+		     $display("expected flits:");
+		     for(x = 0; x < num_ports*num_vcs; x = x + 1)
+		       begin
+			  if(ref_valid_ip_ivc[x])
+			    $display({"ip=%d,ivc=%d,head=%b,tail=%b,data=%x,",
+				      "op=%d,vcs=%b"},
+				     x / num_vcs, x % num_vcs,
+				     ref_head_ip_ivc[x],
+				     ref_tail_ip_ivc[x],
+				     ref_data_ip_ivc[x*flit_data_width +: 
+						     flit_data_width],
+				     ref_port_ip_ivc[x*port_idx_width +: 
+						     port_idx_width],
+				     ref_vcs_ip_ivc[x*num_vcs +: num_vcs]);
+		       end
+		     $display("================================");
+		     $display({"NOTE: This is merely a limitation of the ", 
+			       "current router checker implementation; ",
+			       "it does not necessarily indicate a problem ",
+			       "with the router logic."});
+		     $display("================================");
+		  end
 		if(x_error)
 		  begin
-		     $display("X value error: %m, op=%d, cyc=%d", op, $time);
+		     $display({"X value error at checker: ",
+			       "%m, op=%d, cyc=%d"}, op, $time);
 		     $display("valid=%b, head=%b, tail=%b, vcs=%b, data=%x",
 			      flit_valid_out,
 			      flit_head_out,
@@ -788,10 +851,13 @@ module router_checker
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:3*num_ports-1] errors_s, errors_q;
-	   assign errors_s = {rff_errors_ip, check_error_op, x_error_op};
+	   wire [0:4*num_ports-1] errors_s, errors_q;
+	   assign errors_s = {rff_errors_ip, 
+			      no_match_error_op, 
+			      multi_match_error_op, 
+			      x_error_op};
 	   c_err_rpt
-	     #(.num_errors(3*num_ports),
+	     #(.num_errors(4*num_ports),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
