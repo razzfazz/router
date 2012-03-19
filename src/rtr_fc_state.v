@@ -151,7 +151,6 @@ module rtr_fc_state
 		.errors(ft_errors));
 
 	     assign fc_active = ~ft_empty;
-	     assign full_prev = ft_full;
 	     
 	     wire 			 two_credits_left_s, two_credits_left_q;
 	     if(num_flits_per_vc == 2)
@@ -197,6 +196,7 @@ module rtr_fc_state
 		      (two_credits_left_q & flit_sent & ~fc_event_valid);
 		  assign full = (ft_full | (ft_almost_full & flit_sent)) &
 				~fc_event_valid;
+		  assign full_prev = ft_full & ~fc_event_valid;
 	       end
 	     else
 	       begin
@@ -204,6 +204,7 @@ module rtr_fc_state
 		  assign almost_full
 		    = flit_sent ? two_credits_left_q : ft_almost_full;
 		  assign full = ft_full | (ft_almost_full & flit_sent);
+		  assign full_prev = ft_full;
 	       end
 
 	     assign error_ft_underflow = ft_errors[0];
