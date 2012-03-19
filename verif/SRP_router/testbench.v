@@ -23,7 +23,7 @@
  ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
 
 //`default_nettype none
 
@@ -44,7 +44,7 @@ module testbench
    parameter max_packet_count = -1;
    
    // packet injection rate (percentage of cycles)
-//   parameter packet_rate = 25;
+   //   parameter packet_rate = 25;
    
    // flit consumption rate (percentage of cycles)
    parameter consume_rate = 100;
@@ -151,6 +151,20 @@ module testbench
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
+
+   localparam payload_length_width
+     = clogb(max_payload_length-min_payload_length+1);
+   // total number of bits required for storing header information
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       route_info_width : 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       route_info_width : 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (route_info_width + payload_length_width) : 
+       -1;
+   parameter time_to_wait_width  = 8;
+   localparam pid_width 	 = channel_width- flit_ctrl_width - header_info_width - time_to_wait_width - port_idx_width;
    
    
    reg clk;
@@ -173,7 +187,7 @@ module testbench
    reg 					run;
    
    genvar 				ip;
-      
+   
    generate
       
       for(ip = 0; ip < num_ports; ip = ip + 1)
@@ -189,11 +203,10 @@ module testbench
 	     begin
 		
 		assign channel_in_ip[ip*channel_width:(ip+1)*channel_width-1]
-		  = {channel_width{1'b0}};
+	     = {channel_width{1'b0}};
 		assign flit_valid_in_ip[ip] = 1'b0;
 		
 		assign ps_error_ip[ip] = 1'b0;
-		
 	     end
 	   else
 	     begin
@@ -215,8 +228,9 @@ module testbench
 		
 		wire 			   ps_error;
 		
-		packet_source
-		  #(.initial_seed(initial_seed+ip),
+		verif_packet_source
+		  #(.time_to_wait_width(time_to_wait_width),
+		    .initial_seed(initial_seed+ip),
 		    .max_packet_count(max_packet_count),
 		    .packet_rate(packet_rate),
 		    .packet_ratio(packet_ratio),
@@ -433,7 +447,7 @@ module testbench
 	      .data_out(flow_ctrl_dly));
 	   
 	   assign flow_ctrl_in_op[op*flow_ctrl_width:(op+1)*flow_ctrl_width-1]
-		    = flow_ctrl_dly;
+	     = flow_ctrl_dly;
 	   
 	   assign cred_valid_in_op[op] = flow_ctrl_dly[0];
 	   
@@ -447,7 +461,7 @@ module testbench
    wire       tb_error;
    assign tb_error = |tb_errors;
 
-wire [0:31] ops_flits_s [0:num_ports-1];
+   wire [0:31] ops_flits_s [0:num_ports-1];
    wire [0:31] ops_flits_q [0:num_ports-1];
    generate
       genvar ops_count;
@@ -586,12 +600,12 @@ wire [0:31] ops_flits_s [0:num_ports-1];
    reg 	       clk_en;
    
    always
-   begin
-      clk <= clk_en;
-      #(Tclk/2);
-      clk <= 1'b0;
-      #(Tclk/2);
-   end
+     begin
+	clk <= clk_en;
+	#(Tclk/2);
+	clk <= 1'b0;
+	#(Tclk/2);
+     end
    
    always @(posedge clk)
      begin
@@ -610,95 +624,138 @@ wire [0:31] ops_flits_s [0:num_ports-1];
    integer cycles;
    integer d;
    integer lolz;
+   integer srp_in, srp_out;
+   integer srp_in_i;
+   integer srp_out_i;
+   integer in_index;
+   integer in_ttw_index;
+   integer in_pid_index;
+   integer in_port_index;
+   
+   integer out_index;
+   integer out_ttw_index;
+   integer out_pid_index;
+   integer out_port_index;
+   
+   
+   //file IO  for SRP checking
 
+   always@(negedge clk)
+     if(run)
+       begin
+	  for(srp_in_i = 0; srp_in_i < num_ports; srp_in_i = srp_in_i + 1)
+	    begin:in_ps
+	       in_index       = srp_in_i*channel_width;
+	       in_port_index  = in_index+channel_width-port_idx_width;
+	       in_ttw_index   = in_index+flit_ctrl_width+header_info_width;
+	       in_pid_index   = in_ttw_index+time_to_wait_width;
+	       if(channel_in_ip[in_index] & channel_in_ip[in_index+3])
+		 $fwrite(srp_in,"%d %d %d %d\n",
+			 cycles,
+			 channel_in_ip[in_ttw_index+:time_to_wait_width],
+			 channel_in_ip[in_pid_index+:pid_width],
+			 channel_in_ip[in_port_index+:port_idx_width ]);
+	    end
+       end
+   always@(negedge clk)
+     if(run)
+       begin
+	  for(srp_out_i = 0; srp_out_i < num_ports; srp_out_i = srp_out_i + 1)
+	    begin:out_ps
+	       out_index       = srp_out_i*channel_width;
+	       out_port_index  = out_index+channel_width-port_idx_width;
+	       out_ttw_index   = out_index+flit_ctrl_width+header_info_width;
+	       out_pid_index   = out_ttw_index+time_to_wait_width;
+	       if(channel_out_op[out_index] & channel_out_op[out_index+3])
+		 $fwrite(srp_out,"%d %d %d %d\n",
+			 cycles,
+			 channel_out_op[out_ttw_index+:time_to_wait_width],
+			 channel_out_op[out_pid_index+:pid_width],
+			 channel_out_op[out_port_index+:port_idx_width ]);
+	    end
+       end
+   
+   
    initial
-   begin
-      
-      for(d = 0; d < num_dimensions; d = d + 1)
-	begin
-	   router_address[d*dim_addr_width +: dim_addr_width]
-	     = num_routers_per_dim / 2;
-	end
-      
-      reset = 1'b0;
-      clk_en = 1'b0;
-      run = 1'b0;
-      count_en = 1'b0;
-      cycles = 0;
-      
-      #(Tclk);
-      
-      #(Tclk/2);
-      
-      reset = 1'b1;
-      
-      #(Tclk);
-      
-      reset = 1'b0;
-      
-      #(Tclk);
-      
-      clk_en = 1'b1;
-      
-      #(Tclk/2);
-      
-      $display("warming up...");
-      
-      run = 1'b1;
+     begin
+	//file IO declaration for SRP checking
+	srp_in   = $fopen("srp_input.txt","w");
+	srp_out  = $fopen("srp_output.txt","w");
 
-      while(cycles < warmup_time)
-	begin
-	   cycles = cycles + 1;
-	   #(Tclk);
-	end
-      
-      $display("measuring...");
-      
-      count_en = 1'b1;
-      
-      while(cycles < warmup_time + measure_time)
-	begin
-	   cycles = cycles + 1;
-	   #(Tclk);
-	end
-      
-      count_en = 1'b0;
-      
-      $display("measured %d cycles", measure_time);
-      
-      $display("%d flits in, %d flits out", count_in_flits, count_out_flits);
-      
-      $display("cooling down...");
-      
-      run = 1'b0;
-      
-      while((in_flits > out_flits) || (in_flits > in_creds))
-	begin
-	   cycles = cycles + 1;
-	   #(Tclk);
-	end
-      
-      #(Tclk*10);
-      
-      $display("simulation ended after %d cycles", cycles);
-      
-      $display("%d flits received, %d flits sent", in_flits, out_flits);
+	for(d = 0; d < num_dimensions; d = d + 1)
+	  begin
+	     router_address[d*dim_addr_width +: dim_addr_width]
+	  = num_routers_per_dim / 2;
+	  end
+	
+	reset = 1'b0;
+	clk_en = 1'b0;
+	run = 1'b0;
+	count_en = 1'b0;
+	cycles = 0;
+	
+	#(Tclk);
+	
+	#(Tclk/2);
+	
+	reset = 1'b1;
+	
+	#(Tclk);
+	
+	reset = 1'b0;
+	
+	#(Tclk);
+	
+	clk_en = 1'b1;
+	
+	#(Tclk/2);
+	
+	$display("warming up...");
+	
+	run = 1'b1;
+
+	while(cycles < warmup_time)
+	  begin
+	     cycles = cycles + 1;
+	     #(Tclk);
+	  end
+	
+	$display("measuring...");      
+	count_en = 1'b1;      
+	while(cycles < warmup_time + measure_time)
+	  begin
+	     cycles = cycles + 1;
+	     #(Tclk);
+	  end
+	
+	count_en = 1'b0;      
+	$display("measured %d cycles", measure_time);
+	$display("%d flits in, %d flits out", count_in_flits, count_out_flits);
+	$display("cooling down...");
+	run = 1'b0;
+
+	//stat print out
+	while((in_flits > out_flits) || (in_flits > in_creds))
+	  begin
+	     cycles = cycles + 1;
+	     #(Tclk);
+	  end
+	#(Tclk*10);
+	$display("simulation ended after %d cycles", cycles);      
+	$display("%d flits received, %d flits sent", in_flits, out_flits);
         for(lolz = 0; lolz<num_ports; lolz=lolz+1)
-	begin
-	   $display("port %d eject : %d",
-		    lolz,ops_flits_q[lolz]);
-
-	   
-	   	   
-	end
-      for(lolz = 0; lolz<num_ports; lolz=lolz+1)
-	begin
-      	   $display("port %d inject: %d flits",
-		    lolz,ips_flits_q[lolz]);
-	end
-      
-      $finish;
-      
-   end
+	  begin
+	     $display("port %d eject : %d",
+		      lolz,ops_flits_q[lolz]);
+	  end
+	for(lolz = 0; lolz<num_ports; lolz=lolz+1)
+	  begin
+      	     $display("port %d inject: %d flits",
+		      lolz,ips_flits_q[lolz]);
+	  end
+	$fclose(srp_in);
+	$fclose(srp_out);
+	$finish;      
+     end
    
 endmodule

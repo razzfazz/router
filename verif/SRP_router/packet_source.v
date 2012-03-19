@@ -36,76 +36,79 @@ module packet_source
 `include "c_constants.v"
 `include "rtr_constants.v"
 `include "vcr_constants.v"
+
    
-   parameter initial_seed = 0;
+parameter time_to_wait_width = 8;
+   
+   parameter initial_seed 		= 0;
    
    // maximum number of packets to generate (-1 = no limit)
-   parameter max_packet_count = 1000;
+   parameter max_packet_count 		= 1000;
    
    // packet injection rate (percentage of cycles)
-   parameter packet_rate = 25;
-   parameter packet_ratio = 25;
+   parameter packet_rate 		= 25;
+   parameter packet_ratio 		= 25;
    // width of packet count register
-   parameter packet_count_reg_width = 32;
+   parameter packet_count_reg_width 	= 32;
 
    // select packet length mode (0: uniform random, 1: bimodal)
-   parameter packet_length_mode = 0;
+   parameter packet_length_mode 	= 0;
    
    // select network topology
-   parameter topology = `TOPOLOGY_FBFLY;
+   parameter topology 			= `TOPOLOGY_FBFLY;
    
    // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   parameter num_flits_per_vc 		= 8;
    
    // number of bits required for flit buffer addresses
-   localparam flit_buffer_idx_width = clogb(num_flits_per_vc);
+   localparam flit_buffer_idx_width 	= clogb(num_flits_per_vc);
    
    // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
+   parameter num_message_classes 	= 2;
    
    // nuber of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
+   parameter num_resource_classes 	= 2;
    
    // width required to select individual resource class
-   localparam resource_class_idx_width = clogb(num_resource_classes);
+   localparam resource_class_idx_width 	= clogb(num_resource_classes);
    
    // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   localparam num_packet_classes 	= num_message_classes * num_resource_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 2;
+   parameter num_vcs_per_class 		= 2;
    
    // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   localparam num_vcs 			= num_packet_classes * num_vcs_per_class;
    
    // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   localparam vc_idx_width 		= clogb(num_vcs);
    
    // total number of nodes
-   parameter num_nodes = 64;
+   parameter num_nodes 			= 64;
    
    // number of dimensions in network
-   parameter num_dimensions = 2;
+   parameter num_dimensions 		= 2;
    
    // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 4;
+   parameter num_nodes_per_router 	= 4;
 
    // total number of routers
    localparam num_routers
-     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+ 					= (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
    
    // number of routers in each dimension
-   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
+   localparam num_routers_per_dim 	= croot(num_routers, num_dimensions);
    
    // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
+   localparam dim_addr_width 		= clogb(num_routers_per_dim);
    
    // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
+   localparam router_addr_width 	= num_dimensions * dim_addr_width;
    
    // connectivity within each dimension
    localparam connectivity
-     = (topology == `TOPOLOGY_MESH) ?
+ 					= (topology == `TOPOLOGY_MESH) ?
        `CONNECTIVITY_LINE :
        (topology == `TOPOLOGY_TORUS) ?
        `CONNECTIVITY_RING :
@@ -483,8 +486,13 @@ module packet_source
    */
    assign flit_data[0:header_info_width-1]
      = flit_head ? header_info : data_hold_s[0:header_info_width-1];
-   assign flit_data[header_info_width:flit_data_width-1]
-     = data_hold_s[header_info_width:flit_data_width-1];
+   assign flit_data[header_info_width+time_to_wait_width:flit_data_width-1]
+     =  data_hold_s[header_info_width+time_to_wait_width:flit_data_width-1];
+   
+   assign flit_data[header_info_width +:time_to_wait_width]
+     = flit_head ? {time_to_wait_width{1'b1}} : 
+       data_hold_s[header_info_width +:time_to_wait_width];
+
    
    reg [0:dest_info_width-1] dest_info;
    
