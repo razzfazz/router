@@ -359,13 +359,6 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 				     empty_ivc;
    wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
    
-   
-   // test for TTW variable in vcr_ivc_ctrl_justin
-   
-   wire [0:time_to_wait_width-1] time_to_wait_in;
-   assign time_to_wait_in = 8'd100;
-   wire [0:time_to_wait_width-1] time_to_wait_out;
-   
    genvar 					     ivc;
    
    generate
@@ -468,9 +461,7 @@ module vcr_ip_ctrl_mac
 	        .allocated(allocated),
 	        .free_nonspec(free_nonspec),
 	        .free_spec(free_spec),
-	        .errors(ivcc_errors),
-	        .time_to_wait_in(time_to_wait_in),
-	        .time_to_wait_out (time_to_wait_out));
+	        .errors(ivcc_errors));
 	        
 	   end else begin
 	     

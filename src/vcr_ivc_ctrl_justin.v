@@ -35,7 +35,7 @@ module vcr_ivc_ctrl_justin
    flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_gnt, 
    vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev, next_lar_info, 
    flit_valid, flit_head, flit_tail, flit_sel_ovc, flit_data, empty, full, 
-   allocated, free_nonspec, free_spec, errors, time_to_wait_in, time_to_wait_out);
+   allocated, free_nonspec, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -161,14 +161,17 @@ module vcr_ivc_ctrl_justin
    // total number of bits required for routing-related information
    localparam route_info_width = lar_info_width + dest_info_width;
    
+   // total number of bits required for storing time-to-wait information
+   parameter time_to_wait_width = 8;
+   
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       route_info_width : 
+       route_info_width + time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       route_info_width : 
+       route_info_width + time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width + time_to_wait_width) : 
        -1;
    
    // select order of dimension traversal
@@ -215,10 +218,6 @@ module vcr_ivc_ctrl_justin
    
    // ID of current input port
    parameter port_id = 0;
-   
-   
-   // width of TTW value stored in header
-   parameter time_to_wait_width = 8;
    
    // width of TTW counter - increase this to make TTW more coarse
    localparam counter_width = 10;
@@ -324,8 +323,8 @@ module vcr_ivc_ctrl_justin
    
    // time stamp input and output
    
-   input [0:time_to_wait_width-1] time_to_wait_in;
-   output [0:time_to_wait_width-1] time_to_wait_out;
+   wire [0:time_to_wait_width-1] time_to_wait_in;
+   wire [0:time_to_wait_width-1] time_to_wait_out;
    
    
    
@@ -994,20 +993,15 @@ module vcr_ivc_ctrl_justin
    endgenerate
    
    
-   //---------------------------------------------------------------------------
-   // generate output data
-   //---------------------------------------------------------------------------
    
-   generate
+   
+   
+   
       
-      if(explicit_pipeline_register)
-  assign flit_data = empty ? flit_data_in : fbf_flit_data;
-      else
-  assign flit_data = fbf_flit_data;
-      
-   endgenerate
+
+
    
-   
+
    //---------------------------------------------------------------------------
    // credit tracking
    //---------------------------------------------------------------------------
@@ -1390,37 +1384,104 @@ module vcr_ivc_ctrl_justin
      end
       endgenerate
   
-      
-//-------------------
-// check if header is expired
-//-------------------      
 
+   
+   //---------------------------------------------------------------------------
+   // check if header is expired
+   //---------------------------------------------------------------------------
+ 
    wire flit_head_valid;
-   
+ 
    assign flit_head_valid = ~tbc_empty & htr_flit_head_q;
+ 
+   assign time_to_wait_in = flit_data[header_info_width - time_to_wait_width:
+                                      header_info_width-1];
    
-   wire [0:time_to_wait_width-1] time_diff;
    
+
+wire [0:time_to_wait_width-1] time_to_wait_in_q;
+
+   
+   c_dff
+     #(.width(time_to_wait_width),
+       .reset_type(reset_type))
+   dff_time_diff
+     (.clk(clk),
+      .reset(1'b0),
+      .active(1'b1),
+      .d(time_to_wait_in),
+      .q(time_to_wait_in_q));
+      
+      
+      // TODO: assign signal flit_valid_in_q and replace
+      //       time_to_wait_out if statement to valid || (valid_q && time_diffs_eq)
+      
+   wire time_diffs_eq;
+   
+
+   
+   assign time_diffs_eq = (time_to_wait_in == time_to_wait_in_q);   
+    wire [0:time_to_wait_width-1] time_diff;
+
+ 
    assign time_diff = coarse_counter - tbf_read_data;
-   
+ 
    wire header_expired;
-   
+ 
    assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
-   
+ 
    assign time_to_wait_out = flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
+ 
+ 
+ 
+ 
+  //---------------------------------------------------------------------------
+  // generate output data
+  //---------------------------------------------------------------------------
+ 
+ 
+  wire [0:flit_data_width-1] flit_data_new, flit_data_old;
+  wire tbc_pop_active_q;
+  wire new_value;
+  
+  assign new_value = tbc_pop_active_q | tbc_pop_active;
+  
+  
+  generate
+    
+    if(explicit_pipeline_register) begin
+      assign flit_data_old = empty ? flit_data_in : fbf_flit_data;
+      assign flit_data_new = flit_data_old;
+    end else begin
+      assign flit_data_old = fbf_flit_data;
+      assign flit_data_new = {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
+                              time_to_wait_out,
+                              flit_data_old[header_info_width:flit_data_width-1]};
+    end                          
+   endgenerate
    
    
    
-   // delete this
+   //assign flit_data_new = (tbc_pop_active | tbc_pop_active_q) ? flit_data_new : flit_data_old; 
+   assign flit_data = flit_data_old;
+   //assign flit_data = flit_data_new;
    
    
-   wire [2:0] in, out, test;
+   assign tbf_write_enable = flit_head_in & flit_valid_in;
    
-   assign in = 3'b011;
-   assign out = 3'b010;
-   
-   assign test = out - in;
-   
+ 
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   tbf_read_addrq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(1'b1),
+      .d(tbc_pop_active),
+      .q(tbc_pop_active_q));
+  
+ 
+    
    
    //---------------------------------------------------------------------------
    // error checking
