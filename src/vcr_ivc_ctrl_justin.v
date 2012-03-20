@@ -24,7 +24,7 @@
  ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
 
 //==============================================================================
 // input VC controller
@@ -85,7 +85,7 @@ module vcr_ivc_ctrl_justin
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
      = ((connectivity == `CONNECTIVITY_LINE) ||
-  (connectivity == `CONNECTIVITY_RING)) ?
+	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
        (connectivity == `CONNECTIVITY_FULL) ?
        (num_routers_per_dim - 1) :
@@ -339,9 +339,9 @@ module vcr_ivc_ctrl_justin
    wire 					     pop_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-  assign pop_active = flit_valid | flit_sent_prev;
+	assign pop_active = flit_valid | flit_sent_prev;
       else
-  assign pop_active = flit_valid;
+	assign pop_active = flit_valid;
    endgenerate
    
    wire 					     flit_sent;
@@ -350,13 +350,13 @@ module vcr_ivc_ctrl_justin
    assign packet_done = flit_sent & flit_tail;
    
    wire 					     vc_allocated_s, 
-                 vc_allocated_q;
+						     vc_allocated_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-  assign vc_allocated_s
-    = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
+	assign vc_allocated_s
+		    = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
       else
-  assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+	assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
    endgenerate
    c_dff
      #(.width(1),
@@ -377,49 +377,49 @@ module vcr_ivc_ctrl_justin
    generate
       
       if(num_vcs_per_class == 1)
-  begin
-     assign vc_allocated_next_ocvc = 1'b1;
-     assign vc_allocated_ocvc = 1'b1;
-  end
+	begin
+	   assign vc_allocated_next_ocvc = 1'b1;
+	   assign vc_allocated_ocvc = 1'b1;
+	end
       if(num_vcs_per_class > 1)
-  begin
-     
-     assign vc_allocated_next_ocvc
-       = vc_allocated_q ? vc_allocated_ocvc : vc_gnt_ocvc;
-     
-     wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
-     wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
-     assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
-     c_dff
-       #(.width(num_vcs_per_class),
-         .reset_type(reset_type))
-     vc_allocated_ocvcq
-       (.clk(clk),
-        .reset(reset),
-        .active(pop_active),
-        .d(vc_allocated_ocvc_s),
-        .q(vc_allocated_ocvc_q));
-     
-     assign vc_allocated_ocvc = vc_allocated_ocvc_q;
-     
-  end
+	begin
+	   
+	   assign vc_allocated_next_ocvc
+	     = vc_allocated_q ? vc_allocated_ocvc : vc_gnt_ocvc;
+	   
+	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
+	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
+	   assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
+	   c_dff
+	     #(.width(num_vcs_per_class),
+               .reset_type(reset_type))
+	   vc_allocated_ocvcq
+	     (.clk(clk),
+              .reset(reset),
+              .active(pop_active),
+              .d(vc_allocated_ocvc_s),
+              .q(vc_allocated_ocvc_q));
+	   
+	   assign vc_allocated_ocvc = vc_allocated_ocvc_q;
+	   
+	end
       
       if(sw_alloc_spec)
-  begin
-     if(elig_mask == `ELIG_MASK_NONE)
-       assign flit_sent
-         = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
-     else
-       assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
-     
-     assign allocated_ocvc = vc_allocated_next_ocvc;
-  end
+	begin
+	   if(elig_mask == `ELIG_MASK_NONE)
+	     assign flit_sent
+			 = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
+	   else
+	     assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
+	   
+	   assign allocated_ocvc = vc_allocated_next_ocvc;
+	end
       else
-  begin
-     assign flit_sent = sw_gnt;
-     
-     assign allocated_ocvc = vc_allocated_ocvc;
-  end
+	begin
+	   assign flit_sent = sw_gnt;
+	   
+	   assign allocated_ocvc = vc_allocated_ocvc;
+	end
       
    endgenerate
    
@@ -505,37 +505,37 @@ module vcr_ivc_ctrl_justin
    generate
       
       if(explicit_pipeline_register)
-  begin
-     
-     if(gate_buffer_write)
-       assign fbf_write_enable
-         = flit_valid_in & ~(fbc_empty & flit_sent);
-     else
-       assign fbf_write_enable = flit_valid_in;
-     
-     assign fbf_read_addr = fbc_pop_addr;
-     
-  end
+	begin
+	   
+	   if(gate_buffer_write)
+	     assign fbf_write_enable
+               = flit_valid_in & ~(fbc_empty & flit_sent);
+	   else
+	     assign fbf_write_enable = flit_valid_in;
+	   
+	   assign fbf_read_addr = fbc_pop_addr;
+	   
+	end
       else
-  begin
-     
-     assign fbf_write_enable = flit_valid_in;
-     
-     wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-     assign fbf_read_addr_s = fbc_pop_addr;
-     c_dff
-       #(.width(fb_addr_width),
-         .reset_type(reset_type))
-     fbf_read_addrq
-       (.clk(clk),
-        .reset(1'b0),
-        .active(pop_active),
-        .d(fbf_read_addr_s),
-        .q(fbf_read_addr_q));
-     
-     assign fbf_read_addr = fbf_read_addr_q;
-     
-  end
+	begin
+	   
+	   assign fbf_write_enable = flit_valid_in;
+	   
+	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
+	   assign fbf_read_addr_s = fbc_pop_addr;
+	   c_dff
+	     #(.width(fb_addr_width),
+               .reset_type(reset_type))
+	   fbf_read_addrq
+	     (.clk(clk),
+              .reset(1'b0),
+              .active(pop_active),
+              .d(fbf_read_addr_s),
+              .q(fbf_read_addr_q));
+	   
+	   assign fbf_read_addr = fbf_read_addr_q;
+	   
+	end
       
    endgenerate
    
@@ -548,50 +548,50 @@ module vcr_ivc_ctrl_justin
    generate
 
       if(elig_mask == `ELIG_MASK_USED)
-  begin
-     
-     c_regfile
-       #(.depth(num_flits_per_vc),
-         .width(flit_data_width),
-         .regfile_type(fb_regfile_type))
-     fbf
-       (.clk(clk),
-        .write_active(push_active),
-        .write_enable(fbf_write_enable),
-        .write_address(fbc_push_addr),
-        .write_data(fbf_write_data),
-        .read_address(fbf_read_addr),
-        .read_data(fbf_read_data));
-     
-     assign fbf_peek_data = {flit_data_width{1'b0}};
-     
-  end
+	begin
+	   
+	   c_regfile
+		    #(.depth(num_flits_per_vc),
+		      .width(flit_data_width),
+		      .regfile_type(fb_regfile_type))
+	   fbf
+		    (.clk(clk),
+		     .write_active(push_active),
+		     .write_enable(fbf_write_enable),
+		     .write_address(fbc_push_addr),
+		     .write_data(fbf_write_data),
+		     .read_address(fbf_read_addr),
+		     .read_data(fbf_read_data));
+	   
+	   assign fbf_peek_data = {flit_data_width{1'b0}};
+	   
+	end
       else
-  begin
-     
-     wire [0:fb_addr_width-1] fbf_peek_addr;
-     c_incr
-       #(.width(fb_addr_width),
-         .max_value(num_flits_per_vc - 1))
-     fbf_peek_addr_incr
-       (.data_in(fbc_pop_addr),
-        .data_out(fbf_peek_addr));
-     
-     c_regfile
-       #(.depth(num_flits_per_vc),
-         .width(flit_data_width),
-         .num_read_ports(2),
-         .regfile_type(fb_regfile_type))
-     fbf
-       (.clk(clk),
-        .write_active(push_active),
-        .write_enable(fbf_write_enable),
-        .write_address(fbc_push_addr),
-        .write_data(fbf_write_data),
-        .read_address({fbf_read_addr, fbf_peek_addr}),
-        .read_data({fbf_read_data, fbf_peek_data}));
+	begin
+	   
+	   wire [0:fb_addr_width-1] fbf_peek_addr;
+	   c_incr
+	     #(.width(fb_addr_width),
+               .max_value(num_flits_per_vc - 1))
+	   fbf_peek_addr_incr
+	     (.data_in(fbc_pop_addr),
+              .data_out(fbf_peek_addr));
+	   
+	   c_regfile
+	     #(.depth(num_flits_per_vc),
+               .width(flit_data_width),
+               .num_read_ports(2),
+               .regfile_type(fb_regfile_type))
+	   fbf
+	     (.clk(clk),
+              .write_active(push_active),
+              .write_enable(fbf_write_enable),
+              .write_address(fbc_push_addr),
+              .write_data(fbf_write_data),
+              .read_address({fbf_read_addr, fbf_peek_addr}),
+              .read_data({fbf_read_data, fbf_peek_data}));
 
-  end
+	end
    endgenerate
    
    wire [0:flit_data_width-1] fbf_flit_data;
@@ -621,53 +621,53 @@ module vcr_ivc_ctrl_justin
    generate
       
       if(elig_mask == `ELIG_MASK_USED)
-  begin
-     
-     wire has_tail_s, has_tail_q;
-     assign has_tail_s = (has_tail_q & ~(flit_valid_in & flit_head_in)) | 
-             (flit_valid_in & flit_tail_in);
-     c_dff
-       #(.width(1),
-         .reset_type(reset_type))
-     has_tailq
-       (.clk(clk),
-        .reset(reset),
-        .active(push_active),
-        .d(has_tail_s),
-        .q(has_tail_q));
-     
-     assign fb_flit_tail = fbc_almost_empty & has_tail_q;
-     
-  end
+	begin
+	   
+	   wire has_tail_s, has_tail_q;
+	   assign has_tail_s = (has_tail_q & ~(flit_valid_in & flit_head_in)) | 
+			       (flit_valid_in & flit_tail_in);
+	   c_dff
+	     #(.width(1),
+               .reset_type(reset_type))
+	   has_tailq
+	     (.clk(clk),
+              .reset(reset),
+              .active(push_active),
+              .d(has_tail_s),
+              .q(has_tail_q));
+	   
+	   assign fb_flit_tail = fbc_almost_empty & has_tail_q;
+	   
+	end
       else
-  begin
-     
-     wire [0:num_flits_per_vc-1] push_mask;
-     c_decode
-       #(.num_ports(num_flits_per_vc))
-     push_addr_dec
-       (.data_in(fbc_push_addr),
-        .data_out(push_mask));
-     
-     wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
-     assign flit_tail_s
-       = fbf_write_enable ? 
-         ({num_flits_per_vc{flit_tail_in}} & push_mask) | 
-         (flit_tail_q & ~push_mask) :
-         flit_tail_q;
-     c_dff
-       #(.width(num_flits_per_vc),
-         .reset_type(reset_type))
-     flit_tailq
-       (.clk(clk),
-        .reset(1'b0),
-        .active(push_active),
-        .d(flit_tail_s),
-        .q(flit_tail_q));
-     
-     assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
-     
-  end
+	begin
+	   
+	   wire [0:num_flits_per_vc-1] push_mask;
+	   c_decode
+	     #(.num_ports(num_flits_per_vc))
+	   push_addr_dec
+	     (.data_in(fbc_push_addr),
+              .data_out(push_mask));
+	   
+	   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
+	   assign flit_tail_s
+	     = fbf_write_enable ? 
+               ({num_flits_per_vc{flit_tail_in}} & push_mask) | 
+               (flit_tail_q & ~push_mask) :
+               flit_tail_q;
+	   c_dff
+	     #(.width(num_flits_per_vc),
+               .reset_type(reset_type))
+	   flit_tailq
+	     (.clk(clk),
+              .reset(1'b0),
+              .active(push_active),
+              .d(flit_tail_s),
+              .q(flit_tail_q));
+	   
+	   assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
+	   
+	end
       
    endgenerate
    
@@ -696,15 +696,15 @@ module vcr_ivc_ctrl_justin
    wire 			     hdr_valid_s, hdr_valid_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-  assign hdr_valid_s
-    = (hdr_valid_q & ~(flit_sent_prev & flit_tail_prev)) | flit_valid_in;
+	assign hdr_valid_s
+		    = (hdr_valid_q & ~(flit_sent_prev & flit_tail_prev)) | flit_valid_in;
       else
-  assign hdr_valid_s
-    = flit_sent ?
-      (fbc_empty ? 
-       ~flit_tail_in : 
-       (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
-      (hdr_valid_q | flit_valid_in);
+	assign hdr_valid_s
+	  = flit_sent ?
+	    (fbc_empty ? 
+	     ~flit_tail_in : 
+	     (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
+	    (hdr_valid_q | flit_valid_in);
    endgenerate
    c_dff
      #(.width(1),
@@ -727,19 +727,19 @@ module vcr_ivc_ctrl_justin
    
    wire [0:dest_info_width-1] 	     dest_info_in;
    assign dest_info_in = route_info_in[lar_info_width:
-               lar_info_width+dest_info_width-1];
+				       lar_info_width+dest_info_width-1];
    
    wire 			     hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-  assign hdr_active = ~hdr_valid_q & flit_valid_in;
+	assign hdr_active = ~hdr_valid_q & flit_valid_in;
       else
-  // NOTE: If this ends up being timing-critical, we can simply eliminate 
-  // the fb_flit_tail term at the expense of slightly worse gating under 
-  // load.
-  // For relatively short packets, this is probably a good tradeoff.
-  assign hdr_active
-    = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
+	// NOTE: If this ends up being timing-critical, we can simply eliminate 
+	// the fb_flit_tail term at the expense of slightly worse gating under 
+	// load.
+	// For relatively short packets, this is probably a good tradeoff.
+	assign hdr_active
+	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
    endgenerate
    
    wire 			     two_plus_flits;
@@ -748,19 +748,19 @@ module vcr_ivc_ctrl_justin
    wire [0:lar_info_width-1] 	     hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-  assign hdr_lar_info_s = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+	assign hdr_lar_info_s = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
       else
-  begin
-     
-     wire [0:lar_info_width-1] peek_lar_info;
-     assign peek_lar_info = peek_route_info[0:lar_info_width-1];
-     
-     assign hdr_lar_info_s
-       = (~hdr_valid_q | packet_done) ? 
-         (two_plus_flits ? peek_lar_info : lar_info_in) : 
-         hdr_lar_info_q;
-     
-  end
+	begin
+	   
+	   wire [0:lar_info_width-1] peek_lar_info;
+	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
+	   
+	   assign hdr_lar_info_s
+	     = (~hdr_valid_q | packet_done) ? 
+               (two_plus_flits ? peek_lar_info : lar_info_in) : 
+               hdr_lar_info_q;
+	   
+	end
    endgenerate
    c_dff
      #(.width(lar_info_width),
@@ -775,20 +775,20 @@ module vcr_ivc_ctrl_justin
    wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-  assign hdr_dest_info_s = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+	assign hdr_dest_info_s = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
       else
-  begin
-     
-     wire [0:dest_info_width-1] peek_dest_info;
-     assign peek_dest_info
-       = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
-     
-     assign hdr_dest_info_s
-       = (~hdr_valid_q | packet_done) ?
-         (two_plus_flits ? peek_dest_info : dest_info_in) :
-         hdr_dest_info_q;
-     
-  end
+	begin
+	   
+	   wire [0:dest_info_width-1] peek_dest_info;
+	   assign peek_dest_info
+	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
+	   
+	   assign hdr_dest_info_s
+	     = (~hdr_valid_q | packet_done) ?
+               (two_plus_flits ? peek_dest_info : dest_info_in) :
+               hdr_dest_info_q;
+	   
+	end
    endgenerate
    c_dff
      #(.width(dest_info_width),
@@ -837,38 +837,38 @@ module vcr_ivc_ctrl_justin
    generate
       
       if(num_resource_classes == 1)
-  assign route_unmasked_orc = 1'b1;
+	assign route_unmasked_orc = 1'b1;
       else if(num_resource_classes > 1)
-  begin
-     
-     wire [0:resource_class_idx_width-1] route_rcsel_in;
-     assign route_rcsel_in
-       = lar_info_in[port_idx_width:
-        port_idx_width+resource_class_idx_width-1];
-     
-     wire [0:num_resource_classes-1]     route_in_orc;
-     c_decode
-       #(.num_ports(num_resource_classes))
-     route_in_orc_dec
-       (.data_in(route_rcsel_in),
-        .data_out(route_in_orc));
-     
-     wire [0:resource_class_idx_width-1] hdr_route_rcsel;
-     assign hdr_route_rcsel
-       = hdr_lar_info_q[port_idx_width:
-           port_idx_width+resource_class_idx_width-1];
-     
-     wire [0:num_resource_classes-1]     hdr_route_orc;
-     c_decode
-       #(.num_ports(num_resource_classes))
-     hdr_route_orc_dec
-       (.data_in(hdr_route_rcsel),
-        .data_out(hdr_route_orc));
-     
-     assign route_unmasked_orc
-       = hdr_valid_q ? hdr_route_orc : route_in_orc;
-     
-  end
+	begin
+	   
+	   wire [0:resource_class_idx_width-1] route_rcsel_in;
+	   assign route_rcsel_in
+	     = lar_info_in[port_idx_width:
+			   port_idx_width+resource_class_idx_width-1];
+	   
+	   wire [0:num_resource_classes-1]     route_in_orc;
+	   c_decode
+	     #(.num_ports(num_resource_classes))
+	   route_in_orc_dec
+	     (.data_in(route_rcsel_in),
+              .data_out(route_in_orc));
+	   
+	   wire [0:resource_class_idx_width-1] hdr_route_rcsel;
+	   assign hdr_route_rcsel
+	     = hdr_lar_info_q[port_idx_width:
+			      port_idx_width+resource_class_idx_width-1];
+	   
+	   wire [0:num_resource_classes-1]     hdr_route_orc;
+	   c_decode
+	     #(.num_ports(num_resource_classes))
+	   hdr_route_orc_dec
+	     (.data_in(hdr_route_rcsel),
+              .data_out(hdr_route_orc));
+	   
+	   assign route_unmasked_orc
+	     = hdr_valid_q ? hdr_route_orc : route_in_orc;
+	   
+	end
       
    endgenerate
    
@@ -975,20 +975,20 @@ module vcr_ivc_ctrl_justin
    generate
       
       if(num_resource_classes > 1)
-  begin
-     
-     wire [0:resource_class_idx_width-1] next_route_rcsel;
-     c_encode
-       #(.num_ports(num_resource_classes))
-     next_route_rcsel_enc
-       (.data_in(next_route_orc),
-        .data_out(next_route_rcsel));
-     
-     assign next_lar_info[port_idx_width:
-             port_idx_width+resource_class_idx_width-1]
-       = next_route_rcsel;
-     
-  end
+	begin
+	   
+	   wire [0:resource_class_idx_width-1] next_route_rcsel;
+	   c_encode
+	     #(.num_ports(num_resource_classes))
+	   next_route_rcsel_enc
+	     (.data_in(next_route_orc),
+              .data_out(next_route_rcsel));
+	   
+	   assign next_lar_info[port_idx_width:
+				port_idx_width+resource_class_idx_width-1]
+	     = next_route_rcsel;
+	   
+	end
       
    endgenerate
    
@@ -997,7 +997,7 @@ module vcr_ivc_ctrl_justin
    
    
    
-      
+   
 
 
    
@@ -1019,15 +1019,15 @@ module vcr_ivc_ctrl_justin
       .data_out(int_flow_ctrl_ovc));
    
    wire [0:num_resource_classes*num_vcs_per_class*
-   int_flow_ctrl_width-1] 	       int_flow_ctrl_orc_ocvc;
+	 int_flow_ctrl_width-1] 	       int_flow_ctrl_orc_ocvc;
    assign int_flow_ctrl_orc_ocvc = int_flow_ctrl_ovc[message_class*
-                 num_resource_classes*
-                 num_vcs_per_class*
-                 int_flow_ctrl_width:
-                 (message_class+1)*
-                 num_resource_classes*
-                 num_vcs_per_class*
-                 int_flow_ctrl_width-1];
+						     num_resource_classes*
+						     num_vcs_per_class*
+						     int_flow_ctrl_width:
+						     (message_class+1)*
+						     num_resource_classes*
+						     num_vcs_per_class*
+						     int_flow_ctrl_width-1];
    
    wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
    wire 					    error_ct_overflow;
@@ -1035,172 +1035,172 @@ module vcr_ivc_ctrl_justin
    generate
       
       if(num_resource_classes == 1)
-  assign int_flow_ctrl_ocvc = int_flow_ctrl_orc_ocvc;
+	assign int_flow_ctrl_ocvc = int_flow_ctrl_orc_ocvc;
       else if(num_resource_classes > 1)
-  begin
-     c_select_1ofn
-       #(.num_ports(num_resource_classes),
-         .width(num_vcs_per_class*int_flow_ctrl_width))
-     int_flow_ctrl_ocvc_sel
-       (.select(route_orc),
-        .data_in(int_flow_ctrl_orc_ocvc),
-        .data_out(int_flow_ctrl_ocvc));
-  end
+	begin
+	   c_select_1ofn
+	     #(.num_ports(num_resource_classes),
+               .width(num_vcs_per_class*int_flow_ctrl_width))
+	   int_flow_ctrl_ocvc_sel
+	     (.select(route_orc),
+              .data_in(int_flow_ctrl_orc_ocvc),
+              .data_out(int_flow_ctrl_ocvc));
+	end
       
       case(int_flow_ctrl_type)
-  
-  // the current number of credits available are transmitted from the 
-  // output controllers as a multi-level signal (0, 1, 2 or 3+ credits
-  // currently available)
-  `INT_FLOW_CTRL_TYPE_LEVEL:
-    begin
-       
-       wire [0:num_vcs_per_class-1]   next_free_ocvc;
-       wire [0:num_vcs_per_class-1]   free_spec_ocvc;
-       
-       genvar 			    ocvc;
-       
-       for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
-         begin:ocvcs
-      
-      wire [0:1] int_flow_ctrl;
-      assign int_flow_ctrl
-        = int_flow_ctrl_ocvc[ocvc*2:(ocvc+1)*2-1];
-      
-      wire 	     two_or_more_credits;
-      assign two_or_more_credits
-        = int_flow_ctrl[0] & (int_flow_ctrl[1] | ~flit_sent_prev);
-      
-      wire 	     one_or_more_credits;
-      assign one_or_more_credits
-        = int_flow_ctrl[0] | (int_flow_ctrl[1] & ~flit_sent_prev);
-      
-      wire 	     next_free;
-      assign next_free
-        = flit_sent ? two_or_more_credits : one_or_more_credits;
-      
-      assign next_free_ocvc[ocvc] = next_free;
-      
-      // NOTE: When sending the first flit in each packet, we must 
-      // have won VC allocation. Consequently, the destination 
-      // output VC must have been eligible and thus not assigned to 
-      // any input VC, so we know that nobody sent a flit to it in 
-      // the previous cycle.
-      
-      wire 	     free_spec;
-      assign free_spec = |int_flow_ctrl;
-      
-      assign free_spec_ocvc[ocvc] = free_spec;
-      
-         end
-       
-       wire 	     free_nonspec_s, free_nonspec_q;
-       assign free_nonspec_s = |(next_free_ocvc & vc_allocated_next_ocvc);
-       c_dff
-         #(.width(1),
-     .reset_value(1'b1),
-     .reset_type(reset_type))
-       free_nonspecq
-         (.clk(clk),
-    .reset(reset),
-    .active(cred_track_active),
-    .d(free_nonspec_s),
-    .q(free_nonspec_q));
-       
-       assign free_nonspec = free_nonspec_q;
-       
-       if(num_vcs_per_class == 1)
-         assign free_spec = free_spec_ocvc;
-       else if(num_vcs_per_class > 1)
-         assign free_spec = |(free_spec_ocvc & vc_gnt_ocvc);
-       
-       assign error_ct_overflow = 1'b0;
-       
-    end
-  
-  // credits are forwarded from the output controllers individually as 
-  // pulses, accumulated at the input controllers, and used whenever a
-  // flit is sent to the crossbar
-  `INT_FLOW_CTRL_TYPE_PUSH:
-    begin
-       
-       wire [0:num_vcs_per_class-1] cred_ocvc;
-       assign cred_ocvc = int_flow_ctrl_ocvc;
-       
-       wire 			  cred_allocated;
-       assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc);
-       
-       wire 			  cred_unallocated;
-       
-       if(num_vcs_per_class == 1)
-         assign cred_unallocated = cred_ocvc;
-       else
-         assign cred_unallocated = |(cred_ocvc & vc_gnt_ocvc);
-       
-       wire [0:cred_hold_width-1]   cred_hold_q;
-       
-       wire 			  has_cred_s, has_cred_q;
-       if(elig_mask == `ELIG_MASK_NONE)
-         assign has_cred_s
-     = vc_allocated_q ?
-       ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
-       (~sw_gnt & cred_unallocated);
-       else
-         assign has_cred_s 
-     = vc_allocated_q ? 
-       ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
-       (~sw_gnt | cred_unallocated);
-       c_dff
-         #(.width(1),
-     .reset_type(reset_type))
-       has_credq
-         (.clk(clk),
-    .reset(reset),
-    .active(cred_track_active),
-    .d(has_cred_s),
-    .q(has_cred_q));
-       
-       assign free_nonspec = has_cred_q;
-       
-       assign free_spec = cred_unallocated;
-       
-       wire 			  incr_cred_hold;
-       assign incr_cred_hold = cred_allocated & has_cred_q & ~sw_gnt;
-       
-       wire 			  decr_cred_hold;
-       assign decr_cred_hold = ~cred_allocated & |cred_hold_q & sw_gnt;
-       
-       wire [0:cred_hold_width-1]   cred_hold_new;
-       if(elig_mask == `ELIG_MASK_NONE)
-         assign cred_hold_new = {cred_hold_width{1'b0}};
-       else
-         assign cred_hold_new = cred_unallocated & ~sw_gnt;
-       
-       wire [0:cred_hold_width-1]   cred_hold_s;
-       assign cred_hold_s
-         = vc_allocated_q ?
-     (cred_hold_q + incr_cred_hold - decr_cred_hold) :
-     cred_hold_new;
-       c_dff
-         #(.width(cred_hold_width),
-     .reset_type(reset_type))
-       cred_holdq
-         (.clk(clk),
-    .reset(reset),
-    .active(cred_track_active),
-    .d(cred_hold_s),
-    .q(cred_hold_q));
-       
-       assign error_ct_overflow
-         = vc_allocated_q && (cred_hold_q == num_flits_per_vc-1) &&
-     incr_cred_hold;
-       
-    end
-  
+	
+	// the current number of credits available are transmitted from the 
+	// output controllers as a multi-level signal (0, 1, 2 or 3+ credits
+	// currently available)
+	`INT_FLOW_CTRL_TYPE_LEVEL:
+	  begin
+	     
+	     wire [0:num_vcs_per_class-1]   next_free_ocvc;
+	     wire [0:num_vcs_per_class-1]   free_spec_ocvc;
+	     
+	     genvar 			    ocvc;
+	     
+	     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
+               begin:ocvcs
+		  
+		  wire [0:1] int_flow_ctrl;
+		  assign int_flow_ctrl
+		    = int_flow_ctrl_ocvc[ocvc*2:(ocvc+1)*2-1];
+		  
+		  wire 	     two_or_more_credits;
+		  assign two_or_more_credits
+		    = int_flow_ctrl[0] & (int_flow_ctrl[1] | ~flit_sent_prev);
+		  
+		  wire 	     one_or_more_credits;
+		  assign one_or_more_credits
+		    = int_flow_ctrl[0] | (int_flow_ctrl[1] & ~flit_sent_prev);
+		  
+		  wire 	     next_free;
+		  assign next_free
+		    = flit_sent ? two_or_more_credits : one_or_more_credits;
+		  
+		  assign next_free_ocvc[ocvc] = next_free;
+		  
+		  // NOTE: When sending the first flit in each packet, we must 
+		  // have won VC allocation. Consequently, the destination 
+		  // output VC must have been eligible and thus not assigned to 
+		  // any input VC, so we know that nobody sent a flit to it in 
+		  // the previous cycle.
+		  
+		  wire 	     free_spec;
+		  assign free_spec = |int_flow_ctrl;
+		  
+		  assign free_spec_ocvc[ocvc] = free_spec;
+		  
+               end
+	     
+	     wire 	     free_nonspec_s, free_nonspec_q;
+	     assign free_nonspec_s = |(next_free_ocvc & vc_allocated_next_ocvc);
+	     c_dff
+               #(.width(1),
+		 .reset_value(1'b1),
+		 .reset_type(reset_type))
+	     free_nonspecq
+               (.clk(clk),
+		.reset(reset),
+		.active(cred_track_active),
+		.d(free_nonspec_s),
+		.q(free_nonspec_q));
+	     
+	     assign free_nonspec = free_nonspec_q;
+	     
+	     if(num_vcs_per_class == 1)
+               assign free_spec = free_spec_ocvc;
+	     else if(num_vcs_per_class > 1)
+               assign free_spec = |(free_spec_ocvc & vc_gnt_ocvc);
+	     
+	     assign error_ct_overflow = 1'b0;
+	     
+	  end
+	
+	// credits are forwarded from the output controllers individually as 
+	// pulses, accumulated at the input controllers, and used whenever a
+	// flit is sent to the crossbar
+	`INT_FLOW_CTRL_TYPE_PUSH:
+	  begin
+	     
+	     wire [0:num_vcs_per_class-1] cred_ocvc;
+	     assign cred_ocvc = int_flow_ctrl_ocvc;
+	     
+	     wire 			  cred_allocated;
+	     assign cred_allocated = |(cred_ocvc & vc_allocated_ocvc);
+	     
+	     wire 			  cred_unallocated;
+	     
+	     if(num_vcs_per_class == 1)
+               assign cred_unallocated = cred_ocvc;
+	     else
+               assign cred_unallocated = |(cred_ocvc & vc_gnt_ocvc);
+	     
+	     wire [0:cred_hold_width-1]   cred_hold_q;
+	     
+	     wire 			  has_cred_s, has_cred_q;
+	     if(elig_mask == `ELIG_MASK_NONE)
+               assign has_cred_s
+			   = vc_allocated_q ?
+			   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
+			   (~sw_gnt & cred_unallocated);
+	     else
+               assign has_cred_s 
+		 = vc_allocated_q ? 
+		   ((has_cred_q & ~sw_gnt) | (|cred_hold_q) | cred_allocated) :
+		   (~sw_gnt | cred_unallocated);
+	     c_dff
+               #(.width(1),
+		 .reset_type(reset_type))
+	     has_credq
+               (.clk(clk),
+		.reset(reset),
+		.active(cred_track_active),
+		.d(has_cred_s),
+		.q(has_cred_q));
+	     
+	     assign free_nonspec = has_cred_q;
+	     
+	     assign free_spec = cred_unallocated;
+	     
+	     wire 			  incr_cred_hold;
+	     assign incr_cred_hold = cred_allocated & has_cred_q & ~sw_gnt;
+	     
+	     wire 			  decr_cred_hold;
+	     assign decr_cred_hold = ~cred_allocated & |cred_hold_q & sw_gnt;
+	     
+	     wire [0:cred_hold_width-1]   cred_hold_new;
+	     if(elig_mask == `ELIG_MASK_NONE)
+               assign cred_hold_new = {cred_hold_width{1'b0}};
+	     else
+               assign cred_hold_new = cred_unallocated & ~sw_gnt;
+	     
+	     wire [0:cred_hold_width-1]   cred_hold_s;
+	     assign cred_hold_s
+               = vc_allocated_q ?
+		 (cred_hold_q + incr_cred_hold - decr_cred_hold) :
+		 cred_hold_new;
+	     c_dff
+               #(.width(cred_hold_width),
+		 .reset_type(reset_type))
+	     cred_holdq
+               (.clk(clk),
+		.reset(reset),
+		.active(cred_track_active),
+		.d(cred_hold_s),
+		.q(cred_hold_q));
+	     
+	     assign error_ct_overflow
+               = vc_allocated_q && (cred_hold_q == num_flits_per_vc-1) &&
+		 incr_cred_hold;
+	     
+	  end
+	
       endcase
       
    endgenerate
-      
+   
    //---------------------------------------------------------------------------
    // TTW counter
    //---------------------------------------------------------------------------
@@ -1211,21 +1211,21 @@ module vcr_ivc_ctrl_justin
    assign ttw_counter_d = ttw_counter_q + 1'b1;
    
    c_dff
-      #(.width(counter_width),
-        .reset_type(reset_type))
+     #(.width(counter_width),
+       .reset_type(reset_type))
    counter
-      (.clk(clk),
-       .reset(reset),
-       .active(1'b1),
-       .d(ttw_counter_d),
-       .q(ttw_counter_q));
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(ttw_counter_d),
+      .q(ttw_counter_q));
    
    
    
    //---------------------------------------------------------------------------
    // timestamp buffer control
    //---------------------------------------------------------------------------
-      wire 					     tbc_empty;
+   wire 					     tbc_empty;
    
    
    wire 					     tbc_push_active;
@@ -1266,8 +1266,8 @@ module vcr_ivc_ctrl_justin
       .full(tbc_full),
       .errors(tbc_errors));
    
-   assign tb_empty = tbc_empty;
-   assign tb_full = tbc_full;
+   //assign tb_empty = tbc_empty;
+   //assign tb_full = tbc_full;
    
    wire 					     error_tbc_underflow;
    assign error_tbc_underflow = tbc_errors[0];
@@ -1275,131 +1275,132 @@ module vcr_ivc_ctrl_justin
    wire 					     error_tbc_overflow;
    assign error_tbc_overflow = tbc_errors[1];
    
- 
-      //---------------------------------------------------------------------------
-      // time stamp buffer
-      //---------------------------------------------------------------------------
-      
-      wire 					     tbf_write_enable;
-      wire [0:fb_addr_width-1] 			     tbf_read_addr;
-      
-//      generate
-         
-//         if(explicit_pipeline_register)
-//     begin
-        
-        if(gate_buffer_write)
-          assign tbf_write_enable
-            = flit_head_in & flit_valid_in & ~(fbc_empty & flit_sent);
-        else
-          assign tbf_write_enable = flit_valid_in & flit_head_in;
-        
-        assign tbf_read_addr = tbc_pop_addr;
-        
-/*     end
-         else
-     begin
-        
-        assign tbf_write_enable = flit_head_in & flit_valid_in;
-        
-        wire [0:fb_addr_width-1] tbf_read_addr_s, tbf_read_addr_q;
-        assign tbf_read_addr_s = tbc_pop_addr;
-        c_dff
-          #(.width(fb_addr_width),
-            .reset_type(reset_type))
-        tbf_read_addrq
-          (.clk(clk),
-           .reset(1'b0),
-           .active(tbc_pop_active),
-           .d(tbf_read_addr_s),
-           .q(tbf_read_addr_q));
-        
-        assign tbf_read_addr = tbf_read_addr_q;
-        
-     end
-         
-      endgenerate*/
-      
-      
-      
-      //---------------------------
-      //
-      //---------------------------
-      
-      wire [0:time_to_wait_width-1] coarse_counter;
-      assign coarse_counter = ttw_counter_q[0:time_to_wait_width-1]; 
-      
-      wire [0:time_to_wait_width-1] 	     tbf_write_data;
-      assign tbf_write_data = coarse_counter;
-      
-      wire [0:time_to_wait_width-1] 	     tbf_read_data;
-      wire [0:time_to_wait_width-1] 	     tbf_peek_data;
    
-      generate
+   //---------------------------------------------------------------------------
+   // time stamp buffer
+   //---------------------------------------------------------------------------
    
-         if(elig_mask == `ELIG_MASK_USED)
-     begin
-        
-        c_regfile
-          #(.depth(num_flits_per_vc),
-            .width(time_to_wait_width),
-            .regfile_type(fb_regfile_type))  // may need to change this
-        tbf
-          (.clk(clk),
-           .write_active(tbc_push_active),
-           .write_enable(tbf_write_enable),
-           .write_address(tbc_push_addr),
-           .write_data(tbf_write_data),
-           .read_address(tbf_read_addr),
-           .read_data(tbf_read_data));
-        
-        assign tbf_peek_data = {8{1'b0}};
-        
-     end
-         else
-     begin
-        
-        wire [0:fb_addr_width-1] tbf_peek_addr;
-        c_incr
-          #(.width(fb_addr_width),
-            .max_value(num_flits_per_vc - 1))
-        tbf_peek_addr_incr
-          (.data_in(tbc_pop_addr),
-           .data_out(tbf_peek_addr));
-        
-        c_regfile
-          #(.depth(num_flits_per_vc),
-            .width(time_to_wait_width),
-            .num_read_ports(2),
-            .regfile_type(fb_regfile_type))  // may need to change this
-        tbf
-          (.clk(clk),
-           .write_active(tbc_push_active),
-           .write_enable(tbf_write_enable),
-           .write_address(tbc_push_addr),
-           .write_data(tbf_write_data),
-           .read_address({tbf_read_addr, tbf_peek_addr}),
-           .read_data({tbf_read_data, tbf_peek_data}));
+   wire 					     tbf_write_enable;
+   wire [0:fb_addr_width-1] 			     tbf_read_addr;
    
-     end
-      endgenerate
-  
+   generate
+      
+      if(explicit_pipeline_register)
+	begin
+           
+           if(gate_buffer_write)
+             assign tbf_write_enable
+               = flit_head_in & flit_valid_in & ~(fbc_empty & flit_sent);
+           else
+             assign tbf_write_enable = flit_valid_in & flit_head_in;
+           
+           assign tbf_read_addr = tbc_pop_addr;
+           
+	end
+      else
+	begin
+           
+           assign tbf_write_enable = flit_head_in & flit_valid_in;
+           
+           wire [0:fb_addr_width-1] tbf_read_addr_s, tbf_read_addr_q;
+           assign tbf_read_addr_s = tbc_pop_addr;
+           c_dff
+             #(.width(fb_addr_width),
+               .reset_type(reset_type))
+           tbf_read_addrqs
+             (.clk(clk),
+              .reset(1'b0),
+              .active(tbc_pop_active),
+              .d(tbf_read_addr_s),
+              .q(tbf_read_addr_q));
+           
+           assign tbf_read_addr = tbf_read_addr_q;
+           
+	end
+      
+   endgenerate
+   
+   
+   
+   //---------------------------
+   //
+   //---------------------------
+   
+   wire [0:time_to_wait_width-1] coarse_counter;
+   assign coarse_counter = ttw_counter_q[0:time_to_wait_width-1]; 
+   
+   wire [0:time_to_wait_width-1] 	     tbf_write_data;
+   assign tbf_write_data = coarse_counter;
+   
+   wire [0:time_to_wait_width-1] 	     tbf_read_data;
+   wire [0:time_to_wait_width-1] 	     tbf_peek_data;
+   
+   generate
+      
+      if(elig_mask == `ELIG_MASK_USED)
+	begin
+           
+           c_regfile
+		    #(.depth(num_flits_per_vc),
+		      .width(time_to_wait_width),
+		      .regfile_type(fb_regfile_type))  // may need to change this
+           tbf
+		    (.clk(clk),
+		     .write_active(tbc_push_active),
+		     .write_enable(tbf_write_enable),
+		     .write_address(tbc_push_addr),
+		     .write_data(tbf_write_data),
+		     .read_address(tbf_read_addr),
+		     .read_data(tbf_read_data));
+           
+           assign tbf_peek_data = {8{1'b0}};
+           
+	end
+      else
+	begin
+           
+           wire [0:fb_addr_width-1] tbf_peek_addr;
+           c_incr
+             #(.width(fb_addr_width),
+               .max_value(num_flits_per_vc - 1))
+           tbf_peek_addr_incr
+             (.data_in(tbc_pop_addr),
+              .data_out(tbf_peek_addr));
+           
+           c_regfile
+             #(.depth(num_flits_per_vc),
+               .width(time_to_wait_width),
+               .num_read_ports(2),
+               .regfile_type(fb_regfile_type))  // may need to change this
+           tbf
+             (.clk(clk),
+              .write_active(tbc_push_active),
+              .write_enable(tbf_write_enable),
+              .write_address(tbc_push_addr),
+              .write_data(tbf_write_data),
+              .read_address({tbf_read_addr, tbf_peek_addr}),
+              .read_data({tbf_read_data, tbf_peek_data}));
+	   
+	end
+   endgenerate
+   
 
    
    //---------------------------------------------------------------------------
    // check if header is expired
    //---------------------------------------------------------------------------
- 
+
+   wire [0:flit_data_width-1] flit_data_old;
    wire flit_head_valid;
- 
+   
    assign flit_head_valid = ~tbc_empty & htr_flit_head_q;
- 
-   assign time_to_wait_in = flit_data[header_info_width - time_to_wait_width:
-                                      header_info_width-1];
+   
+   assign time_to_wait_in = flit_data_old[header_info_width - time_to_wait_width:
+					     header_info_width-1];
    
    
 
-wire [0:time_to_wait_width-1] time_to_wait_in_q;
+   wire [0:time_to_wait_width-1] time_to_wait_in_q;
 
    
    c_dff
@@ -1411,65 +1412,68 @@ wire [0:time_to_wait_width-1] time_to_wait_in_q;
       .active(1'b1),
       .d(time_to_wait_in),
       .q(time_to_wait_in_q));
-      
-      
-      // TODO: assign signal flit_valid_in_q and replace
-      //       time_to_wait_out if statement to valid || (valid_q && time_diffs_eq)
-      
+   
+   
+   // TODO: assign signal flit_valid_in_q and replace
+   //       time_to_wait_out if statement to valid || (valid_q && time_diffs_eq)
+   
    wire time_diffs_eq;
    
 
    
    assign time_diffs_eq = (time_to_wait_in == time_to_wait_in_q);   
-    wire [0:time_to_wait_width-1] time_diff;
+   wire [0:time_to_wait_width-1] time_diff;
 
- 
-   assign time_diff = coarse_counter - tbf_read_data;
- 
-   wire header_expired;
- 
-   assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
- 
-   assign time_to_wait_out = flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
- 
- 
- 
- 
-  //---------------------------------------------------------------------------
-  // generate output data
-  //---------------------------------------------------------------------------
- 
- 
-  wire [0:flit_data_width-1] flit_data_new, flit_data_old;
-  wire tbc_pop_active_q;
-  wire new_value;
-  
-  assign new_value = tbc_pop_active_q | tbc_pop_active;
-  
-  
-  generate
-    
-    if(explicit_pipeline_register) begin
-      assign flit_data_old = empty ? flit_data_in : fbf_flit_data;
-      assign flit_data_new = flit_data_old;
-    end else begin
-      assign flit_data_old = fbf_flit_data;
-      assign flit_data_new = {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
-                              time_to_wait_out,
-                              flit_data_old[header_info_width:flit_data_width-1]};
-    end                          
-   endgenerate
    
+   assign time_diff = coarse_counter - tbf_read_data;
+   
+   wire header_expired;
+   
+   assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
+   
+   assign time_to_wait_out = flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
+   
+   
+   
+   
+   //---------------------------------------------------------------------------
+   // generate output data
+   //---------------------------------------------------------------------------
+   
+   
+
+   wire tbc_pop_active_q;
+   wire new_value;
+   
+   assign new_value = tbc_pop_active_q | tbc_pop_active;
+   
+   
+   generate
+      
+      if(explicit_pipeline_register) begin
+	 assign flit_data_old = empty ? flit_data_in : fbf_flit_data;
+      end else begin
+	 assign flit_data_old = fbf_flit_data;
+      end                          
+   endgenerate
+
+   assign flit_data = (tbc_pop_active | tbc_pop_active_q) ?
+     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
+      time_to_wait_out,
+      flit_data_old[header_info_width:flit_data_width-1]}:
+       {flit_data_old};
+   
+		      
    
    
    //assign flit_data_new = (tbc_pop_active | tbc_pop_active_q) ? flit_data_new : flit_data_old; 
-   assign flit_data = flit_data_old;
+   //assign flit_data = flit_data_old;
    //assign flit_data = flit_data_new;
    
    
    assign tbf_write_enable = flit_head_in & flit_valid_in;
    
- 
+   
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -1479,9 +1483,9 @@ wire [0:time_to_wait_width-1] time_to_wait_in_q;
       .active(1'b1),
       .d(tbc_pop_active),
       .q(tbc_pop_active_q));
-  
- 
-    
+   
+   
+   
    
    //---------------------------------------------------------------------------
    // error checking
@@ -1491,13 +1495,13 @@ wire [0:time_to_wait_width-1] time_to_wait_in_q;
    
    always @(posedge clk)
      begin
-  
-  if(error_no_header)
-    $display("ERROR: Stray flit received in module %m.");
-  
-  if(error_ct_overflow)
-    $display("ERROR: Credit tracker overflow in module %m.");
-  
+	
+	if(error_no_header)
+	  $display("ERROR: Stray flit received in module %m.");
+	
+	if(error_ct_overflow)
+	  $display("ERROR: Credit tracker overflow in module %m.");
+	
      end
    
    // synopsys translate_on
