@@ -500,7 +500,7 @@ module verif_packet_source
 	     else
 	       begin
 		  for(i = 0; i < flit_data_width; i = i + 1)
-		    data_q[i] <= 1'b0;
+		    data_q[i] <= $dist_uniform(seed, 0, 1);
 	       end
 	  end
      end

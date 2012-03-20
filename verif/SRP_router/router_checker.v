@@ -30,7 +30,12 @@
 //==============================================================================
 
 module router_checker
-  (clk, reset, router_address, channel_in_ip, channel_out_op, error);
+  (/*autoarg*/
+   // Outputs
+   error,
+   // Inputs
+   clk, reset, router_address, channel_in_ip, channel_out_op
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
