@@ -233,7 +233,7 @@ module testbench
 		
 		wire 			   ps_error;
 		
-		verif_packet_source
+		srp_packet_source
 		  #(.time_to_wait_width(time_to_wait_width),
 		    .initial_seed(initial_seed+ip),
 		    .max_packet_count(max_packet_count),
@@ -244,7 +244,6 @@ module testbench
 		    .topology(topology),
 		    .num_flits_per_vc(num_flits_per_vc),
 		    .num_message_classes(num_message_classes),
-		    .num_resource_classes(num_resource_classes),
 		    .num_vcs_per_class(num_vcs_per_class),
 		    .num_nodes(num_nodes),
 		    .num_dimensions(num_dimensions),
