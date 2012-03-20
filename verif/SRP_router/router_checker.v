@@ -41,61 +41,63 @@ module router_checker
 `include "c_constants.v"
 `include "rtr_constants.v"
 `include "vcr_constants.v"
+
+    parameter time_to_wait_width = 8;
    
    // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   parameter num_flits_per_vc 		= 8;
    
    // number of bits required for flit buffer addresses
-   localparam flit_buffer_idx_width = clogb(num_flits_per_vc);
+   localparam flit_buffer_idx_width 	= clogb(num_flits_per_vc);
    
    // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
+   parameter num_message_classes 	= 2;
    
    // number of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
+   parameter num_resource_classes 	= 2;
    
    // width required to select individual resource class
-   localparam resource_class_idx_width = clogb(num_resource_classes);
+   localparam resource_class_idx_width 	= clogb(num_resource_classes);
    
    // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   localparam num_packet_classes 	= num_message_classes * num_resource_classes;
    
    // number of VCs per class
-   parameter num_vcs_per_class = 1;
+   parameter num_vcs_per_class 		= 1;
    
    // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   localparam num_vcs 			= num_packet_classes * num_vcs_per_class;
    
    // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   localparam vc_idx_width 		= clogb(num_vcs);
    
    // number of routers in each dimension
-   parameter num_routers_per_dim = 4;
+   parameter num_routers_per_dim 	= 4;
    
    // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
+   localparam dim_addr_width 		= clogb(num_routers_per_dim);
    
    // number of dimensions in network
-   parameter num_dimensions = 2;
+   parameter num_dimensions 		= 2;
    
    // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
+   localparam router_addr_width 	= num_dimensions * dim_addr_width;
    
    // number of nodes per router (a.k.a. concentration factor)
-   parameter num_nodes_per_router = 1;
+   parameter num_nodes_per_router 	= 1;
    
    // width required to select individual node at current router
-   localparam node_addr_width = clogb(num_nodes_per_router);
+   localparam node_addr_width 		= clogb(num_nodes_per_router);
    
    // width of global addresses
-   localparam addr_width = router_addr_width + node_addr_width;
+   localparam addr_width 		= router_addr_width + node_addr_width;
    
    // connectivity within each dimension
-   parameter connectivity = `CONNECTIVITY_LINE;
+   parameter connectivity 		= `CONNECTIVITY_LINE;
    
    // number of adjacent routers in each dimension
    localparam num_neighbors_per_dim
-     = ((connectivity == `CONNECTIVITY_LINE) ||
+ 					= ((connectivity == `CONNECTIVITY_LINE) ||
 	(connectivity == `CONNECTIVITY_RING)) ?
        2 :
        (connectivity == `CONNECTIVITY_FULL) ?
@@ -164,12 +166,13 @@ module router_checker
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       route_info_width : 
+       route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       route_info_width : 
+       route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width + time_to_wait_width) : 
        -1;
+
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;

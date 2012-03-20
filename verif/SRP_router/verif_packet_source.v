@@ -27,7 +27,7 @@
 
 //==============================================================================
 // packet source with a trackable data payload for external verficiation
-// packet structure [header_info][ttw][packet_id][input_port]
+// packet structure [route_info][ttw][packet_id][input_port]
 //note: [packet_id] is NOT sequential, it increments when flit_head_s=1, not head+valid
 //==============================================================================
 
@@ -199,11 +199,11 @@ module verif_packet_source
    // total number of bits required for storing header information
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       route_info_width : 
+       route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       route_info_width : 
+       route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width + time_to_wait_width) : 
        -1;
    
    // select order of dimension traversal
@@ -475,14 +475,6 @@ module verif_packet_source
    
    reg [0:flit_data_width-1] 		 data_q;
 
-   /*
-   always @(posedge clk, posedge reset)
-     begin
-	
-	  for(i = 0; i < flit_data_width; i = i + 1)
-	    data_q[i] <= $dist_uniform(seed, 0, 1);
-     end
-*/
    always @(posedge clk, posedge reset)
      begin
 	if(reset)
@@ -521,21 +513,15 @@ module verif_packet_source
    assign data_hold_s  = flit_valid?data_q:data_hold_q;
    
    wire [0:header_info_width-1] header_info;
-   /*
    assign flit_data[0:header_info_width-1]
      = flit_head ? header_info : data_q[0:header_info_width-1];
    assign flit_data[header_info_width:flit_data_width-1]
      = data_q[header_info_width:flit_data_width-1];
-   */
-   assign flit_data[0:header_info_width-1]
-     = flit_head ? header_info : data_hold_s[0:header_info_width-1];
-   assign flit_data[header_info_width+time_to_wait_width:flit_data_width-1]
-     =  data_hold_s[header_info_width+time_to_wait_width:flit_data_width-1];
-   
-   assign flit_data[header_info_width +:time_to_wait_width]
-     = flit_head ? {time_to_wait_width{1'b1}} : 
-       data_hold_s[header_info_width +:time_to_wait_width];
 
+   //set TTW to all 1's
+   assign  header_info[(route_info_width+payload_length_width)+:time_to_wait_width]
+     ={time_to_wait_width{1'b1}};
+   
    
    reg [0:dest_info_width-1] dest_info;
    
@@ -962,7 +948,8 @@ module verif_packet_source
 	   always @(posedge clk, posedge reset)
 	     begin
 		if(reset | packet_sent)
-		  random_vc <= $dist_uniform(seed, 0, num_vcs-1);
+		  random_vc <= 'd3;
+//$dist_uniform(seed, 0, num_vcs-1);
 	     end
 	   
 	   c_decode

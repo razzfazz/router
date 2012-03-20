@@ -150,21 +150,26 @@ module testbench
        -1;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width 	    = flit_ctrl_width + flit_data_width;
 
    localparam payload_length_width
-     = clogb(max_payload_length-min_payload_length+1);
+ 				    = clogb(max_payload_length-min_payload_length+1);
    // total number of bits required for storing header information
+   parameter time_to_wait_width     = 8;
+   
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       route_info_width : 
+       route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       route_info_width : 
+       route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width) : 
+       (route_info_width + payload_length_width + time_to_wait_width) : 
        -1;
-   parameter time_to_wait_width  = 8;
-   localparam pid_width 	 = channel_width- flit_ctrl_width - header_info_width - time_to_wait_width - port_idx_width;
+   localparam pid_width 	 
+     = channel_width- 
+       flit_ctrl_width - 
+       header_info_width - 
+       port_idx_width;
    
    
    reg clk;
@@ -355,7 +360,8 @@ module testbench
    assign rchk_error  = 1'b0;
    /*
    router_checker
-     #(.num_flits_per_vc(num_flits_per_vc),
+    #(.time_to_wait_width(time_to_wait_width),
+    .num_flits_per_vc(num_flits_per_vc),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -640,7 +646,7 @@ module testbench
    
    
    //file IO  for SRP checking
-
+   //assumes explicit length
    always@(negedge clk)
      if(run)
        begin
@@ -648,7 +654,7 @@ module testbench
 	    begin:in_ps
 	       in_index       = srp_in_i*channel_width;
 	       in_port_index  = in_index+channel_width-port_idx_width;
-	       in_ttw_index   = in_index+flit_ctrl_width+header_info_width;
+	       in_ttw_index   = in_index+flit_ctrl_width+route_info_width + payload_length_width ;	       
 	       in_pid_index   = in_ttw_index+time_to_wait_width;
 	       if(channel_in_ip[in_index] & channel_in_ip[in_index+3])
 		 $fdisplay(srp_in,"%d %d %d %d",
@@ -665,7 +671,7 @@ module testbench
 	    begin:out_ps
 	       out_index       = srp_out_i*channel_width;
 	       out_port_index  = out_index+channel_width-port_idx_width;
-	       out_ttw_index   = out_index+flit_ctrl_width+header_info_width;
+	       out_ttw_index   = out_index+flit_ctrl_width+route_info_width + payload_length_width ;
 	       out_pid_index   = out_ttw_index+time_to_wait_width;
 	       if(channel_out_op[out_index] & channel_out_op[out_index+3])
 		 $fwrite(srp_out,"%d %d %d %d\n",
