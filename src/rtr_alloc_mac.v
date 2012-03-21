@@ -1504,7 +1504,7 @@ module rtr_alloc_mac
 		   
 		   wire [0:num_ports-1] gnt_ip;
 		   wire 		flit_sent;
-		   wire [0:num_vcs-1] 	sel_ip;
+		   wire [0:num_ports-1] sel_ip;
 		   
 		   if(dual_path_alloc == 1)
 		     begin
