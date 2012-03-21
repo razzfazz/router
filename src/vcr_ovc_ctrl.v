@@ -163,11 +163,11 @@ module vcr_ovc_ctrl
    wire 		 credit;
    assign credit = fc_event_valid;
    
-   wire 		 flit_valid_qual;
-   assign flit_valid_qual = flit_valid & flit_sel;
+   wire 		 flit_sent;
+   assign flit_sent = flit_valid & flit_sel;
    
    wire 		 debit;
-   assign debit = flit_valid_qual;
+   assign debit = flit_sent;
    
    
    //---------------------------------------------------------------------------
@@ -191,10 +191,10 @@ module vcr_ovc_ctrl
       .d(allocated_s),
       .q(allocated_q));
    
-   assign allocated = allocated_q & ~(flit_valid_qual & flit_tail);
+   assign allocated = allocated_q & ~(flit_sent & flit_tail);
    
    wire 		 error_stray_flit;
-   assign error_stray_flit = flit_valid_qual & ~allocated_q;
+   assign error_stray_flit = flit_sent & ~allocated_q;
    
    wire [0:num_ports-1]  flit_sel_ip_s, flit_sel_ip_q;
    assign flit_sel_ip_s = vc_gnt ? vc_sel_ip : flit_sel_ip_q;
@@ -258,7 +258,7 @@ module vcr_ovc_ctrl
      (.clk(clk),
       .reset(reset),
       .active(flags_active),
-      .flit_sent(flit_valid_qual),
+      .flit_sent(flit_sent),
       .fc_event_valid(fc_event_valid),
       .fc_active(fc_active),
       .empty(fc_empty),
