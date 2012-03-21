@@ -160,14 +160,8 @@ module vcr_ovc_ctrl
    // decode control signals
    //---------------------------------------------------------------------------
    
-   wire 		 credit;
-   assign credit = fc_event_valid;
-   
    wire 		 flit_sent;
    assign flit_sent = flit_valid & flit_sel;
-   
-   wire 		 debit;
-   assign debit = flit_sent;
    
    
    //---------------------------------------------------------------------------
