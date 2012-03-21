@@ -492,6 +492,7 @@ module vcr_top
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
 	       .elig_mask(elig_mask),
+	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .port_id(op),
 	       .reset_type(reset_type))
 	   opc

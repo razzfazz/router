@@ -101,6 +101,9 @@ module vcr_op_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // enable speculative switch allocation
+   parameter sw_alloc_spec = 1;
+   
    // ID of current input port
    parameter port_id = 0;
    
@@ -197,9 +200,9 @@ module vcr_op_ctrl_mac
    // output VC control logic
    //---------------------------------------------------------------------------
    
-   wire 			 flit_active;
+   wire 			 flit_valid;
 
-   wire 			 gnt_active = sw_active | flit_active;
+   wire 			 gnt_active = sw_active | flit_valid;
    
    wire 			 sw_gnt_s, sw_gnt_q;
    assign sw_gnt_s = sw_gnt;
@@ -213,12 +216,33 @@ module vcr_op_ctrl_mac
       .d(sw_gnt_s),
       .q(sw_gnt_q));
    
-   assign flit_active = sw_gnt_q;
+   assign flit_valid = sw_gnt_q;
    
+   wire [0:num_vcs-1] 		 free_spec_ovc;
    wire [0:num_vcs-1] 		 flit_sel_ovc;
-
-   wire 			 flit_valid;
-   assign flit_valid = sw_gnt_q & (|flit_sel_ovc);
+   wire 			 flit_sent;
+   
+   generate
+      
+      if(elig_mask == `ELIG_MASK_NONE)
+	begin
+	   
+	   wire free_spec;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   free_spec_sel
+	     (.select(flit_sel_ovc),
+	      .data_in(free_spec_ovc),
+	      .data_out(free_spec));
+	   
+	   assign flit_sent = flit_valid & (|flit_sel_ovc) & free_spec;
+	   
+	end
+      else
+	assign flit_sent = flit_valid & (|flit_sel_ovc);
+      
+   endgenerate
    
    wire [0:num_ports-1] 	 sw_sel_ip_s, sw_sel_ip_q;
    assign sw_sel_ip_s = sw_gnt ? sw_sel_ip : sw_sel_ip_q;
@@ -307,6 +331,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire 		flit_sel;
 	   wire 		elig;
+	   wire 		free_spec;
 	   wire 		fc_active;
 	   wire 		almost_full;
 	   wire 		full;
@@ -331,13 +356,13 @@ module vcr_op_ctrl_mac
 	      .vc_gnt(vc_gnt),
 	      .vc_sel_ip(vc_sel_ip),
 	      .vc_sel_ivc(vc_sel_ivc),
-	      .flit_active(flit_active),
 	      .flit_valid(flit_valid),
 	      .flit_tail(flit_tail_q),
 	      .flit_sel_ip(flit_sel_ip),
 	      .flit_sel_ivc(flit_sel_ivc),
 	      .flit_sel(flit_sel),
 	      .elig(elig),
+	      .free_spec(free_spec),
 	      .fc_active(fc_active),
 	      .almost_full(almost_full),
 	      .full(full),
@@ -346,6 +371,7 @@ module vcr_op_ctrl_mac
 	   assign flit_sel_ovc[ovc] = flit_sel;
 	   assign fc_active_ovc[ovc] = fc_active;
 	   assign elig_ovc[ovc] = elig;
+	   assign free_spec_ovc[ovc] = free_spec;
 	   assign almost_full_ovc[ovc] = almost_full;
 	   assign full_ovc[ovc] = full;
 	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
@@ -355,13 +381,24 @@ module vcr_op_ctrl_mac
    endgenerate
    
    wire 			error_unmatched;
-   assign error_unmatched = flit_valid & ~|flit_sel_ovc;
+   
+   generate
+      
+      if(sw_alloc_spec)
+	assign error_unmatched = 1'b0;
+      else
+	assign error_unmatched = flit_valid & ~|flit_sel_ovc;
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
    // output staging
    //---------------------------------------------------------------------------
    
+   wire 			cho_active;
+   assign cho_active = flit_valid;
+      
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
@@ -370,8 +407,8 @@ module vcr_op_ctrl_mac
    cho
      (.clk(clk),
       .reset(reset),
-      .active(flit_active),
-      .flit_valid_in(flit_valid),
+      .active(cho_active),
+      .flit_valid_in(flit_sent),
       .flit_head_in(flit_head_q),
       .flit_tail_in(flit_tail_q),
       .flit_data_in(flit_data),

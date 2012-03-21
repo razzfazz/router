@@ -31,8 +31,8 @@
 
 module vcr_ovc_ctrl
   (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, 
-   flit_active, flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, 
-   elig, fc_active, almost_full, full, errors);
+   flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, elig, free_spec, 
+   fc_active, almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -116,9 +116,6 @@ module vcr_ovc_ctrl
    // input VC that the output VC was granted to
    input [0:num_vcs-1] 	 vc_sel_ivc;
    
-   // flit activity indicator
-   input 		 flit_active;
-   
    // incoming flit is valid
    input 		 flit_valid;
    
@@ -138,6 +135,10 @@ module vcr_ovc_ctrl
    // output VC is eligible for allocation (i.e., not currently allocated)
    output 		 elig;
    wire 		 elig;
+   
+   // speculative credit check
+   output 		 free_spec;
+   wire 		 free_spec;
    
    // activity indicator for flow control receive logic
    output 		 fc_active;
@@ -161,7 +162,15 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 		 flit_sent;
-   assign flit_sent = flit_valid & flit_sel;
+   
+   generate
+      
+      if(elig_mask == `ELIG_MASK_NONE)
+	assign flit_sent = flit_valid & flit_sel & free_spec;
+      else
+	assign flit_sent = flit_valid & flit_sel;
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -169,7 +178,7 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 		 alloc_active;
-   assign alloc_active = vc_active | flit_active;
+   assign alloc_active = vc_active | flit_valid;
    
    wire 		 allocated;
    
@@ -231,10 +240,8 @@ module vcr_ovc_ctrl
 	end
       
    endgenerate
-
-   wire 		      cred_mask;
    
-   assign flit_sel = allocated_q & port_match & vc_match & cred_mask;
+   assign flit_sel = allocated_q & port_match & vc_match;
    
    
    //---------------------------------------------------------------------------
@@ -242,9 +249,8 @@ module vcr_ovc_ctrl
    //---------------------------------------------------------------------------
    
    wire 		      flags_active;
-   assign flags_active = flit_active | fc_event_valid;
+   assign flags_active = flit_valid | fc_event_valid;
    
-   wire 		      fc_active;
    wire 		      fc_empty;
    wire 		      fc_full_prev;
    wire [0:1] 		      fc_errors;
@@ -266,14 +272,7 @@ module vcr_ovc_ctrl
       .full_prev(fc_full_prev),
       .errors(fc_errors));
    
-   generate
-      
-      if(elig_mask != `ELIG_MASK_NONE)
-	assign cred_mask = 1'b1;
-      else
-	assign cred_mask = ~fc_full_prev;
-      
-   endgenerate
+   assign free_spec = ~fc_full_prev;
    
    
    //---------------------------------------------------------------------------
