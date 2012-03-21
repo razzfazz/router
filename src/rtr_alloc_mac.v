@@ -491,24 +491,32 @@ module rtr_alloc_mac
 		      .data_in(ivs_flit_sel_ivc_ovc),
 		      .data_out(ivs_flit_sel_ovc));
 		   
-		   wire [0:num_vcs-1] 		  flit_sel_ivc;
-		   assign flit_sel_ivc = flit_sel_fast_in_ivc & ivs_cred_ivc;
-		   
 		   wire [0:num_ports-1] 	  rf_route_op;
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
 		       .width(num_ports))
 		   rf_route_op_sel
-		     (.select(flit_sel_ivc),
+		     (.select(flit_sel_fast_in_ivc),
 		      .data_in(rf_route_ivc_op),
 		      .data_out(rf_route_op));
+		   
+		   wire 			  ivs_cred;
+		   c_select_1ofn
+		     #(.num_ports(num_vcs),
+		       .width(1))
+		   ivs_cred_sel
+		     (.select(flit_sel_fast_in_ivc),
+		      .data_in(ivs_cred_ivc),
+		      .data_out(ivs_cred));
 		   
 		   assign ifl_flit_kill = flit_kill;
 		   assign ifl_next_elig_ocvc = next_elig_ocvc;
 		   assign ifl_almost_full = almost_full;
 		   assign ifl_full = full;
 		   assign ifl_flit_valid_op
-		     = (flit_head_fast_in ? route_fast_in_op : rf_route_op) & 
+		     = (flit_head_fast_in ? 
+			route_fast_in_op : 
+			(rf_route_op & {num_ports{ivs_cred}})) & 
 		       {num_ports{flit_valid_fast_in & ial_flit_sel_fast}};
 		   assign ifl_flit_sel_ovc
 		     = flit_head_fast_in ? flit_sel_ovc : ivs_flit_sel_ovc;
