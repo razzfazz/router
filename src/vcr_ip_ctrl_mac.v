@@ -198,7 +198,7 @@ module vcr_ip_ctrl_mac
    // (requires explicit pipeline register; may increase cycle time)
    parameter gate_buffer_write = 0;
    
-   // select speculation type
+   // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
    // select whether to exclude full or non-empty VCs from VC allocation
