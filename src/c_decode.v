@@ -58,13 +58,12 @@ module c_decode
 	begin
 	   initial
 	     begin
-		$display({"ERROR: Decoder module %m needs at least two ", 
-			  "outputs."});
+		$display({"ERROR: Decoder module %m needs at least 2 outputs."});
 		$stop;
 	     end
 	end
       // pragma translate_on
-
+      
       if(num_ports == 2)
         always@(data_in)
           begin

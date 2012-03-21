@@ -54,11 +54,27 @@ module c_select_1ofn
    
    generate
       
+      // pragma translate_off
+      if(num_ports < 1)
+	begin
+	   initial
+	     begin
+		$display({"ERROR: Select-mux module %m needs at least 1 outputs."});
+		$stop;
+	     end
+	end
+      // pragma translate_on
+      
       if(num_ports == 1)
-	always@(data_in)
-	  begin
-	     data_out = data_in;
-	  end
+        always@(select, data_in)
+          begin
+             case(select)
+               1'b1:
+                 data_out = data_in[0*width:1*width-1];
+               default:
+                 data_out = {width{1'bx}};
+             endcase
+          end
       else if(num_ports == 2)
         always@(select, data_in)
           begin

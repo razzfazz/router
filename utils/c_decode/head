@@ -53,15 +53,3 @@ module c_decode
    
    generate
       
-      // pragma translate_off
-      if(num_ports < 2)
-	begin
-	   initial
-	     begin
-		$display({"ERROR: Decoder module %m needs at least two ", 
-			  "outputs."});
-		$stop;
-	     end
-	end
-      // pragma translate_on
-

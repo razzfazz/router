@@ -2,11 +2,28 @@
 #include <cstdlib>
 
 int main(int argc, char ** argv) {
-  int min = (argc > 1) ? atoi(argv[1]) : 2;
-  int max = (argc > 2) ? atoi(argv[2]) : min;
+  int min = (argc > 1) ? atoi(argv[1]) : 1;
+  int max = (argc > 2) ? atoi(argv[2]) : std::max(min, 64);
+  std::cout
+    << "      // pragma translate_off\n"
+    << "      if(num_ports < " << min << ")\n"
+    << "	begin\n"
+    << "	   initial\n"
+    << "	     begin\n"
+    << "		$display({\"ERROR: Select-mux module %m needs at least "
+    << min << " outputs.\"});\n"
+    << "		$stop;\n"
+    << "	     end\n"
+    << "	end\n"
+    << "      // pragma translate_on\n"
+    << "      \n";
   for(int size = min; size <= max; ++size) {
     std::cout
-      << "      else if(num_ports == " << size << ")\n"
+      << "      ";
+    if(size > min) {
+      std::cout << "else ";
+    }
+    std::cout << "if(num_ports == " << size << ")\n"
       << "        always@(select, data_in)\n"
       << "          begin\n"
       << "             case(select)\n";
