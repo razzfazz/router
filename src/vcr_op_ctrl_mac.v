@@ -391,6 +391,16 @@ module vcr_op_ctrl_mac
       
    endgenerate
    
+   wire 			flit_multisel;
+   c_multi_hot_det
+     #(.width(num_vcs))
+   flit_multisel_mhd
+     (.data(flit_sel_ovc),
+      .multi_hot(flit_multisel));
+   
+   wire 			error_multimatch;
+   assign error_multimatch = flit_valid & flit_multisel;
+   
    
    //---------------------------------------------------------------------------
    // output staging
@@ -428,6 +438,9 @@ module vcr_op_ctrl_mac
 	if(error_unmatched)
 	  $display("ERROR: Unmatched flit in module %m.");
 	
+	if(error_multimatch)
+	  $display("ERROR: Multiply matched flit in module %m.");
+	
      end
    
    // pragma translate_on
@@ -437,10 +450,12 @@ module vcr_op_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:1+num_vcs*3-1] errors_s, errors_q;
-	   assign errors_s = {error_unmatched, ovcc_errors_ovc};
+	   wire [0:2+num_vcs*3-1] errors_s, errors_q;
+	   assign errors_s = {error_unmatched, 
+			      error_multimatch, 
+			      ovcc_errors_ovc};
 	   c_err_rpt
-	     #(.num_errors(1+num_vcs*3),
+	     #(.num_errors(2+num_vcs*3),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
