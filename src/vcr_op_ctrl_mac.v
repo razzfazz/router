@@ -178,8 +178,8 @@ module vcr_op_ctrl_mac
    wire 			 flow_ctrl_active;
    assign flow_ctrl_active = |fc_active_ovc;
    
-   wire 			 cred_valid;
-   wire [0:num_vcs-1] 		 cred_sel_ovc;
+   wire 			 fc_event_valid;
+   wire [0:num_vcs-1] 		 fc_event_sel_ovc;
    rtr_flow_ctrl_input
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -189,11 +189,11 @@ module vcr_op_ctrl_mac
       .reset(reset),
       .active(flow_ctrl_active),
       .flow_ctrl_in(flow_ctrl_in),
-      .fc_event_valid_out(cred_valid),
-      .fc_event_sel_out_ovc(cred_sel_ovc));
+      .fc_event_valid_out(fc_event_valid),
+      .fc_event_sel_out_ovc(fc_event_sel_ovc));
    
-   wire [0:num_vcs-1] 		 cred_valid_ovc;
-   assign cred_valid_ovc = {num_vcs{cred_valid}} & cred_sel_ovc;
+   wire [0:num_vcs-1] 		 fc_event_valid_ovc;
+   assign fc_event_valid_ovc = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
    
    
    //---------------------------------------------------------------------------
@@ -326,8 +326,8 @@ module vcr_op_ctrl_mac
 	   wire [0:num_vcs-1] 	vc_sel_ivc;
 	   assign vc_sel_ivc = vc_sel_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
 	   
-	   wire 		cred_valid;
-	   assign cred_valid = cred_valid_ovc[ovc];
+	   wire 		fc_event_valid;
+	   assign fc_event_valid = fc_event_valid_ovc[ovc];
 	   
 	   wire 		flit_sel;
 	   wire 		elig;
@@ -351,7 +351,7 @@ module vcr_op_ctrl_mac
 	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      .fc_event_valid(cred_valid),
+	      .fc_event_valid(fc_event_valid),
 	      .vc_active(vc_active),
 	      .vc_gnt(vc_gnt),
 	      .vc_sel_ip(vc_sel_ip),
