@@ -342,9 +342,6 @@ module rtr_ip_ctrl_mac
       .flit_data_out(chi_flit_data),
       .flit_sel_out_ivc(chi_flit_sel_ivc));
    
-   wire [0:num_vcs-1] 			     chi_flit_valid_ivc;
-   assign chi_flit_valid_ivc = {num_vcs{chi_flit_valid}} & chi_flit_sel_ivc;
-   
    wire [0:header_info_width-1] 	     chi_header_info;
    assign chi_header_info = chi_flit_data[0:header_info_width-1];
    
@@ -500,21 +497,6 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				  flit_sent_in_ivc;
-   assign flit_sent_in_ivc = {num_vcs{flit_sent_in}} & flit_sel_in_ivc;
-   
-   wire [0:num_vcs-1] 				  flit_sent_fast_in_ivc;
-   
-   generate
-      
-      if(dual_path_alloc)
-	assign flit_sent_fast_in_ivc
-	  = {num_vcs{flit_sent_fast_in}} & chi_flit_sel_ivc;
-      else
-	assign flit_sent_fast_in_ivc = {num_vcs{1'b0}};
-      
-   endgenerate
-   
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*flit_data_width-1] 		  fb_flit_data_ivc;
    wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
@@ -531,20 +513,17 @@ module rtr_ip_ctrl_mac
 	   // connect inputs
 	   //-------------------------------------------------------------------
 	   
-	   wire chi_flit_valid;
-	   assign chi_flit_valid = chi_flit_valid_ivc[ivc];
-
+	   wire chi_flit_sel;
+	   assign chi_flit_sel = chi_flit_sel_ivc[ivc];
+	   
 	   wire chi_flit_head;
 	   assign chi_flit_head = chi_flit_head_ivc[ivc];
 	   
 	   wire chi_flit_tail;
 	   assign chi_flit_tail = chi_flit_tail_ivc[ivc];
 	   
-	   wire flit_sent_in;
-	   assign flit_sent_in = flit_sent_in_ivc[ivc];
-	   
-	   wire flit_sent_fast_in;
-	   assign flit_sent_fast_in = flit_sent_fast_in_ivc[ivc];
+	   wire flit_sel_in;
+	   assign flit_sel_in = flit_sel_in_ivc[ivc];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -597,6 +576,15 @@ module rtr_ip_ctrl_mac
 	   // flit buffer
 	   //-------------------------------------------------------------------
 	   
+	   wire 			   chi_flit_valid_sel;
+	   assign chi_flit_valid_sel = chi_flit_valid & chi_flit_sel;
+	   
+	   wire 			   flit_sent_sel_in;
+	   assign flit_sent_sel_in = flit_sent_in & flit_sel_in;
+	   
+	   wire 			   flit_sent_sel_fast_in;
+	   assign flit_sent_sel_fast_in = flit_sent_fast_in & chi_flit_sel;
+	   
 	   wire 			   error_fb_underflow;
 	   wire 			   error_fb_overflow;
 	   
@@ -614,10 +602,10 @@ module rtr_ip_ctrl_mac
 	      assign pop_active = chi_flit_valid | ~fb_empty;
 	      
 	      wire push;
-	      assign push = chi_flit_valid;
+	      assign push = chi_flit_valid_sel;
 	      
 	      wire pop;
-	      assign pop = flit_sent_in | flit_sent_fast_in;
+	      assign pop = flit_sent_sel_in | flit_sent_sel_fast_in;
 	      
 	      wire [0:fb_addr_width-1] push_addr;
 	      wire [0:fb_addr_width-1] pop_addr;
@@ -654,13 +642,13 @@ module rtr_ip_ctrl_mac
 		     begin
 			if(dual_path_alloc)
 			  assign write_enable
-			    = chi_flit_valid & ~flit_sent_fast_in;
+			    = chi_flit_valid_sel & ~flit_sent_sel_fast_in;
 			else
 			  assign write_enable
-			    = chi_flit_valid & ~(empty & flit_sent_in);
+			    = chi_flit_valid_sel & ~(empty & flit_sent_sel_in);
 		     end
 		   else
-		     assign write_enable = chi_flit_valid;
+		     assign write_enable = chi_flit_valid_sel;
 		   
 		   assign read_addr = pop_addr;
 		   
@@ -668,7 +656,7 @@ module rtr_ip_ctrl_mac
 	      else
 		begin
 		   
-		   assign write_enable = chi_flit_valid;
+		   assign write_enable = chi_flit_valid_sel;
 		   
 		   wire [0:fb_addr_width-1] read_addr_s, read_addr_q;
 		   assign read_addr_s = pop_addr;
@@ -767,9 +755,9 @@ module rtr_ip_ctrl_mac
 	     end
 	   else
 	     begin
-		assign flit_valid_out = chi_flit_valid | ~fb_empty;
+		assign flit_valid_out = chi_flit_valid_sel | ~fb_empty;
 		assign flit_last_out
-		  = chi_flit_valid ? fb_empty : fb_almost_empty;
+		  = chi_flit_valid_sel ? fb_empty : fb_almost_empty;
 	     end
 	   
 	   
@@ -788,11 +776,12 @@ module rtr_ip_ctrl_mac
 	      wire flit_head_s, flit_head_q;
 	      if(dual_path_alloc)
 		assign flit_head_s
-		  = flit_sent_in ? flit_tail_out : 
-		    flit_sent_fast_in ? flit_tail_fast_out :
+		  = flit_sent_sel_in ? flit_tail_out : 
+		    flit_sent_sel_fast_in ? flit_tail_fast_out :
 		    flit_head_q;
 	      else
-		assign flit_head_s = flit_sent_in ? flit_tail_out : flit_head_q;
+		assign flit_head_s
+		  = flit_sent_sel_in ? flit_tail_out : flit_head_q;
 	      c_dff
 		#(.width(1),
 		  .reset_type(reset_type),
@@ -814,8 +803,8 @@ module rtr_ip_ctrl_mac
 		   
 		   wire has_tail_s, has_tail_q;
 		   assign has_tail_s
-		     = (has_tail_q & ~(chi_flit_valid & chi_flit_head)) | 
-		       (chi_flit_valid & chi_flit_tail);
+		     = (has_tail_q & ~(chi_flit_valid_sel & chi_flit_head)) | 
+		       (chi_flit_valid_sel & chi_flit_tail);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
@@ -841,7 +830,7 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
 		   assign flit_tail_s
-		     = chi_flit_valid ? 
+		     = chi_flit_valid_sel ? 
 		       ({num_flits_per_vc{chi_flit_tail}} & push_mask | 
 			flit_tail_q & ~push_mask) :
 		       flit_tail_q;
@@ -897,30 +886,31 @@ module rtr_ip_ctrl_mac
 	      if(elig_mask == `ELIG_MASK_USED)
 		begin
 		   if(dual_path_alloc)
-		     assign valid_s = (valid_q | chi_flit_valid) &
-				      ~(flit_sent_in & htt_flit_tail) &
-				      ~(flit_sent_fast_in & chi_flit_tail);
+		     assign valid_s = (valid_q | chi_flit_valid_sel) &
+				      ~(flit_sent_sel_in & htt_flit_tail) &
+				      ~(flit_sent_sel_fast_in & chi_flit_tail);
 		   else
-		     assign valid_s = (valid_q | chi_flit_valid) & 
-				      ~(flit_sent_in & flit_tail_out);
+		     assign valid_s = (valid_q | chi_flit_valid_sel) & 
+				      ~(flit_sent_sel_in & flit_tail_out);
 		end
 	      else
 		begin
 		   if(dual_path_alloc)
 		     assign valid_s
-		       = flit_sent_in ?
-			 (~htt_flit_tail | ~fb_almost_empty | chi_flit_valid) :
-			 (flit_sent_fast_in ? 
+		       = flit_sent_sel_in ?
+			 (~htt_flit_tail | ~fb_almost_empty | 
+			  chi_flit_valid_sel) :
+			 (flit_sent_sel_fast_in ? 
 			  ~chi_flit_tail : 
-			  (valid_q | chi_flit_valid));
+			  (valid_q | chi_flit_valid_sel));
 		   else
 		     assign valid_s
-		       = flit_sent_in ? 
+		       = flit_sent_sel_in ? 
 			 (fb_empty ?
 			  ~chi_flit_tail :
 			  (~htt_flit_tail | ~fb_almost_empty | 
-			   chi_flit_valid)) :
-			 (valid_q | chi_flit_valid);
+			   chi_flit_valid_sel)) :
+			 (valid_q | chi_flit_valid_sel);
 		end
 	      c_dff
 		#(.width(1),
@@ -974,7 +964,7 @@ module rtr_ip_ctrl_mac
 			   .data_out(peek_route_op));
 			
 			assign route_op_s
-			  = (flit_sent_in & htt_flit_tail) ?
+			  = (flit_sent_sel_in & htt_flit_tail) ?
 			    (fb_almost_empty ? gld_route_op : peek_route_op) :
 			    (valid_q ? route_op_q : gld_route_op);
 
@@ -1028,7 +1018,7 @@ module rtr_ip_ctrl_mac
 				.data_out(peek_route_orc));
 			     
 			     assign route_orc_s
-			       = (flit_sent_in & htt_flit_tail) ?
+			       = (flit_sent_sel_in & htt_flit_tail) ?
 				 (fb_almost_empty ? 
 				  gld_route_orc : 
 				  peek_route_orc) :
@@ -1072,7 +1062,7 @@ module rtr_ip_ctrl_mac
 		       = valid_q ? lar_info_q : chi_lar_info;
 		   else
 		     assign lar_info_s
-		       = (flit_sent_in & flit_tail_out) ?
+		       = (flit_sent_sel_in & flit_tail_out) ?
 			 (fb_almost_empty ? 
 			  chi_lar_info : 
 			  peek_lar_info) :
@@ -1133,12 +1123,12 @@ module rtr_ip_ctrl_mac
 	      
 		   if(dual_path_alloc)
 		     assign dest_info_s
-		       = (flit_sent_in & htt_flit_tail) ?
+		       = (flit_sent_sel_in & htt_flit_tail) ?
 			 (fb_almost_empty ? chi_dest_info : peek_dest_info) :
 			 (valid_q ? dest_info_q : chi_dest_info);
 		   else
 		     assign dest_info_s
-		       = (flit_sent_in & flit_tail_out) ?
+		       = (flit_sent_sel_in & flit_tail_out) ?
 			 (fb_almost_empty ? chi_dest_info : peek_dest_info) :
 			 (valid_q ? dest_info_q : chi_dest_info);
 
@@ -1160,7 +1150,8 @@ module rtr_ip_ctrl_mac
 	      assign hit_dest_info = dest_info_q;
 	      
 	      assign error_no_header
-		= ~valid_q & (~fb_empty | (chi_flit_valid & ~chi_flit_head));
+		= ~valid_q & 
+		  (~fb_empty | (chi_flit_valid_sel & ~chi_flit_head));
 	      
 	   end
 	   
@@ -1180,7 +1171,7 @@ module rtr_ip_ctrl_mac
 	     end
 	   else
 	     begin
-		assign route_valid_out = hit_valid | chi_flit_valid;
+		assign route_valid_out = hit_valid | chi_flit_valid_sel;
 		assign route_unmasked_op
 		  = hit_valid ? hit_route_op : gld_route_op;
 		assign route_unmasked_orc

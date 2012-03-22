@@ -31,10 +31,10 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   header_info_in, peek_header_info, fb_flit_tail, almost_full_op_ovc, 
-   full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, sw_gnt, flit_sent, 
-   flit_valid, flit_head, flit_tail, next_lar_info, fbc_almost_empty, 
-   fbc_empty, allocated, free_nonspec, free_spec, errors);
+   flit_sel_in, header_info_in, peek_header_info, fb_flit_tail, 
+   almost_full_op_ovc, full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, 
+   sw_gnt, flit_sent, flit_valid, flit_head, flit_tail, next_lar_info, 
+   fbc_almost_empty, fbc_empty, allocated, free_nonspec, free_spec, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -207,6 +207,9 @@ module vcr_ivc_ctrl
    // incoming flit is tail
    input 			 flit_tail_in;
    
+   // incoming flit is for current VC
+   input 			 flit_sel_in;
+   
    // header info for incoming flit
    // (NOTE: only valid if flit_head_in=1)
    input [0:header_info_width-1] header_info_in;
@@ -289,24 +292,27 @@ module vcr_ivc_ctrl
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    
-   assign flit_valid = flit_valid_in | ~fbc_empty;
+   wire 			     flit_valid_sel_in;
+   assign flit_valid_sel_in = flit_valid_in & flit_sel_in;
+   
+   assign flit_valid = flit_valid_sel_in | ~fbc_empty;
    
    wire 			     pop_active;
-   assign pop_active = flit_valid;
+   assign pop_active = flit_valid_in | ~fbc_empty;
    
    wire 			     packet_done;
    assign packet_done = flit_sent & flit_tail;
    
-   wire 			     flit_valid_head_in;
-   assign flit_valid_head_in = flit_valid_in & flit_head_in;
+   wire 			     flit_valid_sel_head_in;
+   assign flit_valid_sel_head_in = flit_valid_sel_in & flit_head_in;
    
    wire 			     vc_allocated_s, vc_allocated_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
 	   assign vc_allocated_s
-	     = (vc_allocated_q & ~flit_valid_head_in) | vc_gnt;
-	   assign allocated = vc_allocated_q & ~flit_valid_head_in;
+	     = (vc_allocated_q & ~flit_valid_sel_head_in) | vc_gnt;
+	   assign allocated = vc_allocated_q & ~flit_valid_sel_head_in;
 	end
       else
 	begin
@@ -405,13 +411,13 @@ module vcr_ivc_ctrl
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
-	   assign hdr_capture = flit_valid_head_in;
+	   assign hdr_capture = flit_valid_sel_head_in;
 	   assign hdr_active = hdr_capture;
 	   assign hdr_valid = ~hdr_capture;
 	end
       else
 	begin
-	   assign hdr_active = ~fbc_empty | flit_valid_head_in;
+	   assign hdr_active = ~fbc_empty | flit_valid_sel_head_in;
 	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
 	   assign hdr_capture = ~hdr_valid | packet_done;
 	end
@@ -488,7 +494,7 @@ module vcr_ivc_ctrl
    
    wire 			      error_no_header;
    assign error_no_header
-     = ~hdr_valid & (~fbc_empty | (flit_valid_in & ~flit_head_in));
+     = ~hdr_valid & (~fbc_empty | (flit_valid_sel_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -518,9 +524,9 @@ module vcr_ivc_ctrl
    wire 			      bypass_route_info;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign bypass_route_info = flit_valid_head_in;
+	assign bypass_route_info = flit_valid_sel_head_in;
       else
-	assign bypass_route_info = fbc_empty & flit_valid_head_in;
+	assign bypass_route_info = fbc_empty & flit_valid_sel_head_in;
    endgenerate
    
    wire [0:num_ports-1] 	      route_unmasked_op;
@@ -686,7 +692,7 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire 				       cred_track_active;
-   assign cred_track_active = flit_valid | allocated;
+   assign cred_track_active = pop_active | allocated;
    
    wire [0:num_vcs-1] 			       almost_full_ovc;
    c_select_1ofn

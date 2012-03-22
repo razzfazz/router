@@ -30,9 +30,9 @@
 //==============================================================================
 
 module vcr_ovc_ctrl
-  (clk, reset, fc_event_valid, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, 
-   flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, elig, free_spec, 
-   fc_active, almost_full, full, errors);
+  (clk, reset, fc_event_valid, fc_event_sel, vc_active, vc_gnt, vc_sel_ip, 
+   vc_sel_ivc, flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, 
+   elig, free_spec, fc_active, almost_full, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -103,6 +103,9 @@ module vcr_ovc_ctrl
    
    // incoming flow control event
    input fc_event_valid;
+   
+   // incoming flow control event is for current VC
+   input fc_event_sel;
    
    // VC allocation activity indicator
    input vc_active;
@@ -251,6 +254,9 @@ module vcr_ovc_ctrl
    wire 		      flags_active;
    assign flags_active = flit_valid | fc_event_valid;
    
+   wire 		      fc_event_valid_sel;
+   assign fc_event_valid_sel = fc_event_valid & fc_event_sel;
+   
    wire 		      fc_empty;
    wire 		      fc_full_prev;
    wire [0:1] 		      fc_errors;
@@ -264,7 +270,7 @@ module vcr_ovc_ctrl
       .reset(reset),
       .active(flags_active),
       .flit_sent(flit_sent),
-      .fc_event_valid(fc_event_valid),
+      .fc_event_valid(fc_event_valid_sel),
       .fc_active(fc_active),
       .empty(fc_empty),
       .almost_full(almost_full),

@@ -173,9 +173,6 @@ module rtr_op_ctrl_mac
       .fc_event_valid_out(fc_event_valid),
       .fc_event_sel_out_ovc(fc_event_sel_ovc));
    
-   wire [0:num_vcs-1] 	       fc_event_valid_ovc;
-   assign fc_event_valid_ovc = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
-   
    
    //---------------------------------------------------------------------------
    // output staging
@@ -205,9 +202,6 @@ module rtr_op_ctrl_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       flit_valid_in_ovc;
-   assign flit_valid_in_ovc = {num_vcs{flit_valid_in}} & flit_sel_in_ovc;
-   
    wire 		       ovs_active;
    assign ovs_active = flit_valid_in | fc_event_valid;
    
@@ -220,11 +214,17 @@ module rtr_op_ctrl_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire flit_valid_in;
-	   assign flit_valid_in = flit_valid_in_ovc[ovc];
+	   wire flit_sel_in;
+	   assign flit_sel_in = flit_sel_in_ovc[ovc];
 	   
-	   wire fc_event_valid;
-	   assign fc_event_valid = fc_event_valid_ovc[ovc];
+	   wire flit_valid_sel_in;
+	   assign flit_valid_sel_in = flit_valid_in & flit_sel_in;
+	   
+	   wire fc_event_sel;
+	   assign fc_event_sel = fc_event_sel_ovc[ovc];
+	   
+	   wire fc_event_valid_sel;
+	   assign fc_event_valid_sel = fc_event_valid & fc_event_sel;
 	   
 	   wire ovs_fc_active;
 	   wire ovs_elig;
@@ -242,9 +242,9 @@ module rtr_op_ctrl_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(ovs_active),
-	      .flit_sent(flit_valid_in),
+	      .flit_sent(flit_valid_sel_in),
 	      .flit_tail(flit_tail_in),
-	      .fc_event_valid(fc_event_valid),
+	      .fc_event_valid(fc_event_valid_sel),
 	      .fc_active(ovs_fc_active),
 	      .elig(ovs_elig),
 	      .empty(ovs_empty),

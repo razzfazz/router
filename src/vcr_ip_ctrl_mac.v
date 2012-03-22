@@ -376,9 +376,6 @@ module vcr_ip_ctrl_mac
    wire 	      buffer_active;
    assign buffer_active = flit_valid_in;
    
-   wire [0:num_vcs-1] flit_valid_in_ivc;
-   assign flit_valid_in_ivc = {num_vcs{flit_valid_in}} & flit_sel_in_ivc;
-   
    wire [0:header_info_width-1] peek_header_info;
    wire [0:num_vcs*lar_info_width-1] next_lar_info_ivc;
    wire [0:num_vcs*fb_addr_width-1]  fbc_push_addr_ivc;
@@ -399,8 +396,8 @@ module vcr_ip_ctrl_mac
 	   // connect inputs
 	   //-------------------------------------------------------------------
 	   
-	   wire flit_valid_in;
-	   assign flit_valid_in = flit_valid_in_ivc[ivc];
+	   wire flit_sel_in;
+	   assign flit_sel_in = flit_sel_in_ivc[ivc];
 	   
 	   wire flit_head_in;
 	   assign flit_head_in = flit_head_in_ivc[ivc];
@@ -425,6 +422,9 @@ module vcr_ip_ctrl_mac
 	   wire 	      push_active;
 	   assign push_active = flit_valid_in;
 	   
+	   wire 	      flit_valid_sel_in;
+	   assign flit_valid_sel_in = flit_valid_in & flit_sel_in;
+	   
 	   wire [0:fb_addr_width-1] fbc_push_addr;
 	   wire [0:fb_addr_width-1] fbc_pop_addr;
 	   wire 		    fbc_almost_empty;
@@ -436,8 +436,8 @@ module vcr_ip_ctrl_mac
 		
 		wire has_tail_s, has_tail_q;
 		assign has_tail_s
-		  = (has_tail_q & ~(flit_valid_in & flit_head_in)) | 
-		    (flit_valid_in & flit_tail_in);
+		  = (has_tail_q & ~(flit_valid_sel_in & flit_head_in)) | 
+		    (flit_valid_sel_in & flit_tail_in);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -465,7 +465,7 @@ module vcr_ip_ctrl_mac
 		
 		wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
 		assign flit_tail_s
-		  = flit_valid_in ? 
+		  = (flit_valid_sel_in) ? 
 		    (({num_flits_per_vc{flit_tail_in}} & push_mask) | 
 		     (flit_tail_q & ~push_mask)) :
 		    flit_tail_q;
@@ -509,7 +509,7 @@ module vcr_ip_ctrl_mac
 	   assign pop_active = flit_valid_in | ~fbc_empty;
 	   
 	   wire 			    fbc_push;
-	   assign fbc_push = flit_valid_in;
+	   assign fbc_push = flit_valid_sel_in;
 	   
 	   wire 			    flit_sent;
 	   
@@ -590,6 +590,7 @@ module vcr_ip_ctrl_mac
 	      .flit_valid_in(flit_valid_in),
 	      .flit_head_in(flit_head_in),
 	      .flit_tail_in(flit_tail_in),
+	      .flit_sel_in(flit_sel_in),
 	      .header_info_in(header_info_in),
 	      .peek_header_info(peek_header_info),
 	      .fb_flit_tail(fb_flit_tail),

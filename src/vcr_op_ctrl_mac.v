@@ -192,9 +192,6 @@ module vcr_op_ctrl_mac
       .fc_event_valid_out(fc_event_valid),
       .fc_event_sel_out_ovc(fc_event_sel_ovc));
    
-   wire [0:num_vcs-1] 		 fc_event_valid_ovc;
-   assign fc_event_valid_ovc = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
-   
    
    //---------------------------------------------------------------------------
    // output VC control logic
@@ -326,8 +323,8 @@ module vcr_op_ctrl_mac
 	   wire [0:num_vcs-1] 	vc_sel_ivc;
 	   assign vc_sel_ivc = vc_sel_ovc_ivc[ovc*num_vcs:(ovc+1)*num_vcs-1];
 	   
-	   wire 		fc_event_valid;
-	   assign fc_event_valid = fc_event_valid_ovc[ovc];
+	   wire 		fc_event_sel;
+	   assign fc_event_sel = fc_event_sel_ovc[ovc];
 	   
 	   wire 		flit_sel;
 	   wire 		elig;
@@ -352,6 +349,7 @@ module vcr_op_ctrl_mac
 	     (.clk(clk),
 	      .reset(reset),
 	      .fc_event_valid(fc_event_valid),
+	      .fc_event_sel(fc_event_sel),
 	      .vc_active(vc_active),
 	      .vc_gnt(vc_gnt),
 	      .vc_sel_ip(vc_sel_ip),
