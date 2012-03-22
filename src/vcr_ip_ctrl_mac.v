@@ -699,7 +699,7 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   if(gate_buffer_write)
-	     assign fbf_write_enable = flit_sent & fbc_empty;
+	     assign fbf_write_enable = flit_valid_in & ~(flit_sent & fbc_empty);
 	   else
 	     assign fbf_write_enable = flit_valid_in;
 	   
