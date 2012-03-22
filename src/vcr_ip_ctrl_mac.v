@@ -373,9 +373,6 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire 	      buffer_active;
-   assign buffer_active = flit_valid_in;
-   
    wire [0:header_info_width-1] peek_header_info;
    wire [0:num_vcs*lar_info_width-1] next_lar_info_ivc;
    wire [0:num_vcs*fb_addr_width-1]  fbc_push_addr_ivc;
@@ -670,7 +667,7 @@ module vcr_ip_ctrl_mac
       .data_out(fbc_pop_addr));
    
    wire 				   fbf_write_active;
-   assign fbf_write_active = buffer_active;
+   assign fbf_write_active = flit_valid_in;
    
    wire [0:fb_addr_width-1] 		   fbf_write_addr;
    assign fbf_write_addr = fbc_push_addr;
