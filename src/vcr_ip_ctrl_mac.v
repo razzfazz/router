@@ -328,7 +328,6 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs-1] 			     free_spec_ivc;
    
    wire 				     flit_sent;
-   wire [0:num_vcs-1] 			     flit_sent_ivc;
    
    generate
       
@@ -353,20 +352,12 @@ module vcr_ip_ctrl_mac
 	      .data_out(spec_mask));
 	   
 	   assign flit_sent = sw_gnt & spec_mask;
-	   assign flit_sent_ivc
-	     = {num_vcs{sw_gnt}} & sw_sel_ivc & spec_mask_ivc;
 	   
 	end
       else
-	begin
-	   assign flit_sent = sw_gnt;
-	   assign flit_sent_ivc = {num_vcs{sw_gnt}} & sw_sel_ivc;
-	end
+	assign flit_sent = sw_gnt;
       
    endgenerate
-   
-   wire [0:num_vcs-1] sw_gnt_ivc;
-   assign sw_gnt_ivc = {num_vcs{sw_gnt}} & sw_sel_ivc;
    
    
    //---------------------------------------------------------------------------
@@ -408,8 +399,8 @@ module vcr_ip_ctrl_mac
 	   wire [0:num_vcs-1] vc_sel_ovc;
 	   assign vc_sel_ovc = vc_sel_ivc_ovc[ivc*num_vcs:(ivc+1)*num_vcs-1];
 	   
-	   wire 	      sw_gnt;
-	   assign sw_gnt = sw_gnt_ivc[ivc];
+	   wire 	      sw_sel;
+	   assign sw_sel = sw_sel_ivc[ivc];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -598,6 +589,7 @@ module vcr_ip_ctrl_mac
 	      .vc_gnt(vc_gnt),
 	      .vc_sel_ovc(vc_sel_ovc),
 	      .sw_gnt(sw_gnt),
+	      .sw_sel(sw_sel),
 	      .flit_sent(flit_sent),
 	      .flit_valid(flit_valid),
 	      .flit_head(flit_head),

@@ -33,7 +33,7 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_sel_in, header_info_in, peek_header_info, fb_flit_tail, 
    almost_full_op_ovc, full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, 
-   sw_gnt, flit_sent, flit_valid, flit_head, flit_tail, next_lar_info, 
+   sw_gnt, sw_sel, flit_sent, flit_valid, flit_head, flit_tail, next_lar_info, 
    fbc_almost_empty, fbc_empty, allocated, free_nonspec, free_spec, errors);
    
 `include "c_functions.v"
@@ -243,6 +243,9 @@ module vcr_ivc_ctrl
    
    // switch allocator grants
    input 			     sw_gnt;
+   
+   // switch allocator grant is for this VC
+   input 			     sw_sel;
    
    // did this VC send a flit in the current cycle?
    output 			     flit_sent;
@@ -784,17 +787,20 @@ module vcr_ivc_ctrl
       .data_in(free_spec_ovc),
       .data_out(free_spec));
    
+   wire 				sw_gnt_sel;
+   assign sw_gnt_sel = sw_gnt & sw_sel;
+   
    generate
       
       if(sw_alloc_spec)
 	begin
 	   if(elig_mask == `ELIG_MASK_NONE)
-	     assign flit_sent = sw_gnt & ((vc_gnt & free_spec) | allocated);
+	     assign flit_sent = sw_gnt_sel & ((vc_gnt & free_spec) | allocated);
 	   else
-	     assign flit_sent = sw_gnt & (vc_gnt | allocated);
+	     assign flit_sent = sw_gnt_sel & (vc_gnt | allocated);
 	end
       else
-	assign flit_sent = sw_gnt;
+	assign flit_sent = sw_gnt_sel;
       
    endgenerate
    
