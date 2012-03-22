@@ -1,7 +1,8 @@
 /*
  *Currently this "NIC" 
  * Hard coded for 4 VCs
- * can receive reservation but not reply
+ * can receive reservation and reply with a grant
+ * injection fifo, 
  * ejection fifo, ejection arbitration and ejection flow control
  */         
 
@@ -126,16 +127,17 @@ module test_nic(/*autoarg*/
        (route_info_width + payload_length_width ) : 
        -1;
       // select order of dimension traversal
-   parameter dim_order = `DIM_ORDER_ASCENDING;
+   parameter dim_order 		      = `DIM_ORDER_ASCENDING;
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter elig_mask = `ELIG_MASK_NONE;
+   parameter elig_mask 		      = `ELIG_MASK_NONE;
    // maximum packet length (in flits)
-   localparam max_packet_length = 1 + max_payload_length;
+   localparam max_packet_length       = 1 + max_payload_length;
    // total number of bits required to represent maximum packet length
-   localparam packet_length_width = clogb(max_packet_length);
+   localparam packet_length_width     = clogb(max_packet_length);
 
    
    parameter max_reservation_size     = 256;
+   parameter time_to_wait_width      = 8;
    localparam reservation_size_width  = clogb(max_reservation_size);
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
    
@@ -152,7 +154,6 @@ module test_nic(/*autoarg*/
    output[0:channel_width-1] channel_out;
 
    output error;
-   
    
    //Raw input from the router
    wire 			flit_valid;
@@ -259,7 +260,6 @@ module test_nic(/*autoarg*/
 	   assign input_fifo_empty[ivc]  = buffer_empty;
 	   end
    endgenerate
-   assign error 			 = |input_fifo_error;
 
    //////////////////////
    //Ejection arbitration
@@ -269,14 +269,15 @@ module test_nic(/*autoarg*/
    wire[0:4] ejection_gnt;
 
    //these requests NEEDS to be modified significantly, add as we see fit
-   assign ejection_req[0]  = ~input_fifo_empty[1] &  //Grant
-			    ~(|input_fifo_data[(flit_data_width+1)+header_info_width+:2]);
-   assign ejection_req[1] = ~input_fifo_empty[0] & //Reser
-			    ~grant_almost_full;  
+   assign ejection_req[0]  = ~input_fifo_empty[1] &  //Grant VC
+			    ~(|input_fifo_data[(flit_data_width+1)+header_info_width+:2]); //SRP_TYPE == 00
+   assign ejection_req[1] = ~input_fifo_empty[0] & //Reservation VC
+			    ~grant_almost_full;    //Grant output fifo not full
    assign ejection_req[2] = ~input_fifo_empty[1] &  //ack/nack
 			    (|input_fifo_data[(flit_data_width+1)+header_info_width+:2]);
-   assign ejection_req[3]    = ~input_fifo_empty[3];  //nonspec
-   assign ejection_req[4]    = ~input_fifo_empty[2];  //spec
+   assign ejection_req[3]    = ~input_fifo_empty[2];  //nonspec
+   assign ejection_req[4]    = ~input_fifo_empty[3] &  //spec
+			       (~ack_almost_full | ~input_fifo_data[4*(flit_data_width+1)-1]); //ack output fifo not full or this is not a head
    
    assign ejection_carry[0:4] = {1'b1, ~ejection_req[0:3]&ejection_carry[0:3]};
    assign ejection_gnt[0:4] = ejection_req[0:4]&ejection_carry[0:4];
@@ -380,9 +381,6 @@ module test_nic(/*autoarg*/
    grant_route_port_enc
      (.data_in(grant_route_op),
       .data_out(grant_route_port));
-
-
-   
    wire [0:flit_data_width-1] grant_packet_in;
    assign grant_packet_in[0:lar_info_width-1] =  grant_route_port; //lar
    assign grant_packet_in[lar_info_width+:dest_info_width] =  reservation_src;//dest
@@ -392,8 +390,6 @@ module test_nic(/*autoarg*/
    assign grant_packet_in[flit_data_width-32:flit_data_width-1] = grant_time;//G_ts
 
    wire [0:flit_data_width-1] grant_packet_out;
-
-
 
    //insert into grant queue   
    wire grant_push = reservation_request; //0 cycle turn around
@@ -429,6 +425,82 @@ module test_nic(/*autoarg*/
 
 
 
+
+   //////////////////////////////
+   //Spec and Ack handling
+   //Only head generate ack, extract reply src
+   wire speculative_request  = ejection_valid&ejection_head&(ejection_gnt_ivc[3]);
+   wire [0:flit_data_width-1] speculative_data  = input_fifo_data[3*flit_data_width+:flit_data_width];
+   wire [0:dest_info_width-1] speculative_src = (speculative_request)?
+			      speculative_data[(header_info_width+2+time_to_wait_width)+:dest_info_width]:
+			      {dest_info_width{1'b0}};
+   
+   wire [0:num_ports-1] ack_route_op;
+   rtr_routing_logic
+     #(.num_message_classes(1),
+       .num_resource_classes(1),
+       .num_routers_per_dim(num_routers_per_dim),
+       .num_dimensions(num_dimensions),
+       .num_nodes_per_router(num_nodes_per_router),
+       .connectivity(connectivity),
+       .routing_type(routing_type),
+       .dim_order(dim_order))
+   ack_route_compute
+     (.router_address(router_address),
+      .sel_mc(1'b1),
+      .sel_irc(1'b1),
+      .dest_info(speculative_src),
+      .route_op( ack_route_op),
+      .route_orc());
+   wire [0:port_idx_width-1] 			       ack_route_port;
+   c_encode
+     #(.num_ports(num_ports))
+   ack_route_port_enc
+     (.data_in(ack_route_op),
+      .data_out(ack_route_port));
+   wire [0:flit_data_width-1] ack_packet_in;
+   assign ack_packet_in[0:lar_info_width-1] =  ack_route_port; //lar
+   assign ack_packet_in[lar_info_width+:dest_info_width] =  speculative_src;//dest
+   assign ack_packet_in[lar_info_width+dest_info_width:header_info_width-1] = 'b0;//psize
+   assign ack_packet_in[header_info_width+:2] = 2'b01; //srp_type
+   assign ack_packet_in[header_info_width+2:flit_data_width-1] = 'b0;//filler
+
+   wire [0:flit_data_width-1] ack_packet_out;
+   //insert into ack queue   
+   wire ack_push = speculative_request; //0 cycle turn around
+   wire ack_pop ;
+   wire [0:1] ack_errors;
+   wire ack_full;
+   wire ack_empty;
+   wire ack_almost_full;
+   wire ack_almost_empty;
+   c_fifo
+     #(
+       // Parameters
+       .depth			(num_flits_per_vc),
+       .width			(flit_data_width),
+       .regfile_type		(`REGFILE_TYPE_FF_2D),
+       .reset_type		(reset_type))
+   out_ack_fifo
+     (// Outputs
+      .pop_data			(ack_packet_out),
+      .almost_empty		(ack_almost_empty),
+      .empty			(ack_empty),
+      .almost_full		(ack_almost_full),
+      .full			(ack_full),
+      .errors			(ack_errors),
+      // Inputs
+      .clk			(clk),
+      .reset			(reset),
+      .push_active		(run),
+      .pop_active		(run),
+      .push			(ack_push),
+      .pop			(ack_pop),
+      .push_data		(ack_packet_in));
+
+
+   
+
    
    ////////////////////////////
    //injection arbitration
@@ -438,10 +510,10 @@ module test_nic(/*autoarg*/
    wire[0:4] injection_gnt;
    wire[0:3] injection_gnt_ovc;
    
-   //these requests NEEDS to be modified significantly, add as we see fit
+   //these requests NEEDS to be modified significantly, especially flow control
    assign injection_req[0]    = ~grant_empty;
    assign injection_req[1]    = 1'b0;
-   assign injection_req[2]    = 1'b0;
+   assign injection_req[2]    = ~ack_empty;
    assign injection_req[3]    = 1'b0;
    assign injection_req[4]    = 1'b0;
    
@@ -452,12 +524,32 @@ module test_nic(/*autoarg*/
 				    injection_gnt[3:4]};
 
    assign grant_pop 	      = injection_gnt[0];
-   
-   
+   assign ack_pop 	      = injection_gnt[2];
+
+
+
+   //Send them out
+   //For now, both gnt and ack are single flit packets
    wire injection_flit_valid  = |injection_gnt;
-   wire injection_flit_head   = injection_gnt[0];
-   wire injection_flit_tail   = injection_gnt[0];
-   wire [0:flit_data_width-1] injection_flit_data = grant_packet_out;
+   wire injection_flit_head   = injection_gnt[0] | injection_gnt[2] ;
+   wire injection_flit_tail   = injection_gnt[0] | injection_gnt[2] ;
+   wire [0:flit_data_width-1] injection_flit_data;
+
+   c_select_1ofn
+     #(// Parameters
+       .num_ports			(5),
+       .width				(flit_data_width))
+   injection_mux
+     (// Outputs
+      .data_out				(injection_flit_data),
+      // Inputs
+      .select				(injection_gnt),
+      .data_in				({grant_packet_out,
+					  {flit_data_width{1'b0}},
+					  ack_packet_out, 
+					  {flit_data_width{1'b0}},
+					  {flit_data_width{1'b0}}} ));
+   
    
    rtr_channel_output
      #(// Parameters
@@ -478,7 +570,11 @@ module test_nic(/*autoarg*/
       .flit_data_in			(injection_flit_data[0:flit_data_width-1]),
       .flit_sel_in_ovc			(injection_gnt_ovc));
 
+
+
+
    
+   assign error 			 = (|input_fifo_error) | (|grant_errors) | (|ack_errors); 
 endmodule // test_nic
 
 
