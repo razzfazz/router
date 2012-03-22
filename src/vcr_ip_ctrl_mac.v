@@ -204,6 +204,9 @@ module vcr_ip_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // enable peek-ahead port on flit buffer
+   localparam fb_enable_peek = (elig_mask != `ELIG_MASK_USED);
+   
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
@@ -284,10 +287,10 @@ module vcr_ip_ctrl_mac
    // input stage
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 			     fbc_full_ivc;
+   wire 				     fb_full;
    
    wire 				     input_stage_active;
-   assign input_stage_active = ~&fbc_full_ivc;
+   assign input_stage_active = ~fb_full;
    
    wire 				     flit_valid_in;
    wire 				     flit_head_in;
@@ -364,14 +367,14 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:header_info_width-1] peek_header_info;
+   wire [0:header_info_width-1] fb_peek_header_info;
+   wire [0:num_vcs*fb_addr_width-1] fb_push_addr_ivc;
+   wire [0:num_vcs*fb_addr_width-1] fb_pop_addr_ivc;
+   wire [0:num_vcs-1] 		    fb_almost_empty_ivc;
+   wire [0:num_vcs-1] 		    fb_empty_ivc;
+   
    wire [0:num_vcs*lar_info_width-1] next_lar_info_ivc;
-   wire [0:num_vcs*fb_addr_width-1]  fbc_push_addr_ivc;
-   wire [0:num_vcs*fb_addr_width-1]  fbc_pop_addr_ivc;
-   wire [0:num_vcs*fb_addr_width-1]  fbc_peek_addr_ivc;
-   wire [0:num_vcs-1] 		     fbc_empty_ivc;
    wire [0:num_vcs*3-1] 	     ivcc_errors_ivc;
-   wire [0:num_vcs*2-1] 	     fbc_errors_ivc;
    
    genvar 			     ivc;
    
@@ -413,9 +416,16 @@ module vcr_ip_ctrl_mac
 	   wire 	      flit_valid_sel_in;
 	   assign flit_valid_sel_in = flit_valid_in & flit_sel_in;
 	   
-	   wire [0:fb_addr_width-1] fbc_push_addr;
-	   wire [0:fb_addr_width-1] fbc_pop_addr;
-	   wire 		    fbc_almost_empty;
+	   wire [0:fb_addr_width-1] fb_push_addr;
+	   assign fb_push_addr
+	     = fb_push_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1];
+	   
+	   wire [0:fb_addr_width-1] fb_pop_addr;
+	   assign fb_pop_addr
+	     = fb_pop_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1];
+	   
+	   wire 		    fb_almost_empty;
+	   assign fb_almost_empty = fb_almost_empty_ivc[ivc];
 	   
 	   wire 		    fb_flit_tail;
 	   
@@ -436,7 +446,7 @@ module vcr_ip_ctrl_mac
 		   .d(has_tail_s),
 		   .q(has_tail_q));
 		
-		assign fb_flit_tail = fbc_almost_empty & has_tail_q;
+		assign fb_flit_tail = fb_almost_empty & has_tail_q;
 		
 	     end
 	   else
@@ -448,7 +458,7 @@ module vcr_ip_ctrl_mac
 		    .offset((ivc * num_flits_per_vc) % 
 			    (1 << clogb(num_flits_per_vc))))
 		push_mask_dec
-		  (.data_in(fbc_push_addr[fb_addr_pad_width:fb_addr_width-1]),
+		  (.data_in(fb_push_addr[fb_addr_pad_width:fb_addr_width-1]),
 		   .data_out(push_mask));
 		
 		wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
@@ -473,7 +483,7 @@ module vcr_ip_ctrl_mac
 		    .offset((ivc * num_flits_per_vc) % 
 			    (1 << clogb(num_flits_per_vc))))
 		pop_mask_dec
-		  (.data_in(fbc_pop_addr[fb_addr_pad_width:fb_addr_width-1]),
+		  (.data_in(fb_pop_addr[fb_addr_pad_width:fb_addr_width-1]),
 		   .data_out(pop_mask));
 		
 		c_select_1ofn
@@ -488,58 +498,11 @@ module vcr_ip_ctrl_mac
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // flit buffer control
-	   //-------------------------------------------------------------------
-	   
-	   wire 			    fbc_empty;
-	   
-	   wire 			    pop_active;
-	   assign pop_active = flit_valid_in | ~fbc_empty;
-	   
-	   wire 			    fbc_push;
-	   assign fbc_push = flit_valid_sel_in;
-	   
-	   wire 			    flit_sent;
-	   
-	   wire 			    fbc_pop;
-	   assign fbc_pop = flit_sent;
-	   
-	   wire 			    fbc_almost_full;
-	   wire 			    fbc_full;
-	   wire [0:1] 			    fbc_errors;
-	   c_fifo_ctrl
-	     #(.depth(num_flits_per_vc),
-	       .extra_addr_width(fb_addr_pad_width),
-	       .offset(ivc * num_flits_per_vc),
-	       .reset_type(reset_type))
-	   fbc
-	     (.clk(clk),
-	      .reset(reset),
-	      .push_active(push_active),
-	      .pop_active(pop_active),
-	      .push(fbc_push),
-	      .pop(fbc_pop),
-	      .push_addr(fbc_push_addr),
-	      .pop_addr(fbc_pop_addr),
-	      .almost_empty(fbc_almost_empty),
-	      .empty(fbc_empty),
-	      .almost_full(fbc_almost_full),
-	      .full(fbc_full),
-	      .errors(fbc_errors));
-	   
-	   wire [0:fb_addr_width-1] 	    fbc_peek_addr;
-	   c_incr
-	     #(.width(fb_addr_width),
-	       .min_value(ivc * num_flits_per_vc),
-	       .max_value((ivc + 1) * num_flits_per_vc - 1))
-	   fbc_peek_addr_incr
-	     (.data_in(fbc_pop_addr),
-	      .data_out(fbc_peek_addr));
-	   
-	   
-	   //-------------------------------------------------------------------
 	   // input VC controller
 	   //-------------------------------------------------------------------
+	   
+	   wire 			    fb_empty;
+	   assign fb_empty = fb_empty_ivc[ivc];
 	   
 	   wire [0:num_ports-1] 	    route_op;
 	   wire [0:num_resource_classes-1]  route_orc;
@@ -580,7 +543,7 @@ module vcr_ip_ctrl_mac
 	      .flit_tail_in(flit_tail_in),
 	      .flit_sel_in(flit_sel_in),
 	      .header_info_in(header_info_in),
-	      .peek_header_info(peek_header_info),
+	      .fb_peek_header_info(fb_peek_header_info),
 	      .fb_flit_tail(fb_flit_tail),
 	      .almost_full_op_ovc(almost_full_op_ovc),
 	      .full_op_ovc(full_op_ovc),
@@ -590,13 +553,12 @@ module vcr_ip_ctrl_mac
 	      .vc_sel_ovc(vc_sel_ovc),
 	      .sw_gnt(sw_gnt),
 	      .sw_sel(sw_sel),
-	      .flit_sent(flit_sent),
 	      .flit_valid(flit_valid),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),
 	      .next_lar_info(next_lar_info),
-	      .fbc_almost_empty(fbc_almost_empty),
-	      .fbc_empty(fbc_empty),
+	      .fb_almost_empty(fb_almost_empty),
+	      .fb_empty(fb_empty),
 	      .allocated(allocated),
 	      .free_nonspec(free_nonspec),
 	      .free_spec(free_spec),
@@ -607,29 +569,18 @@ module vcr_ip_ctrl_mac
 	   // connect outputs
 	   //-------------------------------------------------------------------
 	   
-	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
-	     = route_op;
+	   assign route_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1] = route_op;
 	   assign route_ivc_orc[ivc*num_resource_classes:
-				(ivc+1)*num_resource_classes-1]
-	     = route_orc;
+				(ivc+1)*num_resource_classes-1] = route_orc;
 	   assign flit_valid_ivc[ivc] = flit_valid;
 	   assign flit_head_ivc[ivc] = flit_head;
 	   assign flit_tail_ivc[ivc] = flit_tail;
 	   assign next_lar_info_ivc[ivc*lar_info_width:(ivc+1)*lar_info_width-1]
 	     = next_lar_info;
-	   assign fbc_push_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1]
-	     = fbc_push_addr;
-	   assign fbc_pop_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1]
-	     = fbc_pop_addr;
-	   assign fbc_peek_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1]
-	     = fbc_peek_addr;
-	   assign fbc_empty_ivc[ivc] = fbc_empty;
-	   assign fbc_full_ivc[ivc] = fbc_full;
 	   assign allocated_ivc[ivc] = allocated;
 	   assign free_nonspec_ivc[ivc] = free_nonspec;
 	   assign free_spec_ivc[ivc] = free_spec;
 	   assign ivcc_errors_ivc[ivc*3:(ivc+1)*3-1] = ivcc_errors;
-	   assign fbc_errors_ivc[ivc*2:(ivc+1)*2-1] = fbc_errors;
 	   
 	end
       
@@ -640,177 +591,62 @@ module vcr_ip_ctrl_mac
    // flit buffer
    //---------------------------------------------------------------------------
    
-   wire [0:fb_addr_width-1] 		   fbc_push_addr;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(fb_addr_width))
-   fbc_push_addr_sel
-     (.select(flit_sel_in_ivc),
-      .data_in(fbc_push_addr_ivc),
-      .data_out(fbc_push_addr));
+   wire 				    fb_push_active;
+   assign fb_push_active = flit_valid_in;
    
-   wire [0:fb_addr_width-1] 		   fbc_pop_addr;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(fb_addr_width))
-   fbc_pop_addr_sel
-     (.select(sw_sel_ivc),
-      .data_in(fbc_pop_addr_ivc),
-      .data_out(fbc_pop_addr));
+   wire 				    fb_push_valid;
+   assign fb_push_valid = flit_valid_in;
    
-   wire 				   fbf_write_active;
-   assign fbf_write_active = flit_valid_in;
+   wire [0:num_vcs-1] 			    fb_push_sel_ivc;
+   assign fb_push_sel_ivc = flit_sel_in_ivc;
    
-   wire [0:fb_addr_width-1] 		   fbf_write_addr;
-   assign fbf_write_addr = fbc_push_addr;
+   wire [0:flit_data_width-1] 		    fb_push_data;
+   assign fb_push_data = flit_data_in;
    
-   wire [0:flit_data_width-1] 		   fbf_write_data;
-   assign fbf_write_data = flit_data_in;
+   wire 				    alloc_active;
+   assign alloc_active = flit_valid_in | ~&fb_empty_ivc;
    
-   wire 				   alloc_active;
-   assign alloc_active = flit_valid_in | ~&fbc_empty_ivc;
+   wire 				    fb_pop_active;
+   assign fb_pop_active = alloc_active;
    
-   wire 				   fbc_empty;
-   c_select_1ofn
-     #(.num_ports(num_vcs),
-       .width(1))
-   fbc_empty_sel
-     (.select(sw_sel_ivc),
-      .data_in(fbc_empty_ivc),
-      .data_out(fbc_empty));
+   wire 				    fb_pop_valid;
+   assign fb_pop_valid = flit_sent;
    
-   wire 				   fbf_write_enable;
-   wire [0:fb_addr_width-1] 		   fbf_read_addr;
+   wire [0:num_vcs-1] 			    fb_pop_sel_ivc;
+   assign fb_pop_sel_ivc = sw_sel_ivc;
    
-   generate
-
-      if(explicit_pipeline_register)
-	begin
-	   
-	   if(gate_buffer_write)
-	     assign fbf_write_enable = flit_valid_in & ~(flit_sent & fbc_empty);
-	   else
-	     assign fbf_write_enable = flit_valid_in;
-	   
-	   assign fbf_read_addr = fbc_pop_addr;
-	   
-	end
-      else
-	begin
-	   
-	   assign fbf_write_enable = flit_valid_in;
-	   
-	   // In the absence of an explicit pipeline register between flit 
-	   // buffer and crossbar, buffer read is delayed by one clock cycle 
-	   // such as to line up the flit data with the crossbar control 
-	   // signals.
-	   
-	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s = fbc_pop_addr;
-	   c_dff
-	     #(.width(fb_addr_width),
-	       .reset_type(reset_type))
-	   fbf_read_addrq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(fbf_read_addr_s),
-	      .q(fbf_read_addr_q));
-	   
-	   assign fbf_read_addr = fbf_read_addr_q;
-	   
-	end
-      
-   endgenerate
+   wire [0:flit_data_width-1] 		    fb_pop_data;
+   wire [0:flit_data_width-1] 		    fb_peek_data;
+   wire [0:num_vcs*2-1] 		    fb_errors_ivc;
+   c_multi_lane_fifo
+     #(.num_lanes(num_vcs),
+       .num_buffers_per_lane(num_flits_per_vc),
+       .data_width(flit_data_width),
+       .regfile_type(fb_regfile_type),
+       .registered_read(explicit_pipeline_register),
+       .gate_buffer_write(gate_buffer_write),
+       .enable_peek(fb_enable_peek),
+       .reset_type(reset_type))
+   fb
+     (.clk(clk),
+      .reset(reset),
+      .push_active(fb_push_active),
+      .push_valid(fb_push_valid),
+      .push_sel_ln(fb_push_sel_ivc),
+      .push_data(fb_push_data),
+      .push_addr_ln(fb_push_addr_ivc),
+      .pop_active(fb_pop_active),
+      .pop_valid(fb_pop_valid),
+      .pop_sel_ln(fb_pop_sel_ivc),
+      .pop_data(fb_pop_data),
+      .pop_addr_ln(fb_pop_addr_ivc),
+      .peek_data(fb_peek_data),
+      .almost_empty_ln(fb_almost_empty_ivc),
+      .empty_ln(fb_empty_ivc),
+      .full(fb_full),
+      .errors_ln(fb_errors_ivc));
    
-   wire [0:flit_data_width-1] 	    fbf_read_data;
-   
-   generate
-      
-      if(elig_mask == `ELIG_MASK_USED)
-	begin
-	   
-	   c_regfile
-	     #(.depth(fb_depth),
-	       .width(flit_data_width),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(fbf_write_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
-	   
-	   assign peek_header_info = {header_info_width{1'b0}};
-	   
-	end
-      else
-	begin
-	   
-	   wire [0:fb_addr_width-1] fbc_peek_addr;
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(fb_addr_width))
-	   fbc_peek_addr_sel
-	     (.select(sw_sel_ivc),
-	      .data_in(fbc_peek_addr_ivc),
-	      .data_out(fbc_peek_addr));
-	   
-	   wire [0:fb_addr_width-1] fbf_peek_addr;
-	   assign fbf_peek_addr = fbc_peek_addr;
-	   
-	   wire [0:flit_data_width-1] fbf_peek_data;
-	   c_regfile
-	     #(.depth(fb_depth),
-	       .width(flit_data_width),
-	       .num_read_ports(2),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(fbf_write_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbf_write_addr),
-	      .write_data(fbf_write_data),
-	      .read_address({fbf_read_addr, fbf_peek_addr}),
-	      .read_data({fbf_read_data, fbf_peek_data}));
-	   
-	   assign peek_header_info = fbf_peek_data[0:header_info_width-1];
-	   
-	end
-      
-   endgenerate
-   
-   wire [0:flit_data_width-1] flit_data_buffered;
-   
-   generate
-      
-      if(explicit_pipeline_register)
-	begin
-	   
-	   wire fbf_bypass;
-	   assign fbf_bypass = fbc_empty;
-	   
-	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = fbf_bypass ? fbf_write_data : fbf_read_data;
-	   c_dff
-	     #(.width(flit_data_width),
-	       .reset_type(reset_type))
-	   flit_dataq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(flit_data_s),
-	      .q(flit_data_q));
-	   
-	   assign flit_data_buffered = flit_data_q;
-	   
-	end
-      else
-	assign flit_data_buffered = fbf_read_data;
-      
-   endgenerate
+   assign fb_peek_header_info = fb_peek_data[0:header_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -843,9 +679,9 @@ module vcr_ip_ctrl_mac
    wire 			      flit_head_prev;
    
    assign flit_data[0:lar_info_width-1]
-     = flit_head_prev ? lar_info_q : flit_data_buffered[0:lar_info_width-1];
+     = flit_head_prev ? lar_info_q : fb_pop_data[0:lar_info_width-1];
    assign flit_data[lar_info_width:flit_data_width-1]
-     = flit_data_buffered[lar_info_width:flit_data_width-1];
+     = fb_pop_data[lar_info_width:flit_data_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -933,7 +769,7 @@ module vcr_ip_ctrl_mac
 	begin
 	   
 	   wire [0:num_vcs*3+num_vcs*2-1] errors_s, errors_q;
-	   assign errors_s = {ivcc_errors_ivc, fbc_errors_ivc};
+	   assign errors_s = {ivcc_errors_ivc, fb_errors_ivc};
 	   c_err_rpt
 	     #(.num_errors(num_vcs*3+num_vcs*2),
 	       .capture_mode(error_capture_mode),
