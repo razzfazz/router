@@ -546,47 +546,32 @@ module whr_ip_ctrl_mac
    // head register
    //---------------------------------------------------------------------------
    
-   wire 			hdr_valid_s, hdr_valid_q;
-   generate
-      if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_valid_s
-	  = (hdr_valid_q | flit_valid_in) & ~(flit_valid_out & flit_tail_out);
-      else
-	assign hdr_valid_s
-	  = flit_valid_out ?
-	    (fbc_empty ?
-	     ~flit_tail_in :
-	     (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) :
-	    (hdr_valid_q | flit_valid_in);
-   endgenerate
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   hdf_validq
-     (.clk(clk),
-      .reset(reset),
-      .active(pop_active),
-      .d(hdr_valid_s),
-      .q(hdr_valid_q));
-   
+   wire 			hdr_capture;
    wire 			hdr_active;
+   wire 			hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign hdr_active = ~hdr_valid_q & flit_valid_in;
+	begin
+	   assign hdr_capture = ~hdr_valid & flit_valid_in;
+	   assign hdr_active = hdr_capture;
+	   assign hdr_valid = ~hdr_capture;
+	end
       else
-	// NOTE: If this ends up being timing-critical, we can simply eliminate 
-	// the fb_flit_tail term at the expense of slightly worse gating under 
-	// load.
-	// For relatively short packets, this is probably a good tradeoff.
-	assign hdr_active
-	  = (~hdr_valid_q & flit_valid_in) | (~fbc_empty & fb_flit_tail);
+	begin
+	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
+	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
+	   assign hdr_capture = ~hdr_valid | (flit_valid_out & flit_tail_out);
+	end
    endgenerate
+   
+   wire two_plus_flits;
+   assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
    
    wire [0:lar_info_width-1] hdr_lar_info_s, hdr_lar_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_lar_info_s
-	  = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+	  = hdr_capture ? lar_info_in : hdr_lar_info_q;
       else
 	begin
 	   
@@ -594,9 +579,9 @@ module whr_ip_ctrl_mac
 	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
-	     = (flit_valid_out & flit_tail_out) ? 
-	       (fbc_almost_empty ? lar_info_in : peek_lar_info) : 
-	       (hdr_valid_q ? hdr_lar_info_q : lar_info_in);
+	     = hdr_capture ? 
+	       (two_plus_flits ? peek_lar_info : lar_info_in) : 
+	       hdr_lar_info_q;
 	   
 	end
    endgenerate
@@ -610,11 +595,11 @@ module whr_ip_ctrl_mac
       .d(hdr_lar_info_s),
       .q(hdr_lar_info_q));
    
-   wire [0:dest_info_width-1] 		  hdr_dest_info_s, hdr_dest_info_q;
+   wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_dest_info_s
-	  = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+	  = hdr_capture ? dest_info_in : hdr_dest_info_q;
       else
 	begin
 	   
@@ -623,9 +608,9 @@ module whr_ip_ctrl_mac
 	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
-	     = (flit_valid_out & flit_tail_out) ? 
-	       (fbc_almost_empty ? dest_info_in : peek_dest_info) : 
-	       (hdr_valid_q ? hdr_dest_info_q : dest_info_in);
+	     = hdr_capture ? 
+	       (two_plus_flits ? peek_dest_info : dest_info_in) : 
+	       hdr_dest_info_q;
 	   
 	end
    endgenerate
@@ -641,7 +626,7 @@ module whr_ip_ctrl_mac
    
    wire 			       error_no_header;
    assign error_no_header
-     = ~hdr_valid_q & (~fbc_empty | (flit_valid_in & ~flit_head_in));
+     = ~hdr_valid & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -668,14 +653,16 @@ module whr_ip_ctrl_mac
      (.data_in(hdr_route_port),
       .data_out(hdr_route_op));
    
+   wire 			       bypass_route_info;
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign bypass_route_info = flit_valid_in & flit_head_in;
+      else
+	assign bypass_route_info = fbc_empty & flit_valid_in & flit_head_in;
+   endgenerate
+   
    wire [0:num_ports-1] 	       route_unmasked_op;
-   assign route_unmasked_op = hdr_valid_q ? hdr_route_op : route_in_op;
-   
-   wire 			       header_valid;
-   assign header_valid = hdr_valid_q | flit_valid_in;
-   
-   wire 			       rf_active;
-   assign rf_active = header_valid;
+   assign route_unmasked_op = bypass_route_info ? route_in_op : hdr_route_op;
    
    wire 			       route_orc;
    wire [0:1] 			       rf_errors;
@@ -695,8 +682,8 @@ module whr_ip_ctrl_mac
    rf
      (.clk(clk),
       .reset(reset),
-      .active(rf_active),
-      .route_valid(header_valid),
+      .active(pop_active),
+      .route_valid(flit_valid),
       .route_in_op(route_unmasked_op),
       .route_in_orc(1'b1),
       .route_out_op(route_op),
@@ -715,10 +702,10 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:dest_info_width-1] 	       dest_info;
-   assign dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+   assign dest_info = hdr_valid ? hdr_dest_info_q : dest_info_in;
    
    wire [0:lar_info_width-1] 	       lar_info;
-   assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+   assign lar_info = hdr_valid ? hdr_lar_info_q : lar_info_in;
    
    wire [0:router_addr_width-1]        next_router_address;
    rtr_next_hop_addr
