@@ -702,9 +702,6 @@ module rtr_ip_ctrl_mac
 	      else
 		begin
 		   
-		   wire peek_active;
-		   assign peek_active = ~empty & ~almost_empty;
-		   
 		   wire [0:fb_addr_width-1] peek_addr;
 		   c_incr
 		     #(.width(fb_addr_width),
