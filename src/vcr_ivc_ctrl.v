@@ -422,7 +422,6 @@ module vcr_ivc_ctrl
 	   assign hdr_valid = ~fb_empty | ~flit_head_in;
 	   assign hdr_capture = ~hdr_valid | packet_done;
 	end
-      
    endgenerate
    
    wire two_plus_flits;
