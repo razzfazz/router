@@ -121,24 +121,70 @@ module testbench();
 
    wire [0:router_addr_width-1] router_address 	= {router_addr_width{1'b1}};
    
-
    wire buffer_empty;
    wire reservation_ready;
    wire nonspec_ready;
    wire spec_ready;
    wire [0:flit_data_width-1] buffer_data;
    wire [0:dest_info_width-1] source_address = {router_address};
-   wire message_ready;
-   wire [0:reservation_size_width-1] message_size;
-   wire [0:dest_info_width-1] message_dest;
+
+   //message generator
+   wire  message_ready;
+   reg [0:reservation_size_width-1] message_size;
+   reg [0:dest_info_width-1] message_dest;
+   reg has_message;
+   assign message_ready  = has_message & buffer_empty;
+
    wire buffer_gnt;
-
    
-
-   wire [0:flit_data_width-1] input_data;
+ 
    wire grant_ready;
    wire ack_ready;
    wire nack_ready;
+   wire buffer_error;
+
+
+
+   wire [0:channel_width-1] channel_bton;
+   wire [0:channel_width-1] channel_ntob;
+   
+   
+   test_nic
+     #(// Parameters
+       .topology			(topology),
+       .num_flits_per_vc		(num_flits_per_vc),
+       .num_message_classes		(num_message_classes),
+       .num_vcs_per_class		(num_vcs_per_class),
+       .num_nodes			(num_nodes),
+       .num_dimensions			(num_dimensions),
+       .num_nodes_per_router		(num_nodes_per_router),
+       .packet_format			(packet_format),
+       .flow_ctrl_type			(flow_ctrl_type),
+       .flow_ctrl_bypass		(flow_ctrl_bypass),
+       .max_payload_length		(max_payload_length),
+       .min_payload_length		(min_payload_length),
+       .flit_data_width			(flit_data_width),
+       .routing_type			(routing_type),
+       .dim_order			(dim_order),
+       .elig_mask			(elig_mask),
+       .max_reservation_size		(max_reservation_size),
+       .time_to_wait_width		(time_to_wait_width),
+       .reset_type			(reset_type))
+   thenic
+     (// Outputs
+      .flow_ctrl			(),
+      .channel_out			(channel_ntob),
+      .error				(error),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .run				(run),
+      .router_address			(router_address),
+      .channel_in			(channel_bton));
+   
+
+
+   
    
    flow_buffer
      #(// Parameters
@@ -167,6 +213,7 @@ module testbench();
       .nonspec_ready			(nonspec_ready),
       .spec_ready			(spec_ready),
       .output_data			(buffer_data),
+      .error (buffer_error),
       // Inputs
       .clk				(clk),
       .run				(run),
@@ -178,16 +225,77 @@ module testbench();
       .grant_ready			(grant_ready),
       .ack_ready			(ack_ready),
       .nack_ready			(nack_ready),
-      .input_data			(input_data),
+      .input_data			(channel_ntob[4:channel_width-1]),
       .current_time			(current_time_q),
       .nic_gnt				(buffer_gnt));
 
+   assign buffer_gnt 		     = reservation_ready;
    
+   assign grant_ready 		     = (channel_ntob[0:2] == 3'b101);
+
+   rtr_channel_output
+     #(// Parameters
+       .num_vcs(num_vcs),
+       .packet_format(packet_format),
+       .flit_data_width(flit_data_width),
+       .reset_type(reset_type))
+   channel_output_stage
+     (// Outputs
+      .channel_out			(channel_bton),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .active				(run),
+      .flit_valid_in			(reservation_ready),
+      .flit_head_in			(1'b1),
+      .flit_tail_in			(1'b1),
+      .flit_data_in			(buffer_data),
+      .flit_sel_in_ovc			(4'b1000));
+
+
+
+   integer total_injected;
+
+   
+   
+   //message genearrotr
+   always@(posedge clk, posedge reset)
+     begin
+	if(reset)
+	  begin
+	     has_message 	    <=0;
+	     message_size 	    <=0;
+	     message_dest 	    <= 0;
+	  end
+	else
+	  begin
+	     if(message_ready)
+	       total_injected 	     = total_injected +  message_size;
+	     
+	     
+	     
+	     if(~has_message)
+	       begin 
+		  has_message 	    <= ($dist_uniform(seed, 0,  99) < 10);
+		  message_size 	    <= $dist_uniform(seed, 1,  max_reservation_size);
+		  message_dest 	    <= $dist_uniform(seed, 0, num_routers_per_dim*num_routers_per_dim-2);
+	       end
+	     else
+	       begin
+		  if(buffer_empty)
+		    begin
+		       has_message  <=0;
+		       message_size <=0;
+		       message_dest <= 0;
+		    end
+	       end // else: !if(~has_message)	
+	  end
+     end
    
    //clock
    always
      begin
-	clk <= clk_en;
+	clk 		      <= clk_en;
 	#(Tclk/2);
 	clk <= 1'b0;
 	#(Tclk/2);
@@ -197,12 +305,14 @@ module testbench();
    integer cycles;   
    initial
      begin
-	seed 	    = 100;
+	seed 	    = 10;
 	
    	reset 	    = 1'b0;
 	clk_en 	    = 1'b0;
 	run 	    = 1'b0;
 	cycles 	    = 0;
+	total_injected  = 0;
+	
 	
 	#(Tclk);
 	#(Tclk/2);

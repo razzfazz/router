@@ -287,10 +287,14 @@ module flow_buffer(/*autoarg*/
      //Grant transition
    wire [0:31] granted_time_s;
    wire [0:31] granted_time_q;
-   assign granted_time_s = grant_ready?
-			   input_data[flit_data_width-32:flit_data_width-1]:
-			   granted_time_q;
-   
+   wire reset_grant;
+   //assumption, grant_ready will not assert when state==FB_EMPTY
+   assign granted_time_s  = (state==FB_EMPTY)?
+			    32'b0:
+			    (grant_ready?
+			     input_data[flit_data_width-32:flit_data_width-1]:
+			     granted_time_q);
+			     
    c_dff
      #(.width				(32),
        .reset_type			(reset_type))
@@ -299,7 +303,7 @@ module flow_buffer(/*autoarg*/
       .q				(granted_time_q),
       // Inputs
       .clk				(clk),
-      .reset				(reset),
+      .reset				(reset ),
       .active				(run),
       .d				(granted_time_s));
 
@@ -334,7 +338,7 @@ module flow_buffer(/*autoarg*/
 		 if(nack_ready | grant_ready)
 		   state <=FB_SPEC_STOP;
 	       FB_SPEC_STOP:
-		 if(current_time >granted_time_s)
+		 if(current_time >granted_time_s && granted_time_s!=32'b0)
 		   begin
 		      //state <=FB_NON_SPEC; //this is correct
 		      state <=FB_EMPTY;//this is test
