@@ -202,6 +202,25 @@ module test_nic(/*autoarg*/
       .fc_event_sel_in_ivc(ejection_gnt_ivc),
       .flow_ctrl_out(flow_ctrl));
 
+   wire [0:31] current_time_s;
+   wire [0:31] current_time_q;
+   assign current_time_s = current_time_q+'b1;   
+   c_dff
+     #(// Parameters
+       .width				(32),
+       .reset_type			(reset_type))
+   destination_timer
+     (// Outputs
+      .q				(current_time_q),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .active				(run),
+      .d				(current_time_s));
+
+
+
+
    
    //////////////////////////
    //NIC Receive FIFO
@@ -267,7 +286,7 @@ module test_nic(/*autoarg*/
    wire[0:4] ejection_req;
    wire[0:4] ejection_carry;
    wire[0:4] ejection_gnt;
-
+   wire  is_ack;
    //these requests NEEDS to be modified significantly, add as we see fit
    assign ejection_req[0]  = ~input_fifo_empty[1] &  //Grant VC
 			    ~(|input_fifo_data[(flit_data_width+1)+header_info_width+:2]); //SRP_TYPE == 00
@@ -275,8 +294,9 @@ module test_nic(/*autoarg*/
 			    ~grant_almost_full;    //Grant output fifo not full
    assign ejection_req[2] = ~input_fifo_empty[1] &  //ack/nack
 			    (|input_fifo_data[(flit_data_width+1)+header_info_width+:2]);
-   assign ejection_req[3]    = ~input_fifo_empty[2];  //nonspec
-   assign ejection_req[4]    = ~input_fifo_empty[3] &  //spec
+   assign is_ack 	   = (input_fifo_data[(flit_data_width+1)+header_info_width+:2] ==2'b01);
+   assign ejection_req[3]  = ~input_fifo_empty[2];  //nonspec
+   assign ejection_req[4]  = ~input_fifo_empty[3] &  //spec
 			       (~ack_almost_full | ~input_fifo_data[4*(flit_data_width+1)-1]); //ack output fifo not full or this is not a head
    
    assign ejection_carry[0:4] = {1'b1, ~ejection_req[0:3]&ejection_carry[0:3]};
@@ -296,6 +316,80 @@ module test_nic(/*autoarg*/
    
 
    
+   wire buffer_empty;
+   wire reservation_ready;
+   wire nonspec_ready;
+   wire spec_ready;
+   wire [0:flit_data_width-1] buffer_data;
+   wire [0:dest_info_width-1] source_address = {router_address};
+   wire message_ready;
+   wire [0:reservation_size_width-1] message_size;
+   wire [0:dest_info_width-1] message_dest;
+   wire buffer_gnt; //assigned in injection arbitration
+
+/*
+   flow_buffer
+     #(// Parameters
+       .topology			(topology),
+       .num_flits_per_vc		(num_flits_per_vc),
+       .num_message_classes		(num_message_classes),
+       .num_vcs_per_class		(num_vcs_per_class),
+       .num_nodes			(num_nodes),
+       .num_dimensions			(num_dimensions),
+       .num_nodes_per_router		(num_nodes_per_router),
+       .packet_format			(packet_format),
+       .flow_ctrl_type			(flow_ctrl_type),
+       .flow_ctrl_bypass		(flow_ctrl_bypass),
+       .max_payload_length		(max_payload_length),
+       .min_payload_length		(min_payload_length),
+       .flit_data_width			(flit_data_width),
+       .routing_type			(routing_type),
+       .dim_order			(dim_order),
+       .elig_mask			(elig_mask),
+       .max_reservation_size		(max_reservation_size),
+       .reset_type			(reset_type))
+   thebuffer
+     (// Outputs
+      .buffer_empty			(buffer_empty),
+      .reservation_ready		(reservation_ready),
+      .nonspec_ready			(nonspec_ready),
+      .spec_ready			(spec_ready),
+      .output_data			(buffer_data),
+      // Inputs
+      .clk				(clk),
+      .run				(run),
+      .reset				(reset),
+      .source_address			(source_address),
+      .message_ready			(message_ready),
+      .message_size			(message_size),
+      .message_dest			(message_dest),
+      .grant_ready			(ejection_gnt[0]),
+      .ack_ready			(ejection_gnt[2]  & is_ack),
+      .nack_ready			(ejection_gnt[2]  &~is_ack),
+      .input_data			(input_fifo_data[0:flit_data_width-1]),
+      .current_time			(current_time_q),
+      .nic_gnt				(buffer_gnt));
+*/
+   
+
+
+
+
+
+
+   
+
+
+
+
+
+
+
+
+
+
+   
+   
    ////////////////////////
    //Reservation request 	
    //extract reservaiton info
@@ -312,22 +406,6 @@ module test_nic(/*autoarg*/
    
    ///////////////////////
    //Reservation scheduler   
-   wire [0:31] current_time_s;
-   wire [0:31] current_time_q;
-   assign current_time_s = current_time_q+'b1;   
-   c_dff
-     #(// Parameters
-       .width				(32),
-       .reset_type			(reset_type))
-   destination_timer
-     (// Outputs
-      .q				(current_time_q),
-      // Inputs
-      .clk				(clk),
-      .reset				(reset),
-      .active				(run),
-      .d				(current_time_s));
-
    wire [0:31] grant_time;
    wire [0:31] reservation_schedule_s;
    wire [0:31] reservation_schedule_q;
@@ -507,8 +585,8 @@ module test_nic(/*autoarg*/
    //Strict priority grant > res > ack/nack > nonspec > spec
    wire[0:4] injection_req;
    wire[0:4] injection_carry;
-   wire[0:4] injection_gnt;
    wire[0:3] injection_gnt_ovc;
+   wire[0:4] injection_gnt;
    
    //these requests NEEDS to be modified significantly, especially flow control
    assign injection_req[0]    = ~grant_empty;
@@ -525,8 +603,8 @@ module test_nic(/*autoarg*/
 
    assign grant_pop 	      = injection_gnt[0];
    assign ack_pop 	      = injection_gnt[2];
-
-
+   assign buffer_gnt 	      = injection_gnt[1]|injection_gnt[3]|injection_gnt[4];
+   
 
    //Send them out
    //For now, both gnt and ack are single flit packets
