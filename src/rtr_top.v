@@ -227,7 +227,6 @@ module rtr_top
    wire [0:num_ports-1] 		  alo_flit_sel_fast_ip;
    wire [0:num_ports-1] 		  alo_flit_sent_fast_ip;
    
-   wire [0:num_ports*num_vcs-1] 	  ipc_route_valid_ip_ivc;
    wire [0:num_ports*num_vcs*num_ports-1] ipc_route_ip_ivc_op;
    wire [0:num_ports*num_vcs*num_resource_classes-1] ipc_route_ip_ivc_orc;
    wire [0:num_ports*num_vcs-1] 		     ipc_flit_valid_ip_ivc;
@@ -272,7 +271,6 @@ module rtr_top
 	   wire 		    alo_flit_sent_fast;
 	   assign alo_flit_sent_fast = alo_flit_sent_fast_ip[ip];
 	   
-	   wire [0:num_vcs-1] 	    ipc_route_valid_ivc;
 	   wire [0:num_vcs*num_ports-1] ipc_route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] ipc_route_ivc_orc;
 	   wire [0:num_vcs-1] 			   ipc_flit_valid_ivc;
@@ -318,7 +316,6 @@ module rtr_top
 	      .reset(reset),
 	      .router_address(router_address),
 	      .channel_in(channel_in),
-	      .route_valid_out_ivc(ipc_route_valid_ivc),
 	      .route_out_ivc_op(ipc_route_ivc_op),
 	      .route_out_ivc_orc(ipc_route_ivc_orc),
 	      .flit_valid_out_ivc(ipc_flit_valid_ivc),
@@ -339,8 +336,6 @@ module rtr_top
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error));
 	   
-	   assign ipc_route_valid_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
-	     = ipc_route_valid_ivc;
 	   assign ipc_route_ip_ivc_op[ip*num_vcs*num_ports:
 				      (ip+1)*num_vcs*num_ports-1]
 	     = ipc_route_ivc_op;
@@ -421,7 +416,6 @@ module rtr_top
    alo
      (.clk(clk),
       .reset(reset),
-      .route_valid_in_ip_ivc(ipc_route_valid_ip_ivc),
       .route_in_ip_ivc_op(ipc_route_ip_ivc_op),
       .route_in_ip_ivc_orc(ipc_route_ip_ivc_orc),
       .flit_valid_in_ip_ivc(ipc_flit_valid_ip_ivc),

@@ -30,12 +30,12 @@
 //==============================================================================
 
 module rtr_ip_ctrl_mac
-  (clk, reset, router_address, channel_in, route_valid_out_ivc, 
-   route_out_ivc_op, route_out_ivc_orc, flit_valid_out_ivc, flit_last_out_ivc, 
-   flit_head_out_ivc, flit_tail_out_ivc, route_fast_out_op, route_fast_out_orc, 
-   flit_valid_fast_out, flit_head_fast_out, flit_tail_fast_out, 
-   flit_sel_fast_out_ivc, flit_data_out, flit_sel_in_ivc, flit_sent_in, 
-   flit_sel_fast_in, flit_sent_fast_in, flow_ctrl_out, error);
+  (clk, reset, router_address, channel_in, route_out_ivc_op, route_out_ivc_orc, 
+   flit_valid_out_ivc, flit_last_out_ivc, flit_head_out_ivc, flit_tail_out_ivc, 
+   route_fast_out_op, route_fast_out_orc, flit_valid_fast_out, 
+   flit_head_fast_out, flit_tail_fast_out, flit_sel_fast_out_ivc, 
+   flit_data_out, flit_sel_in_ivc, flit_sent_in, flit_sel_fast_in, 
+   flit_sent_fast_in, flow_ctrl_out, error);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -227,10 +227,6 @@ module rtr_ip_ctrl_mac
    
    // incoming channel
    input [0:channel_width-1] 	 channel_in;
-   
-   // routing information is valid
-   output [0:num_vcs-1] 	 route_valid_out_ivc;
-   wire [0:num_vcs-1] 		 route_valid_out_ivc;
    
    // selected output port
    output [0:num_vcs*num_ports-1] route_out_ivc_op;
@@ -556,9 +552,6 @@ module rtr_ip_ctrl_mac
 	   assign llu_lar_info_ivc[ivc*lar_info_width:(ivc+1)*lar_info_width-1]
 	     = llu_lar_info;
 	   
-	   wire 		      route_valid_out;
-	   assign route_valid_out_ivc[ivc] = route_valid_out;
-	   
 	   wire [0:num_ports-1]       route_out_op;
 	   assign route_out_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 	     = route_out_op;
@@ -578,6 +571,9 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   chi_flit_valid_sel;
 	   assign chi_flit_valid_sel = chi_flit_valid & chi_flit_sel;
+	   
+	   wire 			   chi_flit_valid_sel_head;
+	   assign chi_flit_valid_sel_head = chi_flit_valid_sel & chi_flit_head;
 	   
 	   wire 			   flit_sent_sel_in;
 	   assign flit_sent_sel_in = flit_sent_in & flit_sel_in;
@@ -800,7 +796,7 @@ module rtr_ip_ctrl_mac
 		   
 		   wire has_tail_s, has_tail_q;
 		   assign has_tail_s
-		     = (has_tail_q & ~(chi_flit_valid_sel & chi_flit_head)) | 
+		     = (has_tail_q & ~chi_flit_valid_sel_head) | 
 		       (chi_flit_valid_sel & chi_flit_tail);
 		   c_dff
 		     #(.width(1),
@@ -866,7 +862,6 @@ module rtr_ip_ctrl_mac
 	   // track header information for frontmost packet
 	   //-------------------------------------------------------------------
 	   
-	   wire hit_valid;
 	   wire [0:num_ports-1] hit_route_op;
 	   wire [0:num_resource_classes-1] hit_route_orc;
 	   wire [0:lar_info_width-1]  hit_lar_info;
@@ -874,63 +869,30 @@ module rtr_ip_ctrl_mac
 	   
 	   if(1) begin:hit
 	      
-	      wire valid_active;
-	      assign valid_active = chi_flit_valid | ~fb_empty;
-	      
-	      wire valid_s, valid_q;
-	      if(elig_mask == `ELIG_MASK_USED)
-		begin
-		   if(dual_path_alloc)
-		     assign valid_s = (valid_q | chi_flit_valid_sel) &
-				      ~(flit_sent_sel_in & htt_flit_tail) &
-				      ~(flit_sent_sel_fast_in & chi_flit_tail);
-		   else
-		     assign valid_s = (valid_q | chi_flit_valid_sel) & 
-				      ~(flit_sent_sel_in & flit_tail_out);
-		end
-	      else
-		begin
-		   if(dual_path_alloc)
-		     assign valid_s
-		       = flit_sent_sel_in ?
-			 (~htt_flit_tail | ~fb_almost_empty | 
-			  chi_flit_valid_sel) :
-			 (flit_sent_sel_fast_in ? 
-			  ~chi_flit_tail : 
-			  (valid_q | chi_flit_valid_sel));
-		   else
-		     assign valid_s
-		       = flit_sent_sel_in ? 
-			 (fb_empty ?
-			  ~chi_flit_tail :
-			  (~htt_flit_tail | ~fb_almost_empty | 
-			   chi_flit_valid_sel)) :
-			 (valid_q | chi_flit_valid_sel);
-		end
-	      c_dff
-		#(.width(1),
-		  .reset_type(reset_type))
-	      validq
-		(.clk(clk),
-		 .reset(reset),
-		 .active(valid_active),
-		 .d(valid_s),
-		 .q(valid_q));
-	      
 	      wire active;
+	      wire capture;
 	      if(elig_mask == `ELIG_MASK_USED)
-		assign active = ~valid_q & chi_flit_valid;
+		begin
+		   assign active = chi_flit_valid & chi_flit_head;
+		   assign capture = chi_flit_valid_sel_head;
+		end
 	      else
-		assign active
-		  = (~valid_q & chi_flit_valid) | (~fb_empty & htt_flit_tail);
+		begin
+		   assign active = ~fb_empty | (chi_flit_valid & chi_flit_head);
+		   assign capture = (fb_empty & chi_flit_valid_sel_head) |
+				    (flit_sent_sel_in & flit_tail_out);
+		end
 	      
-	      wire [0:lar_info_width-1] peek_lar_info;
-	      assign peek_lar_info
+	      wire two_plus_flits;
+	      assign two_plus_flits = ~fb_empty & ~fb_almost_empty;
+	      
+	      wire [0:lar_info_width-1] fb_peek_lar_info;
+	      assign fb_peek_lar_info
 		= fb_peek_route_info[0:lar_info_width-1];
 	      
-	      wire [0:num_ports-1] route_op;
+	      wire [0:num_ports-1] 	route_op;
 	      wire [0:num_resource_classes-1] route_orc;
-	      wire [0:lar_info_width-1]  lar_info;
+	      wire [0:lar_info_width-1]       lar_info;
 	      
 	      if(dual_path_alloc)
 		begin
@@ -943,26 +905,26 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:num_ports-1] route_op_s, route_op_q;
 		   if(elig_mask == `ELIG_MASK_USED)
-		     assign route_op_s = valid_q ? route_op_q : gld_route_op;
+		     assign route_op_s = capture ? gld_route_op : route_op_q;
 		   else
 		     begin
 			
-			wire [0:port_idx_width-1] peek_route_port;
-			assign peek_route_port
-			  = peek_lar_info[0:port_idx_width-1];
+			wire [0:port_idx_width-1] fb_peek_route_port;
+			assign fb_peek_route_port
+			  = fb_peek_lar_info[0:port_idx_width-1];
 			
 			wire [0:num_ports-1] 	  peek_route_op;
 			c_decode
 			  #(.num_ports(num_ports))
 			peek_route_op_dec
-			  (.data_in(peek_route_port),
+			  (.data_in(fb_peek_route_port),
 			   .data_out(peek_route_op));
 			
 			assign route_op_s
-			  = (flit_sent_sel_in & htt_flit_tail) ?
-			    (fb_almost_empty ? gld_route_op : peek_route_op) :
-			    (valid_q ? route_op_q : gld_route_op);
-
+			  = capture ?
+			    (two_plus_flits ? peek_route_op : gld_route_op) :
+			    route_op_q;
+			
 		     end
 		   c_dff
 		     #(.width(num_ports),
@@ -994,31 +956,30 @@ module rtr_ip_ctrl_mac
 			wire [0:num_resource_classes-1] route_orc_q;
 			if(elig_mask == `ELIG_MASK_USED)
 			  assign route_orc_s
-			    = valid_q ? route_orc_q : gld_route_orc;
+			    = capture ? gld_route_orc : route_orc_q;
 			else
 			  begin
 			     
 			     wire [0:resource_class_idx_width-1] 
-			       peek_route_rcsel;
-			     assign peek_route_rcsel
-			       = peek_lar_info[port_idx_width:
-						    port_idx_width+
-						    resource_class_idx_width-1];
+			       fb_peek_route_rcsel;
+			     assign fb_peek_route_rcsel
+			       = fb_peek_lar_info[port_idx_width:
+						  port_idx_width+
+						  resource_class_idx_width-1];
 			     
 			     wire [0:num_resource_classes-1] peek_route_orc;
 			     c_decode
 			       #(.num_ports(num_resource_classes))
 			     peek_route_orc_dec
-			       (.data_in(peek_route_rcsel),
+			       (.data_in(fb_peek_route_rcsel),
 				.data_out(peek_route_orc));
 			     
-			     assign route_orc_s
-			       = (flit_sent_sel_in & htt_flit_tail) ?
-				 (fb_almost_empty ? 
-				  gld_route_orc : 
-				  peek_route_orc) :
-				 (valid_q ? route_orc_q : gld_route_orc);
-
+			     assign route_orc_s = capture ?
+						  (two_plus_flits ? 
+						   peek_route_orc : 
+						   gld_route_orc) :
+						  route_orc_q;
+			     
 			  end
 			c_dff
 			  #(.width(num_resource_classes),
@@ -1050,18 +1011,14 @@ module rtr_ip_ctrl_mac
 	      else
 		begin
 		   
-		   wire [0:lar_info_width-1] lar_info_s;
-		   wire [0:lar_info_width-1] lar_info_q;
+		   wire [0:lar_info_width-1] lar_info_s, lar_info_q;
 		   if(elig_mask == `ELIG_MASK_USED)
-		     assign lar_info_s
-		       = valid_q ? lar_info_q : chi_lar_info;
+		     assign lar_info_s = capture ? chi_lar_info : lar_info_q;
 		   else
 		     assign lar_info_s
-		       = (flit_sent_sel_in & flit_tail_out) ?
-			 (fb_almost_empty ? 
-			  chi_lar_info : 
-			  peek_lar_info) :
-			 (valid_q ? lar_info_q : chi_lar_info);
+		       = capture ?
+			 (two_plus_flits ? fb_peek_lar_info : chi_lar_info) :
+			 lar_info_q;
 		   c_dff
 		     #(.width(lar_info_width),
 		       .reset_type(reset_type))
@@ -1074,7 +1031,7 @@ module rtr_ip_ctrl_mac
 		   
 		   assign lar_info = lar_info_q;
 		   
-		   wire [0:port_idx_width-1] 	  route_port;
+		   wire [0:port_idx_width-1] route_port;
 		   assign route_port = lar_info_q[0:port_idx_width-1];
 		   
 		   c_decode
@@ -1091,8 +1048,8 @@ module rtr_ip_ctrl_mac
 			wire [0:resource_class_idx_width-1] route_rcsel;
 			assign route_rcsel
 			  = lar_info_q[port_idx_width:
-					    port_idx_width+
-					    resource_class_idx_width-1];
+				       port_idx_width+
+				       resource_class_idx_width-1];
 			
 			c_decode
 			  #(.num_ports(num_resource_classes))
@@ -1106,27 +1063,20 @@ module rtr_ip_ctrl_mac
 	      
 	      wire [0:dest_info_width-1] dest_info_s, dest_info_q;
 	      if(elig_mask == `ELIG_MASK_USED)
-		assign dest_info_s
-		  = valid_q ? dest_info_q : chi_dest_info;
+		assign dest_info_s = capture ? chi_dest_info : dest_info_q;
 	      else
 		begin
 		   
-		   wire [0:dest_info_width-1] peek_dest_info;
-		   assign peek_dest_info
+		   wire [0:dest_info_width-1] fb_peek_dest_info;
+		   assign fb_peek_dest_info
 		     = fb_peek_route_info[lar_info_width:
 					  lar_info_width+dest_info_width-1];
-	      
-		   if(dual_path_alloc)
-		     assign dest_info_s
-		       = (flit_sent_sel_in & htt_flit_tail) ?
-			 (fb_almost_empty ? chi_dest_info : peek_dest_info) :
-			 (valid_q ? dest_info_q : chi_dest_info);
-		   else
-		     assign dest_info_s
-		       = (flit_sent_sel_in & flit_tail_out) ?
-			 (fb_almost_empty ? chi_dest_info : peek_dest_info) :
-			 (valid_q ? dest_info_q : chi_dest_info);
-
+		   
+		   assign dest_info_s
+		     = capture ?
+		       (two_plus_flits ? fb_peek_dest_info : chi_dest_info) :
+		       dest_info_q;
+		   
 		end
 	      c_dff
 		#(.width(dest_info_width),
@@ -1138,7 +1088,6 @@ module rtr_ip_ctrl_mac
 		 .d(dest_info_s),
 		 .q(dest_info_q));
 	      
-	      assign hit_valid = valid_q;
 	      assign hit_route_op = route_op;
 	      assign hit_route_orc = route_orc;
 	      assign hit_lar_info = lar_info;
@@ -1156,17 +1105,23 @@ module rtr_ip_ctrl_mac
 	   
 	   if(dual_path_alloc)
 	     begin
-		assign route_valid_out = hit_valid;
 		assign route_unmasked_op = hit_route_op;
 		assign route_unmasked_orc = hit_route_orc;
 	     end
 	   else
 	     begin
-		assign route_valid_out = hit_valid | chi_flit_valid_sel;
+		
+		wire bypass_route_info;
+		if(elig_mask == `ELIG_MASK_USED)
+		  assign bypass_route_info = chi_flit_valid_sel_head;
+		else
+		  assign bypass_route_info = fb_empty & chi_flit_valid_sel_head;
+		
 		assign route_unmasked_op
-		  = hit_valid ? hit_route_op : gld_route_op;
+		  = bypass_route_info ? gld_route_op : hit_route_op;
 		assign route_unmasked_orc
-		  = hit_valid ? hit_route_orc : gld_route_orc;
+		  = bypass_route_info ? gld_route_orc : hit_route_orc;
+		
 	     end
 	   
 	   wire [0:1] rf_errors;
@@ -1185,7 +1140,7 @@ module rtr_ip_ctrl_mac
 	       .vc_id(ivc))
 	   rf
 	     (.clk(clk),
-	      .route_valid(route_valid_out),
+	      .route_valid(flit_valid_out),
 	      .route_in_op(route_unmasked_op),
 	      .route_in_orc(route_unmasked_orc),
 	      .route_out_op(route_out_op),
