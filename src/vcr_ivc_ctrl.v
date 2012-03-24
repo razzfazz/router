@@ -412,13 +412,13 @@ module vcr_ivc_ctrl
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
+	   assign hdr_active = flit_valid_in & flit_head_in;
 	   assign hdr_capture = flit_valid_sel_head_in;
-	   assign hdr_active = hdr_capture;
 	   assign hdr_valid = ~hdr_capture;
 	end
       else
 	begin
-	   assign hdr_active = ~fb_empty | flit_valid_sel_head_in;
+	   assign hdr_active = ~fb_empty | (flit_valid_in & flit_head_in);
 	   assign hdr_valid = ~fb_empty | ~flit_head_in;
 	   assign hdr_capture = ~hdr_valid | packet_done;
 	end
