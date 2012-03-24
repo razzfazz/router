@@ -548,19 +548,17 @@ module whr_ip_ctrl_mac
    
    wire 			hdr_active;
    wire 			hdr_capture;
-   wire 			hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
-	   assign hdr_active = hdr_capture;
-	   assign hdr_capture = ~hdr_valid & flit_valid_in;
-	   assign hdr_valid = ~hdr_capture;
+	   assign hdr_active = flit_valid_in & flit_head_in;
+	   assign hdr_capture = flit_valid_in & flit_head_in;
 	end
       else
 	begin
 	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_capture = ~hdr_valid | (flit_valid_out & flit_tail_out);
-	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
+	   assign hdr_capture
+	     = (fbc_empty & flit_head_in) | (flit_valid_out & flit_tail_out);
 	end
    endgenerate
    
@@ -623,10 +621,6 @@ module whr_ip_ctrl_mac
       .active(hdr_active),
       .d(hdr_dest_info_s),
       .q(hdr_dest_info_q));
-   
-   wire 			       error_no_header;
-   assign error_no_header
-     = ~hdr_valid & (~fbc_empty | (flit_valid_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -702,10 +696,10 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire [0:dest_info_width-1] 	       dest_info;
-   assign dest_info = hdr_valid ? hdr_dest_info_q : dest_info_in;
+   assign dest_info = bypass_route_info ? dest_info_in : hdr_dest_info_q;
    
    wire [0:lar_info_width-1] 	       lar_info;
-   assign lar_info = hdr_valid ? hdr_lar_info_q : lar_info_in;
+   assign lar_info = bypass_route_info ? lar_info_in : hdr_lar_info_q;
    
    wire [0:router_addr_width-1]        next_router_address;
    rtr_next_hop_addr
@@ -845,31 +839,18 @@ module whr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   // pragma translate_off
-   
-   always @(posedge clk)
-     begin
-	
-	if(error_no_header)
-	  $display("ERROR: Stray flit received in module %m.");
-	
-     end
-   
-   // pragma translate_on
-   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 
-	   wire [0:4] errors_s, errors_q;
+	   wire [0:3] errors_s, errors_q;
 	   assign errors_s[0] = error_fbc_underflow;
 	   assign errors_s[1] = error_fbc_overflow;
-	   assign errors_s[2] = error_no_header;
-	   assign errors_s[3] = error_invalid_port;
-	   assign errors_s[4] = error_invalid_class;
+	   assign errors_s[2] = error_invalid_port;
+	   assign errors_s[3] = error_invalid_class;
 	   c_err_rpt
-	     #(.num_errors(5),
+	     #(.num_errors(4),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

@@ -283,8 +283,8 @@ module vcr_ivc_ctrl
    wire 			     free_spec;
    
    // internal error condition detected
-   output [0:2] 		     errors;
-   wire [0:2] 			     errors;
+   output [0:1] 		     errors;
+   wire [0:1] 			     errors;
    
    
    //---------------------------------------------------------------------------
@@ -408,19 +408,16 @@ module vcr_ivc_ctrl
    
    wire 		       hdr_active;
    wire 		       hdr_capture;
-   wire 		       hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
 	   assign hdr_active = flit_valid_in & flit_head_in;
 	   assign hdr_capture = flit_valid_sel_head_in;
-	   assign hdr_valid = ~hdr_capture;
 	end
       else
 	begin
 	   assign hdr_active = ~fb_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_capture = ~hdr_valid | packet_done;
-	   assign hdr_valid = ~fb_empty | ~flit_head_in;
+	   assign hdr_capture = (fb_empty & flit_head_in) | packet_done;
 	end
    endgenerate
    
@@ -492,10 +489,6 @@ module vcr_ivc_ctrl
       .active(hdr_active),
       .d(hdr_dest_info_s),
       .q(hdr_dest_info_q));
-   
-   wire 			      error_no_header;
-   assign error_no_header
-     = ~hdr_valid & (~fb_empty | (flit_valid_sel_in & ~flit_head_in));
    
    
    //---------------------------------------------------------------------------
@@ -610,10 +603,10 @@ module vcr_ivc_ctrl
    //---------------------------------------------------------------------------
    
    wire [0:dest_info_width-1] 		       dest_info;
-   assign dest_info = hdr_valid ? hdr_dest_info_q : dest_info_in;
+   assign dest_info = bypass_route_info ? dest_info_in : hdr_dest_info_q;
    
    wire [0:lar_info_width-1] 		       lar_info;
-   assign lar_info = hdr_valid ? hdr_lar_info_q : lar_info_in;
+   assign lar_info = bypass_route_info ? lar_info_in : hdr_lar_info_q;
    
    wire [0:router_addr_width-1] 	       next_router_address;
    rtr_next_hop_addr
@@ -807,20 +800,7 @@ module vcr_ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
-   // pragma translate_off
-   
-   always @(posedge clk)
-     begin
-	
-	if(error_no_header)
-	  $display("ERROR: Stray flit received in module %m.");
-	
-     end
-   
-   // pragma translate_on
-   
-   assign errors[0] = error_no_header;
-   assign errors[1] = error_invalid_port;
-   assign errors[2] = error_invalid_class;
+   assign errors[0] = error_invalid_port;
+   assign errors[1] = error_invalid_class;
    
 endmodule
