@@ -557,8 +557,8 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_capture
-	     = (fbc_empty & flit_head_in) | (flit_valid_out & flit_tail_out);
+	   assign hdr_capture = (fbc_empty & flit_valid_in & flit_head_in) | 
+				(flit_valid_out & flit_tail_out);
 	end
    endgenerate
    

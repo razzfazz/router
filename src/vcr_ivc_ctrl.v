@@ -301,8 +301,8 @@ module vcr_ivc_ctrl
    
    wire 			     flit_sent;
    
-   wire 			     packet_done;
-   assign packet_done = flit_sent & flit_tail;
+   wire 			     flit_sent_tail;
+   assign flit_sent_tail = flit_sent & flit_tail;
    
    wire 			     flit_valid_sel_head_in;
    assign flit_valid_sel_head_in = flit_valid_sel_in & flit_head_in;
@@ -317,7 +317,7 @@ module vcr_ivc_ctrl
 	end
       else
 	begin
-	   assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+	   assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~flit_sent_tail;
 	   assign allocated = vc_allocated_q;
 	end
    endgenerate
@@ -417,7 +417,8 @@ module vcr_ivc_ctrl
       else
 	begin
 	   assign hdr_active = ~fb_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_capture = (fb_empty & flit_head_in) | packet_done;
+	   assign hdr_capture = (fb_empty & flit_valid_sel_head_in) | 
+				flit_sent_tail;
 	end
    endgenerate
    
