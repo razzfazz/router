@@ -872,8 +872,6 @@ module rtr_ip_ctrl_mac
 	   wire [0:lar_info_width-1]  hit_lar_info;
 	   wire [0:dest_info_width-1] 	   hit_dest_info;
 	   
-	   wire 			   error_no_header;
-	   
 	   if(1) begin:hit
 	      
 	      wire valid_active;
@@ -1146,10 +1144,6 @@ module rtr_ip_ctrl_mac
 	      assign hit_lar_info = lar_info;
 	      assign hit_dest_info = dest_info_q;
 	      
-	      assign error_no_header
-		= ~valid_q & 
-		  (~fb_empty | (chi_flit_valid_sel & ~chi_flit_head));
-	      
 	   end
 	   
 	   
@@ -1295,23 +1289,10 @@ module rtr_ip_ctrl_mac
 	   // error checking
 	   //-------------------------------------------------------------------
 	   
-	   // pragma translate_off
-	   
-	   always @(posedge clk)
-	     begin
-		
-		if(error_no_header)
-		  $display("ERROR: Stray flit received in module %m.");
-		
-	     end
-	   
-	   // pragma translate_on
-	   
 	   assign errors[0] = error_fb_underflow;
 	   assign errors[1] = error_fb_overflow;
-	   assign errors[2] = error_no_header;
-	   assign errors[3] = error_invalid_port;
-	   assign errors[4] = error_invalid_class;
+	   assign errors[2] = error_invalid_port;
+	   assign errors[3] = error_invalid_class;
 	   
 	end
       
@@ -1533,10 +1514,10 @@ module rtr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*5-1] errors_s, errors_q;
+	   wire [0:num_vcs*4-1] errors_s, errors_q;
 	   assign errors_s = errors_ivc;
 	   c_err_rpt
-	     #(.num_errors(num_vcs*5),
+	     #(.num_errors(num_vcs*4),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
