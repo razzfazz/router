@@ -419,8 +419,8 @@ module vcr_ivc_ctrl
       else
 	begin
 	   assign hdr_active = ~fb_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_valid = ~fb_empty | ~flit_head_in;
 	   assign hdr_capture = ~hdr_valid | packet_done;
+	   assign hdr_valid = ~fb_empty | ~flit_head_in;
 	end
    endgenerate
    
