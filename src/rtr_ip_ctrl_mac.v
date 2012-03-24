@@ -500,7 +500,7 @@ module rtr_ip_ctrl_mac
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*flit_data_width-1] 		  fb_flit_data_ivc;
    wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
-   wire [0:num_vcs*5-1] 			  errors_ivc;
+   wire [0:num_vcs*4-1] 			  errors_ivc;
    
    genvar 					  ivc;
    
@@ -568,8 +568,8 @@ module rtr_ip_ctrl_mac
 				    (ivc+1)*num_resource_classes-1]
 	     = route_out_orc;
 	   
-	   wire [0:4] 			   errors;
-	   assign errors_ivc[ivc*5:(ivc+1)*5-1] = errors;
+	   wire [0:3] 			   errors;
+	   assign errors_ivc[ivc*4:(ivc+1)*4-1] = errors;
 	   
 	   
 	   //-------------------------------------------------------------------
