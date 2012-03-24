@@ -31,8 +31,8 @@
 //==============================================================================
 
 module rtr_route_filter
-  (clk, reset, active, route_valid, route_in_op, route_in_orc, route_out_op, 
-   route_out_orc, errors);
+  (clk, route_valid, route_in_op, route_in_orc, route_out_op, route_out_orc, 
+   errors);
    
 `include "c_constants.v"
 `include "rtr_constants.v"
@@ -99,8 +99,6 @@ module rtr_route_filter
    //---------------------------------------------------------------------------
    
    input clk;
-   input reset;
-   input active;
    
    // route information is valid
    input route_valid;

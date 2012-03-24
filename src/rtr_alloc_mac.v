@@ -622,9 +622,6 @@ module rtr_alloc_mac
 		// filter out illegal requests
 		//--------------------------------------------------------------
 		
-		wire 				rf_active;
-		assign rf_active = route_valid_in;
-		
 		wire [0:1] 			rf_errors;
 		rtr_route_filter
 		  #(.num_message_classes(num_message_classes),
@@ -641,8 +638,6 @@ module rtr_alloc_mac
 		    .vc_id(ivc))
 		rf
 		  (.clk(clk),
-		   .reset(reset),
-		   .active(rf_active),
 		   .route_valid(route_valid_in),
 		   .route_in_op(route_in_op),
 		   .route_in_orc(route_in_orc),

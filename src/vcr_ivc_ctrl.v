@@ -583,8 +583,6 @@ module vcr_ivc_ctrl
        .vc_id(vc_id))
    rf
      (.clk(clk),
-      .reset(reset),
-      .active(pop_active),
       .route_valid(flit_valid),
       .route_in_op(route_unmasked_op),
       .route_in_orc(route_unmasked_orc),

@@ -675,8 +675,6 @@ module whr_ip_ctrl_mac
        .vc_id(0))
    rf
      (.clk(clk),
-      .reset(reset),
-      .active(pop_active),
       .route_valid(flit_valid),
       .route_in_op(route_unmasked_op),
       .route_in_orc(1'b1),

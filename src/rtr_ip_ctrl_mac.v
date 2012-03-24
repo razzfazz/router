@@ -1169,9 +1169,6 @@ module rtr_ip_ctrl_mac
 		  = hit_valid ? hit_route_orc : gld_route_orc;
 	     end
 	   
-	   wire rf_active;
-	   assign rf_active = route_valid_out;
-	   
 	   wire [0:1] rf_errors;
 	   rtr_route_filter
 	     #(.num_message_classes(num_message_classes),
@@ -1188,8 +1185,6 @@ module rtr_ip_ctrl_mac
 	       .vc_id(ivc))
 	   rf
 	     (.clk(clk),
-	      .reset(reset),
-	      .active(rf_active),
 	      .route_valid(route_valid_out),
 	      .route_in_op(route_unmasked_op),
 	      .route_in_orc(route_unmasked_orc),
