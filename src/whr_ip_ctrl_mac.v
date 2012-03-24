@@ -546,21 +546,21 @@ module whr_ip_ctrl_mac
    // head register
    //---------------------------------------------------------------------------
    
-   wire 			hdr_capture;
    wire 			hdr_active;
+   wire 			hdr_capture;
    wire 			hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	begin
-	   assign hdr_capture = ~hdr_valid & flit_valid_in;
 	   assign hdr_active = hdr_capture;
+	   assign hdr_capture = ~hdr_valid & flit_valid_in;
 	   assign hdr_valid = ~hdr_capture;
 	end
       else
 	begin
 	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
 	   assign hdr_capture = ~hdr_valid | (flit_valid_out & flit_tail_out);
+	   assign hdr_valid = ~fbc_empty | ~flit_head_in;
 	end
    endgenerate
    
