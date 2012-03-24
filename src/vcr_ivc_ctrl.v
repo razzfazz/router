@@ -406,8 +406,8 @@ module vcr_ivc_ctrl
    wire [0:route_info_width-1] route_info_in;
    assign route_info_in = header_info_in[0:route_info_width-1];
    
-   wire 		       hdr_capture;
    wire 		       hdr_active;
+   wire 		       hdr_capture;
    wire 		       hdr_valid;
    generate
       if(elig_mask == `ELIG_MASK_USED)
