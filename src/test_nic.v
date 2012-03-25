@@ -136,9 +136,10 @@ module test_nic(/*autoarg*/
    localparam packet_length_width     = clogb(max_packet_length);
 
    
-   parameter max_reservation_size     = 256;
-   parameter time_to_wait_width      = 8;
+   parameter max_reservation_size     = 16;
+   parameter time_to_wait_width       = 8;
    localparam reservation_size_width  = clogb(max_reservation_size);
+   
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
    
    
@@ -395,10 +396,10 @@ module test_nic(/*autoarg*/
    //extract reservaiton info
    wire reservation_request  = ejection_valid&ejection_head&(ejection_gnt_ivc[0]);
    wire [0:flit_data_width-1] reservation_data  = input_fifo_data[0:flit_data_width-1];
-   wire [0:reservation_size_width-1] reservation_size = 
+   wire [0:reservation_size_width+packet_length_width-1] reservation_size = 
 				     (reservation_request)?
-				     reservation_data[(header_info_width+2)+:reservation_size_width]:
-				     {reservation_size_width{1'b0}};
+				     {reservation_data[(header_info_width+2)+:reservation_size_width], {packet_length_width{1'b0}}}:
+				     {{reservation_size_width{1'b0}},{packet_length_width{1'b0}}};
    wire [0:dest_info_width-1] reservation_src = (reservation_request)?
 			      reservation_data[(header_info_width+2+reservation_size_width)+:dest_info_width]:
 			       {dest_info_width{1'b0}};
