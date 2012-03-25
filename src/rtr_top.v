@@ -447,15 +447,15 @@ module rtr_top
    // crossbar
    //---------------------------------------------------------------------------
    
-   wire [0:num_ports*flit_data_width-1] 	   xbd_flit_data_op;
+   wire [0:num_ports*flit_data_width-1] 	   xbr_flit_data_op;
    rtr_crossbar_mac
      #(.num_ports(num_ports),
        .width(flit_data_width),
        .crossbar_type(crossbar_type))
-   xbd
+   xbr
      (.ctrl_in_op_ip(alo_flit_sel_op_ip),
       .data_in_ip(ipc_flit_data_ip),
-      .data_out_op(xbd_flit_data_op));
+      .data_out_op(xbr_flit_data_op));
    
    
    //---------------------------------------------------------------------------
@@ -493,9 +493,9 @@ module rtr_top
 	   assign alo_flit_sel_ovc
 	     = alo_flit_sel_op_ovc[op*num_vcs:(op+1)*num_vcs-1];
 	   
-	   wire [0:flit_data_width-1] xbd_flit_data;
-	   assign xbd_flit_data
-	     = xbd_flit_data_op[op*flit_data_width:(op+1)*flit_data_width-1];
+	   wire [0:flit_data_width-1] xbr_flit_data;
+	   assign xbr_flit_data
+	     = xbr_flit_data_op[op*flit_data_width:(op+1)*flit_data_width-1];
 	   
 	   wire [0:channel_width-1]   channel_out;
 	   wire [0:num_vcs-1] 	      opc_elig_ovc;
@@ -521,7 +521,7 @@ module rtr_top
 	      .flit_head_in(alo_flit_head),
 	      .flit_tail_in(alo_flit_tail),
 	      .flit_sel_in_ovc(alo_flit_sel_ovc),
-	      .flit_data_in(xbd_flit_data),
+	      .flit_data_in(xbr_flit_data),
 	      .channel_out(channel_out),
 	      .elig_out_ovc(opc_elig_ovc),
 	      .empty_out_ovc(opc_empty_ovc),
