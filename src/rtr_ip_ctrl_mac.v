@@ -211,8 +211,20 @@ module rtr_ip_ctrl_mac
        (route_info_width + payload_length_width) : 
        -1;
    
-   // required address size for a single VC's buffer
-   localparam fb_addr_width = clogb(num_flits_per_vc);
+   // number of entries in flit buffer
+   localparam fb_depth = num_vcs*num_flits_per_vc;
+   
+   // required address width for flit buffer
+   localparam fb_addr_width = clogb(fb_depth);
+   
+   // how many address bits are required to select an entry for a VC
+   localparam fb_addr_sel_width = clogb(num_flits_per_vc);
+   
+   // number of padding bits required at the beginning of flit buffer addresses
+   localparam fb_addr_pad_width = fb_addr_width - fb_addr_sel_width;
+   
+   // enable peek-ahead port on flit buffer
+   localparam fb_enable_peek = (elig_mask != `ELIG_MASK_USED);
    
    
    //---------------------------------------------------------------------------
@@ -305,10 +317,10 @@ module rtr_ip_ctrl_mac
    // channel input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 			     fb_full_ivc;
+   wire 				     fb_full;
    
    wire 				     chi_active;
-   assign chi_active = ~&fb_full_ivc;
+   assign chi_active = ~fb_full;
    
    wire 				     chi_flit_valid;
    wire 				     chi_flit_head;
@@ -493,10 +505,13 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
+   wire [0:header_info_width-1] 		  fb_peek_header_info;
+   wire [0:num_vcs-1] 				  fb_almost_empty_ivc;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
-   wire [0:num_vcs*flit_data_width-1] 		  fb_flit_data_ivc;
+   wire [0:num_vcs*fb_addr_width-1] 		  fb_push_addr_ivc;
+   wire [0:num_vcs*fb_addr_width-1] 		  fb_pop_addr_ivc;
    wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
-   wire [0:num_vcs*4-1] 			  errors_ivc;
+   wire [0:num_vcs*2-1] 			  ivcc_errors_ivc;
    
    genvar 					  ivc;
    
@@ -521,38 +536,42 @@ module rtr_ip_ctrl_mac
 	   wire flit_sel_in;
 	   assign flit_sel_in = flit_sel_in_ivc[ivc];
 	   
+	   wire fb_almost_empty;
+	   assign fb_almost_empty = fb_almost_empty_ivc[ivc];
+	   
+	   wire fb_empty;
+	   assign fb_empty = fb_empty_ivc[ivc];
+	   
+	   wire [0:fb_addr_width-1] fb_push_addr;
+	   assign fb_push_addr
+	     = fb_push_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1];
+	   
+	   wire [0:fb_addr_width-1] fb_pop_addr;
+	   assign fb_pop_addr
+	     = fb_pop_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1];
+	   
 	   
 	   //-------------------------------------------------------------------
 	   // connect outputs
 	   //-------------------------------------------------------------------
 	   
-	   wire flit_valid_out;
+	   wire 		    flit_valid_out;
 	   assign flit_valid_out_ivc[ivc] = flit_valid_out;
 	   
-	   wire flit_last_out;
+	   wire 		    flit_last_out;
 	   assign flit_last_out_ivc[ivc] = flit_last_out;
 	   
-	   wire flit_head_out;
+	   wire 		    flit_head_out;
 	   assign flit_head_out_ivc[ivc] = flit_head_out;
 	   
-	   wire flit_tail_out;
+	   wire 		    flit_tail_out;
 	   assign flit_tail_out_ivc[ivc] = flit_tail_out;
 	   
-	   wire fb_empty;
-	   assign fb_empty_ivc[ivc] = fb_empty;
-	   
-	   wire fb_full;
-	   assign fb_full_ivc[ivc] = fb_full;
-	   
-	   wire [0:flit_data_width-1] fb_flit_data;
-	   assign fb_flit_data_ivc[ivc*flit_data_width:
-				   (ivc+1)*flit_data_width-1] = fb_flit_data;
-	   
-	   wire [0:lar_info_width-1]  llu_lar_info;
+	   wire [0:lar_info_width-1] llu_lar_info;
 	   assign llu_lar_info_ivc[ivc*lar_info_width:(ivc+1)*lar_info_width-1]
 	     = llu_lar_info;
 	   
-	   wire [0:num_ports-1]       route_out_op;
+	   wire [0:num_ports-1]      route_out_op;
 	   assign route_out_ivc_op[ivc*num_ports:(ivc+1)*num_ports-1]
 	     = route_out_op;
 	   
@@ -561,12 +580,12 @@ module rtr_ip_ctrl_mac
 				    (ivc+1)*num_resource_classes-1]
 	     = route_out_orc;
 	   
-	   wire [0:3] 			   errors;
-	   assign errors_ivc[ivc*4:(ivc+1)*4-1] = errors;
+	   wire [0:1] 			   ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*2:(ivc+1)*2-1] = ivcc_errors;
 	   
 	   
 	   //-------------------------------------------------------------------
-	   // flit buffer
+	   // flit buffer state
 	   //-------------------------------------------------------------------
 	   
 	   wire 			   chi_flit_valid_sel;
@@ -574,172 +593,6 @@ module rtr_ip_ctrl_mac
 	   
 	   wire 			   chi_flit_valid_sel_head;
 	   assign chi_flit_valid_sel_head = chi_flit_valid_sel & chi_flit_head;
-	   
-	   wire 			   flit_sent_sel_in;
-	   assign flit_sent_sel_in = flit_sent_in & flit_sel_in;
-	   
-	   wire 			   flit_sent_sel_fast_in;
-	   assign flit_sent_sel_fast_in = flit_sent_fast_in & chi_flit_sel;
-	   
-	   wire 			   error_fb_underflow;
-	   wire 			   error_fb_overflow;
-	   
-	   wire 			   fb_almost_empty;
-	   wire [0:route_info_width-1] 	   fb_peek_route_info;
-	   wire [0:fb_addr_width-1] 	   fb_push_addr;
-	   wire [0:fb_addr_width-1] 	   fb_pop_addr;
-	   
-	   if(1) begin:fb
-	      
-	      wire push_active;
-	      assign push_active = chi_flit_valid;
-	      
-	      wire pop_active;
-	      assign pop_active = chi_flit_valid | ~fb_empty;
-	      
-	      wire push;
-	      assign push = chi_flit_valid_sel;
-	      
-	      wire pop;
-	      assign pop = flit_sent_sel_in | flit_sent_sel_fast_in;
-	      
-	      wire [0:fb_addr_width-1] push_addr;
-	      wire [0:fb_addr_width-1] pop_addr;
-	      wire 		       almost_empty;
-	      wire 		       empty;
-	      wire 		       almost_full;
-	      wire 		       full;
-	      wire [0:1] 	       errors;
-	      c_fifo_ctrl
-		#(.depth(num_flits_per_vc),
-		  .reset_type(reset_type))
-	      fc
-		(.clk(clk),
-		 .reset(reset),
-		 .push_active(push_active),
-		 .pop_active(pop_active),
-		 .push(push),
-		 .pop(pop),
-		 .push_addr(push_addr),
-		 .pop_addr(pop_addr),
-		 .almost_empty(almost_empty),
-		 .empty(empty),
-		 .almost_full(almost_full),
-		 .full(full),
-		 .errors(errors));
-	      
-	      wire 		       write_enable;
-	      wire [0:fb_addr_width-1] read_addr;
-	      
-	      if(explicit_pipeline_register)
-		begin
-		   
-		   if(gate_buffer_write)
-		     begin
-			if(dual_path_alloc)
-			  assign write_enable
-			    = chi_flit_valid_sel & ~flit_sent_sel_fast_in;
-			else
-			  assign write_enable
-			    = chi_flit_valid_sel & ~(empty & flit_sent_sel_in);
-		     end
-		   else
-		     assign write_enable = chi_flit_valid_sel;
-		   
-		   assign read_addr = pop_addr;
-		   
-		end
-	      else
-		begin
-		   
-		   assign write_enable = chi_flit_valid_sel;
-		   
-		   wire [0:fb_addr_width-1] read_addr_s, read_addr_q;
-		   assign read_addr_s = pop_addr;
-		   c_dff
-		     #(.width(fb_addr_width),
-		       .reset_type(reset_type))
-		   read_addrq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(pop_active),
-		      .d(read_addr_s),
-		      .q(read_addr_q));
-		   
-		   assign read_addr = read_addr_q;
-		   
-		end
-	      
-	      wire [0:flit_data_width-1]    write_data;
-	      assign write_data[0:flit_data_width-1] = chi_flit_data;
-	      
-	      wire [0:flit_data_width-1]    read_data;
-	      wire [0:flit_data_width-1]    peek_data;
-	      
-	      if(elig_mask == `ELIG_MASK_USED)
-		begin
-		   
-		   c_regfile
-		     #(.depth(num_flits_per_vc),
-		       .width(flit_data_width),
-		       .regfile_type(fb_regfile_type))
-		   rf
-		     (.clk(clk),
-		      .write_active(push_active),
-		      .write_enable(write_enable),
-		      .write_address(push_addr),
-		      .write_data(write_data),
-		      .read_address(read_addr),
-		      .read_data(read_data));
-		   
-		   assign peek_data = {flit_data_width{1'b0}};
-		   
-		end
-	      else
-		begin
-		   
-		   wire [0:fb_addr_width-1] peek_addr;
-		   c_incr
-		     #(.width(fb_addr_width),
-		       .max_value(num_flits_per_vc - 1))
-		   peek_addr_incr
-		     (.data_in(pop_addr),
-		      .data_out(peek_addr));
-		   
-		   c_regfile
-		     #(.depth(num_flits_per_vc),
-		       .width(flit_data_width),
-		       .num_read_ports(2),
-		       .regfile_type(fb_regfile_type))
-		   rf
-		     (.clk(clk),
-		      .write_active(push_active),
-		      .write_enable(write_enable),
-		      .write_address(push_addr),
-		      .write_data(write_data),
-		      .read_address({read_addr, peek_addr}),
-		      .read_data({read_data, peek_data}));
-		   
-		end
-	      
-	      wire [0:header_info_width-1]  peek_header_info;
-	      assign peek_header_info = peek_data[0:header_info_width-1];
-	      	      
-	      wire [0:route_info_width-1]   peek_route_info;
-	      assign peek_route_info = peek_header_info[0:route_info_width-1];
-	      
-	      assign error_fb_underflow = errors[0];
-	      assign error_fb_overflow = errors[1];
-	      
-	      assign fb_peek_route_info = peek_route_info;
-	      assign fb_almost_empty = almost_empty;
-	      assign fb_empty = empty;
-	      assign fb_full = full;
-	      assign fb_flit_data = read_data;
-	      assign fb_push_addr = push_addr;
-	      assign fb_pop_addr = pop_addr;
-	      
-	   end
 	   
 	   if(dual_path_alloc)
 	     begin
@@ -758,8 +611,14 @@ module rtr_ip_ctrl_mac
 	   // track whether frontmost flit is head or tail
 	   //-------------------------------------------------------------------
 	   
-	   wire 			     htt_flit_head;
-	   wire 			     htt_flit_tail;
+	   wire flit_sent_sel_in;
+	   assign flit_sent_sel_in = flit_sent_in & flit_sel_in;
+	   
+	   wire flit_sent_sel_fast_in;
+	   assign flit_sent_sel_fast_in = flit_sent_fast_in & chi_flit_sel;
+	   
+	   wire htt_flit_head;
+	   wire htt_flit_tail;
 	   
 	   if(1) begin:htt
 	      
@@ -816,9 +675,11 @@ module rtr_ip_ctrl_mac
 		   
 		   wire [0:num_flits_per_vc-1] push_mask;
 		   c_decode
-		     #(.num_ports(num_flits_per_vc))
+		     #(.num_ports(num_flits_per_vc),
+		       .offset((ivc * num_flits_per_vc) %
+			       (1 << clogb(num_flits_per_vc))))
 		   push_mask_dec
-		     (.data_in(fb_push_addr),
+		     (.data_in(fb_push_addr[fb_addr_pad_width:fb_addr_width-1]),
 		      .data_out(push_mask));
 		   
 		   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
@@ -837,7 +698,22 @@ module rtr_ip_ctrl_mac
 		      .d(flit_tail_s),
 		      .q(flit_tail_q));
 		   
-		   assign flit_tail = flit_tail_q[fb_pop_addr];
+		   wire [0:num_flits_per_vc-1] pop_mask;
+		   c_decode
+		     #(.num_ports(num_flits_per_vc),
+		       .offset((ivc * num_flits_per_vc) % 
+			       (1 << clogb(num_flits_per_vc))))
+		   pop_mask_dec
+		     (.data_in(fb_pop_addr[fb_addr_pad_width:fb_addr_width-1]),
+		      .data_out(pop_mask));
+		   
+		   c_select_1ofn
+		     #(.num_ports(num_flits_per_vc),
+		       .width(1))
+		   flit_tail_sel
+		     (.select(pop_mask),
+		      .data_in(flit_tail_q),
+		      .data_out(flit_tail));
 		   
 		end
 	      
@@ -864,7 +740,7 @@ module rtr_ip_ctrl_mac
 	   
 	   wire [0:num_ports-1] hit_route_op;
 	   wire [0:num_resource_classes-1] hit_route_orc;
-	   wire [0:lar_info_width-1]  hit_lar_info;
+	   wire [0:lar_info_width-1] 	   hit_lar_info;
 	   wire [0:dest_info_width-1] 	   hit_dest_info;
 	   
 	   if(1) begin:hit
@@ -886,11 +762,14 @@ module rtr_ip_ctrl_mac
 	      wire two_plus_flits;
 	      assign two_plus_flits = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire [0:lar_info_width-1] fb_peek_lar_info;
-	      assign fb_peek_lar_info
-		= fb_peek_route_info[0:lar_info_width-1];
+	      wire [0:route_info_width-1] fb_peek_route_info;
+	      assign fb_peek_route_info
+		= fb_peek_header_info[0:route_info_width-1];
 	      
-	      wire [0:num_ports-1] 	route_op;
+	      wire [0:lar_info_width-1]   fb_peek_lar_info;
+	      assign fb_peek_lar_info = fb_peek_route_info[0:lar_info_width-1];
+	      
+	      wire [0:num_ports-1] 	  route_op;
 	      wire [0:num_resource_classes-1] route_orc;
 	      wire [0:lar_info_width-1]       lar_info;
 	      
@@ -1239,14 +1118,88 @@ module rtr_ip_ctrl_mac
 	   // error checking
 	   //-------------------------------------------------------------------
 	   
-	   assign errors[0] = error_fb_underflow;
-	   assign errors[1] = error_fb_overflow;
-	   assign errors[2] = error_invalid_port;
-	   assign errors[3] = error_invalid_class;
+	   assign ivcc_errors[0] = error_invalid_port;
+	   assign ivcc_errors[1] = error_invalid_class;
 	   
 	end
       
    endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // flit buffer
+   //---------------------------------------------------------------------------
+   
+   wire 					       fb_all_empty;
+   assign fb_all_empty = &fb_empty_ivc;
+   
+   wire 				    alloc_active;
+   assign alloc_active = chi_flit_valid | ~fb_all_empty;
+   
+   wire 				    fb_push_active;
+   assign fb_push_active = chi_flit_valid;
+   
+   wire 				    fb_push_valid;
+   assign fb_push_valid = chi_flit_valid;
+   
+   wire [0:num_vcs-1] 			    fb_push_sel_ivc;
+   assign fb_push_sel_ivc = chi_flit_sel_ivc;
+   
+   wire [0:flit_data_width-1] 		    fb_push_data;
+   assign fb_push_data = chi_flit_data;
+   
+   wire 				    fb_pop_active;
+   assign fb_pop_active = alloc_active;
+   
+   wire 				    fb_pop_valid;
+   wire [0:num_vcs-1] 			    fb_pop_sel_ivc;
+   
+   generate
+      if(dual_path_alloc)
+	begin
+	   assign fb_pop_valid = flit_sent_in | flit_sent_fast_in;
+	   assign fb_pop_sel_ivc
+	     = flit_sel_fast_in ? chi_flit_sel_ivc : flit_sel_in_ivc;
+	end
+      else
+	begin
+	   assign fb_pop_valid = flit_sent_in;
+	   assign fb_pop_sel_ivc = flit_sel_in_ivc;
+	end
+   endgenerate
+   
+   wire [0:flit_data_width-1] 		    fb_pop_data;
+   wire [0:flit_data_width-1] 		    fb_peek_data;
+   wire [0:num_vcs*2-1] 		    fb_errors_ivc;
+   c_multi_lane_fifo
+     #(.num_lanes(num_vcs),
+       .num_buffers_per_lane(num_flits_per_vc),
+       .data_width(flit_data_width),
+       .regfile_type(fb_regfile_type),
+       .registered_read(explicit_pipeline_register),
+       .gate_buffer_write(gate_buffer_write),
+       .enable_peek(fb_enable_peek),
+       .reset_type(reset_type))
+   fb
+     (.clk(clk),
+      .reset(reset),
+      .push_active(fb_push_active),
+      .push_valid(fb_push_valid),
+      .push_sel_ln(fb_push_sel_ivc),
+      .push_data(fb_push_data),
+      .push_addr_ln(fb_push_addr_ivc),
+      .pop_active(fb_pop_active),
+      .pop_valid(fb_pop_valid),
+      .pop_sel_ln(fb_pop_sel_ivc),
+      .pop_data(fb_pop_data),
+      .pop_addr_ln(fb_pop_addr_ivc),
+      .peek_data(fb_peek_data),
+      .almost_empty_ln(fb_almost_empty_ivc),
+      .empty_ln(fb_empty_ivc),
+      .full(fb_full),
+      .errors_ln(fb_errors_ivc));
+   
+   assign fb_peek_header_info = fb_peek_data[0:header_info_width-1];
    
    
    //---------------------------------------------------------------------------
@@ -1338,9 +1291,6 @@ module rtr_ip_ctrl_mac
       .data_in(llu_lar_info_ivc),
       .data_out(llu_lar_info));
    
-   wire alloc_active;
-   assign alloc_active = chi_flit_valid | ~&fb_empty_ivc;
-   
    wire flit_head_s, flit_head_q;
    assign flit_head_s = flit_head;
    c_dff
@@ -1366,76 +1316,10 @@ module rtr_ip_ctrl_mac
       .d(lar_info_s),
       .q(lar_info_q));
    
-   wire [0:flit_data_width-1] fb_flit_data;
-   wire [0:flit_data_width-1] flit_data_buffered;
-   
-   generate
-      
-      if(explicit_pipeline_register)
-	begin
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(flit_data_width))
-	   fb_flit_data_sel
-	     (.select(flit_sel_in_ivc),
-	      .data_in(fb_flit_data_ivc),
-	      .data_out(fb_flit_data));
-	   
-	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = bypass ? chi_flit_data : fb_flit_data;
-	   c_dff
-	     #(.width(flit_data_width),
-	       .reset_type(reset_type))
-	   flit_dataq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(alloc_active),
-	      .d(flit_data_s),
-	      .q(flit_data_q));
-	   
-	   assign flit_data_buffered = flit_data_q;
-	   
-	end
-      else
-	begin
-
-	   if(num_vcs == 1)
-	     assign fb_flit_data = fb_flit_data_ivc;
-	   else if(num_vcs > 1)
-	     begin
-		
-		wire [0:num_vcs-1] flit_sel_ivc_s, flit_sel_ivc_q;
-		assign flit_sel_ivc_s = flit_sel_ivc;
-		c_dff
-		  #(.width(num_vcs),
-		    .reset_type(reset_type))
-		flit_sel_ivcq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(alloc_active),
-		   .d(flit_sel_ivc_s),
-		   .q(flit_sel_ivc_q));
-		
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(flit_data_width))
-		fb_flit_data_sel
-		  (.select(flit_sel_ivc_q),
-		   .data_in(fb_flit_data_ivc),
-		   .data_out(fb_flit_data));
-		
-	     end
-	   
-	   assign flit_data_buffered = fb_flit_data;
-	end
-      
-   endgenerate
-   
    assign flit_data_out[0:lar_info_width-1]
-     = flit_head_q ? lar_info_q : flit_data_buffered[0:lar_info_width-1];
+     = flit_head_q ? lar_info_q : fb_pop_data[0:lar_info_width-1];
    assign flit_data_out[lar_info_width:flit_data_width-1]
-     = flit_data_buffered[lar_info_width:flit_data_width-1];
+     = fb_pop_data[lar_info_width:flit_data_width-1];
       
    
    //---------------------------------------------------------------------------
@@ -1464,10 +1348,11 @@ module rtr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*4-1] errors_s, errors_q;
-	   assign errors_s = errors_ivc;
+	   wire [0:num_vcs*2+num_vcs*2-1] errors_s, errors_q;
+	   assign errors_s = {ivcc_errors_ivc, 
+			      fb_errors_ivc};
 	   c_err_rpt
-	     #(.num_errors(num_vcs*4),
+	     #(.num_errors(num_vcs*2+num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
