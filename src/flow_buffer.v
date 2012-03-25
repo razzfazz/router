@@ -1,18 +1,20 @@
 /*Message buffer
  * Can fetch message info from the message generator
  * Can extract grant time from grant
+ * BASIC spec, nonspec, ack handling is working 
  */
 
 
 module flow_buffer(/*autoarg*/
-		   // Outputs
-		   buffer_empty, reservation_ready, nonspec_ready, spec_ready,
-		   output_data, error,
-		   // Inputs
-		   clk, run, reset, source_address, message_ready, message_size,
-		   message_dest, grant_ready, ack_ready, nack_ready, input_data,
-		   current_time, nic_gnt
-		   );
+   // Outputs
+   host_next_flit, buffer_empty, reservation_ready, nonspec_ready,
+   spec_ready, output_data, output_head, output_tail, error,
+   // Inputs
+   clk, run, reset, source_address, message_ready, message_size,
+   message_dest, host_data_valid, host_data_head, host_data_tail,
+   host_data, grant_ready, ack_ready, nack_ready, nic_data,
+   current_time, nic_gnt
+   );
 `include "c_functions.v"
 `include "c_constants.v"
 `include "rtr_constants.v"
@@ -134,13 +136,15 @@ module flow_buffer(/*autoarg*/
    // maximum packet length (in flits)
    localparam max_packet_length       = 1 + max_payload_length;
    // total number of bits required to represent maximum packet length
-   localparam packet_length_width     = clogb(max_packet_length);
+   localparam packet_length_width     = clogb(max_packet_length);   
 
+   parameter time_to_wait_width       = 8;
    
-   parameter max_reservation_size     = 256;
+   parameter max_reservation_size     = 16;
    localparam reservation_size_width  = clogb(max_reservation_size);
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
 
+   
 
    //default inputs
    input clk;
@@ -148,36 +152,37 @@ module flow_buffer(/*autoarg*/
    input reset;
    input [0:dest_info_width-1] source_address;
    
-
-   
    //IO from the message generator
    input message_ready;
-   input [0:reservation_size_width-1] message_size; //messages cannot be > reservation size for now
+   input [0:reservation_size_width-1] message_size; //messages cannot be > reservation size
    input [0:dest_info_width-1] message_dest;
+   input host_data_valid;
+   input host_data_head;
+   input host_data_tail;
+   output host_next_flit;
+   input [0:flit_data_width-1] host_data;//random bits that emulates data 
    output buffer_empty; //this buffer needs a message
    
    
-
+   
    //IO from the NIC
    //no flow control on these input, the buffer must sink them
    input grant_ready;
    input ack_ready;
    input nack_ready;
-   input [0:flit_data_width-1] input_data;
+   input [0:flit_data_width-1] nic_data;
    input [0:31] current_time;
-
-
+   
    input nic_gnt; //flow control for these output
    output reservation_ready;
    output nonspec_ready;
    output spec_ready;
    output [0:flit_data_width-1] output_data;
-
-
-   output error;
+   output output_head;
+   output output_tail;
    
-
-
+   
+   output error;
    
    //FSM
    reg[0:2] state;
@@ -185,25 +190,24 @@ module flow_buffer(/*autoarg*/
    localparam FB_RES_READY   =3'd1;
    localparam FB_SPEC_READY  =3'd2;
    localparam FB_SPEC_STOP   =3'd3;
-   localparam FB_NON_SPEC    =3'd4;
-   
+   localparam FB_NONSPEC    =3'd4;
    
    //"global" values
    wire [0:lar_info_width-1] message_lar;
    
-   
-
    ///////////////////
    //New message from NIC
+   //guaranteed sent
+   wire [0:1] packets_deduct;
    wire [0:reservation_size_width-1] packet_total_s;
    wire [0:reservation_size_width-1] packet_total_q;
    assign packet_total_s  = message_ready?
 			    message_size:
-			    packet_total_q;
+			    packet_total_q-packets_deduct;
    c_dff
      #(.width				(reservation_size_width),
        .reset_type			(reset_type))
-   message_count_reg
+   packet_count_reg
      (// Outputs
       .q				(packet_total_q),
       // Inputs
@@ -211,6 +215,24 @@ module flow_buffer(/*autoarg*/
       .reset				(reset),
       .active				(run),
       .d				(packet_total_s));
+   //prevents spec from sending too many packets
+   wire spec_credit;
+   wire spec_deduct;
+   
+   wire [0:reservation_size_width-1] packet_spec_s;
+   wire [0:reservation_size_width-1] packet_spec_q;
+   assign packet_spec_s  = packet_spec_q + spec_deduct - spec_credit;
+   c_dff
+     #(.width				(reservation_size_width),
+       .reset_type			(reset_type))
+   packet_spec_reg
+     (// Outputs
+      .q				(packet_spec_q),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .active				(run),
+      .d				(packet_spec_s));
    wire [0:dest_info_width-1] message_dest_s;
    wire [0:dest_info_width-1] message_dest_q;
    assign message_dest_s  = message_ready?message_dest:message_dest_q;
@@ -226,8 +248,6 @@ module flow_buffer(/*autoarg*/
       .active				(run),
       .d				(message_dest_s));
 
-
-   
    //This routing computation is hared for all packets (res/spec/nonspec)
    wire [0:num_ports-1] message_route_op;
    rtr_routing_logic
@@ -281,18 +301,16 @@ module flow_buffer(/*autoarg*/
       .reset				(reset),
       .active				(run),
       .d				(reservation_packet_s));
-
-   
-   ///////////////////
-     //Grant transition
+ 
+   //----------------------
+   //Grant time processing
    wire [0:31] granted_time_s;
    wire [0:31] granted_time_q;
-   wire reset_grant;
    //assumption, grant_ready will not assert when state==FB_EMPTY
    assign granted_time_s  = (state==FB_EMPTY)?
 			    32'b0:
 			    (grant_ready?
-			     input_data[flit_data_width-32:flit_data_width-1]:
+			     nic_data[flit_data_width-32:flit_data_width-1]:
 			     granted_time_q);
 			     
    c_dff
@@ -307,41 +325,153 @@ module flow_buffer(/*autoarg*/
       .active				(run),
       .d				(granted_time_s));
 
+
    
+   //-------------------
+   //spec
+   //-------------------
+   wire new_spec_packet;
+   wire inject_spec;
+   wire spec_continue_s;
+   wire spec_continue_q;
+
+   wire spec_head;
+   wire spec_tail;
+   wire [0:flit_data_width-1] spec_packet;
+   assign spec_continue_s  = (spec_continue_q & ~host_data_tail) | //maintain
+			     (new_spec_packet & nic_gnt); //new spec
+			    
+   
+			     
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   spec_packet_state
+     (.q(spec_continue_q),
+       .clk(clk),
+       .reset(reset),
+       .active(run),
+       .d(spec_continue_s));
+
+   //right state and head next
+   assign new_spec_packet  = (state==FB_SPEC_READY) & //state
+	host_data_valid & host_data_head  //proper packet
+	& (packet_spec_q<packet_total_q);//insurance that we didn't sent oto much
+   assign inject_spec  = spec_continue_q | new_spec_packet;
+   assign spec_deduct  = host_data_head & nic_gnt & inject_spec;
+
+   
+   assign spec_head    = host_data_head;
+   assign spec_tail    = host_data_tail;
+   //lar
+   assign spec_packet[0:lar_info_width-1] =   spec_head?
+					      message_lar:
+					      host_data[0:lar_info_width-1];
+   //dest addr
+   assign spec_packet[lar_info_width+:dest_info_width]  = spec_head?
+							  message_dest_s:
+							  host_data[lar_info_width+:dest_info_width];
+   //packet length
+   assign spec_packet[lar_info_width+dest_info_width:header_info_width-1] = spec_head?
+									    max_payload_length:
+									    host_data[lar_info_width+dest_info_width:header_info_width-1];
+   //srp_type
+   assign spec_packet[header_info_width+:2] = spec_head?
+					      2'b00:
+					      host_data[header_info_width+:2];
+   //TTW
+   assign spec_packet[header_info_width+2+:time_to_wait_width] = spec_head?
+								 {time_to_wait_width{1'b1}}:
+								 host_data[header_info_width+2+:time_to_wait_width];
+   //return address
+   assign spec_packet[header_info_width+2+time_to_wait_width+:dest_info_width] =spec_head?
+										source_address:
+										host_data[header_info_width+2+time_to_wait_width+:dest_info_width];
+   //filler
+   assign spec_packet[header_info_width+2+time_to_wait_width+dest_info_width:flit_data_width-1] =  host_data[header_info_width+2+time_to_wait_width+dest_info_width:flit_data_width-1];
    
 
-   //////////////////
-     //spec linked list
-   wire spec_tail  = 1'b1;
    
+
+   //code to insert packet into spec buffer
+   
+   //-------------------
+   //nonspec
+   //-------------------
+   wire nonspec_head = host_data_head;
+   wire nonspec_tail = host_data_tail;
+   wire [0:flit_data_width-1] nonspec_packet;
+   //lar
+   assign nonspec_packet[0:lar_info_width-1] =   nonspec_head?
+						 message_lar:
+						 host_data[0:lar_info_width-1];
+   //dest addr
+   assign nonspec_packet[lar_info_width+:dest_info_width]  = nonspec_head?
+							     message_dest_s:
+							     host_data[lar_info_width+:dest_info_width];
+   //packet length
+   assign nonspec_packet[lar_info_width+dest_info_width:header_info_width-1] = nonspec_head?
+									       max_payload_length:
+									       host_data[lar_info_width+dest_info_width:header_info_width-1];
+   //srp_type
+   assign nonspec_packet[header_info_width+:2] = nonspec_head?
+						 2'b00:
+						 host_data[header_info_width+:2];
+   assign nonspec_packet[header_info_width+2:flit_data_width-1] = host_data[header_info_width+2:flit_data_width-1];
+   
+     
+   //nonspec has slightly higher precedence IF it is in the middle of a packet nonspec_continue_q =0
+   //  nack may create a bubble
+   wire inject_nonspec   = (state==FB_NONSPEC) & ~spec_continue_q & |(packet_total_q-packet_spec_q);
+
+   //code to select between host and retransmit buffer
+
+   //-------------------
+   //ack processing
+   //-------------------
+   
+   //code to free buffer
+   
+   //up to 2 packets could be done per cycle
+   assign packets_deduct  = (host_data_tail & nic_gnt & inject_nonspec) + (ack_ready);
+   
+   //-------------------
+   //nack processing
+   //-------------------
+   
+   //code move buffer to retransmit
+   
+   assign spec_credit 	  = ack_ready|nack_ready; //either way, it is no longer outstanding
 
    
    //FSM update   
    always @ (posedge clk, posedge reset)
      begin
 	if(reset)
-	  state   <=FB_EMPTY;
+	  state 	 <=FB_EMPTY;
 	else
 	  begin
 	     case(state)
 	       FB_EMPTY:
 		 if(message_ready) //new message from nic
 		   state <=FB_RES_READY;
-	       
 	       FB_RES_READY:
 		 if(nic_gnt) //nic accepted reservation packet
 		   begin
-		      state <= FB_SPEC_READY;//this is correct
-		      state <= FB_SPEC_STOP;//this is test
+		      state <= FB_SPEC_READY;
 		   end
 	       FB_SPEC_READY:
 		 if(nack_ready | grant_ready)
 		   state <=FB_SPEC_STOP;
 	       FB_SPEC_STOP:
-		 if(current_time >granted_time_s && granted_time_s!=32'b0)
+		 if(current_time >granted_time_s && (|granted_time_s))
 		   begin
-		      //state <=FB_NON_SPEC; //this is correct
-		      state <=FB_EMPTY;//this is test
+		      state <=FB_NONSPEC;
+		   end
+	       FB_NONSPEC:
+		 if(~(|packet_total_s))
+		   begin		      
+		      state 	    <=FB_EMPTY;
 		   end
 	       default:
 		 state 	    <=FB_EMPTY;
@@ -351,15 +481,35 @@ module flow_buffer(/*autoarg*/
 
 
    //update these conditions
-   assign spec_ready 	     = (state==FB_SPEC_READY) | ~spec_tail;
-   assign nonspec_ready      = (state==FB_NON_SPEC);
+   assign spec_ready 	     = inject_spec;
+   assign nonspec_ready      = inject_nonspec;
    
    assign reservation_ready  = (state==FB_RES_READY);
    assign buffer_empty 	     = (state==FB_EMPTY);
-   assign output_data 	     = reservation_ready?
-			       reservation_packet_q:
-			       {flit_data_width{1'b0}};
-   
+
+
+
+   c_select_1ofn
+     #(// Parameters
+       .num_ports			(3),
+       .width				(flit_data_width+2))
+   injection_mux
+     (// Outputs
+      .data_out				({output_data, output_head, output_tail}),
+      // Inputs
+      .select				({reservation_ready,
+					  nonspec_ready, 
+					  spec_ready}),
+      .data_in				({{reservation_packet_q,1'b1, 1'b1}, 
+					  {spec_packet, spec_head, spec_tail}, 
+					  {nonspec_packet, nonspec_head, nonspec_tail}}));
+
+
+   assign host_next_flit  = (inject_spec | inject_nonspec) & nic_gnt;
+      
    wire [0:3] ready_sum = spec_ready+reservation_ready+nonspec_ready;
    assign error  = (ready_sum > 1);
-endmodule
+endmodule // flow_buffer
+
+
+

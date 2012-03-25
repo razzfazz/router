@@ -84,7 +84,7 @@ module testbench();
        (route_info_width + payload_length_width) : 
        -1;
    
-   parameter max_reservation_size     = 256;
+   parameter max_reservation_size     = 16;
    parameter time_to_wait_width      = 8;
    localparam reservation_size_width  = clogb(max_reservation_size);
 
@@ -125,6 +125,7 @@ module testbench();
    wire reservation_ready;
    wire nonspec_ready;
    wire spec_ready;
+   wire buffer_head, buffer_tail;
    wire [0:flit_data_width-1] buffer_data;
    wire [0:dest_info_width-1] source_address = {router_address};
 
@@ -136,14 +137,22 @@ module testbench();
    assign message_ready  = has_message & buffer_empty;
 
    wire buffer_gnt;
-   
- 
+
    wire grant_ready;
    wire ack_ready;
    wire nack_ready;
    wire buffer_error;
 
+   reg [0:payload_length_width-1]  host_flit_counter;
+   reg [0:reservation_size_width-1] host_message_size;
 
+   wire host_data_valid;
+   wire host_data_head;
+   wire host_data_tail;
+   reg [0:flit_data_width-1]host_data;
+   wire host_next_flit;
+   
+   
 
    wire [0:channel_width-1] channel_bton;
    wire [0:channel_width-1] channel_ntob;
@@ -182,10 +191,6 @@ module testbench();
       .router_address			(router_address),
       .channel_in			(channel_bton));
    
-
-
-   
-   
    flow_buffer
      #(// Parameters
        .topology			(topology),
@@ -204,15 +209,19 @@ module testbench();
        .routing_type			(routing_type),
        .dim_order			(dim_order),
        .elig_mask			(elig_mask),
+       .time_to_wait_width		(time_to_wait_width),
        .max_reservation_size		(max_reservation_size),
        .reset_type			(reset_type))
    thebuffer
      (// Outputs
       .buffer_empty			(buffer_empty),
+      .host_next_flit(host_next_flit),
       .reservation_ready		(reservation_ready),
       .nonspec_ready			(nonspec_ready),
       .spec_ready			(spec_ready),
       .output_data			(buffer_data),
+      .output_head(buffer_head),
+      .output_tail(buffer_tail),
       .error (buffer_error),
       // Inputs
       .clk				(clk),
@@ -222,17 +231,33 @@ module testbench();
       .message_ready			(message_ready),
       .message_size			(message_size),
       .message_dest			(message_dest),
+      .host_data_valid			(host_data_valid),
+      .host_data_head			(host_data_head),
+      .host_data_tail			(host_data_tail),
+      .host_data			(host_data),
       .grant_ready			(grant_ready),
       .ack_ready			(ack_ready),
       .nack_ready			(nack_ready),
-      .input_data			(channel_ntob[4:channel_width-1]),
+      .nic_data			(channel_ntob[4:channel_width-1]),
       .current_time			(current_time_q),
       .nic_gnt				(buffer_gnt));
-
-   assign buffer_gnt 		     = reservation_ready;
    
-   assign grant_ready 		     = (channel_ntob[0:2] == 3'b101);
+   
+   
+   assign buffer_gnt   = reservation_ready|spec_ready|nonspec_ready;
+   
+   assign grant_ready  = (channel_ntob[0:2] == 3'b101) & (channel_ntob[4+header_info_width+:2] == 2'b00) ;
+   assign ack_ready    = (channel_ntob[0:2] == 3'b101) & (channel_ntob[4+header_info_width+:2] == 2'b01) ;
+   assign nack_ready   = 1'b0;
+   
 
+
+   wire [0:num_vcs-1] bton_ivc;
+   assign bton_ivc = {reservation_ready, 
+		      1'b0, //flow buffer deson't generate this type
+		      nonspec_ready,
+		      spec_ready};
+   
    rtr_channel_output
      #(// Parameters
        .num_vcs(num_vcs),
@@ -246,34 +271,55 @@ module testbench();
       .clk				(clk),
       .reset				(reset),
       .active				(run),
-      .flit_valid_in			(reservation_ready),
-      .flit_head_in			(1'b1),
-      .flit_tail_in			(1'b1),
+      .flit_valid_in			(reservation_ready| nonspec_ready|  spec_ready),
+      .flit_head_in			(buffer_head),
+      .flit_tail_in			(buffer_tail),
       .flit_data_in			(buffer_data),
-      .flit_sel_in_ovc			(4'b1000));
+      .flit_sel_in_ovc			(bton_ivc));
 
 
+   
+   assign host_data_head     = (|host_message_size) & ~(|host_flit_counter);
+   assign host_data_tail     = (|host_message_size) *  (host_flit_counter==max_payload_length);
+   assign host_data_valid    = |host_message_size;
 
+   integer i;
    integer total_injected;
-
-   
-   
    //message genearrotr
    always@(posedge clk, posedge reset)
      begin
 	if(reset)
 	  begin
-	     has_message 	    <=0;
-	     message_size 	    <=0;
+	     has_message 	    <= 0;
+	     message_size 	    <= 0;
 	     message_dest 	    <= 0;
+	     host_message_size 	    <= {reservation_size_width{1'b0}};
+	     host_data 	    <= {flit_data_width{1'b0}};
+	     host_flit_counter 	    <= 0;
+	     
 	  end
 	else
 	  begin
+	     //stat
 	     if(message_ready)
 	       total_injected 	     = total_injected +  message_size;
+
+	     //random bits come and go
+	     for(i = 0; i < flit_data_width; i = i + 1)
+	       host_data[i] 	    <= $dist_uniform(seed, 0, 1);
+
+	     if(message_ready)
+	       begin
+		  host_message_size <= message_size;
+	       end
+	     if(host_message_size) //decrement
+	       host_message_size    <=host_message_size-host_data_tail;
+
+	     if(host_next_flit)
+	       host_flit_counter    <= host_flit_counter+1'b1;
 	     
 	     
-	     
+	     //create message
 	     if(~has_message)
 	       begin 
 		  has_message 	    <= ($dist_uniform(seed, 0,  99) < 10);
