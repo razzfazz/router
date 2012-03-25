@@ -677,11 +677,7 @@ module rtr_alloc_mac
 		   assign flit_sent = oal_flit_sent & ial_flit_sel;
 		   
 		   wire 			  flit_sent_fast;
-		   
-		   if(dual_path_alloc)
-		     assign flit_sent_fast = ofl_flit_sent & flit_sel_fast_in;
-		   else
-		     assign flit_sent_fast = 1'b0;
+		   assign flit_sent_fast = ofl_flit_sent & flit_sel_fast_in;
 		   
 		   wire 			  flit_kill;
 		   
@@ -692,11 +688,16 @@ module rtr_alloc_mac
 		   // effect anyway.
 		   
 		   wire 			  allocated_s, allocated_q;
-		   assign allocated_s
-		     = (allocated_q | (flit_sent & ~flit_kill) | 
-			(flit_sent_fast & ~ifl_flit_kill)) & 
-		       ~(flit_sent & flit_tail_in) &
-		       ~(flit_sent_fast & flit_tail_fast_in);
+		   if(dual_path_alloc)
+		     assign allocated_s
+		       = (allocated_q | (flit_sent & ~flit_kill) | 
+			  (flit_sent_fast & ~ifl_flit_kill)) & 
+			 ~(flit_sent & flit_tail_in) &
+			 ~(flit_sent_fast & flit_tail_fast_in);
+		   else
+		     assign allocated_s
+		       = (allocated_q | (flit_sent & ~flit_kill)) & 
+			 ~(flit_sent & flit_tail_in);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
@@ -894,8 +895,11 @@ module rtr_alloc_mac
 		   // 'cred_q' will be ignored in the next cycle anyway.
 		   
 		   wire 			     cred_s, cred_q;
-		   assign cred_s
-		     = ~full & ~(almost_full & (flit_sent | flit_sent_fast));
+		   if(dual_path_alloc)
+		     assign cred_s
+		       = ~full & ~(almost_full & (flit_sent | flit_sent_fast));
+		   else
+		     assign cred_s = ~full & ~(almost_full & flit_sent);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
