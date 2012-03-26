@@ -26,13 +26,13 @@
 */
 
 //==============================================================================
-// multi-lane fifo buffer controller
+// statically allocated multi-queue
 //==============================================================================
 
-module c_multi_lane_fifo
-  (clk, reset, push_active, push_valid, push_sel_ln, push_data, push_addr_ln, 
-   pop_active, pop_valid, pop_sel_ln, pop_data, pop_addr_ln, peek_data, 
-   almost_empty_ln, empty_ln, full, errors_ln);
+module c_samq
+  (clk, reset, push_active, push_valid, push_sel_qu, push_data, push_addr_qu, 
+   pop_active, pop_valid, pop_sel_qu, pop_data, pop_addr_qu, peek_data, 
+   almost_empty_qu, empty_qu, full, errors_qu);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -42,11 +42,11 @@ module c_multi_lane_fifo
    // parameters
    //---------------------------------------------------------------------------
    
-   // number of lanes
-   parameter num_lanes = 4;
+   // number of queues
+   parameter num_queues = 4;
    
-   // buffer entries per lane
-   parameter num_buffers_per_lane = 8;
+   // buffer entries per queue
+   parameter num_buffers_per_queue = 8;
    
    // width of payload data
    parameter data_width = 64;
@@ -74,16 +74,16 @@ module c_multi_lane_fifo
    //---------------------------------------------------------------------------
    
    // total number of buffers
-   localparam num_buffers = num_lanes * num_buffers_per_lane;
+   localparam num_buffers = num_queues * num_buffers_per_queue;
    
    // address width required for selecting an individual entry
    localparam addr_width = clogb(num_buffers);
    
-   // address width required for selecting an individual entry in a lane
-   localparam lane_addr_width = clogb(num_buffers_per_lane);
+   // address width required for selecting an individual entry in a queue
+   localparam queue_addr_width = clogb(num_buffers_per_queue);
    
    // difference between the two
-   localparam pad_addr_width = addr_width - lane_addr_width;
+   localparam pad_addr_width = addr_width - queue_addr_width;
    
    
    //---------------------------------------------------------------------------
@@ -99,73 +99,73 @@ module c_multi_lane_fifo
    // insert data
    input push_valid;
    
-   // lane to insert into
-   input [0:num_lanes-1] push_sel_ln;
+   // queue to insert into
+   input [0:num_queues-1] push_sel_qu;
    
    // data to be inserted
    input [0:data_width-1] push_data;
 
    // location of next insertion
-   output [0:num_lanes*addr_width-1] push_addr_ln;
-   wire [0:num_lanes*addr_width-1]   push_addr_ln;
+   output [0:num_queues*addr_width-1] push_addr_qu;
+   wire [0:num_queues*addr_width-1]   push_addr_qu;
    
    // activity indicator for read / removal
-   input 			     pop_active;
+   input 			      pop_active;
    
    // read and remove data
-   input 			     pop_valid;
+   input 			      pop_valid;
    
-   // lane to remove from
-   input [0:num_lanes-1] 	     pop_sel_ln;
+   // queue to remove from
+   input [0:num_queues-1] 	      pop_sel_qu;
    
    // read data
    // NOTE: This is valid in the cycle after pop_valid!
-   output [0:data_width-1] 	     pop_data;
-   wire [0:data_width-1] 	     pop_data;
+   output [0:data_width-1] 	      pop_data;
+   wire [0:data_width-1] 	      pop_data;
    
    // location of next element to be read
-   output [0:num_lanes*addr_width-1] pop_addr_ln;
-   wire [0:num_lanes*addr_width-1]   pop_addr_ln;
+   output [0:num_queues*addr_width-1] pop_addr_qu;
+   wire [0:num_queues*addr_width-1]   pop_addr_qu;
    
-   // peek-ahead at the element in each lane after the one to be read next
-   output [0:data_width-1] 	     peek_data;
-   wire [0:data_width-1] 	     peek_data;
+   // peek-ahead at the element in each queue after the one to be read next
+   output [0:data_width-1] 	      peek_data;
+   wire [0:data_width-1] 	      peek_data;
    
-   // lane state flags
-   output [0:num_lanes-1] 	     almost_empty_ln;
-   wire [0:num_lanes-1] 	     almost_empty_ln;
-   output [0:num_lanes-1] 	     empty_ln;
-   wire [0:num_lanes-1] 	     empty_ln;
-   output 			     full;
-   wire 			     full;
+   // queue state flags
+   output [0:num_queues-1] 	      almost_empty_qu;
+   wire [0:num_queues-1] 	      almost_empty_qu;
+   output [0:num_queues-1] 	      empty_qu;
+   wire [0:num_queues-1] 	      empty_qu;
+   output 			      full;
+   wire 			      full;
    
    // internal error conditions detected
-   output [0:num_lanes*2-1] 	     errors_ln;
-   wire [0:num_lanes*2-1] 	     errors_ln;
+   output [0:num_queues*2-1] 	      errors_qu;
+   wire [0:num_queues*2-1] 	      errors_qu;
    
    
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
    
-   wire [0:num_lanes*addr_width-1]   peek_addr_ln;
-   wire [0:num_lanes-1] 	     full_ln;
+   wire [0:num_queues*addr_width-1]   peek_addr_qu;
+   wire [0:num_queues-1] 	      full_qu;
    
-   assign full = &full_ln;
+   assign full = &full_qu;
    
-   genvar 			     lane;
+   genvar 			      queue;
    
    generate
       
-      for(lane = 0; lane < num_lanes; lane = lane + 1)
-	begin:lanes
+      for(queue = 0; queue < num_queues; queue = queue + 1)
+	begin:queues
 
 	   //-------------------------------------------------------------------
 	   // buffer control
 	   //-------------------------------------------------------------------
 	   
 	   wire push_sel;
-	   assign push_sel = push_sel_ln[lane];
+	   assign push_sel = push_sel_qu[queue];
 	   
 	   wire push_valid_sel;
 	   assign push_valid_sel = push_valid & push_sel;
@@ -174,7 +174,7 @@ module c_multi_lane_fifo
 	   assign push = push_valid_sel;
 	   
 	   wire pop_sel;
-	   assign pop_sel = pop_sel_ln[lane];
+	   assign pop_sel = pop_sel_qu[queue];
 	   
 	   wire pop;
 	   assign pop = pop_valid & pop_sel;
@@ -187,9 +187,9 @@ module c_multi_lane_fifo
 	   wire 		 full;
 	   wire [0:1] 		 errors;
 	   c_fifo_ctrl
-	     #(.depth(num_buffers_per_lane),
+	     #(.depth(num_buffers_per_queue),
 	       .extra_addr_width(pad_addr_width),
-	       .offset(lane * num_buffers_per_lane),
+	       .offset(queue * num_buffers_per_queue),
 	       .reset_type(reset_type))
 	   fc
 	     (.clk(clk),
@@ -212,8 +212,8 @@ module c_multi_lane_fifo
 		
 		c_incr
 		  #(.width(addr_width),
-		    .min_value(lane * num_buffers_per_lane),
-		    .max_value((lane + 1) * num_buffers_per_lane - 1))
+		    .min_value(queue * num_buffers_per_queue),
+		    .max_value((queue + 1) * num_buffers_per_queue - 1))
 		peek_addr_incr
 		  (.data_in(pop_addr),
 		   .data_out(peek_addr));
@@ -222,16 +222,16 @@ module c_multi_lane_fifo
 	   else
 	     assign peek_addr = {addr_width{1'bx}};
 	   
-	   assign push_addr_ln[lane*addr_width:(lane+1)*addr_width-1]
+	   assign push_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = push_addr;
-	   assign pop_addr_ln[lane*addr_width:(lane+1)*addr_width-1]
+	   assign pop_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = pop_addr;
-	   assign peek_addr_ln[lane*addr_width:(lane+1)*addr_width-1]
+	   assign peek_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = peek_addr;
-	   assign full_ln[lane] = full;
-	   assign almost_empty_ln[lane] = almost_empty;
-	   assign empty_ln[lane] = empty;
-	   assign errors_ln[lane*2:lane*2+1] = errors;
+	   assign full_qu[queue] = full;
+	   assign almost_empty_qu[queue] = almost_empty;
+	   assign empty_qu[queue] = empty;
+	   assign errors_qu[queue*2:queue*2+1] = errors;
 	   
 	end
       
@@ -242,16 +242,16 @@ module c_multi_lane_fifo
    // storage
    //---------------------------------------------------------------------------
    
-   wire 		 write_active;
+   wire write_active;
    assign write_active = push_active;
    
    wire [0:addr_width-1] push_addr;
    c_select_1ofn
-     #(.num_ports(num_lanes),
+     #(.num_ports(num_queues),
        .width(addr_width))
    push_addr_sel
-     (.select(push_sel_ln),
-      .data_in(push_addr_ln),
+     (.select(push_sel_qu),
+      .data_in(push_addr_qu),
       .data_out(push_addr));
    
    wire [0:addr_width-1] write_addr;
@@ -262,11 +262,11 @@ module c_multi_lane_fifo
    
    wire [0:addr_width-1] pop_addr;
    c_select_1ofn
-     #(.num_ports(num_lanes),
+     #(.num_ports(num_queues),
        .width(addr_width))
    pop_addr_sel
-     (.select(pop_sel_ln),
-      .data_in(pop_addr_ln),
+     (.select(pop_sel_qu),
+      .data_in(pop_addr_qu),
       .data_out(pop_addr));
    
    wire [0:data_width-1] read_data;
@@ -281,11 +281,11 @@ module c_multi_lane_fifo
 	   
 	   wire empty;
 	   c_select_1ofn
-	     #(.num_ports(num_lanes),
+	     #(.num_ports(num_queues),
 	       .width(1))
 	   empty_sel
-	     (.select(pop_sel_ln),
-	      .data_in(empty_ln),
+	     (.select(pop_sel_qu),
+	      .data_in(empty_qu),
 	      .data_out(empty));
 	   
 	   if(gate_buffer_write)
@@ -339,11 +339,11 @@ module c_multi_lane_fifo
 	   
 	   wire [0:addr_width-1] peek_addr;
 	   c_select_1ofn
-	     #(.num_ports(num_lanes),
+	     #(.num_ports(num_queues),
 	       .width(addr_width))
 	   peek_addr_sel
-	     (.select(pop_sel_ln),
-	      .data_in(peek_addr_ln),
+	     (.select(pop_sel_qu),
+	      .data_in(peek_addr_qu),
 	      .data_out(peek_addr));
 	   
 	   c_regfile

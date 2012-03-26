@@ -146,9 +146,9 @@ module rtr_flit_buffer
    // implementation
    //---------------------------------------------------------------------------
    
-   c_multi_lane_fifo
-     #(.num_lanes(num_vcs),
-       .num_buffers_per_lane(num_buffers_per_vc),
+   c_samq
+     #(.num_queues(num_vcs),
+       .num_buffers_per_queue(num_buffers_per_vc),
        .data_width(flit_data_width),
        .regfile_type(regfile_type),
        .registered_read(explicit_pipeline_register),
@@ -160,18 +160,18 @@ module rtr_flit_buffer
       .reset(reset),
       .push_active(push_active),
       .push_valid(push_valid),
-      .push_sel_ln(push_sel_ivc),
+      .push_sel_qu(push_sel_ivc),
       .push_data(push_data),
-      .push_addr_ln(push_addr_ivc),
+      .push_addr_qu(push_addr_ivc),
       .pop_active(pop_active),
       .pop_valid(pop_valid),
-      .pop_sel_ln(pop_sel_ivc),
+      .pop_sel_qu(pop_sel_ivc),
       .pop_data(pop_data),
-      .pop_addr_ln(pop_addr_ivc),
+      .pop_addr_qu(pop_addr_ivc),
       .peek_data(peek_data),
-      .almost_empty_ln(almost_empty_ivc),
-      .empty_ln(empty_ivc),
+      .almost_empty_qu(almost_empty_ivc),
+      .empty_qu(empty_ivc),
       .full(full),
-      .errors_ln(errors_ivc));
+      .errors_qu(errors_ivc));
    
 endmodule
