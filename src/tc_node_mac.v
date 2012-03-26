@@ -1127,7 +1127,7 @@ module tc_node_mac
    wire [0:num_vcs-1] 	      flit_valid_out_ovc;
    assign flit_valid_out_ovc = {num_vcs{flit_valid_out}} & sel_ovc;
    
-   wire [0:num_vcs*2-1]       vs_errors_ovc;
+   wire [0:num_vcs*2-1]       fcs_errors_ovc;
    
    genvar 		      ovc;
    
@@ -1162,6 +1162,7 @@ module tc_node_mac
 	   wire fcs_empty;
 	   wire fcs_almost_full;
 	   wire fcs_full;
+	   wire fcs_full_prev;
 	   wire [0:1] fcs_errors;
 	   rtr_fc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
@@ -1178,6 +1179,7 @@ module tc_node_mac
 	      .empty(fcs_empty),
 	      .almost_full(fcs_almost_full),
 	      .full(fcs_full),
+	      .full_prev(fcs_full_prev),
 	      .errors(fcs_errors));
 	   
 	   assign empty_ovc[ovc] = fcs_empty;
