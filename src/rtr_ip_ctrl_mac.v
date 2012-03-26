@@ -223,8 +223,8 @@ module rtr_ip_ctrl_mac
    // number of padding bits required at the beginning of flit buffer addresses
    localparam fb_addr_pad_width = fb_addr_width - fb_addr_sel_width;
    
-   // enable peek-ahead port on flit buffer
-   localparam fb_enable_peek = (elig_mask != `ELIG_MASK_USED);
+   // VC allocation is atomic
+   localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
    
    
    //---------------------------------------------------------------------------
@@ -650,7 +650,7 @@ module rtr_ip_ctrl_mac
 	      
 	      wire flit_tail;
 	      
-	      if(elig_mask == `ELIG_MASK_USED)
+	      if(atomic_vc_allocation)
 		begin
 		   
 		   wire has_tail_s, has_tail_q;
@@ -747,7 +747,7 @@ module rtr_ip_ctrl_mac
 	      
 	      wire active;
 	      wire capture;
-	      if(elig_mask == `ELIG_MASK_USED)
+	      if(atomic_vc_allocation)
 		begin
 		   assign active = chi_flit_valid & chi_flit_head;
 		   assign capture = chi_flit_valid_sel_head;
@@ -783,7 +783,7 @@ module rtr_ip_ctrl_mac
 		   // timing.
 		   
 		   wire [0:num_ports-1] route_op_s, route_op_q;
-		   if(elig_mask == `ELIG_MASK_USED)
+		   if(atomic_vc_allocation)
 		     assign route_op_s = capture ? gld_route_op : route_op_q;
 		   else
 		     begin
@@ -833,7 +833,7 @@ module rtr_ip_ctrl_mac
 			
 			wire [0:num_resource_classes-1] route_orc_s;
 			wire [0:num_resource_classes-1] route_orc_q;
-			if(elig_mask == `ELIG_MASK_USED)
+			if(atomic_vc_allocation)
 			  assign route_orc_s
 			    = capture ? gld_route_orc : route_orc_q;
 			else
@@ -891,7 +891,7 @@ module rtr_ip_ctrl_mac
 		begin
 		   
 		   wire [0:lar_info_width-1] lar_info_s, lar_info_q;
-		   if(elig_mask == `ELIG_MASK_USED)
+		   if(atomic_vc_allocation)
 		     assign lar_info_s = capture ? chi_lar_info : lar_info_q;
 		   else
 		     assign lar_info_s
@@ -941,7 +941,7 @@ module rtr_ip_ctrl_mac
 		end
 	      
 	      wire [0:dest_info_width-1] dest_info_s, dest_info_q;
-	      if(elig_mask == `ELIG_MASK_USED)
+	      if(atomic_vc_allocation)
 		assign dest_info_s = capture ? chi_dest_info : dest_info_q;
 	      else
 		begin
@@ -991,7 +991,7 @@ module rtr_ip_ctrl_mac
 	     begin
 		
 		wire bypass_route_info;
-		if(elig_mask == `ELIG_MASK_USED)
+		if(atomic_vc_allocation)
 		  assign bypass_route_info = chi_flit_valid_sel_head;
 		else
 		  assign bypass_route_info = fb_empty & chi_flit_valid_sel_head;
@@ -1178,7 +1178,7 @@ module rtr_ip_ctrl_mac
        .regfile_type(fb_regfile_type),
        .registered_read(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
-       .enable_peek(fb_enable_peek),
+       .enable_peek(!atomic_vc_allocation),
        .reset_type(reset_type))
    fb
      (.clk(clk),

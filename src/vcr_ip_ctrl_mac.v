@@ -204,8 +204,8 @@ module vcr_ip_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
-   // enable peek-ahead port on flit buffer
-   localparam fb_enable_peek = (elig_mask != `ELIG_MASK_USED);
+   // VC allocation is atomic
+   localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -429,7 +429,7 @@ module vcr_ip_ctrl_mac
 	   
 	   wire 		    fb_flit_tail;
 	   
-	   if(elig_mask == `ELIG_MASK_USED)
+	   if(atomic_vc_allocation)
 	     begin
 		
 		wire has_tail_s, has_tail_q;
@@ -625,7 +625,7 @@ module vcr_ip_ctrl_mac
        .regfile_type(fb_regfile_type),
        .registered_read(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
-       .enable_peek(fb_enable_peek),
+       .enable_peek(!atomic_vc_allocation),
        .reset_type(reset_type))
    fb
      (.clk(clk),

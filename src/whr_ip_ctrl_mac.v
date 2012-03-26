@@ -95,6 +95,9 @@ module whr_ip_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // VC allocation is atomic
+   localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
+   
    // maximum payload length (in flits)
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter max_payload_length = 4;
@@ -402,7 +405,7 @@ module whr_ip_ctrl_mac
    
    generate
 
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	begin
 	   
 	   c_regfile
@@ -474,7 +477,7 @@ module whr_ip_ctrl_mac
    
    generate
       
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	begin
 	   
 	   wire has_tail_s, has_tail_q;
@@ -549,7 +552,7 @@ module whr_ip_ctrl_mac
    wire 			hdr_active;
    wire 			hdr_capture;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	begin
 	   assign hdr_active = flit_valid_in & flit_head_in;
 	   assign hdr_capture = flit_valid_in & flit_head_in;
@@ -567,7 +570,7 @@ module whr_ip_ctrl_mac
    
    wire [0:lar_info_width-1] hdr_lar_info_s, hdr_lar_info_q;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	assign hdr_lar_info_s
 	  = hdr_capture ? lar_info_in : hdr_lar_info_q;
       else
@@ -595,7 +598,7 @@ module whr_ip_ctrl_mac
    
    wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	assign hdr_dest_info_s
 	  = hdr_capture ? dest_info_in : hdr_dest_info_q;
       else
@@ -649,7 +652,7 @@ module whr_ip_ctrl_mac
    
    wire 			       bypass_route_info;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	assign bypass_route_info = flit_valid_in & flit_head_in;
       else
 	assign bypass_route_info = fbc_empty & flit_valid_in & flit_head_in;

@@ -170,6 +170,9 @@ module vcr_ivc_ctrl
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // VC allocation is atomic
+   localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
+   
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
@@ -309,7 +312,7 @@ module vcr_ivc_ctrl
    
    wire 			     vc_allocated_s, vc_allocated_q;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	begin
 	   assign vc_allocated_s
 	     = (vc_allocated_q & ~flit_valid_sel_head_in) | vc_gnt;
@@ -409,7 +412,7 @@ module vcr_ivc_ctrl
    wire 		       hdr_active;
    wire 		       hdr_capture;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	begin
 	   assign hdr_active = flit_valid_in & flit_head_in;
 	   assign hdr_capture = flit_valid_sel_head_in;
@@ -433,7 +436,7 @@ module vcr_ivc_ctrl
    
    wire [0:lar_info_width-1]   hdr_lar_info_s, hdr_lar_info_q;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	assign hdr_lar_info_s = hdr_capture ? lar_info_in : hdr_lar_info_q;
       else
 	begin
@@ -464,7 +467,7 @@ module vcr_ivc_ctrl
    
    wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	assign hdr_dest_info_s = hdr_capture ? dest_info_in : hdr_dest_info_q;
       else
 	begin
@@ -518,7 +521,7 @@ module vcr_ivc_ctrl
    
    wire 			      bypass_route_info;
    generate
-      if(elig_mask == `ELIG_MASK_USED)
+      if(atomic_vc_allocation)
 	assign bypass_route_info = flit_valid_sel_head_in;
       else
 	assign bypass_route_info = fb_empty & flit_valid_sel_head_in;
