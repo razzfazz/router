@@ -104,9 +104,6 @@ module vcr_op_ctrl_mac
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
-   // ID of current input port
-   parameter port_id = 0;
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -340,14 +337,10 @@ module vcr_op_ctrl_mac
 	   wire [0:1] 		ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_message_classes(num_message_classes),
-	       .num_resource_classes(num_resource_classes),
-	       .num_vcs_per_class(num_vcs_per_class),
+	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
-	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
-	       .vc_id(ovc),
 	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
 	   ovcc

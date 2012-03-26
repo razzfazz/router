@@ -42,32 +42,11 @@ module vcr_ovc_ctrl
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
-   
-   // number of message classes (e.g. request, reply)
-   parameter num_message_classes = 2;
-   
-   // number of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
-   
-   // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
-   
-   // number of VCs available for each class
-   parameter num_vcs_per_class = 1;
-   
    // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
-   
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   parameter num_vcs = 4;
    
    // number of input and output ports on router
    parameter num_ports = 5;
-   
-   // select packet format
-   parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
@@ -75,23 +54,6 @@ module vcr_ovc_ctrl
    // make incoming flow control signals bypass the output VC state tracking 
    // logic
    parameter flow_ctrl_bypass = 1;
-   
-   // width of flit control signals
-   localparam flit_ctrl_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       (1 + vc_idx_width + 1 + 1) : 
-       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       (1 + vc_idx_width + 1) : 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (1 + vc_idx_width + 1) : 
-       -1;
-   
-   // ID of current input VC
-   parameter vc_id = 0;
-   
-   // message class to which the current VC belongs
-   localparam message_class
-     = (vc_id / num_vcs_per_class) / num_resource_classes;
    
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
