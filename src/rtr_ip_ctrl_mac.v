@@ -211,18 +211,6 @@ module rtr_ip_ctrl_mac
        (route_info_width + payload_length_width) : 
        -1;
    
-   // number of entries in flit buffer
-   localparam fb_depth = num_vcs*num_flits_per_vc;
-   
-   // required address width for flit buffer
-   localparam fb_addr_width = clogb(fb_depth);
-   
-   // how many address bits are required to select an entry for a VC
-   localparam fb_addr_sel_width = clogb(num_flits_per_vc);
-   
-   // number of padding bits required at the beginning of flit buffer addresses
-   localparam fb_addr_pad_width = fb_addr_width - fb_addr_sel_width;
-   
    // VC allocation is atomic
    localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
    
@@ -505,11 +493,10 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
+   wire [0:num_vcs-1] 				  fb_peek_tail_ivc;
    wire [0:header_info_width-1] 		  fb_peek_next_header_info;
    wire [0:num_vcs-1] 				  fb_almost_empty_ivc;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
-   wire [0:num_vcs*fb_addr_width-1] 		  fb_push_addr_ivc;
-   wire [0:num_vcs*fb_addr_width-1] 		  fb_pop_addr_ivc;
    wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
    wire [0:num_vcs*2-1] 			  ivcc_errors_ivc;
    
@@ -539,16 +526,11 @@ module rtr_ip_ctrl_mac
 	   wire fb_almost_empty;
 	   assign fb_almost_empty = fb_almost_empty_ivc[ivc];
 	   
+	   wire fb_peek_tail;
+	   assign fb_peek_tail = fb_peek_tail_ivc[ivc];
+	   
 	   wire fb_empty;
 	   assign fb_empty = fb_empty_ivc[ivc];
-	   
-	   wire [0:fb_addr_width-1] fb_push_addr;
-	   assign fb_push_addr
-	     = fb_push_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1];
-	   
-	   wire [0:fb_addr_width-1] fb_pop_addr;
-	   assign fb_pop_addr
-	     = fb_pop_addr_ivc[ivc*fb_addr_width:(ivc+1)*fb_addr_width-1];
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -617,10 +599,9 @@ module rtr_ip_ctrl_mac
 	   wire flit_sent_sel_fast_in;
 	   assign flit_sent_sel_fast_in = flit_sent_fast_in & chi_flit_sel;
 	   
-	   wire htt_flit_head;
-	   wire htt_flit_tail;
+	   wire ht_flit_head;
 	   
-	   if(1) begin:htt
+	   if(1) begin:ht
 	      
 	      wire pop_active;
 	      assign pop_active = chi_flit_valid | ~fb_empty;
@@ -645,92 +626,19 @@ module rtr_ip_ctrl_mac
 		 .d(flit_head_s),
 		 .q(flit_head_q));
 	      
-	      wire push_active;
-	      assign push_active = chi_flit_valid;
-	      
-	      wire flit_tail;
-	      
-	      if(atomic_vc_allocation)
-		begin
-		   
-		   wire has_tail_s, has_tail_q;
-		   assign has_tail_s
-		     = (has_tail_q & ~chi_flit_valid_sel_head) | 
-		       (chi_flit_valid_sel & chi_flit_tail);
-		   c_dff
-		     #(.width(1),
-		       .reset_type(reset_type))
-		   has_tailq
-		     (.clk(clk),
-		      .reset(reset),
-		      .active(push_active),
-		      .d(has_tail_s),
-		      .q(has_tail_q));
-		   
-		   assign flit_tail = fb_almost_empty & has_tail_q;
-	   
-		end
-	      else
-		begin
-		   
-		   wire [0:num_flits_per_vc-1] push_mask;
-		   c_decode
-		     #(.num_ports(num_flits_per_vc),
-		       .offset((ivc * num_flits_per_vc) %
-			       (1 << clogb(num_flits_per_vc))))
-		   push_mask_dec
-		     (.data_in(fb_push_addr[fb_addr_pad_width:fb_addr_width-1]),
-		      .data_out(push_mask));
-		   
-		   wire [0:num_flits_per_vc-1] flit_tail_s, flit_tail_q;
-		   assign flit_tail_s
-		     = chi_flit_valid_sel ? 
-		       ({num_flits_per_vc{chi_flit_tail}} & push_mask | 
-			flit_tail_q & ~push_mask) :
-		       flit_tail_q;
-		   c_dff
-		     #(.width(num_flits_per_vc),
-		       .reset_type(reset_type))
-		   flit_tailq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(push_active),
-		      .d(flit_tail_s),
-		      .q(flit_tail_q));
-		   
-		   wire [0:num_flits_per_vc-1] pop_mask;
-		   c_decode
-		     #(.num_ports(num_flits_per_vc),
-		       .offset((ivc * num_flits_per_vc) % 
-			       (1 << clogb(num_flits_per_vc))))
-		   pop_mask_dec
-		     (.data_in(fb_pop_addr[fb_addr_pad_width:fb_addr_width-1]),
-		      .data_out(pop_mask));
-		   
-		   c_select_1ofn
-		     #(.num_ports(num_flits_per_vc),
-		       .width(1))
-		   flit_tail_sel
-		     (.select(pop_mask),
-		      .data_in(flit_tail_q),
-		      .data_out(flit_tail));
-		   
-		end
-	      
-	      assign htt_flit_head = flit_head_q;
-	      assign htt_flit_tail = flit_tail;
+	      assign ht_flit_head = flit_head_q;
 	      
 	   end
 	   
 	   if(dual_path_alloc)
 	     begin
-		assign flit_head_out = htt_flit_head;
-		assign flit_tail_out = htt_flit_tail;
+		assign flit_head_out = ht_flit_head;
+		assign flit_tail_out = fb_peek_tail;
 	     end
 	   else
 	     begin
-		assign flit_head_out = fb_empty ? chi_flit_head : htt_flit_head;
-		assign flit_tail_out = fb_empty ? chi_flit_tail : htt_flit_tail;
+		assign flit_head_out = fb_empty ? chi_flit_head : ht_flit_head;
+		assign flit_tail_out = fb_empty ? chi_flit_tail : fb_peek_tail;
 	     end
 	   
 	   
@@ -1149,6 +1057,12 @@ module rtr_ip_ctrl_mac
    wire 				    fb_push_valid;
    assign fb_push_valid = chi_flit_valid;
    
+   wire 				    fb_push_head;
+   assign fb_push_head = chi_flit_head;
+   
+   wire 				    fb_push_tail;
+   assign fb_push_tail = chi_flit_tail;
+   
    wire [0:num_vcs-1] 			    fb_push_sel_ivc;
    assign fb_push_sel_ivc = chi_flit_sel_ivc;
    
@@ -1192,14 +1106,15 @@ module rtr_ip_ctrl_mac
       .reset(reset),
       .push_active(fb_push_active),
       .push_valid(fb_push_valid),
+      .push_head(fb_push_head),
+      .push_tail(fb_push_tail),
       .push_sel_ivc(fb_push_sel_ivc),
       .push_data(fb_push_data),
-      .push_addr_ivc(fb_push_addr_ivc),
       .pop_active(fb_pop_active),
       .pop_valid(fb_pop_valid),
       .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
-      .pop_addr_ivc(fb_pop_addr_ivc),
+      .peek_tail_ivc(fb_peek_tail_ivc),
       .peek_next_header_info(fb_peek_next_header_info),
       .almost_empty_ivc(fb_almost_empty_ivc),
       .empty_ivc(fb_empty_ivc),

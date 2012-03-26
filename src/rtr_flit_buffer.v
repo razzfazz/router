@@ -30,8 +30,8 @@
 //==============================================================================
 
 module rtr_flit_buffer
-  (clk, reset, push_active, push_valid, push_sel_ivc, push_data, push_addr_ivc, 
-   pop_active, pop_valid, pop_sel_ivc, pop_data, pop_addr_ivc, 
+  (clk, reset, push_active, push_valid, push_head, push_tail, push_sel_ivc, 
+   push_data, pop_active, pop_valid, pop_sel_ivc, pop_data, peek_tail_ivc, 
    peek_next_header_info, almost_empty_ivc, empty_ivc, full, errors_ivc);
    
 `include "c_functions.v"
@@ -80,6 +80,12 @@ module rtr_flit_buffer
    // address width required for selecting an individual entry
    localparam addr_width = clogb(num_buffers);
    
+   // address width required for selecting an individual entry in a VC
+   localparam vc_addr_width = clogb(num_buffers_per_vc);
+   
+   // difference between the two
+   localparam addr_pad_width = addr_width - vc_addr_width;
+   
    
    //---------------------------------------------------------------------------
    // interface
@@ -90,57 +96,165 @@ module rtr_flit_buffer
 
    // activity indicator for insertion
    input push_active;
-
+   
    // insert data
    input push_valid;
+   
+   // inserting head flit
+   input push_head;
+   
+   // inserting tail flit
+   input push_tail;
    
    // VC to insert into
    input [0:num_vcs-1] push_sel_ivc;
    
    // data to be inserted
    input [0:flit_data_width-1] push_data;
-
-   // location of next insertion
-   output [0:num_vcs*addr_width-1] push_addr_ivc;
-   wire [0:num_vcs*addr_width-1]   push_addr_ivc;
    
    // activity indicator for read / removal
-   input 			   pop_active;
+   input 		       pop_active;
    
    // read and remove data
-   input 			   pop_valid;
+   input 		       pop_valid;
    
    // VC to remove from
-   input [0:num_vcs-1] 		   pop_sel_ivc;
+   input [0:num_vcs-1] 	       pop_sel_ivc;
    
    // read data
    // NOTE: This is valid in the cycle after pop_valid!
-   output [0:flit_data_width-1]    pop_data;
-   wire [0:flit_data_width-1] 	   pop_data;
+   output [0:flit_data_width-1] pop_data;
+   wire [0:flit_data_width-1] 	pop_data;
    
-   // location of next element to be read
-   output [0:num_vcs*addr_width-1] pop_addr_ivc;
-   wire [0:num_vcs*addr_width-1]   pop_addr_ivc;
+   // peek at the tail bit for the element to be read next in each VC
+   output [0:num_vcs-1] 	peek_tail_ivc;
+   wire [0:num_vcs-1] 		peek_tail_ivc;
    
    // peek-ahead at the element in each VC after the one to be read next
-   output [0:header_info_width-1]  peek_next_header_info;
-   wire [0:header_info_width-1]    peek_next_header_info;
+   output [0:header_info_width-1] peek_next_header_info;
+   wire [0:header_info_width-1]   peek_next_header_info;
    
    // VC state flags
-   output [0:num_vcs-1] 	   almost_empty_ivc;
-   wire [0:num_vcs-1] 		   almost_empty_ivc;
-   output [0:num_vcs-1] 	   empty_ivc;
-   wire [0:num_vcs-1] 		   empty_ivc;
-   output 			   full;
-   wire 			   full;
+   output [0:num_vcs-1] 	  almost_empty_ivc;
+   wire [0:num_vcs-1] 		  almost_empty_ivc;
+   output [0:num_vcs-1] 	  empty_ivc;
+   wire [0:num_vcs-1] 		  empty_ivc;
+   output 			  full;
+   wire 			  full;
    
    // internal error conditions detected
-   output [0:num_vcs*2-1] 	   errors_ivc;
-   wire [0:num_vcs*2-1] 	   errors_ivc;
+   output [0:num_vcs*2-1] 	  errors_ivc;
+   wire [0:num_vcs*2-1] 	  errors_ivc;
    
    
    //---------------------------------------------------------------------------
-   // implementation
+   // tail flit tracking
+   //---------------------------------------------------------------------------
+   
+   wire [0:num_vcs*addr_width-1]  push_addr_ivc;
+   wire [0:num_vcs*addr_width-1]  pop_addr_ivc;
+   
+   genvar 			  ivc;
+   
+   generate
+      
+      for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	begin:ivcs
+	   
+	   wire almost_empty;
+	   assign almost_empty = almost_empty_ivc[ivc];
+	   
+	   wire push_sel;
+	   assign push_sel = push_sel_ivc[ivc];
+	   
+	   wire [0:addr_width-1] push_addr;
+	   assign push_addr
+	     = push_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
+	   
+	   wire [0:addr_width-1] pop_addr;
+	   assign pop_addr
+	     = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
+	   
+	   wire push_valid_sel;
+	   assign push_valid_sel = push_valid & push_sel;
+	   
+	   wire peek_tail;
+	   assign peek_tail_ivc[ivc] = peek_tail;
+	   
+	   if(atomic_vc_allocation)
+	     begin
+		
+		wire has_tail_s, has_tail_q;
+		assign has_tail_s
+		  = (has_tail_q & ~(push_valid_sel & push_head)) | 
+		    (push_valid_sel & push_tail);
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		has_tailq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(push_active),
+		   .d(has_tail_s),
+		   .q(has_tail_q));
+		
+		assign peek_tail = almost_empty & has_tail_q;
+		
+	     end
+	   else
+	     begin
+		
+		wire [0:num_buffers_per_vc-1] push_mask;
+		c_decode
+		  #(.num_ports(num_buffers_per_vc),
+		    .offset((ivc * num_buffers_per_vc) %
+			    (1 << clogb(num_buffers_per_vc))))
+		push_mask_dec
+		  (.data_in(push_addr[addr_pad_width:addr_width-1]),
+		   .data_out(push_mask));
+		
+		wire [0:num_buffers_per_vc-1] tail_s, tail_q;
+		assign tail_s
+		  = push_valid_sel ? 
+		    ({num_buffers_per_vc{push_tail}} & push_mask | 
+		     tail_q & ~push_mask) :
+		    tail_q;
+		c_dff
+		  #(.width(num_buffers_per_vc),
+		    .reset_type(reset_type))
+		tailq
+		  (.clk(clk),
+		   .reset(1'b0),
+		   .active(push_active),
+		   .d(tail_s),
+		   .q(tail_q));
+		
+		wire [0:num_buffers_per_vc-1] pop_mask;
+		c_decode
+		  #(.num_ports(num_buffers_per_vc),
+		    .offset((ivc * num_buffers_per_vc) % 
+			    (1 << clogb(num_buffers_per_vc))))
+		pop_mask_dec
+		  (.data_in(pop_addr[addr_pad_width:addr_width-1]),
+		   .data_out(pop_mask));
+		
+		c_select_1ofn
+		  #(.num_ports(num_buffers_per_vc),
+		    .width(1))
+		peek_tail_sel
+		  (.select(pop_mask),
+		   .data_in(tail_q),
+		   .data_out(peek_tail));
+		
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // buffer
    //---------------------------------------------------------------------------
    
    wire [0:flit_data_width-1] 	   peek_next_data;

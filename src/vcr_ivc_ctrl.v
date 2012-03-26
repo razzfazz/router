@@ -31,7 +31,7 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   flit_sel_in, header_info_in, fb_peek_next_header_info, fb_flit_tail, 
+   flit_sel_in, header_info_in, fb_peek_tail, fb_peek_next_header_info, 
    almost_full_op_ovc, full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, 
    sw_gnt, sw_sel, flit_valid, flit_head, flit_tail, next_lar_info, 
    fb_almost_empty, fb_empty, allocated, free_nonspec, free_spec, errors);
@@ -217,12 +217,12 @@ module vcr_ivc_ctrl
    // (NOTE: only valid if flit_head_in=1)
    input [0:header_info_width-1] header_info_in;
    
+   // tail indicator for frontmost flit in buffer (if any)
+   input 			 fb_peek_tail;
+   
    // header info from next flit in buffer
    // (NOTE: only valid if buffer contains at least two entries)
    input [0:header_info_width-1] fb_peek_next_header_info;
-   
-   // tail indicator for frontmost flit in buffer (if any)
-   input 			 fb_flit_tail;
    
    // which output VC have only a single credit left?
    input [0:num_ports*num_vcs-1]   almost_full_op_ovc;
@@ -384,7 +384,7 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   assign flit_tail = fb_empty ? flit_tail_in : fb_flit_tail;
+   assign flit_tail = fb_empty ? flit_tail_in : fb_peek_tail;
    
    wire 	      htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
