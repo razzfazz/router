@@ -212,32 +212,13 @@ module vcr_op_ctrl_mac
    
    assign flit_valid = sw_gnt_q;
    
-   wire [0:num_vcs-1] 		 free_spec_ovc;
    wire [0:num_vcs-1] 		 flit_sel_ovc;
    wire 			 flit_sent;
    
    generate
       
       if(sw_alloc_spec)
-	begin
-	   if(elig_mask == `ELIG_MASK_NONE)
-	     begin
-		
-		wire free_spec;
-		c_select_1ofn
-		  #(.num_ports(num_vcs),
-		    .width(1))
-		free_spec_sel
-		  (.select(flit_sel_ovc),
-		   .data_in(free_spec_ovc),
-		   .data_out(free_spec));
-		
-		assign flit_sent = flit_valid & (|flit_sel_ovc) & free_spec;
-		
-	     end
-	   else
-	     assign flit_sent = flit_valid & (|flit_sel_ovc);
-	end
+	assign flit_sent = flit_valid & (|flit_sel_ovc);
       else
 	assign flit_sent = flit_valid;
             
@@ -330,7 +311,6 @@ module vcr_op_ctrl_mac
 	   
 	   wire 		flit_sel;
 	   wire 		elig;
-	   wire 		free_spec;
 	   wire 		fc_active;
 	   wire 		almost_full;
 	   wire 		full;
@@ -341,6 +321,7 @@ module vcr_op_ctrl_mac
 	       .num_ports(num_ports),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .sw_alloc_spec(sw_alloc_spec),
 	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
 	   ovcc
@@ -358,7 +339,6 @@ module vcr_op_ctrl_mac
 	      .flit_sel_ivc(flit_sel_ivc),
 	      .flit_sel(flit_sel),
 	      .elig(elig),
-	      .free_spec(free_spec),
 	      .fc_active(fc_active),
 	      .almost_full(almost_full),
 	      .full(full),
@@ -367,7 +347,6 @@ module vcr_op_ctrl_mac
 	   assign flit_sel_ovc[ovc] = flit_sel;
 	   assign fc_active_ovc[ovc] = fc_active;
 	   assign elig_ovc[ovc] = elig;
-	   assign free_spec_ovc[ovc] = free_spec;
 	   assign almost_full_ovc[ovc] = almost_full;
 	   assign full_ovc[ovc] = full;
 	   assign ovcc_errors_ovc[ovc*2:(ovc+1)*2-1] = ovcc_errors;
