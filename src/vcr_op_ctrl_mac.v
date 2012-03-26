@@ -221,24 +221,29 @@ module vcr_op_ctrl_mac
    
    generate
       
-      if(elig_mask == `ELIG_MASK_NONE)
+      if(sw_alloc_spec)
 	begin
-	   
-	   wire free_spec;
-	   c_select_1ofn
-	     #(.num_ports(num_vcs),
-	       .width(1))
-	   free_spec_sel
-	     (.select(flit_sel_ovc),
-	      .data_in(free_spec_ovc),
-	      .data_out(free_spec));
-	   
-	   assign flit_sent = flit_valid & (|flit_sel_ovc) & free_spec;
-	   
+	   if(elig_mask == `ELIG_MASK_NONE)
+	     begin
+		
+		wire free_spec;
+		c_select_1ofn
+		  #(.num_ports(num_vcs),
+		    .width(1))
+		free_spec_sel
+		  (.select(flit_sel_ovc),
+		   .data_in(free_spec_ovc),
+		   .data_out(free_spec));
+		
+		assign flit_sent = flit_valid & (|flit_sel_ovc) & free_spec;
+		
+	     end
+	   else
+	     assign flit_sent = flit_valid & (|flit_sel_ovc);
 	end
       else
-	assign flit_sent = flit_valid & (|flit_sel_ovc);
-      
+	assign flit_sent = flit_valid;
+            
    endgenerate
    
    wire [0:num_ports-1] 	 sw_sel_ip_s, sw_sel_ip_q;
