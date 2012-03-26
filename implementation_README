@@ -7,11 +7,11 @@ General
 Router
 	-Input module
 		-4 VCs
-			-Reservation VC
-			-Grant/ACK/NACK VC
-			-Data VC
+			-Reservation VC [00]	
+			-Grant/ACK/NACK VC [01]	
+			-Data VC [10]
 				-No significant change
-			-Speculative VC
+			-Speculative VC [11]
 				-Packet drop
 					-Clear packet from buffer
 						-Maybe best implmented as 1-flit per cycle
@@ -36,7 +36,82 @@ Router
 		-The exception is NACKs if we decide to rewrite the head flit of the dropped speculative packets (speculative VC bidding for control VC)
 		
 	-Output Module
-	
+
+
+
+NIC (router testing only)
+	-Reservation scheduler
+	      -Grant reply fifo
+	      -back pressure from the injection grant fifo, through the scheduler, back to the ejection fifo
+	-Speculative receiver
+	      -Ack reply fifo, (no nack at destination)
+	      -Ack is issue as soon as head flit is received
+	      -back pressure from the injection ack fifo, back pressure only apply to head flits (only head flit generate ack)
+	-Flow buffer
+	      -Flow buffer control FSM (2)
+	      -Speculative inject data structure
+	      		   -Linked list
+			   -Packets are contiguous, and assuming uniform packet size
+	      -Non-speculative inject and how it interacts with the speculative data structure
+	      		   -At the beginning of the packet check if specualtive retransmisison ready
+	      -Nack received, add to a list
+	      -Ack Free, add to free list
+	      -Corn cases!
+
+NIC (Real host NIC)
+
+
+
+
+
+
+Speculative data Packet header structure	
+[Default header][SRP_TYPE][TTW][SRC][PID][PORT]
+	 -[Default header]: header_info_width, unmodified header from the baseline RTL
+	 -[SRP_TYPE]: 2'b00 
+	 -[TTW]: 8bits time to wait
+	 -[SRC]: reply address
+	 -[PID]: variable bits, identifier for external checker
+	 -[PORT]: port_idx_width, identifier for external checker
+
+Reservation request packet structure
+[Default header][SRP_TYPE][RESERVATION_SIZE][SRC][PID][PORT]
+	 -[SRP_TYPE]: 2'b00
+	 -[RESERVATION_SIZE]: log2(max_flow_size)
+	 -[SRC]: reply address
+
+Grant request packet structure
+[Default header][SRP_TYPE][FILLER][TIMESTAMP]
+	 -[SRP_TYPE]: 2'b00
+	 -[FILLER]: 'b0
+	 -[TIMESTAMP]:32 bits
+
+Ack request packet structure
+[Default header][SRP_TYPE][FILLER]
+	 -[SRP_TYPE]: 2'b01
+	 -[FILLER]: 'b0
+
+
 (1) Speculative timer overflow
 Because the speuclative VC is inherently dynamic, timer overflow is more manageable than other situations. Hypothetically, n speculative packets [P1 to Pn] with length [psize] arrives in rapid succession right before timer overflow [P1_timestamp = tmax-(n-1)*psize-1 and Pn_timestamp = tmax-1]. For the HoL packet [P1] overflow detection is trivial as there is a timer check every cycle. After TTW cycles P1 is dropped and the worst case value for the timer is exactly tmax-(n-1)*psize-1+TTW-tmax simplifies to TTW-(n-1)*psize-1 [-tmax is due to overflow]. It takes psize cycles to drop P1, now timer =  TTW-(n-2)*psize-1. P2 is up for time check and if (P2_timestamp > timer) then overflow is again detectable. Substitute values and we get tmax > TTW.  Assume TTW on all packets are the the same or lower, then  the previous relations can be used to show that overflow will be detected on all n packets.  
 Also TTW>psize, or tmax>ttw+psize. 
+
+
+
+(2) Flow buffer control FSM
+States
+	EMPTY: ready for new flow
+	RES_READY: ready to inject reservaiton packet
+	SPEC_READY: ready to inject speculative packet
+	SPEC_STOP: grant or nack received, finish transmittingthe current packet
+	NORMAL: ready for non-spec transmission
+Transitions
+	flow_valid: EMPTY->RES_READY
+	res_sent: RES_READY->SPEC_READY;
+	grant_received: SPEC_READY->SPEC_STOP
+	nack_received: SPEC_READY->SPEC_STOP
+	curr_time==grant_time: SPEC_STOP->NORMAL
+	packet_count==0: NORMAL->EMPTY
+Non-transition events
+	arb_grant: send a flit
+	ack_received: update spec meta data
