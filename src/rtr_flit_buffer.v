@@ -91,7 +91,7 @@ module rtr_flit_buffer
    // insert data
    input push_valid;
    
-   // lane to insert into
+   // VC to insert into
    input [0:num_vcs-1] push_sel_ivc;
    
    // data to be inserted
@@ -107,7 +107,7 @@ module rtr_flit_buffer
    // read and remove data
    input 			   pop_valid;
    
-   // lane to remove from
+   // VC to remove from
    input [0:num_vcs-1] 		   pop_sel_ivc;
    
    // read data
@@ -119,11 +119,11 @@ module rtr_flit_buffer
    output [0:num_vcs*addr_width-1] pop_addr_ivc;
    wire [0:num_vcs*addr_width-1]   pop_addr_ivc;
    
-   // peek-ahead at the element in each lane after the one to be read next
+   // peek-ahead at the element in each VC after the one to be read next
    output [0:flit_data_width-1]    peek_next_data;
    wire [0:flit_data_width-1] 	   peek_next_data;
    
-   // lane state flags
+   // VC state flags
    output [0:num_vcs-1] 	   almost_empty_ivc;
    wire [0:num_vcs-1] 		   almost_empty_ivc;
    output [0:num_vcs-1] 	   empty_ivc;
