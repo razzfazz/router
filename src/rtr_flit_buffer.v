@@ -77,12 +77,6 @@ module rtr_flit_buffer
    // address width required for selecting an individual entry
    localparam addr_width = clogb(num_buffers);
    
-   // address width required for selecting an individual entry in a VC
-   localparam vc_addr_width = clogb(num_buffers_per_vc);
-   
-   // difference between the two
-   localparam pad_addr_width = addr_width - vc_addr_width;
-   
    
    //---------------------------------------------------------------------------
    // interface

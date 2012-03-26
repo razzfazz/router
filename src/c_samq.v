@@ -83,7 +83,7 @@ module c_samq
    localparam queue_addr_width = clogb(num_buffers_per_queue);
    
    // difference between the two
-   localparam pad_addr_width = addr_width - queue_addr_width;
+   localparam addr_pad_width = addr_width - queue_addr_width;
    
    
    //---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ module c_samq
 	   wire [0:1] 		 errors;
 	   c_fifo_ctrl
 	     #(.depth(num_buffers_per_queue),
-	       .extra_addr_width(pad_addr_width),
+	       .extra_addr_width(addr_pad_width),
 	       .offset(queue * num_buffers_per_queue),
 	       .reset_type(reset_type))
 	   fc
