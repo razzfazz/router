@@ -505,7 +505,7 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:header_info_width-1] 		  fb_peek_header_info;
+   wire [0:header_info_width-1] 		  fb_peek_next_header_info;
    wire [0:num_vcs-1] 				  fb_almost_empty_ivc;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*fb_addr_width-1] 		  fb_push_addr_ivc;
@@ -762,12 +762,13 @@ module rtr_ip_ctrl_mac
 	      wire two_plus_flits;
 	      assign two_plus_flits = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire [0:route_info_width-1] fb_peek_route_info;
-	      assign fb_peek_route_info
-		= fb_peek_header_info[0:route_info_width-1];
+	      wire [0:route_info_width-1] fb_peek_next_route_info;
+	      assign fb_peek_next_route_info
+		= fb_peek_next_header_info[0:route_info_width-1];
 	      
-	      wire [0:lar_info_width-1]   fb_peek_lar_info;
-	      assign fb_peek_lar_info = fb_peek_route_info[0:lar_info_width-1];
+	      wire [0:lar_info_width-1]   fb_peek_next_lar_info;
+	      assign fb_peek_next_lar_info
+		= fb_peek_next_route_info[0:lar_info_width-1];
 	      
 	      wire [0:num_ports-1] 	  route_op;
 	      wire [0:num_resource_classes-1] route_orc;
@@ -788,21 +789,22 @@ module rtr_ip_ctrl_mac
 		   else
 		     begin
 			
-			wire [0:port_idx_width-1] fb_peek_route_port;
-			assign fb_peek_route_port
-			  = fb_peek_lar_info[0:port_idx_width-1];
+			wire [0:port_idx_width-1] fb_peek_next_route_port;
+			assign fb_peek_next_route_port
+			  = fb_peek_next_lar_info[0:port_idx_width-1];
 			
-			wire [0:num_ports-1] 	  peek_route_op;
+			wire [0:num_ports-1] 	  peek_next_route_op;
 			c_decode
 			  #(.num_ports(num_ports))
-			peek_route_op_dec
-			  (.data_in(fb_peek_route_port),
-			   .data_out(peek_route_op));
+			peek_next_route_op_dec
+			  (.data_in(fb_peek_next_route_port),
+			   .data_out(peek_next_route_op));
 			
-			assign route_op_s
-			  = capture ?
-			    (two_plus_flits ? peek_route_op : gld_route_op) :
-			    route_op_q;
+			assign route_op_s = capture ?
+					    (two_plus_flits ? 
+					     peek_next_route_op : 
+					     gld_route_op) :
+					    route_op_q;
 			
 		     end
 		   c_dff
@@ -840,22 +842,24 @@ module rtr_ip_ctrl_mac
 			  begin
 			     
 			     wire [0:resource_class_idx_width-1] 
-			       fb_peek_route_rcsel;
-			     assign fb_peek_route_rcsel
-			       = fb_peek_lar_info[port_idx_width:
-						  port_idx_width+
-						  resource_class_idx_width-1];
+			       fb_peek_next_route_rcsel;
+			     assign fb_peek_next_route_rcsel
+			       = fb_peek_next_lar_info[port_idx_width:
+						       port_idx_width+
+						       resource_class_idx_width-
+						       1];
 			     
-			     wire [0:num_resource_classes-1] peek_route_orc;
+			     wire [0:num_resource_classes-1] 
+			       peek_next_route_orc;
 			     c_decode
 			       #(.num_ports(num_resource_classes))
-			     peek_route_orc_dec
-			       (.data_in(fb_peek_route_rcsel),
-				.data_out(peek_route_orc));
+			     peek_next_route_orc_dec
+			       (.data_in(fb_peek_next_route_rcsel),
+				.data_out(peek_next_route_orc));
 			     
 			     assign route_orc_s = capture ?
 						  (two_plus_flits ? 
-						   peek_route_orc : 
+						   peek_next_route_orc : 
 						   gld_route_orc) :
 						  route_orc_q;
 			     
@@ -894,10 +898,11 @@ module rtr_ip_ctrl_mac
 		   if(atomic_vc_allocation)
 		     assign lar_info_s = capture ? chi_lar_info : lar_info_q;
 		   else
-		     assign lar_info_s
-		       = capture ?
-			 (two_plus_flits ? fb_peek_lar_info : chi_lar_info) :
-			 lar_info_q;
+		     assign lar_info_s = capture ?
+					 (two_plus_flits ? 
+					  fb_peek_next_lar_info : 
+					  chi_lar_info) :
+					 lar_info_q;
 		   c_dff
 		     #(.width(lar_info_width),
 		       .reset_type(reset_type))
@@ -946,15 +951,17 @@ module rtr_ip_ctrl_mac
 	      else
 		begin
 		   
-		   wire [0:dest_info_width-1] fb_peek_dest_info;
-		   assign fb_peek_dest_info
-		     = fb_peek_route_info[lar_info_width:
-					  lar_info_width+dest_info_width-1];
+		   wire [0:dest_info_width-1] fb_peek_next_dest_info;
+		   assign fb_peek_next_dest_info
+		     = fb_peek_next_route_info[lar_info_width:
+					       lar_info_width+
+					       dest_info_width-1];
 		   
-		   assign dest_info_s
-		     = capture ?
-		       (two_plus_flits ? fb_peek_dest_info : chi_dest_info) :
-		       dest_info_q;
+		   assign dest_info_s = capture ?
+					(two_plus_flits ? 
+					 fb_peek_next_dest_info : 
+					 chi_dest_info) :
+					dest_info_q;
 		   
 		end
 	      c_dff
@@ -1169,7 +1176,7 @@ module rtr_ip_ctrl_mac
    endgenerate
    
    wire [0:flit_data_width-1] 		    fb_pop_data;
-   wire [0:flit_data_width-1] 		    fb_peek_data;
+   wire [0:flit_data_width-1] 		    fb_peek_next_data;
    wire [0:num_vcs*2-1] 		    fb_errors_ivc;
    rtr_flit_buffer
      #(.num_vcs(num_vcs),
@@ -1193,13 +1200,13 @@ module rtr_ip_ctrl_mac
       .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
       .pop_addr_ivc(fb_pop_addr_ivc),
-      .peek_data(fb_peek_data),
+      .peek_next_data(fb_peek_next_data),
       .almost_empty_ivc(fb_almost_empty_ivc),
       .empty_ivc(fb_empty_ivc),
       .full(fb_full),
       .errors_ivc(fb_errors_ivc));
    
-   assign fb_peek_header_info = fb_peek_data[0:header_info_width-1];
+   assign fb_peek_next_header_info = fb_peek_next_data[0:header_info_width-1];
    
    
    //---------------------------------------------------------------------------

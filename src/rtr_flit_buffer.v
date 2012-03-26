@@ -31,7 +31,7 @@
 
 module rtr_flit_buffer
   (clk, reset, push_active, push_valid, push_sel_ivc, push_data, push_addr_ivc, 
-   pop_active, pop_valid, pop_sel_ivc, pop_data, pop_addr_ivc, peek_data, 
+   pop_active, pop_valid, pop_sel_ivc, pop_data, pop_addr_ivc, peek_next_data, 
    almost_empty_ivc, empty_ivc, full, errors_ivc);
    
 `include "c_functions.v"
@@ -120,8 +120,8 @@ module rtr_flit_buffer
    wire [0:num_vcs*addr_width-1]   pop_addr_ivc;
    
    // peek-ahead at the element in each lane after the one to be read next
-   output [0:flit_data_width-1]    peek_data;
-   wire [0:flit_data_width-1] 	   peek_data;
+   output [0:flit_data_width-1]    peek_next_data;
+   wire [0:flit_data_width-1] 	   peek_next_data;
    
    // lane state flags
    output [0:num_vcs-1] 	   almost_empty_ivc;
@@ -147,7 +147,7 @@ module rtr_flit_buffer
        .regfile_type(regfile_type),
        .registered_read(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
-       .enable_peek(!atomic_vc_allocation),
+       .enable_peek_next(!atomic_vc_allocation),
        .reset_type(reset_type))
    mlf
      (.clk(clk),
@@ -162,7 +162,7 @@ module rtr_flit_buffer
       .pop_sel_qu(pop_sel_ivc),
       .pop_data(pop_data),
       .pop_addr_qu(pop_addr_ivc),
-      .peek_data(peek_data),
+      .peek_next_data(peek_next_data),
       .almost_empty_qu(almost_empty_ivc),
       .empty_qu(empty_ivc),
       .full(full),

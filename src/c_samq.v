@@ -31,7 +31,7 @@
 
 module c_samq
   (clk, reset, push_active, push_valid, push_sel_qu, push_data, push_addr_qu, 
-   pop_active, pop_valid, pop_sel_qu, pop_data, pop_addr_qu, peek_data, 
+   pop_active, pop_valid, pop_sel_qu, pop_data, pop_addr_qu, peek_next_data, 
    almost_empty_qu, empty_qu, full, errors_qu);
    
 `include "c_functions.v"
@@ -64,7 +64,7 @@ module c_samq
    parameter gate_buffer_write = 0;
    
    // enable peek-ahead ports
-   parameter enable_peek = 1;
+   parameter enable_peek_next = 1;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    
@@ -128,8 +128,8 @@ module c_samq
    wire [0:num_queues*addr_width-1]   pop_addr_qu;
    
    // peek-ahead at the element in each queue after the one to be read next
-   output [0:data_width-1] 	      peek_data;
-   wire [0:data_width-1] 	      peek_data;
+   output [0:data_width-1] 	      peek_next_data;
+   wire [0:data_width-1] 	      peek_next_data;
    
    // queue state flags
    output [0:num_queues-1] 	      almost_empty_qu;
@@ -148,7 +148,7 @@ module c_samq
    // implementation
    //---------------------------------------------------------------------------
    
-   wire [0:num_queues*addr_width-1]   peek_addr_qu;
+   wire [0:num_queues*addr_width-1]   peek_next_addr_qu;
    wire [0:num_queues-1] 	      full_qu;
    
    assign full = &full_qu;
@@ -206,28 +206,28 @@ module c_samq
 	      .full(full),
 	      .errors(errors));
 	   
-	   wire [0:addr_width-1] peek_addr;
-	   if(enable_peek)
+	   wire [0:addr_width-1] peek_next_addr;
+	   if(enable_peek_next)
 	     begin
 		
 		c_incr
 		  #(.width(addr_width),
 		    .min_value(queue * num_buffers_per_queue),
 		    .max_value((queue + 1) * num_buffers_per_queue - 1))
-		peek_addr_incr
+		peek_next_addr_incr
 		  (.data_in(pop_addr),
-		   .data_out(peek_addr));
+		   .data_out(peek_next_addr));
 		
 	     end
 	   else
-	     assign peek_addr = {addr_width{1'bx}};
+	     assign peek_next_addr = {addr_width{1'bx}};
 	   
 	   assign push_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = push_addr;
 	   assign pop_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = pop_addr;
-	   assign peek_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
-	     = peek_addr;
+	   assign peek_next_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
+	     = peek_next_addr;
 	   assign full_qu[queue] = full;
 	   assign almost_empty_qu[queue] = almost_empty;
 	   assign empty_qu[queue] = empty;
@@ -334,17 +334,17 @@ module c_samq
 	   
 	end
       
-      if(enable_peek)
+      if(enable_peek_next)
 	begin
 	   
-	   wire [0:addr_width-1] peek_addr;
+	   wire [0:addr_width-1] peek_next_addr;
 	   c_select_1ofn
 	     #(.num_ports(num_queues),
 	       .width(addr_width))
-	   peek_addr_sel
+	   peek_next_addr_sel
 	     (.select(pop_sel_qu),
-	      .data_in(peek_addr_qu),
-	      .data_out(peek_addr));
+	      .data_in(peek_next_addr_qu),
+	      .data_out(peek_next_addr));
 	   
 	   c_regfile
 	     #(.depth(num_buffers),
@@ -357,8 +357,8 @@ module c_samq
 	      .write_enable(write_enable),
 	      .write_address(write_addr),
 	      .write_data(write_data),
-	      .read_address({read_addr, peek_addr}),
-	      .read_data({read_data, peek_data}));
+	      .read_address({read_addr, peek_next_addr}),
+	      .read_data({read_data, peek_next_data}));
 	   
 	end
       else
@@ -377,7 +377,7 @@ module c_samq
 	      .read_address(read_addr),
 	      .read_data(read_data));
 	   
-	   assign peek_data = {data_width{1'bx}};
+	   assign peek_next_data = {data_width{1'bx}};
 	   
 	end
       

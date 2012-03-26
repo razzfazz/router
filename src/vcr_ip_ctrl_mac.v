@@ -367,7 +367,7 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:header_info_width-1] fb_peek_header_info;
+   wire [0:header_info_width-1] fb_peek_next_header_info;
    wire [0:num_vcs*fb_addr_width-1] fb_push_addr_ivc;
    wire [0:num_vcs*fb_addr_width-1] fb_pop_addr_ivc;
    wire [0:num_vcs-1] 		    fb_almost_empty_ivc;
@@ -543,7 +543,7 @@ module vcr_ip_ctrl_mac
 	      .flit_tail_in(flit_tail_in),
 	      .flit_sel_in(flit_sel_in),
 	      .header_info_in(header_info_in),
-	      .fb_peek_header_info(fb_peek_header_info),
+	      .fb_peek_next_header_info(fb_peek_next_header_info),
 	      .fb_flit_tail(fb_flit_tail),
 	      .almost_full_op_ovc(almost_full_op_ovc),
 	      .full_op_ovc(full_op_ovc),
@@ -616,7 +616,7 @@ module vcr_ip_ctrl_mac
    assign fb_pop_sel_ivc = sw_sel_ivc;
    
    wire [0:flit_data_width-1] 		    fb_pop_data;
-   wire [0:flit_data_width-1] 		    fb_peek_data;
+   wire [0:flit_data_width-1] 		    fb_peek_next_data;
    wire [0:num_vcs*2-1] 		    fb_errors_ivc;
    rtr_flit_buffer
      #(.num_vcs(num_vcs),
@@ -640,13 +640,13 @@ module vcr_ip_ctrl_mac
       .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
       .pop_addr_ivc(fb_pop_addr_ivc),
-      .peek_data(fb_peek_data),
+      .peek_next_data(fb_peek_next_data),
       .almost_empty_ivc(fb_almost_empty_ivc),
       .empty_ivc(fb_empty_ivc),
       .full(fb_full),
       .errors_ivc(fb_errors_ivc));
    
-   assign fb_peek_header_info = fb_peek_data[0:header_info_width-1];
+   assign fb_peek_next_header_info = fb_peek_next_data[0:header_info_width-1];
    
    
    //---------------------------------------------------------------------------
