@@ -31,8 +31,8 @@
 
 module rtr_flit_buffer
   (clk, reset, push_active, push_valid, push_sel_ivc, push_data, push_addr_ivc, 
-   pop_active, pop_valid, pop_sel_ivc, pop_data, pop_addr_ivc, peek_next_data, 
-   almost_empty_ivc, empty_ivc, full, errors_ivc);
+   pop_active, pop_valid, pop_sel_ivc, pop_data, pop_addr_ivc, 
+   peek_next_header_info, almost_empty_ivc, empty_ivc, full, errors_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -51,7 +51,10 @@ module rtr_flit_buffer
    // width of payload data
    parameter flit_data_width = 64;
    
-    // implementation variant for register file
+   // total number of bits of header information encoded in header flit payload
+   parameter header_info_width = 8;
+   
+   // implementation variant for register file
    parameter regfile_type = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
@@ -120,8 +123,8 @@ module rtr_flit_buffer
    wire [0:num_vcs*addr_width-1]   pop_addr_ivc;
    
    // peek-ahead at the element in each VC after the one to be read next
-   output [0:flit_data_width-1]    peek_next_data;
-   wire [0:flit_data_width-1] 	   peek_next_data;
+   output [0:header_info_width-1]  peek_next_header_info;
+   wire [0:header_info_width-1]    peek_next_header_info;
    
    // VC state flags
    output [0:num_vcs-1] 	   almost_empty_ivc;
@@ -140,6 +143,7 @@ module rtr_flit_buffer
    // implementation
    //---------------------------------------------------------------------------
    
+   wire [0:flit_data_width-1] 	   peek_next_data;
    c_samq
      #(.num_queues(num_vcs),
        .num_buffers_per_queue(num_buffers_per_vc),
@@ -167,5 +171,7 @@ module rtr_flit_buffer
       .empty_qu(empty_ivc),
       .full(full),
       .errors_qu(errors_ivc));
+   
+   assign peek_next_header_info = peek_next_data[0:header_info_width-1];
    
 endmodule

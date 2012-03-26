@@ -616,12 +616,12 @@ module vcr_ip_ctrl_mac
    assign fb_pop_sel_ivc = sw_sel_ivc;
    
    wire [0:flit_data_width-1] 		    fb_pop_data;
-   wire [0:flit_data_width-1] 		    fb_peek_next_data;
    wire [0:num_vcs*2-1] 		    fb_errors_ivc;
    rtr_flit_buffer
      #(.num_vcs(num_vcs),
        .num_buffers_per_vc(num_flits_per_vc),
        .flit_data_width(flit_data_width),
+       .header_info_width(header_info_width),
        .regfile_type(fb_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
@@ -640,13 +640,11 @@ module vcr_ip_ctrl_mac
       .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
       .pop_addr_ivc(fb_pop_addr_ivc),
-      .peek_next_data(fb_peek_next_data),
+      .peek_next_header_info(fb_peek_next_header_info),
       .almost_empty_ivc(fb_almost_empty_ivc),
       .empty_ivc(fb_empty_ivc),
       .full(fb_full),
       .errors_ivc(fb_errors_ivc));
-   
-   assign fb_peek_next_header_info = fb_peek_next_data[0:header_info_width-1];
    
    
    //---------------------------------------------------------------------------
