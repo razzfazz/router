@@ -156,8 +156,8 @@ module vcr_ovc_ctrl
    wire 		 full;
    
    // internal error condition detected
-   output [0:2] 	 errors;
-   wire [0:2] 		 errors;
+   output [0:1] 	 errors;
+   wire [0:1] 		 errors;
    
    
    //---------------------------------------------------------------------------
@@ -198,9 +198,6 @@ module vcr_ovc_ctrl
       .q(allocated_q));
    
    assign allocated = allocated_q & ~(flit_sent & flit_tail);
-   
-   wire 		 error_stray_flit;
-   assign error_stray_flit = flit_sent & ~allocated_q;
    
    wire [0:num_ports-1]  flit_sel_ip_s, flit_sel_ip_q;
    assign flit_sel_ip_s = vc_gnt ? vc_sel_ip : flit_sel_ip_q;
@@ -279,6 +276,7 @@ module vcr_ovc_ctrl
       .errors(fc_errors));
    
    assign free_spec = ~fc_full_prev;
+   assign errors[0:1] = fc_errors;
    
    
    //---------------------------------------------------------------------------
@@ -307,25 +305,5 @@ module vcr_ovc_ctrl
       endcase
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // error checking
-   //---------------------------------------------------------------------------
-   
-   // pragma translate_off
-   
-   always @(posedge clk)
-     begin
-	
-	if(error_stray_flit)
-	  $display("ERROR: Stray flit in module %m.");
-	
-     end
-   
-   // pragma translate_on
-   
-   assign errors[0] = error_stray_flit;
-   assign errors[1:2] = fc_errors;
    
 endmodule

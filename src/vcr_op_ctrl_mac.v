@@ -305,7 +305,7 @@ module vcr_op_ctrl_mac
       
    endgenerate
    
-   wire [0:num_vcs*3-1]       ovcc_errors_ovc;
+   wire [0:num_vcs*2-1]       ovcc_errors_ovc;
    
    genvar 		      ovc;
    
@@ -332,7 +332,7 @@ module vcr_op_ctrl_mac
 	   wire 		fc_active;
 	   wire 		almost_full;
 	   wire 		full;
-	   wire [0:2] 		ovcc_errors;
+	   wire [0:1] 		ovcc_errors;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_message_classes(num_message_classes),
@@ -372,7 +372,7 @@ module vcr_op_ctrl_mac
 	   assign free_spec_ovc[ovc] = free_spec;
 	   assign almost_full_ovc[ovc] = almost_full;
 	   assign full_ovc[ovc] = full;
-	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
+	   assign ovcc_errors_ovc[ovc*2:(ovc+1)*2-1] = ovcc_errors;
 	   
 	end
       
@@ -448,12 +448,12 @@ module vcr_op_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:2+num_vcs*3-1] errors_s, errors_q;
+	   wire [0:2+num_vcs*2-1] errors_s, errors_q;
 	   assign errors_s = {error_unmatched, 
 			      error_multimatch, 
 			      ovcc_errors_ovc};
 	   c_err_rpt
-	     #(.num_errors(2+num_vcs*3),
+	     #(.num_errors(2+num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
