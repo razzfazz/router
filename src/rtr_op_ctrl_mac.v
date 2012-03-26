@@ -154,10 +154,10 @@ module rtr_op_ctrl_mac
    // flow control input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       ovs_fc_active_ovc;
+   wire [0:num_vcs-1] 	       fcs_fc_active_ovc;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = |ovs_fc_active_ovc;
+   assign flow_ctrl_active = |fcs_fc_active_ovc;
    
    wire 		       fc_event_valid;
    wire [0:num_vcs-1] 	       fc_event_sel_ovc;
@@ -202,10 +202,10 @@ module rtr_op_ctrl_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
-   wire 		       ovs_active;
-   assign ovs_active = flit_valid_in | fc_event_valid;
+   wire 		       ovc_active;
+   assign ovc_active = flit_valid_in | fc_event_valid;
    
-   wire [0:num_vcs*2-1]        ovs_errors_ovc;
+   wire [0:num_vcs*2-1]        fcs_errors_ovc;
    
    genvar 		       ovc;
    
@@ -213,6 +213,10 @@ module rtr_op_ctrl_mac
       
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
+	   
+	   //-------------------------------------------------------------------
+	   // track buffer occupancy
+	   //-------------------------------------------------------------------
 	   
 	   wire flit_sel_in;
 	   assign flit_sel_in = flit_sel_in_ovc[ovc];
@@ -226,38 +230,79 @@ module rtr_op_ctrl_mac
 	   wire fc_event_valid_sel;
 	   assign fc_event_valid_sel = fc_event_valid & fc_event_sel;
 	   
-	   wire ovs_fc_active;
-	   wire ovs_elig;
-	   wire ovs_empty;
-	   wire ovs_almost_full;
-	   wire ovs_full;
-	   wire [0:1] ovs_errors;
-	   rtr_vc_state
+	   wire fcs_fc_active;
+	   wire fcs_empty;
+	   wire fcs_almost_full;
+	   wire fcs_full;
+	   wire fcs_full_prev;
+	   wire [0:1] fcs_errors;
+	   rtr_fc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
-	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
-	   ovs
+	   fcs
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(ovs_active),
+	      .active(ovc_active),
 	      .flit_sent(flit_valid_sel_in),
-	      .flit_tail(flit_tail_in),
 	      .fc_event_valid(fc_event_valid_sel),
-	      .fc_active(ovs_fc_active),
-	      .elig(ovs_elig),
-	      .empty(ovs_empty),
-	      .almost_full(ovs_almost_full),
-	      .full(ovs_full),
-	      .errors(ovs_errors));
+	      .fc_active(fcs_fc_active),
+	      .empty(fcs_empty),
+	      .almost_full(fcs_almost_full),
+	      .full(fcs_full),
+	      .full_prev(fcs_full_prev),
+	      .errors(fcs_errors));
 	   
-	   assign elig_out_ovc[ovc] = ovs_elig;
-	   assign empty_out_ovc[ovc] = ovs_empty;
-	   assign almost_full_out_ovc[ovc] = ovs_almost_full;
-	   assign full_out_ovc[ovc] = ovs_full;	   
-	   assign ovs_fc_active_ovc[ovc] = ovs_fc_active;
-	   assign ovs_errors_ovc[ovc*2:(ovc+1)*2-1] = ovs_errors;
+	   assign empty_out_ovc[ovc] = fcs_empty;
+	   assign almost_full_out_ovc[ovc] = fcs_almost_full;
+	   assign full_out_ovc[ovc] = fcs_full;	   
+	   assign fcs_fc_active_ovc[ovc] = fcs_fc_active;
+	   assign fcs_errors_ovc[ovc*2:(ovc+1)*2-1] = fcs_errors;
+	   
+	   //-------------------------------------------------------------------
+	   // track whether this output VC is currently in use
+	   //-------------------------------------------------------------------
+	   
+	   // NOTE: For the reset condition, we don't have to worry about 
+	   // whether or not sufficient buffer space is available: If the VC is 
+	   // currently allocated, these checks would already have been 
+	   // performed at the beginning of switch allocation; on the other 
+	   // hand, if it is not currently allocated, 'allocated_q' is zero, 
+	   // and thus the reset condition does not have any effect.
+	   
+	   wire       allocated;
+	   
+	   wire       allocated_s, allocated_q;
+	   assign allocated_s = allocated;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   allocatedq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(ovc_active),
+	      .d(allocated_s),
+	      .q(allocated_q));
+	   
+	   assign allocated = flit_valid_sel_in ? ~flit_tail_in : allocated_q;
+	   
+	   wire       elig;
+	   
+	   case(elig_mask)
+	     
+	     `ELIG_MASK_NONE:
+	       assign elig = ~allocated;
+	     
+	     `ELIG_MASK_FULL:
+	       assign elig = ~allocated & ~fcs_full;
+	     
+	     `ELIG_MASK_USED:
+	       assign elig = ~allocated & fcs_empty;
+	     
+	   endcase
+	   
+	   assign elig_out_ovc[ovc] = elig;
 	   
 	end
       
@@ -274,7 +319,7 @@ module rtr_op_ctrl_mac
 	begin
 	   
 	   wire [0:num_vcs*2-1] errors_s, errors_q;
-	   assign errors_s = ovs_errors_ovc;
+	   assign errors_s = fcs_errors_ovc;
 	   c_err_rpt
 	     #(.num_errors(num_vcs*2),
 	       .capture_mode(error_capture_mode),

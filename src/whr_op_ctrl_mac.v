@@ -140,10 +140,10 @@ module whr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire 		       vs_fc_active;
+   wire 		       fcs_fc_active;
    
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = vs_fc_active;
+   assign flow_ctrl_active = fcs_fc_active;
    
    wire 		       fc_event_valid;
    wire 		       fc_event_sel_ovc;
@@ -161,39 +161,81 @@ module whr_op_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // track state of downstream buffer
+   // track buffer occupancy
    //---------------------------------------------------------------------------
    
-   wire 		       vs_active;
-   assign vs_active = flit_valid_in | fc_event_valid;
+   wire 		       fcs_active;
+   assign fcs_active = flit_valid_in | fc_event_valid;
    
-   wire 		       vs_elig;
-   wire 		       vs_empty;
-   wire 		       vs_almost_full;
-   wire 		       vs_full;
-   wire [0:1] 		       vs_errors;
-   rtr_vc_state
+   wire 		       fcs_empty;
+   wire 		       fcs_almost_full;
+   wire 		       fcs_full;
+   wire 		       fcs_full_prev;
+   wire [0:1] 		       fcs_errors;
+   rtr_fc_state
      #(.num_flits_per_vc(num_flits_per_vc),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
-       .elig_mask(elig_mask),
        .reset_type(reset_type))
-   vs
+   fcs
      (.clk(clk),
       .reset(reset),
-      .active(vs_active),
+      .active(fcs_active),
       .flit_sent(flit_valid_in),
-      .flit_tail(flit_tail_in),
       .fc_event_valid(fc_event_valid),
-      .fc_active(vs_fc_active),
-      .elig(vs_elig),
-      .empty(vs_empty),
-      .almost_full(vs_almost_full),
-      .full(vs_full),
-      .errors(vs_errors));
+      .fc_active(fcs_fc_active),
+      .empty(fcs_empty),
+      .almost_full(fcs_almost_full),
+      .full(fcs_full),
+      .full_prev(fcs_full_prev),
+      .errors(fcs_errors));
    
-   assign elig = vs_elig;
-   assign full = vs_full;
+   assign full = fcs_full;
+   
+   
+   //---------------------------------------------------------------------------
+   // track whether this output VC is currently in use
+   //---------------------------------------------------------------------------
+   
+   // NOTE: For the reset condition, we don't have to worry about whether or 
+   // not sufficient buffer space is available: If the VC is currently 
+   // allocated, these checks would already have been performed at the 
+   // beginning of switch allocation; on the other hand, if it is not currently 
+   // allocated, 'allocated_q' is zero, and thus the reset condition does not 
+   // have any effect.
+   
+   wire 		       allocated;
+   
+   wire 		       allocated_s, allocated_q;
+   assign allocated_s = allocated;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   allocatedq
+     (.clk(clk),
+      .reset(reset),
+      .active(fcs_active),
+      .d(allocated_s),
+      .q(allocated_q));
+   
+   assign allocated = flit_valid_in ? ~flit_tail_in : allocated_q;
+   
+   generate
+      
+      case(elig_mask)
+	
+	`ELIG_MASK_NONE:
+	  assign elig = ~allocated;
+	
+	`ELIG_MASK_FULL:
+	  assign elig = ~allocated & ~fcs_full;
+	
+	`ELIG_MASK_USED:
+	  assign elig = ~allocated & fcs_empty;
+	
+      endcase
+      
+   endgenerate
    
    
    //---------------------------------------------------------------------------
@@ -230,7 +272,7 @@ module whr_op_ctrl_mac
 	begin
 	   
 	   wire [0:1] errors_s, errors_q;
-	   assign errors_s = vs_errors;
+	   assign errors_s = fcs_errors;
 	   c_err_rpt
 	     #(.num_errors(2),
 	       .capture_mode(error_capture_mode),

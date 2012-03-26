@@ -348,7 +348,7 @@ module packet_source
    
    wire [0:num_vcs-1] 			 full_ovc;
    wire [0:num_vcs-1] 			 elig_ovc;
-   wire [0:num_vcs*2-1] 		 vs_errors_ovc;
+   wire [0:num_vcs*2-1] 		 fcs_errors_ovc;
    
    genvar 				 ovc;
    
@@ -386,36 +386,66 @@ module packet_source
 	      .active(1'b1),
 	      .d(flit_tail_s),
 	      .q(flit_tail_q));
-
-	   wire vs_fc_active;
-	   wire vs_elig;
-	   wire vs_empty;
-	   wire vs_almost_full;
-	   wire vs_full;
-	   wire [0:1] 		       vs_errors;
-	   rtr_vc_state
+	   
+	   wire fcs_fc_active;
+	   wire fcs_empty;
+	   wire fcs_almost_full;
+	   wire fcs_full;
+	   wire fcs_full_prev;
+	   wire [0:1] fcs_errors;
+	   rtr_fc_state
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
-	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
-	   vs
+	   fcs
 	     (.clk(clk),
 	      .reset(reset),
 	      .active(1'b1),
 	      .flit_sent(flit_valid_q),
-	      .flit_tail(flit_tail_q),
 	      .fc_event_valid(fc_event_valid),
-	      .fc_active(vs_fc_active),
-	      .elig(vs_elig),
-	      .empty(vs_empty),
-	      .almost_full(vs_almost_full),
-	      .full(vs_full),
-	      .errors(vs_errors));
+	      .fc_active(fcs_fc_active),
+	      .empty(fcs_empty),
+	      .almost_full(fcs_almost_full),
+	      .full(fcs_full),
+	      .full_prev(fcs_full_prev),
+	      .errors(fcs_errors));
 	   
-	   assign elig_ovc[ovc] = vs_elig;
-	   assign full_ovc[ovc] = vs_full;
-	   assign vs_errors_ovc[ovc*2:(ovc+1)*2-1] = vs_errors;
+	   assign full_ovc[ovc] = fcs_full;
+	   assign fcs_errors_ovc[ovc*2:(ovc+1)*2-1] = fcs_errors;
+	   
+	   wire       allocated;
+	   
+	   wire       allocated_s, allocated_q;
+	   assign allocated_s = allocated;
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   allocatedq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(allocated_s),
+	      .q(allocated_q));
+	   
+	   assign allocated = flit_valid_q ? ~flit_tail_q : allocated_q;
+	   
+	   wire       elig;
+	   
+	   case(elig_mask)
+	     
+	     `ELIG_MASK_NONE:
+	       assign elig = ~allocated;
+	     
+	     `ELIG_MASK_FULL:
+	       assign elig = ~allocated & ~fcs_full;
+	     
+	     `ELIG_MASK_USED:
+	       assign elig = ~allocated & fcs_empty;
+	     
+	   endcase
+	   
+	   assign elig_ovc[ovc] = elig;
 	   
 	end
       
@@ -912,6 +942,6 @@ module packet_source
       
    endgenerate
    
-   assign error = |vs_errors_ovc;
+   assign error = |fcs_errors_ovc;
    
 endmodule
