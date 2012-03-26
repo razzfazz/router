@@ -1171,33 +1171,33 @@ module rtr_ip_ctrl_mac
    wire [0:flit_data_width-1] 		    fb_pop_data;
    wire [0:flit_data_width-1] 		    fb_peek_data;
    wire [0:num_vcs*2-1] 		    fb_errors_ivc;
-   c_multi_lane_fifo
-     #(.num_lanes(num_vcs),
-       .num_buffers_per_lane(num_flits_per_vc),
-       .data_width(flit_data_width),
+   rtr_flit_buffer
+     #(.num_vcs(num_vcs),
+       .num_buffers_per_vc(num_flits_per_vc),
+       .flit_data_width(flit_data_width),
        .regfile_type(fb_regfile_type),
-       .registered_read(explicit_pipeline_register),
+       .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
-       .enable_peek(!atomic_vc_allocation),
+       .atomic_vc_allocation(atomic_vc_allocation),
        .reset_type(reset_type))
    fb
      (.clk(clk),
       .reset(reset),
       .push_active(fb_push_active),
       .push_valid(fb_push_valid),
-      .push_sel_ln(fb_push_sel_ivc),
+      .push_sel_ivc(fb_push_sel_ivc),
       .push_data(fb_push_data),
-      .push_addr_ln(fb_push_addr_ivc),
+      .push_addr_ivc(fb_push_addr_ivc),
       .pop_active(fb_pop_active),
       .pop_valid(fb_pop_valid),
-      .pop_sel_ln(fb_pop_sel_ivc),
+      .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
-      .pop_addr_ln(fb_pop_addr_ivc),
+      .pop_addr_ivc(fb_pop_addr_ivc),
       .peek_data(fb_peek_data),
-      .almost_empty_ln(fb_almost_empty_ivc),
-      .empty_ln(fb_empty_ivc),
+      .almost_empty_ivc(fb_almost_empty_ivc),
+      .empty_ivc(fb_empty_ivc),
       .full(fb_full),
-      .errors_ln(fb_errors_ivc));
+      .errors_ivc(fb_errors_ivc));
    
    assign fb_peek_header_info = fb_peek_data[0:header_info_width-1];
    
