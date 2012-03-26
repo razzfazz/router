@@ -1103,10 +1103,6 @@ module tc_node_mac
       .fc_event_valid_out(fc_event_valid_in),
       .fc_event_sel_out_ovc(fc_event_sel_in_ovc));
    
-   wire [0:num_vcs-1] 	      fc_event_valid_in_ovc;
-   assign fc_event_valid_in_ovc
-     = {num_vcs{fc_event_valid_in}} & fc_event_sel_in_ovc;
-   
    
    //---------------------------------------------------------------------------
    // VC state tracking
@@ -1124,9 +1120,6 @@ module tc_node_mac
       .d(flit_tail_s),
       .q(flit_tail_q));
    
-   wire [0:num_vcs-1] 	      flit_valid_out_ovc;
-   assign flit_valid_out_ovc = {num_vcs{flit_valid_out}} & sel_ovc;
-   
    wire [0:num_vcs*2-1]       fcs_errors_ovc;
    
    genvar 		      ovc;
@@ -1140,14 +1133,17 @@ module tc_node_mac
 	   // track buffer occupancy
 	   //-------------------------------------------------------------------
 	   
-	   wire flit_valid_out;
-	   assign flit_valid_out = flit_valid_out_ovc[ovc];
+	   wire sel;
+	   assign sel = sel_ovc[ovc];
 	   
-	   wire fc_event_valid_in;
-	   assign fc_event_valid_in = fc_event_valid_in_ovc[ovc];
+	   wire fc_event_sel_in;
+	   assign fc_event_sel_in = fc_event_sel_in_ovc[ovc];
+	   
+	   wire fc_event_valid_sel;
+	   assign fc_event_valid_sel = fc_event_valid_in & fc_event_sel_in;
 	   
 	   wire flit_sent_s, flit_sent_q;
-	   assign flit_sent_s = flit_valid_out;
+	   assign flit_sent_s = flit_valid_out & sel;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -1174,7 +1170,7 @@ module tc_node_mac
 	      .reset(reset),
 	      .active(active_q),
 	      .flit_sent(flit_sent_q),
-	      .fc_event_valid(fc_event_valid_in),
+	      .fc_event_valid(fc_event_valid_sel),
 	      .fc_active(fcs_fc_active),
 	      .empty(fcs_empty),
 	      .almost_full(fcs_almost_full),
