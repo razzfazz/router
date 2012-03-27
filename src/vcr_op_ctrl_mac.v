@@ -170,7 +170,7 @@ module vcr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 		 fc_active;
+   wire 			 fc_active;
    
    wire 			 flow_ctrl_active;
    assign flow_ctrl_active = fc_active;
