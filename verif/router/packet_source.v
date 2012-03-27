@@ -340,12 +340,6 @@ module packet_source
       .fc_event_valid_out(fc_event_valid),
       .fc_event_sel_out_ovc(fc_event_sel_ovc));
    
-   wire [0:num_vcs-1] 			 fc_event_valid_ovc;
-   assign fc_event_valid_ovc = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
-   
-   wire [0:num_vcs-1] 			 flit_valid_ovc;
-   assign flit_valid_ovc = {num_vcs{flit_valid}} & sel_ovc;
-   
    wire [0:num_vcs-1] 			 full_ovc;
    wire [0:num_vcs-1] 			 elig_ovc;
    wire [0:num_vcs*2-1] 		 fcs_errors_ovc;
@@ -357,14 +351,14 @@ module packet_source
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire fc_event_valid;
-	   assign fc_event_valid = fc_event_valid_ovc[ovc];
+	   wire fc_event_valid_sel;
+	   assign fc_event_valid_sel = fc_event_valid & fc_event_sel_ovc[ovc];
 	   
-	   wire flit_valid;
-	   assign flit_valid = flit_valid_ovc[ovc];
-
+	   wire flit_valid_sel;
+	   assign flit_valid_sel = flit_valid & sel_ovc[ovc];
+	   
 	   wire flit_valid_s, flit_valid_q;
-	   assign flit_valid_s = flit_valid;
+	   assign flit_valid_s = flit_valid_sel;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
@@ -403,7 +397,7 @@ module packet_source
 	      .reset(reset),
 	      .active(1'b1),
 	      .flit_sent(flit_valid_q),
-	      .fc_event_valid(fc_event_valid),
+	      .fc_event_valid(fc_event_valid_sel),
 	      .fc_active(fcs_fc_active),
 	      .empty(fcs_empty),
 	      .almost_full(fcs_almost_full),
