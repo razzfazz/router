@@ -353,8 +353,7 @@ module vcr_op_ctrl_mac
 	   
 	   wire 		elig;
 	   vcr_ovc_ctrl
-	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_vcs(num_vcs),
+	     #(.num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .sw_alloc_spec(sw_alloc_spec),
 	       .elig_mask(elig_mask),

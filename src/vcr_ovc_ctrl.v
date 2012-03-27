@@ -38,9 +38,6 @@ module vcr_ovc_ctrl
 `include "rtr_constants.v"
 `include "vcr_constants.v"
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
-   
    // number of VCs
    parameter num_vcs = 4;
    
