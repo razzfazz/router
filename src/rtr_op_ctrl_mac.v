@@ -154,10 +154,7 @@ module rtr_op_ctrl_mac
    // flow control input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	       fcs_fc_active_ovc;
-   
    wire 		       flow_ctrl_active;
-   assign flow_ctrl_active = |fcs_fc_active_ovc;
    
    wire 		       fc_event_valid;
    wire [0:num_vcs-1] 	       fc_event_sel_ovc;
@@ -202,10 +199,44 @@ module rtr_op_ctrl_mac
    // VC state tracking
    //---------------------------------------------------------------------------
    
-   wire 		       ovc_active;
-   assign ovc_active = flit_valid_in | fc_event_valid;
+   wire 		       fcs_active;
+   assign fcs_active = flit_valid_in | fc_event_valid;
    
+   wire 		       fcs_fc_active;
+   wire [0:num_vcs-1] 	       fcs_empty_ovc;
+   wire [0:num_vcs-1] 	       fcs_almost_full_ovc;
+   wire [0:num_vcs-1] 	       fcs_full_ovc;
+   wire [0:num_vcs-1] 	       fcs_full_prev_ovc;
    wire [0:num_vcs*2-1]        fcs_errors_ovc;
+   rtr_fc_state
+     #(.num_vcs(num_vcs),
+       .num_flits_per_vc(num_flits_per_vc),
+       .flow_ctrl_type(flow_ctrl_type),
+       .flow_ctrl_bypass(flow_ctrl_bypass),
+       .reset_type(reset_type))
+   fcs
+     (.clk(clk),
+      .reset(reset),
+      .active(fcs_active),
+      .flit_valid(flit_valid_in),
+      .flit_sel_ovc(flit_sel_in_ovc),
+      .fc_event_valid(fc_event_valid),
+      .fc_event_sel_ovc(fc_event_sel_ovc),
+      .fc_active(fcs_fc_active),
+      .empty_ovc(fcs_empty_ovc),
+      .almost_full_ovc(fcs_almost_full_ovc),
+      .full_ovc(fcs_full_ovc),
+      .full_prev_ovc(fcs_full_prev_ovc),
+      .errors_ovc(fcs_errors_ovc));
+   
+   assign empty_out_ovc = fcs_empty_ovc;
+   assign almost_full_out_ovc = fcs_almost_full_ovc;
+   assign full_out_ovc = fcs_full_ovc;
+   
+   assign flow_ctrl_active = fcs_fc_active;
+   
+   wire 		       ovc_active;
+   assign ovc_active = flit_valid_in;
    
    genvar 		       ovc;
    
@@ -214,51 +245,18 @@ module rtr_op_ctrl_mac
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   //-------------------------------------------------------------------
-	   // track buffer occupancy
-	   //-------------------------------------------------------------------
-	   
 	   wire flit_sel_in;
 	   assign flit_sel_in = flit_sel_in_ovc[ovc];
 	   
 	   wire flit_valid_sel_in;
 	   assign flit_valid_sel_in = flit_valid_in & flit_sel_in;
 	   
-	   wire fc_event_sel;
-	   assign fc_event_sel = fc_event_sel_ovc[ovc];
-	   
-	   wire fc_event_valid_sel;
-	   assign fc_event_valid_sel = fc_event_valid & fc_event_sel;
-	   
-	   wire fcs_fc_active;
 	   wire fcs_empty;
-	   wire fcs_almost_full;
+	   assign fcs_empty = fcs_empty_ovc[ovc];
+
 	   wire fcs_full;
-	   wire fcs_full_prev;
-	   wire [0:1] fcs_errors;
-	   rtr_fc_state
-	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .flow_ctrl_type(flow_ctrl_type),
-	       .flow_ctrl_bypass(flow_ctrl_bypass),
-	       .reset_type(reset_type))
-	   fcs
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(ovc_active),
-	      .flit_sent(flit_valid_sel_in),
-	      .fc_event_valid(fc_event_valid_sel),
-	      .fc_active(fcs_fc_active),
-	      .empty(fcs_empty),
-	      .almost_full(fcs_almost_full),
-	      .full(fcs_full),
-	      .full_prev(fcs_full_prev),
-	      .errors(fcs_errors));
+	   assign fcs_full = fcs_full_ovc[ovc];	   
 	   
-	   assign empty_out_ovc[ovc] = fcs_empty;
-	   assign almost_full_out_ovc[ovc] = fcs_almost_full;
-	   assign full_out_ovc[ovc] = fcs_full;	   
-	   assign fcs_fc_active_ovc[ovc] = fcs_fc_active;
-	   assign fcs_errors_ovc[ovc*2:(ovc+1)*2-1] = fcs_errors;
 	   
 	   //-------------------------------------------------------------------
 	   // track whether this output VC is currently in use
@@ -271,9 +269,9 @@ module rtr_op_ctrl_mac
 	   // hand, if it is not currently allocated, 'allocated_q' is zero, 
 	   // and thus the reset condition does not have any effect.
 	   
-	   wire       allocated;
+	   wire allocated;
 	   
-	   wire       allocated_s, allocated_q;
+	   wire allocated_s, allocated_q;
 	   assign allocated_s = allocated;
 	   c_dff
 	     #(.width(1),
@@ -287,7 +285,7 @@ module rtr_op_ctrl_mac
 	   
 	   assign allocated = flit_valid_sel_in ? ~flit_tail_in : allocated_q;
 	   
-	   wire       elig;
+	   wire elig;
 	   
 	   case(elig_mask)
 	     

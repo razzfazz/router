@@ -170,10 +170,10 @@ module vcr_op_ctrl_mac
    // input staging
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 		 fc_active_ovc;
+   wire [0:num_vcs-1] 		 fc_active;
    
    wire 			 flow_ctrl_active;
-   assign flow_ctrl_active = |fc_active_ovc;
+   assign flow_ctrl_active = fc_active;
    
    wire 			 fc_event_valid;
    wire [0:num_vcs-1] 		 fc_event_sel_ovc;
@@ -288,7 +288,32 @@ module vcr_op_ctrl_mac
       
    endgenerate
    
-   wire [0:num_vcs*2-1]       ovcc_errors_ovc;
+   wire 		      fcs_active;
+   assign fcs_active = flit_valid | fc_event_valid;
+   
+   wire [0:num_vcs-1] 	      empty_ovc;
+   wire [0:num_vcs-1] 	      full_prev_ovc;
+   wire [0:num_vcs*2-1]       fcs_errors_ovc;
+   rtr_fc_state
+     #(.num_vcs(num_vcs),
+       .num_flits_per_vc(num_flits_per_vc),
+       .flow_ctrl_type(flow_ctrl_type),
+       .flow_ctrl_bypass(flow_ctrl_bypass),
+       .reset_type(reset_type))
+   fcs
+     (.clk(clk),
+      .reset(reset),
+      .active(fcs_active),
+      .flit_valid(flit_valid),
+      .flit_sel_ovc(flit_sel_ovc),
+      .fc_event_valid(fc_event_valid),
+      .fc_event_sel_ovc(fc_event_sel_ovc),
+      .fc_active(fc_active),
+      .empty_ovc(empty_ovc),
+      .almost_full_ovc(almost_full_ovc),
+      .full_ovc(full_ovc),
+      .full_prev_ovc(full_prev_ovc),
+      .errors_ovc(fcs_errors_ovc));
    
    genvar 		      ovc;
    
@@ -309,27 +334,35 @@ module vcr_op_ctrl_mac
 	   wire 		fc_event_sel;
 	   assign fc_event_sel = fc_event_sel_ovc[ovc];
 	   
-	   wire 		flit_sel;
-	   wire 		elig;
-	   wire 		fc_active;
-	   wire 		almost_full;
+	   wire 		empty;
+	   assign empty = empty_ovc[ovc];
+	   
 	   wire 		full;
-	   wire [0:1] 		ovcc_errors;
+	   assign full = full_ovc[ovc];
+	   
+	   wire 		full_prev;
+	   assign full_prev = full_prev_ovc[ovc];
+	   
+	   wire 		flit_sel;
+	   
+	   wire 		flit_valid_sel;
+	   assign flit_valid_sel = flit_valid & flit_sel;
+	   
+	   wire 		ovcc_active;
+	   assign ovcc_active = vc_active | flit_valid_sel;
+	   
+	   wire 		elig;
 	   vcr_ovc_ctrl
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
-	       .flow_ctrl_type(flow_ctrl_type),
-	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .sw_alloc_spec(sw_alloc_spec),
 	       .elig_mask(elig_mask),
 	       .reset_type(reset_type))
 	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      .fc_event_valid(fc_event_valid),
-	      .fc_event_sel(fc_event_sel),
-	      .vc_active(vc_active),
+	      .active(ovcc_active),
 	      .vc_gnt(vc_gnt),
 	      .vc_sel_ip(vc_sel_ip),
 	      .vc_sel_ivc(vc_sel_ivc),
@@ -339,17 +372,12 @@ module vcr_op_ctrl_mac
 	      .flit_sel_ivc(flit_sel_ivc),
 	      .flit_sel(flit_sel),
 	      .elig(elig),
-	      .fc_active(fc_active),
-	      .almost_full(almost_full),
 	      .full(full),
-	      .errors(ovcc_errors));
-
+	      .full_prev(full_prev),
+	      .empty(empty));
+	   
 	   assign flit_sel_ovc[ovc] = flit_sel;
-	   assign fc_active_ovc[ovc] = fc_active;
 	   assign elig_ovc[ovc] = elig;
-	   assign almost_full_ovc[ovc] = almost_full;
-	   assign full_ovc[ovc] = full;
-	   assign ovcc_errors_ovc[ovc*2:(ovc+1)*2-1] = ovcc_errors;
 	   
 	end
       
@@ -428,7 +456,7 @@ module vcr_op_ctrl_mac
 	   wire [0:2+num_vcs*2-1] errors_s, errors_q;
 	   assign errors_s = {error_unmatched, 
 			      error_multimatch, 
-			      ovcc_errors_ovc};
+			      fcs_errors_ovc};
 	   c_err_rpt
 	     #(.num_errors(2+num_vcs*2),
 	       .capture_mode(error_capture_mode),

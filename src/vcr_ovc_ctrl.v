@@ -30,9 +30,8 @@
 //==============================================================================
 
 module vcr_ovc_ctrl
-  (clk, reset, fc_event_valid, fc_event_sel, vc_active, vc_gnt, vc_sel_ip, 
-   vc_sel_ivc, flit_valid, flit_tail, flit_sel_ip, flit_sel_ivc, flit_sel, 
-   elig, fc_active, almost_full, full, errors);
+  (clk, reset, active, vc_gnt, vc_sel_ip, vc_sel_ivc, flit_valid, flit_tail, 
+   flit_sel_ip, flit_sel_ivc, flit_sel, elig, full, full_prev, empty);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -48,13 +47,6 @@ module vcr_ovc_ctrl
    // number of input and output ports on router
    parameter num_ports = 5;
    
-   // select type of flow control
-   parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
-   
-   // make incoming flow control signals bypass the output VC state tracking 
-   // logic
-   parameter flow_ctrl_bypass = 1;
-   
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
@@ -65,15 +57,7 @@ module vcr_ovc_ctrl
    
    input clk;
    input reset;
-   
-   // incoming flow control event
-   input fc_event_valid;
-   
-   // incoming flow control event is for current VC
-   input fc_event_sel;
-   
-   // VC allocation activity indicator
-   input vc_active;
+   input active;
    
    // output VC was granted to an input VC
    input vc_gnt;
@@ -104,29 +88,19 @@ module vcr_ovc_ctrl
    output 		 elig;
    wire 		 elig;
    
-   // activity indicator for flow control receive logic
-   output 		 fc_active;
-   wire 		 fc_active;
-   
-   // VC has a single credit left
-   output 		 almost_full;
-   wire 		 almost_full;
-   
    // VC has no credits left
-   output 		 full;
-   wire 		 full;
+   input 		 full;
    
-   // internal error condition detected
-   output [0:1] 	 errors;
-   wire [0:1] 		 errors;
+   // ignoring the current flit, VC has no credits left
+   input 		 full_prev;
+   
+   // VC is empty
+   input 		 empty;
    
    
    //---------------------------------------------------------------------------
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
-   
-   wire 		 alloc_active;
-   assign alloc_active = vc_active | flit_valid;
    
    wire 		 allocated;
    
@@ -138,14 +112,11 @@ module vcr_ovc_ctrl
    allocatedq
      (.clk(clk),
       .reset(reset),
-      .active(alloc_active),
+      .active(active),
       .d(allocated_s),
       .q(allocated_q));
    
-   wire 		 flit_sent;
-   assign flit_sent = flit_valid & flit_sel;
-   
-   assign allocated = allocated_q & ~(flit_sent & flit_tail);
+   assign allocated = allocated_q & ~(flit_valid & flit_sel & flit_tail);
    
    wire [0:num_ports-1]  flit_sel_ip_s, flit_sel_ip_q;
    assign flit_sel_ip_s = vc_gnt ? vc_sel_ip : flit_sel_ip_q;
@@ -155,7 +126,7 @@ module vcr_ovc_ctrl
    flit_sel_ipq
      (.clk(clk),
       .reset(1'b0),
-      .active(vc_active),
+      .active(active),
       .d(flit_sel_ip_s),
       .q(flit_sel_ip_q));
    
@@ -179,7 +150,7 @@ module vcr_ovc_ctrl
 	   flit_sel_ivcq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(vc_active),
+	      .active(active),
 	      .d(flit_sel_ivc_s),
 	      .q(flit_sel_ivc_q));
 	   
@@ -187,51 +158,12 @@ module vcr_ovc_ctrl
 	   
 	end
       
-   endgenerate
-   
-   wire 		      fc_full_prev;
-   
-   generate
-      
       if(sw_alloc_spec && (elig_mask == `ELIG_MASK_NONE))
-	assign flit_sel = allocated_q & port_match & vc_match & ~fc_full_prev;
+	assign flit_sel = allocated_q & port_match & vc_match & ~full_prev;
       else
 	assign flit_sel = allocated_q & port_match & vc_match;
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // track number of flits that downstream buffer can still accept
-   //---------------------------------------------------------------------------
-   
-   wire 		      flags_active;
-   assign flags_active = flit_valid | fc_event_valid;
-   
-   wire 		      fc_event_valid_sel;
-   assign fc_event_valid_sel = fc_event_valid & fc_event_sel;
-   
-   wire 		      fc_empty;
-   wire [0:1] 		      fc_errors;
-   rtr_fc_state
-     #(.num_flits_per_vc(num_flits_per_vc),
-       .flow_ctrl_type(flow_ctrl_type),
-       .flow_ctrl_bypass(flow_ctrl_bypass),
-       .reset_type(reset_type))
-   fc
-     (.clk(clk),
-      .reset(reset),
-      .active(flags_active),
-      .flit_sent(flit_sent),
-      .fc_event_valid(fc_event_valid_sel),
-      .fc_active(fc_active),
-      .empty(fc_empty),
-      .almost_full(almost_full),
-      .full(full),
-      .full_prev(fc_full_prev),
-      .errors(fc_errors));
-   
-   assign errors[0:1] = fc_errors;
    
    
    //---------------------------------------------------------------------------
@@ -254,7 +186,7 @@ module vcr_ovc_ctrl
 
 	`ELIG_MASK_USED:
 	  begin
-	     assign elig = ~allocated & fc_empty;
+	     assign elig = ~allocated & empty;
 	  end
 	
       endcase

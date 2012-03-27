@@ -340,9 +340,70 @@ module packet_source
       .fc_event_valid_out(fc_event_valid),
       .fc_event_sel_out_ovc(fc_event_sel_ovc));
    
+   wire 				 flit_valid_s, flit_valid_q;
+   assign flit_valid_s = flit_valid;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_validq
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(flit_valid_s),
+      .q(flit_valid_q));
+   
+   wire 				 flit_tail_s, flit_tail_q;
+   assign flit_tail_s = flit_tail;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   flit_tailq
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(flit_tail_s),
+      .q(flit_tail_q));
+   
+   wire [0:num_vcs-1] 			 flit_sel_ovc_s, flit_sel_ovc_q;
+   assign flit_sel_ovc_s = sel_ovc;
+   c_dff
+     #(.width(num_vcs),
+       .reset_type(reset_type))
+   flit_sel_ovcq
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(flit_sel_ovc_s),
+      .q(flit_sel_ovc_q));
+   
+   wire 				 fc_active;
+   wire [0:num_vcs-1] 			 empty_ovc;
+   wire [0:num_vcs-1] 			 almost_full_ovc;
    wire [0:num_vcs-1] 			 full_ovc;
-   wire [0:num_vcs-1] 			 elig_ovc;
+   wire [0:num_vcs-1] 			 full_prev_ovc;
    wire [0:num_vcs*2-1] 		 fcs_errors_ovc;
+   rtr_fc_state
+     #(.num_vcs(num_vcs),
+       .num_flits_per_vc(num_flits_per_vc),
+       .flow_ctrl_type(flow_ctrl_type),
+       .flow_ctrl_bypass(flow_ctrl_bypass),
+       .reset_type(reset_type))
+   fcs
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .flit_valid(flit_valid_q),
+      .flit_sel_ovc(flit_sel_ovc_q),
+      .fc_event_valid(fc_event_valid),
+      .fc_event_sel_ovc(fc_event_sel_ovc),
+      .fc_active(fc_active),
+      .empty_ovc(empty_ovc),
+      .almost_full_ovc(almost_full_ovc),
+      .full_ovc(full_ovc),
+      .full_prev_ovc(full_prev_ovc),
+      .errors_ovc(fcs_errors_ovc));
+   
+   wire [0:num_vcs-1] 			 elig_ovc;
    
    genvar 				 ovc;
    
@@ -351,66 +412,9 @@ module packet_source
       for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
 	begin:ovcs
 	   
-	   wire fc_event_valid_sel;
-	   assign fc_event_valid_sel = fc_event_valid & fc_event_sel_ovc[ovc];
+	   wire allocated;
 	   
-	   wire flit_valid_sel;
-	   assign flit_valid_sel = flit_valid & sel_ovc[ovc];
-	   
-	   wire flit_valid_s, flit_valid_q;
-	   assign flit_valid_s = flit_valid_sel;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_validq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .d(flit_valid_s),
-	      .q(flit_valid_q));
-
-	   wire flit_tail_s, flit_tail_q;
-	   assign flit_tail_s = flit_tail;
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   flit_tailq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .d(flit_tail_s),
-	      .q(flit_tail_q));
-	   
-	   wire fcs_fc_active;
-	   wire fcs_empty;
-	   wire fcs_almost_full;
-	   wire fcs_full;
-	   wire fcs_full_prev;
-	   wire [0:1] fcs_errors;
-	   rtr_fc_state
-	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .flow_ctrl_type(flow_ctrl_type),
-	       .flow_ctrl_bypass(flow_ctrl_bypass),
-	       .reset_type(reset_type))
-	   fcs
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .flit_sent(flit_valid_q),
-	      .fc_event_valid(fc_event_valid_sel),
-	      .fc_active(fcs_fc_active),
-	      .empty(fcs_empty),
-	      .almost_full(fcs_almost_full),
-	      .full(fcs_full),
-	      .full_prev(fcs_full_prev),
-	      .errors(fcs_errors));
-	   
-	   assign full_ovc[ovc] = fcs_full;
-	   assign fcs_errors_ovc[ovc*2:(ovc+1)*2-1] = fcs_errors;
-	   
-	   wire       allocated;
-	   
-	   wire       allocated_s, allocated_q;
+	   wire allocated_s, allocated_q;
 	   assign allocated_s = allocated;
 	   c_dff
 	     #(.width(1),
@@ -422,9 +426,18 @@ module packet_source
 	      .d(allocated_s),
 	      .q(allocated_q));
 	   
-	   assign allocated = flit_valid_q ? ~flit_tail_q : allocated_q;
+	   wire flit_sent;
+	   assign flit_sent = flit_valid_q & flit_sel_ovc_q[ovc];
 	   
-	   wire       elig;
+	   assign allocated = flit_sent ? ~flit_tail_q : allocated_q;
+	   
+	   wire empty;
+	   assign empty = empty_ovc[ovc];
+	   
+	   wire full;
+	   assign full = full_ovc[ovc];
+	   
+	   wire elig;
 	   
 	   case(elig_mask)
 	     
@@ -432,10 +445,10 @@ module packet_source
 	       assign elig = ~allocated;
 	     
 	     `ELIG_MASK_FULL:
-	       assign elig = ~allocated & ~fcs_full;
+	       assign elig = ~allocated & ~full;
 	     
 	     `ELIG_MASK_USED:
-	       assign elig = ~allocated & fcs_empty;
+	       assign elig = ~allocated & empty;
 	     
 	   endcase
 	   
@@ -445,7 +458,7 @@ module packet_source
       
    endgenerate
    
-   wire 				 full;
+   wire 	full;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(1))
@@ -454,7 +467,7 @@ module packet_source
       .data_in(full_ovc),
       .data_out(full));
    
-   wire 				 elig;
+   wire 	elig;
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(1))
@@ -463,18 +476,18 @@ module packet_source
       .data_in(elig_ovc),
       .data_out(elig));
    
-   wire 				 flit_pending_q;
+   wire 	flit_pending_q;
    
-   wire 				 flit_sent;
+   wire 	flit_sent;
    assign flit_sent = flit_pending_q & ~full & (elig | ~flit_head);
    
-   wire 				 flit_kill;
+   wire 	flit_kill;
    
    assign flit_valid = flit_sent & ~flit_kill;
    
    assign packet_sent = flit_tail & flit_sent;
    
-   wire 				 flit_pending_s;
+   wire 	flit_pending_s;
    assign flit_pending_s
      = (flit_pending_q & ~packet_sent) | ~ready_packet_count_zero;
    c_dff
@@ -487,7 +500,7 @@ module packet_source
       .d(flit_pending_s),
       .q(flit_pending_q));
    
-   reg [0:flit_data_width-1] 		 data_q;
+   reg [0:flit_data_width-1] data_q;
    always @(posedge clk, posedge reset)
      begin
 	if(reset | flit_valid)

@@ -30,8 +30,9 @@
 //==============================================================================
 
 module rtr_fc_state
-  (clk, reset, active, flit_sent, fc_event_valid, fc_active, empty, 
-   almost_full, full, full_prev, errors);
+  (clk, reset, active, flit_valid, flit_sel_ovc, fc_event_valid, 
+   fc_event_sel_ovc, fc_active, empty_ovc, almost_full_ovc, full_ovc, 
+   full_prev_ovc, errors_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -41,6 +42,9 @@ module rtr_fc_state
    //---------------------------------------------------------------------------
    // parameters
    //---------------------------------------------------------------------------
+   
+   // number of VCs
+   parameter num_vcs = 4;
    
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
@@ -73,170 +77,223 @@ module rtr_fc_state
    // clock enable signal
    input active;
    
-   // a flit was sent
-   input flit_sent;
+   // a flit is begin sent
+   input flit_valid;
+   
+   // VC to which the flit is sent
+   input [0:num_vcs-1] flit_sel_ovc;
    
    // flow control event occurred
-   input fc_event_valid;
+   input 	       fc_event_valid;
+
+   // VC for which the flow control event occurred
+   input [0:num_vcs-1] fc_event_sel_ovc;
    
    // activate flow control input logic
    output fc_active;
    wire   fc_active;
    
    // VC is empty
-   output empty;
-   wire   empty;
+   output [0:num_vcs-1] empty_ovc;
+   wire [0:num_vcs-1] 	empty_ovc;
 
    // VC has one slot left
-   output almost_full;
-   wire   almost_full;
+   output [0:num_vcs-1] almost_full_ovc;
+   wire [0:num_vcs-1] 	almost_full_ovc;
    
    // VC is full
-   output full;
-   wire   full;
+   output [0:num_vcs-1] full_ovc;
+   wire [0:num_vcs-1] 	full_ovc;
    
    // VC was full in previous cycle
-   output full_prev;
-   wire   full_prev;
+   output [0:num_vcs-1] full_prev_ovc;
+   wire [0:num_vcs-1] 	full_prev_ovc;
    
    // internal error condition detected
-   output [0:1] errors;
-   wire [0:1] 	errors;
+   output [0:num_vcs*2-1] errors_ovc;
+   wire [0:num_vcs*2-1]   errors_ovc;
    
    
    //---------------------------------------------------------------------------
    // implementation
    //---------------------------------------------------------------------------
    
-   wire 	error_ft_underflow;
-   wire 	error_ft_overflow;
+   wire [0:num_vcs-1] 	  fc_active_ovc;
+   assign fc_active = |fc_active_ovc;
+   
+   genvar 		  ovc;
    
    generate
       
-      case(flow_ctrl_type)
-	
-	`FLOW_CTRL_TYPE_CREDIT:
-	  begin
+      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
+	begin:ovcs
+	   
+	   wire fc_active;
+	   wire empty;
+	   wire almost_full;
+	   wire full;
+	   wire full_prev;
+	   
+	   wire error_ft_underflow;
+	   wire error_ft_overflow;
+	   
+	   case(flow_ctrl_type)
 	     
-	     //-----------------------------------------------------------------
-	     // track number of flits the VC can still accept
-	     //-----------------------------------------------------------------
-	     
-	     wire ft_debit;
-	     assign ft_debit = flit_sent;
-	     
-	     wire ft_credit;
-	     assign ft_credit = fc_event_valid;
-	     
-	     wire ft_almost_empty;
-	     wire ft_empty;
-	     wire ft_almost_full;
-	     wire ft_full;
-	     wire [0:flit_count_width-1] ft_free;
-	     wire [0:1] 		 ft_errors;
-	     c_fifo_tracker
-	       #(.depth(num_flits_per_vc),
-		 .reset_type(reset_type))
-	     ft
-	       (.clk(clk),
-		.reset(reset),
-		.active(active),
-		.push(ft_debit),
-		.pop(ft_credit),
-		.almost_empty(ft_almost_empty),
-		.empty(ft_empty),
-		.almost_full(ft_almost_full),
-		.full(ft_full),
-		.free(ft_free),
-		.errors(ft_errors));
-
-	     assign fc_active = ~ft_empty;
-	     
-	     wire 			 two_credits_left_s, two_credits_left_q;
-	     if(num_flits_per_vc == 2)
-	       assign two_credits_left_s
-		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
-		   (two_credits_left_q & (flit_sent ~^ fc_event_valid));
-	     else if(num_flits_per_vc == 3)
-	       assign two_credits_left_s
-		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
-		   (two_credits_left_q & (flit_sent ~^ fc_event_valid)) |
-		   (ft_empty & flit_sent);
-	     else if(num_flits_per_vc == 4)
-	       assign two_credits_left_s
-		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
-		   (two_credits_left_q & (flit_sent ~^ fc_event_valid)) |
-		   (ft_almost_empty & flit_sent & ~fc_event_valid);
-	     else if(num_flits_per_vc > 4)
-	       assign two_credits_left_s
-		 = (ft_almost_full & ~flit_sent & fc_event_valid) | 
-		   (two_credits_left_q & (flit_sent ~^ fc_event_valid)) |
-		   (~|ft_free[0:flit_count_width-3] &
-		    &ft_free[flit_count_width-2:flit_count_width-1] &
-		    flit_sent & ~fc_event_valid);
-	     c_dff
-	       #(.width(1),
-		 .reset_type(reset_type),
-		 .reset_value((num_flits_per_vc == 2) ? 1'b1 : 1'b0))
-	     two_credits_leftq
-	       (.clk(clk),
-		.reset(reset),
-		.active(active),
-		.d(two_credits_left_s),
-		.q(two_credits_left_q));
-	     
-	     if(flow_ctrl_bypass)
+	     `FLOW_CTRL_TYPE_CREDIT:
 	       begin
-		  assign empty
-		    = (ft_empty | (ft_almost_empty & fc_event_valid)) &
-		      ~flit_sent;	
-		  assign almost_full
-		    = (ft_full & fc_event_valid) | 
-		      (ft_almost_full & (flit_sent ~^ fc_event_valid)) |
-		      (two_credits_left_q & flit_sent & ~fc_event_valid);
-		  assign full = (ft_full | (ft_almost_full & flit_sent)) &
-				~fc_event_valid;
-		  assign full_prev = ft_full & ~fc_event_valid;
+		  
+		  //------------------------------------------------------------
+		  // track number of flits the VC can still accept
+		  //------------------------------------------------------------
+		  
+		  wire flit_sel;
+		  assign flit_sel = flit_sel_ovc[ovc];
+		  
+		  wire flit_valid_sel;
+		  assign flit_valid_sel = flit_valid & flit_sel;
+		  
+		  wire fc_event_sel;
+		  assign fc_event_sel = fc_event_sel_ovc[ovc];
+		  
+		  wire fc_event_valid_sel;
+		  assign fc_event_valid_sel = fc_event_valid & fc_event_sel;
+		  
+		  wire ft_almost_empty;
+		  wire ft_empty;
+		  wire ft_almost_full;
+		  wire ft_full;
+		  wire [0:flit_count_width-1] ft_free;
+		  wire [0:1] 		      ft_errors;
+		  c_fifo_tracker
+		    #(.depth(num_flits_per_vc),
+		      .reset_type(reset_type))
+		  ft
+		    (.clk(clk),
+		     .reset(reset),
+		     .active(active),
+		     .push(flit_valid_sel),
+		     .pop(fc_event_valid_sel),
+		     .almost_empty(ft_almost_empty),
+		     .empty(ft_empty),
+		     .almost_full(ft_almost_full),
+		     .full(ft_full),
+		     .free(ft_free),
+		     .errors(ft_errors));
+		  
+		  assign fc_active = ~ft_empty;
+		  
+		  wire 			      two_credits_left_s, 
+					      two_credits_left_q;
+		  if(num_flits_per_vc == 2)
+		    assign two_credits_left_s
+		      = (ft_almost_full & 
+			 (~flit_valid_sel & fc_event_valid_sel)) | 
+			(two_credits_left_q & 
+			 (flit_valid_sel ~^ fc_event_valid_sel));
+		  else if(num_flits_per_vc == 3)
+		    assign two_credits_left_s
+		      = (ft_almost_full & 
+			 (~flit_valid_sel & fc_event_valid_sel)) | 
+			(two_credits_left_q & 
+			 (flit_valid_sel ~^ fc_event_valid_sel)) |
+			(ft_empty & flit_valid_sel);
+		  else if(num_flits_per_vc == 4)
+		    assign two_credits_left_s
+		      = (ft_almost_full & 
+			 (~flit_valid_sel & fc_event_valid_sel)) | 
+			(two_credits_left_q & 
+			 (flit_valid_sel ~^ fc_event_valid_sel)) |
+			(ft_almost_empty & 
+			 (flit_valid_sel & ~fc_event_valid_sel));
+		  else if(num_flits_per_vc > 4)
+		    assign two_credits_left_s
+		      = (ft_almost_full & 
+			 (~flit_valid_sel & fc_event_valid_sel)) | 
+			(two_credits_left_q & 
+			 (flit_valid_sel ~^ fc_event_valid_sel)) |
+			(~|ft_free[0:flit_count_width-3] &
+			 &ft_free[flit_count_width-2:flit_count_width-1] &
+			 flit_valid_sel & ~fc_event_valid_sel);
+		  c_dff
+		    #(.width(1),
+		      .reset_type(reset_type),
+		      .reset_value((num_flits_per_vc == 2) ? 1'b1 : 1'b0))
+		  two_credits_leftq
+		    (.clk(clk),
+		     .reset(reset),
+		     .active(active),
+		     .d(two_credits_left_s),
+		     .q(two_credits_left_q));
+		  
+		  if(flow_ctrl_bypass)
+		    begin
+		       assign empty
+			 = (ft_empty | (ft_almost_empty & fc_event_valid_sel)) &
+			   ~flit_valid_sel;
+		       assign almost_full
+			 = (ft_full & fc_event_valid_sel) | 
+			   (ft_almost_full & 
+			    (flit_valid_sel ~^ fc_event_valid_sel)) |
+			   (two_credits_left_q & 
+			    (flit_valid_sel & ~fc_event_valid_sel));
+		       assign full = (ft_full | 
+				      (ft_almost_full & flit_valid_sel)) &
+				     ~fc_event_valid_sel;
+		       assign full_prev = ft_full & ~fc_event_valid_sel;
+		    end
+		  else
+		    begin
+		       assign empty = ft_empty & ~flit_valid_sel;
+		       assign almost_full
+			 = flit_valid_sel ? two_credits_left_q : ft_almost_full;
+		       assign full = ft_full | 
+				     (ft_almost_full & flit_valid_sel);
+		       assign full_prev = ft_full;
+		    end
+		  
+		  assign error_ft_underflow = ft_errors[0];
+		  assign error_ft_overflow = ft_errors[1];
+	     	  
 	       end
-	     else
-	       begin
-		  assign empty = ft_empty & ~flit_sent;
-		  assign almost_full
-		    = flit_sent ? two_credits_left_q : ft_almost_full;
-		  assign full = ft_full | (ft_almost_full & flit_sent);
-		  assign full_prev = ft_full;
-	       end
-
-	     assign error_ft_underflow = ft_errors[0];
-	     assign error_ft_overflow = ft_errors[1];
-	     	     
-	  end
-	
-      endcase
+	     
+	   endcase
+	   
+	   assign fc_active_ovc[ovc] = fc_active;
+	   assign empty_ovc[ovc] = empty;
+	   assign almost_full_ovc[ovc] = almost_full;
+	   assign full_ovc[ovc] = full;
+	   assign full_prev_ovc[ovc] = full_prev;
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // error checking
+	   //-------------------------------------------------------------------
+	   
+	   // pragma translate_off
+	   
+	   always @(posedge clk)
+	     begin
+		
+		if(error_ft_underflow)
+		  $display({"ERROR: Flow control state tracker underflow in ", 
+			    "module %m, VC %d."}, ovc);
+		
+		if(error_ft_overflow)
+		  $display({"ERROR: Flow control state tracker overflow in ",
+			    "module %m, VC %d."}, ovc);
+		
+	     end
+	   
+	   // pragma translate_on
+	   
+	   wire [0:1] errors;
+	   assign errors[0] = error_ft_underflow;
+	   assign errors[1] = error_ft_overflow;
+	   
+	   assign errors_ovc[ovc*2:(ovc+1)*2-1] = errors;
+	   
+	end
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // error checking
-   //---------------------------------------------------------------------------
-   
-   // pragma translate_off
-   
-   always @(posedge clk)
-     begin
-	
-	if(error_ft_underflow)
-	  $display("ERROR: Flit count tracker underflow in module %m.");
-	
-	if(error_ft_overflow)
-	  $display("ERROR: Flit count tracker overflow in module %m.");
-	
-     end
-   
-   // pragma translate_on
-   
-   assign errors[0] = error_ft_underflow;
-   assign errors[1] = error_ft_overflow;
    
 endmodule

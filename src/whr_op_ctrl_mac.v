@@ -173,7 +173,8 @@ module whr_op_ctrl_mac
    wire 		       fcs_full_prev;
    wire [0:1] 		       fcs_errors;
    rtr_fc_state
-     #(.num_flits_per_vc(num_flits_per_vc),
+     #(.num_vcs(1),
+       .num_flits_per_vc(num_flits_per_vc),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .reset_type(reset_type))
@@ -181,14 +182,16 @@ module whr_op_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(fcs_active),
-      .flit_sent(flit_valid_in),
+      .flit_valid(flit_valid_in),
+      .flit_sel_ovc(1'b1),
       .fc_event_valid(fc_event_valid),
+      .fc_event_sel_ovc(1'b1),
       .fc_active(fcs_fc_active),
-      .empty(fcs_empty),
-      .almost_full(fcs_almost_full),
-      .full(fcs_full),
-      .full_prev(fcs_full_prev),
-      .errors(fcs_errors));
+      .empty_ovc(fcs_empty),
+      .almost_full_ovc(fcs_almost_full),
+      .full_ovc(fcs_full),
+      .full_prev_ovc(fcs_full_prev),
+      .errors_ovc(fcs_errors));
    
    assign full = fcs_full;
    
