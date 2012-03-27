@@ -94,6 +94,12 @@ module flit_sink
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
+   // select implementation variant for flit buffer register file
+   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // use atomic VC allocation
+   parameter atomic_vc_allocation = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -144,13 +150,10 @@ module flit_sink
 	consume <= $dist_uniform(seed, 0, 99) < consume_rate;
      end
    
-   wire [0:num_vcs-1] flit_valid_ivc;
-   assign flit_valid_ivc = {num_vcs{flit_valid}} & flit_sel_ivc;
-   
-   wire [0:num_vcs-1] buffer_empty_ivc;
+   wire [0:num_vcs-1] empty_ivc;
    
    wire [0:num_vcs-1] req_ivc;
-   assign req_ivc = flit_valid_ivc | ~buffer_empty_ivc;
+   assign req_ivc = ({num_vcs{flit_valid}} & flit_sel_ivc) | ~empty_ivc;
    
    wire 	      update;
    assign update = |req_ivc & consume;
@@ -170,13 +173,36 @@ module flit_sink
       .gnt_pr(gnt_ivc),
       .gnt());
    
-   wire [0:num_vcs-1] buffer_push_ivc;
-   assign buffer_push_ivc = flit_valid_ivc;
-   
-   wire [0:num_vcs-1] buffer_pop_ivc;
-   assign buffer_pop_ivc = {num_vcs{consume}} & gnt_ivc;
-   
-   wire [0:num_vcs-1] buffer_error_ivc;
+   wire [0:num_vcs*2-1] errors_ivc;
+   rtr_flit_buffer
+     #(.num_vcs(num_vcs),
+       .buffer_size(buffer_size),
+       .flit_data_width(flit_data_width),
+       .header_info_width(flit_data_width),
+       .regfile_type(fb_regfile_type),
+       .explicit_pipeline_register(0),
+       .gate_buffer_write(0),
+       .atomic_vc_allocation(atomic_vc_allocation),
+       .reset_type(reset_type))
+   fb
+     (.clk(clk),
+      .reset(reset),
+      .push_active(1'b1),
+      .push_valid(flit_valid),
+      .push_sel_ivc(flit_sel_ivc),
+      .push_head(flit_head),
+      .push_tail(flit_tail),
+      .push_data(flit_data),
+      .pop_active(1'b1),
+      .pop_valid(consume),
+      .pop_sel_ivc(gnt_ivc),
+      .pop_data(),
+      .peek_tail_ivc(),
+      .peek_next_header_info(),
+      .almost_empty_ivc(),
+      .empty_ivc(empty_ivc),
+      .full(),
+      .errors_ivc(errors_ivc));
    
    rtr_flow_ctrl_output
      #(.num_vcs(num_vcs),
@@ -190,48 +216,6 @@ module flit_sink
       .fc_event_sel_in_ivc(gnt_ivc),
       .flow_ctrl_out(flow_ctrl));
    
-   generate
-      
-      genvar 	      ivc;
-      
-      for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	begin:ivcs
-	   
-	   wire buffer_push;
-	   assign buffer_push = buffer_push_ivc[ivc];
-	   
-	   wire buffer_pop;
-	   assign buffer_pop = buffer_pop_ivc[ivc];
-	   
-	   wire 			    buffer_almost_empty;
-	   wire 			    buffer_empty;
-	   wire 			    buffer_almost_full;
-	   wire 			    buffer_full;
-	   wire [0:flit_count_width-1] 	    buffer_free;
-	   wire [0:1] 			    buffer_errors;
-	   c_fifo_tracker
-	     #(.depth(buffer_size_per_vc),
-	       .reset_type(reset_type))
-	   ft
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(1'b1),
-	      .push(buffer_push),
-	      .pop(buffer_pop),
-	      .almost_empty(buffer_almost_empty),
-	      .empty(buffer_empty),
-	      .almost_full(buffer_almost_full),
-	      .full(buffer_full),
-	      .free(buffer_free),
-	      .errors(buffer_errors));
-	   
-	   assign buffer_empty_ivc[ivc] = buffer_empty;
-	   assign buffer_error_ivc[ivc] = |buffer_errors;
-	   
-	end
-      
-   endgenerate
-   
-   assign error = |buffer_error_ivc;
+   assign error = |errors_ivc;
    
 endmodule

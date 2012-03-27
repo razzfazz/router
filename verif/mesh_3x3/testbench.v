@@ -151,6 +151,9 @@ module testbench
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
    
+   // use atomic VC allocation
+   localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
+   
    // number of pipeline stages in the channels
    localparam num_channel_stages = channel_latency - 1;
    
@@ -1283,6 +1286,8 @@ module testbench
 	       .min_payload_length(min_payload_length),
 	       .route_info_width(route_info_width),
 	       .flit_data_width(flit_data_width),
+	       .fb_regfile_type(fb_regfile_type),
+	       .atomic_vc_allocation(atomic_vc_allocation),
 	       .reset_type(reset_type))
 	   fs
 	     (.clk(clk),
