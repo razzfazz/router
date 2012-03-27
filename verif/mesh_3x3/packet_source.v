@@ -463,10 +463,10 @@ module packet_source
       .data_in(elig_ovc),
       .data_out(elig));
    
-   wire 				 flit_valid_q;
+   wire 				 flit_pending_q;
    
    wire 				 flit_sent;
-   assign flit_sent = flit_valid_q & ~full & (elig | ~flit_head);
+   assign flit_sent = flit_pending_q & ~full & (elig | ~flit_head);
    
    wire 				 flit_kill;
    
@@ -474,18 +474,18 @@ module packet_source
    
    assign packet_sent = flit_tail & flit_sent;
    
-   wire 				 flit_valid_s;
-   assign flit_valid_s
-     = (flit_valid_q & ~packet_sent) | ~ready_packet_count_zero;
+   wire 				 flit_pending_s;
+   assign flit_pending_s
+     = (flit_pending_q & ~packet_sent) | ~ready_packet_count_zero;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   flit_validq
+   flit_pendingq
      (.clk(clk),
       .reset(reset),
       .active(1'b1),
-      .d(flit_valid_s),
-      .q(flit_valid_q));
+      .d(flit_pending_s),
+      .q(flit_pending_q));
    
    reg [0:flit_data_width-1] 		 data_q;
    always @(posedge clk, posedge reset)
