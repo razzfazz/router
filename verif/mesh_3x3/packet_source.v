@@ -57,9 +57,6 @@ module packet_source
    // flit buffer entries per VC
    parameter num_flits_per_vc = 8;
    
-   // number of bits required for flit buffer addresses
-   localparam flit_buffer_idx_width = clogb(num_flits_per_vc);
-   
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
    
