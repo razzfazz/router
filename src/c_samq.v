@@ -46,7 +46,7 @@ module c_samq
    parameter num_queues = 4;
    
    // buffer entries per queue
-   parameter num_buffers_per_queue = 8;
+   parameter num_slots_per_queue = 8;
    
    // width of payload data
    parameter data_width = 64;
@@ -73,14 +73,14 @@ module c_samq
    // derived parameters
    //---------------------------------------------------------------------------
    
-   // total number of buffers
-   localparam num_buffers = num_queues * num_buffers_per_queue;
+   // total number of slots
+   localparam num_slots = num_queues * num_slots_per_queue;
    
    // address width required for selecting an individual entry
-   localparam addr_width = clogb(num_buffers);
+   localparam addr_width = clogb(num_slots);
    
    // address width required for selecting an individual entry in a queue
-   localparam queue_addr_width = clogb(num_buffers_per_queue);
+   localparam queue_addr_width = clogb(num_slots_per_queue);
    
    // difference between the two
    localparam addr_pad_width = addr_width - queue_addr_width;
@@ -187,9 +187,9 @@ module c_samq
 	   wire 		 full;
 	   wire [0:1] 		 errors;
 	   c_fifo_ctrl
-	     #(.depth(num_buffers_per_queue),
+	     #(.depth(num_slots_per_queue),
 	       .extra_addr_width(addr_pad_width),
-	       .offset(queue * num_buffers_per_queue),
+	       .offset(queue * num_slots_per_queue),
 	       .reset_type(reset_type))
 	   fc
 	     (.clk(clk),
@@ -212,8 +212,8 @@ module c_samq
 		
 		c_incr
 		  #(.width(addr_width),
-		    .min_value(queue * num_buffers_per_queue),
-		    .max_value((queue + 1) * num_buffers_per_queue - 1))
+		    .min_value(queue * num_slots_per_queue),
+		    .max_value((queue + 1) * num_slots_per_queue - 1))
 		peek_next_addr_incr
 		  (.data_in(pop_addr),
 		   .data_out(peek_next_addr));
@@ -347,7 +347,7 @@ module c_samq
 	      .data_out(peek_next_addr));
 	   
 	   c_regfile
-	     #(.depth(num_buffers),
+	     #(.depth(num_slots),
 	       .width(data_width),
 	       .num_read_ports(2),
 	       .regfile_type(regfile_type))
@@ -365,7 +365,7 @@ module c_samq
 	begin
 	   
 	   c_regfile
-	     #(.depth(num_buffers),
+	     #(.depth(num_slots),
 	       .width(data_width),
 	       .regfile_type(regfile_type))
 	   bf

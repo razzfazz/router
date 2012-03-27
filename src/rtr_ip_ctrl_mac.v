@@ -1093,7 +1093,7 @@ module rtr_ip_ctrl_mac
    wire [0:num_vcs*2-1] 		    fb_errors_ivc;
    rtr_flit_buffer
      #(.num_vcs(num_vcs),
-       .num_buffers_per_vc(num_flits_per_vc),
+       .num_flits_per_vc(num_flits_per_vc),
        .flit_data_width(flit_data_width),
        .header_info_width(header_info_width),
        .regfile_type(fb_regfile_type),
