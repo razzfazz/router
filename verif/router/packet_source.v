@@ -446,10 +446,22 @@ module packet_source
    endgenerate
    
    wire 				 full;
-   assign full = |(sel_ovc & full_ovc);
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(1))
+   full_sel
+     (.select(sel_ovc),
+      .data_in(full_ovc),
+      .data_out(full));
    
    wire 				 elig;
-   assign elig = |(sel_ovc & elig_ovc);
+   c_select_1ofn
+     #(.num_ports(num_ports),
+       .width(1))
+   elig_sel
+     (.select(sel_ovc),
+      .data_in(elig_ovc),
+      .data_out(elig));
    
    wire 				 flit_valid_q;
    
