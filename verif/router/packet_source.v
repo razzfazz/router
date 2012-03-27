@@ -456,7 +456,7 @@ module packet_source
    
    wire 				 elig;
    c_select_1ofn
-     #(.num_ports(num_ports),
+     #(.num_ports(num_vcs),
        .width(1))
    elig_sel
      (.select(sel_ovc),
