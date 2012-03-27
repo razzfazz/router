@@ -137,9 +137,15 @@ module test_nic(/*autoarg*/
 
    
    parameter max_reservation_size     = 16; //packets
-   parameter time_to_wait_width       = 8;
    localparam reservation_size_width  = clogb(max_reservation_size);
+   parameter time_to_wait_width       = 8;
+   parameter spec_buffer_capacity     = 4;
+   localparam spec_buffer_width       = clogb(spec_buffer_capacity);   
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
+   
+   //SRP packet related
+`include "srp_format.v"
+   
    
    
    input clk;
@@ -282,7 +288,7 @@ module test_nic(/*autoarg*/
    //these requests NEEDS to be modified significantly, add as we see fit
    assign ejection_req[0]  = ~eject_fifo_empty[1] &  //Grant VC
 			    ~(|eject_fifo_data[(flit_data_width+1)+header_info_width+:2]); //SRP_TYPE == 00
-   assign ejection_req[1] = ~eject_fifo_empty[0] & //Reservation VC
+   assign ejection_req[1] = ~eject_fifo_empty[0] & //Reservation VC{testbench.thebuffer.spec_packet[0:63]}
 			    ~grant_almost_full;    //Grant output fifo flow control
    assign ejection_req[2] = ~eject_fifo_empty[1] &  //ack/nack
 			    (|eject_fifo_data[(flit_data_width+1)+header_info_width+:2]);
@@ -320,11 +326,11 @@ module test_nic(/*autoarg*/
    wire [0:flit_data_width-1] reservation_data  = eject_fifo_data[0:flit_data_width-1];
    wire [0:reservation_size_width+packet_length_width-1] reservation_size = 
 				     (reservation_request)?
-				     {reservation_data[(header_info_width+2)+:reservation_size_width], {packet_length_width{1'b0}}}:
+				     {reservation_data[res_size_start +:reservation_size_width], {packet_length_width{1'b0}}}:
 				     {{reservation_size_width{1'b0}},{packet_length_width{1'b0}}};
    wire [0:dest_info_width-1] reservation_src = (reservation_request)?
-			      reservation_data[(header_info_width+2+reservation_size_width)+:dest_info_width]:
-			       {dest_info_width{1'b0}};
+			      reservation_data[res_src_start+:dest_info_width]:
+			      {dest_info_width{1'b0}};
    
    
    ///////////////////////
@@ -383,14 +389,17 @@ module test_nic(/*autoarg*/
      (.data_in(grant_route_op),
       .data_out(grant_route_port));
    wire [0:flit_data_width-1] grant_packet_in;
-   assign grant_packet_in[0:lar_info_width-1] =  grant_route_port; //lar
-   assign grant_packet_in[lar_info_width+:dest_info_width] =  reservation_src;//dest
-   assign grant_packet_in[lar_info_width+dest_info_width:header_info_width-1] = 'b0;//psize
-   assign grant_packet_in[header_info_width+:2] = 2'b00; //srp_type
-   assign grant_packet_in[header_info_width+2:flit_data_width-32-1] = 'b0;//filler
-   assign grant_packet_in[flit_data_width-32:flit_data_width-1] = grant_time;//G_ts
-
    wire [0:flit_data_width-1] grant_packet_out;
+   wire [0:payload_length_width-1] grant_payload_size = {payload_length_width{1'b0}};
+   
+   assign grant_packet_in[0:flit_data_width-1] = {grant_route_port,
+						  reservation_src,
+						  grant_payload_size,
+						  2'b00,
+						  {(grant_time_start-grant_data_start){1'b0}},
+						  grant_time
+						  };
+
 
    //insert into grant fifo
    wire grant_push = reservation_request; //0 cycle turn around
@@ -431,10 +440,11 @@ module test_nic(/*autoarg*/
    //Spec and Ack handling
    //Only head generate ack, extract reply src
    wire speculative_request  = ejection_valid&ejection_head&(ejection_gnt_ivc[3]);
-   wire [0:flit_data_width-1] speculative_data  = eject_fifo_data[3*flit_data_width+:flit_data_width];
+   wire [0:flit_data_width-1] speculative_data  = eject_fifo_data[3*(flit_data_width+1)+:flit_data_width];
    wire [0:dest_info_width-1] speculative_src = (speculative_request)?
-			      speculative_data[(header_info_width+2+time_to_wait_width)+:dest_info_width]:
+			      speculative_data[spec_src_start+:dest_info_width]:
 			      {dest_info_width{1'b0}};
+   wire [0:spec_buffer_width-1] speculative_id  = speculative_data[spec_id_start+:spec_buffer_width];
    
    wire [0:num_ports-1] ack_route_op;
    rtr_routing_logic
@@ -459,14 +469,17 @@ module test_nic(/*autoarg*/
    ack_route_port_enc
      (.data_in(ack_route_op),
       .data_out(ack_route_port));
+   
    wire [0:flit_data_width-1] ack_packet_in;
-   assign ack_packet_in[0:lar_info_width-1] =  ack_route_port; //lar
-   assign ack_packet_in[lar_info_width+:dest_info_width] =  speculative_src;//dest
-   assign ack_packet_in[lar_info_width+dest_info_width:header_info_width-1] = 'b0;//psize
-   assign ack_packet_in[header_info_width+:2] = 2'b01; //srp_type
-   assign ack_packet_in[header_info_width+2:flit_data_width-1] = 'b0;//filler
-
    wire [0:flit_data_width-1] ack_packet_out;
+   wire [0:payload_length_width-1] ack_payload_size = {payload_length_width{1'b0}};
+   assign ack_packet_in[0:ack_data_start-1] = {ack_route_port,
+					       speculative_src,
+					       ack_payload_size,
+					       2'b10,
+					       speculative_id};
+   assign ack_packet_in[ack_data_start:flit_data_width-1] = 'b0;//filler
+
    //insert into ack fifo   
    wire ack_push = speculative_request; //0 cycle turn around
    wire ack_pop ;

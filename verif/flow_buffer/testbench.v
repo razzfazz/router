@@ -83,9 +83,9 @@ module testbench();
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (route_info_width + payload_length_width) : 
        -1;
-   
+   parameter spec_buffer_capacity     = 8;
    parameter max_reservation_size     = 16;
-   parameter time_to_wait_width      = 8;
+   parameter time_to_wait_width       = 8;
    localparam reservation_size_width  = clogb(max_reservation_size);
 
    // measurement interval in cycles
@@ -176,20 +176,21 @@ module testbench();
        .routing_type			(routing_type),
        .dim_order			(dim_order),
        .elig_mask			(elig_mask),
+       .spec_buffer_capacity(spec_buffer_capacity),
        .max_reservation_size		(max_reservation_size),
        .time_to_wait_width		(time_to_wait_width),
        .reset_type			(reset_type))
    thenic
      (// Outputs
-      .flow_ctrl			(),
-      .channel_out			(channel_ntob),
+      .flow_ctrl_eject			(),
+      .channel_inject			(channel_ntob),
       .error				(error),
       // Inputs
       .clk				(clk),
       .reset				(reset),
       .run				(run),
       .router_address			(router_address),
-      .channel_in			(channel_bton));
+      .channel_eject			(channel_bton));
    
    flow_buffer
      #(// Parameters
@@ -209,6 +210,7 @@ module testbench();
        .routing_type			(routing_type),
        .dim_order			(dim_order),
        .elig_mask			(elig_mask),
+       .spec_buffer_capacity(spec_buffer_capacity),
        .time_to_wait_width		(time_to_wait_width),
        .max_reservation_size		(max_reservation_size),
        .reset_type			(reset_type))
@@ -248,7 +250,7 @@ module testbench();
    
    assign grant_ready  = (channel_ntob[0:2] == 3'b101) & (channel_ntob[4+header_info_width+:2] == 2'b00) ;
    assign ack_ready    = (channel_ntob[0:2] == 3'b101) & (channel_ntob[4+header_info_width+:2] == 2'b01) ;
-   assign nack_ready   = 1'b0;
+   assign nack_ready   =  (channel_ntob[0:2] == 3'b101) & (channel_ntob[4+header_info_width+:2] == 2'b10) ;
    
 
 
@@ -257,6 +259,8 @@ module testbench();
 		      1'b0, //flow buffer deson't generate this type
 		      nonspec_ready,
 		      spec_ready};
+
+   wire [0:channel_width-1] channel_bton_predly;
    
    rtr_channel_output
      #(// Parameters
@@ -266,7 +270,7 @@ module testbench();
        .reset_type(reset_type))
    channel_output_stage
      (// Outputs
-      .channel_out			(channel_bton),
+      .channel_out			(channel_bton_predly),
       // Inputs
       .clk				(clk),
       .reset				(reset),
@@ -278,10 +282,24 @@ module testbench();
       .flit_sel_in_ovc			(bton_ivc));
 
 
+   c_shift_reg
+     #(.width(channel_width),
+       .depth(20),
+       .reset_type(reset_type))
+   flow_ctrl_dly_sr
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .data_in(channel_bton_predly),
+      .data_out(channel_bton));
    
-   assign host_data_head     = (|host_message_size) & ~(|host_flit_counter);
-   assign host_data_tail     = (|host_message_size) *  (host_flit_counter==max_payload_length);
-   assign host_data_valid    = |host_message_size;
+   
+
+   
+   
+   assign host_data_head   = (|host_message_size) & ~(|host_flit_counter);
+   assign host_data_tail   = (|host_message_size) *  (host_flit_counter==max_payload_length);
+   assign host_data_valid  = |host_message_size;
 
    integer i;
    integer total_injected;
@@ -323,12 +341,12 @@ module testbench();
 	     if(~has_message)
 	       begin 
 		  has_message 	    <= ($dist_uniform(seed, 0,  99) < 10);
-		  message_size 	    <= $dist_uniform(seed, 1,  max_reservation_size);
+		  message_size 	    <= $dist_uniform(seed, 1,  max_reservation_size-1);
 		  message_dest 	    <= $dist_uniform(seed, 0, num_routers_per_dim*num_routers_per_dim-2);
 	       end
 	     else
 	       begin
-		  if(buffer_empty)
+		  if(message_ready)
 		    begin
 		       has_message  <=0;
 		       message_size <=0;

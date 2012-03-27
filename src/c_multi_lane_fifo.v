@@ -30,9 +30,14 @@
 //==============================================================================
 
 module c_multi_lane_fifo
-  (clk, reset, push_active, push_valid, push_sel_ln, push_data, push_addr_ln, 
-   pop_active, pop_valid, pop_sel_ln, pop_data, pop_addr_ln, peek_data, 
-   almost_empty_ln, empty_ln, full, errors_ln);
+  (/*autoarg*/
+   // Outputs
+   push_addr_ln, pop_data, pop_addr_ln, peek_data, almost_empty_ln,
+   empty_ln, full_ln, errors_ln,
+   // Inputs
+   clk, reset, clear, push_active, push_valid, push_sel_ln, push_data,
+   pop_active, pop_valid, pop_sel_ln
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -57,7 +62,7 @@ module c_multi_lane_fifo
    // if enabled, read data comes from a register; otherwise, it comes straight
    // out of the register file
    // NOTE: In either case, pop_data is valid in the cycle after pop_valid!
-   parameter registered_read = 0;
+   parameter registered_read = 1;
    
    // gate buffer write port if bypassing
    // (requires registered read; may increase cycle time)
@@ -93,6 +98,9 @@ module c_multi_lane_fifo
    input clk;
    input reset;
 
+   input [0:num_lanes-1] clear;
+   
+   
    // activity indicator for insertion
    input push_active;
 
@@ -136,8 +144,8 @@ module c_multi_lane_fifo
    wire [0:num_lanes-1] 	     almost_empty_ln;
    output [0:num_lanes-1] 	     empty_ln;
    wire [0:num_lanes-1] 	     empty_ln;
-   output 			     full;
-   wire 			     full;
+   output [0:num_lanes-1]	     full_ln;
+   wire [0:num_lanes-1] 	     full_ln;
    
    // internal error conditions detected
    output [0:num_lanes*2-1] 	     errors_ln;
@@ -149,9 +157,8 @@ module c_multi_lane_fifo
    //---------------------------------------------------------------------------
    
    wire [0:num_lanes*addr_width-1]   peek_addr_ln;
-   wire [0:num_lanes-1] 	     full_ln;
    
-   assign full = &full_ln;
+
    
    genvar 			     lane;
    
@@ -193,7 +200,7 @@ module c_multi_lane_fifo
 	       .reset_type(reset_type))
 	   fc
 	     (.clk(clk),
-	      .reset(reset),
+	      .reset(reset|clear[lane]),
 	      .push_active(push_active),
 	      .pop_active(pop_active),
 	      .push(push),
@@ -294,7 +301,7 @@ module c_multi_lane_fifo
 	     assign write_enable = push_valid;
 	   
 	   assign read_addr = pop_addr;
-	   
+	   /*
 	   wire [0:data_width-1] pop_data_s, pop_data_q;
 	   assign pop_data_s
 	     = pop_valid ? (empty ? write_data : read_data) : pop_data_q;
@@ -307,14 +314,15 @@ module c_multi_lane_fifo
 	      .active(pop_active),
 	      .d(pop_data_s),
 	      .q(pop_data_q));
+	   */
+	   assign pop_data 	= (empty ? write_data : read_data);
 	   
-	   assign pop_data = pop_data_q;
 	   
 	end
       else
 	begin
 	   
-	   assign write_enable = push_valid;
+	   assign write_enable 	= push_valid;
 	   
 	   wire [0:addr_width-1] read_addr_s, read_addr_q;
 	   assign read_addr_s = pop_valid ? pop_addr : read_addr_q;

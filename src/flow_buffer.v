@@ -1,7 +1,10 @@
 /*Message buffer
  * Can fetch message info from the message generator
  * Can extract grant time from grant
- * BASIC spec, nonspec, ack handling is working 
+ * basic spec, nonspec, ack handling is working 
+ * basic nack, retransmitworking
+ * 
+ * need lots and lots of extensive tests
  */
 
 
@@ -129,6 +132,8 @@ module flow_buffer(/*autoarg*/
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (route_info_width + payload_length_width ) : 
        -1;
+ 
+   
    // select order of dimension traversal
    parameter dim_order 		      = `DIM_ORDER_ASCENDING;
    // select whether to exclude full or non-empty VCs from VC allocation
@@ -138,13 +143,18 @@ module flow_buffer(/*autoarg*/
    // total number of bits required to represent maximum packet length
    localparam packet_length_width     = clogb(max_packet_length);   
 
+   parameter spec_buffer_capacity     = 4;
+   localparam spec_buffer_width       = clogb(spec_buffer_capacity);   
+   
    parameter time_to_wait_width       = 8;
    parameter max_reservation_size     = 16; //packtes
    localparam reservation_size_width  = clogb(max_reservation_size);
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
 
-   
+   //SRP packet related
+`include "srp_format.v"
 
+   
    //default inputs
    input clk;
    input run;
@@ -236,6 +246,31 @@ module flow_buffer(/*autoarg*/
      (.data_in(message_route_op),
       .data_out(message_lar));   
 
+   //this tracks if we are in the middle of importing a packet from the the host
+   wire consumed_head  = host_data_head&host_next_flit;
+   wire consumed_tail  = host_data_tail&host_next_flit;
+   wire host_after_head_s;
+   wire host_after_head;
+   assign host_after_head_s = consumed_head?
+			      (consumed_tail?
+			       1'b0:
+			       1'b1):
+			      (consumed_tail?
+			       1'b0:
+			       host_after_head);
+   //host tracker
+   c_dff
+     #(.width				(1),
+       .reset_type			(reset_type))
+   host_state_reg
+     (// Outputs
+      .q				(host_after_head),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .active				(run),
+      .d				(host_after_head_s));
+   
    
    
    ///////////////////
@@ -262,8 +297,9 @@ module flow_buffer(/*autoarg*/
       .d				(packets_remaining_s));
    
    //prevents spec from sending too many packets
-   wire spec_credit;
-   wire spec_debit;
+   wire spec_credit; //when ack/nack received
+   wire spec_debit; //when head flit is sent
+   wire spec_tail_debit; //when tail flit is sent
    wire [0:reservation_size_width-1] packets_spec_s;
    wire [0:reservation_size_width-1] packets_spec_q;
    assign packets_spec_s  = packets_spec_q + spec_debit - spec_credit;
@@ -285,19 +321,17 @@ module flow_buffer(/*autoarg*/
    //Reservation packet packing
    wire [0:flit_data_width-1] reservation_packet_s;
    wire [0:flit_data_width-1] reservation_packet_q;
-   assign reservation_packet_s[0:lar_info_width-1] 
-     = message_lar;
-   assign reservation_packet_s[lar_info_width+:dest_info_width] 
-     = message_dest_s;
-   assign reservation_packet_s[lar_info_width+dest_info_width:header_info_width-1] 
-     = 'b0;//psize
-   assign reservation_packet_s[header_info_width+:2] = 2'b00; //srp_type
-   assign reservation_packet_s[(header_info_width+2)+:reservation_size_width] 
+   wire [0:payload_length_width-1] reservation_payload_size = {payload_length_width{1'b0}};
+   assign reservation_packet_s[0:res_size_start-1] ={message_lar,
+						     message_dest_s,
+						     reservation_payload_size,
+						      2'b00};
+   assign reservation_packet_s[res_size_start+:reservation_size_width] 
      = message_ready? //reservation-size
        message_size:
        reservation_packet_q[(header_info_width+2)+:reservation_size_width];
-   assign reservation_packet_s[(header_info_width+2+reservation_size_width)+:dest_info_width] = source_address; //source address
-   assign reservation_packet_s[(header_info_width+2+reservation_size_width)+dest_info_width:flit_data_width-1]
+   assign reservation_packet_s[res_src_start+:dest_info_width] = source_address; //source address
+   assign reservation_packet_s[res_data_start:flit_data_width-1]
      ='b0;
    c_dff
      #(.width				(flit_data_width),
@@ -320,7 +354,7 @@ module flow_buffer(/*autoarg*/
    assign granted_time_s  = (state==FB_EMPTY)? 
 			    32'b0: //all 0 means no grant
 			    (grant_ready?
-			     nic_data[flit_data_width-32:flit_data_width-1]:
+			     nic_data[grant_time_start:flit_data_width-1]:
 			     granted_time_q); //hold
    c_dff
      #(.width				(32),
@@ -339,12 +373,137 @@ module flow_buffer(/*autoarg*/
    //-------------------
    //spec packet injection
    wire new_spec_packet;
+
+   wire spec_buffer_available ;
+   wire [0:spec_buffer_width-1] clear_spec_buffer;
+   wire [0:spec_buffer_capacity-1] clear_spec_buffer_decode;
+   wire [0:spec_buffer_width-1] current_spec_buffer;
+   wire [0:spec_buffer_capacity-1] current_spec_buffer_decode;
+   wire retransmit;
+   wire [0:spec_buffer_width-1] retran_spec_buffer;
+   wire [0:spec_buffer_capacity-1] retran_spec_buffer_decode;
+
    
    wire spec_continue_s;
    wire spec_continue_q;
    wire spec_head;
    wire spec_tail;
    wire [0:flit_data_width-1] spec_packet;
+
+   wire [0:flit_data_width-1] spec_buffer_pop_data;
+   wire [0:2*spec_buffer_capacity-1] spec_buffer_errors;
+   wire [0:spec_buffer_capacity-1] spec_buffer_full;
+   wire [0:spec_buffer_capacity-1] spec_buffer_empty;
+   wire [0:spec_buffer_capacity-1] spec_buffer_almost_empty;
+   
+
+   c_decode
+     #(.num_ports			(spec_buffer_capacity))
+   spec_buffer_push_decode
+     ( // Outputs
+      .data_out				(current_spec_buffer_decode),
+      // Inputs
+      .data_in				(current_spec_buffer));
+   c_decode
+     #(.num_ports			(spec_buffer_capacity))
+   spec_buffer_clear_decode
+     (// Outputs
+      .data_out				(clear_spec_buffer_decode),
+      // Inputs
+      .data_in				(clear_spec_buffer));
+   c_decode
+     #(.num_ports			(spec_buffer_capacity))
+   spec_buffer_pop_decode
+     (// Outputs
+      .data_out				(retran_spec_buffer_decode),
+      // Inputs
+      .data_in				(retran_spec_buffer));
+   
+   c_multi_lane_fifo
+     #(// Parameters
+       .num_lanes			(spec_buffer_capacity),
+       .num_buffers_per_lane		(max_packet_length),
+       .data_width			(flit_data_width),
+       .regfile_type			(`REGFILE_TYPE_FF_2D),
+       .reset_type			(reset_type))
+   spec_buffer_fifo
+     (// Outputs
+      .push_addr_ln			(),
+      .pop_data				(spec_buffer_pop_data),
+      .pop_addr_ln			(),
+      .peek_data			(),
+      .almost_empty_ln			(spec_buffer_almost_empty),
+      .empty_ln				(spec_buffer_empty),
+      .full_ln				(spec_buffer_full),
+      .errors_ln			(spec_buffer_errors),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .clear                            (clear_spec_buffer_decode &{spec_buffer_capacity{ack_ready}}),
+      .push_active			(run),
+      .push_valid			(nic_gnt & spec_ready),
+      .push_sel_ln			(current_spec_buffer_decode),
+      .push_data			(spec_packet),
+      .pop_active			(run),
+      .pop_valid			(retransmit & nic_gnt),
+      .pop_sel_ln			(retran_spec_buffer_decode));
+   
+   
+
+   //Start up free list - used before real free list is built
+   wire free_list_init;
+   wire[0:spec_buffer_width] free_list_init_s;
+   wire[0:spec_buffer_width] free_list_init_q;
+   assign free_list_init_s  = free_list_init?
+				free_list_init_q+spec_tail_debit:
+				free_list_init_q;
+   c_dff
+     #(.width(spec_buffer_width+1),
+       .reset_type(reset_type))
+   free_list_init_reg
+     (.d(free_list_init_s), 
+      .q(free_list_init_q),
+      .clk(clk),
+      .active(run),
+      .reset(reset));  
+   assign free_list_init  = (free_list_init_q<spec_buffer_capacity);
+
+   //Real free list
+   wire [0:1] free_list_errors;
+   wire free_list_push;
+   wire free_list_pop;
+   wire free_list_empty;
+   wire free_list_full;
+   wire [0:spec_buffer_width-1] free_pop_buffer;
+   wire [0:spec_buffer_width-1] free_push_buffer;
+   
+   c_fifo
+     #(// Parameters
+       .depth				(spec_buffer_capacity),
+       .width				(spec_buffer_width),
+       .regfile_type			(`REGFILE_TYPE_FF_2D),
+       .reset_type			(reset_type))
+   free_list
+     (// Outputs
+      .pop_data				(free_pop_buffer),
+      .almost_empty			(),
+      .empty				(free_list_empty),
+      .almost_full			(),
+      .full				(free_list_full),
+      .errors				(free_list_errors),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .push_active			(run),
+      .pop_active			(run),
+      .push				(free_list_push),
+      .pop				(free_list_pop),
+      .push_data			(free_push_buffer));
+
+   assign spec_buffer_available  = free_list_init | ~free_list_empty;
+   assign current_spec_buffer 	 = free_list_init?free_list_init_q[1:spec_buffer_width]:free_pop_buffer;
+   
+
    //prevents nonspec from cutting into spec in the middle of a packet
    assign spec_continue_s  = (spec_continue_q & ~host_data_tail) |
 			     (new_spec_packet & nic_gnt);
@@ -361,98 +520,156 @@ module flow_buffer(/*autoarg*/
    
    //Conditions for speculative injection
    assign new_spec_packet  = (state==FB_SPEC_READY) & //state
-	host_data_valid & host_data_head  //proper packet
-	& (|packets_available);//insure we dont' send too much
-   assign spec_ready  = spec_continue_q | new_spec_packet;
-   assign spec_debit  = host_data_head & nic_gnt & spec_ready;
-
-   assign spec_head   = host_data_head;
-   assign spec_tail   = host_data_tail;
+			     host_data_valid & host_data_head & //proper packet
+			     spec_buffer_available & //spec buffer is free
+			     (|packets_available);//insure we dont' send too much
    
+   assign spec_ready 	 = spec_continue_q | new_spec_packet;
+   assign spec_debit 	 = host_data_head & nic_gnt & spec_ready;
+   assign spec_tail_debit= host_data_tail & nic_gnt & spec_ready;
+   assign free_list_pop  = spec_tail_debit&~free_list_init;
+   
+   
+   assign spec_head 	 = host_data_head;
+   assign spec_tail 	 = host_data_tail;
+
    //spec  packet injection
-   //lar
-   assign spec_packet[0:lar_info_width-1] =   spec_head?
-					      message_lar:
-					      host_data[0:lar_info_width-1];
-   //dest addr
-   assign spec_packet[lar_info_width+:dest_info_width]  = spec_head?
-							  message_dest_s:
-							  host_data[lar_info_width+:dest_info_width];
-   //packet length
-   assign spec_packet[lar_info_width+dest_info_width:header_info_width-1] = spec_head?
-									    max_payload_length:
-									    host_data[lar_info_width+dest_info_width:header_info_width-1];
-   //srp_type
-   assign spec_packet[header_info_width+:2] = spec_head?
-					      2'b00:
-					      host_data[header_info_width+:2];
-   //TTW
-   assign spec_packet[header_info_width+2+:time_to_wait_width] = spec_head?
-								 {time_to_wait_width{1'b1}}:
-								 host_data[header_info_width+2+:time_to_wait_width];
-   //return address
-   assign spec_packet[header_info_width+2+time_to_wait_width+:dest_info_width] =spec_head?
-										source_address:
-										host_data[header_info_width+2+time_to_wait_width+:dest_info_width];
-   //payload
-   assign spec_packet[header_info_width+2+time_to_wait_width+dest_info_width:flit_data_width-1] =  host_data[header_info_width+2+time_to_wait_width+dest_info_width:flit_data_width-1];
+   wire [0:payload_length_width-1] spec_payload_size = max_payload_length;
+   c_select_1ofn
+     #(.num_ports(2),
+       .width(spec_data_start))
+   spec_head_mux
+     (.select({~spec_head,spec_head}),
+      .data_in({host_data[0+:spec_data_start], //body flit
+		//head flit
+		message_lar,
+		message_dest_s,
+		spec_payload_size,
+		2'b00,
+		{time_to_wait_width{1'b1}},
+		source_address,
+		current_spec_buffer}),
+      .data_out(spec_packet[0+:spec_data_start]));
+ 
+   //data payload
+   assign spec_packet[spec_data_start:flit_data_width-1] =  host_data[spec_data_start:flit_data_width-1];
+
+
+
+
+
    
    
    //-------------------
    //nonspec packet packing
-   wire nonspec_head = host_data_head;
-   wire nonspec_tail = host_data_tail;
+   wire nonspec_head ;
+   wire nonspec_tail ;
    wire [0:flit_data_width-1] nonspec_packet;
-   //lar
-   assign nonspec_packet[0:lar_info_width-1] =   nonspec_head?
-						 message_lar:
-						 host_data[0:lar_info_width-1];
-   //dest addr
-   assign nonspec_packet[lar_info_width+:dest_info_width]  = nonspec_head?
-							     message_dest_s:
-							     host_data[lar_info_width+:dest_info_width];
-   //packet length
-   assign nonspec_packet[lar_info_width+dest_info_width:header_info_width-1] = nonspec_head?
-									       max_payload_length:
-									       host_data[lar_info_width+dest_info_width:header_info_width-1];
-   //srp_type
-   assign nonspec_packet[header_info_width+:2] = nonspec_head?
-						 2'b00:
-						 host_data[header_info_width+:2];
-   assign nonspec_packet[header_info_width+2:flit_data_width-1] = host_data[header_info_width+2:flit_data_width-1];
-   
 
+   //Retransmission list
+   wire [0:1] retran_list_errors;
+   wire retran_list_push;
+   wire retran_list_pop;
+   wire retran_list_empty;
+   wire retran_list_full;
+   wire [0:spec_buffer_width-1] retran_push_buffer;
+   
+   c_fifo
+     #(// Parameters
+       .depth				(spec_buffer_capacity),
+       .width				(spec_buffer_width),
+       .regfile_type			(`REGFILE_TYPE_FF_2D),
+       .reset_type			(reset_type))
+   retran_list
+     (// Outputs
+      .pop_data				(retran_spec_buffer),
+      .almost_empty			(),
+      .empty				(retran_list_empty),
+      .almost_full			(),
+      .full				(retran_list_full),
+      .errors				(retran_list_errors),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .push_active			(run),
+      .pop_active			(run),
+      .push				(retran_list_push),
+      .pop				(retran_list_pop),
+      .push_data			(retran_push_buffer));
+
+   //wire retransmit_done  = |(spec_buffer_empty & retran_spec_buffer_decode);
+   wire retransmit_last  = |(spec_buffer_almost_empty & retran_spec_buffer_decode);
+   wire retransmit;
+   wire retransmit_q;
+   assign retransmit  = (~retran_list_empty & ~host_after_head);
+   assign retran_list_pop  = retransmit & retransmit_last & nic_gnt;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   retransmit_continue_state
+     (.q(retransmit_q),
+       .clk(clk),
+       .reset(reset),
+       .active(run),
+      .d(retransmit));
+   
+   wire [0:2] nonspec_sel ={~host_data_head& ~retransmit,
+			    host_data_head  & ~retransmit,
+			    retransmit};
    
    
-   wire inject_nonspec = (state==FB_NONSPEC) &  //state
+   wire [0:payload_length_width-1] nonspec_payload_size = max_payload_length;
+   c_select_1ofn
+     #(.num_ports(3),
+       .width(flit_data_width+2))
+   nonspec_head_mux
+     (.select(nonspec_sel),
+      .data_in({host_data[0:flit_data_width-1],host_data_head, host_data_tail,//body flit
+		//head
+		message_lar,
+		message_dest_s,
+		nonspec_payload_size,
+		2'b00,
+		host_data[nonspec_data_start:flit_data_width-1],
+		host_data_head,
+		host_data_tail,
+		//retran
+		spec_buffer_pop_data, 
+		|(spec_buffer_full & retran_spec_buffer_decode),
+		|(spec_buffer_almost_empty & retran_spec_buffer_decode)
+		}),
+      .data_out({nonspec_packet[0:flit_data_width-1], nonspec_head,  nonspec_tail}));
+   
+   
+   wire inject_nonspec 	= (state==FB_NONSPEC) &  //state
 	~spec_continue_q &  //don't cut in
 	(|packets_available); //don't retransmit until nack
-
 
 
    //-------------------
    //ack pack processing
    //-------------------
+   assign packets_debit       = (nonspec_tail & nic_gnt & inject_nonspec) + (ack_ready);
+   assign free_push_buffer    = retran_list_pop? 
+				retran_spec_buffer:
+				nic_data[ack_id_start+:spec_buffer_width];
+   assign clear_spec_buffer   = free_push_buffer;
+   assign free_list_push      = ack_ready | retran_list_pop ;
    
-   //code to free buffer
-   
-   //up to 2 packets could be done per cycle
-   assign packets_debit  = (host_data_tail & nic_gnt & inject_nonspec) + (ack_ready);
-
    
    //-------------------
    //nack processing
    //-------------------
-   //code move buffer to retransmit
+   assign retran_push_buffer  = nic_data[nack_id_start+:spec_buffer_width];
+   assign retran_list_push    = nack_ready;
+   assign spec_credit 	      = ack_ready|nack_ready;//either way
    
-   assign spec_credit 	 = ack_ready|nack_ready; //either way, it is no longer outstanding
-
 
    //FSM update   
    always @ (posedge clk, posedge reset)
      begin
 	if(reset)
-	  state 	<=FB_EMPTY;
+	  state 	     <=FB_EMPTY;
 	else
 	  begin
 	     case(state)
@@ -505,11 +722,11 @@ module flow_buffer(/*autoarg*/
 					  nonspec_ready, 
 					  spec_ready}),
       .data_in				({{reservation_packet_q,1'b1, 1'b1}, 
-					  {spec_packet, spec_head, spec_tail}, 
-					  {nonspec_packet, nonspec_head, nonspec_tail}}));
+					  {nonspec_packet, nonspec_head, nonspec_tail},
+					  {spec_packet, spec_head, spec_tail} }));
 
 
-   assign host_next_flit  = (inject_spec | inject_nonspec) & nic_gnt;
+   assign host_next_flit  = (spec_ready | (nonspec_ready&~retransmit)) & nic_gnt;
       
    wire [0:3] ready_sum = spec_ready+reservation_ready+nonspec_ready;
    assign error  = (ready_sum > 1);
