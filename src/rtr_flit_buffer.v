@@ -45,8 +45,8 @@ module rtr_flit_buffer
    // number of VCs
    parameter num_vcs = 4;
    
-   // buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 32;
    
    // width of payload data
    parameter flit_data_width = 64;
@@ -74,14 +74,14 @@ module rtr_flit_buffer
    // derived parameters
    //---------------------------------------------------------------------------
    
-   // total number of flit buffers
-   localparam num_flits = num_vcs * num_flits_per_vc;
+   // buffer size per VC in flits
+   localparam buffer_size_per_vc = buffer_size / num_vcs;
    
    // address width required for selecting an individual entry
-   localparam addr_width = clogb(num_flits);
+   localparam addr_width = clogb(buffer_size);
    
    // address width required for selecting an individual entry in a VC
-   localparam vc_addr_width = clogb(num_flits_per_vc);
+   localparam vc_addr_width = clogb(buffer_size_per_vc);
    
    // difference between the two
    localparam addr_pad_width = addr_width - vc_addr_width;
@@ -175,10 +175,10 @@ module rtr_flit_buffer
 	   assign pop_addr
 	     = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
 	   
-	   wire push_valid_sel;
+	   wire 		 push_valid_sel;
 	   assign push_valid_sel = push_valid & push_sel;
 	   
-	   wire peek_tail;
+	   wire 		 peek_tail;
 	   assign peek_tail_ivc[ivc] = peek_tail;
 	   
 	   if(atomic_vc_allocation)
@@ -204,23 +204,23 @@ module rtr_flit_buffer
 	   else
 	     begin
 		
-		wire [0:num_flits_per_vc-1] push_mask;
+		wire [0:buffer_size_per_vc-1] push_mask;
 		c_decode
-		  #(.num_ports(num_flits_per_vc),
-		    .offset((ivc * num_flits_per_vc) %
-			    (1 << clogb(num_flits_per_vc))))
+		  #(.num_ports(buffer_size_per_vc),
+		    .offset((ivc * buffer_size_per_vc) %
+			    (1 << clogb(buffer_size_per_vc))))
 		push_mask_dec
 		  (.data_in(push_addr[addr_pad_width:addr_width-1]),
 		   .data_out(push_mask));
 		
-		wire [0:num_flits_per_vc-1] tail_s, tail_q;
+		wire [0:buffer_size_per_vc-1] tail_s, tail_q;
 		assign tail_s
 		  = push_valid_sel ? 
-		    ({num_flits_per_vc{push_tail}} & push_mask | 
+		    ({buffer_size_per_vc{push_tail}} & push_mask | 
 		     tail_q & ~push_mask) :
 		    tail_q;
 		c_dff
-		  #(.width(num_flits_per_vc),
+		  #(.width(buffer_size_per_vc),
 		    .reset_type(reset_type))
 		tailq
 		  (.clk(clk),
@@ -229,17 +229,17 @@ module rtr_flit_buffer
 		   .d(tail_s),
 		   .q(tail_q));
 		
-		wire [0:num_flits_per_vc-1] pop_mask;
+		wire [0:buffer_size_per_vc-1] pop_mask;
 		c_decode
-		  #(.num_ports(num_flits_per_vc),
-		    .offset((ivc * num_flits_per_vc) % 
-			    (1 << clogb(num_flits_per_vc))))
+		  #(.num_ports(buffer_size_per_vc),
+		    .offset((ivc * buffer_size_per_vc) % 
+			    (1 << clogb(buffer_size_per_vc))))
 		pop_mask_dec
 		  (.data_in(pop_addr[addr_pad_width:addr_width-1]),
 		   .data_out(pop_mask));
 		
 		c_select_1ofn
-		  #(.num_ports(num_flits_per_vc),
+		  #(.num_ports(buffer_size_per_vc),
 		    .width(1))
 		peek_tail_sel
 		  (.select(pop_mask),
@@ -257,10 +257,10 @@ module rtr_flit_buffer
    // buffer
    //---------------------------------------------------------------------------
    
-   wire [0:flit_data_width-1] 	   peek_next_data;
+   wire [0:flit_data_width-1] 		      peek_next_data;
    c_samq
      #(.num_queues(num_vcs),
-       .num_slots_per_queue(num_flits_per_vc),
+       .num_slots_per_queue(buffer_size_per_vc),
        .data_width(flit_data_width),
        .regfile_type(regfile_type),
        .registered_read(explicit_pipeline_register),

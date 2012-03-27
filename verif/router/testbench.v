@@ -223,7 +223,7 @@ module testbench
 		    .packet_count_reg_width(packet_count_reg_width),
 		    .packet_length_mode(packet_length_mode),
 		    .topology(topology),
-		    .num_flits_per_vc(num_flits_per_vc),
+		    .buffer_size(buffer_size),
 		    .num_message_classes(num_message_classes),
 		    .num_resource_classes(num_resource_classes),
 		    .num_vcs_per_class(num_vcs_per_class),
@@ -292,7 +292,7 @@ module testbench
    
    router_wrap
      #(.topology(topology),
-       .num_flits_per_vc(num_flits_per_vc),
+       .buffer_size(buffer_size),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -339,7 +339,7 @@ module testbench
    wire 				      rchk_error;
    
    router_checker
-     #(.num_flits_per_vc(num_flits_per_vc),
+     #(.buffer_size(buffer_size),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -401,7 +401,7 @@ module testbench
 	   flit_sink
 	     #(.initial_seed(initial_seed + num_ports + op),
 	       .consume_rate(consume_rate),
-	       .num_flits_per_vc(num_flits_per_vc),
+	       .buffer_size(buffer_size),
 	       .num_vcs(num_vcs),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),

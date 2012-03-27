@@ -32,8 +32,8 @@
 // select network topology
 parameter topology = `TOPOLOGY_MESH;
 
-// flit buffer entries per VC
-parameter num_flits_per_vc = 8;
+// total buffer size per port in flits
+parameter buffer_size = 16;
 
 // number of message classes (e.g. request, reply)
 parameter num_message_classes = 2;

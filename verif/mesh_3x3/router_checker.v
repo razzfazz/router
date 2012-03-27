@@ -37,8 +37,8 @@ module router_checker
 `include "rtr_constants.v"
 `include "vcr_constants.v"
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 32;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -530,7 +530,7 @@ module router_checker
 		wire 			     rff_empty;
 		wire [0:1] 		     rff_errors;
 		c_fifo
-		  #(.depth(num_flits_per_vc),
+		  #(.depth(buffer_size),
 		    .width(2+port_idx_width+num_vcs+flit_data_width),
 		    .reset_type(reset_type))
 		rff

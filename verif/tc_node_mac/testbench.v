@@ -257,7 +257,7 @@ module testbench
    wire 			   dut0_error;
    
    tc_node_mac
-     #(.num_flits_per_vc(num_flits_per_vc),
+     #(.buffer_size(buffer_size),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),
@@ -361,7 +361,7 @@ module testbench
    wire 			   dut1_error;
    
    tc_node_mac
-     #(.num_flits_per_vc(num_flits_per_vc),
+     #(.buffer_size(buffer_size),
        .num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
        .num_vcs_per_class(num_vcs_per_class),

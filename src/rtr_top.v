@@ -42,8 +42,8 @@ module rtr_top
    // parameters
    //---------------------------------------------------------------------------
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 32;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -287,7 +287,7 @@ module rtr_top
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
 	   wire 				   ipc_error;
 	   rtr_ip_ctrl_mac
-	     #(.num_flits_per_vc(num_flits_per_vc),
+	     #(.buffer_size(buffer_size),
 	       .num_message_classes(num_message_classes),
 	       .num_resource_classes(num_resource_classes),
 	       .num_vcs_per_class(num_vcs_per_class),
@@ -504,7 +504,7 @@ module rtr_top
 	   wire [0:num_vcs-1] 	      opc_full_ovc;
 	   wire 		      opc_error;
 	   rtr_op_ctrl_mac
-	     #(.num_flits_per_vc(num_flits_per_vc),
+	     #(.buffer_size(buffer_size),
 	       .num_vcs(num_vcs),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),

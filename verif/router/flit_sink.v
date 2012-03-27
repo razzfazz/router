@@ -37,17 +37,20 @@ module flit_sink
    // flit consumption rate (percentage of cycles)
    parameter consume_rate = 50;
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
-   
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   // total buffer size per port in flits
+   parameter buffer_size = 64;
    
    // number of VCs
    parameter num_vcs = 8;
    
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
+   
+   // buffer size per VC in flits
+   localparam buffer_size_per_vc = buffer_size / num_vcs;
+   
+   // width required to express number of flits in a VC
+   localparam flit_count_width = clogb(buffer_size_per_vc + 1);
    
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
@@ -207,7 +210,7 @@ module flit_sink
 	   wire [0:flit_count_width-1] 	    buffer_free;
 	   wire [0:1] 			    buffer_errors;
 	   c_fifo_tracker
-	     #(.depth(num_flits_per_vc),
+	     #(.depth(buffer_size_per_vc),
 	       .reset_type(reset_type))
 	   ft
 	     (.clk(clk),

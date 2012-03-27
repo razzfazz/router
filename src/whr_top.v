@@ -38,8 +38,8 @@ module whr_top
 `include "rtr_constants.v"
 `include "whr_constants.v"
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 8;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -232,7 +232,7 @@ module whr_top
 	   wire [0:flow_ctrl_width-1] flow_ctrl_out;
 	   wire 		      ipc_error;
 	   whr_ip_ctrl_mac
-	     #(.num_flits_per_vc(num_flits_per_vc),
+	     #(.buffer_size(buffer_size),
 	       .num_routers_per_dim(num_routers_per_dim),
 	       .num_dimensions(num_dimensions),
 	       .num_nodes_per_router(num_nodes_per_router),
@@ -367,7 +367,7 @@ module whr_top
 	   wire 		      full;
 	   wire 		      opc_error;
 	   whr_op_ctrl_mac
-	     #(.num_flits_per_vc(num_flits_per_vc),
+	     #(.buffer_size(buffer_size),
 	       .num_ports(num_ports),
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),

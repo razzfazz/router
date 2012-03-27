@@ -38,8 +38,8 @@ module whr_ip_ctrl_mac
 `include "rtr_constants.v"
 `include "whr_constants.v"
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 8;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -167,7 +167,7 @@ module whr_ip_ctrl_mac
    
    // number of entries in flit buffer
    localparam fb_depth
-     = input_stage_can_hold ? (num_flits_per_vc - 1) : num_flits_per_vc;
+     = input_stage_can_hold ? (buffer_size - 1) : buffer_size;
    
    // required address width for flit buffer
    localparam fb_addr_width = clogb(fb_depth);

@@ -46,8 +46,8 @@ module rtr_ip_ctrl_mac
    // parameters
    //---------------------------------------------------------------------------
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 32;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -1093,7 +1093,7 @@ module rtr_ip_ctrl_mac
    wire [0:num_vcs*2-1] 		    fb_errors_ivc;
    rtr_flit_buffer
      #(.num_vcs(num_vcs),
-       .num_flits_per_vc(num_flits_per_vc),
+       .buffer_size(buffer_size),
        .flit_data_width(flit_data_width),
        .header_info_width(header_info_width),
        .regfile_type(fb_regfile_type),

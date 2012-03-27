@@ -46,8 +46,8 @@ module rtr_fc_state
    // number of VCs
    parameter num_vcs = 4;
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 16;
    
    // select type of flow control
    parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
@@ -63,8 +63,11 @@ module rtr_fc_state
    // derived parameters
    //---------------------------------------------------------------------------
    
+   // number of buffer entries per VC
+   localparam buffer_size_per_vc = buffer_size / num_vcs;
+   
    // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(num_flits_per_vc + 1);
+   localparam flit_count_width = clogb(buffer_size_per_vc + 1);
    
    
    //---------------------------------------------------------------------------
@@ -165,7 +168,7 @@ module rtr_fc_state
 		  wire [0:flit_count_width-1] ft_free;
 		  wire [0:1] 		      ft_errors;
 		  c_fifo_tracker
-		    #(.depth(num_flits_per_vc),
+		    #(.depth(buffer_size_per_vc),
 		      .reset_type(reset_type))
 		  ft
 		    (.clk(clk),
@@ -184,20 +187,20 @@ module rtr_fc_state
 		  
 		  wire 			      two_credits_left_s, 
 					      two_credits_left_q;
-		  if(num_flits_per_vc == 2)
+		  if(buffer_size_per_vc == 2)
 		    assign two_credits_left_s
 		      = (ft_almost_full & 
 			 (~flit_valid_sel & fc_event_valid_sel)) | 
 			(two_credits_left_q & 
 			 (flit_valid_sel ~^ fc_event_valid_sel));
-		  else if(num_flits_per_vc == 3)
+		  else if(buffer_size_per_vc == 3)
 		    assign two_credits_left_s
 		      = (ft_almost_full & 
 			 (~flit_valid_sel & fc_event_valid_sel)) | 
 			(two_credits_left_q & 
 			 (flit_valid_sel ~^ fc_event_valid_sel)) |
 			(ft_empty & flit_valid_sel);
-		  else if(num_flits_per_vc == 4)
+		  else if(buffer_size_per_vc == 4)
 		    assign two_credits_left_s
 		      = (ft_almost_full & 
 			 (~flit_valid_sel & fc_event_valid_sel)) | 
@@ -205,7 +208,7 @@ module rtr_fc_state
 			 (flit_valid_sel ~^ fc_event_valid_sel)) |
 			(ft_almost_empty & 
 			 (flit_valid_sel & ~fc_event_valid_sel));
-		  else if(num_flits_per_vc > 4)
+		  else if(buffer_size_per_vc > 4)
 		    assign two_credits_left_s
 		      = (ft_almost_full & 
 			 (~flit_valid_sel & fc_event_valid_sel)) | 
@@ -217,7 +220,7 @@ module rtr_fc_state
 		  c_dff
 		    #(.width(1),
 		      .reset_type(reset_type),
-		      .reset_value((num_flits_per_vc == 2) ? 1'b1 : 1'b0))
+		      .reset_value((buffer_size_per_vc == 2) ? 1'b1 : 1'b0))
 		  two_credits_leftq
 		    (.clk(clk),
 		     .reset(reset),

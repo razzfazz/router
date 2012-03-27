@@ -38,8 +38,8 @@ module whr_op_ctrl_mac
 `include "rtr_constants.v"
 `include "whr_constants.v"
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 8;
    
    // number of routers in each dimension
    parameter num_routers_per_dim = 4;
@@ -174,7 +174,7 @@ module whr_op_ctrl_mac
    wire [0:1] 		       fcs_errors;
    rtr_fc_state
      #(.num_vcs(1),
-       .num_flits_per_vc(num_flits_per_vc),
+       .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .reset_type(reset_type))

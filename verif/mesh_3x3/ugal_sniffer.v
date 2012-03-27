@@ -41,8 +41,8 @@ module ugal_sniffer(/*autoarg*/
 `include "rtr_constants.v"
 `include "vcr_constants.v"
 
-   // flit buffer entries per VC
-   parameter num_flits_per_vc 	   = 8;
+   // flit buffer entries
+   parameter buffer_size 	   = 16;
    // number of message classes (e.g. request, reply)
    parameter num_message_classes   = 1;
    
@@ -98,7 +98,7 @@ module ugal_sniffer(/*autoarg*/
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   localparam credit_count_width  = clogb(num_vcs*num_flits_per_vc)+1;
+   localparam credit_count_width  = clogb(buffer_size)+1;
    
    
    

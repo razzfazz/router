@@ -54,8 +54,8 @@ module packet_source
    // select network topology
    parameter topology = `TOPOLOGY_FBFLY;
    
-   // flit buffer entries per VC
-   parameter num_flits_per_vc = 8;
+   // total buffer size per port in flits
+   parameter buffer_size = 32;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -381,7 +381,7 @@ module packet_source
    wire [0:num_vcs*2-1] 		 fcs_errors_ovc;
    rtr_fc_state
      #(.num_vcs(num_vcs),
-       .num_flits_per_vc(num_flits_per_vc),
+       .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .reset_type(reset_type))
