@@ -68,6 +68,9 @@ parameter max_payload_length = 4;
 // minimum payload length (in flits)
 parameter min_payload_length = 0;
 
+// select router implementation
+parameter router_type = `ROUTER_TYPE_COMBINED;
+
 // width of flit payload data
 parameter flit_data_width = 32;
 
@@ -85,7 +88,50 @@ parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
 // select order of dimension traversal
 parameter dim_order = `DIM_ORDER_ASCENDING;
 
+// use input register as part of the flit buffer (wormhole router only)
+parameter input_stage_can_hold = 0;
+
+// select implementation variant for flit buffer register file
+parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
+
+// use explicit pipeline register between flit buffer and crossbar?
+parameter explicit_pipeline_register = 0;
+
+// gate flit buffer write port if bypass succeeds
+// (requires explicit pipeline register; may increase cycle time)
+parameter gate_buffer_write = 0;
+
+// enable dual-path allocation
+parameter dual_path_alloc = 0;
+
+// precompute input-side arbitration decision one cycle ahead
+parameter precomp_ivc_sel = 0;
+
+// precompute output-side arbitration decision one cycle ahead
+parameter precomp_ip_sel = 0;
+
 // select whether to exclude full or non-empty VCs from VC allocation
 parameter elig_mask = `ELIG_MASK_FULL;
 
-parameter reset_type = `RESET_TYPE_ASYNC;  
+// select implementation variant for VC allocator
+parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
+
+// select which arbiter type to use for VC allocator
+parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+
+// prefer empty VCs over non-empty ones in VC allocation
+parameter vc_alloc_prefer_empty = 0;
+
+// select implementation variant for switch allocator
+parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
+
+// select which arbiter type to use for switch allocator
+parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+
+// select speculation type for switch allocator
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+
+// select implementation variant for crossbar
+parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
+
+parameter reset_type = `RESET_TYPE_ASYNC;
