@@ -150,16 +150,12 @@ module rtr_flit_buffer
    wire [0:num_vcs*2-1] 	  errors_ivc;
    
    
-   //---------------------------------------------------------------------------
-   // tail flit tracking
-   //---------------------------------------------------------------------------
-   
-   wire [0:num_vcs*addr_width-1]  push_addr_ivc;
-   wire [0:num_vcs*addr_width-1]  pop_addr_ivc;
-   
-   genvar 			  ivc;
-   
    generate
+      
+      
+      //------------------------------------------------------------------------
+      // tail flit tracking (atomic)
+      //------------------------------------------------------------------------
       
       if(atomic_vc_allocation)
 	begin
@@ -182,117 +178,140 @@ module rtr_flit_buffer
 	   assign peek_tail_ivc = almost_empty_ivc & has_tail_ivc_q;
 	   
 	end
-      else
-	begin
-	   
-	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	     begin:ivcs
-		
-		wire push_sel;
-		assign push_sel = push_sel_ivc[ivc];
-		
-		wire push_valid_sel;
-		assign push_valid_sel = push_valid & push_sel;
-		
-		wire [0:addr_width-1] push_addr;
-		assign push_addr
-		  = push_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
-		
-		wire [0:vc_addr_width-1] push_vc_addr;
-		assign push_vc_addr = push_addr[addr_pad_width:addr_width-1];
-		
-		wire [0:buffer_size_per_vc-1] push_mask;
-		c_decode
-		  #(.num_ports(buffer_size_per_vc),
-		    .offset((ivc * buffer_size_per_vc) %
-			    (1 << clogb(buffer_size_per_vc))))
-		push_mask_dec
-		  (.data_in(push_vc_addr),
-		   .data_out(push_mask));
-		
-		wire [0:buffer_size_per_vc-1] tail_s, tail_q;
-		assign tail_s
-		  = push_valid_sel ? 
-		    ({buffer_size_per_vc{push_tail}} & push_mask | 
-		     tail_q & ~push_mask) :
-		    tail_q;
-		c_dff
-		  #(.width(buffer_size_per_vc),
-		    .reset_type(reset_type))
-		tailq
-		  (.clk(clk),
-		   .reset(1'b0),
-		   .active(push_active),
-		   .d(tail_s),
-		   .q(tail_q));
-		
-		wire [0:addr_width-1] 	      pop_addr;
-		assign pop_addr
-		  = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
-		
-		wire [0:vc_addr_width-1]      pop_vc_addr;
-		assign pop_vc_addr = pop_addr[addr_pad_width:addr_width-1];
-		
-		wire [0:buffer_size_per_vc-1] pop_mask;
-		c_decode
-		  #(.num_ports(buffer_size_per_vc),
-		    .offset((ivc * buffer_size_per_vc) % 
-			    (1 << clogb(buffer_size_per_vc))))
-		pop_mask_dec
-		  (.data_in(pop_vc_addr),
-		   .data_out(pop_mask));
-		
-		wire 			      peek_tail;
-		c_select_1ofn
-		  #(.num_ports(buffer_size_per_vc),
-		    .width(1))
-		peek_tail_sel
-		  (.select(pop_mask),
-		   .data_in(tail_q),
-		   .data_out(peek_tail));
-		
-		assign peek_tail_ivc[ivc] = peek_tail;
-		
-	     end
-	   
-	end
+      
+      case(mgmt_type)
+
+	`FB_MGMT_TYPE_STATIC:
+	  begin
+	     
+	     wire [0:num_vcs*addr_width-1] push_addr_ivc;
+	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
+	     
+	     
+	     //-----------------------------------------------------------------
+	     // tail flit tracking (non-atomic)
+	     //-----------------------------------------------------------------
+	     
+	     if(!atomic_vc_allocation)
+	       begin
+		  
+		  genvar ivc;
+		  
+		  for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+		    begin:ivcs
+		       
+		       wire push_sel;
+		       assign push_sel = push_sel_ivc[ivc];
+		       
+		       wire push_valid_sel;
+		       assign push_valid_sel = push_valid & push_sel;
+		       
+		       wire [0:addr_width-1] push_addr;
+		       assign push_addr
+			 = push_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
+		       
+		       wire [0:vc_addr_width-1] push_vc_addr;
+		       assign push_vc_addr
+			 = push_addr[addr_pad_width:addr_width-1];
+		       
+		       wire [0:buffer_size_per_vc-1] push_mask;
+		       c_decode
+			 #(.num_ports(buffer_size_per_vc),
+			   .offset((ivc * buffer_size_per_vc) %
+				   (1 << clogb(buffer_size_per_vc))))
+		       push_mask_dec
+			 (.data_in(push_vc_addr),
+			  .data_out(push_mask));
+		       
+		       wire [0:buffer_size_per_vc-1] tail_s, tail_q;
+		       assign tail_s
+			 = push_valid_sel ? 
+			   (({buffer_size_per_vc{push_tail}} & push_mask) | 
+			    (tail_q & ~push_mask)) :
+			   tail_q;
+		       c_dff
+			 #(.width(buffer_size_per_vc),
+			   .reset_type(reset_type))
+		       tailq
+			 (.clk(clk),
+			  .reset(1'b0),
+			  .active(push_active),
+			  .d(tail_s),
+			  .q(tail_q));
+		       
+		       wire [0:addr_width-1] 	     pop_addr;
+		       assign pop_addr
+			 = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
+		       
+		       wire [0:vc_addr_width-1]      pop_vc_addr;
+		       assign pop_vc_addr
+			 = pop_addr[addr_pad_width:addr_width-1];
+		       
+		       wire [0:buffer_size_per_vc-1] pop_mask;
+		       c_decode
+			 #(.num_ports(buffer_size_per_vc),
+			   .offset((ivc * buffer_size_per_vc) % 
+				   (1 << clogb(buffer_size_per_vc))))
+		       pop_mask_dec
+			 (.data_in(pop_vc_addr),
+			  .data_out(pop_mask));
+		       
+		       wire 			     peek_tail;
+		       c_select_1ofn
+			 #(.num_ports(buffer_size_per_vc),
+			   .width(1))
+		       peek_tail_sel
+			 (.select(pop_mask),
+			  .data_in(tail_q),
+			  .data_out(peek_tail));
+		       
+		       assign peek_tail_ivc[ivc] = peek_tail;
+		       
+		    end
+		  
+	       end
+	     
+	     
+	     //-----------------------------------------------------------------
+	     // buffer
+	     //-----------------------------------------------------------------
+	     
+	     wire [0:flit_data_width-1] 	     peek_next_data;
+	     c_samq
+	       #(.num_queues(num_vcs),
+		 .num_slots_per_queue(buffer_size_per_vc),
+		 .data_width(flit_data_width),
+		 .regfile_type(regfile_type),
+		 .registered_read(explicit_pipeline_register),
+		 .gate_buffer_write(gate_buffer_write),
+		 .enable_peek_next(!atomic_vc_allocation),
+		 .reset_type(reset_type))
+	     mlf
+	       (.clk(clk),
+		.reset(reset),
+		.push_active(push_active),
+		.push_valid(push_valid),
+		.push_sel_qu(push_sel_ivc),
+		.push_data(push_data),
+		.push_addr_qu(push_addr_ivc),
+		.pop_active(pop_active),
+		.pop_valid(pop_valid),
+		.pop_sel_qu(pop_sel_ivc),
+		.pop_data(pop_data),
+		.pop_addr_qu(pop_addr_ivc),
+		.peek_next_data(peek_next_data),
+		.almost_empty_qu(almost_empty_ivc),
+		.empty_qu(empty_ivc),
+		.full(full),
+		.errors_qu(errors_ivc));
+	     
+	     assign peek_next_header_info
+	       = peek_next_data[0:header_info_width-1];
+	     
+	  end
+	
+      endcase
       
    endgenerate
-   
-   
-   //---------------------------------------------------------------------------
-   // buffer
-   //---------------------------------------------------------------------------
-   
-   wire [0:flit_data_width-1] 		      peek_next_data;
-   c_samq
-     #(.num_queues(num_vcs),
-       .num_slots_per_queue(buffer_size_per_vc),
-       .data_width(flit_data_width),
-       .regfile_type(regfile_type),
-       .registered_read(explicit_pipeline_register),
-       .gate_buffer_write(gate_buffer_write),
-       .enable_peek_next(!atomic_vc_allocation),
-       .reset_type(reset_type))
-   mlf
-     (.clk(clk),
-      .reset(reset),
-      .push_active(push_active),
-      .push_valid(push_valid),
-      .push_sel_qu(push_sel_ivc),
-      .push_data(push_data),
-      .push_addr_qu(push_addr_ivc),
-      .pop_active(pop_active),
-      .pop_valid(pop_valid),
-      .pop_sel_qu(pop_sel_ivc),
-      .pop_data(pop_data),
-      .pop_addr_qu(pop_addr_ivc),
-      .peek_next_data(peek_next_data),
-      .almost_empty_qu(almost_empty_ivc),
-      .empty_qu(empty_ivc),
-      .full(full),
-      .errors_qu(errors_ivc));
-   
-   assign peek_next_header_info = peek_next_data[0:header_info_width-1];
    
 endmodule
