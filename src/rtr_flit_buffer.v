@@ -286,7 +286,7 @@ module rtr_flit_buffer
 		 .gate_buffer_write(gate_buffer_write),
 		 .enable_peek_next(!atomic_vc_allocation),
 		 .reset_type(reset_type))
-	     mlf
+	     samq
 	       (.clk(clk),
 		.reset(reset),
 		.push_active(push_active),
