@@ -32,7 +32,7 @@
 module c_samq
   (clk, reset, push_active, push_valid, push_sel_qu, push_data, push_addr_qu, 
    pop_active, pop_valid, pop_sel_qu, pop_data, pop_addr_qu, peek_next_data, 
-   almost_empty_qu, empty_qu, full, errors_qu);
+   almost_empty_qu, empty_qu, full_qu, errors_qu);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -136,8 +136,8 @@ module c_samq
    wire [0:num_queues-1] 	      almost_empty_qu;
    output [0:num_queues-1] 	      empty_qu;
    wire [0:num_queues-1] 	      empty_qu;
-   output 			      full;
-   wire 			      full;
+   output [0:num_queues-1] 	      full_qu;
+   wire [0:num_queues-1] 	      full_qu;
    
    // internal error conditions detected
    output [0:num_queues*2-1] 	      errors_qu;
@@ -149,9 +149,6 @@ module c_samq
    //---------------------------------------------------------------------------
    
    wire [0:num_queues*addr_width-1]   peek_next_addr_qu;
-   wire [0:num_queues-1] 	      full_qu;
-   
-   assign full = &full_qu;
    
    genvar 			      queue;
    

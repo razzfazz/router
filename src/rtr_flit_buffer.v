@@ -279,6 +279,7 @@ module rtr_flit_buffer
 	     //-----------------------------------------------------------------
 	     
 	     wire [0:flit_data_width-1] 	     peek_next_data;
+	     wire [0:num_vcs-1] 		     full_ivc;
 	     c_samq
 	       #(.num_queues(num_vcs),
 		 .num_slots_per_queue(buffer_size_per_vc),
@@ -304,11 +305,13 @@ module rtr_flit_buffer
 		.peek_next_data(peek_next_data),
 		.almost_empty_qu(almost_empty_ivc),
 		.empty_qu(empty_ivc),
-		.full(full),
+		.full_qu(full_ivc),
 		.errors_qu(errors_ivc));
 	     
 	     assign peek_next_header_info
 	       = peek_next_data[0:header_info_width-1];
+	     
+	     assign full = &full_ivc;
 	     
 	  end
 	
