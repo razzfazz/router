@@ -164,11 +164,8 @@ module c_samq
 	   wire push_sel;
 	   assign push_sel = push_sel_qu[queue];
 	   
-	   wire push_valid_sel;
-	   assign push_valid_sel = push_valid & push_sel;
-	   
 	   wire push;
-	   assign push = push_valid_sel;
+	   assign push = push_valid & push_sel;
 	   
 	   wire pop_sel;
 	   assign pop_sel = pop_sel_qu[queue];
