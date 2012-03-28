@@ -170,18 +170,10 @@ module rtr_flit_buffer
 	   wire push_sel;
 	   assign push_sel = push_sel_ivc[ivc];
 	   
-	   wire [0:addr_width-1] push_addr;
-	   assign push_addr
-	     = push_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
-	   
-	   wire [0:addr_width-1] pop_addr;
-	   assign pop_addr
-	     = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
-	   
-	   wire 		 push_valid_sel;
+	   wire push_valid_sel;
 	   assign push_valid_sel = push_valid & push_sel;
 	   
-	   wire 		 peek_tail;
+	   wire peek_tail;
 	   assign peek_tail_ivc[ivc] = peek_tail;
 	   
 	   if(atomic_vc_allocation)
@@ -207,6 +199,10 @@ module rtr_flit_buffer
 	   else
 	     begin
 		
+		wire [0:addr_width-1] push_addr;
+		assign push_addr
+		  = push_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
+		
 		wire [0:buffer_size_per_vc-1] push_mask;
 		c_decode
 		  #(.num_ports(buffer_size_per_vc),
@@ -231,6 +227,10 @@ module rtr_flit_buffer
 		   .active(push_active),
 		   .d(tail_s),
 		   .q(tail_q));
+		
+		wire [0:addr_width-1] 	      pop_addr;
+		assign pop_addr
+		  = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
 		
 		wire [0:buffer_size_per_vc-1] pop_mask;
 		c_decode
