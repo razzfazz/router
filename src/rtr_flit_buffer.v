@@ -161,43 +161,38 @@ module rtr_flit_buffer
    
    generate
       
-      for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
-	begin:ivcs
+      if(atomic_vc_allocation)
+	begin
 	   
-	   wire almost_empty;
-	   assign almost_empty = almost_empty_ivc[ivc];
+	   wire [0:num_vcs-1] has_tail_ivc_s, has_tail_ivc_q;
+	   assign has_tail_ivc_s
+	     = (has_tail_ivc_q & 
+		~({num_vcs{push_valid & push_head}} & push_sel_ivc)) | 
+	       ({num_vcs{push_valid & push_tail}} & push_sel_ivc);
+	   c_dff
+	     #(.width(num_vcs),
+	       .reset_type(reset_type))
+	   has_tail_ivcq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(push_active),
+	      .d(has_tail_ivc_s),
+	      .q(has_tail_ivc_q));
 	   
-	   wire push_sel;
-	   assign push_sel = push_sel_ivc[ivc];
+	   assign peek_tail_ivc = almost_empty_ivc & has_tail_ivc_q;
 	   
-	   wire push_valid_sel;
-	   assign push_valid_sel = push_valid & push_sel;
+	end
+      else
+	begin
 	   
-	   wire peek_tail;
-	   assign peek_tail_ivc[ivc] = peek_tail;
-	   
-	   if(atomic_vc_allocation)
-	     begin
+	   for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+	     begin:ivcs
 		
-		wire has_tail_s, has_tail_q;
-		assign has_tail_s
-		  = (has_tail_q & ~(push_valid_sel & push_head)) | 
-		    (push_valid_sel & push_tail);
-		c_dff
-		  #(.width(1),
-		    .reset_type(reset_type))
-		has_tailq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(push_active),
-		   .d(has_tail_s),
-		   .q(has_tail_q));
+		wire push_sel;
+		assign push_sel = push_sel_ivc[ivc];
 		
-		assign peek_tail = almost_empty & has_tail_q;
-		
-	     end
-	   else
-	     begin
+		wire push_valid_sel;
+		assign push_valid_sel = push_valid & push_sel;
 		
 		wire [0:addr_width-1] push_addr;
 		assign push_addr
@@ -247,6 +242,7 @@ module rtr_flit_buffer
 		  (.data_in(pop_vc_addr),
 		   .data_out(pop_mask));
 		
+		wire 			      peek_tail;
 		c_select_1ofn
 		  #(.num_ports(buffer_size_per_vc),
 		    .width(1))
@@ -254,6 +250,8 @@ module rtr_flit_buffer
 		  (.select(pop_mask),
 		   .data_in(tail_q),
 		   .data_out(peek_tail));
+		
+		assign peek_tail_ivc[ivc] = peek_tail;
 		
 	     end
 	   
