@@ -55,7 +55,6 @@ module testbench
    wire [0:data_width-1] pop_data;
    wire 		 ff_almost_empty;
    wire 		 ff_empty;
-   wire 		 ff_almost_full;
    wire 		 ff_full;
    wire [0:1] 		 ff_errors;
    
@@ -75,7 +74,6 @@ module testbench
       .pop_data(pop_data),
       .almost_empty(ff_almost_empty),
       .empty(ff_empty),
-      .almost_full(ff_almost_full),
       .full(ff_full),
       .errors(ff_errors));
    
@@ -142,7 +140,6 @@ module testbench
 	  end
 	if((ff_almost_empty ^ ft_almost_empty) |
 	   (ff_empty ^ ft_empty) |
-	   (ff_almost_full ^ ft_almost_full) |
 	   (ff_full ^ ft_full))
 	  begin
 	     $display($time, " ERROR: c_fifo and c_fifo_tracker mismatch");

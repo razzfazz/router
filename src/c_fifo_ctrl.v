@@ -31,7 +31,7 @@
 
 module c_fifo_ctrl
   (clk, reset, push_active, pop_active, push, pop, push_addr, pop_addr, 
-   almost_empty, empty, almost_full, full, errors);
+   almost_empty, empty, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -83,10 +83,6 @@ module c_fifo_ctrl
    output 		   empty;
    wire 		   empty;
    
-   // buffer almost full (1 unused slot remaining) indication
-   output 		   almost_full;
-   wire 		   almost_full;
-   
    // buffer full indication
    output 		   full;
    wire 		   full;
@@ -121,7 +117,6 @@ module c_fifo_ctrl
 	   
 	   assign almost_empty = ~empty_q;
 	   assign empty = empty_q;
-	   assign almost_full = empty_q;
 	   assign full = ~empty_q;
 	   
 	end
@@ -239,36 +234,10 @@ module c_fifo_ctrl
 	   
 	   assign empty = empty_q;
 	   
-	   if(depth == 2)
-	     assign almost_full = almost_empty;
-	   else if(depth > 2)
-	     begin
-		
-		wire next_almost_full;
-		assign next_almost_full = (push_addr_next == pop_addr_prev);
-		
-		wire almost_full_s, almost_full_q;
-		assign almost_full_s = (almost_full & ~(push ^ pop)) |
-				       (next_almost_full & (push & ~pop)) |
-				       (equal & (~push & pop));
-		c_dff
-		  #(.width(1),
-		    .reset_type(reset_type))
-		almost_fullq
-		  (.clk(clk),
-		   .reset(reset),
-		   .active(active),
-		   .d(almost_full_s),
-		   .q(almost_full_q));
-		
-		assign almost_full = almost_full_q;
-		
-	     end
-	   
-	   wire      next_full;
+	   wire 		 next_full;
 	   assign next_full = (push_addr_next == pop_addr_q);
 	   
-	   wire      full_s, full_q;
+	   wire 		 full_s, full_q;
 	   assign full_s = (full & ~(~push & pop)) | 
 			   (next_full & (push & ~pop));
 	   c_dff

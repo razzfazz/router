@@ -31,7 +31,7 @@
 
 module c_fifo
   (clk, reset, push_active, pop_active, push, pop, push_data, pop_data, 
-   almost_empty, empty, almost_full, full, errors);
+   almost_empty, empty, full, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -79,10 +79,6 @@ module c_fifo
    output 	      empty;
    wire 	      empty;
    
-   // buffer almost full (1 unused slot remaining) indication
-   output 	      almost_full;
-   wire 	      almost_full;
-   
    // buffer full indication
    output 	      full;
    wire 	      full;
@@ -104,7 +100,6 @@ module c_fifo
 	   
 	   assign almost_empty = 1'b0;
 	   assign empty = 1'b1;
-	   assign almost_full = 1'b0;
 	   assign full = 1'b1;
 	   
 	   assign error_underflow = pop;
@@ -152,7 +147,6 @@ module c_fifo
 	   
 	   assign almost_empty = ~empty_q;
 	   assign empty = empty_q;
-	   assign almost_full = empty_q;
 	   assign full = ~empty_q;
 	   
 	   wire 	    error_underflow;
@@ -184,7 +178,6 @@ module c_fifo
 	      .pop_addr(pop_addr),
 	      .almost_empty(almost_empty),
 	      .empty(empty),
-	      .almost_full(almost_full),
 	      .full(full),
 	      .errors(errors));
 	   

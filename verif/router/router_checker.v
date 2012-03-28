@@ -524,7 +524,6 @@ module router_checker
 		
 		wire [0:(port_idx_width+num_vcs+2+
 			 flit_data_width)-1] rff_pop_data;
-		wire 			     rff_almost_full;
 		wire 			     rff_full;
 		wire 			     rff_almost_empty;
 		wire 			     rff_empty;
@@ -544,7 +543,6 @@ module router_checker
 		   .pop_data(rff_pop_data),
 		   .almost_empty(rff_almost_empty),
 		   .empty(rff_empty),
-		   .almost_full(rff_almost_full),
 		   .full(rff_full),
 		   .errors(rff_errors));
 		

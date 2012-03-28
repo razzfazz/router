@@ -326,7 +326,6 @@ module whr_ip_ctrl_mac
    wire [0:fb_addr_width-1] 	  fbc_push_addr;
    wire [0:fb_addr_width-1] 	  fbc_pop_addr;
    wire 			  fbc_almost_empty;
-   wire 			  fbc_almost_full;
    wire [0:1] 			  fbc_errors;
    c_fifo_ctrl
      #(.depth(fb_depth),
@@ -342,7 +341,6 @@ module whr_ip_ctrl_mac
       .pop_addr(fbc_pop_addr),
       .almost_empty(fbc_almost_empty),
       .empty(fbc_empty),
-      .almost_full(fbc_almost_full),
       .full(fbc_full),
       .errors(fbc_errors));
    

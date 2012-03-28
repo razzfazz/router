@@ -180,7 +180,6 @@ module c_samq
 	   wire [0:addr_width-1] pop_addr;
 	   wire 		 almost_empty;
 	   wire 		 empty;
-	   wire 		 almost_full;
 	   wire 		 full;
 	   wire [0:1] 		 errors;
 	   c_fifo_ctrl
@@ -199,7 +198,6 @@ module c_samq
 	      .pop_addr(pop_addr),
 	      .almost_empty(almost_empty),
 	      .empty(empty),
-	      .almost_full(almost_full),
 	      .full(full),
 	      .errors(errors));
 	   
