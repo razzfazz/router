@@ -235,6 +235,7 @@ module testbench
        .dim_order(dim_order),
        .input_stage_can_hold(input_stage_can_hold),
        .fb_regfile_type(fb_regfile_type),
+       .fb_mgmt_type(fb_mgmt_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
        .dual_path_alloc(dual_path_alloc),

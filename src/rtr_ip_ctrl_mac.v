@@ -98,11 +98,14 @@ module rtr_ip_ctrl_mac
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
-   // select whether to exclude full or non-empty VCs from VC allocation
-   parameter elig_mask = `ELIG_MASK_NONE;
-   
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
+   
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
+   // select whether to exclude full or non-empty VCs from VC allocation
+   parameter elig_mask = `ELIG_MASK_NONE;
    
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 1;
@@ -1099,6 +1102,7 @@ module rtr_ip_ctrl_mac
        .regfile_type(fb_regfile_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
+       .mgmt_type(fb_mgmt_type),
        .atomic_vc_allocation(atomic_vc_allocation),
        .reset_type(reset_type))
    fb

@@ -94,6 +94,9 @@ parameter input_stage_can_hold = 0;
 // select implementation variant for flit buffer register file
 parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 
+// select flit buffer management scheme
+parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 

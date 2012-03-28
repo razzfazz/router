@@ -54,8 +54,8 @@ module packet_source
    // select network topology
    parameter topology = `TOPOLOGY_FBFLY;
    
-   // flit buffer entries per VC
-   parameter buffer_size = 64;
+   // total buffer size per port in flits
+   parameter buffer_size = 32;
    
    // number of message classes (e.g. request, reply)
    parameter num_message_classes = 2;
@@ -200,7 +200,10 @@ module packet_source
    
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
-
+   
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
@@ -384,6 +387,7 @@ module packet_source
        .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
+       .mgmt_type(fb_mgmt_type),
        .reset_type(reset_type))
    fcs
      (.clk(clk),

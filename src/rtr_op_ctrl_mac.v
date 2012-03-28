@@ -62,6 +62,9 @@ module rtr_op_ctrl_mac
    // logic
    parameter flow_ctrl_bypass = 1;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
@@ -213,6 +216,7 @@ module rtr_op_ctrl_mac
        .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
+       .mgmt_type(fb_mgmt_type),
        .reset_type(reset_type))
    fcs
      (.clk(clk),

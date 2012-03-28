@@ -146,6 +146,9 @@ module vcr_top
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -283,6 +286,7 @@ module vcr_top
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .fb_regfile_type(fb_regfile_type),
+	       .fb_mgmt_type(fb_mgmt_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .gate_buffer_write(gate_buffer_write),
 	       .elig_mask(elig_mask),
@@ -491,6 +495,7 @@ module vcr_top
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
+	       .fb_mgmt_type(fb_mgmt_type),
 	       .elig_mask(elig_mask),
 	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .reset_type(reset_type))

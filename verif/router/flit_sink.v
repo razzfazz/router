@@ -97,6 +97,9 @@ module flit_sink
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // use atomic VC allocation
    parameter atomic_vc_allocation = 0;
    
@@ -182,6 +185,7 @@ module flit_sink
        .regfile_type(fb_regfile_type),
        .explicit_pipeline_register(0),
        .gate_buffer_write(0),
+       .mgmt_type(fb_mgmt_type),
        .atomic_vc_allocation(atomic_vc_allocation),
        .reset_type(reset_type))
    fb

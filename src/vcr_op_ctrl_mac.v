@@ -98,6 +98,9 @@ module vcr_op_ctrl_mac
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
@@ -299,6 +302,7 @@ module vcr_op_ctrl_mac
        .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
+       .fb_mgmt_type(fb_mgmt_type),
        .reset_type(reset_type))
    fcs
      (.clk(clk),

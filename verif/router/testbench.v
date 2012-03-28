@@ -241,6 +241,7 @@ module testbench
 		    .flit_data_width(flit_data_width),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
+		    .fb_mgmt_type(fb_mgmt_type),
 		    .elig_mask(elig_mask),
 		    .port_id(ip),
 		    .reset_type(reset_type))
@@ -315,6 +316,7 @@ module testbench
        .dim_order(dim_order),
        .input_stage_can_hold(input_stage_can_hold),
        .fb_regfile_type(fb_regfile_type),
+       .fb_mgmt_type(fb_mgmt_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .dual_path_alloc(dual_path_alloc),
        .precomp_ivc_sel(precomp_ivc_sel),
@@ -413,6 +415,7 @@ module testbench
 	       .route_info_width(route_info_width),
 	       .flit_data_width(flit_data_width),
 	       .fb_regfile_type(fb_regfile_type),
+	       .fb_mgmt_type(fb_mgmt_type),
 	       .atomic_vc_allocation(atomic_vc_allocation),
 	       .reset_type(reset_type))
 	   fs

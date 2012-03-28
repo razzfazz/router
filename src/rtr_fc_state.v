@@ -56,6 +56,9 @@ module rtr_fc_state
    // logic
    parameter flow_ctrl_bypass = 1;
    
+   // select buffer management scheme
+   parameter mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    

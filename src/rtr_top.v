@@ -104,6 +104,9 @@ module rtr_top
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -303,8 +306,9 @@ module rtr_top
 	       .restrict_turns(restrict_turns),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
-	       .elig_mask(elig_mask),
 	       .fb_regfile_type(fb_regfile_type),
+	       .fb_mgmt_type(fb_mgmt_type),
+	       .elig_mask(elig_mask),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .gate_buffer_write(gate_buffer_write),
 	       .dual_path_alloc(dual_path_alloc),
@@ -510,6 +514,7 @@ module rtr_top
 	       .packet_format(packet_format),
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
+	       .fb_mgmt_type(fb_mgmt_type),
 	       .elig_mask(elig_mask),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))

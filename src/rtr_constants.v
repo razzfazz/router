@@ -145,3 +145,13 @@
 `define ELIG_MASK_USED 2
 
 `define ELIG_MASK_LAST `ELIG_MASK_USED
+
+
+//------------------------------------------------------------------------------
+// flit buffer management schemes
+//------------------------------------------------------------------------------
+
+// statically partitioned
+`define FB_MGMT_TYPE_STATIC  0
+
+`define FB_MGMT_TYPE_LAST    `FB_MGMT_TYPE_STATIC

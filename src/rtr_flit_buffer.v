@@ -64,6 +64,9 @@ module rtr_flit_buffer
    // (requires explicit pipeline register; may increase cycle time)
    parameter gate_buffer_write = 0;
    
+   // select buffer management scheme
+   parameter mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // use atomic VC allocation
    parameter atomic_vc_allocation = 1;
    
