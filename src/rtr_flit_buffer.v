@@ -162,9 +162,11 @@ module rtr_flit_buffer
 	   
 	   wire [0:num_vcs-1] has_tail_ivc_s, has_tail_ivc_q;
 	   assign has_tail_ivc_s
-	     = (has_tail_ivc_q & 
-		~({num_vcs{push_valid & push_head}} & push_sel_ivc)) | 
-	       ({num_vcs{push_valid & push_tail}} & push_sel_ivc);
+	     = push_valid ?
+	       ((has_tail_ivc_q & 
+		 ~({num_vcs{push_head}} & push_sel_ivc)) | 
+		({num_vcs{push_tail}} & push_sel_ivc)) : 
+	       has_tail_ivc_q;
 	   c_dff
 	     #(.width(num_vcs),
 	       .reset_type(reset_type))
