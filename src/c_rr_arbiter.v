@@ -40,6 +40,9 @@ module c_rr_arbiter
    // number of priority levels
    parameter num_priorities = 1;
    
+   // perform masking between priorities
+   parameter mask_priorities = 1;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -65,14 +68,21 @@ module c_rr_arbiter
       if(num_ports == 1)
 	begin
 	   
-	   c_lod
-	     #(.width(num_priorities),
-	       .num_priorities(1))
-	   gnt_lod
-	     (.data_in_pr(req_pr),
-	      .data_out_pr(gnt_pr),
-	      .data_out(),
-	      .mask_out());
+	   if(mask_priorities)
+	     begin
+		
+		c_lod
+		  #(.width(num_priorities),
+		    .num_priorities(1))
+		gnt_lod
+		  (.data_in_pr(req_pr),
+		   .data_out_pr(gnt_pr),
+		   .data_out(),
+		   .mask_out());
+		
+	     end
+	   else
+	     assign gnt_pr = req_pr;
 	   
 	   assign gnt = |req_pr;
 	   
@@ -107,20 +117,41 @@ module c_rr_arbiter
 		assign gnt_unqual
 		  = gnt_exp[(prio*2+1)*num_ports:(prio*2+2)*num_ports-1];
 		
-		assign gnt_pr[prio*num_ports:(prio+1)*num_ports-1]
-		  = gnt_qual | gnt_unqual;
+		if(mask_priorities)
+		  assign gnt_pr[prio*num_ports:(prio+1)*num_ports-1]
+		    = gnt_qual | gnt_unqual;
+		else
+		  assign gnt_pr[prio*num_ports:(prio+1)*num_ports-1]
+		    = (|req_qual) ? gnt_qual : gnt_unqual;
 		
 	     end
 	   
+	   wire [0:num_ports-1]      gnt_intm;
 	   wire [0:num_ports-1]      next_mask;
 	   c_lod
 	     #(.width(num_ports),
-	       .num_priorities(num_priorities*2))
+	       .num_priorities(num_priorities*2),
+	       .mask_priorities(mask_priorities))
 	   gnt_lod
 	     (.data_in_pr(req_exp),
 	      .data_out_pr(gnt_exp),
-	      .data_out(gnt),
+	      .data_out(gnt_intm),
 	      .mask_out(next_mask));
+	   
+	   if(mask_priorities)
+	     assign gnt = gnt_intm;
+	   else
+	     begin
+		
+		c_binary_op
+		  #(.num_ports(num_priorities),
+		    .width(num_ports),
+		    .op(`BINARY_OP_OR))
+		gnt_or
+		  (.data_in(gnt_pr),
+		   .data_out(gnt));
+		
+	     end
 	   
 	   wire [0:num_ports-2]      mask_s, mask_q;
 	   assign mask_s = update ? next_mask[1:num_ports-1] : mask_q;

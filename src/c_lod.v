@@ -40,6 +40,9 @@ module c_lod
    // number of priority levels
    parameter num_priorities = 1;
    
+   // perform masking between priorities
+   parameter mask_priorities = 1;
+   
    // vector of requests
    input [0:num_priorities*width-1] data_in_pr;
    
@@ -169,27 +172,46 @@ module c_lod
 		
 	     end
 	   
-	   wire [0:num_priorities*width-1] gnt_mask_pr;
-	   c_mat_mult
-	     #(.dim1_width(num_priorities),
-	       .dim2_width(1),
-	       .dim3_width(width),
-	       .prod_op(`BINARY_OP_AND),
-	       .sum_op(`BINARY_OP_OR))
-	   gnt_mask_pr_mmult
-	     (.input_a(sel_pr),
-	      .input_b({width{1'b1}}),
-	      .result(gnt_mask_pr));
-	   
-	   c_select_1ofn
-	     #(.num_ports(num_priorities),
-	       .width(width))
-	   data_out_sel
-	     (.select(sel_pr),
-	      .data_in(data_intm_pr),
-	      .data_out(data_out));
-	   
-	   assign data_out_pr = data_intm_pr & gnt_mask_pr;
+	   if(mask_priorities)
+	     begin
+		
+		wire [0:num_priorities*width-1] gnt_mask_pr;
+		c_mat_mult
+		  #(.dim1_width(num_priorities),
+		    .dim2_width(1),
+		    .dim3_width(width),
+		    .prod_op(`BINARY_OP_AND),
+		    .sum_op(`BINARY_OP_OR))
+		gnt_mask_pr_mmult
+		  (.input_a(sel_pr),
+		   .input_b({width{1'b1}}),
+		   .result(gnt_mask_pr));
+		
+		c_select_1ofn
+		  #(.num_ports(num_priorities),
+		    .width(width))
+		data_out_sel
+		  (.select(sel_pr),
+		   .data_in(data_intm_pr),
+		   .data_out(data_out));
+		
+		assign data_out_pr = data_intm_pr & gnt_mask_pr;
+		
+	     end
+	   else
+	     begin
+		
+		assign data_out_pr = data_intm_pr;
+		
+		c_binary_op
+		  #(.num_ports(num_priorities),
+		    .width(width),
+		    .op(`BINARY_OP_OR))
+		data_out_or
+		  (.data_in(data_intm_pr),
+		   .data_out(data_out));
+		
+	     end
 	   
 	   c_select_1ofn
 	     #(.num_ports(num_priorities),
