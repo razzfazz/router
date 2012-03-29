@@ -138,7 +138,7 @@ module c_rr_arbiter
 	      .data_out(gnt_intm),
 	      .mask_out(next_mask));
 	   
-	   if(mask_priorities)
+	   if(mask_priorities || (num_priorities == 1))
 	     assign gnt = gnt_intm;
 	   else
 	     begin
@@ -153,7 +153,7 @@ module c_rr_arbiter
 		
 	     end
 	   
-	   wire [0:num_ports-2]      mask_s, mask_q;
+	   wire [0:num_ports-2] mask_s, mask_q;
 	   assign mask_s = update ? next_mask[1:num_ports-1] : mask_q;
 	   c_dff
 	     #(.width(num_ports-1),

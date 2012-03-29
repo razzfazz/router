@@ -84,6 +84,7 @@ module c_matrix_arbiter
 	begin
 	   
 	   wire [0:num_priorities*num_ports-1] gnt_intm_pr;
+	   wire [0:num_ports-1] 	       gnt_intm;
 	   
 	   // port priority matrix
 	   wire [0:num_ports*num_ports-1] state;
@@ -127,9 +128,10 @@ module c_matrix_arbiter
 		       begin
 			  
 			  wire state_s, state_q;
-			  assign state_s = update ? 
-					   ((state_q | gnt[col]) & ~gnt[row]) : 
-					   state_q;
+			  assign state_s
+			    = update ? 
+			      ((state_q | gnt_intm[col]) & ~gnt_intm[row]) : 
+			      state_q;
 			  c_dff
 			    #(.width(1),
 			      .reset_type(reset_type),
@@ -151,49 +153,57 @@ module c_matrix_arbiter
 	   
 	   if(num_priorities == 1)
 	     begin
+		assign gnt_intm = gnt_intm_pr;
 		assign gnt_pr = gnt_intm_pr;
-		assign gnt = gnt_intm_pr;
+		assign gnt = gnt_intm;
 	     end
 	   else if(num_priorities > 1)
 	     begin
 		
-		if(mask_priorities)
+		wire [0:num_priorities-1] sel_pr;
+		
+		if(num_priorities == 2)
+		  assign sel_pr
+		    = {|req_pr[0:num_ports-1], ~|req_pr[0:num_ports-1]};
+		else if(num_priorities > 2)
 		  begin
 		     
-		     wire [0:num_priorities-1] sel_pr;
+		     wire [0:num_priorities-1] valid_pr;
+		     c_mat_mult
+		       #(.dim1_width(num_priorities),
+			 .dim2_width(num_ports),
+			 .dim3_width(1),
+			 .prod_op(`BINARY_OP_AND),
+			 .sum_op(`BINARY_OP_OR))
+		     valid_pr_mmult
+		       (.input_a(req_pr),
+			.input_b({num_ports{1'b1}}),
+			.result(valid_pr));
 		     
-		     if(num_priorities == 2)
-		       assign sel_pr
-			 = {|req_pr[0:num_ports-1], ~|req_pr[0:num_ports-1]};
-		     else if(num_priorities > 2)
-		       begin
-			  
-			  wire [0:num_priorities-1] valid_pr;
-			  c_mat_mult
-			    #(.dim1_width(num_priorities),
-			      .dim2_width(num_ports),
-			      .dim3_width(1),
-			      .prod_op(`BINARY_OP_AND),
-			      .sum_op(`BINARY_OP_OR))
-			  valid_pr_mmult
-			    (.input_a(req_pr),
-			     .input_b({num_ports{1'b1}}),
-			     .result(valid_pr));
-			  
-			  wire [0:num_priorities-1] any_req_pr;
-			  assign any_req_pr
-			    = {valid_pr[0:num_priorities-2], 1'b1};
-			  
-			  c_lod
-			    #(.width(num_priorities),
-			      .num_priorities(1))
-			  sel_pr_lod
-			    (.data_in_pr(any_req_pr),
-			     .data_out_pr(sel_pr),
-			     .data_out(),
-			     .mask_out());
-			  
-		       end
+		     wire [0:num_priorities-1] any_req_pr;
+		     assign any_req_pr = {valid_pr[0:num_priorities-2], 1'b1};
+		     
+		     c_lod
+		       #(.width(num_priorities),
+			 .num_priorities(1))
+		     sel_pr_lod
+		       (.data_in_pr(any_req_pr),
+			.data_out_pr(sel_pr),
+			.data_out(),
+			.mask_out());
+		     
+		  end
+		
+		c_select_1ofn
+		  #(.num_ports(num_priorities),
+		    .width(num_ports))
+		gnt_intm_sel
+		  (.select(sel_pr),
+		   .data_in(gnt_intm_pr),
+		   .data_out(gnt_intm));
+		
+		if(mask_priorities)
+		  begin
 		     
 		     wire [0:num_priorities*num_ports-1] gnt_mask_pr;
 		     c_mat_mult
@@ -208,14 +218,7 @@ module c_matrix_arbiter
 			.result(gnt_mask_pr));
 		     
 		     assign gnt_pr = gnt_intm_pr & gnt_mask_pr;
-		     
-		     c_select_1ofn
-		       #(.num_ports(num_priorities),
-			 .width(num_ports))
-		     gnt_sel
-		       (.select(sel_pr),
-			.data_in(gnt_intm_pr),
-			.data_out(gnt));
+		     assign gnt = gnt_intm;
 		     
 		  end
 		else
