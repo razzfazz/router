@@ -42,6 +42,9 @@ module c_regfile
    // width of each entry
    parameter width = 64;
    
+   // number of write ports
+   parameter num_write_ports = 1;
+   
    // number of read ports
    parameter num_read_ports = 1;
    
@@ -56,22 +59,23 @@ module c_regfile
    input write_active;
    
    // if high, write to entry selected by write_address
-   input write_enable;
+   input [0:num_write_ports-1] write_enable;
    
    // entry to be written to
-   input [0:addr_width-1] write_address;
+   input [0:num_write_ports*addr_width-1] write_address;
    
    // data to be written
-   input [0:width-1] 	  write_data;
+   input [0:num_write_ports*width-1] 	  write_data;
    
    // entries to read out
-   input [0:num_read_ports*addr_width-1] read_address;
+   input [0:num_read_ports*addr_width-1]  read_address;
    
    // contents of entries selected by read_address
-   output [0:num_read_ports*width-1] 	 read_data;
-   wire [0:num_read_ports*width-1] 	 read_data;
+   output [0:num_read_ports*width-1] 	  read_data;
+   wire [0:num_read_ports*width-1] 	  read_data;
    
-   genvar 				 read_port;
+   genvar 				  read_port;
+   genvar 				  write_port;
    
    generate
       
@@ -81,10 +85,29 @@ module c_regfile
 	  begin
 	     
 	     reg [0:width-1] storage_2d [0:depth-1];
-	     always @(posedge clk)
-	       if(write_active)
-		 if(write_enable)
-		   storage_2d[write_address] <= write_data;
+
+	     for(write_port = 0; write_port < num_write_ports; 
+		 write_port = write_port + 1)
+	       begin:write_ports
+		  
+		  wire port_write_enable;
+		  assign port_write_enable = write_enable[write_port];
+		  
+		  wire [0:addr_width-1] port_write_address;
+		  assign port_write_address
+		    = write_address[write_port*addr_width:
+				    (write_port+1)*addr_width-1];
+		  
+		  wire [0:width-1] 	port_write_data;
+		  assign port_write_data
+		    = write_data[write_port*width:(write_port+1)*width-1];
+		  
+		  always @(posedge clk)
+		    if(write_active)
+		      if(port_write_enable)
+			storage_2d[port_write_address] <= port_write_data;
+		  
+	       end
 	     
 	     for(read_port = 0; read_port < num_read_ports; 
 		 read_port = read_port + 1)
@@ -115,14 +138,34 @@ module c_regfile
 	     for(level = 0; level < depth; level = level + 1)
 	       begin:levels
 		  
-		  wire write;
-		  assign write = write_enable && (write_address == level);
-		  
 		  reg [0:width-1] storage;
-		  always @(posedge clk)
-		    if(write_active)
-		      if(write)
-			storage <= write_data;
+		  
+		  for(write_port = 0; write_port < num_write_ports;
+		      write_port = write_port + 1)
+		    begin:write_ports
+		       
+		       wire port_write_enable;
+		       assign port_write_enable = write_enable[write_port];
+		       
+		       wire [0:addr_width-1] port_write_address;
+		       assign port_write_address
+			 = write_address[write_port*addr_width:
+					 (write_port+1)*addr_width-1];
+		       
+		       wire [0:width-1]      port_write_data;
+		       assign port_write_data
+			 = write_data[write_port*width:(write_port+1)*width-1];
+		       
+		       wire 		     port_write;
+		       assign port_write
+			 = port_write_enable && (port_write_address == level);
+		       
+		       always @(posedge clk)
+			 if(write_active)
+			   if(port_write)
+			     storage <= port_write_data;
+		       
+		    end
 		  
 		  assign storage_1d[level*width:(level+1)*width-1] = storage;
 		  
@@ -184,76 +227,71 @@ module c_regfile
 	     wire write_enable_b;
 	     assign write_enable_b = ~write_enable;
 	     
-	     case(num_read_ports)
-	       
-	       1:
-		 begin
-		    
-		    DW_ram_r_w_s_dff
-		      #(.data_width(width),
-			.depth(depth),
-			.rst_mode(1))
-		    DW_rf_dff
-		      (.clk(clk),
-		       .rst_n(1'b1),
-		       .cs_n(write_enable_b),
-		       .wr_n(write_enable_b),
-		       .rd_addr(read_address),
-		       .wr_addr(write_address),
-		       .data_in(write_data),
-		       .data_out(read_data));
-		    
-		 end
-	       
-	       2:
-		 begin
-		    
-		    wire [0:addr_width-1] read_address_1;
-		    assign read_address_1
-		      = read_address[0:addr_width-1];
-		    
-		    wire [0:addr_width-1] read_address_2;
-		    assign read_address_2
-		      = read_address[addr_width:2*addr_width-1];
-		    
-		    wire [0:width-1] 	  read_data_1;
-		    wire [0:width-1] 	  read_data_2;
-		    DW_ram_2r_w_s_dff
-		      #(.data_width(width),
-			.depth(depth),
-			.rst_mode(1))
-		    DW_rf_dff
-		      (.clk(clk),
-		       .rst_n(1'b1),
-		       .cs_n(write_enable_b),
-		       .wr_n(write_enable_b),
-		       .rd1_addr(read_address_1),
-		       .rd2_addr(read_address_2),
-		       .wr_addr(write_address),
-		       .data_in(write_data),
-		       .data_rd1_out(read_data_1),
-		       .data_rd2_out(read_data_2));
-		    
-		    assign read_data = {read_data_1, read_data_2};
-		    
-		 end
-	       
-	       default:
-		 begin
-		    
-		    // pragma translate_off
-		    initial
+	     if((num_read_ports == 1) && (num_write_ports == 1))
+	       begin
+		  
+		  DW_ram_r_w_s_dff
+		    #(.data_width(width),
+		      .depth(depth),
+		      .rst_mode(1))
+		  DW_rf_dff
+		    (.clk(clk),
+		     .rst_n(1'b1),
+		     .cs_n(write_enable_b),
+		     .wr_n(write_enable_b),
+		     .rd_addr(read_address),
+		     .wr_addr(write_address),
+		     .data_in(write_data),
+		     .data_out(read_data));
+		  
+	       end
+	     else if((num_read_ports == 2) && (num_write_ports == 1))
+	       begin
+		  
+		  wire [0:addr_width-1] read_address_1;
+		  assign read_address_1
+		    = read_address[0:addr_width-1];
+		  
+		  wire [0:addr_width-1] read_address_2;
+		  assign read_address_2
+		    = read_address[addr_width:2*addr_width-1];
+		  
+		  wire [0:width-1] 	read_data_1;
+		  wire [0:width-1] 	read_data_2;
+		  DW_ram_2r_w_s_dff
+		    #(.data_width(width),
+		      .depth(depth),
+		      .rst_mode(1))
+		  DW_rf_dff
+		    (.clk(clk),
+		     .rst_n(1'b1),
+		     .cs_n(write_enable_b),
+		     .wr_n(write_enable_b),
+		     .rd1_addr(read_address_1),
+		     .rd2_addr(read_address_2),
+		     .wr_addr(write_address),
+		     .data_in(write_data),
+		     .data_rd1_out(read_data_1),
+		     .data_rd2_out(read_data_2));
+		  
+		  assign read_data = {read_data_1, read_data_2};
+		  
+	       end
+	     else
+	       begin
+		  
+		  // pragma translate_off
+		  initial
 		    begin
 		       $display({"ERROR: Register file %m does not support ",
 				 "DesignWare register file models with %d ",
-				 "read ports."}, num_read_ports);
+				 "read ports and %d write ports."}, 
+				num_read_ports, num_write_ports);
 		       $stop;
 		    end
-		    // pragma translate_on
-		    
-		 end
-	       
-	     endcase
+		  // pragma translate_on
+		  
+	       end
 	     
 	  end
 	
