@@ -82,6 +82,10 @@ parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
 // such turns)
 parameter restrict_turns = 1;
 
+// store lookahead routing info in pre-decoded form
+// (only useful with dual-path routing enable)
+parameter predecode_lar_info = 1;
+
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
 
@@ -105,7 +109,7 @@ parameter explicit_pipeline_register = 0;
 parameter gate_buffer_write = 0;
 
 // enable dual-path allocation
-parameter dual_path_alloc = 0;
+parameter dual_path_alloc = 1;
 
 // precompute input-side arbitration decision one cycle ahead
 parameter precomp_ivc_sel = 0;

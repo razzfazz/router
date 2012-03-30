@@ -431,6 +431,7 @@ module tc_router_wrap
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
+       .predecode_lar_info(predecode_lar_info),
        .routing_type(routing_type),
        .dim_order(dim_order),
        .input_stage_can_hold(input_stage_can_hold),

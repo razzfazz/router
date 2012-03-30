@@ -92,6 +92,10 @@ module rtr_ip_ctrl_mac
    // with such turns)
    parameter restrict_turns = 1;
    
+   // store lookahead routing info in pre-decoded form
+   // (only useful with dual-path routing enable)
+   parameter predecode_lar_info = 1;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
@@ -685,7 +689,7 @@ module rtr_ip_ctrl_mac
 	      wire [0:num_resource_classes-1] route_orc;
 	      wire [0:lar_info_width-1]       lar_info;
 	      
-	      if(dual_path_alloc)
+	      if(dual_path_alloc && predecode_lar_info)
 		begin
 		   
 		   // NOTE: For dual-path routing, we never have to bypass the

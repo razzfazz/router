@@ -95,6 +95,10 @@ module rtr_top
    // with such turns)
    parameter restrict_turns = 1;
    
+   // store lookahead routing info in pre-decoded form
+   // (only useful with dual-path routing enable)
+   parameter predecode_lar_info = 1;
+   
    // select routing function type
    parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
    
@@ -304,6 +308,7 @@ module rtr_top
 	       .min_payload_length(min_payload_length),
 	       .flit_data_width(flit_data_width),
 	       .restrict_turns(restrict_turns),
+	       .predecode_lar_info(predecode_lar_info),
 	       .routing_type(routing_type),
 	       .dim_order(dim_order),
 	       .fb_regfile_type(fb_regfile_type),
