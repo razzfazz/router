@@ -218,7 +218,7 @@ module c_regfile
 		    
 		    wire [0:width-1] 	  read_data_1;
 		    wire [0:width-1] 	  read_data_2;
-		    DW_ram_r_w_s_dff
+		    DW_ram_2r_w_s_dff
 		      #(.data_width(width),
 			.depth(depth),
 			.rst_mode(1))
