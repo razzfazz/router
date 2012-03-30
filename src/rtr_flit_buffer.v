@@ -456,5 +456,4 @@ module rtr_flit_buffer
       
    endgenerate
    
-   
 endmodule
