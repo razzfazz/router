@@ -30,8 +30,9 @@
 //==============================================================================
 
 module vcr_ovc_ctrl
-  (clk, reset, active, vc_gnt, vc_sel_ip, vc_sel_ivc, flit_valid, flit_tail, 
-   flit_sel_ip, flit_sel_ivc, flit_sel, elig, full, full_prev, empty);
+  (clk, reset, vc_active, vc_gnt, vc_sel_ip, vc_sel_ivc, sw_active, sw_gnt, 
+   sw_sel_ip, sw_sel_ivc, flit_valid, flit_tail, flit_sel, elig, full, 
+   full_prev, empty);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -54,7 +55,9 @@ module vcr_ovc_ctrl
    
    input clk;
    input reset;
-   input active;
+   
+   // activity indicator for VC allocation
+   input vc_active;
    
    // output VC was granted to an input VC
    input vc_gnt;
@@ -65,17 +68,23 @@ module vcr_ovc_ctrl
    // input VC that the output VC was granted to
    input [0:num_vcs-1] 	 vc_sel_ivc;
    
+   // activity indicator for switch allocation
+   input 		 sw_active;
+   
+   // switch allocator grant
+   input 		 sw_gnt;
+   
+   // which input port does the incoming flit come from?
+   input [0:num_ports-1] sw_sel_ip;
+   
+   // which input VC does the incoming flit belong to?
+   input [0:num_vcs-1] 	 sw_sel_ivc;
+   
    // incoming flit is valid
    input 		 flit_valid;
    
    // incoming flit is a tail flit
    input 		 flit_tail;
-   
-   //
-   input [0:num_ports-1] flit_sel_ip;
-   
-   // which input VC does the incoming flit belong to?
-   input [0:num_vcs-1] 	 flit_sel_ivc;
    
    // output VC is the owner of the incoming flit
    output 		 flit_sel;
@@ -99,6 +108,9 @@ module vcr_ovc_ctrl
    // track whether this output VC is currently assigend to an input VC
    //---------------------------------------------------------------------------
    
+   wire 		 alloc_active;
+   assign alloc_active = vc_active | flit_valid;
+   
    wire 		 allocated;
    
    wire 		 allocated_s, allocated_q;
@@ -109,56 +121,78 @@ module vcr_ovc_ctrl
    allocatedq
      (.clk(clk),
       .reset(reset),
-      .active(active),
+      .active(alloc_active),
       .d(allocated_s),
       .q(allocated_q));
    
    assign allocated = allocated_q & ~(flit_valid & flit_sel & flit_tail);
    
-   wire [0:num_ports-1]  flit_sel_ip_s, flit_sel_ip_q;
-   assign flit_sel_ip_s = vc_gnt ? vc_sel_ip : flit_sel_ip_q;
+   wire [0:num_ports-1]  allocated_ip_s, allocated_ip_q;
+   assign allocated_ip_s = allocated ? allocated_ip_q : vc_sel_ip;
    c_dff
      #(.width(num_ports),
        .reset_type(reset_type))
-   flit_sel_ipq
+   allocated_ipq
      (.clk(clk),
       .reset(1'b0),
-      .active(active),
-      .d(flit_sel_ip_s),
-      .q(flit_sel_ip_q));
+      .active(vc_active),
+      .d(allocated_ip_s),
+      .q(allocated_ip_q));
    
    wire 		 port_match;
-   assign port_match = |(flit_sel_ip & flit_sel_ip_q);
-   
    wire 		 vc_match;
    
    generate
+      
+      if(sw_alloc_spec)
+	assign port_match = |(sw_sel_ip & allocated_ip_s);
+      else
+	assign port_match = |(sw_sel_ip & allocated_ip_q);
       
       if(num_vcs == 1)
 	assign vc_match = 1'b1;
       else if(num_vcs > 1)
 	begin
 	   
-	   wire [0:num_vcs-1] flit_sel_ivc_s, flit_sel_ivc_q;
-	   assign flit_sel_ivc_s = vc_gnt ? vc_sel_ivc : flit_sel_ivc_q;
+	   wire [0:num_vcs-1] allocated_ivc_s, allocated_ivc_q;
+	   assign allocated_ivc_s = allocated ? allocated_ivc_q : vc_sel_ivc;
 	   c_dff
 	     #(.width(num_vcs),
 	       .reset_type(reset_type))
-	   flit_sel_ivcq
+	   allocated_ivcq
 	     (.clk(clk),
 	      .reset(1'b0),
-	      .active(active),
-	      .d(flit_sel_ivc_s),
-	      .q(flit_sel_ivc_q));
+	      .active(vc_active),
+	      .d(allocated_ivc_s),
+	      .q(allocated_ivc_q));
 	   
-	   assign vc_match = |(flit_sel_ivc & flit_sel_ivc_q);
+	   if(sw_alloc_spec)
+	     assign vc_match = |(sw_sel_ivc & allocated_ivc_s);
+	   else
+	     assign vc_match = |(sw_sel_ivc & allocated_ivc_q);
 	   
 	end
       
+   endgenerate
+   
+   wire 		      match_s, match_q;
+   assign match_s = sw_gnt ? (port_match & vc_match) : match_q;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   matchq
+     (.clk(clk),
+      .reset(reset),
+      .active(sw_active),
+      .d(match_s),
+      .q(match_q));
+   
+   generate
+	 
       if(sw_alloc_spec && (elig_mask == `ELIG_MASK_NONE))
-	assign flit_sel = allocated_q & port_match & vc_match & ~full_prev;
+	assign flit_sel = allocated_q & match_q & ~full_prev;
       else
-	assign flit_sel = allocated_q & port_match & vc_match;
+	assign flit_sel = allocated_q & match_q;
       
    endgenerate
    

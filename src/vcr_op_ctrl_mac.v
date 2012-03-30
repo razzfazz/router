@@ -197,51 +197,21 @@ module vcr_op_ctrl_mac
    // output VC control logic
    //---------------------------------------------------------------------------
    
-   wire 			 flit_valid;
-
    wire 			 gnt_active;
-   assign gnt_active = sw_active | flit_valid;
    
-   wire 			 sw_gnt_s, sw_gnt_q;
-   assign sw_gnt_s = sw_gnt;
+   wire 			 flit_valid_s, flit_valid_q;
+   assign flit_valid_s = sw_gnt;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
-   sw_gntq
+   flit_validq
      (.clk(clk),
       .reset(reset),
       .active(gnt_active),
-      .d(sw_gnt_s),
-      .q(sw_gnt_q));
+      .d(flit_valid_s),
+      .q(flit_valid_q));
    
-   assign flit_valid = sw_gnt_q;
-   
-   wire [0:num_vcs-1] 		 flit_sel_ovc;
-   wire 			 flit_sent;
-   
-   generate
-      
-      if(sw_alloc_spec)
-	assign flit_sent = flit_valid & (|flit_sel_ovc);
-      else
-	assign flit_sent = flit_valid;
-            
-   endgenerate
-   
-   wire [0:num_ports-1] 	 sw_sel_ip_s, sw_sel_ip_q;
-   assign sw_sel_ip_s = sw_gnt ? sw_sel_ip : sw_sel_ip_q;
-   c_dff
-     #(.width(num_ports),
-       .reset_type(reset_type))
-   sw_sel_ipq
-     (.clk(clk),
-      .reset(1'b0),
-      .active(sw_active),
-      .d(sw_sel_ip_s),
-      .q(sw_sel_ip_q));
-   
-   wire [0:num_ports-1] 	 flit_sel_ip;
-   assign flit_sel_ip = sw_sel_ip_q;
+   assign gnt_active = sw_active | flit_valid_q;
    
    wire 			 flit_head_s, flit_head_q;
    assign flit_head_s = sw_gnt ? flit_head : flit_head_q;
@@ -267,37 +237,14 @@ module vcr_op_ctrl_mac
       .d(flit_tail_s),
       .q(flit_tail_q));
    
-   wire [0:num_vcs-1] 		 flit_sel_ivc;
+   wire [0:num_vcs-1] 		 flit_sel_ovc;
    
-   generate
-      
-      if(num_vcs == 1)
-	assign flit_sel_ivc = 1'b1;
-      else if(num_vcs > 1)
-	begin
-	   wire [0:num_vcs-1] flit_sel_ivc_s, flit_sel_ivc_q;
-	   assign flit_sel_ivc_s = sw_gnt ? sw_sel_ivc : flit_sel_ivc_q;
-	   c_dff
-	     #(.width(num_vcs),
-	       .reset_type(reset_type))
-	   flit_sel_ivcq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(sw_active),
-	      .d(flit_sel_ivc_s),
-	      .q(flit_sel_ivc_q));
-	   
-	   assign flit_sel_ivc = flit_sel_ivc_q;
-	end
-      
-   endgenerate
+   wire 			 fcs_active;
+   assign fcs_active = flit_valid_q | fc_event_valid;
    
-   wire 		      fcs_active;
-   assign fcs_active = flit_valid | fc_event_valid;
-   
-   wire [0:num_vcs-1] 	      empty_ovc;
-   wire [0:num_vcs-1] 	      full_prev_ovc;
-   wire [0:num_vcs*2-1]       fcs_errors_ovc;
+   wire [0:num_vcs-1] 		 empty_ovc;
+   wire [0:num_vcs-1] 		 full_prev_ovc;
+   wire [0:num_vcs*2-1] 	 fcs_errors_ovc;
    rtr_fc_state
      #(.num_vcs(num_vcs),
        .buffer_size(buffer_size),
@@ -309,7 +256,7 @@ module vcr_op_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(fcs_active),
-      .flit_valid(flit_valid),
+      .flit_valid(flit_valid_q),
       .flit_sel_ovc(flit_sel_ovc),
       .fc_event_valid(fc_event_valid),
       .fc_event_sel_ovc(fc_event_sel_ovc),
@@ -320,7 +267,7 @@ module vcr_op_ctrl_mac
       .full_prev_ovc(full_prev_ovc),
       .errors_ovc(fcs_errors_ovc));
    
-   genvar 		      ovc;
+   genvar 			 ovc;
    
    generate
       
@@ -349,13 +296,6 @@ module vcr_op_ctrl_mac
 	   assign full_prev = full_prev_ovc[ovc];
 	   
 	   wire 		flit_sel;
-	   
-	   wire 		flit_valid_sel;
-	   assign flit_valid_sel = flit_valid & flit_sel;
-	   
-	   wire 		ovcc_active;
-	   assign ovcc_active = vc_active | flit_valid_sel;
-	   
 	   wire 		elig;
 	   vcr_ovc_ctrl
 	     #(.num_vcs(num_vcs),
@@ -366,14 +306,16 @@ module vcr_op_ctrl_mac
 	   ovcc
 	     (.clk(clk),
 	      .reset(reset),
-	      .active(ovcc_active),
+	      .vc_active(vc_active),
 	      .vc_gnt(vc_gnt),
 	      .vc_sel_ip(vc_sel_ip),
 	      .vc_sel_ivc(vc_sel_ivc),
-	      .flit_valid(flit_valid),
+	      .sw_active(sw_active),
+	      .sw_gnt(sw_gnt),
+	      .sw_sel_ip(sw_sel_ip),
+	      .sw_sel_ivc(sw_sel_ivc),
+	      .flit_valid(flit_valid_q),
 	      .flit_tail(flit_tail_q),
-	      .flit_sel_ip(flit_sel_ip),
-	      .flit_sel_ivc(flit_sel_ivc),
 	      .flit_sel(flit_sel),
 	      .elig(elig),
 	      .full(full),
@@ -394,7 +336,7 @@ module vcr_op_ctrl_mac
       if(sw_alloc_spec)
 	assign error_unmatched = 1'b0;
       else
-	assign error_unmatched = flit_valid & ~|flit_sel_ovc;
+	assign error_unmatched = flit_valid_q & ~|flit_sel_ovc;
       
    endgenerate
    
@@ -406,16 +348,27 @@ module vcr_op_ctrl_mac
       .multi_hot(flit_multisel));
    
    wire 			error_multimatch;
-   assign error_multimatch = flit_valid & flit_multisel;
+   assign error_multimatch = flit_valid_q & flit_multisel;
    
    
    //---------------------------------------------------------------------------
    // output staging
    //---------------------------------------------------------------------------
    
-   wire 			cho_active;
-   assign cho_active = flit_valid;
+   wire 			flit_sent;
+   
+   generate
       
+      if(sw_alloc_spec)
+	assign flit_sent = flit_valid_q & (|flit_sel_ovc);
+      else
+	assign flit_sent = flit_valid_q;
+            
+   endgenerate
+   
+   wire 			cho_active;
+   assign cho_active = flit_valid_q;
+   
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
