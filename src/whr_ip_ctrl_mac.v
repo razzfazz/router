@@ -169,9 +169,6 @@ module whr_ip_ctrl_mac
    localparam fb_depth
      = input_stage_can_hold ? (buffer_size - 1) : buffer_size;
    
-   // required address width for flit buffer
-   localparam fb_addr_width = clogb(fb_depth);
-   
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
@@ -236,22 +233,22 @@ module whr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    
    wire 			 flit_valid_in;
-   wire 			 fbc_empty;
+   wire 			 fb_empty;
    
    wire 			 flit_valid;
-   assign flit_valid = flit_valid_in | ~fbc_empty;
+   assign flit_valid = flit_valid_in | ~fb_empty;
    
    wire 			 flit_valid_out;
    assign flit_valid_out = gnt;
    
-   wire 			 fbc_full;
+   wire 			 fb_full;
    
    wire 			 hold_input_enable;
    
    generate
       
       if(input_stage_can_hold)
-	assign hold_input_enable = fbc_full;
+	assign hold_input_enable = fb_full;
       else
 	assign hold_input_enable = 1'b0;
       
@@ -308,225 +305,84 @@ module whr_ip_ctrl_mac
    
    
    //---------------------------------------------------------------------------
-   // flit buffer control
-   //---------------------------------------------------------------------------
-   
-   wire 			  push_active;
-   assign push_active = flit_valid_thru;
-   
-   wire 			  pop_active;
-   assign pop_active = flit_valid;
-   
-   wire 			  fbc_push;
-   assign fbc_push = flit_valid_thru;
-   
-   wire 			  fbc_pop;
-   assign fbc_pop = flit_valid_out;
-   
-   wire [0:fb_addr_width-1] 	  fbc_push_addr;
-   wire [0:fb_addr_width-1] 	  fbc_pop_addr;
-   wire 			  fbc_almost_empty;
-   wire [0:1] 			  fbc_errors;
-   c_fifo_ctrl
-     #(.depth(fb_depth),
-       .reset_type(reset_type))
-   fbc
-     (.clk(clk),
-      .reset(reset),
-      .push_active(push_active),
-      .pop_active(pop_active),
-      .push(fbc_push),
-      .pop(fbc_pop),
-      .push_addr(fbc_push_addr),
-      .pop_addr(fbc_pop_addr),
-      .almost_empty(fbc_almost_empty),
-      .empty(fbc_empty),
-      .full(fbc_full),
-      .errors(fbc_errors));
-   
-   wire 			  error_fbc_underflow;
-   assign error_fbc_underflow = fbc_errors[0];
-   
-   wire 			  error_fbc_overflow;
-   assign error_fbc_overflow = fbc_errors[1];
-   
-   
-   //---------------------------------------------------------------------------
    // flit buffer
    //---------------------------------------------------------------------------
    
-   wire 			  fbf_write_enable;
-   wire [0:fb_addr_width-1] 	  fbf_read_addr;
+   wire 			  fb_push_active;
+   assign fb_push_active = flit_valid_thru;
    
-   generate
-      
-      if(explicit_pipeline_register)
-	begin
-	   
-	   if(gate_buffer_write)
-	     assign fbf_write_enable
-	       = flit_valid_in & ~(fbc_empty & flit_valid_out);
-	   else
-	     assign fbf_write_enable = flit_valid_in;
-	   
-	   assign fbf_read_addr = fbc_pop_addr;
-	   
-	end
-      else
-	begin
-	   
-	   assign fbf_write_enable = flit_valid_in;
-	   
-	   wire [0:fb_addr_width-1] fbf_read_addr_s, fbf_read_addr_q;
-	   assign fbf_read_addr_s = fbc_pop_addr;
-	   c_dff
-	     #(.width(fb_addr_width),
-	       .reset_type(reset_type))
-	   fbf_read_addrq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(pop_active),
-	      .d(fbf_read_addr_s),
-	      .q(fbf_read_addr_q));
-	   
-	   assign fbf_read_addr = fbf_read_addr_q;
-	   
-	end
-      
-   endgenerate
+   wire 			  fb_push_valid;
+   assign fb_push_valid = flit_valid_thru;
    
-   wire [0:flit_data_width-1] 	     fbf_write_data;
-   assign fbf_write_data = flit_data_in;
+   wire 			  fb_push_head;
+   assign fb_push_head = flit_head_in;
    
-   wire [0:flit_data_width-1] 	     fbf_read_data;
-   wire [0:flit_data_width-1] 	     fbf_peek_data;
+   wire 			  fb_push_tail;
+   assign fb_push_tail = flit_tail_in;
    
-   generate
-
-      if(atomic_vc_allocation)
-	begin
-	   
-	   c_regfile
-	     #(.depth(fb_depth),
-	       .width(flit_data_width),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(push_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbc_push_addr),
-	      .write_data(fbf_write_data),
-	      .read_address(fbf_read_addr),
-	      .read_data(fbf_read_data));
-	   
-	   assign fbf_peek_data = {flit_data_width{1'b0}};
-	   
-	end
-      else
-	begin
-	   
-	   wire fbf_peek_active;
-	   assign fbf_peek_active = ~fbc_empty & ~fbc_almost_empty;
-	   
-	   wire [0:fb_addr_width-1] fbf_peek_addr;
-	   c_incr
-	     #(.width(fb_addr_width),
-	       .max_value(fb_depth - 1))
-	   fbf_peek_addr_incr
-	     (.data_in(fbc_pop_addr),
-	      .data_out(fbf_peek_addr));
-	   
-	   c_regfile
-	     #(.depth(fb_depth),
-	       .width(flit_data_width),
-	       .num_read_ports(2),
-	       .regfile_type(fb_regfile_type))
-	   fbf
-	     (.clk(clk),
-	      .write_active(push_active),
-	      .write_enable(fbf_write_enable),
-	      .write_address(fbc_push_addr),
-	      .write_data(fbf_write_data),
-	      .read_address({fbf_read_addr, fbf_peek_addr}),
-	      .read_data({fbf_read_data, fbf_peek_data}));
-	   
-	end
-      
-   endgenerate
+   wire [0:flit_data_width-1] 	  fb_push_data;
+   assign fb_push_data = flit_data_in;
    
-   wire [0:flit_data_width-1] fbf_flit_data;
-   assign fbf_flit_data = fbf_read_data;
+   wire 			  fb_pop_active;
+   assign fb_pop_active = flit_valid;
    
-   wire [0:header_info_width-1] peek_header_info;
-   assign peek_header_info = fbf_peek_data[0:header_info_width-1];
-
-   wire [0:route_info_width-1] 	peek_route_info;
-   assign peek_route_info = peek_header_info[0:route_info_width-1];
+   wire 			  fb_pop_valid;
+   assign fb_pop_valid = flit_valid_out;
+   
+   wire [0:flit_data_width-1] 	  fb_pop_data;
+   wire 			  fb_pop_tail;
+   wire [0:header_info_width-1]   fb_pop_next_header_info;
+   wire 			  fb_almost_empty;
+   wire [0:1] 			  fb_errors;
+   rtr_flit_buffer
+     #(.num_vcs(1),
+       .buffer_size(fb_depth),
+       .flit_data_width(flit_data_width),
+       .header_info_width(header_info_width),
+       .regfile_type(fb_regfile_type),
+       .explicit_pipeline_register(explicit_pipeline_register),
+       .gate_buffer_write(gate_buffer_write),
+       .mgmt_type(`FB_MGMT_TYPE_STATIC),
+       .atomic_vc_allocation(atomic_vc_allocation),
+       .reset_type(reset_type))
+   fb
+     (.clk(clk),
+      .reset(reset),
+      .push_active(fb_push_active),
+      .push_valid(fb_push_valid),
+      .push_head(fb_push_head),
+      .push_tail(fb_push_tail),
+      .push_sel_ivc(1'b1),
+      .push_data(fb_push_data),
+      .pop_active(fb_pop_active),
+      .pop_valid(fb_pop_valid),
+      .pop_sel_ivc(1'b1),
+      .pop_data(fb_pop_data),
+      .pop_tail_ivc(fb_pop_tail),
+      .pop_next_header_info(fb_pop_next_header_info),
+      .almost_empty_ivc(fb_almost_empty),
+      .empty_ivc(fb_empty),
+      .full(fb_full),
+      .errors_ivc(fb_errors));
+   
+   wire 			  error_fb_underflow;
+   assign error_fb_underflow = fb_errors[0];
+   
+   wire 			  error_fb_overflow;
+   assign error_fb_overflow = fb_errors[1];
    
    
    //---------------------------------------------------------------------------
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   wire 			fb_flit_tail;
+   wire 			  pop_active;
+   assign pop_active = flit_valid;
    
-   wire 			flit_tail_out;
-   assign flit_tail_out = fbc_empty ? flit_tail_in : fb_flit_tail;
+   wire 			  flit_tail_out;
+   assign flit_tail_out = fb_empty ? flit_tail_in : fb_pop_tail;
    
-   generate
-      
-      if(atomic_vc_allocation)
-	begin
-	   
-	   wire has_tail_s, has_tail_q;
-	   assign has_tail_s = (has_tail_q & ~(flit_valid_in & flit_head_in)) |
-			       (flit_valid_in & flit_tail_in);
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   has_tailq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(pop_active),
-	      .d(has_tail_s),
-	      .q(has_tail_q));
-	   
-	   assign fb_flit_tail = fbc_almost_empty & has_tail_q;
-	   
-	end
-      else
-	begin
-	   
-	   wire [0:fb_depth-1] 	push_mask;
-	   c_decode
-	     #(.num_ports(fb_depth))
-	   push_addr_dec
-	     (.data_in(fbc_push_addr),
-	      .data_out(push_mask));
-	   
-	   wire [0:fb_depth-1] 	flit_tail_s, flit_tail_q;
-	   assign flit_tail_s
-	     = fbf_write_enable ? 
-	       ({fb_depth{flit_tail_in}} & push_mask) | 
-	       (flit_tail_q & ~push_mask) : 
-	       flit_tail_q;
-	   c_dff
-	     #(.width(fb_depth),
-	       .reset_type(reset_type))
-	   flit_tailq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(push_active),
-	      .d(flit_tail_s),
-	      .q(flit_tail_q));
-	   
-	   assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
-	   
-	end
-      
-   endgenerate
-   
-   wire 			htr_flit_head_s, htr_flit_head_q;
+   wire 			  htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_valid_out ? flit_tail_out : htr_flit_head_q;
    c_dff
      #(.width(1),
@@ -539,16 +395,16 @@ module whr_ip_ctrl_mac
       .d(htr_flit_head_s),
       .q(htr_flit_head_q));
    
-   wire 			flit_head_out;
-   assign flit_head_out = fbc_empty ? flit_head_in : htr_flit_head_q;
+   wire 			  flit_head_out;
+   assign flit_head_out = fb_empty ? flit_head_in : htr_flit_head_q;
    
    
    //---------------------------------------------------------------------------
    // head register
    //---------------------------------------------------------------------------
    
-   wire 			hdr_active;
-   wire 			hdr_capture;
+   wire 			  hdr_active;
+   wire 			  hdr_capture;
    generate
       if(atomic_vc_allocation)
 	begin
@@ -557,14 +413,18 @@ module whr_ip_ctrl_mac
 	end
       else
 	begin
-	   assign hdr_active = ~fbc_empty | (flit_valid_in & flit_head_in);
-	   assign hdr_capture = (fbc_empty & flit_valid_in & flit_head_in) | 
+	   assign hdr_active = ~fb_empty | (flit_valid_in & flit_head_in);
+	   assign hdr_capture = (fb_empty & flit_valid_in & flit_head_in) | 
 				(flit_valid_out & flit_tail_out);
 	end
    endgenerate
    
    wire two_plus_flits;
-   assign two_plus_flits = ~fbc_empty & ~fbc_almost_empty;
+   assign two_plus_flits = ~fb_empty & ~fb_almost_empty;
+   
+   wire [0:route_info_width-1] fb_pop_next_route_info;
+   assign fb_pop_next_route_info
+     = fb_pop_next_header_info[0:route_info_width-1];
    
    wire [0:lar_info_width-1] hdr_lar_info_s, hdr_lar_info_q;
    generate
@@ -574,12 +434,13 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   
-	   wire [0:lar_info_width-1] peek_lar_info;
-	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
+	   wire [0:lar_info_width-1] fb_pop_next_lar_info;
+	   assign fb_pop_next_lar_info
+	     = fb_pop_next_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
 	     = hdr_capture ? 
-	       (two_plus_flits ? peek_lar_info : lar_info_in) : 
+	       (two_plus_flits ? fb_pop_next_lar_info : lar_info_in) : 
 	       hdr_lar_info_q;
 	   
 	end
@@ -602,13 +463,14 @@ module whr_ip_ctrl_mac
       else
 	begin
 	   
-	   wire [0:dest_info_width-1] peek_dest_info;
-	   assign peek_dest_info
-	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
+	   wire [0:dest_info_width-1] fb_pop_next_dest_info;
+	   assign fb_pop_next_dest_info
+	     = fb_pop_next_route_info[lar_info_width:
+				      lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
 	     = hdr_capture ? 
-	       (two_plus_flits ? peek_dest_info : dest_info_in) : 
+	       (two_plus_flits ? fb_pop_next_dest_info : dest_info_in) : 
 	       hdr_dest_info_q;
 	   
 	end
@@ -653,7 +515,7 @@ module whr_ip_ctrl_mac
       if(atomic_vc_allocation)
 	assign bypass_route_info = flit_valid_in & flit_head_in;
       else
-	assign bypass_route_info = fbc_empty & flit_valid_in & flit_head_in;
+	assign bypass_route_info = fb_empty & flit_valid_in & flit_head_in;
    endgenerate
    
    wire [0:num_ports-1] 	       route_unmasked_op;
@@ -772,38 +634,11 @@ module whr_ip_ctrl_mac
       .d(flit_head_prev_s),
       .q(flit_head_prev_q));
    
-   wire [0:flit_data_width-1] 	       flit_data_buffered;
-   
-   generate
-      
-      if(explicit_pipeline_register)
-	begin
-	   
-	   wire [0:flit_data_width-1] flit_data_s, flit_data_q;
-	   assign flit_data_s = fbc_empty ? flit_data_in : fbf_flit_data;
-	   c_dff
-	     #(.width(flit_data_width),
-	       .reset_type(reset_type))
-	   flit_dataq
-	     (.clk(clk),
-	      .reset(1'b0),
-	      .active(pop_active),
-	      .d(flit_data_s),
-	      .q(flit_data_q));
-	   
-	   assign flit_data_buffered = flit_data_q;
-	   
-	end
-      else
-	assign flit_data_buffered = fbf_flit_data;
-      
-   endgenerate
-   
    assign flit_data_out[0:lar_info_width-1]
-     = flit_head_prev_q ? lar_info_q : flit_data_buffered[0:lar_info_width-1];
+     = flit_head_prev_q ? lar_info_q : fb_pop_data[0:lar_info_width-1];
    assign flit_data_out[lar_info_width:flit_data_width-1]
-     = flit_data_buffered[lar_info_width:flit_data_width-1];
-	   
+     = fb_pop_data[lar_info_width:flit_data_width-1];
+   
    
    //---------------------------------------------------------------------------
    // generate control signals to switch allocator
@@ -844,8 +679,8 @@ module whr_ip_ctrl_mac
 	begin
 
 	   wire [0:3] errors_s, errors_q;
-	   assign errors_s[0] = error_fbc_underflow;
-	   assign errors_s[1] = error_fbc_overflow;
+	   assign errors_s[0] = error_fb_underflow;
+	   assign errors_s[1] = error_fb_overflow;
 	   assign errors_s[2] = error_invalid_port;
 	   assign errors_s[3] = error_invalid_class;
 	   c_err_rpt
