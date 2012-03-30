@@ -534,7 +534,7 @@ module vcr_ip_ctrl_mac
        .flit_data_width(flit_data_width),
        .header_info_width(header_info_width),
        .regfile_type(fb_regfile_type),
-       .fb_mgmt_type(fb_mgmt_type),
+       .mgmt_type(fb_mgmt_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
        .atomic_vc_allocation(atomic_vc_allocation),
