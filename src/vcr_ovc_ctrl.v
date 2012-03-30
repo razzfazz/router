@@ -128,7 +128,7 @@ module vcr_ovc_ctrl
       .q(flit_sel_ip_q));
    
    wire 		 port_match;
-   assign port_match = (flit_sel_ip == flit_sel_ip_q);
+   assign port_match = |(flit_sel_ip & flit_sel_ip_q);
    
    wire 		 vc_match;
    
@@ -151,7 +151,7 @@ module vcr_ovc_ctrl
 	      .d(flit_sel_ivc_s),
 	      .q(flit_sel_ivc_q));
 	   
-	   assign vc_match = (flit_sel_ivc == flit_sel_ivc_q);
+	   assign vc_match = |(flit_sel_ivc & flit_sel_ivc_q);
 	   
 	end
       
