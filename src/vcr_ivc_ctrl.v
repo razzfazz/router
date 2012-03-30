@@ -31,7 +31,7 @@
 
 module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   flit_sel_in, header_info_in, fb_peek_tail, fb_peek_next_header_info, 
+   flit_sel_in, header_info_in, fb_pop_tail, fb_pop_next_header_info, 
    almost_full_op_ovc, full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, 
    sw_gnt, sw_sel, flit_valid, flit_head, flit_tail, next_lar_info, 
    fb_almost_empty, fb_empty, allocated, free_nonspec, free_spec, errors);
@@ -218,11 +218,11 @@ module vcr_ivc_ctrl
    input [0:header_info_width-1] header_info_in;
    
    // tail indicator for frontmost flit in buffer (if any)
-   input 			 fb_peek_tail;
+   input 			 fb_pop_tail;
    
    // header info from next flit in buffer
    // (NOTE: only valid if buffer contains at least two entries)
-   input [0:header_info_width-1] fb_peek_next_header_info;
+   input [0:header_info_width-1] fb_pop_next_header_info;
    
    // which output VC have only a single credit left?
    input [0:num_ports*num_vcs-1]   almost_full_op_ovc;
@@ -384,7 +384,7 @@ module vcr_ivc_ctrl
    // generate head and tail indicators
    //---------------------------------------------------------------------------
    
-   assign flit_tail = fb_empty ? flit_tail_in : fb_peek_tail;
+   assign flit_tail = fb_empty ? flit_tail_in : fb_pop_tail;
    
    wire 	      htr_flit_head_s, htr_flit_head_q;
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
@@ -428,9 +428,9 @@ module vcr_ivc_ctrl
    wire two_plus_flits;
    assign two_plus_flits = ~fb_empty & ~fb_almost_empty;
    
-   wire [0:route_info_width-1] fb_peek_next_route_info;
-   assign fb_peek_next_route_info
-     = fb_peek_next_header_info[0:route_info_width-1];
+   wire [0:route_info_width-1] fb_pop_next_route_info;
+   assign fb_pop_next_route_info
+     = fb_pop_next_header_info[0:route_info_width-1];
    
    wire [0:lar_info_width-1]   lar_info_in;
    assign lar_info_in = route_info_in[0:lar_info_width-1];
@@ -442,13 +442,13 @@ module vcr_ivc_ctrl
       else
 	begin
 	   
-	   wire [0:lar_info_width-1] fb_peek_next_lar_info;
-	   assign fb_peek_next_lar_info
-	     = fb_peek_next_route_info[0:lar_info_width-1];
+	   wire [0:lar_info_width-1] fb_pop_next_lar_info;
+	   assign fb_pop_next_lar_info
+	     = fb_pop_next_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
 	     = hdr_capture ?
-	       (two_plus_flits ? fb_peek_next_lar_info : lar_info_in) :
+	       (two_plus_flits ? fb_pop_next_lar_info : lar_info_in) :
 	       hdr_lar_info_q;
 	   
 	end
@@ -474,14 +474,14 @@ module vcr_ivc_ctrl
       else
 	begin
 	   
-	   wire [0:dest_info_width-1] fb_peek_next_dest_info;
-	   assign fb_peek_next_dest_info
-	     = fb_peek_next_route_info[lar_info_width:
-				       lar_info_width+dest_info_width-1];
+	   wire [0:dest_info_width-1] fb_pop_next_dest_info;
+	   assign fb_pop_next_dest_info
+	     = fb_pop_next_route_info[lar_info_width:
+				      lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
 	     = hdr_capture ?
-	       (two_plus_flits ? fb_peek_next_dest_info : dest_info_in) :
+	       (two_plus_flits ? fb_pop_next_dest_info : dest_info_in) :
 	       hdr_dest_info_q;
 	   
 	end

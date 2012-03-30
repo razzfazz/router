@@ -496,8 +496,8 @@ module rtr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 				  fb_peek_tail_ivc;
-   wire [0:header_info_width-1] 		  fb_peek_next_header_info;
+   wire [0:num_vcs-1] 				  fb_pop_tail_ivc;
+   wire [0:header_info_width-1] 		  fb_pop_next_header_info;
    wire [0:num_vcs-1] 				  fb_almost_empty_ivc;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
@@ -529,8 +529,8 @@ module rtr_ip_ctrl_mac
 	   wire fb_almost_empty;
 	   assign fb_almost_empty = fb_almost_empty_ivc[ivc];
 	   
-	   wire fb_peek_tail;
-	   assign fb_peek_tail = fb_peek_tail_ivc[ivc];
+	   wire fb_pop_tail;
+	   assign fb_pop_tail = fb_pop_tail_ivc[ivc];
 	   
 	   wire fb_empty;
 	   assign fb_empty = fb_empty_ivc[ivc];
@@ -636,12 +636,12 @@ module rtr_ip_ctrl_mac
 	   if(dual_path_alloc)
 	     begin
 		assign flit_head_out = ht_flit_head;
-		assign flit_tail_out = fb_peek_tail;
+		assign flit_tail_out = fb_pop_tail;
 	     end
 	   else
 	     begin
 		assign flit_head_out = fb_empty ? chi_flit_head : ht_flit_head;
-		assign flit_tail_out = fb_empty ? chi_flit_tail : fb_peek_tail;
+		assign flit_tail_out = fb_empty ? chi_flit_tail : fb_pop_tail;
 	     end
 	   
 	   
@@ -673,13 +673,13 @@ module rtr_ip_ctrl_mac
 	      wire two_plus_flits;
 	      assign two_plus_flits = ~fb_empty & ~fb_almost_empty;
 	      
-	      wire [0:route_info_width-1] fb_peek_next_route_info;
-	      assign fb_peek_next_route_info
-		= fb_peek_next_header_info[0:route_info_width-1];
+	      wire [0:route_info_width-1] fb_pop_next_route_info;
+	      assign fb_pop_next_route_info
+		= fb_pop_next_header_info[0:route_info_width-1];
 	      
-	      wire [0:lar_info_width-1]   fb_peek_next_lar_info;
-	      assign fb_peek_next_lar_info
-		= fb_peek_next_route_info[0:lar_info_width-1];
+	      wire [0:lar_info_width-1]   fb_pop_next_lar_info;
+	      assign fb_pop_next_lar_info
+		= fb_pop_next_route_info[0:lar_info_width-1];
 	      
 	      wire [0:num_ports-1] 	  route_op;
 	      wire [0:num_resource_classes-1] route_orc;
@@ -700,20 +700,20 @@ module rtr_ip_ctrl_mac
 		   else
 		     begin
 			
-			wire [0:port_idx_width-1] fb_peek_next_route_port;
-			assign fb_peek_next_route_port
-			  = fb_peek_next_lar_info[0:port_idx_width-1];
+			wire [0:port_idx_width-1] fb_pop_next_route_port;
+			assign fb_pop_next_route_port
+			  = fb_pop_next_lar_info[0:port_idx_width-1];
 			
-			wire [0:num_ports-1] 	  peek_next_route_op;
+			wire [0:num_ports-1] 	  pop_next_route_op;
 			c_decode
 			  #(.num_ports(num_ports))
-			peek_next_route_op_dec
-			  (.data_in(fb_peek_next_route_port),
-			   .data_out(peek_next_route_op));
+			pop_next_route_op_dec
+			  (.data_in(fb_pop_next_route_port),
+			   .data_out(pop_next_route_op));
 			
 			assign route_op_s = capture ?
 					    (two_plus_flits ? 
-					     peek_next_route_op : 
+					     pop_next_route_op : 
 					     gld_route_op) :
 					    route_op_q;
 			
@@ -753,24 +753,23 @@ module rtr_ip_ctrl_mac
 			  begin
 			     
 			     wire [0:resource_class_idx_width-1] 
-			       fb_peek_next_route_rcsel;
-			     assign fb_peek_next_route_rcsel
-			       = fb_peek_next_lar_info[port_idx_width:
-						       port_idx_width+
-						       resource_class_idx_width-
-						       1];
+			       fb_pop_next_route_rcsel;
+			     assign fb_pop_next_route_rcsel
+			       = fb_pop_next_lar_info[port_idx_width:
+						      port_idx_width+
+						      resource_class_idx_width-
+						      1];
 			     
-			     wire [0:num_resource_classes-1] 
-			       peek_next_route_orc;
+			     wire [0:num_resource_classes-1] pop_next_route_orc;
 			     c_decode
 			       #(.num_ports(num_resource_classes))
-			     peek_next_route_orc_dec
-			       (.data_in(fb_peek_next_route_rcsel),
-				.data_out(peek_next_route_orc));
+			     pop_next_route_orc_dec
+			       (.data_in(fb_pop_next_route_rcsel),
+				.data_out(pop_next_route_orc));
 			     
 			     assign route_orc_s = capture ?
 						  (two_plus_flits ? 
-						   peek_next_route_orc : 
+						   pop_next_route_orc : 
 						   gld_route_orc) :
 						  route_orc_q;
 			     
@@ -811,7 +810,7 @@ module rtr_ip_ctrl_mac
 		   else
 		     assign lar_info_s = capture ?
 					 (two_plus_flits ? 
-					  fb_peek_next_lar_info : 
+					  fb_pop_next_lar_info : 
 					  chi_lar_info) :
 					 lar_info_q;
 		   c_dff
@@ -862,15 +861,14 @@ module rtr_ip_ctrl_mac
 	      else
 		begin
 		   
-		   wire [0:dest_info_width-1] fb_peek_next_dest_info;
-		   assign fb_peek_next_dest_info
-		     = fb_peek_next_route_info[lar_info_width:
-					       lar_info_width+
-					       dest_info_width-1];
+		   wire [0:dest_info_width-1] fb_pop_next_dest_info;
+		   assign fb_pop_next_dest_info
+		     = fb_pop_next_route_info[lar_info_width:
+					      lar_info_width+dest_info_width-1];
 		   
 		   assign dest_info_s = capture ?
 					(two_plus_flits ? 
-					 fb_peek_next_dest_info : 
+					 fb_pop_next_dest_info : 
 					 chi_dest_info) :
 					dest_info_q;
 		   
@@ -1118,8 +1116,8 @@ module rtr_ip_ctrl_mac
       .pop_valid(fb_pop_valid),
       .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
-      .peek_tail_ivc(fb_peek_tail_ivc),
-      .peek_next_header_info(fb_peek_next_header_info),
+      .pop_tail_ivc(fb_pop_tail_ivc),
+      .pop_next_header_info(fb_pop_next_header_info),
       .almost_empty_ivc(fb_almost_empty_ivc),
       .empty_ivc(fb_empty_ivc),
       .full(fb_full),

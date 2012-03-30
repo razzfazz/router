@@ -358,8 +358,8 @@ module vcr_ip_ctrl_mac
    // input vc controllers
    //---------------------------------------------------------------------------
    
-   wire [0:num_vcs-1] 	      fb_peek_tail_ivc;
-   wire [0:header_info_width-1] fb_peek_next_header_info;
+   wire [0:num_vcs-1] 	      fb_pop_tail_ivc;
+   wire [0:header_info_width-1] fb_pop_next_header_info;
    wire [0:num_vcs-1] 		    fb_almost_empty_ivc;
    wire [0:num_vcs-1] 		    fb_empty_ivc;
    
@@ -395,8 +395,8 @@ module vcr_ip_ctrl_mac
 	   wire 	      sw_sel;
 	   assign sw_sel = sw_sel_ivc[ivc];
 	   
-	   wire 	      fb_peek_tail;
-	   assign fb_peek_tail = fb_peek_tail_ivc[ivc];
+	   wire 	      fb_pop_tail;
+	   assign fb_pop_tail = fb_pop_tail_ivc[ivc];
 	   
 	   wire 	      fb_almost_empty;
 	   assign fb_almost_empty = fb_almost_empty_ivc[ivc];
@@ -448,8 +448,8 @@ module vcr_ip_ctrl_mac
 	      .flit_tail_in(flit_tail_in),
 	      .flit_sel_in(flit_sel_in),
 	      .header_info_in(header_info_in),
-	      .fb_peek_tail(fb_peek_tail),
-	      .fb_peek_next_header_info(fb_peek_next_header_info),
+	      .fb_pop_tail(fb_pop_tail),
+	      .fb_pop_next_header_info(fb_pop_next_header_info),
 	      .almost_full_op_ovc(almost_full_op_ovc),
 	      .full_op_ovc(full_op_ovc),
 	      .route_op(route_op),
@@ -552,8 +552,8 @@ module vcr_ip_ctrl_mac
       .pop_valid(fb_pop_valid),
       .pop_sel_ivc(fb_pop_sel_ivc),
       .pop_data(fb_pop_data),
-      .peek_tail_ivc(fb_peek_tail_ivc),
-      .peek_next_header_info(fb_peek_next_header_info),
+      .pop_tail_ivc(fb_pop_tail_ivc),
+      .pop_next_header_info(fb_pop_next_header_info),
       .almost_empty_ivc(fb_almost_empty_ivc),
       .empty_ivc(fb_empty_ivc),
       .full(fb_full),

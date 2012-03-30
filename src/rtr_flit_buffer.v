@@ -31,8 +31,8 @@
 
 module rtr_flit_buffer
   (clk, reset, push_active, push_valid, push_head, push_tail, push_sel_ivc, 
-   push_data, pop_active, pop_valid, pop_sel_ivc, pop_data, peek_tail_ivc, 
-   peek_next_header_info, almost_empty_ivc, empty_ivc, full, errors_ivc);
+   push_data, pop_active, pop_valid, pop_sel_ivc, pop_data, pop_tail_ivc, 
+   pop_next_header_info, almost_empty_ivc, empty_ivc, full, errors_ivc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -129,13 +129,13 @@ module rtr_flit_buffer
    output [0:flit_data_width-1] pop_data;
    wire [0:flit_data_width-1] 	pop_data;
    
-   // peek at the tail bit for the element to be read next in each VC
-   output [0:num_vcs-1] 	peek_tail_ivc;
-   wire [0:num_vcs-1] 		peek_tail_ivc;
+   // tail bit for the element to be read next in each VC
+   output [0:num_vcs-1] 	pop_tail_ivc;
+   wire [0:num_vcs-1] 		pop_tail_ivc;
    
    // peek-ahead at the element in each VC after the one to be read next
-   output [0:header_info_width-1] peek_next_header_info;
-   wire [0:header_info_width-1]   peek_next_header_info;
+   output [0:header_info_width-1] pop_next_header_info;
+   wire [0:header_info_width-1]   pop_next_header_info;
    
    // VC state flags
    output [0:num_vcs-1] 	  almost_empty_ivc;
@@ -149,9 +149,11 @@ module rtr_flit_buffer
    output [0:num_vcs*2-1] 	  errors_ivc;
    wire [0:num_vcs*2-1] 	  errors_ivc;
    
+   wire [0:addr_width-1] 	  push_addr;
+   wire [0:addr_width-1] 	  pop_addr;
+   wire [0:addr_width-1] 	  pop_next_addr;
    
    generate
-      
       
       //------------------------------------------------------------------------
       // tail flit tracking (atomic)
@@ -177,7 +179,7 @@ module rtr_flit_buffer
 	      .d(has_tail_ivc_s),
 	      .q(has_tail_ivc_q));
 	   
-	   assign peek_tail_ivc = almost_empty_ivc & has_tail_ivc_q;
+	   assign pop_tail_ivc = almost_empty_ivc & has_tail_ivc_q;
 	   
 	end
       
@@ -186,13 +188,12 @@ module rtr_flit_buffer
 	`FB_MGMT_TYPE_STATIC:
 	  begin
 	     
-	     wire [0:num_vcs*addr_width-1] push_addr_ivc;
-	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
-	     
-	     
 	     //-----------------------------------------------------------------
 	     // tail flit tracking (non-atomic)
 	     //-----------------------------------------------------------------
+	     
+	     wire [0:num_vcs*addr_width-1] push_addr_ivc;
+	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
 	     
 	     if(!atomic_vc_allocation)
 	       begin
@@ -258,16 +259,16 @@ module rtr_flit_buffer
 			 (.data_in(pop_vc_addr),
 			  .data_out(pop_mask));
 		       
-		       wire 			     peek_tail;
+		       wire 			     pop_tail;
 		       c_select_1ofn
 			 #(.num_ports(buffer_size_per_vc),
 			   .width(1))
-		       peek_tail_sel
+		       pop_tail_sel
 			 (.select(pop_mask),
 			  .data_in(tail_q),
-			  .data_out(peek_tail));
+			  .data_out(pop_tail));
 		       
-		       assign peek_tail_ivc[ivc] = peek_tail;
+		       assign pop_tail_ivc[ivc] = pop_tail;
 		       
 		    end
 		  
@@ -275,41 +276,55 @@ module rtr_flit_buffer
 	     
 	     
 	     //-----------------------------------------------------------------
-	     // buffer
+	     // buffer control
 	     //-----------------------------------------------------------------
 	     
-	     wire [0:flit_data_width-1] 	     peek_next_data;
+	     wire [0:num_vcs*addr_width-1] 	     pop_next_addr_ivc;
 	     wire [0:num_vcs-1] 		     full_ivc;
-	     c_samq
+	     c_samq_ctrl
 	       #(.num_queues(num_vcs),
 		 .num_slots_per_queue(buffer_size_per_vc),
-		 .data_width(flit_data_width),
-		 .regfile_type(regfile_type),
-		 .registered_read(explicit_pipeline_register),
-		 .gate_buffer_write(gate_buffer_write),
-		 .enable_peek_next(!atomic_vc_allocation),
 		 .reset_type(reset_type))
-	     samq
+	     samqc
 	       (.clk(clk),
 		.reset(reset),
 		.push_active(push_active),
 		.push_valid(push_valid),
 		.push_sel_qu(push_sel_ivc),
-		.push_data(push_data),
 		.push_addr_qu(push_addr_ivc),
 		.pop_active(pop_active),
 		.pop_valid(pop_valid),
 		.pop_sel_qu(pop_sel_ivc),
-		.pop_data(pop_data),
 		.pop_addr_qu(pop_addr_ivc),
-		.peek_next_data(peek_next_data),
+		.pop_next_addr_qu(pop_next_addr_ivc),
 		.almost_empty_qu(almost_empty_ivc),
 		.empty_qu(empty_ivc),
 		.full_qu(full_ivc),
 		.errors_qu(errors_ivc));
 	     
-	     assign peek_next_header_info
-	       = peek_next_data[0:header_info_width-1];
+	     c_select_1ofn
+	       #(.num_ports(num_vcs),
+		 .width(addr_width))
+	     push_addr_sel
+	       (.select(push_sel_ivc),
+		.data_in(push_addr_ivc),
+		.data_out(push_addr));
+	     
+	     c_select_1ofn
+	       #(.num_ports(num_vcs),
+		 .width(addr_width))
+	     pop_addr_sel
+	       (.select(pop_sel_ivc),
+		.data_in(pop_addr_ivc),
+		.data_out(pop_addr));
+	     
+	     c_select_1ofn
+	       #(.num_ports(num_vcs),
+		 .width(addr_width))
+	     pop_next_addr_sel
+	       (.select(pop_sel_ivc),
+		.data_in(pop_next_addr_ivc),
+		.data_out(pop_next_addr));
 	     
 	     assign full = &full_ivc;
 	     
@@ -318,5 +333,128 @@ module rtr_flit_buffer
       endcase
       
    endgenerate
+   
+   
+   //---------------------------------------------------------------------------
+   // storage
+   //---------------------------------------------------------------------------
+   
+   wire 					     write_active;
+   assign write_active = push_active;
+   
+   wire [0:addr_width-1] 			     write_addr;
+   assign write_addr = push_addr;
+   
+   wire [0:flit_data_width-1] 			     write_data;
+   assign write_data = push_data;
+   
+   wire [0:flit_data_width-1] 			     read_data;
+   
+   wire 					     write_enable;
+   wire [0:addr_width-1] 			     read_addr;
+   
+   generate
+      
+      if(explicit_pipeline_register)
+	begin
+	   
+	   wire empty;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(1))
+	   empty_sel
+	     (.select(pop_sel_ivc),
+	      .data_in(empty_ivc),
+	      .data_out(empty));
+	   
+	   if(gate_buffer_write)
+	     assign write_enable = push_valid & ~(pop_valid & empty);
+	   else
+	     assign write_enable = push_valid;
+	   
+	   assign read_addr = pop_addr;
+	   
+	   wire [0:flit_data_width-1] pop_data_s, pop_data_q;
+	   assign pop_data_s
+	     = pop_valid ? (empty ? write_data : read_data) : pop_data_q;
+	   c_dff
+	     #(.width(flit_data_width),
+	       .reset_type(reset_type))
+	   pop_dataq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(pop_active),
+	      .d(pop_data_s),
+	      .q(pop_data_q));
+	   
+	   assign pop_data = pop_data_q;
+	   
+	end
+      else
+	begin
+	   
+	   assign write_enable = push_valid;
+	   
+	   wire [0:addr_width-1] read_addr_s, read_addr_q;
+	   assign read_addr_s = pop_valid ? pop_addr : read_addr_q;
+	   c_dff
+	     #(.width(addr_width),
+	       .reset_type(reset_type))
+	   read_addrq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(pop_active),
+	      .d(read_addr_s),
+	      .q(read_addr_q));
+	   
+	   assign read_addr = read_addr_q;
+	   
+	   assign pop_data = read_data;
+	   
+	end
+      
+      if(atomic_vc_allocation)
+	begin
+	   
+	   c_regfile
+	     #(.depth(buffer_size),
+	       .width(flit_data_width),
+	       .regfile_type(regfile_type))
+	   bf
+	     (.clk(clk),
+	      .write_active(write_active),
+	      .write_enable(write_enable),
+	      .write_address(write_addr),
+	      .write_data(write_data),
+	      .read_address(read_addr),
+	      .read_data(read_data));
+	   
+	   assign pop_next_header_info = {header_info_width{1'bx}};
+	   
+	end
+      else
+	begin
+	   
+	   wire [0:flit_data_width-1] pop_next_data;
+	   c_regfile
+	     #(.depth(buffer_size),
+	       .width(flit_data_width),
+	       .num_read_ports(2),
+	       .regfile_type(regfile_type))
+	   bf
+	     (.clk(clk),
+	      .write_active(write_active),
+	      .write_enable(write_enable),
+	      .write_address(write_addr),
+	      .write_data(write_data),
+	      .read_address({read_addr, pop_next_addr}),
+	      .read_data({read_data, pop_next_data}));
+	   
+	   assign pop_next_header_info = pop_next_data[0:header_info_width-1];
+	   
+	end
+      
+   endgenerate
+   
    
 endmodule
