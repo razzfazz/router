@@ -199,7 +199,8 @@ module vcr_op_ctrl_mac
    
    wire 			 flit_valid;
 
-   wire 			 gnt_active = sw_active | flit_valid;
+   wire 			 gnt_active;
+   assign gnt_active = sw_active | flit_valid;
    
    wire 			 sw_gnt_s, sw_gnt_q;
    assign sw_gnt_s = sw_gnt;
