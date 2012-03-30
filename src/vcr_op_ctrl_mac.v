@@ -302,7 +302,7 @@ module vcr_op_ctrl_mac
        .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
-       .fb_mgmt_type(fb_mgmt_type),
+       .mgmt_type(fb_mgmt_type),
        .reset_type(reset_type))
    fcs
      (.clk(clk),
