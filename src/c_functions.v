@@ -68,13 +68,16 @@ endfunction
 
 // compute the length of the longest disjoint suffix among two values
 function integer suffix_length(input integer value1, input integer value2);
+   integer v1, v2;
    begin
+      v1 = value1;
+      v2 = value2;
       suffix_length = 0;
-      while(value1 != value2)
+      while(v1 != v2)
 	begin
 	   suffix_length = suffix_length + 1;
-	   value1 = value1 >> 1;
-	   value2 = value2 >> 1;
+	   v1 = v1 >> 1;
+	   v2 = v2 >> 1;
 	end
    end
 endfunction
