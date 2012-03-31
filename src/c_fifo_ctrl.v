@@ -254,7 +254,7 @@ module c_fifo_ctrl
 	   
 	end
       
-      // pragma translate_off
+      // synopsys translate_off
       
       else
 	begin
@@ -266,7 +266,7 @@ module c_fifo_ctrl
 	   end
 	end
       
-      // pragma translate_on
+      // synopsys translate_on
       
    endgenerate
    
@@ -276,7 +276,7 @@ module c_fifo_ctrl
    wire 			 error_overflow;
    assign error_overflow = full & push & ~pop;
    
-   // pragma translate_off
+   // synopsys translate_off
    
    always @(posedge clk)
      begin
@@ -289,7 +289,7 @@ module c_fifo_ctrl
 	
      end
    
-   // pragma translate_on
+   // synopsys translate_on
    
    assign errors[0] = error_underflow;
    assign errors[1] = error_overflow;

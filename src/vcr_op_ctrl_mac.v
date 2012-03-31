@@ -390,7 +390,7 @@ module vcr_op_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   // pragma translate_off
+   // synopsys translate_off
    
    always @(posedge clk)
      begin
@@ -403,7 +403,7 @@ module vcr_op_ctrl_mac
 	
      end
    
-   // pragma translate_on
+   // synopsys translate_on
    
    generate
       

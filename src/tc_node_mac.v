@@ -750,7 +750,7 @@ module tc_node_mac
       if(num_message_classes > 1)
 	begin
 	   
-	   // pragma translate_off
+	   // synopsys translate_off
 	   if(mc_threshs_width > cfg_data_width)
 	     begin
 		initial
@@ -764,7 +764,7 @@ module tc_node_mac
 		   $stop;
 		end
 	     end
-	   // pragma translate_on
+	   // synopsys translate_on
 	   
 	   wire [0:mc_threshs_width-1] mc_threshs_loadval;
 	   c_align
@@ -855,7 +855,7 @@ module tc_node_mac
       if(num_resource_classes > 1)
 	begin
 	   
-	   // pragma translate_off
+	   // synopsys translate_off
 	   if(rc_threshs_width > cfg_data_width)
 	     begin
 		initial
@@ -869,7 +869,7 @@ module tc_node_mac
 		   $stop;
 		end
 	     end
-	   // pragma translate_on
+	   // synopsys translate_on
 	   
 	   wire [0:rc_threshs_width-1] rc_threshs_loadval;
 	   c_align
@@ -1501,7 +1501,7 @@ module tc_node_mac
       if(max_payload_length > min_payload_length)
 	begin
 	   
-	   // pragma translate_off
+	   // synopsys translate_off
 	   if(plength_threshs_width > cfg_data_width)
 	     begin
 		initial
@@ -1528,7 +1528,7 @@ module tc_node_mac
 		   $stop;
 		end
 	     end
-	   // pragma translate_on
+	   // synopsys translate_on
 	   
 	   wire [0:plength_vals_width-1] plength_vals_loadval;
 	   c_align
@@ -1915,7 +1915,7 @@ module tc_node_mac
    // error checking
    //---------------------------------------------------------------------------
    
-   // pragma translate_off
+   // synopsys translate_off
    
    integer 			   i;
    
@@ -1935,7 +1935,7 @@ module tc_node_mac
 	
      end
    
-   // pragma translate_on
+   // synopsys translate_on
    
    generate
       

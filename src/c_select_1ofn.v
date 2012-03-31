@@ -54,7 +54,7 @@ module c_select_1ofn
    
    generate
       
-      // pragma translate_off
+      // synopsys translate_off
       if(num_ports < 1)
 	begin
 	   initial
@@ -63,7 +63,7 @@ module c_select_1ofn
 		$stop;
 	     end
 	end
-      // pragma translate_on
+      // synopsys translate_on
       
       if(num_ports == 1)
         always@(select, data_in)

@@ -69,7 +69,7 @@ parameter max_payload_length = 4;
 parameter min_payload_length = 0;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_COMBINED;
+parameter router_type = `ROUTER_TYPE_VC;
 
 // width of flit payload data
 parameter flit_data_width = 64;
@@ -102,7 +102,7 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
 
 // use explicit pipeline register between flit buffer and crossbar?
-parameter explicit_pipeline_register = 0;
+parameter explicit_pipeline_register = 1;
 
 // gate flit buffer write port if bypass succeeds
 // (requires explicit pipeline register; may increase cycle time)
@@ -136,9 +136,9 @@ parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select speculation type for switch allocator
-parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_PRIO;
 
 // select implementation variant for crossbar
-parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;
+parameter crossbar_type = `CROSSBAR_TYPE_MUX;
 
 parameter reset_type = `RESET_TYPE_ASYNC;

@@ -280,7 +280,7 @@ module c_regfile
 	     else
 	       begin
 		  
-		  // pragma translate_off
+		  // synopsys translate_off
 		  initial
 		    begin
 		       $display({"ERROR: Register file %m does not support ",
@@ -289,7 +289,7 @@ module c_regfile
 				num_read_ports, num_write_ports);
 		       $stop;
 		    end
-		  // pragma translate_on
+		  // synopsys translate_on
 		  
 	       end
 	     
@@ -302,7 +302,7 @@ module c_regfile
       // check parameter validity
       //----------------------------------------------------------------------
       
-      // pragma translate_off
+      // synopsys translate_off
       
       if(depth < 2)
 	begin
@@ -314,7 +314,7 @@ module c_regfile
 	     end
 	end
       
-      // pragma translate_on
+      // synopsys translate_on
       
    endgenerate
    

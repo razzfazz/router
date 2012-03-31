@@ -219,7 +219,7 @@ module c_fifo_tracker
 	   
 	end
       
-      // pragma translate_off
+      // synopsys translate_off
       
       else
 	begin
@@ -231,7 +231,7 @@ module c_fifo_tracker
 	   end
 	end
       
-      // pragma translate_on
+      // synopsys translate_on
       
    endgenerate
    

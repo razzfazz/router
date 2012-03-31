@@ -289,7 +289,7 @@ module rtr_fc_state
 		  // error checking
 		  //------------------------------------------------------------
 		  
-		  // pragma translate_off
+		  // synopsys translate_off
 		  
 		  always @(posedge clk)
 		    begin
@@ -304,7 +304,7 @@ module rtr_fc_state
 		       
 		    end
 		  
-		  // pragma translate_on
+		  // synopsys translate_on
 		  
 		  wire [0:1] errors;
 		  assign errors[0] = error_ft_underflow;

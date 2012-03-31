@@ -286,7 +286,7 @@ module rtr_route_filter
    wire error_invalid_class;
    assign error_invalid_class = route_valid & ((|error_orc) | (~|route_in_orc));
    
-   // pragma translate_off
+   // synopsys translate_off
    always @(posedge clk)
      begin
 	
@@ -300,7 +300,7 @@ module rtr_route_filter
 	
      end
    
-   // pragma translate_on
+   // synopsys translate_on
    
    assign errors[0] = error_invalid_port;
    assign errors[1] = error_invalid_class;
