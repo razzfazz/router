@@ -54,6 +54,9 @@ module c_fifo_ctrl
    // maximum (rightmost) address
    localparam [0:addr_width-1] max_value = offset + depth - 1;
    
+   // generate the almost_empty output early in the clock cycle
+   parameter fast_almost_empty = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -192,28 +195,35 @@ module c_fifo_ctrl
 	      .q(pop_addr_q));
 	   
 	   assign pop_addr = pop_addr_q;
-	   
-	   wire 		 equal;
-	   assign equal = (push_addr_q == pop_addr_q);
-	   
-	   wire 		 next_almost_empty;
-	   assign next_almost_empty = (push_addr_prev == pop_addr_next);
-	   
-	   wire 		 almost_empty_s, almost_empty_q;
-	   assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
-				   (next_almost_empty & (~push & pop)) |
-				   (equal & (push & ~pop));
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   almost_emptyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(active),
-	      .d(almost_empty_s),
-	      .q(almost_empty_q));
-	   
-	   assign almost_empty = almost_empty_q;
+
+	   if(fast_almost_empty)
+	     begin
+		
+		wire equal;
+		assign equal = (push_addr_q == pop_addr_q);
+		
+		wire next_almost_empty;
+		assign next_almost_empty = (push_addr_prev == pop_addr_next);
+		
+		wire almost_empty_s, almost_empty_q;
+		assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+					(next_almost_empty & (~push & pop)) |
+					(equal & (push & ~pop));
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		almost_emptyq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .d(almost_empty_s),
+		   .q(almost_empty_q));
+		
+		assign almost_empty = almost_empty_q;
+		
+	     end
+	   else
+	     assign almost_empty = (push_addr_prev == pop_addr_q);
 	   
 	   wire 		 next_empty;
 	   assign next_empty = (push_addr_q == pop_addr_next);

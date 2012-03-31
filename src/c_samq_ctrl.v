@@ -48,6 +48,9 @@ module c_samq_ctrl
    // buffer entries per queue
    parameter num_slots_per_queue = 8;
    
+   // generate the almost_empty output early in the clock cycle
+   parameter fast_almost_empty = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -147,6 +150,7 @@ module c_samq_ctrl
 	     #(.depth(num_slots_per_queue),
 	       .extra_addr_width(addr_pad_width),
 	       .offset(queue * num_slots_per_queue),
+	       .fast_almost_empty(fast_almost_empty),
 	       .reset_type(reset_type))
 	   fc
 	     (.clk(clk),

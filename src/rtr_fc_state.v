@@ -59,6 +59,9 @@ module rtr_fc_state
    // select buffer management scheme
    parameter mgmt_type = `FB_MGMT_TYPE_STATIC;
    
+   // generate the almost_empty output early in the clock cycle
+   parameter fast_almost_empty = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -182,6 +185,7 @@ module rtr_fc_state
 			 wire [0:1] 		     ft_errors;
 			 c_fifo_tracker
 			   #(.depth(buffer_size_per_vc),
+			     .fast_almost_empty(fast_almost_empty),
 			     .reset_type(reset_type))
 			 ft
 			   (.clk(clk),

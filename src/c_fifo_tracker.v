@@ -39,6 +39,9 @@ module c_fifo_tracker
    // total number of credits available
    parameter depth = 8;
    
+   // generate the almost_empty output early in the clock cycle
+   parameter fast_almost_empty = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    // width required to represent full range of credit count (0..depth)
@@ -129,27 +132,34 @@ module c_fifo_tracker
 	   
 	   assign free_s = push ? free_push : free_nopush;
 	   
-	   wire 		 free_max;
-	   assign free_max = (free_q == depth);
-	   
-	   wire 		 next_almost_empty;
-	   assign next_almost_empty = (free_q == (depth - 2));
-	   
-	   wire 		 almost_empty_s, almost_empty_q;
-	   assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
-				   (next_almost_empty & (~push & pop)) | 
-				   (free_max & (push & ~pop));
-	   c_dff
-	     #(.width(1),
-	       .reset_type(reset_type))
-	   almost_emptyq
-	     (.clk(clk),
-	      .reset(reset),
-	      .active(active),
-	      .d(almost_empty_s),
-	      .q(almost_empty_q));
-	   
-	   assign almost_empty = almost_empty_q;
+	   if(fast_almost_empty)
+	     begin
+		
+		wire free_max;
+		assign free_max = (free_q == depth);
+		
+		wire next_almost_empty;
+		assign next_almost_empty = (free_q == (depth - 2));
+		
+		wire almost_empty_s, almost_empty_q;
+		assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+					(next_almost_empty & (~push & pop)) | 
+					(free_max & (push & ~pop));
+		c_dff
+		  #(.width(1),
+		    .reset_type(reset_type))
+		almost_emptyq
+		  (.clk(clk),
+		   .reset(reset),
+		   .active(active),
+		   .d(almost_empty_s),
+		   .q(almost_empty_q));
+		
+		assign almost_empty = almost_empty_q;
+		
+	     end
+	   else
+	     assign almost_empty = (free_q == (depth - 1));
 	   
 	   wire 		 next_empty;
 	   assign next_empty = (free_q == (depth - 1));
