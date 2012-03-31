@@ -308,7 +308,7 @@ module c_regfile
 	begin
 	   initial
 	     begin
-		$display({"ERROR: The register file module requires a depth ", 
+		$display({"ERROR: Register file module %m requires a depth ", 
 			  "of two or more entries."});
 		$stop;
 	     end
