@@ -248,7 +248,7 @@ module c_fifo_ctrl
 	   assign next_full = (push_addr_next == pop_addr_q);
 	   
 	   wire 		 full_s, full_q;
-	   assign full_s = (full & ~(~push & pop)) | 
+	   assign full_s = (full & ~pop) | 
 			   (next_full & (push & ~pop));
 	   c_dff
 	     #(.width(1),
@@ -284,7 +284,7 @@ module c_fifo_ctrl
    assign error_underflow = empty & ~push & pop;
    
    wire 			 error_overflow;
-   assign error_overflow = full & push & ~pop;
+   assign error_overflow = full & push;
    
    // synopsys translate_off
    

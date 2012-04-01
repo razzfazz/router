@@ -99,7 +99,7 @@ module c_fifo_tracker
    assign error_underflow = empty & ~push & pop;
    
    wire 		   error_overflow;
-   assign error_overflow = full & push & ~pop;
+   assign error_overflow = full & push;
    
    generate
       
@@ -180,13 +180,13 @@ module c_fifo_tracker
 	   
 	   assign empty = empty_q;
 	   
-	   wire 		 free_zero;
-	   assign free_zero = ~|free_q;
-	   
 	   if(depth == 2)
 	     assign almost_full = almost_empty;
 	   else if(depth > 2)
 	     begin
+		
+		wire free_zero;
+		assign free_zero = ~|free_q;
 		
 		wire next_almost_full;
 		assign next_almost_full = (free_q == 2);
@@ -194,7 +194,7 @@ module c_fifo_tracker
 		wire almost_full_s, almost_full_q;
 		assign almost_full_s = (almost_full & ~(push ^ pop)) |
 				       (next_almost_full & (push & ~pop)) |
-				       (free_zero & (~push & pop));
+				       (free_zero & pop);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -213,7 +213,7 @@ module c_fifo_tracker
 	   assign next_full = (free_q == 1);
 
 	   wire      full_s, full_q;
-	   assign full_s = (full & ~(~push & pop)) | 
+	   assign full_s = (full & ~pop) | 
 			   (next_full & (push & ~pop));
 	   c_dff
 	     #(.width(1),
