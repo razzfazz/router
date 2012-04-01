@@ -36,7 +36,7 @@ module testbench
    parameter num_buffers = 8;
    parameter data_width = 16;
    parameter regfile_type = `REGFILE_TYPE_FF_2D;
-   parameter enable_bypass = 0;
+   parameter enable_bypass = 1;
    parameter reset_type = `RESET_TYPE_ASYNC;
    parameter Tclk = 2;
    parameter runtime = 1000;
@@ -119,7 +119,13 @@ module testbench
    reg flag_in, flag_out;
 
    assign push = ~reset & flag_in & ~ff_full;
-   assign pop = ~reset & flag_out & ~ff_empty;
+   
+   generate
+      if(enable_bypass)
+	assign pop = ~reset & flag_out & (~ff_empty | push);
+      else
+	assign pop = ~reset & flag_out & ~ff_empty;
+   endgenerate
    
    integer seed = initial_seed;
 
