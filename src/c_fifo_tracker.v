@@ -213,8 +213,7 @@ module c_fifo_tracker
 	   assign next_full = (free_q == 1);
 
 	   wire      full_s, full_q;
-	   assign full_s = (full & ~pop) | 
-			   (next_full & (push & ~pop));
+	   assign full_s = (full | (next_full & push)) & ~pop;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
