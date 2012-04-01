@@ -133,7 +133,7 @@ module c_fifo
 	   assign empty_active = push_active | pop_active;
 	   
 	   wire 	    empty_s, empty_q;
-	   assign empty_s = (empty_q | (pop & ~push)) & ~(push & ~pop);
+	   assign empty_s = (empty_q & ~push) | pop;
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -150,10 +150,13 @@ module c_fifo
 	   assign full = ~empty_q;
 	   
 	   wire 	    error_underflow;
-	   assign error_underflow = empty_q & pop & ~push;
+	   if(enable_bypass)
+	     assign error_underflow = empty_q & pop & ~push;
+	   else
+	     assign error_underflow = empty_q & pop;
 	   
 	   wire 	    error_overflow;
-	   assign error_overflow = ~empty_q & push & ~pop;
+	   assign error_overflow = ~empty_q & push;
 	   
 	   assign errors[0] = error_underflow;
 	   assign errors[1] = error_overflow;
@@ -166,6 +169,7 @@ module c_fifo
 	   wire [0:addr_width-1] pop_addr;
 	   c_fifo_ctrl
 	     #(.depth(depth),
+	       .enable_bypass(enable_bypass),
 	       .reset_type(reset_type))
 	   ctrl
 	     (.clk(clk),

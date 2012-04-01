@@ -186,6 +186,7 @@ module rtr_fc_state
 			 c_fifo_tracker
 			   #(.depth(buffer_size_per_vc),
 			     .fast_almost_empty(fast_almost_empty),
+			     .enable_bypass(0),
 			     .reset_type(reset_type))
 			 ft
 			   (.clk(clk),

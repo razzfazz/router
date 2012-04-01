@@ -57,6 +57,9 @@ module c_fifo_ctrl
    // generate the almost_empty output early in the clock cycle
    parameter fast_almost_empty = 0;
    
+   // allow bypassing through empty FIFO (i.e., empty & push & pop)
+   parameter enable_bypass = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    input clk;
@@ -206,9 +209,14 @@ module c_fifo_ctrl
 		assign next_almost_empty = (push_addr_prev == pop_addr_next);
 		
 		wire almost_empty_s, almost_empty_q;
-		assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
-					(next_almost_empty & (~push & pop)) |
-					(equal & (push & ~pop));
+		if(enable_bypass)
+		  assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+					  (next_almost_empty & (~push & pop)) |
+					  (equal & (push & ~pop));
+		else
+		  assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+					  (next_almost_empty & (~push & pop)) |
+					  (equal & push);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -229,8 +237,11 @@ module c_fifo_ctrl
 	   assign next_empty = (push_addr_q == pop_addr_next);
 	   
 	   wire 		 empty_s, empty_q;
-	   assign empty_s = (empty & ~(push & ~pop)) | 
-			    (next_empty & (~push & pop));
+	   if(enable_bypass)
+	     assign empty_s = (empty & ~(push & ~pop)) | 
+			      (next_empty & (~push & pop));
+	   else
+	     assign empty_s = (empty | (next_empty & pop)) & ~push;
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -280,7 +291,15 @@ module c_fifo_ctrl
    endgenerate
    
    wire 			 error_underflow;
-   assign error_underflow = empty & ~push & pop;
+   
+   generate
+      
+      if(enable_bypass)
+	assign error_underflow = empty & ~push & pop;
+      else
+	assign error_underflow = empty & pop;
+      
+   endgenerate
    
    wire 			 error_overflow;
    assign error_overflow = full & push;

@@ -538,6 +538,7 @@ module vcr_ip_ctrl_mac
        .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
        .atomic_vc_allocation(atomic_vc_allocation),
+       .enable_bypass(1),
        .reset_type(reset_type))
    fb
      (.clk(clk),

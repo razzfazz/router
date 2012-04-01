@@ -42,6 +42,9 @@ module c_fifo_tracker
    // generate the almost_empty output early in the clock cycle
    parameter fast_almost_empty = 0;
    
+   // allow bypassing through empty FIFO (i.e., empty & push & pop)
+   parameter enable_bypass = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    // width required to represent full range of credit count (0..depth)
@@ -96,7 +99,15 @@ module c_fifo_tracker
    assign free = free_q;
    
    wire 		   error_underflow;
-   assign error_underflow = empty & ~push & pop;
+   
+   generate
+      
+      if(enable_bypass)
+	assign error_underflow = empty & ~push & pop;
+      else
+	assign error_underflow = empty & pop;
+      
+   endgenerate
    
    wire 		   error_overflow;
    assign error_overflow = full & push;
@@ -142,9 +153,14 @@ module c_fifo_tracker
 		assign next_almost_empty = (free_q == (depth - 2));
 		
 		wire almost_empty_s, almost_empty_q;
-		assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
-					(next_almost_empty & (~push & pop)) | 
-					(free_max & (push & ~pop));
+		if(enable_bypass)
+		  assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+					  (next_almost_empty & (~push & pop)) | 
+					  (free_max & (push & ~pop));
+		else
+		  assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
+					  (next_almost_empty & (~push & pop)) | 
+					  (free_max & push);
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -165,8 +181,11 @@ module c_fifo_tracker
 	   assign next_empty = (free_q == (depth - 1));
 	   
 	   wire 		 empty_s, empty_q;
-	   assign empty_s = (empty & ~(push & ~pop)) |
-			    (next_empty & (~push & pop));
+	   if(enable_bypass)
+	     assign empty_s = (empty & ~(push & ~pop)) |
+			      (next_empty & (~push & pop));
+	   else
+	     assign empty_s = (empty | (next_empty & pop)) & ~push;
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),

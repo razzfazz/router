@@ -1106,6 +1106,7 @@ module rtr_ip_ctrl_mac
        .gate_buffer_write(gate_buffer_write),
        .mgmt_type(fb_mgmt_type),
        .atomic_vc_allocation(atomic_vc_allocation),
+       .enable_bypass(fb_bypass),
        .reset_type(reset_type))
    fb
      (.clk(clk),

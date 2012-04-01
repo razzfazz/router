@@ -187,6 +187,7 @@ module flit_sink
        .gate_buffer_write(0),
        .mgmt_type(fb_mgmt_type),
        .atomic_vc_allocation(atomic_vc_allocation),
+       .enable_bypass(1),
        .reset_type(reset_type))
    fb
      (.clk(clk),

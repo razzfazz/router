@@ -531,6 +531,7 @@ module router_checker
 		c_fifo
 		  #(.depth(buffer_size),
 		    .width(2+port_idx_width+num_vcs+flit_data_width),
+		    .enable_bypass(0),
 		    .reset_type(reset_type))
 		rff
 		  (.clk(clk),

@@ -51,6 +51,9 @@ module c_samq_ctrl
    // generate the almost_empty output early in the clock cycle
    parameter fast_almost_empty = 0;
    
+   // allow bypassing through empty FIFO (i.e., empty & push & pop)
+   parameter enable_bypass = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -151,6 +154,7 @@ module c_samq_ctrl
 	       .extra_addr_width(addr_pad_width),
 	       .offset(queue * num_slots_per_queue),
 	       .fast_almost_empty(fast_almost_empty),
+	       .enable_bypass(enable_bypass),
 	       .reset_type(reset_type))
 	   fc
 	     (.clk(clk),

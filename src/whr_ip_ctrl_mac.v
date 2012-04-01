@@ -344,6 +344,7 @@ module whr_ip_ctrl_mac
        .gate_buffer_write(gate_buffer_write),
        .mgmt_type(`FB_MGMT_TYPE_STATIC),
        .atomic_vc_allocation(atomic_vc_allocation),
+       .enable_bypass(1),
        .reset_type(reset_type))
    fb
      (.clk(clk),

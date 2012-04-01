@@ -36,6 +36,7 @@ module testbench
    parameter num_buffers = 8;
    parameter data_width = 16;
    parameter regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter enable_bypass = 0;
    parameter reset_type = `RESET_TYPE_ASYNC;
    parameter Tclk = 2;
    parameter runtime = 1000;
@@ -62,6 +63,7 @@ module testbench
      #(.depth(num_buffers),
        .width(data_width),
        .regfile_type(regfile_type),
+       .enable_bypass(enable_bypass),
        .reset_type(reset_type))
    ff
      (.clk(clk),
@@ -86,6 +88,7 @@ module testbench
    
    c_fifo_tracker
      #(.depth(num_buffers),
+       .enable_bypass(enable_bypass),
        .reset_type(reset_type))
    ft
      (.clk(clk),

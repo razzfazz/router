@@ -70,6 +70,9 @@ module rtr_flit_buffer
    // use atomic VC allocation
    parameter atomic_vc_allocation = 1;
    
+   // allow bypassing through empty FIFO (i.e., empty & push & pop)
+   parameter enable_bypass = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -284,6 +287,7 @@ module rtr_flit_buffer
 	     c_samq_ctrl
 	       #(.num_queues(num_vcs),
 		 .num_slots_per_queue(buffer_size_per_vc),
+		 .enable_bypass(enable_bypass),
 		 .reset_type(reset_type))
 	     samqc
 	       (.clk(clk),
