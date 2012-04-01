@@ -106,7 +106,7 @@ module c_fifo_tracker
       if(depth == 1)
 	begin
 	   
-	   assign free_s = free_q ? (~push | pop) : (~push & pop);
+	   assign free_s = (free_q & ~push) | pop;
 	   
 	   assign almost_empty = ~free_q;
 	   assign empty = free_q;

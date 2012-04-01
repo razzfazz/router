@@ -106,7 +106,7 @@ module c_fifo_ctrl
 	   assign pop_addr = min_value;
 	   
 	   wire empty_s, empty_q;
-	   assign empty_s = empty_q ? (~push | pop) : (~push & pop);
+	   assign empty_s = (empty_q & ~push) | pop;
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
