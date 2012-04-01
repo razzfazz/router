@@ -154,4 +154,7 @@
 // statically partitioned
 `define FB_MGMT_TYPE_STATIC  0
 
-`define FB_MGMT_TYPE_LAST    `FB_MGMT_TYPE_STATIC
+// dynamically managed
+`define FB_MGMT_TYPE_DYNAMIC 1
+
+`define FB_MGMT_TYPE_LAST    `FB_MGMT_TYPE_DYNAMIC

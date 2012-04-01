@@ -334,6 +334,109 @@ module rtr_flit_buffer
 	     
 	  end
 	
+	`FB_MGMT_TYPE_DYNAMIC:
+	  begin
+	     
+	     //-----------------------------------------------------------------
+	     // tail flit tracking (non-atomic)
+	     //-----------------------------------------------------------------
+	     
+	     wire [0:addr_width-1] push_addr;
+	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
+	     
+	     if(!atomic_vc_allocation)
+	       begin
+		  
+		  wire [0:buffer_size-1] push_mask;
+		  c_decode
+		    #(.num_ports(buffer_size))
+		  push_mask_dec
+		    (.data_in(push_addr),
+		     .data_out(push_mask));
+		  
+		  wire [0:buffer_size-1] tail_s, tail_q;
+		  assign tail_s = push_valid ? 
+				  (({buffer_size{push_tail}} & push_mask) | 
+				   (tail_q & ~push_mask)) :
+				  tail_q;
+		  c_dff
+		    #(.width(buffer_size),
+		      .reset_type(reset_type))
+		  tailq
+		    (.clk(clk),
+		     .reset(1'b0),
+		     .active(push_active),
+		     .d(tail_s),
+		     .q(tail_q));
+		  
+		  genvar ivc;
+		  
+		  for(ivc = 0; ivc < num_vcs; ivc = ivc + 1)
+		    begin:ivcs
+		       
+		       wire [0:addr_width-1] pop_addr;
+		       assign pop_addr
+			 = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
+		       
+		       wire [0:buffer_size-1] pop_mask;
+		       c_decode
+			 #(.num_ports(buffer_size))
+		       pop_mask_dec
+			 (.data_in(pop_addr),
+			  .data_out(pop_mask));
+		       
+		       wire 		      pop_tail;
+		       c_select_1ofn
+			 #(.num_ports(buffer_size),
+			   .width(1))
+		       pop_tail_sel
+			 (.select(pop_mask),
+			  .data_in(tail_q),
+			  .data_out(pop_tail));
+		       
+		       assign pop_tail_ivc[ivc] = pop_tail;
+		       
+		    end
+		  
+	       end
+	     
+	     
+	     //-----------------------------------------------------------------
+	     // buffer control
+	     //-----------------------------------------------------------------
+	     
+	     c_damq_ctrl
+	       #(.num_queues(num_vcs),
+		 .num_slots(buffer_size),
+		 .enable_bypass(enable_bypass),
+		 .reset_type(reset_type))
+	     damqc
+	       (.clk(clk),
+		.reset(reset),
+		.push_active(push_active),
+		.push_valid(push_valid),
+		.push_sel_qu(push_sel_ivc),
+		.push_addr(push_addr),
+		.pop_active(pop_active),
+		.pop_valid(pop_valid),
+		.pop_sel_qu(pop_sel_ivc),
+		.pop_addr_qu(pop_addr_ivc),
+		.pop_next_addr(pop_next_addr),
+		.almost_empty_qu(almost_empty_ivc),
+		.empty_qu(empty_ivc),
+		.full(full),
+		.errors_qu(errors_ivc));
+	     
+	     c_select_1ofn
+	       #(.num_ports(num_vcs),
+		 .width(addr_width))
+	     pop_addr_sel
+	       (.select(pop_sel_ivc),
+		.data_in(pop_addr_ivc),
+		.data_out(pop_addr));
+	     
+	  end
+	
       endcase
       
    endgenerate

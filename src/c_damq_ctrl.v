@@ -1,0 +1,412 @@
+// $Id$
+
+/*
+ Copyright (c) 2007-2011, Trustees of The Leland Stanford Junior University
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+
+ Redistributions of source code must retain the above copyright notice, this 
+ list of conditions and the following disclaimer.
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
+ other materials provided with the distribution.
+
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+//==============================================================================
+// controller for statically allocated multi-queue
+//==============================================================================
+
+module c_damq_ctrl
+  (clk, reset, push_active, push_valid, push_sel_qu, push_addr, pop_active, 
+   pop_valid, pop_sel_qu, pop_addr_qu, pop_next_addr, almost_empty_qu, 
+   empty_qu, full, errors_qu);
+   
+`include "c_functions.v"
+`include "c_constants.v"
+   
+   
+   //---------------------------------------------------------------------------
+   // parameters
+   //---------------------------------------------------------------------------
+   
+   // number of queues
+   parameter num_queues = 4;
+   
+   // total number of buffer entries
+   parameter num_slots = 8;
+   
+   // generate the almost_empty output early in the clock cycle
+   parameter fast_almost_empty = 0;
+   
+   // allow bypassing through empty FIFO (i.e., empty & push & pop)
+   parameter enable_bypass = 0;
+   
+   parameter reset_type = `RESET_TYPE_ASYNC;
+   
+   
+   //---------------------------------------------------------------------------
+   // derived parameters
+   //---------------------------------------------------------------------------
+   
+   // address width required for selecting an individual entry
+   localparam addr_width = clogb(num_slots);
+   
+   
+   //---------------------------------------------------------------------------
+   // interface
+   //---------------------------------------------------------------------------
+   
+   input clk;
+   input reset;
+
+   // activity indicator for insertion
+   input push_active;
+
+   // insert data
+   input push_valid;
+   
+   // queue to insert into
+   input [0:num_queues-1] push_sel_qu;
+   
+   // location of next insertion
+   output [0:addr_width-1] push_addr;
+   wire [0:addr_width-1]   push_addr;
+   
+   // activity indicator for read / removal
+   input 		   pop_active;
+   
+   // read and remove data
+   input 		   pop_valid;
+   
+   // queue to remove from
+   input [0:num_queues-1]  pop_sel_qu;
+   
+   // location of next element to be read
+   output [0:num_queues*addr_width-1] pop_addr_qu;
+   wire [0:num_queues*addr_width-1]   pop_addr_qu;
+   
+   // location of the element after the next one to be read
+   output [0:addr_width-1] 	      pop_next_addr;
+   wire [0:addr_width-1] 	      pop_next_addr;
+   
+   // queue state flags
+   output 			      almost_empty_qu;
+   wire 			      almost_empty_qu;
+   output 			      empty_qu;
+   wire 			      empty_qu;
+   output 			      full;
+   wire 			      full;
+   
+   // internal error conditions detected
+   output [0:num_queues*2-1] 	      errors_qu;
+   wire [0:num_queues*2-1] 	      errors_qu;
+   
+   
+   // synopsys translate_off
+   
+   generate
+      
+      if(fast_almost_empty)
+	begin
+	   
+	   initial
+	     begin
+		$display({"ERROR: DAMQ controller %m does not support ", 
+			  "fast_almost_empty=1."});
+		$stop;
+	     end
+	   
+	end
+      
+      if(num_slots < 2)
+	begin
+	   
+	   initial
+	     begin
+		$display({"ERROR: DAMQ controller %m requires at least two ",
+			  "slots."});
+		$stop;
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   // synopsys translate_on
+   
+   wire 		 active;
+   assign active = push_active | pop_active;
+   
+   wire [0:num_queues*addr_width-1] queue_tail_addr_qu;
+   
+   wire [0:addr_width-1] 	    queue_tail_addr;
+   c_select_1ofn
+     #(.num_ports(num_queues),
+       .width(addr_width))
+   queue_tail_addr_sel
+     (.select(push_sel_qu),
+      .data_in(queue_tail_addr_qu),
+      .data_out(queue_tail_addr));
+   
+   wire [0:addr_width-1] 	    free_head_addr;
+   
+   wire [0:addr_width-1] 	    next_queue_tail_addr;
+   assign next_queue_tail_addr = free_head_addr;
+   
+   wire [0:num_queues*addr_width-1] queue_head_addr_qu;
+   
+   wire [0:addr_width-1] 	    queue_head_addr;
+   c_select_1ofn
+     #(.num_ports(num_queues),
+       .width(addr_width))
+   queue_head_addr_sel
+     (.select(pop_sel_qu),
+      .data_in(queue_head_addr_qu),
+      .data_out(queue_head_addr));
+   
+   wire [0:addr_width-1] 	    next_free_tail_addr;
+   assign next_free_tail_addr = queue_head_addr;
+   
+   wire [0:addr_width-1] 	    free_tail_addr;
+   
+   wire [0:addr_width-1] 	    next_queue_head_addr;
+   wire [0:addr_width-1] 	    next_free_head_addr;
+   c_regfile
+     #(.depth(num_slots),
+       .width(addr_width),
+       .num_write_ports(2),
+       .num_read_ports(2))
+   prf
+     (.clk(clk),
+      .write_active(active),
+      .write_enable({push_valid, pop_valid}),
+      .write_address({queue_tail_addr, free_tail_addr}),
+      .write_data({next_queue_tail_addr, next_free_tail_addr}),
+      .read_address({queue_head_addr, free_head_addr}),
+      .read_data({next_queue_head_addr, next_free_head_addr}));
+   
+   wire 			    almost_bootstrapped;
+   assign almost_bootstrapped = (free_head_addr == (num_slots - 2));
+   
+   wire 			    bootstrap_s, bootstrap_q;
+   assign bootstrap_s = bootstrap_q & ~(almost_bootstrapped & push_valid);
+   c_dff
+     #(.width(1),
+       .reset_value(1'b1),
+       .reset_type(reset_type))
+   bootstrapq
+     (.clk(clk),
+      .reset(reset),
+      .active(push_active),
+      .d(bootstrap_s),
+      .q(bootstrap_q));
+   
+   wire [0:addr_width-1] 	    incr_free_head_addr;
+   c_incr
+     #(.width(addr_width))
+   incr_free_head_addr_incr
+     (.data_in(free_head_addr),
+      .data_out(incr_free_head_addr));
+   
+   wire [0:addr_width-1] 	    new_free_head_addr;
+   assign new_free_head_addr
+     = bootstrap_q ? incr_free_head_addr : next_free_head_addr;
+   
+   wire [0:addr_width-1] 	    free_head_addr_s, free_head_addr_q;
+   assign free_head_addr_s
+     = (full & pop_valid) ? 
+       next_free_tail_addr : 
+       (push_valid ? new_free_head_addr : free_head_addr_q);
+   c_dff
+     #(.width(addr_width),
+       .reset_type(reset_type))
+   free_head_addrq
+     (.clk(clk),
+      .reset(reset),
+      .active(active),
+      .d(free_head_addr_s),
+      .q(free_head_addr_q));
+   
+   assign free_head_addr = free_head_addr_q;
+   
+   wire [0:addr_width-1] 	    free_tail_addr_s, free_tail_addr_q;
+   assign free_tail_addr_s = pop_valid ? next_free_tail_addr : free_tail_addr_q;
+   c_dff
+     #(.width(addr_width),
+       .reset_value(num_slots - 1),
+       .reset_type(reset_type))
+   free_tail_addrq
+     (.clk(clk),
+      .reset(reset),
+      .active(pop_active),
+      .d(free_tail_addr_s),
+      .q(free_tail_addr_q));
+   
+   assign free_tail_addr = free_tail_addr_q;
+   
+   wire 			    equal;
+   assign equal = (free_head_addr_q == free_tail_addr_q);
+   
+   wire 			    full_s, full_q;
+   assign full_s = (full | (equal & push_valid)) & ~pop_valid;
+   c_dff
+     #(.width(1),
+       .reset_type(reset_type))
+   fullq
+     (.clk(clk),
+      .reset(reset),
+      .active(active),
+      .d(full_s),
+      .q(full_q));
+   
+   assign full = full_q;
+   
+   wire 			    error_overflow;
+   assign error_overflow = full & push_valid;
+   
+   // synopsys translate_off
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_overflow)
+	  $display("ERROR: FIFO overflow in module %m.");
+	
+     end
+   
+   // synopsys translate_on
+   
+   assign push_addr = free_head_addr;
+   assign pop_addr_qu = queue_head_addr_qu;
+   assign pop_next_addr = next_queue_head_addr;
+   
+   genvar 			    queue;
+   
+   generate
+      
+      for(queue = 0; queue < num_queues; queue = queue + 1)
+	begin:queues
+	   
+	   wire push_sel;
+	   assign push_sel = push_sel_qu[queue];
+	   
+	   wire push_valid_sel;
+	   assign push_valid_sel = push_valid & push_sel;
+	   
+	   wire pop_sel;
+	   assign pop_sel = pop_sel_qu[queue];
+	   
+	   wire pop_valid_sel;
+	   assign pop_valid_sel = pop_valid & pop_sel;
+	   
+	   wire empty;
+	   
+	   wire [0:addr_width-1] head_addr_s, head_addr_q;
+	   assign head_addr_s
+	     = (empty & push_valid_sel) ?
+	       next_queue_tail_addr :
+	       (pop_valid_sel ? next_queue_head_addr : head_addr_q);
+	   c_dff
+	     #(.width(addr_width),
+	       .reset_type(reset_type))
+	   head_addrq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(active),
+	      .d(head_addr_s),
+	      .q(head_addr_q));
+	   
+	   wire [0:addr_width-1] queue_head_addr;
+	   assign queue_head_addr = head_addr_q;
+	   
+	   wire [0:addr_width-1] tail_addr_s, tail_addr_q;
+	   assign tail_addr_s
+	     = push_valid_sel ? next_queue_tail_addr : tail_addr_q;
+	   c_dff
+	     #(.width(addr_width),
+	       .reset_type(reset_type))
+	   tail_addrq
+	     (.clk(clk),
+	      .reset(1'b0),
+	      .active(push_active),
+	      .d(tail_addr_s),
+	      .q(tail_addr_q));
+	   
+	   wire [0:addr_width-1] queue_tail_addr;
+	   assign queue_tail_addr = tail_addr_q;
+	   
+	   wire 		 equal;
+	   assign equal = (head_addr_q == tail_addr_q);
+	   
+	   wire 		 almost_empty;
+	   assign almost_empty = ~empty & equal;
+	   
+	   wire 		 empty_s, empty_q;
+	   if(enable_bypass)
+	     assign empty_s = empty ? 
+			      ~(push_valid_sel & ~pop_valid_sel) : 
+			      (equal & (~push_valid_sel & pop_valid_sel));
+	   else
+	     assign empty_s
+	       = (empty | (equal & pop_valid_sel)) & ~push_valid_sel;
+	   c_dff
+	     #(.width(1),
+	       .reset_value(1'b1),
+	       .reset_type(reset_type))
+	   emptyq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(empty_s),
+	      .q(empty_q));
+	   
+	   assign empty = empty_q;
+	   
+	   wire 		 error_underflow;
+	   if(enable_bypass)
+	     assign error_underflow = empty & ~push_valid_sel & pop_valid_sel;
+	   else
+	     assign error_underflow = empty & pop_valid_sel;
+	   
+	   // synopsys translate_off
+	   
+	   always @(posedge clk)
+	     begin
+		
+		if(error_underflow)
+		  $display("ERROR: FIFO underflow in module %m, queue %d.", queue);
+		
+	     end
+	   
+	   // synopsys translate_on
+	   
+	   wire [0:1] errors;
+	   assign errors[0] = error_underflow;
+	   assign errors[1] = error_overflow;
+	   
+	   assign queue_head_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
+	     = queue_head_addr;
+	   assign queue_tail_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
+	     = queue_tail_addr;
+	   assign almost_empty_qu[queue] = almost_empty;
+	   assign empty_qu[queue] = empty;
+	   assign errors_qu[queue*2:queue*2+1] = errors;
+	   
+	end
+      
+   endgenerate
+   
+endmodule
