@@ -341,7 +341,6 @@ module rtr_flit_buffer
 	     // tail flit tracking (non-atomic)
 	     //-----------------------------------------------------------------
 	     
-	     wire [0:addr_width-1] push_addr;
 	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
 	     
 	     if(!atomic_vc_allocation)
