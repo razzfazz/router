@@ -68,6 +68,9 @@ module rtr_op_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // prefer empty VCs over non-empty ones in VC allocation
+   parameter vc_alloc_prefer_empty = 0;
+   
    // width of flit payload data
    parameter flit_data_width = 64;
    
@@ -101,6 +104,11 @@ module rtr_op_ctrl_mac
    
    // channel width
    localparam channel_width = flit_ctrl_width + flit_data_width;
+   
+   // generate almost_empty signal early on in clock cycle
+   localparam fast_almost_empty
+     = flow_ctrl_bypass && 
+       ((elig_mask == `ELIG_MASK_USED) || vc_alloc_prefer_empty);
    
    
    //---------------------------------------------------------------------------
@@ -217,6 +225,7 @@ module rtr_op_ctrl_mac
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .mgmt_type(fb_mgmt_type),
+       .fast_almost_empty(fast_almost_empty),
        .reset_type(reset_type))
    fcs
      (.clk(clk),

@@ -521,6 +521,7 @@ module rtr_top
 	       .flow_ctrl_bypass(flow_ctrl_bypass),
 	       .fb_mgmt_type(fb_mgmt_type),
 	       .elig_mask(elig_mask),
+	       .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   opc

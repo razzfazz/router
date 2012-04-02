@@ -192,6 +192,10 @@ module tc_node_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // generate almost_empty signal early on in clock cycle
+   localparam fast_almost_empty
+     = flow_ctrl_bypass && (elig_mask == `ELIG_MASK_USED);
+   
    // select set of feedback polynomials used for LFSRs
    parameter lfsr_index = 0;
    
@@ -1157,6 +1161,7 @@ module tc_node_mac
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .mgmt_type(fb_mgmt_type),
+       .fast_almost_empty(fast_almost_empty),
        .reset_type(reset_type))
    fcs
      (.clk(clk),

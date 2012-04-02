@@ -104,6 +104,10 @@ module vcr_op_ctrl_mac
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
+   // generate almost_empty signal early on in clock cycle
+   localparam fast_almost_empty
+     = flow_ctrl_bypass && (elig_mask == `ELIG_MASK_USED);
+   
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
@@ -251,6 +255,7 @@ module vcr_op_ctrl_mac
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .mgmt_type(fb_mgmt_type),
+       .fast_almost_empty(fast_almost_empty),
        .reset_type(reset_type))
    fcs
      (.clk(clk),
