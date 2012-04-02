@@ -30,8 +30,8 @@
 //==============================================================================
 
 module c_fifo_tracker
-  (clk, reset, active, push, pop, almost_empty, empty, almost_full, full, 
-   free, errors);
+  (clk, reset, active, push, pop, almost_empty, empty, almost_full, full, free, 
+   errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -76,27 +76,13 @@ module c_fifo_tracker
    output full;
    wire   full;
    
-   // number of free entries
+   // two entries are free
    output [0:free_width-1] free;
-   wire [0:free_width-1]   free;
+   wire   [0:free_width-1] free;
    
    // internal error condition encountered
    output [0:1] 	   errors;
    wire [0:1] 		   errors;
-   
-   wire [0:free_width-1]   free_s, free_q;
-   c_dff
-     #(.width(free_width),
-       .reset_value(depth),
-       .reset_type(reset_type))
-   freeq
-     (.clk(clk),
-      .reset(reset),
-      .active(active),
-      .d(free_s),
-      .q(free_q));
-   
-   assign free = free_q;
    
    wire 		   error_underflow;
    
@@ -117,50 +103,84 @@ module c_fifo_tracker
       if(depth == 1)
 	begin
 	   
-	   assign free_s = (free_q & ~push) | pop;
+	   wire empty_s, empty_q;
+	   assign empty_s = pop ? 1'b1 : 
+			    push ? 1'b0 : 
+			    empty_q;
+	   c_dff
+	     #(.width(1),
+	       .reset_value(1'b1),
+	       .reset_type(reset_type))
+	   emptyq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(empty_s),
+	      .q(empty_q));
 	   
-	   assign almost_empty = ~free_q;
-	   assign empty = free_q;
-	   assign almost_full = free_q;
-	   assign full = ~free_q;
+	   assign empty = empty_q;
+
+	   assign almost_empty = ~empty;
+	   assign almost_full = empty;
+	   assign full = ~empty;
+	   assign free = empty;
 	   
 	end
-      
       else if(depth > 1)
 	begin
 	   
-	   wire decr_push;
-	   assign decr_push = ~pop;
+	   wire [0:free_width-1] free_minus1;
+	   c_decr
+	     #(.width(free_width))
+	   free_minus1_decr
+	     (.data_in(free),
+	      .data_out(free_minus1));
 	   
-	   wire [0:free_width-1] free_push;
-	   assign free_push = free_q - decr_push;
+	   wire [0:free_width-1] free_plus1;
+	   c_incr
+	     #(.width(free_width))
+	   free_plus1_incr
+	       (.data_in(free),
+		.data_out(free_plus1));
 	   
-	   wire 		 incr_nopush;
-	   assign incr_nopush = pop;
+	   wire [0:free_width-1]   free_s, free_q;
+	   assign free_s = (push & ~pop) ? free_minus1 : 
+			   (~push & pop) ? free_plus1 : 
+			   free_q;
+	   c_dff
+	     #(.width(free_width),
+	       .reset_value(depth),
+	       .reset_type(reset_type))
+	   freeq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(free_s),
+	      .q(free_q));
 	   
-	   wire [0:free_width-1] free_nopush;
-	   assign free_nopush = free_q + incr_nopush;
+	   assign free = free_q;
 	   
-	   assign free_s = push ? free_push : free_nopush;
+	   wire 		   free_max_minus1;
+	   assign free_max_minus1 = (free == (depth - 1));
 	   
 	   if(fast_almost_empty)
 	     begin
 		
 		wire free_max;
-		assign free_max = (free_q == depth);
+		assign free_max = (free == depth);
 		
-		wire next_almost_empty;
-		assign next_almost_empty = (free_q == (depth - 2));
+		wire free_max_minus2;
+		assign free_max_minus2 = (free == (depth - 2));
 		
 		wire almost_empty_s, almost_empty_q;
 		if(enable_bypass)
-		  assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
-					  (next_almost_empty & (~push & pop)) | 
-					  (free_max & (push & ~pop));
+		  assign almost_empty_s = (push & ~pop) ? free_max :
+					  (~push & pop) ? free_max_minus2 : 
+					  almost_empty_q;
 		else
-		  assign almost_empty_s = (almost_empty & ~(push ^ pop)) | 
-					  (next_almost_empty & (~push & pop)) | 
-					  (free_max & push);
+		  assign almost_empty_s = push ? free_max : 
+					  pop ? free_max_minus2 : 
+					  almost_empty_q;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -175,17 +195,17 @@ module c_fifo_tracker
 		
 	     end
 	   else
-	     assign almost_empty = (free_q == (depth - 1));
+	     assign almost_empty = free_max_minus1;
 	   
-	   wire 		 next_empty;
-	   assign next_empty = (free_q == (depth - 1));
-	   
-	   wire 		 empty_s, empty_q;
+	   wire      empty_s, empty_q;
 	   if(enable_bypass)
-	     assign empty_s = (empty & ~(push & ~pop)) |
-			      (next_empty & (~push & pop));
+	     assign empty_s = (push & ~pop) ? 1'b0 : 
+			      (pop & ~push) ? free_max_minus1 : 
+			      empty_q;
 	   else
-	     assign empty_s = (empty | (next_empty & pop)) & ~push;
+	     assign empty_s = push ? 1'b0 :
+			      pop ? free_max_minus1 : 
+			      empty_q;
 	   c_dff
 	     #(.width(1),
 	       .reset_value(1'b1),
@@ -204,16 +224,16 @@ module c_fifo_tracker
 	   else if(depth > 2)
 	     begin
 		
+		wire free_two;
+		assign free_two = (free_q == 2);
+		
 		wire free_zero;
 		assign free_zero = ~|free_q;
 		
-		wire next_almost_full;
-		assign next_almost_full = (free_q == 2);
-		
 		wire almost_full_s, almost_full_q;
-		assign almost_full_s = (almost_full & ~(push ^ pop)) |
-				       (next_almost_full & (push & ~pop)) |
-				       (free_zero & pop);
+		assign almost_full_s = (push & ~pop) ? free_two : 
+				       (~push & pop) ? free_zero : 
+				       almost_full_q;
 		c_dff
 		  #(.width(1),
 		    .reset_type(reset_type))
@@ -228,11 +248,13 @@ module c_fifo_tracker
 		
 	     end
 	   
-	   wire      next_full;
-	   assign next_full = (free_q == 1);
-
+	   wire      free_one;
+	   assign free_one = (free_q == 1);
+	   
 	   wire      full_s, full_q;
-	   assign full_s = (full | (next_full & push)) & ~pop;
+	   assign full_s = pop ? 1'b0 : 
+			   push ? free_one : 
+			   full_q;
 	   c_dff
 	     #(.width(1),
 	       .reset_type(reset_type))
