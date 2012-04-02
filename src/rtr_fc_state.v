@@ -72,13 +72,6 @@ module rtr_fc_state
    // number of buffer entries per VC
    localparam buffer_size_per_vc = buffer_size / num_vcs;
    
-   // width required to express number of flits in a VC
-   localparam flit_count_width = clogb(buffer_size_per_vc + 1);
-   
-   // reset value for two_credits_leftq registers
-   localparam two_credits_left_reset_value
-     = (buffer_size_per_vc == 2) ? 1'b1 : 1'b0;
-   
    
    //---------------------------------------------------------------------------
    // interface
@@ -181,11 +174,12 @@ module rtr_fc_state
 			 wire ft_empty;
 			 wire ft_almost_full;
 			 wire ft_full;
-			 wire [0:flit_count_width-1] ft_free;
+			 wire ft_two_free;
 			 wire [0:1] 		     ft_errors;
 			 c_fifo_tracker
 			   #(.depth(buffer_size_per_vc),
 			     .fast_almost_empty(fast_almost_empty),
+			     .fast_two_free(1),
 			     .enable_bypass(0),
 			     .reset_type(reset_type))
 			 ft
@@ -198,54 +192,10 @@ module rtr_fc_state
 			    .empty(ft_empty),
 			    .almost_full(ft_almost_full),
 			    .full(ft_full),
-			    .free(ft_free),
+			    .two_free(ft_two_free),
 			    .errors(ft_errors));
 			 
 			 assign fc_active = ~ft_empty;
-			 
-			 wire 			     two_credits_left_s, 
-						     two_credits_left_q;
-			 if(buffer_size_per_vc == 2)
-			   assign two_credits_left_s
-			     = (ft_almost_full & 
-				(~flit_valid_sel & fc_event_valid_sel)) | 
-			       (two_credits_left_q & 
-				(flit_valid_sel ~^ fc_event_valid_sel));
-			 else if(buffer_size_per_vc == 3)
-			   assign two_credits_left_s
-			     = (ft_almost_full & 
-				(~flit_valid_sel & fc_event_valid_sel)) | 
-			       (two_credits_left_q & 
-				(flit_valid_sel ~^ fc_event_valid_sel)) |
-			       (ft_empty & flit_valid_sel);
-			 else if(buffer_size_per_vc == 4)
-			   assign two_credits_left_s
-			     = (ft_almost_full & 
-				(~flit_valid_sel & fc_event_valid_sel)) | 
-			       (two_credits_left_q & 
-				(flit_valid_sel ~^ fc_event_valid_sel)) |
-			       (ft_almost_empty & 
-				(flit_valid_sel & ~fc_event_valid_sel));
-			 else if(buffer_size_per_vc > 4)
-			   assign two_credits_left_s
-			     = (ft_almost_full & 
-				(~flit_valid_sel & fc_event_valid_sel)) | 
-			       (two_credits_left_q & 
-				(flit_valid_sel ~^ fc_event_valid_sel)) |
-			       (~|ft_free[0:flit_count_width-3] &
-				&ft_free[flit_count_width-2:
-					 flit_count_width-1] &
-				flit_valid_sel & ~fc_event_valid_sel);
-			 c_dff
-			   #(.width(1),
-			     .reset_type(reset_type),
-			     .reset_value(two_credits_left_reset_value))
-			 two_credits_leftq
-			   (.clk(clk),
-			    .reset(reset),
-			    .active(active),
-			    .d(two_credits_left_s),
-			    .q(two_credits_left_q));
 			 
 			 if(flow_ctrl_bypass)
 			   begin
@@ -257,7 +207,7 @@ module rtr_fc_state
 				= (ft_full & fc_event_valid_sel) | 
 				  (ft_almost_full & 
 				   (flit_valid_sel ~^ fc_event_valid_sel)) |
-				  (two_credits_left_q & 
+				  (ft_two_free & 
 				   (flit_valid_sel & ~fc_event_valid_sel));
 			      assign full
 				= (ft_full | 
@@ -269,7 +219,7 @@ module rtr_fc_state
 			   begin
 			      assign empty = ft_empty & ~flit_valid_sel;
 			      assign almost_full = flit_valid_sel ? 
-						   two_credits_left_q : 
+						   ft_two_free : 
 						   ft_almost_full;
 			      assign full = ft_full | 
 					    (ft_almost_full & flit_valid_sel);

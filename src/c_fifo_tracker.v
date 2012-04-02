@@ -30,8 +30,8 @@
 //==============================================================================
 
 module c_fifo_tracker
-  (clk, reset, active, push, pop, almost_empty, empty, almost_full, full, free, 
-   errors);
+  (clk, reset, active, push, pop, almost_empty, empty, almost_full, full, 
+   two_free, errors);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -41,6 +41,9 @@ module c_fifo_tracker
    
    // generate the almost_empty output early in the clock cycle
    parameter fast_almost_empty = 0;
+   
+   // generate the two_free output early in the clock cycle
+   parameter fast_two_free = 0;
    
    // allow bypassing through empty FIFO (i.e., empty & push & pop)
    parameter enable_bypass = 0;
@@ -77,8 +80,8 @@ module c_fifo_tracker
    wire   full;
    
    // two entries are free
-   output [0:free_width-1] free;
-   wire   [0:free_width-1] free;
+   output two_free;
+   wire   two_free;
    
    // internal error condition encountered
    output [0:1] 	   errors;
@@ -123,11 +126,13 @@ module c_fifo_tracker
 	   assign almost_empty = ~empty;
 	   assign almost_full = empty;
 	   assign full = ~empty;
-	   assign free = empty;
+	   assign two_free = 1'b0;
 	   
 	end
       else if(depth > 1)
 	begin
+	   
+	   wire [0:free_width-1] free;
 	   
 	   wire [0:free_width-1] free_minus1;
 	   c_decr
@@ -219,16 +224,22 @@ module c_fifo_tracker
 	   
 	   assign empty = empty_q;
 	   
+	   wire      free_one;
+	   assign free_one = (free == 1);
+	   
 	   if(depth == 2)
-	     assign almost_full = almost_empty;
+	     begin
+		assign almost_full = almost_empty;
+		assign two_free = empty;
+	     end
 	   else if(depth > 2)
 	     begin
 		
 		wire free_two;
-		assign free_two = (free_q == 2);
+		assign free_two = (free == 2);
 		
 		wire free_zero;
-		assign free_zero = ~|free_q;
+		assign free_zero = (free == 0);
 		
 		wire almost_full_s, almost_full_q;
 		assign almost_full_s = (push & ~pop) ? free_two : 
@@ -246,12 +257,35 @@ module c_fifo_tracker
 		
 		assign almost_full = almost_full_q;
 		
+		wire free_three;
+		assign free_three = (free == 3);
+		
+		if(fast_two_free)
+		  begin
+		     
+		     wire two_free_s, two_free_q;
+		     assign two_free_s = (push & ~pop) ? free_three :
+					 (~push & pop) ? free_one :
+					 two_free_q;
+		     c_dff
+		       #(.width(1),
+			 .reset_type(reset_type))
+		     two_freeq
+		       (.clk(clk),
+			.reset(reset),
+			.active(active),
+			.d(two_free_s),
+			.q(two_free_q));
+		     
+		     assign two_free = two_free_q;
+		     
+		  end
+		else
+		  assign two_free = free_two;
+		
 	     end
 	   
-	   wire      free_one;
-	   assign free_one = (free_q == 1);
-	   
-	   wire      full_s, full_q;
+	   wire 	  full_s, full_q;
 	   assign full_s = pop ? 1'b0 : 
 			   push ? free_one : 
 			   full_q;
