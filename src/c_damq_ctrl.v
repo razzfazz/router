@@ -103,10 +103,10 @@ module c_damq_ctrl
    wire [0:addr_width-1] 	      pop_next_addr;
    
    // queue state flags
-   output 			      almost_empty_qu;
-   wire 			      almost_empty_qu;
-   output 			      empty_qu;
-   wire 			      empty_qu;
+   output [0:num_queues-1] 	      almost_empty_qu;
+   wire [0:num_queues-1] 	      almost_empty_qu;
+   output [0:num_queues-1] 	      empty_qu;
+   wire [0:num_queues-1] 	      empty_qu;
    output 			      full;
    wire 			      full;
    
@@ -152,14 +152,14 @@ module c_damq_ctrl
    
    wire [0:num_queues*addr_width-1] queue_tail_addr_qu;
    
-   wire [0:addr_width-1] 	    queue_tail_addr;
+   wire [0:addr_width-1] 	    push_queue_tail_addr;
    c_select_1ofn
      #(.num_ports(num_queues),
        .width(addr_width))
-   queue_tail_addr_sel
+   push_queue_tail_addr_sel
      (.select(push_sel_qu),
       .data_in(queue_tail_addr_qu),
-      .data_out(queue_tail_addr));
+      .data_out(push_queue_tail_addr));
    
    wire [0:addr_width-1] 	    free_head_addr;
    
@@ -168,17 +168,54 @@ module c_damq_ctrl
    
    wire [0:num_queues*addr_width-1] queue_head_addr_qu;
    
-   wire [0:addr_width-1] 	    queue_head_addr;
+   wire [0:addr_width-1] 	    pop_queue_head_addr;
    c_select_1ofn
      #(.num_ports(num_queues),
        .width(addr_width))
-   queue_head_addr_sel
+   pop_queue_head_addr_sel
      (.select(pop_sel_qu),
       .data_in(queue_head_addr_qu),
-      .data_out(queue_head_addr));
+      .data_out(pop_queue_head_addr));
    
    wire [0:addr_width-1] 	    next_free_tail_addr;
-   assign next_free_tail_addr = queue_head_addr;
+   
+   generate
+      
+      if(enable_bypass)
+	begin
+	   
+	   wire pop_empty;
+	   c_select_1ofn
+	     #(.num_ports(num_queues),
+	       .width(1))
+	   pop_empty_sel
+	     (.select(pop_sel_qu),
+	      .data_in(empty_qu),
+	      .data_out(pop_empty));
+	   
+	   assign next_free_tail_addr
+	     = pop_empty ? free_head_addr : pop_queue_head_addr;
+	   
+	end
+      else
+	assign next_free_tail_addr = pop_queue_head_addr;
+      
+   endgenerate
+   
+   wire 	push_empty;
+   c_select_1ofn
+     #(.num_ports(num_queues),
+       .width(1))
+   push_empty_sel
+     (.select(push_sel_qu),
+      .data_in(empty_qu),
+      .data_out(push_empty));
+   
+   wire 	update_queue_tail;
+   assign update_queue_tail = push_valid & ~push_empty;
+
+   wire 	update_free_tail;
+   assign update_free_tail = pop_valid & ~full;
    
    wire [0:addr_width-1] 	    free_tail_addr;
    
@@ -192,10 +229,10 @@ module c_damq_ctrl
    prf
      (.clk(clk),
       .write_active(active),
-      .write_enable({push_valid, pop_valid}),
-      .write_address({queue_tail_addr, free_tail_addr}),
+      .write_enable({update_queue_tail, update_free_tail}),
+      .write_address({push_queue_tail_addr, free_tail_addr}),
       .write_data({next_queue_tail_addr, next_free_tail_addr}),
-      .read_address({queue_head_addr, free_head_addr}),
+      .read_address({pop_queue_head_addr, free_head_addr}),
       .read_data({next_queue_head_addr, next_free_head_addr}));
    
    wire 			    almost_bootstrapped;
@@ -225,10 +262,13 @@ module c_damq_ctrl
    assign new_free_head_addr
      = bootstrap_q ? incr_free_head_addr : next_free_head_addr;
    
+   wire 			    equal;
+   assign equal = (free_head_addr_q == free_tail_addr_q);
+   
    wire [0:addr_width-1] 	    free_head_addr_s, free_head_addr_q;
    assign free_head_addr_s
-     = (full & pop_valid) ? 
-       next_free_tail_addr : 
+     = ((full | (equal & push_valid)) & pop_valid) ? 
+       pop_queue_head_addr : 
        (push_valid ? new_free_head_addr : free_head_addr_q);
    c_dff
      #(.width(addr_width),
@@ -256,9 +296,6 @@ module c_damq_ctrl
       .q(free_tail_addr_q));
    
    assign free_tail_addr = free_tail_addr_q;
-   
-   wire 			    equal;
-   assign equal = (free_head_addr_q == free_tail_addr_q);
    
    wire 			    full_s, full_q;
    assign full_s = (full | (equal & push_valid)) & ~pop_valid;
@@ -290,7 +327,6 @@ module c_damq_ctrl
    // synopsys translate_on
    
    assign push_addr = free_head_addr;
-   assign pop_addr_qu = queue_head_addr_qu;
    assign pop_next_addr = next_queue_head_addr;
    
    genvar 			    queue;
@@ -314,10 +350,16 @@ module c_damq_ctrl
 	   
 	   wire empty;
 	   
+	   wire [0:addr_width-1] queue_head_addr;
+	   wire [0:addr_width-1] queue_tail_addr;
+	   assign equal = (queue_head_addr == queue_tail_addr);
+
+	   wire 		 equal;
+	   
 	   wire [0:addr_width-1] head_addr_s, head_addr_q;
 	   assign head_addr_s
-	     = (empty & push_valid_sel) ?
-	       next_queue_tail_addr :
+	     = ((empty | (equal & pop_valid_sel)) & push_valid_sel) ?
+	       free_head_addr :
 	       (pop_valid_sel ? next_queue_head_addr : head_addr_q);
 	   c_dff
 	     #(.width(addr_width),
@@ -329,12 +371,10 @@ module c_damq_ctrl
 	      .d(head_addr_s),
 	      .q(head_addr_q));
 	   
-	   wire [0:addr_width-1] queue_head_addr;
 	   assign queue_head_addr = head_addr_q;
 	   
 	   wire [0:addr_width-1] tail_addr_s, tail_addr_q;
-	   assign tail_addr_s
-	     = push_valid_sel ? next_queue_tail_addr : tail_addr_q;
+	   assign tail_addr_s = push_valid_sel ? free_head_addr : tail_addr_q;
 	   c_dff
 	     #(.width(addr_width),
 	       .reset_type(reset_type))
@@ -345,11 +385,7 @@ module c_damq_ctrl
 	      .d(tail_addr_s),
 	      .q(tail_addr_q));
 	   
-	   wire [0:addr_width-1] queue_tail_addr;
 	   assign queue_tail_addr = tail_addr_q;
-	   
-	   wire 		 equal;
-	   assign equal = (head_addr_q == tail_addr_q);
 	   
 	   wire 		 almost_empty;
 	   assign almost_empty = ~empty & equal;
@@ -397,10 +433,18 @@ module c_damq_ctrl
 	   assign errors[0] = error_underflow;
 	   assign errors[1] = error_overflow;
 	   
+	   wire [0:addr_width-1] pop_addr;
+	   if(enable_bypass)
+	     assign pop_addr = empty ? free_head_addr : queue_head_addr;
+	   else
+	     assign pop_addr = queue_head_addr;
+	   
 	   assign queue_head_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = queue_head_addr;
 	   assign queue_tail_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
 	     = queue_tail_addr;
+	   assign pop_addr_qu[queue*addr_width:(queue+1)*addr_width-1]
+	     = pop_addr;
 	   assign almost_empty_qu[queue] = almost_empty;
 	   assign empty_qu[queue] = empty;
 	   assign errors_qu[queue*2:queue*2+1] = errors;
