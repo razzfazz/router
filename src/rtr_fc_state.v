@@ -144,9 +144,7 @@ module rtr_fc_state
 		  wire almost_full;
 		  wire full;
 		  wire full_prev;
-		  
-		  wire error_ft_underflow;
-		  wire error_ft_overflow;
+		  wire [0:1] errors;
 		  
 		  case(flow_ctrl_type)
 		    
@@ -226,8 +224,7 @@ module rtr_fc_state
 			      assign full_prev = ft_full;
 			   end
 			 
-			 assign error_ft_underflow = ft_errors[0];
-			 assign error_ft_overflow = ft_errors[1];
+			 assign errors = ft_errors;
 	     		 
 		      end
 		    
@@ -238,33 +235,6 @@ module rtr_fc_state
 		  assign almost_full_ovc[ovc] = almost_full;
 		  assign full_ovc[ovc] = full;
 		  assign full_prev_ovc[ovc] = full_prev;
-		  
-		  
-		  //------------------------------------------------------------
-		  // error checking
-		  //------------------------------------------------------------
-		  
-		  // synopsys translate_off
-		  
-		  always @(posedge clk)
-		    begin
-		       
-		       if(error_ft_underflow)
-			 $display({"ERROR: Flow control state tracker ", 
-				   "underflow in module %m, VC %d."}, ovc);
-		       
-		       if(error_ft_overflow)
-			 $display({"ERROR: Flow control state tracker ",
-				   "overflow in module %m, VC %d."}, ovc);
-		       
-		    end
-		  
-		  // synopsys translate_on
-		  
-		  wire [0:1] errors;
-		  assign errors[0] = error_ft_underflow;
-		  assign errors[1] = error_ft_overflow;
-		  
 		  assign errors_ovc[ovc*2:(ovc+1)*2-1] = errors;
 		  
 	       end

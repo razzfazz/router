@@ -319,6 +319,21 @@ module c_fifo_tracker
       
    endgenerate
    
+   // synopsys translate_off
+   
+   always @(posedge clk)
+     begin
+	
+	if(error_underflow)
+	  $display("ERROR: FIFO tracker underflow in module %m.");
+	
+	if(error_overflow)
+	  $display("ERROR: FIFO tracker overflow in module %m.");
+	
+     end
+   
+   // synopsys translate_on
+   
    assign errors = {error_underflow, error_overflow};
    
 endmodule
