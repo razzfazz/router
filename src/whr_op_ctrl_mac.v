@@ -177,6 +177,7 @@ module whr_op_ctrl_mac
        .buffer_size(buffer_size),
        .flow_ctrl_type(flow_ctrl_type),
        .flow_ctrl_bypass(flow_ctrl_bypass),
+       .mgmt_type(`FB_MGMT_TYPE_STATIC),
        .reset_type(reset_type))
    fcs
      (.clk(clk),
