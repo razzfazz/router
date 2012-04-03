@@ -126,118 +126,89 @@ module rtr_fc_state
    
    generate
       
-      case(mgmt_type)
+      case(flow_ctrl_type)
 	
-	`FB_MGMT_TYPE_STATIC:
+	`FLOW_CTRL_TYPE_CREDIT:
 	  begin
 	     
-	     wire [0:num_vcs-1] fc_active_ovc;
-	     assign fc_active = |fc_active_ovc;
+	     wire [0:num_vcs-1] ft_almost_empty_ovc;
+	     wire [0:num_vcs-1] ft_empty_ovc;
+	     wire [0:num_vcs-1] ft_almost_full_ovc;
+	     wire [0:num_vcs-1] ft_full_ovc;
+	     wire [0:num_vcs-1] ft_two_free_ovc;
+	     wire [0:num_vcs*2-1] ft_errors_ovc;
 	     
-	     genvar 		ovc;
+	     case(mgmt_type)
+	       
+	       `FB_MGMT_TYPE_STATIC:
+		 begin
+		    
+		    c_samq_tracker
+		      #(.num_queues(num_vcs),
+			.num_slots_per_queue(buffer_size_per_vc),
+			.fast_almost_empty(fast_almost_empty),
+			.fast_two_free(1),
+			.enable_bypass(0),
+			.reset_type(reset_type))
+		    samqt
+		      (.clk(clk),
+		       .reset(reset),
+		       .active(active),
+		       .push_valid(flit_valid),
+		       .push_sel_qu(flit_sel_ovc),
+		       .pop_valid(fc_event_valid),
+		       .pop_sel_qu(fc_event_sel_ovc),
+		       .almost_empty_qu(ft_almost_empty_ovc),
+		       .empty_qu(ft_empty_ovc),
+		       .almost_full_qu(ft_almost_full_ovc),
+		       .full_qu(ft_full_ovc),
+		       .two_free_qu(ft_two_free_ovc),
+		       .errors_qu(ft_errors_ovc));
+		    
+		    assign fc_active = ~&ft_empty_ovc;
+		    
+		 end
+	       
+	     endcase
 	     
-	     for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	       begin:ovcs
-		  
-		  wire fc_active;
-		  wire empty;
-		  wire almost_full;
-		  wire full;
-		  wire full_prev;
-		  wire [0:1] errors;
-		  
-		  case(flow_ctrl_type)
-		    
-		    `FLOW_CTRL_TYPE_CREDIT:
-		      begin
-			 
-			 //-----------------------------------------------------
-			 // track number of flits the VC can still accept
-			 //-----------------------------------------------------
-			 
-			 wire flit_sel;
-			 assign flit_sel = flit_sel_ovc[ovc];
-			 
-			 wire flit_valid_sel;
-			 assign flit_valid_sel = flit_valid & flit_sel;
-			 
-			 wire fc_event_sel;
-			 assign fc_event_sel = fc_event_sel_ovc[ovc];
-			 
-			 wire fc_event_valid_sel;
-			 assign fc_event_valid_sel
-			   = fc_event_valid & fc_event_sel;
-			 
-			 wire ft_almost_empty;
-			 wire ft_empty;
-			 wire ft_almost_full;
-			 wire ft_full;
-			 wire ft_two_free;
-			 wire [0:1] 		     ft_errors;
-			 c_fifo_tracker
-			   #(.depth(buffer_size_per_vc),
-			     .fast_almost_empty(fast_almost_empty),
-			     .fast_two_free(1),
-			     .enable_bypass(0),
-			     .reset_type(reset_type))
-			 ft
-			   (.clk(clk),
-			    .reset(reset),
-			    .active(active),
-			    .push(flit_valid_sel),
-			    .pop(fc_event_valid_sel),
-			    .almost_empty(ft_almost_empty),
-			    .empty(ft_empty),
-			    .almost_full(ft_almost_full),
-			    .full(ft_full),
-			    .two_free(ft_two_free),
-			    .errors(ft_errors));
-			 
-			 assign fc_active = ~ft_empty;
-			 
-			 if(flow_ctrl_bypass)
-			   begin
-			      assign empty
-				= (ft_empty | 
-				   (ft_almost_empty & fc_event_valid_sel)) &
-				  ~flit_valid_sel;
-			      assign almost_full
-				= (ft_full & fc_event_valid_sel) | 
-				  (ft_almost_full & 
-				   (flit_valid_sel ~^ fc_event_valid_sel)) |
-				  (ft_two_free & 
-				   (flit_valid_sel & ~fc_event_valid_sel));
-			      assign full
-				= (ft_full | 
-				   (ft_almost_full & flit_valid_sel)) &
-				  ~fc_event_valid_sel;
-			      assign full_prev = ft_full & ~fc_event_valid_sel;
-			   end
-			 else
-			   begin
-			      assign empty = ft_empty & ~flit_valid_sel;
-			      assign almost_full = flit_valid_sel ? 
-						   ft_two_free : 
-						   ft_almost_full;
-			      assign full = ft_full | 
-					    (ft_almost_full & flit_valid_sel);
-			      assign full_prev = ft_full;
-			   end
-			 
-			 assign errors = ft_errors;
-	     		 
-		      end
-		    
-		  endcase
-		  
-		  assign fc_active_ovc[ovc] = fc_active;
-		  assign empty_ovc[ovc] = empty;
-		  assign almost_full_ovc[ovc] = almost_full;
-		  assign full_ovc[ovc] = full;
-		  assign full_prev_ovc[ovc] = full_prev;
-		  assign errors_ovc[ovc*2:(ovc+1)*2-1] = errors;
-		  
+	     wire [0:num_vcs-1] flit_valid_sel_ovc;
+	     assign flit_valid_sel_ovc
+	       = {num_vcs{flit_valid}} & flit_sel_ovc;
+	     
+	     wire [0:num_vcs-1] fc_event_valid_sel_ovc;
+	     assign fc_event_valid_sel_ovc
+	       = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
+	     
+	     if(flow_ctrl_bypass)
+	       begin
+		  assign empty_ovc
+		    = (ft_empty_ovc | 
+		       (ft_almost_empty_ovc & fc_event_valid_sel_ovc)) &
+		      ~flit_valid_sel_ovc;
+		  assign almost_full_ovc
+		    = (ft_full_ovc & fc_event_valid_sel_ovc) | 
+		      (ft_almost_full_ovc & 
+		       (flit_valid_sel_ovc ~^ fc_event_valid_sel_ovc)) |
+		      (ft_two_free_ovc & 
+		       (flit_valid_sel_ovc & ~fc_event_valid_sel_ovc));
+		  assign full_ovc
+		    = (ft_full_ovc | 
+		       (ft_almost_full_ovc & flit_valid_sel_ovc)) &
+		      ~fc_event_valid_sel_ovc;
+		  assign full_prev_ovc = ft_full_ovc & ~fc_event_valid_sel_ovc;
 	       end
+	     else
+	       begin
+		  assign empty_ovc = ft_empty_ovc & ~flit_valid_sel_ovc;
+		  assign almost_full_ovc
+		    = (flit_valid_sel_ovc & ft_two_free_ovc) |
+		      (~flit_valid_sel_ovc & ft_almost_full_ovc);
+		  assign full_ovc
+		    = ft_full_ovc | (ft_almost_full_ovc & flit_valid_sel_ovc);
+		  assign full_prev_ovc = ft_full_ovc;
+	       end
+	     
+	     assign errors_ovc = ft_errors_ovc;
 	     
 	  end
 	
