@@ -33,10 +33,10 @@
 parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
-parameter num_flits_per_vc = 8;
+parameter num_flits_per_vc = 32;
 
 // number of message classes (e.g. request, reply)
-parameter num_message_classes = 2;
+parameter num_message_classes = 4;
 
 // number of resource classes (e.g. minimal, adaptive)
 parameter num_resource_classes = 1;
@@ -63,24 +63,24 @@ parameter flow_ctrl_type = `FLOW_CTRL_TYPE_CREDIT;
 parameter flow_ctrl_bypass = 0;
 
 // maximum payload length (in flits)
-parameter max_payload_length = 4;
+parameter max_payload_length = 3;
 
 // minimum payload length (in flits)
 parameter min_payload_length = 0;
 
 // select router implementation
-parameter router_type = `ROUTER_TYPE_COMBINED;
+parameter router_type = `ROUTER_TYPE_VC;
 
 // width of flit payload data
 parameter flit_data_width = 64;
 
 // configure error checking logic
-parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
+parameter error_capture_mode = `ERROR_CAPTURE_MODE_NONE;
 
 // filter out illegal destination ports
 // (the intent is to allow synthesis to optimize away the logic associated with 
 // such turns)
-parameter restrict_turns = 1;
+parameter restrict_turns = 0;
 
 // select routing function type
 parameter routing_type = `ROUTING_TYPE_PHASED_DOR;
@@ -98,7 +98,7 @@ parameter input_stage_can_hold = 0;
 parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 
 // use explicit pipeline register between flit buffer and crossbar?
-parameter explicit_pipeline_register = 0;
+parameter explicit_pipeline_register = 1;
 
 // gate flit buffer write port if bypass succeeds
 // (requires explicit pipeline register; may increase cycle time)
@@ -132,7 +132,7 @@ parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
 parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
 
 // select speculation type for switch allocator
-parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_NONE;
 
 // select implementation variant for crossbar
 parameter crossbar_type = `CROSSBAR_TYPE_TRISTATE;

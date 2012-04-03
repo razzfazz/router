@@ -1393,9 +1393,9 @@ module vcr_ivc_ctrl_justin
    wire [0:flit_data_width-1] flit_data_old;
    wire flit_head_valid;
    
-   assign flit_head_valid = ~tbc_empty & htr_flit_head_q;
+   assign flit_head_valid  = ~tbc_empty & flit_head;
    
-   assign time_to_wait_in = flit_data_old[header_info_width - time_to_wait_width:
+   assign time_to_wait_in  = flit_data_old[header_info_width - time_to_wait_width:
 					     header_info_width-1];
    
    
@@ -1457,13 +1457,12 @@ module vcr_ivc_ctrl_justin
       end                          
    endgenerate
 
-   assign flit_data = (tbc_pop_active | tbc_pop_active_q) ?
-     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
-      time_to_wait_out,
-      flit_data_old[header_info_width:flit_data_width-1]}:
-       {flit_data_old};
+   assign flit_data =flit_head?
+		     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
+		      time_to_wait_out,
+		      flit_data_old[header_info_width:flit_data_width-1]}:
+		     flit_data_old;
    
-		      
    
    
    //assign flit_data_new = (tbc_pop_active | tbc_pop_active_q) ? flit_data_new : flit_data_old; 
