@@ -1398,41 +1398,28 @@ module vcr_ivc_ctrl_justin
    assign time_to_wait_in  = flit_data_old[header_info_width - time_to_wait_width:
 					     header_info_width-1];
    
-   
-
-   wire [0:time_to_wait_width-1] time_to_wait_in_q;
+   wire [0:time_to_wait_width-1] time_diff;
 
    
+   wire header_expired, header_expired_q;
+   
+   assign time_diff = coarse_counter - tbf_read_data;
+  
+   
+   //assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
+   
+   assign time_to_wait_out = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
+   
+   assign header_expired = flit_head_valid & (header_expired_q | (time_diff > time_to_wait_in));
    c_dff
-     #(.width(time_to_wait_width),
+     #(.width(1),
        .reset_type(reset_type))
    dff_time_diff
      (.clk(clk),
       .reset(1'b0),
       .active(1'b1),
-      .d(time_to_wait_in),
-      .q(time_to_wait_in_q));
-   
-   
-   // TODO: assign signal flit_valid_in_q and replace
-   //       time_to_wait_out if statement to valid || (valid_q && time_diffs_eq)
-   
-   wire time_diffs_eq;
-   
-
-   
-   assign time_diffs_eq = (time_to_wait_in == time_to_wait_in_q);   
-   wire [0:time_to_wait_width-1] time_diff;
-
-   
-   assign time_diff = coarse_counter - tbf_read_data;
-   
-   wire header_expired;
-   
-   assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
-   
-   assign time_to_wait_out = flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
-   
+      .d(header_expired),
+      .q(header_expired_q));
    
    
    
