@@ -98,7 +98,7 @@ parameter input_stage_can_hold = 0;
 parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 
 // use explicit pipeline register between flit buffer and crossbar?
-parameter explicit_pipeline_register = 1;
+parameter explicit_pipeline_register = 0;
 
 // gate flit buffer write port if bypass succeeds
 // (requires explicit pipeline register; may increase cycle time)

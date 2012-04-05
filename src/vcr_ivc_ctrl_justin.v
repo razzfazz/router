@@ -1421,7 +1421,7 @@ module vcr_ivc_ctrl_justin
       .d(header_expired),
       .q(header_expired_q));
    
-   
+
    
    //---------------------------------------------------------------------------
    // generate output data
@@ -1435,6 +1435,7 @@ module vcr_ivc_ctrl_justin
    assign new_value = tbc_pop_active_q | tbc_pop_active;
    
    
+   
    generate
       
       if(explicit_pipeline_register) begin
@@ -1444,11 +1445,35 @@ module vcr_ivc_ctrl_justin
       end                          
    endgenerate
 
-   assign flit_data =flit_head?
+
+
+
+
+   assign flit_data =flit_head ?
 		     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
 		      time_to_wait_out,
 		      flit_data_old[header_info_width:flit_data_width-1]}:
-		     flit_data_old;
+	 	      flit_data_old;
+   
+   /*
+   
+   // TODO: comment above flit_data assignment and remove comments here
+   wire [0:route_info_width-1] route_info_out;
+   
+   assign route_info_out = header_expired ? 
+          {flit_data_old[lar_info_width:route_info_width-1], 
+           flit_data_old[0:lar_info_width-1]} : 
+           flit_data_old[0:route_info_width-1];
+   
+   assign flit_data =flit_head ?
+         {route_info_out, 
+          flit_data_old[route_info_width:(header_info_width-time_to_wait_width-1)],
+          time_to_wait_out,
+          flit_data_old[header_info_width:flit_data_width-1]}:
+          flit_data_old;   
+   */
+   
+   
    
    
    
