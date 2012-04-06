@@ -1321,11 +1321,6 @@ module vcr_ivc_ctrl_justin
    endgenerate
    
    
-   
-   //---------------------------
-   //
-   //---------------------------
-   
    wire [0:time_to_wait_width-1] coarse_counter;
    assign coarse_counter = ttw_counter_q[0:time_to_wait_width-1]; 
    
@@ -1402,15 +1397,19 @@ module vcr_ivc_ctrl_justin
 
    
    wire header_expired, header_expired_q;
+   wire [0:time_to_wait_width-1] time_to_wait_in_q, time_to_compare;
    
    assign time_diff = coarse_counter - tbf_read_data;
   
+   assign time_to_compare = explicit_pipeline_register ? time_to_wait_in_q : time_to_wait_in;
+   
    
    //assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
    
    assign time_to_wait_out = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
    
-   assign header_expired = flit_head_valid & (header_expired_q | (time_diff > time_to_wait_in));
+   assign header_expired = (header_expired_q | (time_diff > time_to_compare)) & flit_head_valid;
+   
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -1420,7 +1419,18 @@ module vcr_ivc_ctrl_justin
       .active(1'b1),
       .d(header_expired),
       .q(header_expired_q));
-   
+         
+         
+         
+      c_dff
+        #(.width(time_to_wait_width),
+          .reset_type(reset_type))
+      dff_ttw_in
+        (.clk(clk),
+         .reset(1'b0),
+         .active(1'b1),
+         .d(time_to_wait_in),
+         .q(time_to_wait_in_q));
 
    
    //---------------------------------------------------------------------------
