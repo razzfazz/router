@@ -158,8 +158,11 @@ module flit_sink
    wire [0:num_vcs-1] req_ivc;
    assign req_ivc = ({num_vcs{flit_valid}} & flit_sel_ivc) | ~empty_ivc;
    
+   wire 	      gnt;
+   assign gnt = |req_ivc & consume;
+   
    wire 	      update;
-   assign update = |req_ivc & consume;
+   assign update = gnt;
    
    wire [0:num_vcs-1] gnt_ivc;
    c_arbiter
@@ -199,7 +202,7 @@ module flit_sink
       .push_tail(flit_tail),
       .push_data(flit_data),
       .pop_active(1'b1),
-      .pop_valid(consume),
+      .pop_valid(gnt),
       .pop_sel_ivc(gnt_ivc),
       .pop_data(),
       .pop_tail_ivc(),
