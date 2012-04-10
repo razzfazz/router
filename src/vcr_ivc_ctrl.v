@@ -711,46 +711,14 @@ module vcr_ivc_ctrl
       .data_out(full_ovc));
    
    wire [0:num_vcs-1] 			       next_free_ovc;
-   wire [0:num_vcs-1] 			       free_spec_ovc;
+   assign next_free_ovc = ~full_ovc & ~(almost_full_ovc & {num_vcs{flit_sent}});
    
-   genvar 				       ovc;
-   
-   generate
-      
-      for(ovc = 0; ovc < num_vcs; ovc = ovc + 1)
-	begin:ovcs
-	   
-	   wire almost_full;
-	   assign almost_full = almost_full_ovc[ovc];
-	   
-	   wire full;
-	   assign full = full_ovc[ovc];
-	   
-	   wire next_free;
-	   assign next_free = ~full & (~almost_full | ~flit_sent);
-	   
-	   assign next_free_ovc[ovc] = next_free;
-	   
-	   // NOTE: When sending the first flit in each packet, we must have 
-	   // won VC allocation. Consequently, the destination output VC must 
-	   // have been eligible and thus not assigned to any input VC, so we 
-	   // know that nobody sent a flit to it in the previous cycle.
-	   
-	   wire free_spec;
-	   assign free_spec = ~full;
-	   
-	   assign free_spec_ovc[ovc] = free_spec;
-	   
-	end
-      
-   endgenerate
-   
-   wire [0:num_vcs_per_message_class-1] next_free_orc_ocvc;
+   wire [0:num_vcs_per_message_class-1]        next_free_orc_ocvc;
    assign next_free_orc_ocvc
      = next_free_ovc[message_class*num_vcs_per_message_class:
 		     (message_class+1)*num_vcs_per_message_class-1];
    
-   wire 				free_nonspec_muxed;
+   wire 				       free_nonspec_muxed;
    c_select_1ofn
      #(.num_ports(num_vcs_per_message_class),
        .width(1))
@@ -759,7 +727,7 @@ module vcr_ivc_ctrl
       .data_in(next_free_orc_ocvc),
       .data_out(free_nonspec_muxed));
    
-   wire 				free_nonspec_s, free_nonspec_q;
+   wire 				       free_nonspec_s, free_nonspec_q;
    assign free_nonspec_s = free_nonspec_muxed;
    c_dff
      #(.width(1),
@@ -774,6 +742,9 @@ module vcr_ivc_ctrl
    
    assign free_nonspec = free_nonspec_q;
    
+   wire [0:num_vcs-1] 			       free_spec_ovc;
+   assign free_spec_ovc = ~full_ovc;
+   
    c_select_1ofn
      #(.num_ports(num_vcs),
        .width(1))
@@ -782,7 +753,7 @@ module vcr_ivc_ctrl
       .data_in(free_spec_ovc),
       .data_out(free_spec));
    
-   wire 				sw_gnt_sel;
+   wire 				       sw_gnt_sel;
    assign sw_gnt_sel = sw_gnt & sw_sel;
    
    generate
