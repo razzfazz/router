@@ -243,6 +243,17 @@ module vcr_op_ctrl_mac
    
    wire [0:num_vcs-1] 		 flit_sel_ovc;
    
+   wire 			 flit_sent;
+   
+   generate
+      
+      if(sw_alloc_spec)
+	assign flit_sent = flit_valid_q & (|flit_sel_ovc);
+      else
+	assign flit_sent = flit_valid_q;
+            
+   endgenerate
+   
    wire 			 fcs_active;
    assign fcs_active = flit_valid_q | fc_event_valid;
    
@@ -261,7 +272,7 @@ module vcr_op_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(fcs_active),
-      .flit_valid(flit_valid_q),
+      .flit_valid(flit_sent),
       .flit_sel_ovc(flit_sel_ovc),
       .fc_event_valid(fc_event_valid),
       .fc_event_sel_ovc(fc_event_sel_ovc),
@@ -359,17 +370,6 @@ module vcr_op_ctrl_mac
    //---------------------------------------------------------------------------
    // output staging
    //---------------------------------------------------------------------------
-   
-   wire 			flit_sent;
-   
-   generate
-      
-      if(sw_alloc_spec)
-	assign flit_sent = flit_valid_q & (|flit_sel_ovc);
-      else
-	assign flit_sent = flit_valid_q;
-            
-   endgenerate
    
    wire 			cho_active;
    assign cho_active = flit_valid_q;
