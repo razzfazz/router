@@ -352,9 +352,9 @@ module c_damq_ctrl
 	   
 	   wire [0:addr_width-1] queue_head_addr;
 	   wire [0:addr_width-1] queue_tail_addr;
-	   assign equal = (queue_head_addr == queue_tail_addr);
-
+	   
 	   wire 		 equal;
+	   assign equal = (queue_head_addr == queue_tail_addr);
 	   
 	   wire [0:addr_width-1] head_addr_s, head_addr_q;
 	   assign head_addr_s
