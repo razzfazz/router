@@ -89,6 +89,9 @@ module rtr_alloc_mac
    // precompute output-side arbitration decision one cycle ahead
    parameter precomp_ip_sel = 1;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
@@ -227,6 +230,7 @@ module rtr_alloc_mac
    
    wire [0:num_ports*num_ports-1] 		      oal_flit_sent_ip_op;
    wire [0:num_ports*num_ports-1] 		      ofl_flit_sent_ip_op;
+   wire [0:num_ports-1] 			      oxl_flit_sent_op;
    
    generate
       
@@ -358,6 +362,7 @@ module rtr_alloc_mac
 	   wire [0:num_vcs_per_class-1]    ifl_next_elig_ocvc;
 	   wire 			   ifl_almost_full;
 	   wire 			   ifl_full;
+	   wire 			   ifl_debit;
 	   
 	   if(1) begin:ifl
 	      
@@ -450,6 +455,15 @@ module rtr_alloc_mac
 		      .data_in(full_ocvc),
 		      .data_out(full));
 		   
+		   wire 			  debit;
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   debit_sel
+		     (.select(route_fast_in_op),
+		      .data_in(oxl_flit_sent_op),
+		      .data_out(debit));
+		   
 		   wire [0:num_resource_classes*
 			 num_vcs_per_class-1] 	  flit_sel_orc_ocvc;
 		   c_mat_mult
@@ -506,6 +520,7 @@ module rtr_alloc_mac
 		   assign ifl_next_elig_ocvc = next_elig_ocvc;
 		   assign ifl_almost_full = almost_full;
 		   assign ifl_full = full;
+		   assign ifl_debit = debit;
 		   assign ifl_flit_valid_op
 		     = (flit_head_fast_in ? 
 			route_fast_in_op : 
@@ -525,6 +540,7 @@ module rtr_alloc_mac
 		   assign ifl_next_elig_ocvc = {num_vcs_per_class{1'b0}};
 		   assign ifl_almost_full = 1'b0;
 		   assign ifl_full = 1'b0;
+		   assign ifl_debit = 1'b0;
 		   assign ifl_flit_valid_op = {num_ports{1'b0}};
 		   assign ifl_flit_sel_ovc = {num_vcs{1'b0}};
 		   
@@ -855,8 +871,18 @@ module rtr_alloc_mac
 		      .data_in(full_ocvc),
 		      .data_out(allocated_next_full));
 		   
+		   wire 			     debit;
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   debit_sel
+		     (.select(rf_route_op),
+		      .data_in(oxl_flit_sent_op),
+		      .data_out(debit));
+		   
 		   wire 			     almost_full;
 		   wire 			     full;
+		   wire 			     reduce;
 		   
 		   if(dual_path_alloc)
 		     begin
@@ -871,11 +897,23 @@ module rtr_alloc_mac
 				      allocated_next_full : 
 				      ifl_full;
 			
+			if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
+			  assign reduce = flit_sent | flit_sent_fast;
+			else
+			  assign reduce = route_valid_in ? debit : ifl_debit;
+			
 		     end
 		   else
 		     begin
+			
 			assign almost_full = allocated_next_almost_full;
 			assign full = allocated_next_full;
+
+			if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
+			  assign reduce = flit_sent;
+			else
+			  assign reduce = debit;
+			
 		     end
 		   
 		   // we need to track credits even when we temporarily run out 
@@ -895,11 +933,7 @@ module rtr_alloc_mac
 		   // 'cred_q' will be ignored in the next cycle anyway.
 		   
 		   wire 			     cred_s, cred_q;
-		   if(dual_path_alloc)
-		     assign cred_s
-		       = ~full & ~(almost_full & (flit_sent | flit_sent_fast));
-		   else
-		     assign cred_s = ~full & ~(almost_full & flit_sent);
+		   assign cred_s = ~full & ~(almost_full & reduce);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
@@ -1285,6 +1319,9 @@ module rtr_alloc_mac
 	   assign ofl_flit_sent_op_ip[op*num_ports:(op+1)*num_ports-1]
 	     = ofl_flit_sent_ip;
 	   
+	   wire 			 oxl_flit_sent;
+	   assign oxl_flit_sent_op[op] = oxl_flit_sent;
+	   
 	   wire 			 flit_valid_out;
 	   assign flit_valid_out_op[op] = flit_valid_out;
 	   
@@ -1640,6 +1677,13 @@ module rtr_alloc_mac
 	      assign flit_sel_out_ip = flit_sel_ip_q;
 	      
 	   end
+	   
+	   
+	   //-------------------------------------------------------------------
+	   // generate early flit sent signal
+	   //-------------------------------------------------------------------
+	   
+	   assign oxl_flit_sent = oal_flit_sent | ofl_flit_sent;
 	   
 	   
 	   //-------------------------------------------------------------------

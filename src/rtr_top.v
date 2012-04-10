@@ -416,6 +416,7 @@ module rtr_top
        .dim_order(dim_order),
        .precomp_ivc_sel(precomp_ivc_sel),
        .precomp_ip_sel(precomp_ip_sel),
+       .fb_mgmt_type(fb_mgmt_type),
        .elig_mask(elig_mask),
        .sw_alloc_arbiter_type(sw_alloc_arbiter_type),
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),

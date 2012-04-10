@@ -33,7 +33,7 @@ module vcr_ivc_ctrl
   (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
    flit_sel_in, header_info_in, fb_pop_tail, fb_pop_next_header_info, 
    almost_full_op_ovc, full_op_ovc, route_op, route_orc, vc_gnt, vc_sel_ovc, 
-   sw_gnt, sw_sel, flit_valid, flit_head, flit_tail, next_lar_info, 
+   sw_gnt, sw_sel, sw_gnt_op, flit_valid, flit_head, flit_tail, next_lar_info, 
    fb_almost_empty, fb_empty, allocated, free_nonspec, free_spec, errors);
    
 `include "c_functions.v"
@@ -176,6 +176,9 @@ module vcr_ivc_ctrl
    // enable speculative switch allocation
    parameter sw_alloc_spec = 1;
    
+   // select flit buffer management scheme
+   parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -249,6 +252,9 @@ module vcr_ivc_ctrl
    
    // switch allocator grant is for this VC
    input 			     sw_sel;
+   
+   // switch grant for output ports
+   input [0:num_ports-1] 	     sw_gnt_op;
    
    // outgoing flit is available
    output 			     flit_valid;
@@ -710,8 +716,29 @@ module vcr_ivc_ctrl
       .data_in(full_op_ovc),
       .data_out(full_ovc));
    
+   wire 				       reduce;
+   
+   generate
+      
+      if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
+	assign reduce = flit_sent;
+      else
+	begin
+	   
+	   c_select_1ofn
+	     #(.num_ports(num_ports),
+	       .width(1))
+	   reduce_sel
+	     (.select(route_op),
+	      .data_in(sw_gnt_op),
+	      .data_out(reduce));
+	   
+	end
+      
+   endgenerate
+   
    wire [0:num_vcs-1] 			       next_free_ovc;
-   assign next_free_ovc = ~full_ovc & ~(almost_full_ovc & {num_vcs{flit_sent}});
+   assign next_free_ovc = ~full_ovc & ~(almost_full_ovc & {num_vcs{reduce}});
    
    wire [0:num_vcs_per_message_class-1]        next_free_orc_ocvc;
    assign next_free_orc_ocvc

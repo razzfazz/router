@@ -32,7 +32,7 @@
 module vcr_ip_ctrl_mac
   (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
    allocated_ivc, flit_valid_ivc, flit_head_ivc, flit_tail_ivc, 
-   free_nonspec_ivc, vc_gnt_ivc, vc_sel_ivc_ovc, sw_gnt, sw_sel_ivc, 
+   free_nonspec_ivc, vc_gnt_ivc, vc_sel_ivc_ovc, sw_gnt, sw_sel_ivc, sw_gnt_op, 
    almost_full_op_ovc, full_op_ovc, flit_data, flow_ctrl_out, error);
    
 `include "c_functions.v"
@@ -255,6 +255,9 @@ module vcr_ip_ctrl_mac
    // select VC for switch grant
    input [0:num_vcs-1] 			     sw_sel_ivc;
    
+   // switch grant for output ports
+   input [0:num_ports-1] 		     sw_gnt_op;
+   
    // which output VC have only a single credit left?
    input [0:num_ports*num_vcs-1] 	     almost_full_op_ovc;
    
@@ -435,6 +438,7 @@ module vcr_ip_ctrl_mac
 	       .dim_order(dim_order),
 	       .elig_mask(elig_mask),
 	       .sw_alloc_spec(sw_alloc_spec),
+	       .fb_mgmt_type(fb_mgmt_type),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .vc_id(ivc),
 	       .port_id(port_id),
@@ -458,6 +462,7 @@ module vcr_ip_ctrl_mac
 	      .vc_sel_ovc(vc_sel_ovc),
 	      .sw_gnt(sw_gnt),
 	      .sw_sel(sw_sel),
+	      .sw_gnt_op(sw_gnt_op),
 	      .flit_valid(flit_valid),
 	      .flit_head(flit_head),
 	      .flit_tail(flit_tail),

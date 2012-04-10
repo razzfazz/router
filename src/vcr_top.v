@@ -221,6 +221,7 @@ module vcr_top
    
    wire [0:num_ports-1] 			     sw_gnt_ip;
    wire [0:num_ports*num_vcs-1] 		     sw_sel_ip_ivc;
+   wire [0:num_ports-1] 			     sw_gnt_op;
    
    wire [0:num_ports*flit_data_width-1] 	     xbr_data_in_ip;
    
@@ -310,6 +311,7 @@ module vcr_top
 	      .vc_sel_ivc_ovc(vc_sel_ivc_ovc),
 	      .sw_gnt(sw_gnt),
 	      .sw_sel_ivc(sw_sel_ivc),
+	      .sw_gnt_op(sw_gnt_op),
 	      .almost_full_op_ovc(almost_full_op_ovc),
 	      .full_op_ovc(full_op_ovc),
 	      .flit_data(flit_data),
@@ -358,7 +360,6 @@ module vcr_top
    wire [0:num_ports*num_vcs*num_ports-1] 	vc_sel_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1] 	vc_sel_op_ovc_ivc;
    wire [0:num_ports-1] 			sw_active_op;
-   wire [0:num_ports-1] 			sw_gnt_op;
    wire [0:num_ports*num_ports-1] 		sw_sel_op_ip;
    wire [0:num_ports*num_vcs-1] 		sw_sel_op_ivc;
    wire [0:num_ports-1] 			flit_head_op;

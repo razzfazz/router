@@ -131,6 +131,17 @@ module rtr_fc_state
 	`FLOW_CTRL_TYPE_CREDIT:
 	  begin
 	     
+	     wire [0:num_vcs-1] flit_valid_sel_ovc;
+	     assign flit_valid_sel_ovc
+	       = {num_vcs{flit_valid}} & flit_sel_ovc;
+	     
+	     wire [0:num_vcs-1] fc_event_valid_sel_ovc;
+	     assign fc_event_valid_sel_ovc
+	       = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
+	     
+	     wire [0:num_vcs-1] debit_ovc;
+	     wire [0:num_vcs-1] credit_ovc;
+	     
 	     wire [0:num_vcs-1] ft_almost_empty_ovc;
 	     wire [0:num_vcs-1] ft_empty_ovc;
 	     wire [0:num_vcs-1] ft_almost_full_ovc;
@@ -165,49 +176,94 @@ module rtr_fc_state
 		       .two_free_qu(ft_two_free_ovc),
 		       .errors_qu(ft_errors_ovc));
 		    
-		    assign fc_active = ~&ft_empty_ovc;
+		    assign debit_ovc = flit_valid_sel_ovc;
+		    assign credit_ovc = fc_event_valid_sel_ovc;
+		    
+		 end
+	       
+	       `FB_MGMT_TYPE_DYNAMIC:
+		 begin
+		    
+		    c_damq_tracker
+		      #(.num_queues(num_vcs),
+			.num_slots(buffer_size),
+			.fast_almost_empty(fast_almost_empty),
+			.fast_two_free(1),
+			.enable_bypass(0),
+			.reset_type(reset_type))
+		    damqt
+		      (.clk(clk),
+		       .reset(reset),
+		       .active(active),
+		       .push_valid(flit_valid),
+		       .push_sel_qu(flit_sel_ovc),
+		       .pop_valid(fc_event_valid),
+		       .pop_sel_qu(fc_event_sel_ovc),
+		       .almost_empty_qu(ft_almost_empty_ovc),
+		       .empty_qu(ft_empty_ovc),
+		       .almost_full_qu(ft_almost_full_ovc),
+		       .full_qu(ft_full_ovc),
+		       .two_free_qu(ft_two_free_ovc),
+		       .errors_qu(ft_errors_ovc));
+		    
+		    wire debit_empty;
+		    c_select_1ofn
+		      #(.num_ports(num_vcs),
+			.width(1))
+		    debit_empty_sel
+		      (.select(flit_sel_ovc),
+		       .data_in(ft_empty_ovc),
+		       .data_out(debit_empty));
+		    
+		    assign debit_ovc = flit_valid_sel_ovc | 
+				       {num_vcs{flit_valid & ~debit_empty}};
+		    
+		    wire 	       credit_almost_empty;
+		    c_select_1ofn
+		      #(.num_ports(num_vcs),
+			.width(1))
+		    debit_almost_empty_sel
+		      (.select(fc_event_sel_ovc),
+		       .data_in(ft_almost_empty_ovc),
+		       .data_out(credit_almost_empty));
+		    
+		    assign credit_ovc
+		      = fc_event_valid_sel_ovc | 
+			{num_vcs{fc_event_valid & ~credit_almost_empty}};
 		    
 		 end
 	       
 	     endcase
 	     
-	     wire [0:num_vcs-1] flit_valid_sel_ovc;
-	     assign flit_valid_sel_ovc
-	       = {num_vcs{flit_valid}} & flit_sel_ovc;
-	     
-	     wire [0:num_vcs-1] fc_event_valid_sel_ovc;
-	     assign fc_event_valid_sel_ovc
-	       = {num_vcs{fc_event_valid}} & fc_event_sel_ovc;
-	     
 	     if(flow_ctrl_bypass)
 	       begin
-		  assign empty_ovc
-		    = (ft_empty_ovc | 
-		       (ft_almost_empty_ovc & fc_event_valid_sel_ovc)) &
-		      ~flit_valid_sel_ovc;
 		  assign almost_full_ovc
-		    = (ft_full_ovc & fc_event_valid_sel_ovc) | 
-		      (ft_almost_full_ovc & 
-		       (flit_valid_sel_ovc ~^ fc_event_valid_sel_ovc)) |
-		      (ft_two_free_ovc & 
-		       (flit_valid_sel_ovc & ~fc_event_valid_sel_ovc));
+		    = (credit_ovc & ft_full_ovc) | 
+		      ((debit_ovc ~^ credit_ovc) & ft_almost_full_ovc) |
+		      ((debit_ovc & ~credit_ovc) & ft_two_free_ovc);
 		  assign full_ovc
 		    = (ft_full_ovc | 
 		       (ft_almost_full_ovc & flit_valid_sel_ovc)) &
 		      ~fc_event_valid_sel_ovc;
-		  assign full_prev_ovc = ft_full_ovc & ~fc_event_valid_sel_ovc;
+		  assign full_prev_ovc
+		    = ft_full_ovc & ~fc_event_valid_sel_ovc;
+		  assign empty_ovc
+		    = (ft_empty_ovc | 
+		       (ft_almost_empty_ovc & fc_event_valid_sel_ovc)) &
+		      ~flit_valid_sel_ovc;
 	       end
 	     else
 	       begin
-		  assign empty_ovc = ft_empty_ovc & ~flit_valid_sel_ovc;
 		  assign almost_full_ovc
-		    = (flit_valid_sel_ovc & ft_two_free_ovc) |
-		      (~flit_valid_sel_ovc & ft_almost_full_ovc);
+		    = (debit_ovc & ft_two_free_ovc) |
+		      (~debit_ovc & ft_almost_full_ovc);
 		  assign full_ovc
-		    = ft_full_ovc | (ft_almost_full_ovc & flit_valid_sel_ovc);
+		    = ft_full_ovc | (debit_ovc & ft_almost_full_ovc);
 		  assign full_prev_ovc = ft_full_ovc;
+		  assign empty_ovc = ft_empty_ovc & ~flit_valid_sel_ovc;
 	       end
 	     
+	     assign fc_active = ~&ft_empty_ovc;
 	     assign errors_ovc = ft_errors_ovc;
 	     
 	  end
