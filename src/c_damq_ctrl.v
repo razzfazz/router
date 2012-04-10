@@ -263,7 +263,7 @@ module c_damq_ctrl
      = bootstrap_q ? incr_free_head_addr : next_free_head_addr;
    
    wire 			    equal;
-   assign equal = (free_head_addr_q == free_tail_addr_q);
+   assign equal = (free_head_addr == free_tail_addr);
    
    wire [0:addr_width-1] 	    pop_addr;
    c_select_1ofn
