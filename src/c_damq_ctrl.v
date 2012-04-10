@@ -599,7 +599,7 @@ module c_damq_ctrl
 		  end
 	     end
 	   
-	   // synopssy translate_on
+	   // synopsys translate_on
 	   
 	end
       
