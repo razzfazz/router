@@ -265,11 +265,21 @@ module c_damq_ctrl
    wire 			    equal;
    assign equal = (free_head_addr_q == free_tail_addr_q);
    
+   wire [0:addr_width-1] 	    pop_addr;
+   c_select_1ofn
+     #(.num_ports(num_queues),
+       .width(addr_width))
+   pop_addr_sel
+     (.select(pop_sel_qu),
+      .data_in(pop_addr_qu),
+      .data_out(pop_addr));
+   
    wire [0:addr_width-1] 	    free_head_addr_s, free_head_addr_q;
    assign free_head_addr_s
      = ((full | (equal & push_valid)) & pop_valid) ? 
-       pop_queue_head_addr : 
+       pop_addr : 
        (push_valid ? new_free_head_addr : free_head_addr_q);
+   
    c_dff
      #(.width(addr_width),
        .reset_type(reset_type))
@@ -328,6 +338,111 @@ module c_damq_ctrl
    
    assign push_addr = free_head_addr;
    assign pop_next_addr = next_queue_head_addr;
+   
+   // synopsys translate_off
+   
+   wire [0:num_slots-1] push_mask;
+   c_decode
+     #(.num_ports(num_slots))
+   push_mask_dec
+     (.data_in(push_addr),
+      .data_out(push_mask));
+   
+   wire [0:num_slots-1]  pop_mask;
+   c_decode
+     #(.num_ports(num_slots))
+   pop_mask_dec
+     (.data_in(pop_addr),
+      .data_out(pop_mask));
+   
+   wire [0:num_slots-1]  unused_s, unused_q;
+   assign unused_s = (unused_q & ~({num_slots{push_valid}} & push_mask)) |
+		     ({num_slots{pop_valid}} & pop_mask);
+   c_dff
+     #(.width(num_slots),
+       .reset_value({num_slots{1'b1}}),
+       .reset_type(reset_type))
+   unusedq
+     (.clk(clk),
+      .reset(reset),
+      .active(active),
+      .d(unused_s),
+      .q(unused_q));
+   
+   wire [0:num_queues*num_slots-1] used_by_queue;
+   
+   wire [0:num_slots*num_queues-1] used_by_slot;
+   c_interleave
+     #(.width(num_slots*num_queues),
+       .num_blocks(num_queues))
+   used_by_slot_intl
+     (.data_in(used_by_queue),
+      .data_out(used_by_slot));
+   
+   genvar 			   slot;
+   
+   generate
+      
+      for(slot = 0; slot < num_slots; slot = slot + 1)
+	begin:slots
+	   
+	   wire [0:num_queues-1] used;
+	   assign used = used_by_slot[slot*num_queues:(slot+1)*num_queues-1];
+	   
+	   wire 		  multi_used;
+	   c_multi_hot_det
+	     #(.width(num_queues))
+	   multi_use_mhd
+	     (.data(used),
+	      .multi_hot(multi_used));
+	   
+	   wire 		  used_and_unused;
+	   assign used_and_unused = unused_q[slot] & (|used);
+	   
+	   wire 		  used_nor_unused;
+	   assign used_nor_unused = ~unused_q[slot] & (~|used);
+	   
+	   always @(posedge clk)
+	     begin
+		if(multi_used)
+		  begin
+		     $display({"ERROR: slot %d is used by multiple queues in ",
+			       "%m."}, slot);
+		     $stop;
+		  end
+		if(used_and_unused)
+		  begin
+		     $display({"ERROR: slot %d is both in use and in free ",
+			       "list in %m."}, slot);
+		     $stop;
+		  end
+		if(used_nor_unused)
+		  begin
+		     $display({"ERROR: slot %d is neither in use nore in ",
+			       "free list in %m."}, slot);
+		     $stop;
+		  end
+	     end
+	   
+	end
+      
+   endgenerate
+   
+   always @(posedge clk)
+     begin
+	if(~full & ~unused_q[free_head_addr])
+	  begin
+	     $display("ERROR: Invalid free head pointer in %m.");
+	     $stop;
+	  end
+	if(~full & ~unused_q[free_tail_addr])
+	  begin
+	     $display("ERROR: Invalid free tail pointer in %m.");
+	     $stop;
+	  end
+     end
+   
+   // synopsys translate_on
    
    genvar 			    queue;
    
@@ -423,7 +538,8 @@ module c_damq_ctrl
 	     begin
 		
 		if(error_underflow)
-		  $display("ERROR: FIFO underflow in module %m, queue %d.", queue);
+		  $display("ERROR: FIFO underflow in module %m, queue %d.", 
+			   queue);
 		
 	     end
 	   
@@ -448,6 +564,42 @@ module c_damq_ctrl
 	   assign almost_empty_qu[queue] = almost_empty;
 	   assign empty_qu[queue] = empty;
 	   assign errors_qu[queue*2:queue*2+1] = errors;
+	   
+	   // synopsys translate_off
+	   
+	   wire [0:num_slots-1]  used_s, used_q;
+	   assign used_s
+	     = (used_q | ({num_slots{push_valid_sel}} & push_mask)) & 
+	       ~({num_slots{pop_valid_sel}} & pop_mask);
+	   c_dff
+	     #(.width(num_slots),
+	       .reset_type(reset_type))
+	   usedq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(used_s),
+	      .q(used_q));
+	   
+	   assign used_by_queue[queue*num_slots:(queue+1)*num_slots-1] = used_q;
+	   
+	   always @(posedge clk)
+	     begin
+		if(~empty & ~used_q[queue_head_addr])
+		  begin
+		     $display("ERROR: Invalid head pointer in queue %d in %m.",
+			      queue);
+		     $stop;
+		  end
+		if(~empty & ~used_q[queue_tail_addr])
+		  begin
+		     $display("ERROR: Invalid tail pointer in queue %d in %m.",
+			      queue);
+		     $stop;
+		  end
+	     end
+	   
+	   // synopssy translate_on
 	   
 	end
       
