@@ -373,7 +373,7 @@ module c_damq_ctrl
    
    wire [0:num_slots*num_queues-1] used_by_slot;
    c_interleave
-     #(.width(num_slots*num_queues),
+     #(.width(num_queues*num_slots),
        .num_blocks(num_queues))
    used_by_slot_intl
      (.data_in(used_by_queue),
