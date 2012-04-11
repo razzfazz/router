@@ -128,7 +128,7 @@ module c_regfile
 	     
 	  end
 	
-	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_TRISTATE:
+	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_SEL:
 	  begin
 	     
 	     wire [0:depth*width-1] storage_1d;
@@ -184,7 +184,7 @@ module c_regfile
 		  
 		  case(regfile_type)
 		    
-		    `REGFILE_TYPE_FF_1D_TRISTATE:
+		    `REGFILE_TYPE_FF_1D_SEL:
 		      begin
 			 
 			 wire [0:depth-1] port_read_sel;
