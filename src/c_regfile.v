@@ -84,45 +84,46 @@ module c_regfile
 	`REGFILE_TYPE_FF_2D:
 	  begin
 	     
-	     reg [0:width-1] storage_2d [0:depth-1];
-
-	     for(write_port = 0; write_port < num_write_ports; 
-		 write_port = write_port + 1)
-	       begin:write_ports
+	     if(num_write_ports == 1)
+	       begin
 		  
-		  wire port_write_enable;
-		  assign port_write_enable = write_enable[write_port];
-		  
-		  wire [0:addr_width-1] port_write_address;
-		  assign port_write_address
-		    = write_address[write_port*addr_width:
-				    (write_port+1)*addr_width-1];
-		  
-		  wire [0:width-1] 	port_write_data;
-		  assign port_write_data
-		    = write_data[write_port*width:(write_port+1)*width-1];
+		  reg [0:width-1] storage_2d [0:depth-1];
 		  
 		  always @(posedge clk)
 		    if(write_active)
-		      if(port_write_enable)
-			storage_2d[port_write_address] <= port_write_data;
+		      if(write_enable)
+			storage_2d[write_address] <= write_data;
+		  
+		  for(read_port = 0; read_port < num_read_ports; 
+		      read_port = read_port + 1)
+		    begin:read_ports_2d
+		       
+		       wire [0:addr_width-1] port_read_address;
+		       assign port_read_address
+			 = read_address[read_port*addr_width:
+					(read_port+1)*addr_width-1];
+		       
+		       wire [0:width-1]      port_read_data;
+		       assign port_read_data = storage_2d[port_read_address];
+		       
+		       assign read_data[read_port*width:(read_port+1)*width-1]
+			 = port_read_data;
+		       
+		    end
 		  
 	       end
-	     
-	     for(read_port = 0; read_port < num_read_ports; 
-		 read_port = read_port + 1)
-	       begin:read_ports_2d
+	     else
+	       begin
 		  
-		  wire [0:addr_width-1] port_read_address;
-		  assign port_read_address
-		    = read_address[read_port*addr_width:
-				   (read_port+1)*addr_width-1];
-		  
-		  wire [0:width-1] 	port_read_data;
-		  assign port_read_data = storage_2d[port_read_address];
-		  
-		  assign read_data[read_port*width:(read_port+1)*width-1]
-		    = port_read_data;
+		  // synopsys translate_off
+		  initial
+		    begin
+		       $display({"ERROR: Register file %m does not support ",
+				 "2D FF array register file models with %d ",
+				 "write ports."}, num_write_ports);
+		       $stop;
+		    end
+		  // synopsys translate_on
 		  
 	       end
 	     
@@ -131,41 +132,71 @@ module c_regfile
 	`REGFILE_TYPE_FF_1D_MUX, `REGFILE_TYPE_FF_1D_SEL:
 	  begin
 	     
-	     wire [0:depth*width-1] storage_1d;
+	     wire [0:num_write_ports*depth-1] write_sel_by_port;
+
+	     for(write_port = 0; write_port < num_write_ports;
+		 write_port = write_port + 1)
+	       begin:write_ports_1d
+		  
+		  wire [0:addr_width-1] port_write_address;
+		  assign port_write_address
+		    = write_address[write_port*addr_width:
+				    (write_port+1)*addr_width-1];
+		  
+		  wire [0:depth-1] 	port_write_sel;
+		  c_decode
+		    #(.num_ports(depth))
+		  port_write_sel_dec
+		    (.data_in(port_write_address),
+		     .data_out(port_write_sel));
+		  
+		  assign write_sel_by_port[write_port*depth:
+					   (write_port+1)*depth-1]
+		    = port_write_sel;
+		  
+	       end
 	     
-	     genvar level;
+	     wire [0:depth*num_write_ports-1] write_sel_by_level;
+	     c_interleave
+	       #(.width(num_write_ports*depth),
+		 .num_blocks(num_write_ports))
+	     write_sel_by_level_intl
+	       (.data_in(write_sel_by_port),
+		.data_out(write_sel_by_level));
+	     
+	     wire [0:depth*width-1] 	      storage_1d;
+	     
+	     genvar 			      level;
 	     
 	     for(level = 0; level < depth; level = level + 1)
 	       begin:levels
 		  
-		  reg [0:width-1] storage;
+		  wire [0:num_write_ports-1] lvl_write_sel;
+		  assign lvl_write_sel
+		    = write_sel_by_level[level*num_write_ports:
+					 (level+1)*num_write_ports-1];
 		  
-		  for(write_port = 0; write_port < num_write_ports;
-		      write_port = write_port + 1)
-		    begin:write_ports
-		       
-		       wire port_write_enable;
-		       assign port_write_enable = write_enable[write_port];
-		       
-		       wire [0:addr_width-1] port_write_address;
-		       assign port_write_address
-			 = write_address[write_port*addr_width:
-					 (write_port+1)*addr_width-1];
-		       
-		       wire [0:width-1]      port_write_data;
-		       assign port_write_data
-			 = write_data[write_port*width:(write_port+1)*width-1];
-		       
-		       wire 		     port_write;
-		       assign port_write
-			 = port_write_enable && (port_write_address == level);
-		       
-		       always @(posedge clk)
-			 if(write_active)
-			   if(port_write)
-			     storage <= port_write_data;
-		       
-		    end
+		  wire [0:num_write_ports-1] lvl_port_write;
+		  assign lvl_port_write = write_enable & lvl_write_sel;
+		  
+		  wire 			     lvl_write_enable;
+		  assign lvl_write_enable = |lvl_port_write;
+		  
+		  wire [0:width-1] 	     lvl_write_data;
+		  c_select_1ofn
+		    #(.num_ports(num_write_ports),
+		      .width(width))
+		  lvl_write_data_sel
+		    (.select(lvl_port_write),
+		     .data_in(write_data),
+		     .data_out(lvl_write_data));
+		  
+		  reg [0:width-1] 	     storage;
+		  
+		  always @(posedge clk)
+		    if(write_active)
+		      if(lvl_write_enable)
+			storage <= lvl_write_data;
 		  
 		  assign storage_1d[level*width:(level+1)*width-1] = storage;
 		  

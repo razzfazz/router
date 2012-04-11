@@ -225,7 +225,8 @@ module c_damq_ctrl
      #(.depth(num_slots),
        .width(addr_width),
        .num_write_ports(2),
-       .num_read_ports(2))
+       .num_read_ports(2),
+       .regfile_type(`REGFILE_TYPE_FF_1D_MUX))
    prf
      (.clk(clk),
       .write_active(active),
