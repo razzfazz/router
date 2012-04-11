@@ -221,47 +221,75 @@ module c_damq_ctrl
    
    wire [0:addr_width-1] 	    next_queue_head_addr;
    wire [0:addr_width-1] 	    next_free_head_addr;
-   c_regfile
-     #(.depth(num_slots),
-       .width(addr_width),
-       .num_write_ports(2),
-       .num_read_ports(2),
-       .regfile_type(`REGFILE_TYPE_FF_1D_MUX))
-   prf
-     (.clk(clk),
-      .write_active(active),
-      .write_enable({update_queue_tail, update_free_tail}),
-      .write_address({push_queue_tail_addr, free_tail_addr}),
-      .write_data({next_queue_tail_addr, next_free_tail_addr}),
-      .read_address({pop_queue_head_addr, free_head_addr}),
-      .read_data({next_queue_head_addr, next_free_head_addr}));
+
+   wire [0:num_slots-1] 	    push_queue_tail_sel_sl;
+   c_decode
+     #(.num_ports(num_slots))
+   push_queue_tail_sel_sl_dec
+     (.data_in(push_queue_tail_addr),
+      .data_out(push_queue_tail_sel_sl));
+
+   wire [0:num_slots-1] 	    free_tail_sel_sl;
+   c_decode
+     #(.num_ports(num_slots))
+   free_tail_sel_sl_dec
+     (.data_in(free_tail_addr),
+      .data_out(free_tail_sel_sl));
    
-   wire 			    almost_bootstrapped;
-   assign almost_bootstrapped = (free_head_addr == (num_slots - 2));
+   wire [0:num_slots*addr_width-1]  addr_sl;
    
-   wire 			    bootstrap_s, bootstrap_q;
-   assign bootstrap_s = bootstrap_q & ~(almost_bootstrapped & push_valid);
-   c_dff
-     #(.width(1),
-       .reset_value(1'b1),
-       .reset_type(reset_type))
-   bootstrapq
-     (.clk(clk),
-      .reset(reset),
-      .active(push_active),
-      .d(bootstrap_s),
-      .q(bootstrap_q));
+   genvar 			    slot;
    
-   wire [0:addr_width-1] 	    incr_free_head_addr;
-   c_incr
-     #(.width(addr_width))
-   incr_free_head_addr_incr
-     (.data_in(free_head_addr),
-      .data_out(incr_free_head_addr));
+   generate
+      
+      for(slot = 0; slot < num_slots; slot = slot + 1)
+	begin:slots
+	   
+	   wire push_queue_tail_sel;
+	   assign push_queue_tail_sel = push_queue_tail_sel_sl[slot];
+	   
+	   wire free_tail_sel;
+	   assign free_tail_sel = free_tail_sel_sl[slot];
+	   
+	   wire [0:1] update_sel;
+	   assign update_sel = {update_queue_tail & push_queue_tail_sel,
+				update_free_tail & free_tail_sel};
+	   
+	   wire       update;
+	   assign update = |update_sel;
+	   
+	   wire [0:addr_width-1] next_addr;
+	   c_select_1ofn
+	     #(.num_ports(2),
+	       .width(addr_width))
+	   next_addr_sel
+	     (.select(update_sel),
+	      .data_in({next_queue_tail_addr, next_free_tail_addr}),
+	      .data_out(next_addr));
+	   
+	   wire [0:addr_width-1] addr_s, addr_q;
+	   assign addr_s = update ? next_addr : addr_q;
+	   c_dff
+	     #(.width(addr_width),
+	       .reset_value((slot + 1) % num_slots),
+	       .reset_type(reset_type))
+	   addrq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(addr_s),
+	      .q(addr_q));
+	   
+	   assign addr_sl[slot*addr_width:(slot+1)*addr_width-1] = addr_q;
+	   
+	end
+      
+   endgenerate
    
-   wire [0:addr_width-1] 	    new_free_head_addr;
-   assign new_free_head_addr
-     = bootstrap_q ? incr_free_head_addr : next_free_head_addr;
+   assign next_queue_head_addr
+     = addr_sl[pop_queue_head_addr*addr_width +: addr_width];
+   assign next_free_head_addr
+     = addr_sl[free_head_addr*addr_width +: addr_width];
    
    wire 			    equal;
    assign equal = (free_head_addr == free_tail_addr);
@@ -279,7 +307,7 @@ module c_damq_ctrl
    assign free_head_addr_s
      = ((full | (equal & push_valid)) & pop_valid) ? 
        pop_addr : 
-       (push_valid ? new_free_head_addr : free_head_addr_q);
+       (push_valid ? next_free_head_addr : free_head_addr_q);
    
    c_dff
      #(.width(addr_width),
@@ -380,12 +408,10 @@ module c_damq_ctrl
      (.data_in(used_by_queue),
       .data_out(used_by_slot));
    
-   genvar 			   slot;
-   
    generate
       
       for(slot = 0; slot < num_slots; slot = slot + 1)
-	begin:slots
+	begin:chk_slots
 	   
 	   wire [0:num_queues-1] used;
 	   assign used = used_by_slot[slot*num_queues:(slot+1)*num_queues-1];
