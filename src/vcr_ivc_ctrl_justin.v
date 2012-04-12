@@ -1309,7 +1309,7 @@ module vcr_ivc_ctrl_justin
                .reset_type(reset_type))
            tbf_read_addrqs
              (.clk(clk),
-              .reset(1'b0),
+              .reset(reset),
               .active(tbc_pop_active),
               .d(tbf_read_addr_s),
               .q(tbf_read_addr_q));
@@ -1388,10 +1388,15 @@ module vcr_ivc_ctrl_justin
    wire [0:flit_data_width-1] flit_data_old;
    wire flit_head_valid;
    wire flit_head_q;
-   
-   assign flit_head_valid  = (explicit_pipeline_register) ? ~tbc_empty & flit_head : ~tbc_empty & flit_head_q;
-   
-   assign time_to_wait_in  = flit_data_old[header_info_width - time_to_wait_width:
+
+   generate
+      if(explicit_pipeline_register)
+	assign flit_head_valid = ~tbc_empty & flit_head;
+      else
+	assign flit_head_valid = ~tbc_empty & flit_head_q;
+   endgenerate
+      
+   assign time_to_wait_in 	= flit_data_old[header_info_width - time_to_wait_width:
 					     header_info_width-1];
    
    wire [0:time_to_wait_width-1] time_diff;
@@ -1416,7 +1421,7 @@ module vcr_ivc_ctrl_justin
        .reset_type(reset_type))
    dff_time_diff
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(1'b1),
       .d(header_expired),
       .q(header_expired_q));
@@ -1439,7 +1444,7 @@ module vcr_ivc_ctrl_justin
        .reset_type(reset_type))
    dff_ttw_in
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(1'b1),
       .d(flit_head),
       .q(flit_head_q));
@@ -1472,7 +1477,7 @@ module vcr_ivc_ctrl_justin
 
 
 
-   assign flit_data =flit_head ?
+   assign flit_data =flit_head_valid ?
 		     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
 		      time_to_wait_out,
 		      flit_data_old[header_info_width:flit_data_width-1]}:
@@ -1513,7 +1518,7 @@ module vcr_ivc_ctrl_justin
        .reset_type(reset_type))
    tbf_read_addrq
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(1'b1),
       .d(tbc_pop_active),
       .q(tbc_pop_active_q));
