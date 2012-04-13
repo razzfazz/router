@@ -50,16 +50,11 @@ module c_incr
    
    // result output
    output [0:width-1] data_out;
-   wire [0:width-1] data_out;
+   wire [0:width-1]   data_out;
    
-   wire 	    wrap;
-   assign wrap = (data_in[(width-cwidth):width-1] ==
-		  max_value[(width-cwidth):width-1]);
+   wire 	      wrap;
    
-   wire [0:cwidth-1] lsb_incr;
-   assign lsb_incr = data_in[(width-cwidth):width-1] + 1'b1;
-   
-   genvar 	     i;
+   genvar 	      i;
    
    generate
       
@@ -71,23 +66,36 @@ module c_incr
 	end
       
       // the LSBs for a modulo counter, possibly with offset
-      if((1 << cwidth) == num_values)
+      if(cwidth > 0)
 	begin
 	   
-	   // if the counter's range is a power of two, we can take advantage of
-	   // natural wraparound
-	   assign data_out[(width-cwidth):width-1] = lsb_incr;
+	   assign wrap = (data_in[(width-cwidth):width-1] ==
+			  max_value[(width-cwidth):width-1]);
+	   
+	   wire [0:cwidth-1] lsb_incr;
+	   assign lsb_incr = data_in[(width-cwidth):width-1] + 1'b1;
+	   
+	   if((1 << cwidth) == num_values)
+	     begin
+		
+		// if the counter's range is a power of two, we can take 
+		// advantage of natural wraparound
+		assign data_out[(width-cwidth):width-1] = lsb_incr;
+		
+	     end
+	   else
+	     begin
+		
+		// if the range is not a power of two, we need to implement 
+		// explicit wraparound
+		assign data_out[(width-cwidth):width-1]
+		  = wrap ? min_value[(width-cwidth):width-1] : lsb_incr;
+		
+	     end
 	   
 	end
       else
-	begin
-	   
-	   // if the range is not a power of two, we need to implement 
-	   // explicit wraparound
-	   assign data_out[(width-cwidth):width-1]
-	     = wrap ? min_value[(width-cwidth):width-1] : lsb_incr;
-	   
-	end
+	assign wrap = 1'b1;
       
       // for the remaining range of bit positions (if any), min_value and 
       // max_value differ by one due to the carry-out from the modulo counter 
