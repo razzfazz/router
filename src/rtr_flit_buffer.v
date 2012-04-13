@@ -216,18 +216,26 @@ module rtr_flit_buffer
 		       assign push_addr
 			 = push_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
 		       
-		       wire [0:vc_addr_width-1] push_vc_addr;
-		       assign push_vc_addr
-			 = push_addr[addr_pad_width:addr_width-1];
-		       
 		       wire [0:buffer_size_per_vc-1] push_mask;
-		       c_decode
-			 #(.num_ports(buffer_size_per_vc),
-			   .offset((ivc * buffer_size_per_vc) %
-				   (1 << clogb(buffer_size_per_vc))))
-		       push_mask_dec
-			 (.data_in(push_vc_addr),
-			  .data_out(push_mask));
+		       
+		       if(buffer_size_per_vc == 1)
+			 assign push_mask = 1'b1;
+		       else if(buffer_size_per_vc > 1)
+			 begin
+			    
+			    wire [0:vc_addr_width-1] push_vc_addr;
+			    assign push_vc_addr
+			      = push_addr[addr_pad_width:addr_width-1];
+			    
+			    c_decode
+			      #(.num_ports(buffer_size_per_vc),
+				.offset((ivc * buffer_size_per_vc) %
+					(1 << clogb(buffer_size_per_vc))))
+			    push_mask_dec
+			      (.data_in(push_vc_addr),
+			       .data_out(push_mask));
+			    
+			 end
 		       
 		       wire [0:buffer_size_per_vc-1] tail_s, tail_q;
 		       assign tail_s
@@ -249,18 +257,26 @@ module rtr_flit_buffer
 		       assign pop_addr
 			 = pop_addr_ivc[ivc*addr_width:(ivc+1)*addr_width-1];
 		       
-		       wire [0:vc_addr_width-1]      pop_vc_addr;
-		       assign pop_vc_addr
-			 = pop_addr[addr_pad_width:addr_width-1];
-		       
 		       wire [0:buffer_size_per_vc-1] pop_mask;
-		       c_decode
-			 #(.num_ports(buffer_size_per_vc),
-			   .offset((ivc * buffer_size_per_vc) % 
-				   (1 << clogb(buffer_size_per_vc))))
-		       pop_mask_dec
-			 (.data_in(pop_vc_addr),
-			  .data_out(pop_mask));
+		       
+		       if(buffer_size_per_vc == 1)
+			 assign pop_mask = 1'b1;
+		       else if(buffer_size_per_vc > 1)
+			 begin
+			    
+			    wire [0:vc_addr_width-1] pop_vc_addr;
+			    assign pop_vc_addr
+			      = pop_addr[addr_pad_width:addr_width-1];
+			    
+			    c_decode
+			      #(.num_ports(buffer_size_per_vc),
+				.offset((ivc * buffer_size_per_vc) % 
+					(1 << clogb(buffer_size_per_vc))))
+			    pop_mask_dec
+			      (.data_in(pop_vc_addr),
+			       .data_out(pop_mask));
+			    
+			 end
 		       
 		       wire 			     pop_tail;
 		       c_select_1ofn
