@@ -34,6 +34,7 @@ DEP_SRCS = parameters.v
 SRCS = $(TOP_SRC) $(DEP_SRCS)
 
 SRC_DIR = ../../src
+CLIB_DIR = ../../src/clib
 DW_DIR = $(SYNOPSYS)/dw/sim_ver
 
 VCS_FLAGS = +lint=all,noVCDE +v2k +libext+.v -timescale=1ns/1ns -Mupdate -debug -full64
@@ -46,10 +47,10 @@ INT_CTRL=
 all: simv
 
 simv: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
-	vcs -o simv $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
+	vcs -o simv $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(CLIB_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
 
 simvfast: $(SRCS) $(DUMP_CTRL) $(SRC_DIR)/*.v
-	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
+	vcs -o simvfast +rad $(VCS_FLAGS) $(INT_CTRL) -y $(SRC_DIR) -y $(CLIB_DIR) -y $(DW_DIR) -y . $(TOP_SRC) $(DUMP_CTRL)
 
 clean:
 	rm -rf work simv simvfast simv.daidir simvfast.daidir transcript *.vcd *.vpd ucli.key vcs.key run.args csrc DVEfiles .vcsmx_rebuild *~
