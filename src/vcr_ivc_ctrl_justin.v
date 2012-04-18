@@ -159,11 +159,11 @@ module vcr_ivc_ctrl_justin
        -1;
    
    // total number of bits required for routing-related information
-   localparam route_info_width = lar_info_width + dest_info_width;
+   localparam route_info_width = lar_info_width + dest_info_width + dest_info_width;
    
    // total number of bits required for storing time-to-wait information
    parameter time_to_wait_width = 8;
-   
+
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -223,9 +223,16 @@ module vcr_ivc_ctrl_justin
    localparam counter_width = 10;
    
    
-   
    parameter reset_type = `RESET_TYPE_ASYNC;
-   
+  
+ 
+//`include "srp_format.v"
+   // spec_src_start
+   // width of dest_info
+
+
+
+ 
    input clk;
    input reset;
    
@@ -729,6 +736,11 @@ module vcr_ivc_ctrl_justin
    assign dest_info_in = route_info_in[lar_info_width:
 				       lar_info_width+dest_info_width-1];
    
+   wire [0:dest_info_width-1] 	     src_info_in;
+   assign src_info_in = route_info_in[lar_info_width+dest_info_width:
+				      lar_info_width+dest_info_width+dest_info_width-1];
+   
+   
    wire 			     hdr_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
@@ -772,7 +784,46 @@ module vcr_ivc_ctrl_justin
       .d(hdr_lar_info_s),
       .q(hdr_lar_info_q));
    
-   wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q;
+
+
+   // included hdr_src_info in case header is expired (replace dest_info with src_info)
+   wire [0:dest_info_width-1] 	     hdr_src_info_s, hdr_src_info_q;
+
+   
+   generate
+      if(elig_mask == `ELIG_MASK_USED)
+	assign hdr_src_info_s = hdr_valid_q ? hdr_src_info_q : src_info_in;
+      else
+	begin
+	   
+	   wire [0:dest_info_width-1] peek_src_info;
+	   assign peek_src_info
+	     = peek_route_info[lar_info_width+dest_info_width:
+			       lar_info_width+dest_info_width+dest_info_width-1];
+	   
+	   assign hdr_src_info_s
+	     = (~hdr_valid_q | packet_done) ?
+               (two_plus_flits ? peek_src_info : src_info_in) :
+               hdr_src_info_q;
+	   
+	end
+   endgenerate
+   c_dff
+     #(.width(dest_info_width),
+       .reset_type(reset_type))
+   hdr_src_infoq
+     (.clk(clk),
+      .reset(1'b0),
+      .active(hdr_active),
+      .d(hdr_src_info_s),
+      .q(hdr_src_info_q));
+
+
+
+
+
+   wire [0:dest_info_width-1] 	     hdr_dest_info_s, hdr_dest_info_q; 	     
+   
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_dest_info_s = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
@@ -811,6 +862,12 @@ module vcr_ivc_ctrl_justin
    
    wire [0:port_idx_width-1] 			     route_port_in;
    assign route_port_in = lar_info_in[0:port_idx_width-1];
+
+   // TODO: change route_port_in based on whether or not the header is valid
+
+
+
+   
    
    wire [0:num_ports-1] 			     route_in_op;
    c_decode
@@ -914,9 +971,28 @@ module vcr_ivc_ctrl_justin
    // update lookahead routing information for next hop
    //---------------------------------------------------------------------------
    
-   wire [0:dest_info_width-1] 		       dest_info;
-   assign dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+
+   wire 				       header_expired;
    
+   wire [0:dest_info_width-1] 		       dest_info, valid_dest_info;
+  
+   wire [0:dest_info_width-1] 		       src_info;
+
+
+   
+   // TODO: assign src_info_in and src_info.  take from queue 		       
+
+   
+   assign valid_dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+
+   assign src_info = hdr_valid_q ? hdr_src_info_q : src_info_in;
+
+//   assign dest_info = valid_dest_info;
+     
+   assign dest_info = ~header_expired ? valid_dest_info : src_info;
+   
+
+ 
    wire [0:lar_info_width-1] 	       lar_info;
    assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
    
@@ -991,17 +1067,9 @@ module vcr_ivc_ctrl_justin
 	end
       
    endgenerate
-   
-   
-   
-   
-   
-   
-   
 
 
    
-
    //---------------------------------------------------------------------------
    // credit tracking
    //---------------------------------------------------------------------------
@@ -1402,7 +1470,7 @@ module vcr_ivc_ctrl_justin
    wire [0:time_to_wait_width-1] time_diff;
 
    
-   wire header_expired, header_expired_q;
+   wire  header_expired_q;
    wire [0:time_to_wait_width-1] time_to_wait_in_q, time_to_compare;
    
    assign time_diff = coarse_counter - tbf_read_data;
@@ -1483,33 +1551,7 @@ module vcr_ivc_ctrl_justin
 		      flit_data_old[header_info_width:flit_data_width-1]}:
 	 	      flit_data_old;
    
-   /*
-   
-   // TODO: comment above flit_data assignment and remove comments here
-   wire [0:route_info_width-1] route_info_out;
-   
-   assign route_info_out = header_expired ? 
-          {flit_data_old[lar_info_width:route_info_width-1], 
-           flit_data_old[0:lar_info_width-1]} : 
-           flit_data_old[0:route_info_width-1];
-   
-   assign flit_data =flit_head ?
-         {route_info_out, 
-          flit_data_old[route_info_width:(header_info_width-time_to_wait_width-1)],
-          time_to_wait_out,
-          flit_data_old[header_info_width:flit_data_width-1]}:
-          flit_data_old;   
-   */
-   
-   
-   
-   
-   
-   //assign flit_data_new = (tbc_pop_active | tbc_pop_active_q) ? flit_data_new : flit_data_old; 
-   //assign flit_data = flit_data_old;
-   //assign flit_data = flit_data_new;
-   
-   
+  
    assign tbf_write_enable = flit_head_in & flit_valid_in;
    
    
