@@ -159,7 +159,7 @@ module vcr_ivc_ctrl_justin
        -1;
    
    // total number of bits required for routing-related information
-   localparam route_info_width = lar_info_width + dest_info_width + dest_info_width;
+   localparam route_info_width = lar_info_width + dest_info_width;
    
    // total number of bits required for storing time-to-wait information
    parameter time_to_wait_width = 8;
@@ -737,8 +737,7 @@ module vcr_ivc_ctrl_justin
 				       lar_info_width+dest_info_width-1];
    
    wire [0:dest_info_width-1] 	     src_info_in;
-   assign src_info_in = route_info_in[lar_info_width+dest_info_width:
-				      lar_info_width+dest_info_width+dest_info_width-1];
+   assign src_info_in = flit_data_in[header_info_width:header_info_width+dest_info_width-1];
    
    
    wire 			     hdr_active;
@@ -798,8 +797,7 @@ module vcr_ivc_ctrl_justin
 	   
 	   wire [0:dest_info_width-1] peek_src_info;
 	   assign peek_src_info
-	     = peek_route_info[lar_info_width+dest_info_width:
-			       lar_info_width+dest_info_width+dest_info_width-1];
+	     = fbf_peek_data[header_info_width:header_info_width+dest_info_width-1];
 	   
 	   assign hdr_src_info_s
 	     = (~hdr_valid_q | packet_done) ?
@@ -987,9 +985,9 @@ module vcr_ivc_ctrl_justin
 
    assign src_info = hdr_valid_q ? hdr_src_info_q : src_info_in;
 
-//   assign dest_info = valid_dest_info;
+   assign dest_info = valid_dest_info;
      
-   assign dest_info = ~header_expired ? valid_dest_info : src_info;
+//   assign dest_info = ~header_expired ? valid_dest_info : src_info;
    
 
  
