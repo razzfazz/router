@@ -30,9 +30,13 @@
 //==============================================================================
 
 module rtr_channel_input
-  (clk, reset, active, channel_in, flit_valid_out, flit_head_out, 
-   flit_head_out_ivc, flit_tail_out, flit_tail_out_ivc, flit_data_out, 
-   flit_sel_out_ivc);
+  (/*autoarg*/
+   // Outputs
+   flit_valid_out, flit_head_out, flit_head_out_ivc, flit_tail_out,
+   flit_tail_out_ivc, flit_data_out, flit_sel_out_ivc,
+   // Inputs
+   clk, reset , active, channel_in
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -158,7 +162,7 @@ module rtr_channel_input
        .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(active),
       .d(flit_data_s),
       .q(flit_data_q));
@@ -204,7 +208,7 @@ module rtr_channel_input
 		    .reset_type(reset_type))
 		  flit_ctrlq
 		    (.clk(clk),
-		     .reset(1'b0),
+		     .reset(reset),
 		     .active(active),
 		     .d(flit_ctrl_s[1:flit_ctrl_width-1]),
 		     .q(flit_ctrl_q[1:flit_ctrl_width-1]));

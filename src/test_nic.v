@@ -84,7 +84,7 @@ module test_nic(/*autoarg*/
    parameter flow_ctrl_bypass = 1;
       // width of flow control signals
    localparam flow_ctrl_width
-     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + num_vcs) :
        -1;
       // maximum payload length (in flits)
    parameter max_payload_length = 4;

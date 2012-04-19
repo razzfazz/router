@@ -30,8 +30,13 @@
 //==============================================================================
 
 module c_fifo_tracker
-  (clk, reset, active, push, pop, almost_empty, empty, almost_full, full, 
-   free, errors);
+  (/*autoarg*/
+   // Outputs
+   almost_empty, empty, almost_full, full, free, errors,
+   // Inputs
+   clk, reset, active, push, pop
+   );
+   
    
 `include "c_functions.v"
 `include "c_constants.v"

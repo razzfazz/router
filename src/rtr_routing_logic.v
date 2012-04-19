@@ -30,7 +30,13 @@
 //==============================================================================
 
 module rtr_routing_logic
-  (router_address, sel_mc, sel_irc, dest_info, route_op, route_orc);
+  (/*autoarg*/
+   // Outputs
+   route_op, route_orc,
+   // Inputs
+   router_address, sel_mc, sel_irc, dest_info
+   );
+   
    
 `include "c_functions.v"
 `include "c_constants.v"

@@ -1524,11 +1524,9 @@ module vcr_ivc_ctrl_justin
    
 
    wire tbc_pop_active_q;
-   wire new_value;
-   
-   assign new_value = tbc_pop_active_q | tbc_pop_active;
-   
-   
+
+   //wire new_value;
+   //assign new_value = tbc_pop_active_q | tbc_pop_active;
    
    generate
       
@@ -1562,8 +1560,6 @@ module vcr_ivc_ctrl_justin
       .active(1'b1),
       .d(tbc_pop_active),
       .q(tbc_pop_active_q));
-   
-   
    
    
    //---------------------------------------------------------------------------

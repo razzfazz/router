@@ -55,12 +55,10 @@ module rtr_flow_ctrl_input
    // derived parameters
    //---------------------------------------------------------------------------
    
-   // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
    
    // width of flow control signals
    localparam flow_ctrl_width
-     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + num_vcs) :
        -1;
    
    
@@ -125,10 +123,10 @@ module rtr_flow_ctrl_input
 	     if(num_vcs > 1)
 	       begin
 		  
-		  wire [0:vc_idx_width-1] cred_vc_s, cred_vc_q;
-		  assign cred_vc_s = flow_ctrl_in[1:vc_idx_width];
+		  wire [0:num_vcs-1] cred_vc_s, cred_vc_q;
+		  assign cred_vc_s = flow_ctrl_in[1:num_vcs];
 		  c_dff
-		    #(.width(vc_idx_width),
+		    #(.width(num_vcs),
 		      .reset_type(reset_type))
 		  cred_vcq
 		    (.clk(clk),
@@ -137,12 +135,7 @@ module rtr_flow_ctrl_input
 		     .d(cred_vc_s),
 		     .q(cred_vc_q));
 		  
-		  c_decode
-		    #(.num_ports(num_vcs))
-		  fc_event_sel_out_ovc_dec
-		    (.data_in(cred_vc_q),
-		     .data_out(fc_event_sel_out_ovc));
-		  
+		  assign fc_event_sel_out_ovc  = cred_vc_q;
 	       end
 	     else
 	       assign fc_event_sel_out_ovc = 1'b1;

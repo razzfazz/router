@@ -122,7 +122,7 @@ module rtr_channel_output
        .reset_type(reset_type))
    flit_dataq
      (.clk(clk),
-      .reset(1'b0),
+      .reset(reset),
       .active(active),
       .d(flit_data_s),
       .q(flit_data_q));
@@ -183,7 +183,7 @@ module rtr_channel_output
 		      .reset_type(reset_type))
 		  flit_ctrlq
 		    (.clk(clk),
-		     .reset(1'b0),
+		     .reset(reset),
 		     .active(active),
 		     .d(flit_ctrl_s[1:flit_ctrl_width-1]),
 		     .q(flit_ctrl_q[1:flit_ctrl_width-1]));
