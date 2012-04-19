@@ -25,10 +25,11 @@ int main(int argc, char** argv){
   string line;
   //Test bench input parsing
   srp_in.open("srp_input.txt");
+  int input_ttw;
   if(srp_in.is_open()){
     while(!srp_in.eof()){
       int unique_id  = parseline(srp_in, cycle, ttw, pid, port);
-      assert(ttw==255);
+      input_ttw = ttw;
       input_data[unique_id] = cycle;
     }
     srp_in.close();
@@ -46,8 +47,10 @@ int main(int argc, char** argv){
       } else {
 	int deltat = cycle-input_data[unique_id];
 	assert(deltat>0);
-	cout<<"TTW "<<255-ttw
-	    <<"\tdeltaT "<<deltat<<endl;
+	cout<<"Port "<<port
+	    <<"\tTTW "<<(input_ttw-ttw)*4
+	    <<"\tdeltaT "<<deltat
+	    <<"\tpassed "<<(deltat-(input_ttw-ttw)*4-4)<<endl;
 	input_data.erase(unique_id);
       }
     }
@@ -58,6 +61,7 @@ int main(int argc, char** argv){
 }
 
 int parseline(ifstream &file, int &cycle, int &ttw, int &pid, int &port){
-  file>>cycle>>ttw>>pid>>port;
+  double raw;
+  file>>cycle>>ttw>>pid>>port>>raw;
   return (pid<<5)+port;
 }

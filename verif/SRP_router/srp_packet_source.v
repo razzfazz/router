@@ -146,7 +146,7 @@ module srp_packet_source
    
    // width of flow control signals
    localparam flow_ctrl_width
-     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + num_vcs) :
        -1;
    
    // maximum payload length (in flits)
@@ -198,7 +198,7 @@ module srp_packet_source
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
        route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width + time_to_wait_width) : 
+       (route_info_width + payload_length_width + time_to_wait_width + dest_info_width) : 
        -1;
    
    // select order of dimension traversal
@@ -487,9 +487,12 @@ module srp_packet_source
    assign flit_data[header_info_width:flit_data_width-1]
      = data_q[header_info_width:flit_data_width-1];
 
-   //set TTW 
-   assign  header_info[(route_info_width+payload_length_width)+:time_to_wait_width]
-     ={time_to_wait_width{1'b1}};
+   //set TTW
+   assign  header_info[(route_info_width + payload_length_width + time_to_wait_width) +: dest_info_width]
+     =router_address;
+   assign  header_info[(route_info_width + payload_length_width)+:time_to_wait_width]
+     //={time_to_wait_width{1'b1}};
+     =8'b00011110;
    
 
    //routing computation
@@ -786,7 +789,7 @@ module srp_packet_source
       
       assign header_info[lar_info_width:
 			 route_info_width-1]
-	       = dest_info;
+		    = dest_info;
       
       if(max_payload_length > 0)
 	begin
@@ -798,8 +801,9 @@ module srp_packet_source
 	     begin
 		case(packet_length_mode)
 		  0:
-		    random_length_q <= $dist_uniform(seed, min_payload_length, 
-						     max_payload_length);
+		    random_length_q <= 1;
+//$dist_uniform(seed, min_payload_length, 
+		  //max_payload_length);
 		  1:
 		    random_length_q <= ($dist_uniform(seed, 0, 1) < 1) ? 
 				       min_payload_length : 
@@ -843,10 +847,9 @@ module srp_packet_source
 	     begin
 		wire [0:payload_length_width-1] payload_length;
 		assign payload_length = (flit_count_q - min_payload_length);
-		assign header_info[route_info_width:
-				   route_info_width+
-				   payload_length_width-1]
-			 = payload_length;
+		assign header_info[(route_info_width) +:
+				   payload_length_width]
+		  = payload_length;
 	     end
 	   
 	end

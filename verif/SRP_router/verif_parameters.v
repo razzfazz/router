@@ -4,11 +4,11 @@
 //fbfly 1.0X
 //kn    1.0X
 //ftree 0.75X
-parameter packet_rate   =9999;
-parameter extern_rate   =9999;
+parameter packet_rate   =25;
+parameter extern_rate   =25;
 
 
-parameter packet_ratio  = 9999;
+parameter packet_ratio  = 99;
 
 initial begin : main
  //  $dumpfile("router.vcd");

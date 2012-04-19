@@ -44,7 +44,7 @@ module testbench
    parameter max_packet_count = -1;
    
    // packet injection rate (percentage of cycles)
-   //   parameter packet_rate = 25;
+   //parameter packet_rate = 50;
    
    // flit consumption rate (percentage of cycles)
    parameter consume_rate = 100;
@@ -136,7 +136,7 @@ module testbench
    
    // width of flow control signals
    localparam flow_ctrl_width
-     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
+     = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + num_vcs) :
        -1;
    
    // width of flit control signals
@@ -168,7 +168,8 @@ module testbench
    localparam pid_width 	 
      = channel_width- 
        flit_ctrl_width - 
-       header_info_width - 
+       header_info_width -
+       dest_info_width-
        port_idx_width;
    
    
@@ -654,13 +655,14 @@ module testbench
 	       in_index       = srp_in_i*channel_width;
 	       in_port_index  = in_index+channel_width-port_idx_width;
 	       in_ttw_index   = in_index+flit_ctrl_width+route_info_width + payload_length_width ;	       
-	       in_pid_index   = in_ttw_index+time_to_wait_width;
-	       if(channel_in_ip[in_index] & channel_in_ip[in_index+3])
-		 $fdisplay(srp_in,"%d %d %d %d",
-			 cycles,
-			 channel_in_ip[in_ttw_index+:time_to_wait_width],
-			 channel_in_ip[in_pid_index+:pid_width],
-			 channel_in_ip[in_port_index+:port_idx_width ]);
+	       in_pid_index   = in_ttw_index+time_to_wait_width+dest_info_width;
+	       if(channel_in_ip[in_index] & channel_in_ip[in_index+3] & channel_in_ip[in_index+1]& channel_in_ip[in_index+2] )
+		 $fdisplay(srp_in,"%d %d %d %d %b",
+			   cycles,
+			   channel_in_ip[in_ttw_index+:time_to_wait_width],
+			   channel_in_ip[in_pid_index+:pid_width],
+			   channel_in_ip[in_port_index+:port_idx_width ],
+			   channel_in_ip[in_index+:flit_ctrl_width+header_info_width ]);
 	    end
        end
    always@(negedge clk)
@@ -671,13 +673,14 @@ module testbench
 	       out_index       = srp_out_i*channel_width;
 	       out_port_index  = out_index+channel_width-port_idx_width;
 	       out_ttw_index   = out_index+flit_ctrl_width+route_info_width + payload_length_width ;
-	       out_pid_index   = out_ttw_index+time_to_wait_width;
-	       if(channel_out_op[out_index] & channel_out_op[out_index+3])
-		 $fwrite(srp_out,"%d %d %d %d\n",
-			 cycles,
-			 channel_out_op[out_ttw_index+:time_to_wait_width],
-			 channel_out_op[out_pid_index+:pid_width],
-			 channel_out_op[out_port_index+:port_idx_width ]);
+	       out_pid_index   = out_ttw_index+time_to_wait_width+dest_info_width;
+	       if(channel_out_op[out_index] & channel_out_op[out_index+3]  & channel_out_op[out_index+1] & channel_out_op[out_index+2])
+		 $fdisplay(srp_out,"%d %d %d %d %b",
+			   cycles,
+			   channel_out_op[out_ttw_index+:time_to_wait_width],
+			   channel_out_op[out_pid_index+:pid_width],
+			   channel_out_op[out_port_index+:port_idx_width ],
+			   channel_out_op[out_index+:flit_ctrl_width+header_info_width]);
 	    end
        end
    
@@ -741,11 +744,12 @@ module testbench
 	run = 1'b0;
 
 	//stat print out
-	while((in_flits > out_flits) || (in_flits > in_creds))
+       	while((in_flits > out_flits) || (in_flits > in_creds))
 	  begin
 	     cycles = cycles + 1;
 	     #(Tclk);
 	  end
+	
 	#(Tclk*10);
 	$display("simulation ended after %d cycles", cycles);      
 	$display("%d flits received, %d flits sent", in_flits, out_flits);
