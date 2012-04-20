@@ -2,12 +2,13 @@
 localparam lar_start 	       = 0;
 localparam dest_start 	       = lar_start+lar_info_width;
 localparam packet_len_start    = dest_start+dest_info_width;
-localparam default_end = packet_len_start + payload_length_width;
+localparam default_end 	       = packet_len_start + payload_length_width;
 
 localparam nonspec_data_start  = default_end;
 
 localparam spec_src_start      = default_end;
-localparam spec_ttw_start      = spec_src_start + dest_info_width
+localparam spec_ttw_start      = spec_src_start + dest_info_width;
+
 localparam spec_id_start       = spec_ttw_start+time_to_wait_width;
 localparam spec_data_start     = spec_id_start+ spec_buffer_width;
 

@@ -321,14 +321,13 @@ module flow_buffer(/*autoarg*/
    wire [0:flit_data_width-1] reservation_packet_s;
    wire [0:flit_data_width-1] reservation_packet_q;
    wire [0:payload_length_width-1] reservation_payload_size = {payload_length_width{1'b0}};
-   assign reservation_packet_s[0:res_size_start-1] ={message_lar,
-						     message_dest_s,
-						     reservation_payload_size,
-						      2'b00};
+   assign reservation_packet_s[0:res_src_start-1] ={message_lar,
+						    message_dest_s,
+						    reservation_payload_size};
    assign reservation_packet_s[res_size_start+:reservation_size_width] 
      = message_ready? //reservation-size
        message_size:
-       reservation_packet_q[(header_info_width+2)+:reservation_size_width];
+       reservation_packet_q[res_size_start+:reservation_size_width];
    assign reservation_packet_s[res_src_start+:dest_info_width] = source_address; //source address
    assign reservation_packet_s[res_data_start:flit_data_width-1]
      ='b0;
@@ -544,9 +543,8 @@ module flow_buffer(/*autoarg*/
 		message_lar,
 		message_dest_s,
 		spec_payload_size,
-		2'b00,
-		{time_to_wait_width{1'b1}},
 		source_address,
+		{time_to_wait_width{1'b1}},
 		current_spec_buffer}),
       .data_out(spec_packet[0+:spec_data_start]));
  
@@ -628,11 +626,10 @@ module flow_buffer(/*autoarg*/
 		message_lar,
 		message_dest_s,
 		nonspec_payload_size,
-		2'b00,
 		host_data[nonspec_data_start:flit_data_width-1],
 		host_data_head,
 		host_data_tail,
-		//retran
+		//retran, this may need to be remarked, because it is structured as a spec
 		spec_buffer_pop_data, 
 		|(spec_buffer_full & retran_spec_buffer_decode),
 		|(spec_buffer_almost_empty & retran_spec_buffer_decode)

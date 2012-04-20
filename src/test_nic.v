@@ -476,7 +476,7 @@ module test_nic(/*autoarg*/
    assign ack_packet_in[0:ack_data_start-1] = {ack_route_port,
 					       speculative_src,
 					       ack_payload_size,
-					       2'b10,
+					       2'b01,
 					       speculative_id};
    assign ack_packet_in[ack_data_start:flit_data_width-1] = 'b0;//filler
 
