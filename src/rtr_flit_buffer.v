@@ -230,7 +230,7 @@ module rtr_flit_buffer
 			    c_decode
 			      #(.num_ports(buffer_size_per_vc),
 				.offset((ivc * buffer_size_per_vc) %
-					(1 << clogb(buffer_size_per_vc))))
+					(1 << vc_addr_width)))
 			    push_mask_dec
 			      (.data_in(push_vc_addr),
 			       .data_out(push_mask));
@@ -271,7 +271,7 @@ module rtr_flit_buffer
 			    c_decode
 			      #(.num_ports(buffer_size_per_vc),
 				.offset((ivc * buffer_size_per_vc) % 
-					(1 << clogb(buffer_size_per_vc))))
+					(1 << vc_addr_width)))
 			    pop_mask_dec
 			      (.data_in(pop_vc_addr),
 			       .data_out(pop_mask));
