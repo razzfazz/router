@@ -42,10 +42,10 @@ module vcr_vc_alloc_sep_if
    parameter num_message_classes = 2;
    
    // number of resource classes (e.g. minimal, adaptive)
-   parameter num_resource_classes = 2;
+   parameter num_resource_classes = 1;
    
    // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   localparam num_packet_classes = num_message_classes;
    
    // number of VCs per class
    parameter num_vcs_per_class = 1;
@@ -68,7 +68,7 @@ module vcr_vc_alloc_sep_if
    input [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op;
    
    // select next resource class
-   input [0:num_ports*num_vcs*num_resource_classes-1] route_ip_ivc_orc;
+   input [0:num_ports*num_vcs-1] route_ip_ivc_orc;
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    input [0:num_ports*num_vcs-1] 		      elig_op_ovc;
@@ -108,15 +108,12 @@ module vcr_vc_alloc_sep_if
 	   // global wires
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
-		 num_ports*num_resource_classes*
-		 num_vcs_per_class-1] req_out_ip_irc_icvc_op_orc_ocvc;
-	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
-		 num_ports*num_resource_classes*
-		 num_vcs_per_class-1] gnt_out_ip_irc_icvc_op_orc_ocvc;
+	   wire [0:num_ports*num_vcs_per_class*
+		 num_ports*num_vcs_per_class-1] req_out_ip_irc_icvc_op_orc_ocvc;
+	   wire [0:num_ports*num_vcs_per_class*
+		 num_ports*num_vcs_per_class-1] gnt_out_ip_irc_icvc_op_orc_ocvc;
 	   
-	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*
-		 num_ports*num_resource_classes*
+	   wire [0:num_ports*num_vcs_per_class*num_ports*
 		 num_vcs_per_class-1] active_ip_irc_icvc_op_orc_ocvc;
 	   
 	   
@@ -129,23 +126,14 @@ module vcr_vc_alloc_sep_if
 	   for(ip = 0; ip < num_ports; ip = ip + 1)
 	     begin:ips
 		
-		wire [0:num_resource_classes*num_vcs_per_class-1] req_irc_icvc;
+		wire [0:num_vcs_per_class-1] req_irc_icvc;
 		assign req_irc_icvc = req_ip_ivc[(ip*num_message_classes+mc)*
-						 num_resource_classes*
 						 num_vcs_per_class:
-						 (ip*num_message_classes+mc+1)*
-						 num_resource_classes*
-						 num_vcs_per_class-1];
+						 (ip*num_message_classes+mc+1)*num_vcs_per_class-1];
 		
 		wire 						  active;
 		assign active = |req_irc_icvc;
-		
-		genvar 						  irc;
-		
-		for(irc = 0; irc < num_resource_classes; irc = irc + 1)
-		  begin:ircs
-		     
-		     genvar icvc;
+		genvar icvc;
 		     
 		     for(icvc = 0; icvc < num_vcs_per_class; icvc = icvc + 1)
 		       begin:icvcs
@@ -156,29 +144,16 @@ module vcr_vc_alloc_sep_if
 			  
 			  wire [0:num_ports-1] route_op;
 			  assign route_op
-			    = route_ip_ivc_op[(((ip*num_message_classes+mc)*
-						num_resource_classes+irc)*
+			    = route_ip_ivc_op[(((ip*num_message_classes+mc))*
 					       num_vcs_per_class+icvc)*
 					      num_ports:
-					      (((ip*num_message_classes+mc)*
-						num_resource_classes+irc)*
+					      (((ip*num_message_classes+mc))*
 					       num_vcs_per_class+icvc+1)*
 					      num_ports-1];
 			  
-			  wire [0:num_resource_classes-1] route_orc;
+			  wire route_orc;
 			  
-			  if(irc == (num_resource_classes - 1))
-			    assign route_orc = 'd1;
-			  else
-			    assign route_orc
-			      = route_ip_ivc_orc[(((ip*num_message_classes+mc)*
-						   num_resource_classes+irc)*
-						  num_vcs_per_class+icvc)*
-						 num_resource_classes:
-						 (((ip*num_message_classes+mc)*
-						   num_resource_classes+irc)*
-						  num_vcs_per_class+icvc+1)*
-						 num_resource_classes-1];
+			  assign route_orc = 'd1;
 			  
 			  wire [0:num_vcs-1]   elig_ovc;
 			  c_select_1ofn
@@ -189,30 +164,20 @@ module vcr_vc_alloc_sep_if
 			     .data_in(elig_op_ovc),
 			     .data_out(elig_ovc));
 			  
-			  wire [0:num_resource_classes*
-				num_vcs_per_class-1] elig_orc_ocvc;
-			  assign elig_orc_ocvc = elig_ovc[mc*
-							  num_resource_classes*
-							  num_vcs_per_class:
-							  (mc+1)* 
-							  num_resource_classes*
-							  num_vcs_per_class-1];
+			  wire [0:num_vcs_per_class-1] elig_orc_ocvc;
+			  assign elig_orc_ocvc = elig_ovc[mc*num_vcs_per_class:
+							  (mc+1)*num_vcs_per_class-1];
 			  
 			  wire 			     req;
-			  assign req = req_irc_icvc[irc*num_vcs_per_class+icvc];
+			  assign req = req_irc_icvc[icvc];
 			  
-			  wire [0:num_ports*num_resource_classes*
-				num_vcs_per_class-1] gnt_out_op_orc_ocvc;
+			  wire [0:num_ports*num_vcs_per_class-1] gnt_out_op_orc_ocvc;
 			  assign gnt_out_op_orc_ocvc
 			    = gnt_out_ip_irc_icvc_op_orc_ocvc
-			      [((ip*num_resource_classes+irc)*
-				num_vcs_per_class+icvc)*
-			       num_ports*num_resource_classes*
-			       num_vcs_per_class:
-			       ((ip*num_resource_classes+irc)*
-				num_vcs_per_class+icvc+1)*
-			       num_ports*num_resource_classes*
-			       num_vcs_per_class-1];
+			      [(ip*num_vcs_per_class+icvc)*
+			       num_ports*num_vcs_per_class:
+			       (ip*num_vcs_per_class+icvc+1)*
+			       num_ports*num_vcs_per_class-1];
 			  
 			  // NOTE: Logically, what we want to do here is select 
 			  // the subvector that corresponds to the current input
@@ -220,37 +185,27 @@ module vcr_vc_alloc_sep_if
 			  // subvectors for all other ports will never have any 
 			  // grants anyway, we can just OR all the subvectors
 			  // instead of using a proper MUX.
-			  wire [0:num_resource_classes*
-				num_vcs_per_class-1] gnt_out_orc_ocvc;
+			  wire [0:num_vcs_per_class-1] gnt_out_orc_ocvc;
 			  c_binary_op
 			    #(.num_ports(num_ports),
-			      .width(num_resource_classes*num_vcs_per_class),
+			      .width(num_vcs_per_class),
 			      .op(`BINARY_OP_OR))
 			  gnt_out_orc_ocvc_or
 			    (.data_in(gnt_out_op_orc_ocvc),
 			     .data_out(gnt_out_orc_ocvc));
 			  
-			  wire [0:num_resource_classes*
-				num_vcs_per_class-1] req_unqual_orc_ocvc;
-			  wire [0:num_resource_classes*
-				num_vcs_per_class-1] gnt_in_orc_ocvc;
-			  
-			  genvar 		     orc;
-			  
-			  for(orc = 0; orc < num_resource_classes; 
-			      orc = orc + 1)
-			    begin:orcs
+			  wire [0:num_vcs_per_class-1] req_unqual_orc_ocvc;
+			  wire [0:num_vcs_per_class-1] gnt_in_orc_ocvc;
 			       
 			       wire [0:num_vcs_per_class-1] req_unqual_ocvc;
 			       wire [0:num_vcs_per_class-1] gnt_in_ocvc;
 			       
 			       wire [0:num_vcs_per_class-1] elig_ocvc;
 			       assign elig_ocvc
-				 = elig_orc_ocvc[orc*num_vcs_per_class:
-						 (orc+1)*num_vcs_per_class-1];
+				 = elig_orc_ocvc[0:num_vcs_per_class-1];
 			       
 			       wire 			    route;
-			       assign route = route_orc[orc];
+			       assign route = route_orc;
 			       
 			       // Perform input-side arbitration regardless
 			       // of whether there was a request; instead, 
@@ -266,10 +221,7 @@ module vcr_vc_alloc_sep_if
 			       
  			       wire [0:num_vcs_per_class-1] gnt_out_ocvc;
 			       assign gnt_out_ocvc
-				 = gnt_out_orc_ocvc[orc*
-						    num_vcs_per_class:
-						    (orc+1)*
-						    num_vcs_per_class-1];
+				 = gnt_out_orc_ocvc[0:num_vcs_per_class-1];
 			       
 			       wire 			    update_arb;
 			       assign update_arb = |gnt_out_ocvc;
@@ -286,29 +238,17 @@ module vcr_vc_alloc_sep_if
 				  .req(req_in_ocvc),
 				  .gnt(gnt_in_ocvc));
 			       
-			       assign req_unqual_orc_ocvc[orc*
-							  num_vcs_per_class:
-							  (orc+1)*
-							  num_vcs_per_class-1]
-				 = req_unqual_ocvc;
+			       assign req_unqual_orc_ocvc = req_unqual_ocvc;
 			       
-			       assign gnt_in_orc_ocvc[orc*
-						      num_vcs_per_class:
-						      (orc+1)*
-						      num_vcs_per_class-1]
-				 = gnt_in_ocvc;
-			       
-			    end
-			  
-			  
+			       assign gnt_in_orc_ocvc = gnt_in_ocvc;
+
 			  //----------------------------------------------------
 			  // generate requests for output stage
 			  //----------------------------------------------------
 			  
-			  wire [0:num_ports*num_resource_classes*
-				num_vcs_per_class-1] active_op_orc_ocvc;
+			  wire [0:num_ports*num_vcs_per_class-1] active_op_orc_ocvc;
 			  
-			  wire [0:num_ports*num_resource_classes*
+			  wire [0:num_ports*
 				num_vcs_per_class-1] req_out_op_orc_ocvc;
 			  
 			  genvar 		     op;
@@ -319,62 +259,51 @@ module vcr_vc_alloc_sep_if
 			       wire route;
 			       assign route = route_op[op];
 			       
-			       wire [0:num_resource_classes*
-				     num_vcs_per_class-1] active_orc_ocvc;
+			       wire [0:num_vcs_per_class-1] active_orc_ocvc;
 			       assign active_orc_ocvc
-				 = {(num_resource_classes*num_vcs_per_class)
+				 = {(num_vcs_per_class)
 				    {req & route}} & req_unqual_orc_ocvc;
 			       
 			       assign active_op_orc_ocvc
-				 [op*num_resource_classes*
-				  num_vcs_per_class:
-				  (op+1)*num_resource_classes*
+				 [op*num_vcs_per_class:
+				  (op+1)*
 				  num_vcs_per_class-1]
 				 = active_orc_ocvc;
 			       
 			       wire [0:num_vcs-1] 	  active_ovc;
 			       c_align
-				 #(.in_width(num_resource_classes*
-					     num_vcs_per_class),
+				 #(.in_width(num_vcs_per_class),
 				   .out_width(num_vcs),
-				   .offset(mc*num_resource_classes*
-					   num_vcs_per_class))
+				   .offset(mc*num_vcs_per_class))
 			       active_ovc_agn
 				 (.data_in(active_orc_ocvc),
 				  .dest_in({num_vcs{1'b0}}),
 				  .data_out(active_ovc));
 			       
 			       assign req_out_op_orc_ocvc
-				 [op*num_resource_classes*
-				  num_vcs_per_class:
-				  (op+1)*num_resource_classes*
-				  num_vcs_per_class-1]
-				 = {(num_resource_classes*
-				     num_vcs_per_class){req & route}} & 
+				 [op*num_vcs_per_class:
+				  (op+1)*num_vcs_per_class-1]
+				 = {(num_vcs_per_class){req & route}} & 
 				   gnt_in_orc_ocvc;
 			       
 			    end
 			  
 			  assign active_ip_irc_icvc_op_orc_ocvc
-			    [((ip*num_resource_classes+irc)*
+			    [((ip)*
 			      num_vcs_per_class+icvc)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class:
-			     ((ip*num_resource_classes+irc)*
+			     num_ports*num_vcs_per_class:
+			     ((ip)*
 			      num_vcs_per_class+icvc+1)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class-1]
+			     num_ports*num_vcs_per_class-1]
 			    = active_op_orc_ocvc;
 			  
 			  assign req_out_ip_irc_icvc_op_orc_ocvc
-			    [((ip*num_resource_classes+irc)*
+			    [((ip)*
 			      num_vcs_per_class+icvc)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class:
-			     ((ip*num_resource_classes+irc)*
+			     num_ports*num_vcs_per_class:
+			     ((ip)*
 			      num_vcs_per_class+icvc+1)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class-1]
+			     num_ports*num_vcs_per_class-1]
 			    = req_out_op_orc_ocvc;
 			  
 			  
@@ -384,39 +313,34 @@ module vcr_vc_alloc_sep_if
 			  
 			  wire [0:num_vcs_per_class-1] 	  gnt_out_ocvc;
 			  c_binary_op
-			    #(.num_ports(num_resource_classes),
+			    #(.num_ports(),
 			      .width(num_vcs_per_class),
 			      .op(`BINARY_OP_OR))
 			  gnt_out_ocvc_or
 			    (.data_in(gnt_out_orc_ocvc),
 			     .data_out(gnt_out_ocvc));
 			  
-			  assign gnt_ip_ivc_ocvc[(((ip*num_message_classes+mc)*
-						   num_resource_classes+irc)*
+			  assign gnt_ip_ivc_ocvc[(((ip*num_message_classes+mc))*
 						  num_vcs_per_class+icvc)*
 						 num_vcs_per_class:
-						 (((ip*num_message_classes+mc)*
-						   num_resource_classes+irc)*
+						 (((ip*num_message_classes+mc))*
 						  num_vcs_per_class+icvc+1)*
 						 num_vcs_per_class-1]
 			    = gnt_out_ocvc;
 			  
-			  assign gnt_ip_ivc[((ip*num_message_classes+mc)*
-					     num_resource_classes+irc)*
+			  assign gnt_ip_ivc[((ip*num_message_classes+mc))*
 					    num_vcs_per_class+icvc]
 			    = |gnt_out_ocvc;
 			  
 		       end
 		     
-		  end
-		
-	     end
+				end
+
 	   
-	   wire [0:num_ports*num_resource_classes*
-		 num_vcs_per_class-1] active_op_orc_ocvc;
+	   wire [0:num_ports*num_vcs_per_class-1] active_op_orc_ocvc;
 	   c_binary_op
-	     #(.width(num_ports*num_resource_classes*num_vcs_per_class),
-	       .num_ports(num_ports*num_resource_classes*num_vcs_per_class),
+	     #(.width(num_ports*num_vcs_per_class),
+	       .num_ports(num_ports*num_vcs_per_class),
 	       .op(`BINARY_OP_OR))
 	   active_op_orc_ocvc_or
 	     (.data_in(active_ip_irc_icvc_op_orc_ocvc),
@@ -427,24 +351,22 @@ module vcr_vc_alloc_sep_if
 	   // bit shuffling for changing sort order
 	   //-------------------------------------------------------------------
 	   
-	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*num_ports*
-		 num_resource_classes*
+	   wire [0:num_ports*num_vcs_per_class*num_ports*
 		 num_vcs_per_class-1] req_out_op_orc_ocvc_ip_irc_icvc;
 	   c_interleave
-	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
-		      num_ports*num_resource_classes*num_vcs_per_class),
-	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
+	     #(.width(num_ports*num_vcs_per_class*
+		      num_ports*num_vcs_per_class),
+	       .num_blocks(num_ports*num_vcs_per_class))
 	   req_out_op_orc_ocvc_ip_irc_icvc_intl
 	     (.data_in(req_out_ip_irc_icvc_op_orc_ocvc),
 	      .data_out(req_out_op_orc_ocvc_ip_irc_icvc));
 	   
-	   wire [0:num_ports*num_resource_classes*num_vcs_per_class*num_ports*
-		 num_resource_classes*
+	   wire [0:num_ports*num_vcs_per_class*num_ports*
 		 num_vcs_per_class-1] gnt_out_op_orc_ocvc_ip_irc_icvc;
 	   c_interleave
-	     #(.width(num_ports*num_resource_classes*num_vcs_per_class*
-		      num_ports*num_resource_classes*num_vcs_per_class),
-	       .num_blocks(num_ports*num_resource_classes*num_vcs_per_class))
+	     #(.width(num_ports*num_vcs_per_class*
+		      num_ports*num_vcs_per_class),
+	       .num_blocks(num_ports*num_vcs_per_class))
 	   gnt_out_op_orc_ocvc_ip_irc_iocvc_intl
 	     (.data_in(gnt_out_op_orc_ocvc_ip_irc_icvc),
 	      .data_out(gnt_out_ip_irc_icvc_op_orc_ocvc));
@@ -459,62 +381,49 @@ module vcr_vc_alloc_sep_if
 	   for (op = 0; op < num_ports; op = op + 1)
 	     begin:ops
 		
-		genvar orc;
-		
-		for(orc = 0; orc < num_resource_classes; orc = orc + 1)
-		  begin:orcs
-		     
-		     genvar ocvc;
-		     
-		     for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
-		       begin:ocvcs
-			  
+
+			 genvar ocvc;
+			 
+			 for(ocvc = 0; ocvc < num_vcs_per_class; ocvc = ocvc + 1)
+				 begin:ocvcs
+			
 			  //----------------------------------------------------
 			  // output-side arbitration (select input port and VC)
 			  //----------------------------------------------------
 			  
 			  wire elig;
 			  assign elig = elig_op_ovc[((op*num_message_classes+
-						      mc)*
-						     num_resource_classes+orc)*
+						      mc))*
 						    num_vcs_per_class+ocvc];
 			  
 			  wire active;
 			  assign active
-			    = active_op_orc_ocvc[(op*num_resource_classes+
-						  orc)*num_vcs_per_class+
+			    = active_op_orc_ocvc[op*num_vcs_per_class+
 						 ocvc];
 			  
-			  wire [0:num_ports*num_resource_classes*
-				num_vcs_per_class-1] req_out_ip_irc_icvc;
+			  wire [0:num_ports*num_vcs_per_class-1] req_out_ip_irc_icvc;
 			  assign req_out_ip_irc_icvc
 			    = req_out_op_orc_ocvc_ip_irc_icvc
-			      [((op*num_resource_classes+orc)*
+			      [(op*
 				num_vcs_per_class+ocvc)*
-			       num_ports*num_resource_classes*
-			       num_vcs_per_class:
-			       ((op*num_resource_classes+orc)*
-				num_vcs_per_class+ocvc+1)*
-			       num_ports*num_resource_classes*
-			       num_vcs_per_class-1];
+			       num_ports*num_vcs_per_class:
+			       (op*num_vcs_per_class+ocvc+1)*
+			       num_ports*num_vcs_per_class-1];
 			  
 			  wire [0:num_ports-1] 	     req_out_ip;
 			  c_mat_mult
 			    #(.dim1_width(num_ports),
-			      .dim2_width(num_resource_classes*
-					  num_vcs_per_class),
+			      .dim2_width(num_vcs_per_class),
 			      .dim3_width(1),
 			      .prod_op(`BINARY_OP_AND),
 			      .sum_op(`BINARY_OP_OR))
 			  req_out_ip_mmult
 			    (.input_a(req_out_ip_irc_icvc),
-			     .input_b({(num_resource_classes*
-					num_vcs_per_class){1'b1}}),
+			     .input_b({(num_vcs_per_class){1'b1}}),
 			     .result(req_out_ip));
 			  
 			  wire [0:num_ports-1] 	     gnt_out_ip;
-			  wire [0:num_ports*num_resource_classes*
-				num_vcs_per_class-1] gnt_out_ip_irc_icvc;
+			  wire [0:num_ports*num_vcs_per_class-1] gnt_out_ip_irc_icvc;
 			  
 			  wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
 			  
@@ -528,24 +437,17 @@ module vcr_vc_alloc_sep_if
 			  for(ip = 0; ip < num_ports; ip = ip + 1)
 			    begin:ips
 			       
-			       wire [0:num_resource_classes*
-				     num_vcs_per_class-1] req_out_irc_icvc;
+			       wire [0:num_vcs_per_class-1] req_out_irc_icvc;
 			       assign req_out_irc_icvc
-				 = req_out_ip_irc_icvc[ip*
-						       num_resource_classes*
-						       num_vcs_per_class:
-						       (ip+1)*
-						       num_resource_classes*
-						       num_vcs_per_class-1];
+				 = req_out_ip_irc_icvc[ip*num_vcs_per_class:
+						       (ip+1)*num_vcs_per_class-1];
 			       
 			       wire 			  update_arb;
 			       assign update_arb = gnt_out_ip[ip];
 			       
-			       wire [0:num_resource_classes*
-				     num_vcs_per_class-1] gnt_out_irc_icvc;
+			       wire [0:num_vcs_per_class-1] gnt_out_irc_icvc;
 			       c_arbiter
-				 #(.num_ports(num_resource_classes*
-					      num_vcs_per_class),
+				 #(.num_ports(num_vcs_per_class),
 				   .arbiter_type(arbiter_type),
 				   .reset_type(reset_type))
 			       gnt_our_irc_icvc_arb
@@ -556,23 +458,16 @@ module vcr_vc_alloc_sep_if
 				  .req(req_out_irc_icvc),
 				  .gnt(gnt_out_irc_icvc));
 			       
-			       assign gnt_out_ip_irc_icvc[ip*
-							  num_resource_classes*
-							  num_vcs_per_class:
-							  (ip+1)*
-							  num_resource_classes*
-							  num_vcs_per_class-1]
+			       assign gnt_out_ip_irc_icvc[ip*num_vcs_per_class:
+							  (ip+1)*num_vcs_per_class-1]
 				 = gnt_out_irc_icvc & 
-				   {(num_resource_classes*
-				     num_vcs_per_class){gnt_out_ip[ip]}};
+				   {(num_vcs_per_class){gnt_out_ip[ip]}};
 			       
 			       wire [0:num_vcs-1] 	  gnt_out_ivc;
 			       c_align
-				 #(.in_width(num_resource_classes*
-					     num_vcs_per_class),
+				 #(.in_width(num_vcs_per_class),
 				   .out_width(num_vcs),
-				   .offset(mc*num_resource_classes*
-					   num_vcs_per_class))
+				   .offset(mc*num_vcs_per_class))
 			       gnt_out_ivc_alg
 				 (.data_in(gnt_out_irc_icvc),
 				  .dest_in({num_vcs{1'b0}}),
@@ -611,14 +506,10 @@ module vcr_vc_alloc_sep_if
 			     .gnt(gnt_out_ip));
 			  
 			  assign gnt_out_op_orc_ocvc_ip_irc_icvc
-			    [((op*num_resource_classes+orc)*
-			      num_vcs_per_class+ocvc)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class:
-			     ((op*num_resource_classes+orc)*
-			      num_vcs_per_class+ocvc+1)*
-			     num_ports*num_resource_classes*
-			     num_vcs_per_class-1]
+			    [(op*num_vcs_per_class+ocvc)*
+			     num_ports*num_vcs_per_class:
+			     (op*num_vcs_per_class+ocvc+1)*
+			     num_ports*num_vcs_per_class-1]
 			    = gnt_out_ip_irc_icvc;
 			  
 			  
@@ -626,27 +517,22 @@ module vcr_vc_alloc_sep_if
 			  // generate control signals to output controller
 			  //----------------------------------------------------
 			  
-			  assign gnt_op_ovc[((op*num_message_classes+mc)*
-					     num_resource_classes+orc)*
+			  assign gnt_op_ovc[(op*num_message_classes+mc)*
 					    num_vcs_per_class+ocvc]
 			    = req_out;
 			  
-			  assign gnt_op_ovc_ip[(((op*num_message_classes+mc)*
-						 num_resource_classes+orc)*
+			  assign gnt_op_ovc_ip[((op*num_message_classes+mc)*
 						num_vcs_per_class+ocvc)*
 					       num_ports:
-					       (((op*num_message_classes+mc)*
-						 num_resource_classes+orc)*
+					       ((op*num_message_classes+mc)*
 						num_vcs_per_class+ocvc+1)*
 					       num_ports-1]
 			    = gnt_out_ip;
 			  
-			  assign gnt_op_ovc_ivc[(((op*num_message_classes+mc)*
-						  num_resource_classes+orc)*
+			  assign gnt_op_ovc_ivc[((op*num_message_classes+mc)*
 						 num_vcs_per_class+ocvc)*
 						num_vcs:
-						(((op*num_message_classes+mc)*
-						  num_resource_classes+orc)*
+						(((op*num_message_classes+mc))*
 						 num_vcs_per_class+ocvc+1)*
 						num_vcs-1]
 			    = gnt_ivc;
@@ -655,7 +541,6 @@ module vcr_vc_alloc_sep_if
 		     
 		  end
 		
-	     end
 	   
 	end
       

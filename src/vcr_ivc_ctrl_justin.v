@@ -1,4 +1,4 @@
-
+0
 // $Id: vcr_ivc_ctrl.v 4280 2012-02-01 20:13:42Z dub $
 
 /*
@@ -861,7 +861,7 @@ module vcr_ivc_ctrl_justin
    wire [0:port_idx_width-1] 			     route_port_in;
    assign route_port_in = lar_info_in[0:port_idx_width-1];
 
-   // TODO: change route_port_in based on whether or not the header is valid
+   // TODO: change route_port_in based on whether or not the header is expired
 
 
 
@@ -871,7 +871,7 @@ module vcr_ivc_ctrl_justin
    c_decode
      #(.num_ports(num_ports))
    route_in_op_dec
-     (.data_in(route_port_in),
+     (.data_in(header_expired ? port_id : route_port_in),
       .data_out(route_in_op));
    
    wire [0:port_idx_width-1] 			     hdr_route_port;
@@ -1479,6 +1479,9 @@ module vcr_ivc_ctrl_justin
    //assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
    
    assign time_to_wait_out = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
+
+   // TODO: header is only expired if vc_allocated_s is NOT high and ttw is 0, we need to keep
+   // it at 0 (no overflow)
    
    assign header_expired = (header_expired_q | (time_diff > time_to_wait_in)) & flit_head_valid;
    
