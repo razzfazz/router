@@ -311,7 +311,6 @@ module vcr_vc_alloc_sep_if
 			  // generate global grants
 			  //----------------------------------------------------
 			  
-			  wire [0:num_vcs_per_class-1] 	  gnt_out_ocvc;
 			  c_binary_op
 			    #(.num_ports(),
 			      .width(num_vcs_per_class),

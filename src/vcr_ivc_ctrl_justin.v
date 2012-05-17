@@ -1,4 +1,3 @@
-0
 // $Id: vcr_ivc_ctrl.v 4280 2012-02-01 20:13:42Z dub $
 
 /*
@@ -332,6 +331,8 @@ module vcr_ivc_ctrl_justin
    
    wire [0:time_to_wait_width-1] time_to_wait_in;
    wire [0:time_to_wait_width-1] time_to_wait_out;
+   wire 			 header_expired;
+   
    
    
    
@@ -970,7 +971,7 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    
 
-   wire 				       header_expired;
+ 
    
    wire [0:dest_info_width-1] 		       dest_info, valid_dest_info;
   
