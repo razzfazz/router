@@ -1049,7 +1049,15 @@ module rtr_alloc_mac
 			   .d(mask_ivc_s),
 			   .q(mask_ivc_q));
 			
-			assign mask_ivc = mask_ivc_q - 1'b1;
+			wire [0:num_vcs-1] mask_shifted_ivc;
+			assign mask_shifted_ivc
+			  = {1'b0, mask_ivc_q[0:num_vcs-2]};
+			
+			c_one_hot_therm_conv
+			  #(.num_ports(num_vcs))
+			mask_ivc_tconv
+			  (.data_in(mask_shifted_ivc),
+			   .data_out(mask_ivc));
 			
 			assign update
 			  = oal_flit_sent | 
@@ -1398,7 +1406,14 @@ module rtr_alloc_mac
 		      .d(mask_ip_s),
 		      .q(mask_ip_q));
 		   
-		   assign mask_ip = mask_ip_q - 1'b1;
+		   wire [0:num_ports-1] mask_shifted_ip;
+		   assign mask_shifted_ip = {1'b0, mask_ip_q[0:num_ports-2]};
+		   
+		   c_one_hot_therm_conv
+		     #(.num_ports(num_ports))
+		   mask_ip_tconv
+		     (.data_in(mask_shifted_ip),
+		      .data_out(mask_ip));
 		   
 		   wire [0:num_ports-1] req_ip;
 		   assign req_ip = req_hi_ip | req_lo_ip;

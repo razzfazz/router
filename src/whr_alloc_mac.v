@@ -190,7 +190,14 @@ module whr_alloc_mac
 		   .d(mask_ip_s),
 		   .q(mask_ip_q));
 		
-		assign mask_ip = mask_ip_q - 1'b1;
+		wire [0:num_ports-1] mask_shifted_ip;
+		assign mask_shifted_ip = {1'b0, mask_ip_q[0:num_ports-2]};
+		
+		c_one_hot_therm_conv
+		  #(.num_ports(num_ports))
+		mask_ip_tconv
+		  (.data_in(mask_shifted_ip),
+		   .data_out(mask_ip));
 		
 		wire [0:num_ports-1] gnt_presel_ip;
 		assign gnt_presel_ip = arb_req_ip & mask_ip_q;
