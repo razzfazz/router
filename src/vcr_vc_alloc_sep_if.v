@@ -58,7 +58,7 @@ module vcr_vc_alloc_sep_if
    parameter num_ports = 5;
    
    // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    

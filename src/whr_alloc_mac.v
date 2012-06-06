@@ -42,7 +42,7 @@ module whr_alloc_mac
    parameter precomp_ip_sel = 1;
    
    // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    parameter reset_type = `RESET_TYPE_ASYNC;
    

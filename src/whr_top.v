@@ -158,7 +158,7 @@ module whr_top
    parameter precomp_ip_sel = 1;
    
    // select which arbiter type to use for switch allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    // select implementation variant for control crossbar
    parameter crossbar_type = `CROSSBAR_TYPE_MUX;

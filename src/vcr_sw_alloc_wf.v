@@ -47,7 +47,7 @@ module vcr_sw_alloc_wf
    parameter wf_alloc_type = `WF_ALLOC_TYPE_REP;
    
    // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    // select speculation type
    parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;

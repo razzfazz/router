@@ -44,7 +44,7 @@ module vcr_sw_alloc_sep_if
    parameter num_ports = 5;
    
    // select which arbiter type to use in allocator
-   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    // select speculation type
    parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;

@@ -66,13 +66,13 @@ module vcr_alloc_mac
    parameter vc_allocator_type = `SW_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use in VC allocator
-   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    // select implementation variant for VC switch allocator
    parameter sw_allocator_type = `VC_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use in switch allocator
-   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter sw_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN_BINARY;
    
    // select speculation type
    parameter spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
