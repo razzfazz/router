@@ -29,7 +29,7 @@
 // VC allocator variant using separable input-first allocation
 //==============================================================================
 
-module vcr_vc_alloc_sep_if
+module vcr_vc_alloc_SRP
   (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
    gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
    
@@ -311,9 +311,8 @@ module vcr_vc_alloc_sep_if
 			  // generate global grants
 			  //----------------------------------------------------
 			  
-			  wire [0:num_vcs_per_class-1] 	  gnt_out_ocvc;
 			  c_binary_op
-			    #(.num_ports(),
+			    #(.num_ports(1),
 			      .width(num_vcs_per_class),
 			      .op(`BINARY_OP_OR))
 			  gnt_out_ocvc_or
