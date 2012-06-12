@@ -1021,8 +1021,7 @@ module rtr_alloc_mac
 					flit_valid_in_ivc & mask_ivc, 
 					flit_valid_in_ivc}),
 			   .data_out_pr(),
-			   .data_out(mgnt_ivc),
-			   .mask_out());
+			   .data_out(mgnt_ivc));
 			
 			wire [0:num_vcs-1] flit_sent_ivc;
 			assign flit_sent_ivc = {num_vcs{oal_flit_sent}} & 
@@ -1389,8 +1388,7 @@ module rtr_alloc_mac
 				   req_lo_ip & mask_ip, 
 				   req_lo_ip}),
 		      .data_out_pr(),
-		      .data_out(mgnt_ip),
-		      .mask_out());
+		      .data_out(mgnt_ip));
 		   
 		   wire 		update;
 		   

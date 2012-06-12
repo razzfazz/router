@@ -172,8 +172,7 @@ module whr_alloc_mac
 		olod
 		  (.data_in_pr({arb_req_ip & mask_ip, arb_req_ip}),
 		   .data_out_pr(),
-		   .data_out(mgnt_ip),
-		   .mask_out());
+		   .data_out(mgnt_ip));
 		
 		wire 		     update;
 		assign update = |arb_req_ip;
