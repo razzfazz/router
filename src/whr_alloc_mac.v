@@ -163,16 +163,15 @@ module whr_alloc_mac
 	   if(precomp_ip_sel)
 	     begin
 		
-		wire [0:num_ports-1] mask_ip;
+		wire [0:num_ports-1] prio_ip;
 		
 		wire [0:num_ports-1] mgnt_ip;
-		c_lod
-		  #(.width(num_ports),
-		    .num_priorities(2))
-		olod
-		  (.data_in_pr({arb_req_ip & mask_ip, arb_req_ip}),
-		   .data_out_pr(),
-		   .data_out(mgnt_ip));
+		c_prefix_arbiter_base
+		  #(.num_ports(num_ports))
+		opab
+		  (.prio_port(prio_ip),
+		   .req(arb_req_ip),
+		   .gnt(mgnt_ip));
 		
 		wire 		     update;
 		assign update = |arb_req_ip;
@@ -189,17 +188,10 @@ module whr_alloc_mac
 		   .d(mask_ip_s),
 		   .q(mask_ip_q));
 		
-		wire [0:num_ports-1] mask_shifted_ip;
-		assign mask_shifted_ip = {1'b0, mask_ip_q[0:num_ports-2]};
-		
-		c_one_hot_therm_conv
-		  #(.num_ports(num_ports))
-		mask_ip_tconv
-		  (.data_in(mask_shifted_ip),
-		   .data_out(mask_ip));
+		assign prio_ip = mask_ip_q;
 		
 		wire [0:num_ports-1] gnt_presel_ip;
-		assign gnt_presel_ip = arb_req_ip & mask_ip_q;
+		assign gnt_presel_ip = arb_req_ip & prio_ip;
 		
 		wire [0:num_ports-1] gnt_onehot_ip;
 		c_one_hot_filter
