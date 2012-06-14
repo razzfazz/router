@@ -333,6 +333,14 @@ module vcr_ivc_ctrl_justin
 
    output expired;
 
+   reg [0:5] state;
+   localparam VC_EMPTY 	= 6'd1;
+   localparam VC_WAIT 	= 6'd2;
+   localparam SW_WAIT 	= 6'd3;
+   localparam SW_HOLD 	= 6'd4;
+   localparam VC_NACK 	= 6'd5;
+   localparam VC_DROP 	= 6'd6;
+   
    
   
    // time stamp input and output
@@ -1335,21 +1343,16 @@ module vcr_ivc_ctrl_justin
       
       if(explicit_pipeline_register)
 	begin
-           
            if(gate_buffer_write)
              assign tbf_write_enable
                = flit_head_in & flit_valid_in & ~(fbc_empty & flit_sent);
            else
              assign tbf_write_enable = flit_valid_in & flit_head_in;
-           
            assign tbf_read_addr = tbc_pop_addr;
-           
-	end
+        end
       else
 	begin
-           
            assign tbf_write_enable = flit_head_in & flit_valid_in;
-           
            wire [0:fb_addr_width-1] tbf_read_addr_s, tbf_read_addr_q;
            assign tbf_read_addr_s = tbc_pop_addr;
            c_dff
@@ -1361,11 +1364,8 @@ module vcr_ivc_ctrl_justin
               .active(tbc_pop_active),
               .d(tbf_read_addr_s),
               .q(tbf_read_addr_q));
-           
            assign tbf_read_addr = tbf_read_addr_q;
-           
 	end
-      
    endgenerate
    
    
@@ -1451,21 +1451,17 @@ module vcr_ivc_ctrl_justin
 
    
    wire  header_expired_q;
-   wire [0:time_to_wait_width-1] time_to_wait_in_q, time_to_compare;
+   wire [0:time_to_wait_width-1] time_to_wait_in_q;
    
-   assign time_diff = coarse_counter - tbf_read_data;
+   assign time_diff 	    = coarse_counter - tbf_read_data;
   
-   //assign time_to_compare = explicit_pipeline_register ? time_to_wait_in_q : time_to_wait_in;
    
-   
-   //assign header_expired = flit_head_valid && (time_diff > time_to_wait_in);
-   
-   assign time_to_wait_out = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
+   assign time_to_wait_out  = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
 
-   // TODO: header is only expired if vc_allocated_s is NOT high and ttw is 0, we need to keep
-   // it at 0 (no overflow)
    
-   assign header_expired = (header_expired_q | (time_diff > time_to_wait_in)&~vc_allocated_q) & flit_head_valid;
+   assign header_expired    = (time_diff >= time_to_wait_in) & flit_head_valid &
+			      state!=SW_WAIT;//temporary
+   
    
    c_dff
      #(.width(1),
@@ -1476,19 +1472,7 @@ module vcr_ivc_ctrl_justin
       .active(1'b1),
       .d(header_expired),
       .q(header_expired_q));
-         
-         
- /*        
-      c_dff
-        #(.width(time_to_wait_width),
-          .reset_type(reset_type))
-      dff_ttw_in
-        (.clk(clk),
-         .reset(1'b0),
-         .active(1'b1),
-         .d(time_to_wait_in),
-         .q(time_to_wait_in_q));
-*/
+
    
    c_dff
      #(.width(1),
@@ -1505,24 +1489,15 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    // generate output data
    //---------------------------------------------------------------------------
-   
-   
 
-   wire tbc_pop_active_q;
 
-   //wire new_value;
-   //assign new_value = tbc_pop_active_q | tbc_pop_active;
-   
-   generate
-      
+   generate      
       if(explicit_pipeline_register) begin
 	 assign flit_data_old = empty ? flit_data_in : fbf_flit_data;
       end else begin
 	 assign flit_data_old = fbf_flit_data;
       end                          
    endgenerate
-
-
 
 
 
@@ -1536,17 +1511,6 @@ module vcr_ivc_ctrl_justin
    assign tbf_write_enable = flit_head_in & flit_valid_in;
    
    
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   tbf_read_addrq
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .d(tbc_pop_active),
-      .q(tbc_pop_active_q));
-   
-   
    //---------------------------------------------------------------------------
    // error checking
    //---------------------------------------------------------------------------
@@ -1555,17 +1519,14 @@ module vcr_ivc_ctrl_justin
    
    always @(posedge clk)
      begin
-	
 	if(error_no_header)
 	  $display("ERROR: Stray flit received in module %m.");
 	
 	if(error_ct_overflow)
 	  $display("ERROR: Credit tracker overflow in module %m.");
-	
 	end
    
    // synopsys translate_on
-   
    assign errors[0] 	= error_fbc_underflow;
    assign errors[1] 	= error_fbc_overflow;
    assign errors[2] 	= error_no_header;
@@ -1573,59 +1534,62 @@ module vcr_ivc_ctrl_justin
    assign errors[4] 	= 1'b0; //error_invalid_port;
    assign errors[5] 	= 1'b0; //error_invalid_class;
 
-   localparam VC_EMPTY 	= 6'b000001;
-   localparam VC_WAIT 	= 6'b000010;
-   localparam SW_WAIT 	= 6'b000100;
-   localparam SW_HOLD 	= 6'b001000;
-   localparam VC_NACK 	= 6'b010000;
-   localparam VC_DROP 	= 6'b100000;
+ 
    
-   reg [0:5] state;
-   
+
+
+   //thsi only works with explicit reg right now
    always@(posedge clk, posedge reset)
      begin
 	if(reset)
-	  state        <=VC_EMPTY;
+	  state <=VC_WAIT;
 	else
 	  begin
 	     case(state)
-	       VC_EMPTY:
-		 if(flit_valid_in)
+	       VC_EMPTY: //is this state necessary?
+		 if(flit_valid_in & ~vc_gnt)
 		   state <=VC_WAIT;
+		 else if(flit_valid_in & vc_gnt)
+		   state <=SW_WAIT;
 		 else
 		   state <=VC_EMPTY;
 	       VC_WAIT:
-		 if(vc_gnt)
+		 if(vc_gnt & ~header_expired)
 		   state <=SW_WAIT;
-		 else if(header_expired)
+		 else if(vc_gnt & header_expired)
 		   state <=VC_NACK;
 		 else
 		   state <=VC_WAIT;
 	       SW_WAIT:
 		 if(header_expired)
 		   state <=VC_NACK;
-		 else if(sw_gnt)
+		 else if(sw_gnt & ~flit_tail)
 		   state <=SW_HOLD;
+		 else if(sw_gnt & flit_tail)
+		   state <=VC_WAIT;
 		 else
 		   state <=SW_WAIT;
 	       SW_HOLD:
-		 if(flit_tail)
-		   if(fbc_almost_empty)
-		     state   <=VC_EMPTY;
-	       	   else
-		     state <=VC_WAIT;
+		 if(sw_gnt & flit_tail)
+		   state <=VC_WAIT;
 	       	 else
-		   state     <=SW_HOLD;
+		   state <=SW_HOLD;
 	       VC_NACK:
 		 if(sw_gnt)
-		   state <=VC_DROP;
+		   //state <=VC_DROP; //real
+		   state <=VC_WAIT; //single flist test
 	       	 else
 		   state <=VC_NACK;
 	       VC_DROP:
-		 state <=VC_EMPTY;
+		 state <=VC_WAIT;
 	       default:
-		 state        <=VC_EMPTY;
+		 state <=VC_WAIT;
 	     endcase // case (state)
-	  end
+	  end // else: !if(reset)	
+     end // always@ (posedge clk, posedge reset)
+   always @(posedge clk)
+     begin
+	if(state==VC_DROP)
+	  $display("ERROR: Stray flit in module %m.");
      end
 endmodule
