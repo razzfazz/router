@@ -30,8 +30,14 @@
 //==============================================================================
 
 module vcr_vc_alloc_SRP
-  (clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc, req_ip_ivc, 
-   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip, gnt_op_ovc_ivc);
+  (/*autoarg*/
+   // Outputs
+   gnt_ip_ivc, gnt_ip_ivc_ocvc, gnt_op_ovc, gnt_op_ovc_ip,
+   gnt_op_ovc_ivc,
+   // Inputs
+   clk, reset, route_ip_ivc_op, route_ip_ivc_orc, elig_op_ovc,
+   req_ip_ivc, expired
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -96,16 +102,13 @@ module vcr_vc_alloc_SRP
    output [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    wire [0:num_ports*num_vcs*num_vcs-1] 	      gnt_op_ovc_ivc;
    
-
+   input [0:num_ports-1] expired;
+   
    //global wires passing between message class 1 and 3, assume num_vcs_per_class=1
-
    wire [0:num_ports*num_vcs_per_class*num_ports*
-	 num_vcs_per_class-1] req_to_class_one;
+	 num_vcs_per_class-1] req_out_op_orc_ocvc_ip_irc_icvc_to_one;
    wire [0:num_ports*num_vcs_per_class*num_ports*
-	 num_vcs_per_class-1] gnt_to_class_three;
-      
-   wire [0:num_ports-1] expired = {num_ports{1'b0}};
-
+	 num_vcs_per_class-1] gnt_out_ip_irc_icvc_op_orc_ocvc_to_three;
 
    
    generate
@@ -183,12 +186,31 @@ module vcr_vc_alloc_SRP
 		     assign req = req_irc_icvc[icvc];
 		     
 		     wire [0:num_ports*num_vcs_per_class-1] gnt_out_op_orc_ocvc;
-		     assign gnt_out_op_orc_ocvc
-		       = gnt_out_ip_irc_icvc_op_orc_ocvc
-			 [(ip*num_vcs_per_class+icvc)*
-			  num_ports*num_vcs_per_class:
-			  (ip*num_vcs_per_class+icvc+1)*
-			  num_ports*num_vcs_per_class-1];
+		     if(mc==3)
+		       begin
+			  assign gnt_out_op_orc_ocvc
+ 			   = gnt_out_ip_irc_icvc_op_orc_ocvc
+			   [(ip*num_vcs_per_class+icvc)*
+			    num_ports*num_vcs_per_class:
+			    (ip*num_vcs_per_class+icvc+1)*
+			    num_ports*num_vcs_per_class-1]|
+			   gnt_out_ip_irc_icvc_op_orc_ocvc_to_three
+			   [(ip*num_vcs_per_class+icvc)*
+			    num_ports*num_vcs_per_class:
+			    (ip*num_vcs_per_class+icvc+1)*
+			    num_ports*num_vcs_per_class-1];
+		       end
+		     else
+		       begin
+			  assign gnt_out_op_orc_ocvc
+ 			    = gnt_out_ip_irc_icvc_op_orc_ocvc
+			      [(ip*num_vcs_per_class+icvc)*
+			       num_ports*num_vcs_per_class:
+			       (ip*num_vcs_per_class+icvc+1)*
+			       num_ports*num_vcs_per_class-1];
+		       end
+		     
+		     
 		     
 		     // NOTE: Logically, what we want to do here is select 
 		     // the subvector that corresponds to the current input
@@ -366,17 +388,18 @@ module vcr_vc_alloc_SRP
 		 num_vcs_per_class-1] gnt_out_op_orc_ocvc_ip_irc_icvc;
 	   if(mc==3)
 	     begin
+		//splitting the input stage request to message classes 1 and 3
 		wire [0:num_ports*num_vcs_per_class*num_ports*
-		      num_vcs_per_class-1] req_out_ip_irc_icvc_op_orc_ocvc_class_one;
+		      num_vcs_per_class-1] req_out_ip_irc_icvc_op_orc_ocvc_one;
 		wire [0:num_ports*num_vcs_per_class*num_ports*
-		      num_vcs_per_class-1] req_out_ip_irc_icvc_op_orc_ocvc_class_three;
+		      num_vcs_per_class-1] req_out_ip_irc_icvc_op_orc_ocvc_three;
 		c_gate_bits
 		  #(.num_ports		(num_ports),
 		    .width		(num_ports),
 		    .op			(`BINARY_OP_AND))
 		class_one_req
 		  (// Outputs
-		   .data_out		(req_out_ip_irc_icvc_op_orc_ocvc_class_one),
+		   .data_out		(req_out_ip_irc_icvc_op_orc_ocvc_one),
 		   // Inputs
 		   .select		(expired),
 		   .data_in		(req_out_ip_irc_icvc_op_orc_ocvc));
@@ -386,34 +409,37 @@ module vcr_vc_alloc_SRP
 		    .op			(`BINARY_OP_AND))
 		class_three_req
 		  (// Outputs
-		   .data_out		(req_out_ip_irc_icvc_op_orc_ocvc_class_three),
+		   .data_out		(req_out_ip_irc_icvc_op_orc_ocvc_three),
 		   // Inputs
 		   .select		(~expired),
 		   .data_in		(req_out_ip_irc_icvc_op_orc_ocvc));
 		
-		
+		//this interleave is original
 		c_interleave
 		  #(.width(num_ports*num_vcs_per_class*
 			   num_ports*num_vcs_per_class),
 		    .num_blocks(num_ports*num_vcs_per_class))
 		req_out_op_orc_ocvc_ip_irc_icvc_intl
-		  (.data_in(req_out_ip_irc_icvc_op_orc_ocvc_class_three),
+		  (.data_in(req_out_ip_irc_icvc_op_orc_ocvc_three),
 		   .data_out(req_out_op_orc_ocvc_ip_irc_icvc));
+
+		//this interleave is to message class one
 		c_interleave
 		  #(.width(num_ports*num_vcs_per_class*
 			   num_ports*num_vcs_per_class),
 		    .num_blocks(num_ports*num_vcs_per_class))
-		req_out_op_orc_ocvc_ip_irc_icvc_intl_class_one
-		  (.data_in(req_out_ip_irc_icvc_op_orc_ocvc_class_one),
-		   .data_out(req_to_class_one));
+		req_out_op_orc_ocvc_ip_irc_icvc_intl_one
+		  (.data_in(req_out_ip_irc_icvc_op_orc_ocvc_one),
+		   .data_out(req_out_op_orc_ocvc_ip_irc_icvc_to_one));
 
-		
+		//the grant from the output stage of class one and three are merged
 		c_interleave
 		  #(.width(num_ports*num_vcs_per_class*
 			   num_ports*num_vcs_per_class),
 		    .num_blocks(num_ports*num_vcs_per_class))
 		gnt_out_op_orc_ocvc_ip_irc_iocvc_intl
-		  (.data_in((gnt_out_op_orc_ocvc_ip_irc_icvc|gnt_to_class_three)),
+		  (.data_in((gnt_out_op_orc_ocvc_ip_irc_icvc|
+			     gnt_out_ip_irc_icvc_op_orc_ocvc_to_three)),
 		   .data_out(gnt_out_ip_irc_icvc_op_orc_ocvc));
 	     end // if (mc==3)
 	   else
@@ -435,19 +461,8 @@ module vcr_vc_alloc_SRP
 		   .data_out(gnt_out_ip_irc_icvc_op_orc_ocvc));
 	     end // else: !if(mc==3)
 	   
-	   
-	   
 
-	   
-	   
-	   
-	   //
-	   //Extra global wires for interaction of class 1 and class 3
-	   //  -class 3 requests goes to class 1 or 3 depending on expired
-	   //
-	   //  -class 3 input arbiter update is triggered by class 1 or 3 output arbs
-	   //     -if |class1gnt & expired | class3gnt
-	   
+
 	   
 	   if(mc==1)
 	     begin
@@ -474,19 +489,19 @@ module vcr_vc_alloc_SRP
 			    = active_op_orc_ocvc[op*num_vcs_per_class+
 						 ocvc];
 			  wire [0:num_ports*num_vcs_per_class*2-1] req_out_ip_irc_icvc;
-			  wire [0:num_ports*num_vcs_per_class-1] req_from_class_one=
+			  wire [0:num_ports*num_vcs_per_class-1] temp_from_one=
 								 req_out_op_orc_ocvc_ip_irc_icvc[(op*num_vcs_per_class+ocvc)*num_ports*num_vcs_per_class:
 												 (op*num_vcs_per_class+ocvc+1)*num_ports*num_vcs_per_class-1];
-			  wire [0:num_ports*num_vcs_per_class-1] req_to_class_one_out_ip = 
-								 req_to_class_one[(op*num_vcs_per_class+ocvc)*num_ports*num_vcs_per_class:
-										  (op*num_vcs_per_class+ocvc+1)*num_ports*num_vcs_per_class-1];
+			  wire [0:num_ports*num_vcs_per_class-1] temp_to_one = 
+								 req_out_op_orc_ocvc_ip_irc_icvc_to_one[(op*num_vcs_per_class+ocvc)*num_ports*num_vcs_per_class:
+													(op*num_vcs_per_class+ocvc+1)*num_ports*num_vcs_per_class-1];
 			  
 			  
 			  c_interleave
 			    #(.width(num_ports*num_vcs_per_class*2),
 			      .num_blocks(2))
 			  req_out_ip_irc_icvc_intl
-			    (.data_in({req_from_class_one,req_to_class_one_out_ip}),
+			    (.data_in({temp_from_one,temp_to_one}),
 			     .data_out(req_out_ip_irc_icvc));
 			  
 			  
@@ -504,9 +519,9 @@ module vcr_vc_alloc_SRP
 			  
 			  wire [0:num_ports-1] 	     gnt_out_ip;
 			  wire [0:num_ports*num_vcs_per_class-1] gnt_out_ip_irc_icvc;
-			  wire [0:num_ports*num_vcs_per_class-1] gnt_out_ip_irc_icvc_three;
+			  wire [0:num_ports*num_vcs_per_class-1] gnt_out_ip_irc_icvc_to_three;
 			  
-			  wire [0:num_ports*num_vcs-1] gnt_ip_ivc;//
+			  wire [0:num_ports*num_vcs-1] gnt_ip_ivc;
 			  
 			  
 			  //----------------------------------------------------
@@ -517,12 +532,12 @@ module vcr_vc_alloc_SRP
 			  
 			  for(ip = 0; ip < num_ports; ip = ip + 1)
 			    begin:ips
-			       
+			       //assume 1vc/class
 			       wire [0:num_vcs_per_class*2-1] req_out_irc_icvc;
 			       assign req_out_irc_icvc[0]
-				 = req_from_class_one[ip+:1];
+				 = temp_from_one[ip+:1];
 			       assign req_out_irc_icvc[1]
-				 = req_to_class_one[ip+:1];
+				 = temp_to_one[ip+:1];
 			       
 			       wire 			  update_arb;
 			       assign update_arb = gnt_out_ip[ip];
@@ -545,12 +560,11 @@ module vcr_vc_alloc_SRP
 							  (ip+1)*num_vcs_per_class-1]
 				 = gnt_out_irc_icvc[0] & 
 				   gnt_out_ip[ip];
-			       assign gnt_out_ip_irc_icvc_three[ip*num_vcs_per_class:
-								(ip+1)*num_vcs_per_class-1]
+			       assign gnt_out_ip_irc_icvc_to_three[ip*num_vcs_per_class:
+								   (ip+1)*num_vcs_per_class-1]
 				 = gnt_out_irc_icvc[1] & 
 				   gnt_out_ip[ip];
 			       
-			       //wire [0:num_vcs-1] 	  gnt_out_ivc;
 			       wire [0:num_vcs-1] gnt_out_ivc_one;
 			       wire [0:num_vcs-1] gnt_out_ivc_three;
 			       
@@ -573,7 +587,6 @@ module vcr_vc_alloc_SRP
 			       
 			       assign gnt_ip_ivc[ip*num_vcs:(ip+1)*num_vcs-1]
 				 = gnt_out_ivc_one|gnt_out_ivc_three;
-			       //gnt_out_ivc;
 			    end
 			  
 			  wire [0:num_vcs-1] 		  gnt_ivc;
@@ -609,12 +622,12 @@ module vcr_vc_alloc_SRP
 			     (op*num_vcs_per_class+ocvc+1)*
 			     num_ports*num_vcs_per_class-1]
 			    = gnt_out_ip_irc_icvc; 
-			  assign gnt_to_class_three
+			  assign gnt_out_ip_irc_icvc_op_orc_ocvc_to_three
 			    [(op*num_vcs_per_class+ocvc)*
 			     num_ports*num_vcs_per_class:
 			     (op*num_vcs_per_class+ocvc+1)*
 			     num_ports*num_vcs_per_class-1]
-			    = gnt_out_ip_irc_icvc_three; 
+			    = gnt_out_ip_irc_icvc_to_three; 
 			  
 			  //----------------------------------------------------
 			  // generate control signals to output controller
