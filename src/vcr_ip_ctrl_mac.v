@@ -30,10 +30,15 @@
 //==============================================================================
 
 module vcr_ip_ctrl_mac
-  (clk, reset, router_address, channel_in, route_ivc_op, route_ivc_orc, 
-   allocated_ivc, flit_valid_ivc, free_nonspec_ivc, vc_gnt_ivc, vc_gnt_ivc_ocvc,
-   sw_sel_ivc, sw_gnt, int_flow_ctrl_op_ovc, int_flit_ctrl, flit_data, 
-   flow_ctrl_out, error);
+  (/*autoarg*/
+   // Outputs
+   route_ivc_op, route_ivc_orc, allocated_ivc, flit_valid_ivc,
+   free_nonspec_ivc, int_flit_ctrl, flit_data, flow_ctrl_out, error,
+   expired,
+   // Inputs
+   clk, reset, router_address, channel_in, vc_gnt_ivc,
+   vc_gnt_ivc_ocvc, sw_sel_ivc, sw_gnt, int_flow_ctrl_op_ovc
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -270,6 +275,8 @@ module vcr_ip_ctrl_mac
    // internal error condition detected
    output 					     error;
    wire 					     error;
+
+   output expired;
    
    
    //---------------------------------------------------------------------------
@@ -461,7 +468,8 @@ module vcr_ip_ctrl_mac
 	        .allocated(allocated),
 	        .free_nonspec(free_nonspec),
 	        .free_spec(free_spec),
-	        .errors(ivcc_errors));
+	        .errors(ivcc_errors),
+		.expired(expired));
 	        
 	   end else begin
 	     

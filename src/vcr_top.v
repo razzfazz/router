@@ -238,6 +238,9 @@ module vcr_top
    wire [0:num_ports*num_vcs*int_flow_ctrl_width-1]  int_flow_ctrl_op_ovc;
    
    wire [0:num_ports-1] 			     ipc_error_ip;
+
+   wire [0:num_ports-1] ipc_expired;
+   
    
    generate
       
@@ -278,6 +281,8 @@ module vcr_top
 	   wire [0:flit_data_width-1] 		   flit_data;
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
 	   wire 				   ipc_error;
+	   wire expired;
+	   
 	   vcr_ip_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
 	       .num_message_classes(num_message_classes),
@@ -322,8 +327,11 @@ module vcr_top
 	      .int_flit_ctrl(int_flit_ctrl),
 	      .flit_data(flit_data),
 	      .flow_ctrl_out(flow_ctrl_out),
-	      .error(ipc_error));
+	      .error(ipc_error),
+	      .expired(expired));
+	   assign ipc_expired[ip]  = expired;
 	   
+	      
 	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
 				  (ip+1)*num_vcs*num_ports-1]
 	     = route_ivc_op;
@@ -365,6 +373,44 @@ module vcr_top
    wire [0:num_ports*num_vcs-1] 		vc_gnt_op_ovc;
    wire [0:num_ports*num_vcs*num_ports-1] 	vc_gnt_op_ovc_ip;
    wire [0:num_ports*num_vcs*num_vcs-1] 	vc_gnt_op_ovc_ivc;
+
+
+   wire [0:num_ports*num_vcs-1] req_ip_ivc;
+   assign req_ip_ivc = flit_valid_ip_ivc & ~allocated_ip_ivc;
+   vcr_vc_alloc_SRP
+     #(// Parameters
+       .num_message_classes		(num_message_classes),
+       .num_resource_classes		(num_resource_classes),
+       .num_vcs_per_class		(num_vcs_per_class),
+       .num_ports			(num_ports),
+       .arbiter_type			(vc_alloc_arbiter_type),
+       .reset_type			(reset_type))
+   vca
+     (// Outputs
+      .gnt_ip_ivc			(vc_gnt_ip_ivc),
+      .gnt_ip_ivc_ocvc			(vc_gnt_ip_ivc_ocvc),
+      .gnt_op_ovc			(vc_gnt_op_ovc),
+      .gnt_op_ovc_ip			(vc_gnt_op_ovc_ip),
+      .gnt_op_ovc_ivc			(vc_gnt_op_ovc_ivc),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .route_ip_ivc_op			(route_ip_ivc_op),
+      .route_ip_ivc_orc			(route_ip_ivc_orc),
+      .elig_op_ovc			(elig_op_ovc),
+      .req_ip_ivc			(req_ip_ivc),
+      .expired(ipc_expired));
+   
+   c_select_mofn
+     #(.num_ports(num_ports*num_vcs),
+       .width(num_ports))
+   active_op_sel
+     (.select(req_ip_ivc),
+      .data_in(route_ip_ivc_op),
+      .data_out(vc_active_op));
+
+   /*
+   
    vcr_vc_alloc_mac
      #(.num_message_classes(num_message_classes),
        .num_resource_classes(num_resource_classes),
@@ -374,20 +420,21 @@ module vcr_top
        .arbiter_type(vc_alloc_arbiter_type),
        .reset_type(reset_type))
    vca
-     (.clk(clk),
-      .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
-      .route_ip_ivc_orc(route_ip_ivc_orc),
-      .allocated_ip_ivc(allocated_ip_ivc),
-      .flit_valid_ip_ivc(flit_valid_ip_ivc),
-      .elig_op_ovc(elig_op_ovc),
-      .active_op(vc_active_op),
-      .gnt_ip_ivc(vc_gnt_ip_ivc),
-      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),
-      .gnt_op_ovc(vc_gnt_op_ovc),
-      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),
+     (.clk(clk),//
+      .reset(reset),//
+    .route_ip_ivc_op(route_ip_ivc_op),//
+    .route_ip_ivc_orc(route_ip_ivc_orc),//
+      .allocated_ip_ivc(allocated_ip_ivc),//
+      .flit_valid_ip_ivc(flit_valid_ip_ivc),//
+      .elig_op_ovc(elig_op_ovc),//
+      .active_op(vc_active_op),//
+      .gnt_ip_ivc(vc_gnt_ip_ivc),//
+      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),//
+      .gnt_op_ovc(vc_gnt_op_ovc),//
+      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),//
       .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
    
+    */
    
    //---------------------------------------------------------------------------
    // switch allocator

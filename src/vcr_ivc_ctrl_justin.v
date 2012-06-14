@@ -30,11 +30,16 @@
 //==============================================================================
 
 module vcr_ivc_ctrl_justin
-  (clk, reset, router_address, flit_valid_in, flit_head_in, flit_tail_in, 
-   flit_data_in, int_flow_ctrl_op_ovc, route_op, route_orc, vc_gnt, 
-   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev, next_lar_info, 
-   flit_valid, flit_head, flit_tail, flit_sel_ovc, flit_data, empty, full, 
-   allocated, free_nonspec, free_spec, errors);
+  (/*autoarg*/
+   // Outputs
+   route_op, route_orc, next_lar_info, flit_valid, flit_head,
+   flit_tail, flit_sel_ovc, flit_data, empty, full, allocated,
+   free_nonspec, free_spec, errors, expired,
+   // Inputs
+   clk, reset, router_address, flit_valid_in, flit_head_in,
+   flit_tail_in, flit_data_in, int_flow_ctrl_op_ovc, vc_gnt,
+   vc_gnt_ocvc, sw_gnt, flit_sent_prev, flit_tail_prev
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -325,13 +330,16 @@ module vcr_ivc_ctrl_justin
    // internal error condition detected
    output [0:5] 				     errors;
    wire [0:5] 					     errors;
+
+   output expired;
+
    
-   
+  
    // time stamp input and output
-   
    wire [0:time_to_wait_width-1] time_to_wait_in;
    wire [0:time_to_wait_width-1] time_to_wait_out;
    wire 			 header_expired;
+   assign expired  = header_expired;   
    
    
    
@@ -339,7 +347,6 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
-   
    wire 					     fbc_empty;
    
    assign flit_valid = flit_valid_in | ~fbc_empty;
@@ -364,7 +371,7 @@ module vcr_ivc_ctrl_justin
 	assign vc_allocated_s
 		    = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
       else
-	assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done;
+	assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done; //edit here for relinquish VC
    endgenerate
    c_dff
      #(.width(1),
@@ -442,18 +449,10 @@ module vcr_ivc_ctrl_justin
      (.input_a(route_orc),
       .input_b(allocated_ocvc),
       .result(allocated_orc_ocvc));
-   
-   wire [0:num_vcs-1] 				     allocated_ovc;
-   c_align
-     #(.in_width(num_resource_classes*num_vcs_per_class),
-       .out_width(num_vcs),
-       .offset(message_class*num_resource_classes*num_vcs_per_class))
-   allocated_ovc_alg
-     (.data_in(allocated_orc_ocvc),
-      .dest_in({num_vcs{1'b0}}),
-      .data_out(allocated_ovc));
-   
-   assign flit_sel_ovc = allocated_ovc;
+
+
+   //hard coded for 1vc/class SRP
+   assign flit_sel_ovc 	= {1'b0,header_expired,1'b0,~header_expired};
    
    
    //---------------------------------------------------------------------------
@@ -860,19 +859,21 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    
    wire [0:port_idx_width-1] 			     route_port_in;
-   assign route_port_in = lar_info_in[0:port_idx_width-1];
+   assign route_port_in     = lar_info_in[0:port_idx_width-1];
 
    // TODO: change route_port_in based on whether or not the header is expired
 
 
 
+   localparam [0:num_ports-1] default_port  = {5'b1}<<(num_ports-1-port_id);
+   
    
    
    wire [0:num_ports-1] 			     route_in_op;
    c_decode
      #(.num_ports(num_ports))
    route_in_op_dec
-     (.data_in(header_expired ? port_id : route_port_in),
+     (.data_in(route_port_in),
       .data_out(route_in_op));
    
    wire [0:port_idx_width-1] 			     hdr_route_port;
@@ -886,7 +887,7 @@ module vcr_ivc_ctrl_justin
       .data_out(hdr_route_op));
    
    wire [0:num_ports-1] 			     route_unmasked_op;
-   assign route_unmasked_op = hdr_valid_q ? hdr_route_op : route_in_op;
+   assign route_unmasked_op = header_expired?default_port:(hdr_valid_q ? hdr_route_op : route_in_op);
    
    wire [0:num_resource_classes-1] 		     route_unmasked_orc;
    
@@ -929,42 +930,9 @@ module vcr_ivc_ctrl_justin
    endgenerate
    
    wire 				       header_valid;
-   assign header_valid = hdr_valid_q | flit_valid_in;
-   
-   wire 				       rf_active;
-   assign rf_active = header_valid;
-   
-   wire [0:1] 				       rf_errors;
-   rtr_route_filter
-     #(.num_message_classes(num_message_classes),
-       .num_resource_classes(num_resource_classes),
-       .num_vcs_per_class(num_vcs_per_class),
-       .num_ports(num_ports),
-       .num_neighbors_per_dim(num_neighbors_per_dim),
-       .num_nodes_per_router(num_nodes_per_router),
-       .restrict_turns(restrict_turns),
-       .connectivity(connectivity),
-       .routing_type(routing_type),
-       .dim_order(dim_order),
-       .port_id(port_id),
-       .vc_id(vc_id))
-   rf
-     (.clk(clk),
-      .reset(reset),
-      .active(rf_active),
-      .route_valid(header_valid),
-      .route_in_op(route_unmasked_op),
-      .route_in_orc(route_unmasked_orc),
-      .route_out_op(route_op),
-      .route_out_orc(route_orc),
-      .errors(rf_errors));
-   
-   wire 				       error_invalid_port;
-   assign error_invalid_port = rf_errors[0];
-   
-   wire 				       error_invalid_class;
-   assign error_invalid_class = rf_errors[1];
-   
+   assign header_valid 	= hdr_valid_q | flit_valid_in;
+   assign route_op 	= route_unmasked_op;
+   assign route_orc = route_unmasked_orc;
    
    //---------------------------------------------------------------------------
    // update lookahead routing information for next hop
@@ -1087,14 +1055,27 @@ module vcr_ivc_ctrl_justin
    
    wire [0:num_resource_classes*num_vcs_per_class*
 	 int_flow_ctrl_width-1] 	       int_flow_ctrl_orc_ocvc;
-   assign int_flow_ctrl_orc_ocvc = int_flow_ctrl_ovc[message_class*
-						     num_resource_classes*
-						     num_vcs_per_class*
-						     int_flow_ctrl_width:
-						     (message_class+1)*
-						     num_resource_classes*
-						     num_vcs_per_class*
-						     int_flow_ctrl_width-1];
+
+   //assume SRP vc only handles message class one and three, credit selected by expired
+
+   
+   assign int_flow_ctrl_orc_ocvc  = header_expired?
+				    int_flow_ctrl_ovc[1*
+						      num_resource_classes*
+						      num_vcs_per_class*
+						      int_flow_ctrl_width:
+						      (1+1)*
+						      num_resource_classes*
+						      num_vcs_per_class*
+						      int_flow_ctrl_width-1]:
+				    int_flow_ctrl_ovc[message_class*
+						      num_resource_classes*
+						      num_vcs_per_class*
+						      int_flow_ctrl_width:
+						      (message_class+1)*
+						      num_resource_classes*
+						      num_vcs_per_class*
+						      int_flow_ctrl_width-1];
    
    wire [0:num_vcs_per_class*int_flow_ctrl_width-1] int_flow_ctrl_ocvc;
    wire 					    error_ct_overflow;
@@ -1484,7 +1465,7 @@ module vcr_ivc_ctrl_justin
    // TODO: header is only expired if vc_allocated_s is NOT high and ttw is 0, we need to keep
    // it at 0 (no overflow)
    
-   assign header_expired = (header_expired_q | (time_diff > time_to_wait_in)) & flit_head_valid;
+   assign header_expired = (header_expired_q | (time_diff > time_to_wait_in)&~vc_allocated_q) & flit_head_valid;
    
    c_dff
      #(.width(1),
@@ -1581,15 +1562,70 @@ module vcr_ivc_ctrl_justin
 	if(error_ct_overflow)
 	  $display("ERROR: Credit tracker overflow in module %m.");
 	
-     end
+	end
    
    // synopsys translate_on
    
-   assign errors[0] = error_fbc_underflow;
-   assign errors[1] = error_fbc_overflow;
-   assign errors[2] = error_no_header;
-   assign errors[3] = error_ct_overflow;
-   assign errors[4] = error_invalid_port;
-   assign errors[5] = error_invalid_class;
+   assign errors[0] 	= error_fbc_underflow;
+   assign errors[1] 	= error_fbc_overflow;
+   assign errors[2] 	= error_no_header;
+   assign errors[3] 	= error_ct_overflow;
+   assign errors[4] 	= 1'b0; //error_invalid_port;
+   assign errors[5] 	= 1'b0; //error_invalid_class;
+
+   localparam VC_EMPTY 	= 6'b000001;
+   localparam VC_WAIT 	= 6'b000010;
+   localparam SW_WAIT 	= 6'b000100;
+   localparam SW_HOLD 	= 6'b001000;
+   localparam VC_NACK 	= 6'b010000;
+   localparam VC_DROP 	= 6'b100000;
    
+   reg [0:5] state;
+   
+   always@(posedge clk, posedge reset)
+     begin
+	if(reset)
+	  state        <=VC_EMPTY;
+	else
+	  begin
+	     case(state)
+	       VC_EMPTY:
+		 if(flit_valid_in)
+		   state <=VC_WAIT;
+		 else
+		   state <=VC_EMPTY;
+	       VC_WAIT:
+		 if(vc_gnt)
+		   state <=SW_WAIT;
+		 else if(header_expired)
+		   state <=VC_NACK;
+		 else
+		   state <=VC_WAIT;
+	       SW_WAIT:
+		 if(header_expired)
+		   state <=VC_NACK;
+		 else if(sw_gnt)
+		   state <=SW_HOLD;
+		 else
+		   state <=SW_WAIT;
+	       SW_HOLD:
+		 if(flit_tail)
+		   if(fbc_almost_empty)
+		     state   <=VC_EMPTY;
+	       	   else
+		     state <=VC_WAIT;
+	       	 else
+		   state     <=SW_HOLD;
+	       VC_NACK:
+		 if(sw_gnt)
+		   state <=VC_DROP;
+	       	 else
+		   state <=VC_NACK;
+	       VC_DROP:
+		 state <=VC_EMPTY;
+	       default:
+		 state        <=VC_EMPTY;
+	     endcase // case (state)
+	  end
+     end
 endmodule
