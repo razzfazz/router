@@ -984,6 +984,9 @@ module rtr_alloc_mac
 	      
 	      wire 		 flit_sel_fast;
 	      
+	      // Use fast path only if no regular-path flits are ready to go 
+	      // and the fast path VC doesn't have any queued flits already.
+	      
 	      if(dual_path_alloc)
 		assign flit_sel_fast
 		  = ~|(req_ivc | (flit_valid_in_ivc & flit_sel_fast_in_ivc));
