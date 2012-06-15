@@ -34,7 +34,7 @@ module vcr_ivc_ctrl_justin
    // Outputs
    route_op, route_orc, next_lar_info, flit_valid, flit_head,
    flit_tail, flit_sel_ovc, flit_data, empty, full, allocated,
-   free_nonspec, free_spec, errors, expired,
+   free_nonspec, free_spec, errors, expired, drop_event,
    // Inputs
    clk, reset, router_address, flit_valid_in, flit_head_in,
    flit_tail_in, flit_data_in, int_flow_ctrl_op_ovc, vc_gnt,
@@ -228,15 +228,15 @@ module vcr_ivc_ctrl_justin
    
    
    parameter reset_type = `RESET_TYPE_ASYNC;
-  
- 
-//`include "srp_format.v"
+   
+   
+   //`include "srp_format.v"
    // spec_src_start
    // width of dest_info
 
 
 
- 
+   
    input clk;
    input reset;
    
@@ -290,6 +290,7 @@ module vcr_ivc_ctrl_justin
    // outgoing flit is available
    output 					     flit_valid;
    wire 					     flit_valid;
+   wire real_flit_valid; //internally visible flit_valid
    
    // outgoing flit is head flit
    output 					     flit_head;
@@ -298,6 +299,7 @@ module vcr_ivc_ctrl_justin
    // outgoing flit is tail flit
    output 					     flit_tail;
    wire 					     flit_tail;
+   wire real_flit_tail; //internally visible tail flit
    
    // destination VC for outgoing flit
    output [0:num_vcs-1] 			     flit_sel_ovc;
@@ -331,8 +333,12 @@ module vcr_ivc_ctrl_justin
    output [0:5] 				     errors;
    wire [0:5] 					     errors;
 
+   // causes cross message class vc allocation
    output expired;
-
+   
+   output drop_event;
+   
+   
    reg [0:5] state;
    localparam VC_EMPTY 	= 6'd1;
    localparam VC_WAIT 	= 6'd2;
@@ -342,44 +348,46 @@ module vcr_ivc_ctrl_justin
    localparam VC_DROP 	= 6'd6;
    
    
-  
    // time stamp input and output
    wire [0:time_to_wait_width-1] time_to_wait_in;
    wire [0:time_to_wait_width-1] time_to_wait_out;
+   
    wire 			 header_expired;
-   assign expired  = header_expired;   
-   
-   
-   
-   
+   //TODO this currently assumes no cycle gaps within packets
+   wire drop_body     = (state==VC_DROP);
+   assign drop_event  = drop_body;
+   assign expired     = header_expired;   
+
+
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    wire 					     fbc_empty;
-   
-   assign flit_valid = flit_valid_in | ~fbc_empty;
+   //under vc_drop, forces body flits to be invisibile to the ouside
+   assign flit_valid  = (flit_valid_in | ~fbc_empty) & !drop_body;
+   assign real_flit_valid  = (flit_valid_in | ~fbc_empty);
    
    wire 					     pop_active;
    generate
       if(elig_mask == `ELIG_MASK_USED)
-	assign pop_active = flit_valid | flit_sent_prev;
+	assign pop_active = real_flit_valid | flit_sent_prev;
       else
-	assign pop_active = flit_valid;
+	assign pop_active = real_flit_valid;
    endgenerate
    
    wire 					     flit_sent;
-   
    wire 					     packet_done;
    assign packet_done = flit_sent & flit_tail;
    
    wire 					     vc_allocated_s, 
 						     vc_allocated_q;
    generate
+      //TODO here for relinquish VC
       if(elig_mask == `ELIG_MASK_USED)
 	assign vc_allocated_s
-		    = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
+ 		    = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
       else
-	assign vc_allocated_s = (vc_allocated_q | vc_gnt) & ~packet_done; //edit here for relinquish VC
+	assign vc_allocated_s  = (vc_allocated_q | vc_gnt) & ~packet_done;
    endgenerate
    c_dff
      #(.width(1),
@@ -399,52 +407,54 @@ module vcr_ivc_ctrl_justin
    
    generate
       
-      if(num_vcs_per_class == 1)
-	begin
-	   assign vc_allocated_next_ocvc = 1'b1;
-	   assign vc_allocated_ocvc = 1'b1;
+      //if(num_vcs_per_class 		  == 1)
+      //begin
+      assign vc_allocated_next_ocvc  = 1'b1;
+      assign vc_allocated_ocvc 	  = 1'b1;
+      /*
 	end
-      if(num_vcs_per_class > 1)
-	begin
-	   
-	   assign vc_allocated_next_ocvc
-	     = vc_allocated_q ? vc_allocated_ocvc : vc_gnt_ocvc;
-	   
-	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
-	   wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
-	   assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
-	   c_dff
-	     #(.width(num_vcs_per_class),
-               .reset_type(reset_type))
-	   vc_allocated_ocvcq
-	     (.clk(clk),
-              .reset(reset),
-              .active(pop_active),
-              .d(vc_allocated_ocvc_s),
-              .q(vc_allocated_ocvc_q));
-	   
-	   assign vc_allocated_ocvc = vc_allocated_ocvc_q;
-	   
+       if(num_vcs_per_class > 1)
+       begin
+       
+       assign vc_allocated_next_ocvc
+       = vc_allocated_q ? vc_allocated_ocvc : vc_gnt_ocvc;
+       
+       wire [0:num_vcs_per_class-1] vc_allocated_ocvc_s;
+       wire [0:num_vcs_per_class-1] vc_allocated_ocvc_q;
+       assign vc_allocated_ocvc_s = vc_allocated_next_ocvc;
+       c_dff
+       #(.width(num_vcs_per_class),
+       .reset_type(reset_type))
+       vc_allocated_ocvcq
+       (.clk(clk),
+       .reset(reset),
+       .active(pop_active),
+       .d(vc_allocated_ocvc_s),
+       .q(vc_allocated_ocvc_q));
+       
+       assign vc_allocated_ocvc = vc_allocated_ocvc_q;
+       
 	end
-      
-      if(sw_alloc_spec)
-	begin
-	   if(elig_mask == `ELIG_MASK_NONE)
-	     assign flit_sent
-			 = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
-	   else
-	     assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
-	   
-	   assign allocated_ocvc = vc_allocated_next_ocvc;
+       */
+      /*
+       if(sw_alloc_spec)
+       begin
+       if(elig_mask == `ELIG_MASK_NONE)
+       assign flit_sent
+       = sw_gnt & ((vc_gnt & free_spec) | vc_allocated_q);
+       else
+       assign flit_sent = sw_gnt & (vc_gnt | vc_allocated_q);
+       
+       assign allocated_ocvc = vc_allocated_next_ocvc;
 	end
-      else
-	begin
-	   assign flit_sent = sw_gnt;
-	   
-	   assign allocated_ocvc = vc_allocated_ocvc;
-	end
-      
+       else
+       begin*/
+      assign flit_sent = sw_gnt;      
+      assign allocated_ocvc = vc_allocated_ocvc;
+      //end
    endgenerate
+
+
    
    wire [0:num_resource_classes*num_vcs_per_class-1] allocated_orc_ocvc;
    c_mat_mult
@@ -474,7 +484,7 @@ module vcr_ivc_ctrl_justin
    assign fbc_push = flit_valid_in;
    
    wire 					     fbc_pop;
-   assign fbc_pop = flit_sent;
+   assign fbc_pop = flit_sent | drop_body;
    
    wire [0:fb_addr_width-1] 			     fbc_push_addr;
    wire [0:fb_addr_width-1] 			     fbc_pop_addr;
@@ -618,14 +628,7 @@ module vcr_ivc_ctrl_justin
    wire [0:route_info_width-1] 	peek_route_info;
    assign peek_route_info = peek_header_info[0:route_info_width-1];
    
-   
 
-   
-   
-   
-   
-   
-   
    
    //---------------------------------------------------------------------------
    // generate head and tail indicators
@@ -680,15 +683,17 @@ module vcr_ivc_ctrl_justin
               .d(flit_tail_s),
               .q(flit_tail_q));
 	   
-	   assign fb_flit_tail = flit_tail_q[fbc_pop_addr];
+	   assign fb_flit_tail 	= flit_tail_q[fbc_pop_addr];
 	   
 	end
       
    endgenerate
    
-   assign flit_tail = fbc_empty ? flit_tail_in : fb_flit_tail;
-   
+   //under vc_nack, forces the head flit to also be body flit
+   assign flit_tail 		= (fbc_empty ? flit_tail_in : fb_flit_tail)|header_expired;
+   assign real_flit_tail 	= (fbc_empty ? flit_tail_in : fb_flit_tail);
    wire 			     htr_flit_head_s, htr_flit_head_q;
+   
    assign htr_flit_head_s = flit_sent ? flit_tail : htr_flit_head_q;
    c_dff
      #(.width(1),
@@ -947,10 +952,10 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    
 
- 
+   
    
    wire [0:dest_info_width-1] 		       dest_info, valid_dest_info;
-  
+   
    wire [0:dest_info_width-1] 		       src_info;
 
 
@@ -963,11 +968,11 @@ module vcr_ivc_ctrl_justin
    assign src_info = hdr_valid_q ? hdr_src_info_q : src_info_in;
 
    assign dest_info = valid_dest_info;
-     
-//   assign dest_info = ~header_expired ? valid_dest_info : src_info;
+   
+   //   assign dest_info = ~header_expired ? valid_dest_info : src_info;
    
 
- 
+   
    wire [0:lar_info_width-1] 	       lar_info;
    assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
    
@@ -1064,9 +1069,7 @@ module vcr_ivc_ctrl_justin
    wire [0:num_resource_classes*num_vcs_per_class*
 	 int_flow_ctrl_width-1] 	       int_flow_ctrl_orc_ocvc;
 
-   //assume SRP vc only handles message class one and three, credit selected by expired
-
-   
+   //assume SRP vc only handles message class one and three, credit selected by expired   
    assign int_flow_ctrl_orc_ocvc  = header_expired?
 				    int_flow_ctrl_ovc[1*
 						      num_resource_classes*
@@ -1252,9 +1255,7 @@ module vcr_ivc_ctrl_justin
 		 incr_cred_hold;
 	     
 	  end
-	
       endcase
-      
    endgenerate
    
    //---------------------------------------------------------------------------
@@ -1443,18 +1444,18 @@ module vcr_ivc_ctrl_justin
       else
 	assign flit_head_valid = ~tbc_empty & flit_head_q;
    endgenerate
-      
+   
    assign time_to_wait_in 	= flit_data_old[header_info_width - time_to_wait_width:
-					     header_info_width-1];
+						header_info_width-1];
    
    wire [0:time_to_wait_width-1] time_diff;
 
    
-   wire  header_expired_q;
+   //wire  header_expired_q;
    wire [0:time_to_wait_width-1] time_to_wait_in_q;
    
    assign time_diff 	    = coarse_counter - tbf_read_data;
-  
+   
    
    assign time_to_wait_out  = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
 
@@ -1462,7 +1463,7 @@ module vcr_ivc_ctrl_justin
    assign header_expired    = (time_diff >= time_to_wait_in) & flit_head_valid &
 			      state!=SW_WAIT;//temporary
    
-   
+   /*
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -1472,7 +1473,7 @@ module vcr_ivc_ctrl_justin
       .active(1'b1),
       .d(header_expired),
       .q(header_expired_q));
-
+*/
    
    c_dff
      #(.width(1),
@@ -1505,9 +1506,7 @@ module vcr_ivc_ctrl_justin
 		     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
 		      time_to_wait_out,
 		      flit_data_old[header_info_width:flit_data_width-1]}:
-	 	      flit_data_old;
-   
-  
+	 	     flit_data_old;
    assign tbf_write_enable = flit_head_in & flit_valid_in;
    
    
@@ -1524,7 +1523,7 @@ module vcr_ivc_ctrl_justin
 	
 	if(error_ct_overflow)
 	  $display("ERROR: Credit tracker overflow in module %m.");
-	end
+     end
    
    // synopsys translate_on
    assign errors[0] 	= error_fbc_underflow;
@@ -1534,10 +1533,10 @@ module vcr_ivc_ctrl_justin
    assign errors[4] 	= 1'b0; //error_invalid_port;
    assign errors[5] 	= 1'b0; //error_invalid_class;
 
- 
+   
    
 
-
+   //SRP FSM
    //thsi only works with explicit reg right now
    always@(posedge clk, posedge reset)
      begin
@@ -1547,12 +1546,7 @@ module vcr_ivc_ctrl_justin
 	  begin
 	     case(state)
 	       VC_EMPTY: //is this state necessary?
-		 if(flit_valid_in & ~vc_gnt)
-		   state <=VC_WAIT;
-		 else if(flit_valid_in & vc_gnt)
-		   state <=SW_WAIT;
-		 else
-		   state <=VC_EMPTY;
+		 state <=VC_WAIT;
 	       VC_WAIT:
 		 if(vc_gnt & ~header_expired)
 		   state <=SW_WAIT;
@@ -1561,7 +1555,7 @@ module vcr_ivc_ctrl_justin
 		 else
 		   state <=VC_WAIT;
 	       SW_WAIT:
-		 if(header_expired)
+		 if(header_expired) //there is a corner case ehre when sw_gnt occurs
 		   state <=VC_NACK;
 		 else if(sw_gnt & ~flit_tail)
 		   state <=SW_HOLD;
@@ -1575,21 +1569,27 @@ module vcr_ivc_ctrl_justin
 	       	 else
 		   state <=SW_HOLD;
 	       VC_NACK:
-		 if(sw_gnt)
-		   //state <=VC_DROP; //real
-		   state <=VC_WAIT; //single flist test
+		 if(sw_gnt & ~real_flit_tail)
+		   state <=VC_DROP; //multi-flit
+		 else if(sw_gnt & real_flit_tail)
+		   state <=VC_WAIT; //single flit
 	       	 else
 		   state <=VC_NACK;
 	       VC_DROP:
-		 state <=VC_WAIT;
+		 if(real_flit_tail)
+		   state <=VC_WAIT;
+		 else  
+		   state <=VC_DROP;
 	       default:
 		 state <=VC_WAIT;
 	     endcase // case (state)
 	  end // else: !if(reset)	
      end // always@ (posedge clk, posedge reset)
-   always @(posedge clk)
-     begin
-	if(state==VC_DROP)
-	  $display("ERROR: Stray flit in module %m.");
+   /*
+    always @(posedge clk)
+    begin
+    if(state==VC_DROP)
+    $display("ERROR: Stray flit in module %m.");
      end
+    */
 endmodule

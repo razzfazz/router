@@ -365,6 +365,8 @@ module vcr_ip_ctrl_mac
    wire [0:num_vcs*flit_data_width-1] 		     flit_data_ivc;
    wire [0:num_vcs-1] 				     empty_ivc;
    wire [0:num_vcs*6-1] 			     ivcc_errors_ivc;
+
+   wire drop_event;
    
    genvar 					     ivc;
    
@@ -409,12 +411,10 @@ module vcr_ip_ctrl_mac
 	   wire 			   free_spec;
 	   wire [0:5] 			   ivcc_errors;
 	   
+
 	   
 	   
 	   if (ivc == (num_vcs - 1)) begin
-	   
-	   
-	   
 	     vcr_ivc_ctrl_justin
 	       #(.num_flits_per_vc(num_flits_per_vc),
 	         .num_message_classes(num_message_classes),
@@ -469,7 +469,8 @@ module vcr_ip_ctrl_mac
 	        .free_nonspec(free_nonspec),
 	        .free_spec(free_spec),
 	        .errors(ivcc_errors),
-		.expired(expired));
+		.expired(expired),
+		.drop_event(drop_event));
 	        
 	   end else begin
 	     
@@ -828,7 +829,7 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // generate outgoing flow control signals
    //---------------------------------------------------------------------------
-   
+   //CAUTION hardcoded Speculative VC
    rtr_flow_ctrl_output
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -837,8 +838,8 @@ module vcr_ip_ctrl_mac
      (.clk(clk),
       .reset(reset),
       .active(alloc_active),
-      .fc_event_valid_in(flit_sent),
-      .fc_event_sel_in_ivc(sw_sel_ivc),
+      .fc_event_valid_in(flit_sent|drop_event),
+      .fc_event_sel_in_ivc(sw_sel_ivc|{3'b0,drop_event}),
       .flow_ctrl_out(flow_ctrl_out));
    
    
