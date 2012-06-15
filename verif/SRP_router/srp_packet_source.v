@@ -198,7 +198,7 @@ module srp_packet_source
        (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
        route_info_width +time_to_wait_width: 
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width + time_to_wait_width + dest_info_width) : 
+       (route_info_width + payload_length_width) : 
        -1;
    
    // select order of dimension traversal
@@ -221,6 +221,17 @@ module srp_packet_source
    
    parameter reset_type = `RESET_TYPE_ASYNC;
 
+   // width of TTW counter - increase this to make TTW more coarse
+   localparam counter_width 		 = 10;
+   
+   parameter max_reservation_size 	 = 16; //packets
+   localparam reservation_size_width 	 = clogb(max_reservation_size);
+   
+   parameter spec_buffer_capacity 	 = 4;
+   localparam spec_buffer_width 	 = clogb(spec_buffer_capacity);
+   
+`include "srp_format.v"   
+   
    
    input clk;
    input reset;   
@@ -482,17 +493,18 @@ module srp_packet_source
      end
 
    wire [0:header_info_width-1] header_info;
-   assign flit_data[0:header_info_width-1]
-     = flit_head ? header_info : data_q[0:header_info_width-1];
-   assign flit_data[header_info_width:flit_data_width-1]
-     = data_q[header_info_width:flit_data_width-1];
+   assign flit_data[0:spec_data_start -1]
+     = flit_head ? 
+       {header_info,
+	router_address,
+	8'b00011111,//TTW
+	{spec_buffer_width {1'b0}}}: 
+       data_q[0:spec_data_start -1];
+   assign flit_data[spec_data_start :flit_data_width-1]
+     = data_q[spec_data_start :flit_data_width-1];
 
-   //set TTW
-   assign  header_info[(route_info_width + payload_length_width + time_to_wait_width) +: dest_info_width]
-     =router_address;
-   assign  header_info[(route_info_width + payload_length_width)+:time_to_wait_width]
-     //={time_to_wait_width{1'b1}};
-     =8'b00011110;
+
+
    
 
    //routing computation
@@ -801,12 +813,11 @@ module srp_packet_source
 	     begin
 		case(packet_length_mode)
 		  0:
-		    random_length_q <= 1;
-//$dist_uniform(seed, min_payload_length, 
-		  //max_payload_length);
+		    random_length_q <=$dist_uniform(seed, min_payload_length,max_payload_length);
 		  1:
 		    random_length_q <= ($dist_uniform(seed, 0, 1) < 1) ? 
-				       min_payload_length : 
+				       //min_payload_length :
+				       max_payload_length : 
 				       max_payload_length;
 		endcase
 		if(reset)

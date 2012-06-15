@@ -7,8 +7,18 @@
 
 using namespace std;
 
+int ttw_preset = 31*4;
 
-int parseline(ifstream &file, int &cycle, int &ttw, int &pid, int &port);
+int parseinput(ifstream &file, int &cycle, int &ttw, int &pid, int &port){
+  double raw;
+  file>>cycle>>ttw>>pid>>port>>raw;
+  return (pid<<5)+port;
+}
+int parseoutput(ifstream &file, int &cycle, int &ttw, int &pid, int &port, int &actual){
+  double raw;
+  file>>cycle>>ttw>>pid>>port>>actual>>raw;
+  return (pid<<5)+port;
+}
 
 
 int main(int argc, char** argv){
@@ -22,13 +32,14 @@ int main(int argc, char** argv){
   int ttw;
   int pid;
   int port;
+  int actual_port;
   string line;
   //Test bench input parsing
   srp_in.open("srp_input.txt");
   int input_ttw;
   if(srp_in.is_open()){
     while(!srp_in.eof()){
-      int unique_id  = parseline(srp_in, cycle, ttw, pid, port);
+      int unique_id  = parseinput(srp_in, cycle, ttw, pid, port);
       input_ttw = ttw;
       input_data[unique_id] = cycle;
     }
@@ -40,17 +51,17 @@ int main(int argc, char** argv){
   srp_out.open("srp_output.txt");
   if(srp_out.is_open()){
     while(!srp_out.eof()){
-      int unique_id  = parseline(srp_out, cycle, ttw, pid, port);
+      int unique_id  = parseoutput(srp_out, cycle, ttw, pid, port, actual_port);
       if(input_data.count(unique_id)==0){
 	cout<<"Not matched, ignore if last packet read\n";//cycle<<"\t"<<ttw<<"\t"<<pid<<"\t"<<port<<"\n";
 	//assert(false);
       } else {
 	int deltat = cycle-input_data[unique_id];
 	assert(deltat>0);
-	cout<<"Port "<<port
+	cout<<((port!=actual_port)?"":"#")<<"Port "<<port
 	    <<"\tTTW "<<(input_ttw-ttw)*4
 	    <<"\tdeltaT "<<deltat
-	    <<"\tpassed "<<(deltat-(input_ttw-ttw)*4-4)<<endl;
+	    <<((((deltat>=ttw_preset)&&(port==actual_port))||(!(deltat>=ttw_preset+4)&&(port!=actual_port)))?"\tpassed ":"\t\terror ")<<deltat-ttw_preset<<endl;
 	input_data.erase(unique_id);
       }
     }
@@ -58,10 +69,4 @@ int main(int argc, char** argv){
   }
   
   return 0;
-}
-
-int parseline(ifstream &file, int &cycle, int &ttw, int &pid, int &port){
-  double raw;
-  file>>cycle>>ttw>>pid>>port>>raw;
-  return (pid<<5)+port;
 }

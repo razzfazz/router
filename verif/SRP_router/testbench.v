@@ -47,13 +47,13 @@ module testbench
    //parameter packet_rate = 50;
    
    // flit consumption rate (percentage of cycles)
-   parameter consume_rate = 100;
+   parameter consume_rate = 30;
    
    // width of packet count register
    parameter packet_count_reg_width = 32;
    
    // channel latency in cycles
-   parameter channel_latency = 1;
+   parameter channel_latency = 2;
    
    // only inject traffic at the node ports
    parameter inject_node_ports_only = 0;
@@ -62,7 +62,7 @@ module testbench
    parameter warmup_time = 100;
    
    // measurement interval in cycles
-   parameter measure_time = 10000;
+   parameter measure_time = 100000;
    
    // select packet length mode (0: uniform random, 1: bimodal)
    parameter packet_length_mode = 0;
@@ -179,11 +179,13 @@ module testbench
    wire [0:num_ports*channel_width-1] channel_in_ip;
    wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_out_ip;
    wire [0:num_ports-1] 		flit_valid_in_ip;
+   wire [0:num_ports-1] 		packet_valid_in_ip;
    wire [0:num_ports-1] 		cred_valid_out_ip;
    
    wire [0:num_ports*channel_width-1] 	channel_out_op;
    wire [0:num_ports*flow_ctrl_width-1] flow_ctrl_in_op;
    wire [0:num_ports-1] 		flit_valid_out_op;
+   wire [0:num_ports-1] 		packet_valid_out_op;
    wire [0:num_ports-1] 		cred_valid_in_op;
    
    wire [0:num_ports-1] 		ps_error_ip;
@@ -191,6 +193,7 @@ module testbench
    reg [0:router_addr_width-1] 		router_address;
    
    reg 					run;
+   reg checker_run;
    
    genvar 				ip;
    
@@ -211,7 +214,7 @@ module testbench
 		assign channel_in_ip[ip*channel_width:(ip+1)*channel_width-1]
 	     = {channel_width{1'b0}};
 		assign flit_valid_in_ip[ip] = 1'b0;
-		
+		assign packet_valid_in_ip[ip] = 1'b0;
 		assign ps_error_ip[ip] = 1'b0;
 	     end
 	   else
@@ -299,7 +302,8 @@ module testbench
 		   .data_in(flit_valid),
 		   .data_out(flit_valid_dly));
 		
-		assign flit_valid_in_ip[ip] = flit_valid_dly;
+		assign flit_valid_in_ip[ip]    = flit_valid_dly;
+		assign packet_valid_in_ip[ip]  = channel_dly[0]&channel_dly[flit_ctrl_width-1];
 		
 	     end
 	end
@@ -400,9 +404,12 @@ module testbench
 					       (op+1)*channel_width-1];
 	   
 	   wire [0:flit_ctrl_width-1] flit_ctrl_out;
-	   assign flit_ctrl_out = channel_out[0:flit_ctrl_width-1];
+	   assign flit_ctrl_out 	   = channel_out[0:flit_ctrl_width-1];
 	   
-	   assign flit_valid_out_op[op] = flit_ctrl_out[0];
+	   assign flit_valid_out_op[op]    = flit_ctrl_out[0];
+	   assign packet_valid_out_op[op]  = flit_ctrl_out[0]&flit_ctrl_out[flit_ctrl_width-1];
+	   
+	   
 	   
 	   wire [0:channel_width-1] channel_dly;
 	   c_shift_reg
@@ -422,7 +429,8 @@ module testbench
 	   
 	   flit_sink
 	     #(.initial_seed(initial_seed + num_ports + op),
-	       .consume_rate(consume_rate),
+	       .consume_rate( consume_rate),
+	       //.consume_rate( (op < (num_ports-num_nodes_per_router))?consume_rate:100),
 	       .num_flits_per_vc(num_flits_per_vc),
 	       .num_vcs(num_vcs),
 	       .packet_format(packet_format),
@@ -505,6 +513,20 @@ module testbench
 	end
    endgenerate
 
+   wire [0:31] in_packets_s, in_packets_q;
+   assign in_packets_s = in_packets_q + pop_count(packet_valid_in_ip);
+   c_dff
+     #(.width(32),
+       .reset_type(reset_type))
+   in_packetsq
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(in_packets_s),
+      .q(in_packets_q));
+   
+   wire [0:31] in_packets;
+   assign in_packets = in_packets_s;
    
    wire [0:31] in_flits_s, in_flits_q;
    assign in_flits_s = in_flits_q + pop_count(flit_valid_in_ip);
@@ -535,7 +557,22 @@ module testbench
    
    wire [0:31] in_creds;
    assign in_creds = in_creds_q;
+ 
+   wire [0:31] out_packets_s, out_packets_q;
+   assign out_packets_s = out_packets_q + pop_count(packet_valid_out_op);
+   c_dff
+     #(.width(32),
+       .reset_type(reset_type))
+   out_packetsq
+     (.clk(clk),
+      .reset(reset),
+      .active(1'b1),
+      .d(out_packets_s),
+      .q(out_packets_q));
    
+   wire [0:31] out_packets;
+   assign out_packets = out_packets_s;
+  
    wire [0:31] out_flits_s, out_flits_q;
    assign out_flits_s = out_flits_q + pop_count(flit_valid_out_op);
    c_dff
@@ -648,7 +685,7 @@ module testbench
    //file IO  for SRP checking
    //assumes explicit length
    always@(negedge clk)
-     if(run)
+     if(checker_run)
        begin
 	  for(srp_in_i = 0; srp_in_i < num_ports; srp_in_i = srp_in_i + 1)
 	    begin:in_ps
@@ -666,7 +703,7 @@ module testbench
 	    end
        end
    always@(negedge clk)
-     if(run)
+     if(checker_run)
        begin
 	  for(srp_out_i = 0; srp_out_i < num_ports; srp_out_i = srp_out_i + 1)
 	    begin:out_ps
@@ -674,12 +711,13 @@ module testbench
 	       out_port_index  = out_index+channel_width-port_idx_width;
 	       out_ttw_index   = out_index+flit_ctrl_width+route_info_width + payload_length_width ;
 	       out_pid_index   = out_ttw_index+time_to_wait_width+dest_info_width;
-	       if(channel_out_op[out_index] & channel_out_op[out_index+3]  & channel_out_op[out_index+1] & channel_out_op[out_index+2])
-		 $fdisplay(srp_out,"%d %d %d %d %b",
+	       if(channel_out_op[out_index] & channel_out_op[out_index+3] )
+		 $fdisplay(srp_out,"%d %d %d %d %d %b",
 			   cycles,
 			   channel_out_op[out_ttw_index+:time_to_wait_width],
 			   channel_out_op[out_pid_index+:pid_width],
 			   channel_out_op[out_port_index+:port_idx_width ],
+			   srp_out_i,
 			   channel_out_op[out_index+:flit_ctrl_width+header_info_width]);
 	    end
        end
@@ -694,14 +732,16 @@ module testbench
 	for(d = 0; d < num_dimensions; d = d + 1)
 	  begin
 	     router_address[d*dim_addr_width +: dim_addr_width]
-	  = num_routers_per_dim / 2;
+ 								 = num_routers_per_dim / 2;
 	  end
 	
-	reset = 1'b0;
-	clk_en = 1'b0;
-	run = 1'b0;
-	count_en = 1'b0;
-	cycles = 0;
+	reset 							 = 1'b0;
+	clk_en 							 = 1'b0;
+	run 							 = 1'b0;
+	checker_run 						 = 1'b0;
+	
+	count_en 						 = 1'b0;
+	cycles 							 = 0;
 	
 	#(Tclk);
 	
@@ -721,8 +761,9 @@ module testbench
 	
 	$display("warming up...");
 	
-	run = 1'b1;
-
+	run 	     = 1'b1;
+	checker_run  = 1'b1;
+	
 	while(cycles < warmup_time)
 	  begin
 	     cycles = cycles + 1;
@@ -740,11 +781,13 @@ module testbench
 	count_en = 1'b0;      
 	$display("measured %d cycles", measure_time);
 	$display("%d flits in, %d flits out", count_in_flits, count_out_flits);
+	$display("%d packets in, %d packets out", in_packets, out_packets);
 	$display("cooling down...");
 	run = 1'b0;
 
 	//stat print out
-       	while((in_flits > out_flits) || (in_flits > in_creds))
+       	//while((in_flits > out_flits) || (in_flits > in_creds))
+	while((in_packets > out_packets) || (in_flits > in_creds))
 	  begin
 	     cycles = cycles + 1;
 	     #(Tclk);
@@ -753,6 +796,7 @@ module testbench
 	#(Tclk*10);
 	$display("simulation ended after %d cycles", cycles);      
 	$display("%d flits received, %d flits sent", in_flits, out_flits);
+	$display("%d packets received, %d packets sent", in_packets, out_packets);
         for(lolz = 0; lolz<num_ports; lolz=lolz+1)
 	  begin
 	     $display("port %d eject : %d",
@@ -762,7 +806,9 @@ module testbench
 	  begin
       	     $display("port %d inject: %d flits",
 		      lolz,ips_flits_q[lolz]);
-	  end
+	     end
+	checker_run  =1'b1;
+	
 	$fclose(srp_in);
 	$fclose(srp_out);
 	$finish;      

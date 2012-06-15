@@ -4,8 +4,8 @@
 //fbfly 1.0X
 //kn    1.0X
 //ftree 0.75X
-parameter packet_rate   =25;
-parameter extern_rate   =25;
+parameter packet_rate   =99;
+parameter extern_rate   =99;
 
 
 parameter packet_ratio  = 99;
