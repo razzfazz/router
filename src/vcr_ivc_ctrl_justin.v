@@ -165,19 +165,6 @@ module vcr_ivc_ctrl_justin
    // total number of bits required for routing-related information
    localparam route_info_width = lar_info_width + dest_info_width;
    
-   // total number of bits required for storing time-to-wait information
-   parameter time_to_wait_width = 8;
-
-   // total number of bits of header information encoded in header flit payload
-   localparam header_info_width
-     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
-       route_info_width + time_to_wait_width: 
-       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
-       route_info_width + time_to_wait_width: 
-       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
-       (route_info_width + payload_length_width + time_to_wait_width) : 
-       -1;
-   
    // select order of dimension traversal
    parameter dim_order = `DIM_ORDER_ASCENDING;
    
@@ -191,49 +178,68 @@ module vcr_ivc_ctrl_justin
        -1;
    
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter elig_mask = `ELIG_MASK_NONE;
+   parameter elig_mask 			 = `ELIG_MASK_NONE;
    
    // enable speculative switch allocation
-   parameter sw_alloc_spec = 1;
+   parameter sw_alloc_spec 		 = 1;
    
    // select implementation variant for flit buffer register file
-   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type 		 = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
-   parameter explicit_pipeline_register = 0;
+   parameter explicit_pipeline_register  = 0;
    
    // gate flit buffer write port if bypass succeeds
    // (requires explicit pipeline register; may increase cycle time)
-   parameter gate_buffer_write = 0;
+   parameter gate_buffer_write 		 = 0;
    
    // ID of current input VC
-   parameter vc_id = 0;
+   parameter vc_id 			 = 0;
    
    // message class to which this VC belongs
    localparam message_class
-     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
+ 					 = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
    
    // resource class to which this VC belongs
    localparam resource_class
-     = (vc_id / num_vcs_per_class) % num_resource_classes;
+ 					 = (vc_id / num_vcs_per_class) % num_resource_classes;
    
    // required address size for a single VC's buffer
-   localparam fb_addr_width = clogb(num_flits_per_vc);
+   localparam fb_addr_width 		 = clogb(num_flits_per_vc);
    
    // ID of current input port
-   parameter port_id = 0;
+   parameter port_id 			 = 0;
+   
+
+   // total number of bits required for storing time-to-wait information
+   parameter time_to_wait_width 	 = 8;
+
+     // total number of bits of header information encoded in header flit payload
+   localparam header_info_width
+     = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
+       route_info_width + time_to_wait_width: 
+       (packet_format == `PACKET_FORMAT_TAIL_ONLY) ? 
+       route_info_width + time_to_wait_width: 
+       (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
+       (route_info_width + payload_length_width) : 
+       -1;
    
    // width of TTW counter - increase this to make TTW more coarse
-   localparam counter_width = 10;
+   localparam counter_width 		 = 10;
    
+   parameter max_reservation_size 	 = 16; //packets
+   localparam reservation_size_width 	 = clogb(max_reservation_size);
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter spec_buffer_capacity 	 = 4;
+   localparam spec_buffer_width 	 = clogb(spec_buffer_capacity);
    
+   parameter reset_type 		 = `RESET_TYPE_ASYNC;
    
-   //`include "srp_format.v"
-   // spec_src_start
-   // width of dest_info
+`include "srp_format.v"
 
+   //u-turn port for nacks
+   localparam [0:num_ports-1] default_port  = {5'b1}<<(num_ports-1-port_id);
+   localparam [0:port_idx_width-1] default_port_enc= port_id;
 
 
    
@@ -335,9 +341,9 @@ module vcr_ivc_ctrl_justin
 
    // causes cross message class vc allocation
    output expired;
-   
+
+   //signal credit return
    output drop_event;
-   
    
    reg [0:5] state;
    localparam VC_EMPTY 	= 6'd1;
@@ -351,8 +357,13 @@ module vcr_ivc_ctrl_justin
    // time stamp input and output
    wire [0:time_to_wait_width-1] time_to_wait_in;
    wire [0:time_to_wait_width-1] time_to_wait_out;
+   //spec source buffer and source
+   wire [0:dest_info_width-1] spec_source;
+   wire [0:spec_buffer_width-1] spec_buffer_id;
+   
    
    wire 			 header_expired;
+   
    //TODO this currently assumes no cycle gaps within packets
    wire drop_body     = (state==VC_DROP);
    assign drop_event  = drop_body;
@@ -746,11 +757,10 @@ module vcr_ivc_ctrl_justin
    assign lar_info_in = route_info_in[0:lar_info_width-1];
    
    wire [0:dest_info_width-1] 	     dest_info_in;
-   assign dest_info_in = route_info_in[lar_info_width:
-				       lar_info_width+dest_info_width-1];
+   assign dest_info_in = route_info_in[lar_info_width+:dest_info_width];
    
    wire [0:dest_info_width-1] 	     src_info_in;
-   assign src_info_in = flit_data_in[header_info_width:header_info_width+dest_info_width-1];
+   assign src_info_in = flit_data_in[spec_src_start+:dest_info_width];
    
    
    wire 			     hdr_active;
@@ -810,7 +820,7 @@ module vcr_ivc_ctrl_justin
 	   
 	   wire [0:dest_info_width-1] peek_src_info;
 	   assign peek_src_info
-	     = fbf_peek_data[header_info_width:header_info_width+dest_info_width-1];
+	     = fbf_peek_data[spec_src_start+:dest_info_width];
 	   
 	   assign hdr_src_info_s
 	     = (~hdr_valid_q | packet_done) ?
@@ -878,7 +888,7 @@ module vcr_ivc_ctrl_justin
 
 
 
-   localparam [0:num_ports-1] default_port  = {5'b1}<<(num_ports-1-port_id);
+
    
    
    
@@ -903,11 +913,13 @@ module vcr_ivc_ctrl_justin
    assign route_unmasked_op = header_expired?default_port:(hdr_valid_q ? hdr_route_op : route_in_op);
    
    wire [0:num_resource_classes-1] 		     route_unmasked_orc;
-   
+
+   /*
    generate
-      
       if(num_resource_classes == 1)
-	assign route_unmasked_orc = 1'b1;
+    */
+   assign route_unmasked_orc  = 1'b1;
+   /*
       else if(num_resource_classes > 1)
 	begin
 	   
@@ -941,6 +953,7 @@ module vcr_ivc_ctrl_justin
 	end
       
    endgenerate
+   */
    
    wire 				       header_valid;
    assign header_valid 	= hdr_valid_q | flit_valid_in;
@@ -950,31 +963,17 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    // update lookahead routing information for next hop
    //---------------------------------------------------------------------------
-   
-
-   
-   
-   wire [0:dest_info_width-1] 		       dest_info, valid_dest_info;
-   
+   wire [0:dest_info_width-1] 		       dest_info, original_dest_info;
    wire [0:dest_info_width-1] 		       src_info;
 
-
+   assign original_dest_info  = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
+   assign src_info 	      = hdr_valid_q ? hdr_src_info_q : src_info_in;
    
-   // TODO: assign src_info_in and src_info.  take from queue 		       
+   assign dest_info 	      = header_expired ? src_info: original_dest_info;
 
-   
-   assign valid_dest_info = hdr_valid_q ? hdr_dest_info_q : dest_info_in;
-
-   assign src_info = hdr_valid_q ? hdr_src_info_q : src_info_in;
-
-   assign dest_info = valid_dest_info;
-   
-   //   assign dest_info = ~header_expired ? valid_dest_info : src_info;
-   
-
-   
+   //CAUTION, assuming number of resource classes is 1
    wire [0:lar_info_width-1] 	       lar_info;
-   assign lar_info = hdr_valid_q ? hdr_lar_info_q : lar_info_in;
+   assign lar_info =header_expired?default_port_enc:(hdr_valid_q ? hdr_lar_info_q : lar_info_in);
    
    wire [0:router_addr_width-1] 	       next_router_address;
    rtr_next_hop_addr
@@ -1440,18 +1439,20 @@ module vcr_ivc_ctrl_justin
 
    generate
       if(explicit_pipeline_register)
-	assign flit_head_valid = ~tbc_empty & flit_head;
+	assign flit_head_valid 	= ~tbc_empty & flit_head;
       else
-	assign flit_head_valid = ~tbc_empty & flit_head_q;
+	assign flit_head_valid 	= ~tbc_empty & flit_head_q;
    endgenerate
    
-   assign time_to_wait_in 	= flit_data_old[header_info_width - time_to_wait_width:
-						header_info_width-1];
+   assign time_to_wait_in 	= flit_data_old[spec_ttw_start+:time_to_wait_width];
+   assign spec_buffer_id 	= flit_data_old[spec_id_start+:spec_buffer_width];
+   assign spec_source		=flit_data_old[spec_src_start+:dest_info_width];
+   
+   //[header_info_width - time_to_wait_width:
+   //header_info_width-1];
    
    wire [0:time_to_wait_width-1] time_diff;
-
    
-   //wire  header_expired_q;
    wire [0:time_to_wait_width-1] time_to_wait_in_q;
    
    assign time_diff 	    = coarse_counter - tbf_read_data;
@@ -1463,17 +1464,7 @@ module vcr_ivc_ctrl_justin
    assign header_expired    = (time_diff >= time_to_wait_in) & flit_head_valid &
 			      state!=SW_WAIT;//temporary
    
-   /*
-   c_dff
-     #(.width(1),
-       .reset_type(reset_type))
-   dff_time_diff
-     (.clk(clk),
-      .reset(reset),
-      .active(1'b1),
-      .d(header_expired),
-      .q(header_expired_q));
-*/
+ 
    
    c_dff
      #(.width(1),
@@ -1490,23 +1481,31 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    // generate output data
    //---------------------------------------------------------------------------
-
-
    generate      
       if(explicit_pipeline_register) begin
-	 assign flit_data_old = empty ? flit_data_in : fbf_flit_data;
+	 assign flit_data_old  = empty ? flit_data_in : fbf_flit_data;
       end else begin
-	 assign flit_data_old = fbf_flit_data;
+	 assign flit_data_old  = fbf_flit_data;
       end                          
    endgenerate
 
-
-
-   assign flit_data =flit_head_valid ?
-		     {flit_data_old[0:(header_info_width-time_to_wait_width-1)],
-		      time_to_wait_out,
-		      flit_data_old[header_info_width:flit_data_width-1]}:
-	 	     flit_data_old;
+   //CAUTION hardcoded single flit NACK
+   
+   wire [0:flit_data_width-1] nack_packet= {next_lar_info,		    
+					    spec_source,
+					    {payload_length_width{1'b0}},
+					    2'b10,
+					    spec_buffer_id,
+					    flit_data_old[nack_data_start:flit_data_width-1]};
+   
+   
+   assign flit_data =header_expired?
+		     nack_packet:
+		     (flit_head_valid ?
+		      {flit_data_old[0:spec_ttw_start-1],
+		       time_to_wait_out,
+		       flit_data_old[spec_id_start:flit_data_width-1]}:
+	 	      flit_data_old);
    assign tbf_write_enable = flit_head_in & flit_valid_in;
    
    
