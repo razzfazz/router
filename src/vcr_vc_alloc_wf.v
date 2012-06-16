@@ -373,18 +373,13 @@ module vcr_vc_alloc_wf
 			       num_vcs_per_class-1];
 			  
 			  wire [0:num_ports-1] 	     gnt_wf_ip;
-			  c_mat_mult
-			    #(.dim1_width(num_ports),
-			      .dim2_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dim3_width(1),
-			      .prod_op(`BINARY_OP_AND),
-			      .sum_op(`BINARY_OP_OR))
-			  gnt_wf_ip_mmult
-			    (.input_a(gnt_wf_ip_irc_icvc),
-			     .input_b({(num_resource_classes*
-					num_vcs_per_class){1'b1}}),
-			     .result(gnt_wf_ip));
+			  c_reduce_bits
+			    #(.num_ports(num_ports),
+			      .width(num_resource_classes*num_vcs_per_class),
+			      .op(`BINARY_OP_OR))
+			  gnt_wf_ip_rb
+			    (.data_in(gnt_wf_ip_irc_icvc),
+			     .data_out(gnt_wf_ip));
 			  
 			  assign sel_op_ovc_ip[(op*num_vcs+
 						(mc*num_resource_classes+orc)*

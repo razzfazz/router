@@ -445,18 +445,13 @@ module vcr_vc_alloc_sep_if
 			       num_vcs_per_class-1];
 			  
 			  wire [0:num_ports-1] 	     req_out_ip;
-			  c_mat_mult
-			    #(.dim1_width(num_ports),
-			      .dim2_width(num_resource_classes*
-					  num_vcs_per_class),
-			      .dim3_width(1),
-			      .prod_op(`BINARY_OP_AND),
-			      .sum_op(`BINARY_OP_OR))
-			  req_out_ip_mmult
-			    (.input_a(req_out_ip_irc_icvc),
-			     .input_b({(num_resource_classes*
-					num_vcs_per_class){1'b1}}),
-			     .result(req_out_ip));
+			  c_reduce_bits
+			    #(.num_ports(num_ports),
+			      .width(num_resource_classes*num_vcs_per_class),
+			      .op(`BINARY_OP_OR))
+			  req_out_ip_rb
+			    (.data_in(req_out_ip_irc_icvc),
+			     .data_out(req_out_ip));
 			  
 			  wire [0:num_ports-1] 	     gnt_out_ip;
 			  wire [0:num_ports*num_resource_classes*

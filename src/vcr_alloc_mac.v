@@ -170,16 +170,13 @@ module vcr_alloc_mac
    assign vc_req_ip_ivc = flit_valid_ip_ivc & ~allocated_ip_ivc;
    
    wire [0:num_ports-1] 			      vc_active_ip;
-   c_mat_mult
-     #(.dim1_width(num_ports),
-       .dim2_width(num_vcs),
-       .dim3_width(1),
-       .prod_op(`BINARY_OP_AND),
-       .sum_op(`BINARY_OP_OR))
-   vc_active_ip_mmult
-     (.input_a(vc_req_ip_ivc),
-      .input_b({num_vcs{1'b1}}),
-      .result(vc_active_ip));
+   c_reduce_bits
+     #(.num_ports(num_ports),
+       .width(num_vcs),
+       .op(`BINARY_OP_OR))
+   vc_active_ip_rb
+     (.data_in(vc_req_ip_ivc),
+      .data_out(vc_active_ip));
    
    c_select_mofn
      #(.num_ports(num_ports*num_vcs),
@@ -283,16 +280,13 @@ module vcr_alloc_mac
    assign sw_req_spec_ip_ivc = ~allocated_ip_ivc & flit_valid_ip_ivc;
    
    wire [0:num_ports-1] 	sw_active_ip;
-   c_mat_mult
-     #(.dim1_width(num_ports),
-       .dim2_width(num_vcs),
-       .dim3_width(1),
-       .prod_op(`BINARY_OP_AND),
-       .sum_op(`BINARY_OP_OR))
-   sw_active_ip_mmult
-     (.input_a(flit_valid_ip_ivc),
-      .input_b({num_vcs{1'b1}}),
-      .result(sw_active_ip));
+   c_reduce_bits
+     #(.num_ports(num_ports),
+       .width(num_vcs),
+       .op(`BINARY_OP_OR))
+   sw_active_ip_rb
+     (.data_in(flit_valid_ip_ivc),
+      .data_out(sw_active_ip));
    
    c_select_mofn
      #(.num_ports(num_ports*num_vcs),

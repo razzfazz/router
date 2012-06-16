@@ -383,16 +383,13 @@ module vcr_sw_alloc_wf
 	`SW_ALLOC_SPEC_TYPE_REQ:
 	  begin
 	     
-	     c_mat_mult
-	       #(.dim1_width(num_ports),
-		 .dim2_width(num_ports),
-		 .dim3_width(1),
-		 .prod_op(`BINARY_OP_AND),
-		 .sum_op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_mmult
-	       (.input_a(req_wf_nonspec_ip_op),
-		.input_b({num_ports{1'b1}}),
-		.result(unused_by_nonspec_ip));
+	     c_reduce_bits
+	       #(.num_ports(num_ports),
+		 .width(num_ports),
+		 .op(`BINARY_OP_NOR))
+	     unused_by_nonspec_ip_rb
+	       (.data_in(req_wf_nonspec_ip_op),
+		.data_out(unused_by_nonspec_ip));
 	     
 	     c_binary_op
 	       #(.width(num_ports),
@@ -407,16 +404,13 @@ module vcr_sw_alloc_wf
 	`SW_ALLOC_SPEC_TYPE_GNT:
 	  begin
 	     
-	     c_mat_mult
-	       #(.dim1_width(num_ports),
-		 .dim2_width(num_ports),
-		 .dim3_width(1),
-		 .prod_op(`BINARY_OP_AND),
-		 .sum_op(`BINARY_OP_NOR))
-	     unused_by_nonspec_ip_mmult
-	       (.input_a(gnt_wf_nonspec_ip_op),
-		.input_b({num_ports{1'b1}}),
-		.result(unused_by_nonspec_ip));
+	     c_reduce_bits
+	       #(.num_ports(num_ports),
+		 .width(num_ports),
+		 .op(`BINARY_OP_NOR))
+	     unused_by_nonspec_ip_rb
+	       (.data_in(gnt_wf_nonspec_ip_op),
+		.data_out(unused_by_nonspec_ip));
 	     
 	     c_binary_op
 	       #(.width(num_ports),

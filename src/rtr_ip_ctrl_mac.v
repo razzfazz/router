@@ -433,16 +433,13 @@ module rtr_ip_ctrl_mac
 	    .next_router_address(next_router_address));
 	 
 	 wire [0:num_message_classes-1] sel_mc;
-	 c_mat_mult
-	   #(.dim1_width(num_message_classes),
-	     .dim2_width(num_resource_classes*num_vcs_per_class),
-	     .dim3_width(1),
-	     .prod_op(`BINARY_OP_AND),
-	     .sum_op(`BINARY_OP_OR))
-	 sel_mc_mmult
-	   (.input_a(chi_flit_sel_ivc),
-	    .input_b({(num_resource_classes*num_vcs_per_class){1'b1}}),
-	    .result(sel_mc));
+	 c_reduce_bits
+	   #(.num_ports(num_message_classes),
+	     .width(num_resource_classes*num_vcs_per_class),
+	     .op(`BINARY_OP_OR))
+	 sel_mc_rb
+	   (.data_in(chi_flit_sel_ivc),
+	    .data_out(sel_mc));
 	 
 	 wire [0:num_ports-1] 		route_op;
 	 wire [0:num_resource_classes-1] route_orc;

@@ -370,17 +370,13 @@ module rtr_alloc_mac
 		begin
 		   
 		   wire [0:num_message_classes-1] sel_mc;
-		   c_mat_mult
-		     #(.dim1_width(num_message_classes),
-		       .dim2_width(num_resource_classes*num_vcs_per_class),
-		       .dim3_width(1),
-		       .prod_op(`BINARY_OP_AND),
-		       .sum_op(`BINARY_OP_OR))
-		   sel_mc_mmult
-		     (.input_a(flit_sel_fast_in_ivc),
-		      .input_b({(num_resource_classes*
-				 num_vcs_per_class){1'b1}}),
-		      .result(sel_mc));
+		   c_reduce_bits
+		     #(.num_ports(num_message_classes),
+		       .width(num_resource_classes*num_vcs_per_class),
+		       .op(`BINARY_OP_OR))
+		   sel_mc_rb
+		     (.data_in(flit_sel_fast_in_ivc),
+		      .data_out(sel_mc));
 		   
 		   wire 			  any_elig;
 		   rtr_flags_mux
@@ -672,17 +668,13 @@ module rtr_alloc_mac
 		   assign sel_ivc = (1 << (num_vcs - 1 - ivc));
 		   
 		   wire [0:num_message_classes-1] sel_mc;
-		   c_mat_mult
-		     #(.dim1_width(num_message_classes),
-		       .dim2_width(num_resource_classes*num_vcs_per_class),
-		       .dim3_width(1),
-		       .prod_op(`BINARY_OP_AND),
-		       .sum_op(`BINARY_OP_OR))
-		   sel_mc_mmult
-		     (.input_a(sel_ivc),
-		      .input_b({(num_resource_classes*
-				 num_vcs_per_class){1'b1}}),
-		      .result(sel_mc));
+		   c_reduce_bits
+		     #(.num_ports(num_message_classes),
+		       .width(num_resource_classes*num_vcs_per_class),
+		       .op(`BINARY_OP_OR))
+		   sel_mc_rb
+		     (.data_in(sel_ivc),
+		      .data_out(sel_mc));
 		   
 		   
 		   //-----------------------------------------------------------
