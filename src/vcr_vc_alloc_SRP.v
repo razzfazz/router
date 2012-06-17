@@ -179,8 +179,21 @@ module vcr_vc_alloc_SRP
 			.data_out(elig_ovc));
 		     
 		     wire [0:num_vcs_per_class-1] elig_orc_ocvc;
-		     assign elig_orc_ocvc = elig_ovc[mc*num_vcs_per_class:
-						     (mc+1)*num_vcs_per_class-1];
+		     if(mc==3)
+		       begin
+			  assign elig_orc_ocvc  = expired[ip]?
+			   elig_ovc[1*num_vcs_per_class:
+				    (1+1)*num_vcs_per_class-1]:
+			   elig_ovc[3*num_vcs_per_class:
+				    (3+1)*num_vcs_per_class-1];
+		       end
+		     else
+		       begin
+			  assign elig_orc_ocvc  = elig_ovc[mc*num_vcs_per_class:
+							   (mc+1)*num_vcs_per_class-1];
+		       end
+		     
+		     
 		     
 		     wire 			     req;
 		     assign req = req_irc_icvc[icvc];
