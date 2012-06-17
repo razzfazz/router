@@ -133,9 +133,6 @@ module rtr_alloc_mac
    localparam num_ports
      = num_dimensions * num_neighbors_per_dim + num_nodes_per_router;
    
-   // width required to select an individual port
-   localparam port_idx_width = clogb(num_ports);
-   
    
    //---------------------------------------------------------------------------
    // interface
@@ -354,11 +351,18 @@ module rtr_alloc_mac
 	   wire 			   ofl_flit_sent;
 	   assign ofl_flit_sent = |ofl_flit_sent_op;
 	   
+	   wire [0:num_vcs*num_ports-1]    rf_route_ivc_op;
+	   
+	   wire [0:num_vcs*num_vcs-1] 	   ivs_flit_sel_ivc_ovc;
+	   wire [0:num_vcs-1] 		   ivs_cred_ivc;
+	   
 	   wire 			   ial_flit_sel_fast;
 	   
-	   wire [0:num_vcs-1] 		   ifl_allocated_ivc;
-	   wire [0:num_vcs_per_class-1]    ifl_allocated_ocvc;
-	   wire 			   ifl_next_cred;
+	   wire 			   ifl_flit_kill;
+	   wire [0:num_vcs_per_class-1]    ifl_next_elig_ocvc;
+	   wire 			   ifl_almost_full;
+	   wire 			   ifl_full;
+	   wire 			   ifl_debit;
 	   
 	   if(1) begin:ifl
 	      
@@ -374,310 +378,165 @@ module rtr_alloc_mac
 		     (.data_in(flit_sel_fast_in_ivc),
 		      .data_out(sel_mc));
 		   
-		   wire [0:num_packet_classes-1]  sel_opc;
+		   wire 			  any_elig;
+		   rtr_flags_mux
+		     #(.num_message_classes(num_message_classes),
+		       .num_resource_classes(num_resource_classes),
+		       .num_ports(num_ports),
+		       .width(1))
+		   any_elig_ocvc_fmux
+		     (.sel_mc(sel_mc),
+		      .route_op(route_fast_in_op),
+		      .route_orc(route_fast_in_orc),
+		      .flags_op_opc(nvs_any_elig_op_opc),
+		      .flags(any_elig));
+		   
+		   wire 			  flit_kill;
+		   assign flit_kill = flit_head_fast_in & ~any_elig;
+		   
+		   wire [0:num_vcs_per_class-1]   next_elig_ocvc;
+		   rtr_flags_mux
+		     #(.num_message_classes(num_message_classes),
+		       .num_resource_classes(num_resource_classes),
+		       .num_ports(num_ports),
+		       .width(num_vcs_per_class))
+		   next_elig_ocvc_fmux
+		     (.sel_mc(sel_mc),
+		      .route_op(route_fast_in_op),
+		      .route_orc(route_fast_in_orc),
+		      .flags_op_opc(nvs_next_elig_op_ovc),
+		      .flags(next_elig_ocvc));
+		   
+		   wire [0:num_vcs_per_class-1]   almost_full_ocvc;
+		   rtr_flags_mux
+		     #(.num_message_classes(num_message_classes),
+		       .num_resource_classes(num_resource_classes),
+		       .num_ports(num_ports),
+		       .width(num_vcs_per_class))
+		   almost_full_ocvc_fmux
+		     (.sel_mc(sel_mc),
+		      .route_op(route_fast_in_op),
+		      .route_orc(route_fast_in_orc),
+		      .flags_op_opc(almost_full_in_op_ovc),
+		      .flags(almost_full_ocvc));
+		   
+		   wire 			  almost_full;
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(1))
+		   almost_full_sel
+		     (.select(next_elig_ocvc),
+		      .data_in(almost_full_ocvc),
+		      .data_out(almost_full));
+		   
+		   wire [0:num_vcs_per_class-1]   full_ocvc;
+		   rtr_flags_mux
+		     #(.num_message_classes(num_message_classes),
+		       .num_resource_classes(num_resource_classes),
+		       .num_ports(num_ports),
+		       .width(num_vcs_per_class))
+		   full_ocvc_fmux
+		     (.sel_mc(sel_mc),
+		      .route_op(route_fast_in_op),
+		      .route_orc(route_fast_in_orc),
+		      .flags_op_opc(full_in_op_ovc),
+		      .flags(full_ocvc));
+		   
+		   wire 			  full;
+		   c_select_1ofn
+		     #(.num_ports(num_vcs_per_class),
+		       .width(1))
+		   full_sel
+		     (.select(next_elig_ocvc),
+		      .data_in(full_ocvc),
+		      .data_out(full));
+		   
+		   wire 			  debit;
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   debit_sel
+		     (.select(route_fast_in_op),
+		      .data_in(oxl_flit_sent_op),
+		      .data_out(debit));
+		   
+		   wire [0:num_resource_classes*
+			 num_vcs_per_class-1] 	  flit_sel_orc_ocvc;
+		   c_mat_mult
+		     #(.dim1_width(num_resource_classes),
+		       .dim2_width(1),
+		       .dim3_width(num_vcs_per_class),
+		       .prod_op(`BINARY_OP_AND),
+		       .sum_op(`BINARY_OP_OR))
+		   flit_sel_orc_ocvc_mmult
+		     (.input_a(route_fast_in_orc),
+		      .input_b({num_vcs_per_class{1'b1}}),
+		      .result(flit_sel_orc_ocvc));
+		   
+		   wire [0:num_vcs-1] 		  flit_sel_ovc;
 		   c_mat_mult
 		     #(.dim1_width(num_message_classes),
 		       .dim2_width(1),
-		       .dim3_width(num_resource_classes),
+		       .dim3_width(num_resource_classes*num_vcs_per_class),
 		       .prod_op(`BINARY_OP_AND),
 		       .sum_op(`BINARY_OP_OR))
-		   sel_opc_mmult
+		   flit_sel_ovc_mmult
 		     (.input_a(sel_mc),
-		      .input_b(route_fast_in_orc),
-		      .result(sel_opc));
+		      .input_b(flit_sel_orc_ocvc),
+		      .result(flit_sel_ovc));
 		   
-		   wire [0:num_packet_classes-1]  any_elig_opc;
-		   c_select_1ofn
-		     #(.num_ports(num_ports),
-		       .width(num_packet_classes))
-		   any_elig_opc_sel
-		     (.select(route_fast_in_op),
-		      .data_in(nvs_any_elig_op_opc),
-		      .data_out(any_elig_opc));
-		   
-		   wire 			  any_elig;
-		   c_select_1ofn
-		     #(.num_ports(num_packet_classes),
-		       .width(1))
-		   any_elig_sel
-		     (.select(sel_opc),
-		      .data_in(any_elig_opc),
-		      .data_out(any_elig));
-		   
-		   wire 			  active;
-		   assign active = flit_valid_fast_in;
-		   
-		   wire 			  match;
-		   
-		   wire 			  allocated_s, allocated_q;
-		   assign allocated_s
-		     = flit_valid_fast_in ?
-		       (allocated_q ?
-			~(match & (flit_tail_fast_in | ~ofl_flit_sent)) :
-			(flit_head_fast_in & ~flit_tail_fast_in & 
-			 ofl_flit_sent & any_elig)) :
-		       allocated_q;
-		   c_dff
-		     #(.width(1),
-		       .reset_type(reset_type))
-		   allocatedq
-		     (.clk(clk),
-		      .reset(reset),
-		      .active(active),
-		      .d(allocated_s),
-		      .q(allocated_q));
-		   
-		   wire [0:num_vcs-1] 		  allocated_ivc_s, 
-						  allocated_ivc_q;
-		   assign allocated_ivc_s
-		     = allocated_q ? allocated_ivc_q : flit_sel_fast_in_ivc;
-		   c_dff
-		     #(.width(num_vcs),
-		       .reset_type(reset_type))
-		   allocated_ivcq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(active),
-		      .d(allocated_ivc_s),
-		      .q(allocated_ivc_q));
-		   
+		   wire [0:num_vcs-1] 		  ivs_flit_sel_ovc;
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
-		       .width(1))
-		   match_sel
+		       .width(num_vcs))
+		   ivs_flit_sel_ovc_sel
 		     (.select(flit_sel_fast_in_ivc),
-		      .data_in(allocated_ivc_q),
-		      .data_out(match));
+		      .data_in(ivs_flit_sel_ivc_ovc),
+		      .data_out(ivs_flit_sel_ovc));
 		   
-		   wire [0:num_vcs-1] 		  next_elig_opc_ocvc;
+		   wire [0:num_ports-1] 	  rf_route_op;
 		   c_select_1ofn
-		     #(.num_ports(num_ports),
-		       .width(num_vcs))
-		   next_elig_opc_ocvc_sel
-		     (.select(route_fast_in_op),
-		      .data_in(nvs_next_elig_op_ovc),
-		      .data_out(next_elig_opc_ocvc));
+		     #(.num_ports(num_vcs),
+		       .width(num_ports))
+		   rf_route_op_sel
+		     (.select(flit_sel_fast_in_ivc),
+		      .data_in(rf_route_ivc_op),
+		      .data_out(rf_route_op));
 		   
-		   wire [0:num_vcs-1] 		  next_elig_ovc;
-		   c_gate_bits
-		     #(.num_ports(num_packet_classes),
-		       .width(num_vcs_per_class),
-		       .op(`BINARY_OP_AND))
-		   next_elig_ovc_gb
-		     (.select(sel_opc),
-		      .data_in(next_elig_opc_ocvc),
-		      .data_out(next_elig_ovc));
-		   
-		   wire [0:num_vcs-1] 		  allocated_next_ovc;
-		   wire [0:num_vcs-1] 		  allocated_ovc;
-		   wire [0:num_vcs-1] 		  flit_sel_ovc;
-		   
-		   if(num_vcs == 1)
-		     begin
-			assign allocated_next_ovc = 1'b1;
-			assign allocated_ovc = 1'b1;
-			assign flit_sel_ovc = 1'b1;
-		     end
-		   else if(num_vcs > 1)
-		     begin
-			
-			assign allocated_next_ovc
-			  = allocated_q ? allocated_ovc : next_elig_ovc;
-			
-			wire [0:num_vcs-1] allocated_ovc_s, allocated_ovc_q;
-			assign allocated_ovc_s = allocated_next_ovc;
-			c_dff
-			  #(.width(num_vcs),
-			    .reset_type(reset_type))
-			allocated_ovcq
-			  (.clk(clk),
-			   .reset(1'b0),
-			   .active(active),
-			   .d(allocated_ovc_s),
-			   .q(allocated_ovc_q));
-			
-			assign allocated_ovc = allocated_ovc_q;
-			
-			wire [0:num_vcs-1] mask_ovc;
-			c_gate_bits
-			  #(.num_ports(num_packet_classes),
-			    .width(num_vcs_per_class),
-			    .op(`BINARY_OP_OR))
-			mask_ovc_gb
-			  (.select(sel_opc),
-			   .data_in({num_vcs{1'b0}}),
-			   .data_out(mask_ovc));
-			
-			assign flit_sel_ovc
-			  = allocated_q ? allocated_ovc : mask_ovc;
-			
-		     end
-		   
-		   wire [0:num_vcs_per_class-1] allocated_ocvc;
-		   
-		   if(num_vcs_per_class == 1)
-		     assign allocated_ocvc = 1'b1;
-		   else
-		     begin
-			
-			c_binary_op
-			  #(.num_ports(num_packet_classes),
-			    .width(num_vcs_per_class),
-			    .op(`BINARY_OP_OR))
-			allocted_ocvc_bop
-			  (.data_in(allocated_ovc),
-			   .data_out(allocated_ocvc));
-			
-		     end
-		   
-		   wire [0:port_idx_width-1] 	route_port_fast;
-		   c_encode
-		     #(.num_ports(num_ports))
-		   route_port_fast_enc
-		     (.data_in(route_fast_in_op),
-		      .data_out(route_port_fast));
-		   
-		   wire [0:port_idx_width-1] allocated_port_s, allocated_port_q;
-		   assign allocated_port_s
-		     = allocated_q ? allocated_port_q : route_port_fast;
-		   c_dff
-		     #(.width(port_idx_width),
-		       .reset_type(reset_type))
-		   allocated_portq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(active),
-		      .d(allocated_port_s),
-		      .q(allocated_port_q));
-		   
-		   wire [0:num_ports-1]      allocated_op;
-		   c_decode
-		     #(.num_ports(num_ports))
-		   allocated_op_dec
-		     (.data_in(allocated_port_q),
-		      .data_out(allocated_op));
-		   
-		   wire [0:num_ports-1]      allocated_next_op;
-		   assign allocated_next_op
-		     = allocated_q ? allocated_op : route_fast_in_op;
-		   
-		   wire [0:num_vcs-1] 	     almost_full_ovc;
-		   c_select_1ofn
-		     #(.num_ports(num_ports),
-		       .width(num_vcs))
-		   almost_full_ovc_sel
-		     (.select(allocated_next_op),
-		      .data_in(almost_full_in_op_ovc),
-		      .data_out(almost_full_ovc));
-		   
-		   wire 		     almost_full;
+		   wire 			  ivs_cred;
 		   c_select_1ofn
 		     #(.num_ports(num_vcs),
 		       .width(1))
-		   almost_full_sel
-		     (.select(allocated_next_ovc),
-		      .data_in(almost_full_ovc),
-		      .data_out(almost_full));
+		   ivs_cred_sel
+		     (.select(flit_sel_fast_in_ivc),
+		      .data_in(ivs_cred_ivc),
+		      .data_out(ivs_cred));
 		   
-		   wire [0:num_vcs-1] 	     full_ovc;
-		   c_select_1ofn
-		     #(.num_ports(num_ports),
-		       .width(num_vcs))
-		   full_ovc_sel
-		     (.select(allocated_next_op),
-		      .data_in(full_in_op_ovc),
-		      .data_out(full_ovc));
-		   
-		   wire 		     full;
-		   c_select_1ofn
-		     #(.num_ports(num_vcs),
-		       .width(1))
-		   full_sel
-		     (.select(allocated_next_ovc),
-		      .data_in(full_ovc),
-		      .data_out(full));
-		   
-		   wire 		     flit_kill;
-		   assign flit_kill = flit_head_fast_in & ~any_elig;
-		   
-		   wire 		     flit_sent;
-		   assign flit_sent = ofl_flit_sent & ~flit_kill;
-		   
-		   wire 		     reduce;
-		   
-		   if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
-		     assign reduce = flit_sent;
-		   else
-		     begin
-			
-			c_select_1ofn
-			  #(.num_ports(num_ports),
-			    .width(1))
-			reduce_sel
-			  (.select(allocated_next_op),
-			   .data_in(oxl_flit_sent_op),
-			   .data_out(reduce));
-			
-		     end
-		   
-		   // we need to track credits even when we temporarily run out 
-		   // of flits; otherwise, there can be a dead cycle when a new 
-		   // flit arrives after the last flit before we ran out 
-		   // filled up the downstream buffer
-		   //
-		   // NOTE: As it is, synthesis will probably turn this into a 
-		   // free-running register!
-		   
-		   wire 			  cred_active;
-		   assign cred_active = flit_valid_fast_in | allocated_q;
-		   
-		   // NOTE: Since we only use 'cred_q' once the VC is
-		   // allocated, we can ignore 'flit_kill' here -- if the flit
-		   // is killed, we failed allocation, and thus the value of
-		   // 'cred_q' will be ignored in the next cycle anyway.
-		   
-		   wire 			  next_cred;
-		   assign next_cred = ~full & ~(almost_full & reduce);
-		   
-		   wire 			  cred_s, cred_q;
-		   assign cred_s = next_cred;
-		   c_dff
-		     #(.width(1),
-		       .reset_type(reset_type))
-		   credq
-		     (.clk(clk),
-		      .reset(1'b0),
-		      .active(cred_active),
-		      .d(cred_s),
-		      .q(cred_q));
-		   
-		   wire [0:num_vcs-1] 		  allocated_ivc;
-		   assign allocated_ivc
-		     = {num_vcs{allocated_q}} & allocated_ivc_q;
-		   
-		   wire [0:num_ports-1] 	  flit_valid_op;
-		   assign flit_valid_op
-		     = {num_ports{flit_valid_fast_in & ial_flit_sel_fast}} & 
-		       (allocated_q ? 
-			({num_ports{match & cred_q}} & allocated_op) : 
-			({num_ports{flit_head_fast_in}} & route_fast_in_op));
-		   
-		   assign ifl_allocated_ivc = allocated_ivc;
-		   assign ifl_allocated_ocvc = allocated_ocvc;
-		   assign ifl_next_cred = next_cred;
-		   assign ifl_flit_valid_op = flit_valid_op;
-		   assign ifl_flit_sel_ovc = flit_sel_ovc;
+		   assign ifl_flit_kill = flit_kill;
+		   assign ifl_next_elig_ocvc = next_elig_ocvc;
+		   assign ifl_almost_full = almost_full;
+		   assign ifl_full = full;
+		   assign ifl_debit = debit;
+		   assign ifl_flit_valid_op
+		     = (flit_head_fast_in ? 
+			route_fast_in_op : 
+			(rf_route_op & {num_ports{ivs_cred}})) & 
+		       {num_ports{flit_valid_fast_in & ial_flit_sel_fast}};
+		   assign ifl_flit_sel_ovc
+		     = flit_head_fast_in ? flit_sel_ovc : ivs_flit_sel_ovc;
 		   
 		   assign flit_sel_fast_out = ial_flit_sel_fast;
-		   assign flit_sent_fast_out = flit_sent;
+		   assign flit_sent_fast_out = ofl_flit_sent & ~flit_kill;
 		   
 		end
 	      else
 		begin
 		   
-		   assign ifl_allocated_ivc = {num_vcs{1'b0}};
-		   assign ifl_allocated_ocvc = {num_vcs_per_class{1'b0}};
-		   assign ifl_next_cred = 1'b0;
+		   assign ifl_flit_kill = 1'b0;
+		   assign ifl_next_elig_ocvc = {num_vcs_per_class{1'b0}};
+		   assign ifl_almost_full = 1'b0;
+		   assign ifl_full = 1'b0;
+		   assign ifl_debit = 1'b0;
 		   assign ifl_flit_valid_op = {num_ports{1'b0}};
 		   assign ifl_flit_sel_ovc = {num_vcs{1'b0}};
 		   
@@ -695,12 +554,9 @@ module rtr_alloc_mac
 	   
 	   wire [0:num_vcs-1] ial_flit_sel_ivc;
 	   
-	   wire [0:num_vcs*num_ports-1] rf_route_ivc_op;
 	   wire [0:num_vcs*num_resource_classes-1] rf_route_ivc_orc;
 	   
 	   wire [0:num_vcs-1] 			   ivs_allocated_ivc;
-	   wire [0:num_vcs-1] 			   ivs_cred_ivc;
-	   wire [0:num_vcs*num_vcs-1] 		   ivs_flit_sel_ivc_ovc;
 	   wire [0:num_vcs-1] 			   ivs_flit_kill_ivc;
 	   
 	   genvar 				   ivc;
@@ -733,8 +589,8 @@ module rtr_alloc_mac
 		wire 				ial_flit_sel;
 		assign ial_flit_sel = ial_flit_sel_ivc[ivc];
 		
-		wire 				ifl_allocated;
-		assign ifl_allocated = ifl_allocated_ivc[ivc];
+		wire 				flit_sel_fast_in;
+		assign flit_sel_fast_in = flit_sel_fast_in_ivc[ivc];
 		
 		
 		//--------------------------------------------------------------
@@ -798,14 +654,10 @@ module rtr_alloc_mac
 		
 		if(1) begin:ivs
 		   
-		   wire flit_valid_fast_alloc;
-		   assign flit_valid_fast_alloc
-		     = flit_valid_fast_in & ifl_allocated;
-		   
 		   wire flit_valid;
 		   
 		   if(dual_path_alloc)
-		     assign flit_valid = flit_valid_in | flit_valid_fast_alloc;
+		     assign flit_valid = flit_valid_in | flit_valid_fast_in;
 		   else
 		     assign flit_valid = flit_valid_in;
 		   
@@ -832,6 +684,9 @@ module rtr_alloc_mac
 		   wire 			  flit_sent;
 		   assign flit_sent = oal_flit_sent & ial_flit_sel;
 		   
+		   wire 			  flit_sent_fast;
+		   assign flit_sent_fast = ofl_flit_sent & flit_sel_fast_in;
+		   
 		   wire 			  flit_kill;
 		   
 		   // NOTE: For the reset condition, we don't have to worry 
@@ -843,11 +698,10 @@ module rtr_alloc_mac
 		   wire 			  allocated_s, allocated_q;
 		   if(dual_path_alloc)
 		     assign allocated_s
-		       = flit_valid ?
-			 ((allocated_q | (flit_sent & ~flit_kill) |
-			   (flit_valid_fast_alloc & ~ofl_flit_sent)) &
-			  ~(flit_sent & flit_tail_in)) :
-			 allocated_q;
+		       = (allocated_q | (flit_sent & ~flit_kill) | 
+			  (flit_sent_fast & ~ifl_flit_kill)) & 
+			 ~(flit_sent & flit_tail_in) &
+			 ~(flit_sent_fast & flit_tail_fast_in);
 		   else
 		     assign allocated_s
 		       = (allocated_q | (flit_sent & ~flit_kill)) & 
@@ -862,7 +716,7 @@ module rtr_alloc_mac
 		      .d(allocated_s),
 		      .q(allocated_q));
 		   
-		   wire 			  any_elig;
+		   wire 			  nvs_any_elig;
 		   rtr_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
@@ -873,22 +727,22 @@ module rtr_alloc_mac
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_opc(nvs_any_elig_op_opc),
-		      .flags(any_elig));
+		      .flags(nvs_any_elig));
 		   
-		   assign flit_kill = ~allocated_q & ~any_elig;
+		   assign flit_kill = ~allocated_q & ~nvs_any_elig;
 		   
-		   wire [0:num_vcs_per_class-1]   next_elig_ocvc;
+		   wire [0:num_vcs_per_class-1]   nvs_next_elig_ocvc;
 		   rtr_flags_mux
 		     #(.num_message_classes(num_message_classes),
 		       .num_resource_classes(num_resource_classes),
 		       .num_ports(num_ports),
 		       .width(num_vcs_per_class))
-		   next_elig_ocvc_fmux
+		   nvs_next_elig_ocvc_fmux
 		     (.sel_mc(sel_mc),
 		      .route_op(rf_route_op),
 		      .route_orc(rf_route_orc),
 		      .flags_op_opc(nvs_next_elig_op_ovc),
-		      .flags(next_elig_ocvc));
+		      .flags(nvs_next_elig_ocvc));
 		   
 		   wire [0:num_vcs_per_class-1]   allocated_next_ocvc;
 		   wire [0:num_vcs_per_class-1]   allocated_ocvc;
@@ -903,14 +757,21 @@ module rtr_alloc_mac
 		   else if(num_vcs_per_class > 1)
 		     begin
 			
+			wire [0:num_vcs_per_class-1] next_elig_ocvc;
+			
+			if(dual_path_alloc)
+			  assign next_elig_ocvc = flit_valid_in ? 
+						  nvs_next_elig_ocvc : 
+						  ifl_next_elig_ocvc;
+			else
+			  assign next_elig_ocvc = nvs_next_elig_ocvc;
+			
 			assign allocated_next_ocvc
 			  = allocated_q ? allocated_ocvc : next_elig_ocvc;
 			
 			wire [0:num_vcs_per_class-1] allocated_ocvc_s,
 						     allocated_ocvc_q;
-			assign allocated_ocvc_s = ifl_allocated ? 
-						  ifl_allocated_ocvc : 
-						  allocated_next_ocvc;
+			assign allocated_ocvc_s = allocated_next_ocvc;
 			c_dff
 			  #(.width(num_vcs_per_class),
 			    .reset_type(reset_type))
@@ -971,14 +832,14 @@ module rtr_alloc_mac
 		      .flags_op_opc(almost_full_in_op_ovc),
 		      .flags(almost_full_ocvc));
 		   
-		   wire 			     almost_full;
+		   wire 			     allocated_next_almost_full;
 		   c_select_1ofn
 		     #(.num_ports(num_vcs_per_class),
 		       .width(1))
-		   almost_full_sel
+		   allocated_next_almost_full_sel
 		     (.select(allocated_next_ocvc),
 		      .data_in(almost_full_ocvc),
-		      .data_out(almost_full));
+		      .data_out(allocated_next_almost_full));
 		   
 		   wire [0:num_vcs_per_class-1]      full_ocvc;
 		   rtr_flags_mux
@@ -993,29 +854,57 @@ module rtr_alloc_mac
 		      .flags_op_opc(full_in_op_ovc),
 		      .flags(full_ocvc));
 		   
-		   wire 			     full;
+		   wire 			     allocated_next_full;
 		   c_select_1ofn
 		     #(.num_ports(num_vcs_per_class),
 		       .width(1))
-		   full_sel
+		   allocated_next_full_sel
 		     (.select(allocated_next_ocvc),
 		      .data_in(full_ocvc),
-		      .data_out(full));
+		      .data_out(allocated_next_full));
 		   
+		   wire 			     debit;
+		   c_select_1ofn
+		     #(.num_ports(num_ports),
+		       .width(1))
+		   debit_sel
+		     (.select(rf_route_op),
+		      .data_in(oxl_flit_sent_op),
+		      .data_out(debit));
+		   
+		   wire 			     almost_full;
+		   wire 			     full;
 		   wire 			     reduce;
 		   
-		   if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
-		     assign reduce = flit_sent;
+		   if(dual_path_alloc)
+		     begin
+			
+			wire route_valid_in;
+			assign route_valid_in = flit_valid_in | allocated_q;
+			
+			assign almost_full = route_valid_in ? 
+					     allocated_next_almost_full : 
+					     ifl_almost_full;
+			assign full = route_valid_in ? 
+				      allocated_next_full : 
+				      ifl_full;
+			
+			if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
+			  assign reduce = flit_sent | flit_sent_fast;
+			else
+			  assign reduce = route_valid_in ? debit : ifl_debit;
+			
+		     end
 		   else
 		     begin
 			
-			c_select_1ofn
-			  #(.num_ports(num_ports),
-			    .width(1))
-			reduce_sel
-			  (.select(rf_route_op),
-			   .data_in(oxl_flit_sent_op),
-			   .data_out(reduce));
+			assign almost_full = allocated_next_almost_full;
+			assign full = allocated_next_full;
+
+			if(fb_mgmt_type == `FB_MGMT_TYPE_STATIC)
+			  assign reduce = flit_sent;
+			else
+			  assign reduce = debit;
 			
 		     end
 		   
@@ -1035,13 +924,8 @@ module rtr_alloc_mac
 		   // is killed, we failed allocation, and thus the value of
 		   // 'cred_q' will be ignored in the next cycle anyway.
 		   
-		   wire 			     next_cred;
-		   assign next_cred = ifl_allocated ? 
-				      ifl_next_cred : 
-				      (~full & ~(almost_full & reduce));
-		   
 		   wire 			     cred_s, cred_q;
-		   assign cred_s = next_cred;
+		   assign cred_s = ~full & ~(almost_full & reduce);
 		   c_dff
 		     #(.width(1),
 		       .reset_type(reset_type))
