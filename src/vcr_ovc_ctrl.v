@@ -125,6 +125,8 @@ module vcr_ovc_ctrl
    
    // incoming flit is a tail flit
    input flit_tail;
+
+
    
    // output VC is eligible for allocation (i.e., not currently allocated)
    output elig;

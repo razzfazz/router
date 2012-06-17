@@ -34,7 +34,7 @@ module vcr_ivc_ctrl_justin
    // Outputs
    route_op, route_orc, next_lar_info, flit_valid, flit_head,
    flit_tail, flit_sel_ovc, flit_data, empty, full, allocated,
-   free_nonspec, free_spec, errors, expired, drop_event,
+   free_nonspec, free_spec, errors, expired, cancel_vc, drop_event,
    // Inputs
    clk, reset, router_address, flit_valid_in, flit_head_in,
    flit_tail_in, flit_data_in, int_flow_ctrl_op_ovc, vc_gnt,
@@ -198,11 +198,11 @@ module vcr_ivc_ctrl_justin
    
    // message class to which this VC belongs
    localparam message_class
- 					 = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
+     = (vc_id / (num_resource_classes*num_vcs_per_class)) % num_message_classes;
    
    // resource class to which this VC belongs
    localparam resource_class
- 					 = (vc_id / num_vcs_per_class) % num_resource_classes;
+     = (vc_id / num_vcs_per_class) % num_resource_classes;
    
    // required address size for a single VC's buffer
    localparam fb_addr_width 		 = clogb(num_flits_per_vc);
@@ -214,7 +214,7 @@ module vcr_ivc_ctrl_justin
    // total number of bits required for storing time-to-wait information
    parameter time_to_wait_width 	 = 8;
 
-     // total number of bits of header information encoded in header flit payload
+   // total number of bits of header information encoded in header flit payload
    localparam header_info_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
        route_info_width + time_to_wait_width: 
@@ -268,6 +268,8 @@ module vcr_ivc_ctrl_justin
    // destination port (1-hot)
    output [0:num_ports-1] 			     route_op;
    wire [0:num_ports-1] 			     route_op;
+   //orginal destiantion
+   wire [0:num_ports-1] 			     real_route_op;
    
    // select next resource class
    output [0:num_resource_classes-1] 		     route_orc;
@@ -326,6 +328,8 @@ module vcr_ivc_ctrl_justin
    // has an output VC been assigned to this input VC?
    output 					     allocated;
    wire 					     allocated;
+   wire real_allocated;
+   
    
    // credit availability if VC has been assigned
    output 					     free_nonspec;
@@ -340,7 +344,9 @@ module vcr_ivc_ctrl_justin
    wire [0:5] 					     errors;
 
    // causes cross message class vc allocation
-   output expired;
+   output  expired;
+   output [0:num_ports-1] cancel_vc;
+   
 
    //signal credit return
    output drop_event;
@@ -363,11 +369,20 @@ module vcr_ivc_ctrl_justin
    
    
    wire 			 header_expired;
+   wire                          sw_expired  = header_expired&real_allocated&(state==SW_WAIT);
+   
    
    //TODO this currently assumes no cycle gaps within packets
-   wire drop_body     = (state==VC_DROP);
-   assign drop_event  = drop_body;
-   assign expired     = header_expired;   
+   wire drop_body 			     = (state==VC_DROP);
+   assign drop_event 			     = drop_body;
+   assign expired 			     = header_expired;
+
+   assign cancel_vc= 	sw_expired 	    ?
+		     real_route_op:
+		     {num_ports{1'b0}};
+   
+   
+   
 
 
    //---------------------------------------------------------------------------
@@ -393,12 +408,11 @@ module vcr_ivc_ctrl_justin
    wire 					     vc_allocated_s, 
 						     vc_allocated_q;
    generate
-      //TODO here for relinquish VC
       if(elig_mask == `ELIG_MASK_USED)
 	assign vc_allocated_s
- 		    = (vc_allocated_q & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
+ 		    = (vc_allocated_q&~sw_expired & ~(flit_sent_prev & flit_tail_prev)) | vc_gnt;
       else
-	assign vc_allocated_s  = (vc_allocated_q | vc_gnt) & ~packet_done;
+	assign vc_allocated_s  = ((vc_allocated_q&~|cancel_vc) | vc_gnt) & ~packet_done;
    endgenerate
    c_dff
      #(.width(1),
@@ -409,8 +423,11 @@ module vcr_ivc_ctrl_justin
       .active(pop_active),
       .d(vc_allocated_s),
       .q(vc_allocated_q));
-   
-   assign allocated = vc_allocated_q;
+
+
+   //TODO how does this affect the outside, when vc is cancelled
+   assign real_allocated  = vc_allocated_q;
+   assign allocated 	  = vc_allocated_q &~sw_expired;
    
    wire [0:num_vcs_per_class-1] 		     vc_allocated_ocvc;
    wire [0:num_vcs_per_class-1] 		     vc_allocated_next_ocvc;
@@ -908,52 +925,53 @@ module vcr_ivc_ctrl_justin
    hdr_route_op_dec
      (.data_in(hdr_route_port),
       .data_out(hdr_route_op));
-   
+
+   assign real_route_op  = (hdr_valid_q ? hdr_route_op : route_in_op);
    wire [0:num_ports-1] 			     route_unmasked_op;
-   assign route_unmasked_op = header_expired?default_port:(hdr_valid_q ? hdr_route_op : route_in_op);
+   assign route_unmasked_op = header_expired?default_port:real_route_op;
    
    wire [0:num_resource_classes-1] 		     route_unmasked_orc;
 
    /*
-   generate
-      if(num_resource_classes == 1)
+    generate
+    if(num_resource_classes == 1)
     */
    assign route_unmasked_orc  = 1'b1;
    /*
-      else if(num_resource_classes > 1)
-	begin
-	   
-	   wire [0:resource_class_idx_width-1] route_rcsel_in;
-	   assign route_rcsel_in
-	     = lar_info_in[port_idx_width:
-			   port_idx_width+resource_class_idx_width-1];
-	   
-	   wire [0:num_resource_classes-1]     route_in_orc;
-	   c_decode
-	     #(.num_ports(num_resource_classes))
-	   route_in_orc_dec
-	     (.data_in(route_rcsel_in),
-              .data_out(route_in_orc));
-	   
-	   wire [0:resource_class_idx_width-1] hdr_route_rcsel;
-	   assign hdr_route_rcsel
-	     = hdr_lar_info_q[port_idx_width:
-			      port_idx_width+resource_class_idx_width-1];
-	   
-	   wire [0:num_resource_classes-1]     hdr_route_orc;
-	   c_decode
-	     #(.num_ports(num_resource_classes))
-	   hdr_route_orc_dec
-	     (.data_in(hdr_route_rcsel),
-              .data_out(hdr_route_orc));
-	   
-	   assign route_unmasked_orc
-	     = hdr_valid_q ? hdr_route_orc : route_in_orc;
-	   
+    else if(num_resource_classes > 1)
+    begin
+    
+    wire [0:resource_class_idx_width-1] route_rcsel_in;
+    assign route_rcsel_in
+    = lar_info_in[port_idx_width:
+    port_idx_width+resource_class_idx_width-1];
+    
+    wire [0:num_resource_classes-1]     route_in_orc;
+    c_decode
+    #(.num_ports(num_resource_classes))
+    route_in_orc_dec
+    (.data_in(route_rcsel_in),
+    .data_out(route_in_orc));
+    
+    wire [0:resource_class_idx_width-1] hdr_route_rcsel;
+    assign hdr_route_rcsel
+    = hdr_lar_info_q[port_idx_width:
+    port_idx_width+resource_class_idx_width-1];
+    
+    wire [0:num_resource_classes-1]     hdr_route_orc;
+    c_decode
+    #(.num_ports(num_resource_classes))
+    hdr_route_orc_dec
+    (.data_in(hdr_route_rcsel),
+    .data_out(hdr_route_orc));
+    
+    assign route_unmasked_orc
+    = hdr_valid_q ? hdr_route_orc : route_in_orc;
+    
 	end
-      
+    
    endgenerate
-   */
+    */
    
    wire 				       header_valid;
    assign header_valid 	= hdr_valid_q | flit_valid_in;
@@ -1455,16 +1473,15 @@ module vcr_ivc_ctrl_justin
    
    wire [0:time_to_wait_width-1] time_to_wait_in_q;
    
-   assign time_diff 	    = coarse_counter - tbf_read_data;
+   assign time_diff 		      = coarse_counter - tbf_read_data;
    
    
-   assign time_to_wait_out  = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
+   assign time_to_wait_out 	      = header_expired ? 8'b0 : flit_head_valid ? (time_to_wait_in - time_diff) : time_to_wait_in;
 
    
-   assign header_expired    = (time_diff >= time_to_wait_in) & flit_head_valid &
-			      state!=SW_WAIT;//temporary
-   
+   assign header_expired 	      = ((time_diff >= time_to_wait_in) & flit_head_valid) | (state==VC_NACK);
  
+   
    
    c_dff
      #(.width(1),
@@ -1547,14 +1564,14 @@ module vcr_ivc_ctrl_justin
 	       VC_EMPTY: //is this state necessary?
 		 state <=VC_WAIT;
 	       VC_WAIT:
-		 if(vc_gnt & ~header_expired)
-		   state <=SW_WAIT;
-		 else if(vc_gnt & header_expired)
+		 if(header_expired)
 		   state <=VC_NACK;
+		 else if(vc_gnt)
+		   state <=SW_WAIT;
 		 else
 		   state <=VC_WAIT;
 	       SW_WAIT:
-		 if(header_expired) //there is a corner case ehre when sw_gnt occurs
+		 if(sw_expired)
 		   state <=VC_NACK;
 		 else if(sw_gnt & ~flit_tail)
 		   state <=SW_HOLD;

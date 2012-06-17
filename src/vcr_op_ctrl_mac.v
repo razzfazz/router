@@ -23,16 +23,20 @@
  ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
 
 //==============================================================================
 // output port controller (tracks state of buffers in downstream router)
 //==============================================================================
 
 module vcr_op_ctrl_mac
-  (clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, vc_gnt_ovc_ip, 
-   vc_gnt_ovc_ivc, xbr_ctrl_ip, int_flit_ctrl, flit_data, channel_out, 
-   int_flow_ctrl_ovc, elig_ovc, error);
+  (/*autoarg*/
+   // Outputs
+   channel_out, int_flow_ctrl_ovc, elig_ovc, error,
+   // Inputs
+   clk, reset, flow_ctrl_in, vc_active, vc_gnt_ovc, vc_gnt_ovc_ip,
+   vc_gnt_ovc_ivc, xbr_ctrl_ip, int_flit_ctrl, flit_data, cancel
+   );
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -134,6 +138,8 @@ module vcr_op_ctrl_mac
    
    // incoming flit data
    input [0:flit_data_width-1] 	   flit_data;
+
+   input cancel;
    
    // outgoing flit control signals
    output [0:channel_width-1] 	   channel_out;
@@ -234,41 +240,79 @@ module vcr_op_ctrl_mac
 	   wire 		empty;
 	   wire [0:int_flow_ctrl_width-1] int_flow_ctrl;
 	   wire [0:2] 			  ovcc_errors;
-	   vcr_ovc_ctrl
-	     #(.num_flits_per_vc(num_flits_per_vc),
-	       .num_vcs(num_vcs),
-	       .num_ports(num_ports),
-	       .packet_format(packet_format),
-	       .flow_ctrl_type(flow_ctrl_type),
-	       .flow_ctrl_bypass(flow_ctrl_bypass),
-	       .vc_id(ovc),
-	       .elig_mask(elig_mask),
-	       .int_flow_ctrl_type(int_flow_ctrl_type),
-	       .tst_regfile_type(tst_regfile_type),
-	       .reset_type(reset_type))
-	   ovcc
-	     (.clk(clk),
-	      .reset(reset),
-	      .fc_event_valid(cred_valid),
-	      .vc_active(vc_active),
-	      .vc_gnt(vc_gnt),
-	      .vc_gnt_ip(vc_gnt_ip),
-	      .vc_gnt_ivc(vc_gnt_ivc),
-	      .xbr_ctrl_ip(xbr_ctrl_ip),
-	      .flit_valid(flit_valid),
-	      .flit_tail(flit_tail),
-	      .elig(elig),
-	      .empty(empty),
-	      .int_flow_ctrl(int_flow_ctrl),
-	      .errors(ovcc_errors));
-
-	   assign empty_ovc[ovc] = empty;
-	   assign elig_ovc[ovc] = elig;
-	   assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
-				    (ovc+1)*int_flow_ctrl_width-1]
-		    = int_flow_ctrl;
-	   assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
-	   
+	   if (ovc == (num_vcs - 1)) 
+	     begin
+		vcr_ovc_ctrl_SRP
+		    #(.num_flits_per_vc(num_flits_per_vc),
+		      .num_vcs(num_vcs),
+		      .num_ports(num_ports),
+		      .packet_format(packet_format),
+		      .flow_ctrl_type(flow_ctrl_type),
+		      .flow_ctrl_bypass(flow_ctrl_bypass),
+		      .vc_id(ovc),
+		      .elig_mask(elig_mask),
+		      .int_flow_ctrl_type(int_flow_ctrl_type),
+		      .tst_regfile_type(tst_regfile_type),
+		      .reset_type(reset_type))
+		ovcc
+		    (.clk(clk),
+		     .reset(reset),
+		     .fc_event_valid(cred_valid),
+		     .vc_active(vc_active),
+		     .vc_gnt(vc_gnt),
+		     .vc_gnt_ip(vc_gnt_ip),
+		     .vc_gnt_ivc(vc_gnt_ivc),
+		     .xbr_ctrl_ip(xbr_ctrl_ip),
+		     .flit_valid(flit_valid),
+		     .flit_tail(flit_tail),
+		     .elig(elig),
+		     .empty(empty),
+		     .int_flow_ctrl(int_flow_ctrl),
+		     .errors(ovcc_errors),
+		     .cancel(cancel));
+		assign empty_ovc[ovc] = empty;
+		assign elig_ovc[ovc] = elig;
+		assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
+					 (ovc+1)*int_flow_ctrl_width-1]
+		  = int_flow_ctrl;
+		assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
+	     end
+	   else
+	     begin
+		vcr_ovc_ctrl
+		  #(.num_flits_per_vc(num_flits_per_vc),
+		    .num_vcs(num_vcs),
+		    .num_ports(num_ports),
+		    .packet_format(packet_format),
+		    .flow_ctrl_type(flow_ctrl_type),
+		    .flow_ctrl_bypass(flow_ctrl_bypass),
+		    .vc_id(ovc),
+		    .elig_mask(elig_mask),
+		    .int_flow_ctrl_type(int_flow_ctrl_type),
+		    .tst_regfile_type(tst_regfile_type),
+		    .reset_type(reset_type))
+		ovcc
+		  (.clk(clk),
+		   .reset(reset),
+		   .fc_event_valid(cred_valid),
+		   .vc_active(vc_active),
+		   .vc_gnt(vc_gnt),
+		   .vc_gnt_ip(vc_gnt_ip),
+		   .vc_gnt_ivc(vc_gnt_ivc),
+		   .xbr_ctrl_ip(xbr_ctrl_ip),
+		   .flit_valid(flit_valid),
+		   .flit_tail(flit_tail),
+		   .elig(elig),
+		   .empty(empty),
+		   .int_flow_ctrl(int_flow_ctrl),
+		   .errors(ovcc_errors));
+		assign empty_ovc[ovc] = empty;
+		assign elig_ovc[ovc] = elig;
+		assign int_flow_ctrl_ovc[ovc*int_flow_ctrl_width:
+					 (ovc+1)*int_flow_ctrl_width-1]
+		  = int_flow_ctrl;
+		assign ovcc_errors_ovc[ovc*3:(ovc+1)*3-1] = ovcc_errors;
+	     end // else: !if(ivc == (num_vcs - 1))	   	   
 	end
       
    endgenerate

@@ -240,7 +240,7 @@ module vcr_top
    wire [0:num_ports-1] 			     ipc_error_ip;
 
    wire [0:num_ports-1] ipc_expired;
-   
+   wire [0:num_ports*num_ports-1] ipc_opc_cancel;
    
    generate
       
@@ -281,7 +281,8 @@ module vcr_top
 	   wire [0:flit_data_width-1] 		   flit_data;
 	   wire [0:flow_ctrl_width-1] 		   flow_ctrl_out;
 	   wire 				   ipc_error;
-	   wire expired;
+	   wire  expired;
+	   wire [0:num_ports-1] cancel_vc;
 	   
 	   vcr_ip_ctrl_mac
 	     #(.num_flits_per_vc(num_flits_per_vc),
@@ -328,9 +329,11 @@ module vcr_top
 	      .flit_data(flit_data),
 	      .flow_ctrl_out(flow_ctrl_out),
 	      .error(ipc_error),
-	      .expired(expired));
-	   assign ipc_expired[ip]  = expired;
+	      .expired(expired),
+	      .cancel_vc(cancel_vc));
 	   
+	   assign ipc_expired[ip]  = expired;
+	   assign ipc_opc_cancel[ip*num_ports+:num_ports]  = cancel_vc;
 	      
 	   assign route_ip_ivc_op[ip*num_vcs*num_ports:
 				  (ip+1)*num_vcs*num_ports-1]
@@ -488,6 +491,18 @@ module vcr_top
    //---------------------------------------------------------------------------
    // output ports
    //---------------------------------------------------------------------------
+
+   wire  [0:num_ports*num_ports-1] 	opc_cancel;
+   c_interleave
+     #(	// Parameters
+	.width				(num_ports*num_ports),
+	.num_blocks			(num_ports))
+   ipc_opc_cancel_intl
+     (// Outputs
+      .data_out				(opc_cancel),
+      // Inputs
+      .data_in				(ipc_opc_cancel));
+   
    
    wire [0:num_ports-1] 		    opc_error_op;
    
@@ -564,7 +579,8 @@ module vcr_top
 	      .channel_out(channel_out),
 	      .int_flow_ctrl_ovc(int_flow_ctrl_ovc),
 	      .elig_ovc(elig_ovc),
-	      .error(opc_error));
+	      .error(opc_error),
+	      .cancel(|opc_cancel[op*num_ports+:num_ports]));
 	   
 	   assign channel_out_op[op*channel_width:(op+1)*channel_width-1]
 		    = channel_out;
