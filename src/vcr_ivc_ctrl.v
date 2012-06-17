@@ -292,8 +292,8 @@ module vcr_ivc_ctrl
    wire 			     free_spec;
    
    // internal error condition detected
-   output [0:1] 		     errors;
-   wire [0:1] 			     errors;
+   output [0:2] 		     errors;
+   wire [0:2] 			     errors;
    
    
    //---------------------------------------------------------------------------
@@ -802,7 +802,23 @@ module vcr_ivc_ctrl
    // error checking
    //---------------------------------------------------------------------------
    
+   wire ftc_active;
+   assign ftc_active = flit_valid_in;
+   
+   wire error_invalid_flit_type;
+   rtr_flit_type_check
+     #(.reset_type(reset_type))
+   ftc
+     (.clk(clk),
+      .reset(reset),
+      .active(ftc_active),
+      .flit_valid(flit_valid_sel_in),
+      .flit_head(flit_head_in),
+      .flit_tail(flit_tail_in),
+      .error(error_invalid_flit_type));
+   
    assign errors[0] = error_invalid_port;
    assign errors[1] = error_invalid_class;
+   assign errors[2] = error_invalid_flit_type;
    
 endmodule

@@ -502,7 +502,7 @@ module rtr_ip_ctrl_mac
    wire [0:num_vcs-1] 				  fb_almost_empty_ivc;
    wire [0:num_vcs-1] 				  fb_empty_ivc;
    wire [0:num_vcs*lar_info_width-1] 		  llu_lar_info_ivc;
-   wire [0:num_vcs*2-1] 			  ivcc_errors_ivc;
+   wire [0:num_vcs*3-1] 			  ivcc_errors_ivc;
    
    genvar 					  ivc;
    
@@ -566,8 +566,8 @@ module rtr_ip_ctrl_mac
 				    (ivc+1)*num_resource_classes-1]
 	     = route_out_orc;
 	   
-	   wire [0:1] 			   ivcc_errors;
-	   assign ivcc_errors_ivc[ivc*2:(ivc+1)*2-1] = ivcc_errors;
+	   wire [0:2] 			   ivcc_errors;
+	   assign ivcc_errors_ivc[ivc*3:(ivc+1)*3-1] = ivcc_errors;
 	   
 	   
 	   //-------------------------------------------------------------------
@@ -1035,8 +1035,24 @@ module rtr_ip_ctrl_mac
 	   // error checking
 	   //-------------------------------------------------------------------
 	   
+	   wire 				       ftc_active;
+	   assign ftc_active = chi_flit_valid;
+	   
+	   wire 				       error_invalid_flit_type;
+	   rtr_flit_type_check
+	     #(.reset_type(reset_type))
+	   ftc
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(ftc_active),
+	      .flit_valid(chi_flit_valid_sel),
+	      .flit_head(chi_flit_head),
+	      .flit_tail(chi_flit_tail),
+	      .error(error_invalid_flit_type));
+	   
 	   assign ivcc_errors[0] = error_invalid_port;
 	   assign ivcc_errors[1] = error_invalid_class;
+	   assign ivcc_errors[2] = error_invalid_flit_type;
 	   
 	end
       
@@ -1272,11 +1288,10 @@ module rtr_ip_ctrl_mac
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 	   
-	   wire [0:num_vcs*2+num_vcs*2-1] errors_s, errors_q;
-	   assign errors_s = {ivcc_errors_ivc, 
-			      fb_errors_ivc};
+	   wire [0:num_vcs*3+num_vcs*2-1] errors_s, errors_q;
+	   assign errors_s = {ivcc_errors_ivc, fb_errors_ivc};
 	   c_err_rpt
-	     #(.num_errors(num_vcs*2+num_vcs*2),
+	     #(.num_errors(num_vcs*3+num_vcs*2),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk

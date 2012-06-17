@@ -674,18 +674,34 @@ module whr_ip_ctrl_mac
    // error checking
    //---------------------------------------------------------------------------
    
+   wire 				  ftc_active;
+   assign ftc_active = flit_valid_in;
+   
+   wire 				  error_invalid_flit_type;
+   rtr_flit_type_check
+     #(.reset_type(reset_type))
+   ftc
+     (.clk(clk),
+      .reset(reset),
+      .active(ftc_active),
+      .flit_valid(flit_valid_thru),
+      .flit_head(flit_head_in),
+      .flit_tail(flit_tail_in),
+      .error(error_invalid_flit_type));
+   
    generate
       
       if(error_capture_mode != `ERROR_CAPTURE_MODE_NONE)
 	begin
 
-	   wire [0:3] errors_s, errors_q;
+	   wire [0:4] errors_s, errors_q;
 	   assign errors_s[0] = error_fb_underflow;
 	   assign errors_s[1] = error_fb_overflow;
 	   assign errors_s[2] = error_invalid_port;
 	   assign errors_s[3] = error_invalid_class;
+	   assign errors_s[4] = error_invalid_flit_type;
 	   c_err_rpt
-	     #(.num_errors(4),
+	     #(.num_errors(5),
 	       .capture_mode(error_capture_mode),
 	       .reset_type(reset_type))
 	   chk
