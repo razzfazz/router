@@ -77,4 +77,14 @@ module rtr_flit_type_check
    
    assign error = flit_valid & (flit_head ~^ packet_active_q);
    
+   // synopsys translate_off
+   always @(posedge clk)
+     begin
+	
+	if(error)
+	  $display("ERROR: Received flit with unexpected type in module %m.");
+	
+     end
+   // synopsys translate_on
+   
 endmodule
