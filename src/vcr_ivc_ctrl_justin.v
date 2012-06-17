@@ -237,10 +237,24 @@ module vcr_ivc_ctrl_justin
    
 `include "srp_format.v"
 
-   //u-turn port for nacks
-   localparam [0:num_ports-1] default_port  = {5'b1}<<(num_ports-1-port_id);
+ 
+   
+   
    localparam [0:port_idx_width-1] default_port_enc= port_id;
+   //u-turn port for nacks
+   wire [0:num_ports-1] default_port;
+   c_decode
+     #(// Parameters
+       .num_ports			(num_ports))
+   default_port_dec
+     (// Outputs
+      .data_out				(default_port),
+      // Inputs
+      .data_in				(default_port_enc));
+   
 
+
+   
 
    
    input clk;
