@@ -172,6 +172,9 @@ module whr_ip_ctrl_mac
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // improve timing for peek access
+   parameter fb_fast_peek = 1;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -343,6 +346,7 @@ module whr_ip_ctrl_mac
        .explicit_pipeline_register(explicit_pipeline_register),
        .gate_buffer_write(gate_buffer_write),
        .mgmt_type(`FB_MGMT_TYPE_STATIC),
+       .fast_peek(fb_fast_peek),
        .atomic_vc_allocation(atomic_vc_allocation),
        .enable_bypass(1),
        .reset_type(reset_type))

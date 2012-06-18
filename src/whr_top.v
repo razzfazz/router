@@ -147,6 +147,9 @@ module whr_top
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
    
+   // improve timing for peek access
+   parameter fb_fast_peek = 1;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -248,6 +251,7 @@ module whr_top
 	       .dim_order(dim_order),
 	       .input_stage_can_hold(input_stage_can_hold),
 	       .fb_regfile_type(fb_regfile_type),
+	       .fb_fast_peek(fb_fast_peek),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .gate_buffer_write(gate_buffer_write),
 	       .error_capture_mode(error_capture_mode),

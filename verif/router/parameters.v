@@ -101,6 +101,9 @@ parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
 // select flit buffer management scheme
 parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
 
+// improve timing for peek access
+parameter fb_fast_peek = 1;
+
 // use explicit pipeline register between flit buffer and crossbar?
 parameter explicit_pipeline_register = 0;
 

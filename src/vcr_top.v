@@ -149,6 +149,9 @@ module vcr_top
    // select flit buffer management scheme
    parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
    
+   // improve timing for peek access
+   parameter fb_fast_peek = 1;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -288,6 +291,7 @@ module vcr_top
 	       .dim_order(dim_order),
 	       .fb_regfile_type(fb_regfile_type),
 	       .fb_mgmt_type(fb_mgmt_type),
+	       .fb_fast_peek(fb_fast_peek),
 	       .explicit_pipeline_register(explicit_pipeline_register),
 	       .gate_buffer_write(gate_buffer_write),
 	       .elig_mask(elig_mask),

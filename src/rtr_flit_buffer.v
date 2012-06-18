@@ -67,6 +67,9 @@ module rtr_flit_buffer
    // select buffer management scheme
    parameter mgmt_type = `FB_MGMT_TYPE_STATIC;
    
+   // improve timing for peek access
+   parameter fast_peek = 1;
+   
    // use atomic VC allocation
    parameter atomic_vc_allocation = 1;
    
@@ -302,6 +305,7 @@ module rtr_flit_buffer
 	       #(.num_queues(num_vcs),
 		 .num_slots_per_queue(buffer_size_per_vc),
 		 .enable_bypass(enable_bypass),
+		 .fast_pop_next_addr(fast_peek),
 		 .reset_type(reset_type))
 	     samqc
 	       (.clk(clk),
@@ -404,6 +408,7 @@ module rtr_flit_buffer
 	       #(.num_queues(num_vcs),
 		 .num_slots(buffer_size),
 		 .enable_bypass(enable_bypass),
+		 .fast_pop_next_addr(fast_peek),
 		 .reset_type(reset_type))
 	     damqc
 	       (.clk(clk),
