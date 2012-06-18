@@ -153,8 +153,8 @@ module rtr_flit_buffer
    wire [0:num_vcs*2-1] 	  errors_ivc;
    
    wire [0:addr_width-1] 	  push_addr;
-   wire [0:addr_width-1] 	  pop_addr;
-   wire [0:addr_width-1] 	  pop_next_addr;
+   wire [0:num_vcs*addr_width-1]  pop_addr_ivc;
+   wire [0:num_vcs*addr_width-1]  pop_next_addr_ivc;
    
    generate
       
@@ -196,7 +196,6 @@ module rtr_flit_buffer
 	     //-----------------------------------------------------------------
 	     
 	     wire [0:num_vcs*addr_width-1] push_addr_ivc;
-	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
 	     
 	     if(!atomic_vc_allocation)
 	       begin
@@ -298,7 +297,6 @@ module rtr_flit_buffer
 	     // buffer control
 	     //-----------------------------------------------------------------
 	     
-	     wire [0:num_vcs*addr_width-1] 	     pop_next_addr_ivc;
 	     wire [0:num_vcs-1] 		     full_ivc;
 	     c_samq_ctrl
 	       #(.num_queues(num_vcs),
@@ -330,22 +328,6 @@ module rtr_flit_buffer
 		.data_in(push_addr_ivc),
 		.data_out(push_addr));
 	     
-	     c_select_1ofn
-	       #(.num_ports(num_vcs),
-		 .width(addr_width))
-	     pop_addr_sel
-	       (.select(pop_sel_ivc),
-		.data_in(pop_addr_ivc),
-		.data_out(pop_addr));
-	     
-	     c_select_1ofn
-	       #(.num_ports(num_vcs),
-		 .width(addr_width))
-	     pop_next_addr_sel
-	       (.select(pop_sel_ivc),
-		.data_in(pop_next_addr_ivc),
-		.data_out(pop_next_addr));
-	     
 	     assign full = &full_ivc;
 	     
 	  end
@@ -356,8 +338,6 @@ module rtr_flit_buffer
 	     //-----------------------------------------------------------------
 	     // tail flit tracking (non-atomic)
 	     //-----------------------------------------------------------------
-	     
-	     wire [0:num_vcs*addr_width-1] pop_addr_ivc;
 	     
 	     if(!atomic_vc_allocation)
 	       begin
@@ -436,19 +416,11 @@ module rtr_flit_buffer
 		.pop_valid(pop_valid),
 		.pop_sel_qu(pop_sel_ivc),
 		.pop_addr_qu(pop_addr_ivc),
-		.pop_next_addr(pop_next_addr),
+		.pop_next_addr_qu(pop_next_addr_ivc),
 		.almost_empty_qu(almost_empty_ivc),
 		.empty_qu(empty_ivc),
 		.full(full),
 		.errors_qu(errors_ivc));
-	     
-	     c_select_1ofn
-	       #(.num_ports(num_vcs),
-		 .width(addr_width))
-	     pop_addr_sel
-	       (.select(pop_sel_ivc),
-		.data_in(pop_addr_ivc),
-		.data_out(pop_addr));
 	     
 	  end
 	
@@ -461,19 +433,28 @@ module rtr_flit_buffer
    // storage
    //---------------------------------------------------------------------------
    
-   wire 					     write_active;
+   wire [0:addr_width-1] 		      pop_addr;
+   c_select_1ofn
+     #(.num_ports(num_vcs),
+       .width(addr_width))
+   pop_addr_sel
+     (.select(pop_sel_ivc),
+      .data_in(pop_addr_ivc),
+      .data_out(pop_addr));
+   
+   wire 				      write_active;
    assign write_active = push_active;
    
-   wire [0:addr_width-1] 			     write_addr;
+   wire [0:addr_width-1] 		      write_addr;
    assign write_addr = push_addr;
    
-   wire [0:flit_data_width-1] 			     write_data;
+   wire [0:flit_data_width-1] 		      write_data;
    assign write_data = push_data;
    
-   wire [0:flit_data_width-1] 			     read_data;
+   wire [0:flit_data_width-1] 		      read_data;
    
-   wire 					     write_enable;
-   wire [0:addr_width-1] 			     read_addr;
+   wire 				      write_enable;
+   wire [0:addr_width-1] 		      read_addr;
    
    generate
       
@@ -556,6 +537,15 @@ module rtr_flit_buffer
 	end
       else
 	begin
+	   
+	   wire [0:addr_width-1] pop_next_addr;
+	   c_select_1ofn
+	     #(.num_ports(num_vcs),
+	       .width(addr_width))
+	   pop_next_addr_sel
+	     (.select(pop_sel_ivc),
+	      .data_in(pop_next_addr_ivc),
+	      .data_out(pop_next_addr));
 	   
 	   wire [0:flit_data_width-1] pop_next_data;
 	   c_regfile
