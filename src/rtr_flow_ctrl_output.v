@@ -129,7 +129,7 @@ module rtr_flow_ctrl_output
 		      .reset_type(reset_type))
 		  cred_vcq
 		    (.clk(clk),
-		     .reset(1'b0),
+		     .reset(reset),
 		     .active(active),
 		     .d(cred_vc_s),
 		     .q(cred_vc_q));

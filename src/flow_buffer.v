@@ -151,6 +151,10 @@ module flow_buffer(/*autoarg*/
    localparam reservation_size_width  = clogb(max_reservation_size);
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
 
+   parameter [0:time_to_wait_width-1] base_ttw = 31;
+   
+
+   
    //SRP packet related
 `include "srp_format.v"
 
@@ -170,21 +174,22 @@ module flow_buffer(/*autoarg*/
    input host_data_valid;
    input host_data_head;
    input host_data_tail;
-   output host_next_flit; //get a new flit on the next cycle
    input [0:flit_data_width-1] host_data;
+   output host_next_flit; //get a new flit on the next cycle
    output buffer_empty; //allows the message generator to select this buffer
    
    
-   //IO from the NIC
+   //Input from the NIC
    //no flow control on these input, the buffer must sink them
    input grant_ready;
    input ack_ready;
    input nack_ready;
    input [0:flit_data_width-1] nic_data;
    input [0:31] current_time;
+   input nic_gnt;
    
-   //output from the buffer are flow controled   
-   input nic_gnt; 
+   //Output to the NIC
+   //output from the buffer are flow controled by nic gnt
    output reservation_ready;
    output nonspec_ready;
    output spec_ready;
@@ -503,7 +508,7 @@ module flow_buffer(/*autoarg*/
    
 
    //prevents nonspec from cutting into spec in the middle of a packet
-   assign spec_continue_s  = (spec_continue_q & ~host_data_tail) |
+   assign spec_continue_s  = (spec_continue_q & ~(spec_tail&nic_gnt)) |
 			     (new_spec_packet & nic_gnt);
    c_dff
      #(.width(1),
@@ -544,7 +549,7 @@ module flow_buffer(/*autoarg*/
 		message_dest_s,
 		spec_payload_size,
 		source_address,
-		{time_to_wait_width{1'b1}},
+		base_ttw,
 		current_spec_buffer}),
       .data_out(spec_packet[0+:spec_data_start]));
  
@@ -596,7 +601,6 @@ module flow_buffer(/*autoarg*/
 
    //wire retransmit_done  = |(spec_buffer_empty & retran_spec_buffer_decode);
    wire retransmit_last  = |(spec_buffer_almost_empty & retran_spec_buffer_decode);
-   wire retransmit;
    wire retransmit_q;
    assign retransmit  = (~retran_list_empty & ~host_after_head);
    assign retran_list_pop  = retransmit & retransmit_last & nic_gnt;
@@ -648,7 +652,10 @@ module flow_buffer(/*autoarg*/
    assign packets_debit       = (nonspec_tail & nic_gnt & inject_nonspec) + (ack_ready);
    assign free_push_buffer    = retran_list_pop? 
 				retran_spec_buffer:
-				nic_data[ack_id_start+:spec_buffer_width];
+				ack_ready?
+				nic_data[ack_id_start+:spec_buffer_width]:
+				{spec_buffer_width{1'b0}};
+   
    assign clear_spec_buffer   = free_push_buffer;
    assign free_list_push      = ack_ready | retran_list_pop ;
    
@@ -656,7 +663,10 @@ module flow_buffer(/*autoarg*/
    //-------------------
    //nack processing
    //-------------------
-   assign retran_push_buffer  = nic_data[nack_id_start+:spec_buffer_width];
+   assign retran_push_buffer  = nack_ready?
+				nic_data[nack_id_start+:spec_buffer_width]:
+				{spec_buffer_width{1'b0}};
+   
    assign retran_list_push    = nack_ready;
    assign spec_credit 	      = ack_ready|nack_ready;//either way
    

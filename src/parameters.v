@@ -45,13 +45,13 @@ parameter num_resource_classes = 1;
 parameter num_vcs_per_class = 1;
 
 // total number of nodes
-parameter num_nodes = 64;
+parameter num_nodes = 8;
 
 // number of dimensions in network
-parameter num_dimensions = 2;
+parameter num_dimensions = 1;
 
 // number of nodes per router (a.k.a. concentration factor)
-parameter num_nodes_per_router = 1;
+parameter num_nodes_per_router = 4;
 
 // select packet format
 parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
