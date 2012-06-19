@@ -184,37 +184,40 @@ module vcr_ip_ctrl_mac
        -1;
    
    // number of entries in flit buffer
-   localparam fbf_depth = num_vcs*num_flits_per_vc;
+   localparam fbf_depth 		 = num_vcs*num_flits_per_vc;
    
    // required address width for flit buffer
-   localparam fbf_addr_width = clogb(fbf_depth);
+   localparam fbf_addr_width 		 = clogb(fbf_depth);
    
    // select implementation variant for flit buffer register file
-   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type 		 = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
-   parameter explicit_pipeline_register = 0;
+   parameter explicit_pipeline_register  = 0;
    
    // gate flit buffer write port if bypass succeeds
    // (requires explicit pipeline register; may increase cycle time)
-   parameter gate_buffer_write = 0;
+   parameter gate_buffer_write 		 = 0;
    
    // select speculation type
-   parameter sw_alloc_spec = 1;
+   parameter sw_alloc_spec 		 = 1;
    
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter elig_mask = `ELIG_MASK_NONE;
+   parameter elig_mask 			 = `ELIG_MASK_NONE;
    
    // configure error checking logic
-   parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
+   parameter error_capture_mode 	 = `ERROR_CAPTURE_MODE_NO_HOLD;
    
    // ID of current input port
-   parameter port_id = 0;
+   parameter port_id 			 = 0;
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter reset_type 		 = `RESET_TYPE_ASYNC;
+
    
-   
-   localparam time_to_wait_width = 8;
+   //SRP parameters
+   parameter time_to_wait_width 	 = 8;
+   parameter max_reservation_size 	 = 16;
+   parameter spec_buffer_capacity 	 = 4;
    
    input clk;
    input reset;
@@ -414,6 +417,7 @@ module vcr_ip_ctrl_mac
 	   
 
 	   
+
 	   
 	   if (ivc == (num_vcs - 1)) begin
 	      vcr_ivc_ctrl_justin
@@ -440,8 +444,10 @@ module vcr_ip_ctrl_mac
 	              .gate_buffer_write(gate_buffer_write),
 	              .vc_id(ivc),
 	              .port_id(port_id),
-	              .reset_type(reset_type),
-	              .time_to_wait_width(time_to_wait_width))
+		      .time_to_wait_width(time_to_wait_width),
+		      .max_reservation_size(max_reservation_size),
+		      .spec_buffer_capacity(spec_buffer_capacity),
+		      .reset_type(reset_type))
 	      ivcc_justin
 		    (.clk(clk),
 	             .reset(reset),
@@ -819,10 +825,10 @@ module vcr_ip_ctrl_mac
 	      .d(sw_sel_ivc_s),
 	      .q(sw_sel_ivc_q));
 	   
-	   assign prev_sw_sel_ivc = sw_sel_ivc_q;
+	   assign prev_sw_sel_ivc     = sw_sel_ivc_q;
 	   
 	   assign flit_sent_prev_ivc
-	     = {num_vcs{flit_valid_q}} & sw_sel_ivc_q;
+ 				      = {num_vcs{flit_valid_q}} & sw_sel_ivc_q;
 	   
 	end
       
@@ -832,7 +838,9 @@ module vcr_ip_ctrl_mac
    //---------------------------------------------------------------------------
    // generate outgoing flow control signals
    //---------------------------------------------------------------------------
-   //CAUTION hardcoded Speculative VC
+   //
+
+   wire [0:num_vcs-1]flit_sent_event 	      = sw_sel_ivc & {num_vcs{flit_sent}};
    rtr_flow_ctrl_output
      #(.num_vcs(num_vcs),
        .flow_ctrl_type(flow_ctrl_type),
@@ -842,7 +850,7 @@ module vcr_ip_ctrl_mac
       .reset(reset),
       .active(alloc_active),
       .fc_event_valid_in(flit_sent|drop_event),
-      .fc_event_sel_in_ivc(sw_sel_ivc|{3'b0,drop_event}),
+      .fc_event_sel_in_ivc(flit_sent_event|{3'b0,drop_event}),
       .flow_ctrl_out(flow_ctrl_out));
    
    

@@ -151,7 +151,7 @@ module flow_buffer(/*autoarg*/
    localparam reservation_size_width  = clogb(max_reservation_size);
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
 
-   parameter [0:time_to_wait_width-1] base_ttw = 31;
+   parameter [0:time_to_wait_width-1] base_ttw = 7;
    
 
    
@@ -735,7 +735,31 @@ module flow_buffer(/*autoarg*/
    assign host_next_flit  = (spec_ready | (nonspec_ready&~retransmit)) & nic_gnt;
       
    wire [0:3] ready_sum = spec_ready+reservation_ready+nonspec_ready;
-   assign error  = (ready_sum > 1);
+
+   // synopsys translate_off
+   always @(posedge clk)
+     begin
+	if (ready_sum > 1)
+	  $display("Flow buffer ERROR:  More than one type of packet ready %m");
+	if (|spec_buffer_errors)
+	  $display("Flow buffer ERROR:  Speculative storage buffer error %m");
+	if(|free_list_errors)
+	  $display("Flow buffer ERROR:  Free list error %m");
+	if(|retran_list_errors)
+	  $display("Flow buffer ERROR:  Retransmission list error %m");
+	if(ack_ready & retran_list_pop)
+	  $display("Flow buffer ERROR:  Retran and ack are colliding %m");
+	end
+    // synopsys translate_on
+   
+
+   
+   assign error  = (ready_sum > 1) |
+		   (|spec_buffer_errors) |
+		   (|free_list_errors) |
+		   (|retran_list_errors)|
+		   (ack_ready & retran_list_pop);
+   
 endmodule // flow_buffer
 
 

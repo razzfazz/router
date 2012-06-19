@@ -156,40 +156,46 @@ module vcr_top
        -1;
    
    // select implementation variant for flit buffer register file
-   parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
+   parameter fb_regfile_type 		 = `REGFILE_TYPE_FF_2D;
    
    // use explicit pipeline register between flit buffer and crossbar?
-   parameter explicit_pipeline_register = 0;
+   parameter explicit_pipeline_register  = 0;
    
    // gate flit buffer write port if bypass succeeds
    // (requires explicit pipeline register; may increase cycle time)
-   parameter gate_buffer_write = 0;
+   parameter gate_buffer_write 		 = 0;
    
    // select whether to exclude full or non-empty VCs from VC allocation
-   parameter elig_mask = `ELIG_MASK_NONE;
+   parameter elig_mask 			 = `ELIG_MASK_NONE;
    
    // select implementation variant for VC allocator
-   parameter vc_alloc_type = `VC_ALLOC_TYPE_SEP_IF;
+   parameter vc_alloc_type 		 = `VC_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use for VC allocator
-   parameter vc_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter vc_alloc_arbiter_type 	 = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select implementation variant for switch allocator
-   parameter sw_alloc_type = `SW_ALLOC_TYPE_SEP_IF;
+   parameter sw_alloc_type 		 = `SW_ALLOC_TYPE_SEP_IF;
    
    // select which arbiter type to use for switch allocator
-   parameter sw_alloc_arbiter_type = `ARBITER_TYPE_ROUND_ROBIN;
+   parameter sw_alloc_arbiter_type 	 = `ARBITER_TYPE_ROUND_ROBIN;
    
    // select speculation type for switch allocator
-   parameter sw_alloc_spec_type = `SW_ALLOC_SPEC_TYPE_REQ;
+   parameter sw_alloc_spec_type 	 = `SW_ALLOC_SPEC_TYPE_REQ;
    
    // select implementation variant for control crossbar
-   parameter ctrl_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter ctrl_crossbar_type 	 = `CROSSBAR_TYPE_MUX;
    
    // select implementation variant for data crossbar
-   parameter data_crossbar_type = `CROSSBAR_TYPE_MUX;
+   parameter data_crossbar_type 	 = `CROSSBAR_TYPE_MUX;
+   //SRP parameters
+   parameter time_to_wait_width 	 = 8;
+   parameter max_reservation_size 	 = 16;
+   parameter spec_buffer_capacity 	 = 4;
+
+   		     
    
-   parameter reset_type = `RESET_TYPE_ASYNC;
+   parameter reset_type 		 = `RESET_TYPE_ASYNC;
    
    input clk;
    input reset;
@@ -309,6 +315,9 @@ module vcr_top
 	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(ip),
+	       .time_to_wait_width(time_to_wait_width),
+	       .max_reservation_size(max_reservation_size),
+	       .spec_buffer_capacity(spec_buffer_capacity),
 	       .reset_type(reset_type))
 	   ipc
 	     (.clk(clk),

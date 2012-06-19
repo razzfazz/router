@@ -39,33 +39,39 @@ module router_wrap
 `include "rtr_constants.v"
 `include "vcr_constants.v"
 `include "parameters.v"
+
+
+   //SRP parameters
+   parameter time_to_wait_width 	 = 8;
+   parameter max_reservation_size 	 = 16;
+   parameter spec_buffer_capacity 	 = 4;
    
    
    // total number of packet classes
-   localparam num_packet_classes = num_message_classes * num_resource_classes;
+   localparam num_packet_classes   = num_message_classes * num_resource_classes;
    
    // number of VCs
-   localparam num_vcs = num_packet_classes * num_vcs_per_class;
+   localparam num_vcs 		   = num_packet_classes * num_vcs_per_class;
    
    // width required to select individual VC
-   localparam vc_idx_width = clogb(num_vcs);
+   localparam vc_idx_width 	   = clogb(num_vcs);
    
    // total number of routers
    localparam num_routers
-     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+ 				   = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
    
    // number of routers in each dimension
-   localparam num_routers_per_dim = croot(num_routers, num_dimensions);
+   localparam num_routers_per_dim  = croot(num_routers, num_dimensions);
    
    // width required to select individual router in a dimension
-   localparam dim_addr_width = clogb(num_routers_per_dim);
+   localparam dim_addr_width 	   = clogb(num_routers_per_dim);
    
    // width required to select individual router in entire network
-   localparam router_addr_width = num_dimensions * dim_addr_width;
+   localparam router_addr_width    = num_dimensions * dim_addr_width;
    
    // connectivity within each dimension
    localparam connectivity
-     = (topology == `TOPOLOGY_MESH) ?
+ 				   = (topology == `TOPOLOGY_MESH) ?
        `CONNECTIVITY_LINE :
        (topology == `TOPOLOGY_TORUS) ?
        `CONNECTIVITY_RING :
@@ -206,6 +212,9 @@ module router_wrap
 		 .sw_alloc_spec_type(sw_alloc_spec_type),
 		 .ctrl_crossbar_type(crossbar_type),
 		 .data_crossbar_type(crossbar_type),
+		 .time_to_wait_width(time_to_wait_width),
+		 .max_reservation_size(max_reservation_size),
+		 .spec_buffer_capacity(spec_buffer_capacity),
 		 .reset_type(reset_type))
 	     vcr
 	       (.clk(clk),

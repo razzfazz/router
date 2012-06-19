@@ -263,13 +263,15 @@ module test_nic(/*autoarg*/
       .reset				(reset),
       .active				(run),
       .flow_ctrl_in			(flow_ctrl_inject));
-
+   
+   wire [0:num_vcs-1] inject_fc_error;
+   
    generate
       genvar ivc_fc;
       for(ivc_fc=0; ivc_fc<num_vcs;ivc_fc=ivc_fc+1)
 	begin:ivc_fcs
 	   wire full;
-	   wire [0:5] errors;
+	   wire [0:1] errors;
 	   
 	   c_fifo_tracker
 	     #(// Parameters
@@ -281,15 +283,16 @@ module test_nic(/*autoarg*/
 	      .empty		(),
 	      .almost_full		(),
 	      .full			(full),
-	      .free			(errors),
-	      .errors		(),
+	      .free			(),
+	      .errors		(errors),
 	      // Inputs
 	      .clk			(clk),
 	      .reset		(reset),
-	      .active		(inject_fc_active|(|inject_debit)),
-	      .push			(inject_debit[ivc_fc]),
-	      .pop			(inject_credit[ivc_fc]));
+	      .active		(1'b1),
+	      .push			((|inject_debit)?inject_debit[ivc_fc]:1'b0),
+	      .pop			(inject_fc_active?inject_credit[ivc_fc]:1'b0));
 	   assign inject_elig[ivc_fc]  = ~full;
+	   assign inject_fc_error      = |errors;
 	end
    endgenerate
    
@@ -598,6 +601,9 @@ module test_nic(/*autoarg*/
 			      = eject_fifo_data[1*(flit_data_width+1)+:flit_data_width];
    wire fb_output_head;
    wire fb_output_tail;
+
+   wire fb_error;
+   
    
    flow_buffer
      #(// Parameters
@@ -631,13 +637,13 @@ module test_nic(/*autoarg*/
       .output_data			(fb_output_data),
       .output_head			(fb_output_head),
       .output_tail			(fb_output_tail),
-      .error				(),
+      .error				(fb_error),
       // Inputs
       .clk				(clk),
       .run				(run),
       .reset				(reset),
       .source_address			(source_address),
-      //generated outside to nic to buffer TODO
+      //generated outside to nic to buffer
       .message_ready			(message_ready),
       .message_size			(message_size),
       .message_dest			(message_dest),
@@ -724,8 +730,25 @@ module test_nic(/*autoarg*/
       .flit_data_in			(injection_flit_data[0:flit_data_width-1]),
       .flit_sel_in_ovc			(injection_gnt_ovc));
 
+
+  
+   // synopsys translate_off
    
-   assign error 			 = (|eject_fifo_error) | (|grant_errors) | (|ack_errors); 
+   always @(posedge clk)
+     begin
+	if(|eject_fifo_error)
+	  $display("NIC ERROR: Eject fifo problem %m");
+	if(|grant_errors)
+	  $display("NIC ERROR: Grant fifo error %m");
+	if(|ack_errors)
+	  $display("NIC ERROR: Ack fifo error %m");
+	if(|inject_fc_error)
+	  $display("NIC ERROR: Flow control from injection error %m");
+     end
+    // synopsys translate_on
+
+   
+   assign error  = (|eject_fifo_error) | (|grant_errors) | (|ack_errors) |(|inject_fc_error)|fb_error; 
 endmodule // test_nic
 
 

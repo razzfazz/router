@@ -193,14 +193,15 @@ module c_multi_lane_fifo
 	   wire 		 almost_full;
 	   wire 		 full;
 	   wire [0:1] 		 errors;
-	   c_fifo_ctrl
+	   c_fifo_ctrl_clr
 	     #(.depth(num_buffers_per_lane),
 	       .extra_addr_width(pad_addr_width),
 	       .offset(lane * num_buffers_per_lane),
 	       .reset_type(reset_type))
 	   fc
 	     (.clk(clk),
-	      .reset(reset|clear[lane]),
+	      .reset(reset),
+	      .clear(clear[lane]),
 	      .push_active(push_active),
 	      .pop_active(pop_active),
 	      .push(push),
