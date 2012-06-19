@@ -1553,15 +1553,17 @@ module vcr_ivc_ctrl_justin
 	
 	if(error_ct_overflow)
 	  $display("ERROR: Credit tracker overflow in module %m.");
+	if(drop_body&fbc_empty)
+	  $display("ERROR: dropping from empty buffer.");
      end
    
    // synopsys translate_on
-   assign errors[0] 	= error_fbc_underflow;
-   assign errors[1] 	= error_fbc_overflow;
-   assign errors[2] 	= error_no_header;
-   assign errors[3] 	= error_ct_overflow;
-   assign errors[4] 	= 1'b0; //error_invalid_port;
-   assign errors[5] 	= 1'b0; //error_invalid_class;
+   assign errors[0]  = error_fbc_underflow;
+   assign errors[1]  = error_fbc_overflow;
+   assign errors[2]  = error_no_header;
+   assign errors[3]  = error_ct_overflow;
+   assign errors[4]  = 1'b0; //error_invalid_port;
+   assign errors[5]  = 1'b0; //error_invalid_class;
 
    
    
@@ -1571,7 +1573,7 @@ module vcr_ivc_ctrl_justin
    always@(posedge clk, posedge reset)
      begin
 	if(reset)
-	  state <=VC_WAIT;
+	  state     <=VC_WAIT;
 	else
 	  begin
 	     case(state)

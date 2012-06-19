@@ -183,6 +183,9 @@ module flow_buffer(/*autoarg*/
    //no flow control on these input, the buffer must sink them
    input grant_ready;
    input ack_ready;
+   wire ack_pop;
+   
+	
    input nack_ready;
    input [0:flit_data_width-1] nic_data;
    input [0:31] current_time;
@@ -301,7 +304,7 @@ module flow_buffer(/*autoarg*/
       .d				(packets_remaining_s));
    
    //prevents spec from sending too many packets
-   wire spec_credit; //when ack/nack received
+   wire [0:1] spec_credit; //when ack/nack received
    wire spec_debit; //when head flit is sent
    wire spec_tail_debit; //when tail flit is sent
    wire [0:reservation_size_width-1] packets_spec_s;
@@ -378,6 +381,7 @@ module flow_buffer(/*autoarg*/
    wire new_spec_packet;
 
    wire spec_buffer_available ;
+   wire clear_spec;
    wire [0:spec_buffer_width-1] clear_spec_buffer;
    wire [0:spec_buffer_capacity-1] clear_spec_buffer_decode;
    wire [0:spec_buffer_width-1] current_spec_buffer;
@@ -442,7 +446,7 @@ module flow_buffer(/*autoarg*/
       // Inputs
       .clk				(clk),
       .reset				(reset),
-      .clear                            (clear_spec_buffer_decode &{spec_buffer_capacity{ack_ready}}),
+      .clear                            (clear_spec?clear_spec_buffer_decode:{spec_buffer_capacity{1'b0}}),
       .push_active			(run),
       .push_valid			(nic_gnt & spec_ready),
       .push_sel_ln			(current_spec_buffer_decode),
@@ -649,15 +653,50 @@ module flow_buffer(/*autoarg*/
    //-------------------
    //ack pack processing
    //-------------------
-   assign packets_debit       = (nonspec_tail & nic_gnt & inject_nonspec) + (ack_ready);
-   assign free_push_buffer    = retran_list_pop? 
-				retran_spec_buffer:
-				ack_ready?
-				nic_data[ack_id_start+:spec_buffer_width]:
-				{spec_buffer_width{1'b0}};
+   wire [0:spec_buffer_width-1] ack_free_buffer;
+   wire ack_fifo_empty;
+   wire [0:1] ack_fifo_errors;
+   wire ack_push  = ack_ready;
+   assign ack_pop = ~ack_fifo_empty & ~retran_list_pop;
+   
+
+   c_fifo
+     #(// Parameters
+       .depth				(2),
+       .width				(spec_buffer_width),
+       .regfile_type			(`REGFILE_TYPE_FF_2D),
+       .reset_type			(reset_type))
+   ack_fifo
+     (// Outputs
+      .pop_data				(ack_free_buffer),
+      .almost_empty			(),
+      .empty				(ack_fifo_empty),
+      .almost_full			(),
+      .full				(),
+      .errors				(ack_fifo_errors),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .push_active			(1'b1),
+      .pop_active			(1'b1),
+      .push				(ack_push),
+      .pop				(ack_pop),
+      .push_data			(nic_data[ack_id_start+:spec_buffer_width]));
+
+
+
+
+   //
+   assign packets_debit     = (nonspec_tail & nic_gnt & inject_nonspec) + ack_pop;
+   assign free_push_buffer  = retran_list_pop? 
+			      retran_spec_buffer:
+			      (ack_pop?
+			       ack_free_buffer:
+			       {spec_buffer_width{1'b0}});
    
    assign clear_spec_buffer   = free_push_buffer;
-   assign free_list_push      = ack_ready | retran_list_pop ;
+   assign clear_spec 	      = ack_pop | retran_list_pop;
+   assign free_list_push      = ack_pop | retran_list_pop ;
    
    
    //-------------------
@@ -668,7 +707,7 @@ module flow_buffer(/*autoarg*/
 				{spec_buffer_width{1'b0}};
    
    assign retran_list_push    = nack_ready;
-   assign spec_credit 	      = ack_ready|nack_ready;//either way
+   assign spec_credit 	      = ack_pop + nack_ready;//either way
    
 
    //FSM update   
@@ -747,7 +786,7 @@ module flow_buffer(/*autoarg*/
 	  $display("Flow buffer ERROR:  Free list error %m");
 	if(|retran_list_errors)
 	  $display("Flow buffer ERROR:  Retransmission list error %m");
-	if(ack_ready & retran_list_pop)
+	if(ack_pop & retran_list_pop)
 	  $display("Flow buffer ERROR:  Retran and ack are colliding %m");
 	end
     // synopsys translate_on
@@ -758,7 +797,7 @@ module flow_buffer(/*autoarg*/
 		   (|spec_buffer_errors) |
 		   (|free_list_errors) |
 		   (|retran_list_errors)|
-		   (ack_ready & retran_list_pop);
+		   (ack_pop & retran_list_pop);
    
 endmodule // flow_buffer
 
