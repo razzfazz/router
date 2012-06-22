@@ -1,11 +1,3 @@
-/*Message buffer
- * Can fetch message info from the message generator
- * Can extract grant time from grant
- * basic spec, nonspec, ack handling is working 
- * basic nack, retransmitworking
- * 
- * need lots and lots of extensive tests
- */
 
 
 module flow_buffer(/*autoarg*/
@@ -184,21 +176,27 @@ module flow_buffer(/*autoarg*/
    input grant_ready;
    input ack_ready;
    wire ack_pop;
-   
-	
    input nack_ready;
    input [0:flit_data_width-1] nic_data;
    input [0:31] current_time;
    input nic_gnt;
+   wire nic_gnt_int;
+   
    
    //Output to the NIC
-   //output from the buffer are flow controled by nic gnt
+   //*_int signals  are used internally, which is double buffered before actual output
    output reservation_ready;
+   wire reservation_ready_int;
    output nonspec_ready;
+   wire nonspec_ready_int;
    output spec_ready;
+   wire spec_ready_int;
    output [0:flit_data_width-1] output_data;
+   wire [0:flit_data_width-1] output_data_int;
    output output_head;
+   wire output_head_int;
    output output_tail;
+   wire output_tail_int;
    
    output error;
 
@@ -245,7 +243,7 @@ module flow_buffer(/*autoarg*/
       .sel_mc(1'b1),
       .sel_irc(1'b1),
       .dest_info(message_dest_s),
-      .route_op( message_route_op),
+      .route_op(message_route_op),
       .route_orc());
    c_encode
      #(.num_ports(num_ports))
@@ -323,7 +321,8 @@ module flow_buffer(/*autoarg*/
       .d				(packets_spec_s));
    
    assign packets_available  = packets_remaining_q-packets_spec_q;
-     
+
+   
    //--------------------------
    //Reservation packet packing
    wire [0:flit_data_width-1] reservation_packet_s;
@@ -351,6 +350,11 @@ module flow_buffer(/*autoarg*/
       .active				(run),
       .d				(reservation_packet_s));
 
+
+
+
+
+
    
    //----------------------
    //Grant packet processing
@@ -375,17 +379,24 @@ module flow_buffer(/*autoarg*/
       .d				(granted_time_s));
 
 
+
+   
+
    
    //-------------------
    //spec packet injection
    wire new_spec_packet;
 
    wire spec_buffer_available ;
-   wire clear_spec;
-   wire [0:spec_buffer_width-1] clear_spec_buffer;
-   wire [0:spec_buffer_capacity-1] clear_spec_buffer_decode;
+   
+   wire free_list_push;
+   wire [0:spec_buffer_width-1] free_pop_buffer;
+   wire [0:spec_buffer_width-1] free_push_buffer;
+   wire [0:spec_buffer_capacity-1] free_push_buffer_decode;
+   
    wire [0:spec_buffer_width-1] current_spec_buffer;
    wire [0:spec_buffer_capacity-1] current_spec_buffer_decode;
+   
    wire retransmit;
    wire [0:spec_buffer_width-1] retran_spec_buffer;
    wire [0:spec_buffer_capacity-1] retran_spec_buffer_decode;
@@ -415,9 +426,9 @@ module flow_buffer(/*autoarg*/
      #(.num_ports			(spec_buffer_capacity))
    spec_buffer_clear_decode
      (// Outputs
-      .data_out				(clear_spec_buffer_decode),
+      .data_out				(free_push_buffer_decode),
       // Inputs
-      .data_in				(clear_spec_buffer));
+      .data_in				(free_push_buffer));
    c_decode
      #(.num_ports			(spec_buffer_capacity))
    spec_buffer_pop_decode
@@ -446,13 +457,13 @@ module flow_buffer(/*autoarg*/
       // Inputs
       .clk				(clk),
       .reset				(reset),
-      .clear                            (clear_spec?clear_spec_buffer_decode:{spec_buffer_capacity{1'b0}}),
+      .clear                            (free_list_push?free_push_buffer_decode:{spec_buffer_capacity{1'b0}}),
       .push_active			(run),
-      .push_valid			(nic_gnt & spec_ready),
+      .push_valid			(nic_gnt_int & spec_ready_int),
       .push_sel_ln			(current_spec_buffer_decode),
       .push_data			(spec_packet),
       .pop_active			(run),
-      .pop_valid			(retransmit & nic_gnt),
+      .pop_valid			(retransmit & nic_gnt_int),
       .pop_sel_ln			(retran_spec_buffer_decode));
    
    
@@ -477,12 +488,10 @@ module flow_buffer(/*autoarg*/
 
    //Real free list
    wire [0:1] free_list_errors;
-   wire free_list_push;
    wire free_list_pop;
    wire free_list_empty;
    wire free_list_full;
-   wire [0:spec_buffer_width-1] free_pop_buffer;
-   wire [0:spec_buffer_width-1] free_push_buffer;
+
    
    c_fifo
      #(// Parameters
@@ -512,8 +521,8 @@ module flow_buffer(/*autoarg*/
    
 
    //prevents nonspec from cutting into spec in the middle of a packet
-   assign spec_continue_s  = (spec_continue_q & ~(spec_tail&nic_gnt)) |
-			     (new_spec_packet & nic_gnt);
+   assign spec_continue_s  = (spec_continue_q & ~(spec_tail&nic_gnt_int)) |
+			     (new_spec_packet & nic_gnt_int);
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -531,9 +540,9 @@ module flow_buffer(/*autoarg*/
 			     spec_buffer_available & //spec buffer is free
 			     (|packets_available);//insure we dont' send too much
    
-   assign spec_ready 	 = spec_continue_q | new_spec_packet;
-   assign spec_debit 	 = host_data_head & nic_gnt & spec_ready;
-   assign spec_tail_debit= host_data_tail & nic_gnt & spec_ready;
+   assign spec_ready_int = spec_continue_q | new_spec_packet;
+   assign spec_debit 	 = host_data_head & nic_gnt_int & spec_ready_int;
+   assign spec_tail_debit= host_data_tail & nic_gnt_int & spec_ready_int;
    assign free_list_pop  = spec_tail_debit&~free_list_init;
    
    
@@ -607,7 +616,7 @@ module flow_buffer(/*autoarg*/
    wire retransmit_last  = |(spec_buffer_almost_empty & retran_spec_buffer_decode);
    wire retransmit_q;
    assign retransmit  = (~retran_list_empty & ~host_after_head);
-   assign retran_list_pop  = retransmit & retransmit_last & nic_gnt;
+   assign retran_list_pop  = retransmit & retransmit_last & nic_gnt_int;
    c_dff
      #(.width(1),
        .reset_type(reset_type))
@@ -684,18 +693,14 @@ module flow_buffer(/*autoarg*/
       .push_data			(nic_data[ack_id_start+:spec_buffer_width]));
 
 
-
-
-   //
-   assign packets_debit     = (nonspec_tail & nic_gnt & inject_nonspec) + ack_pop;
+   
+   assign packets_debit     = (nonspec_tail & nic_gnt_int & inject_nonspec) + ack_pop;
    assign free_push_buffer  = retran_list_pop? 
 			      retran_spec_buffer:
 			      (ack_pop?
 			       ack_free_buffer:
 			       {spec_buffer_width{1'b0}});
-   
-   assign clear_spec_buffer   = free_push_buffer;
-   assign clear_spec 	      = ack_pop | retran_list_pop;
+  
    assign free_list_push      = ack_pop | retran_list_pop ;
    
    
@@ -722,7 +727,7 @@ module flow_buffer(/*autoarg*/
 		 if(message_ready) //new message from nic
 		   state <=FB_RES_READY;
 	       FB_RES_READY:
-		 if(nic_gnt) //nic accepted reservation packet
+		 if(nic_gnt_int) //nic accepted reservation packet
 		   begin
 		      state <= FB_SPEC_READY;
 		   end
@@ -746,36 +751,77 @@ module flow_buffer(/*autoarg*/
      end // always @ (posedge clk, posedge reset)
 
 
-   //update these conditions
-   //assign spec_ready 	    updated above
-   assign nonspec_ready      = inject_nonspec;
+
    
-   assign reservation_ready  = (state==FB_RES_READY);
+   //Output to the nic
+   //assign spec_ready 	    updated above
+   assign nonspec_ready_int      = inject_nonspec;
+   assign reservation_ready_int  = (state==FB_RES_READY);
    assign buffer_empty 	     = (state==FB_EMPTY);
-
-
-
+   assign host_next_flit  = (spec_ready_int | (nonspec_ready_int&~retransmit)) & nic_gnt_int;
+   
    c_select_1ofn
      #(// Parameters
        .num_ports			(3),
        .width				(flit_data_width+2))
    injection_mux
      (// Outputs
-      .data_out				({output_data, output_head, output_tail}),
+      .data_out				({output_data_int, output_head_int, output_tail_int}),
       // Inputs
-      .select				({reservation_ready,
-					  nonspec_ready, 
-					  spec_ready}),
+      .select				({reservation_ready_int,
+					  nonspec_ready_int, 
+					  spec_ready_int}),
       .data_in				({{reservation_packet_q,1'b1, 1'b1}, 
 					  {nonspec_packet, nonspec_head, nonspec_tail},
 					  {spec_packet, spec_head, spec_tail} }));
 
+   wire staging_empty;
+   wire staging_full;
+   assign nic_gnt_int  = (~staging_full) && (reservation_ready_int|nonspec_ready_int|spec_ready_int);
+   wire[0:1] staging_errors;
+   wire [0:4] status_to_nic;
+   assign {reservation_ready,
+	   nonspec_ready,
+	   spec_ready, 
+	   output_head, 
+	   output_tail}  = staging_empty?
+			   5'b0:
+			   status_to_nic;   
+										   
+   
+   //Act as double buffer, the nic_gnt signal also comes too late. 
+   c_fifo
+     #( // Parameters
+       .depth				(2),
+       .width				(flit_data_width+5),
+       .regfile_type			(`REGFILE_TYPE_FF_2D),
+       .reset_type			(reset_type))
+   output_staging
+     (// Outputs
+      .pop_data				({status_to_nic,
+					  output_data}),
+      .almost_empty			(),
+      .empty				(staging_empty),
+      .almost_full			(),
+      .full				(staging_full),
+      .errors				(staging_errors),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .push_active			(1'b1),
+      .pop_active			(1'b1),
+      .push				(
+					 nic_gnt_int),
+      .pop				(nic_gnt),
+      .push_data			({reservation_ready_int,nonspec_ready_int,spec_ready_int,
+					  output_head_int, output_tail_int,
+					  output_data_int}));
+   
 
-   assign host_next_flit  = (spec_ready | (nonspec_ready&~retransmit)) & nic_gnt;
-      
-   wire [0:3] ready_sum = spec_ready+reservation_ready+nonspec_ready;
 
+   
    // synopsys translate_off
+   wire [0:3] ready_sum = spec_ready+reservation_ready+nonspec_ready;
    always @(posedge clk)
      begin
 	if (ready_sum > 1)
@@ -788,17 +834,16 @@ module flow_buffer(/*autoarg*/
 	  $display("Flow buffer ERROR:  Retransmission list error %m");
 	if(ack_pop & retran_list_pop)
 	  $display("Flow buffer ERROR:  Retran and ack are colliding %m");
+	if(|staging_errors)
+	  $display("NIC ERROR: Staging fifo %m");
 	end
-    // synopsys translate_on
    
-
-   
-   assign error  = (ready_sum > 1) |
-		   (|spec_buffer_errors) |
+   assign error  = (|spec_buffer_errors) |
 		   (|free_list_errors) |
 		   (|retran_list_errors)|
-		   (ack_pop & retran_list_pop);
-   
+		   (ack_pop & retran_list_pop)|
+		   (|staging_errors) ;
+    // synopsys translate_on
 endmodule // flow_buffer
 
 

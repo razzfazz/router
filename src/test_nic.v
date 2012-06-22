@@ -177,8 +177,27 @@ module test_nic(/*autoarg*/
    output host_next_flit; //get a new flit on the next cycle
    output buffer_empty; //allows the message generator to select this buffer
 
-   
    output error;
+
+
+
+   //grant fifo declarations
+   wire grant_push; //0 cycle turn around
+   wire grant_pop ;
+   wire [0:1] grant_errors;
+   wire grant_full;
+   wire grant_empty;
+   wire grant_almost_full;
+   wire grant_almost_empty;
+   //ack fifo declarations
+   wire ack_push;; //0 cycle turn around
+   wire ack_pop ;
+   wire [0:1] ack_errors;
+   wire ack_full;
+   wire ack_empty;
+   wire ack_almost_full;
+   wire ack_almost_empty;
+   
    
    //////////////////////////////
    //channel input from the router
@@ -292,7 +311,7 @@ module test_nic(/*autoarg*/
 	      .push			((|inject_debit)?inject_debit[ivc_fc]:1'b0),
 	      .pop			(inject_fc_active?inject_credit[ivc_fc]:1'b0));
 	   assign inject_elig[ivc_fc]  = ~full;
-	   assign inject_fc_error      = |errors;
+	   assign inject_fc_error[ivc_fc]      = |errors;
 	end
    endgenerate
    
@@ -479,13 +498,7 @@ module test_nic(/*autoarg*/
 
 
    //insert into grant fifo
-   wire grant_push = reservation_request; //0 cycle turn around
-   wire grant_pop ;
-   wire [0:1] grant_errors;
-   wire grant_full;
-   wire grant_empty;
-   wire grant_almost_full;
-   wire grant_almost_empty;
+   assign grant_push = reservation_request; //0 cycle turn around
    c_fifo
      #(
        // Parameters
@@ -558,13 +571,7 @@ module test_nic(/*autoarg*/
    assign ack_packet_in[ack_data_start:flit_data_width-1] = 'b0;//filler
 
    //insert into ack fifo   
-   wire ack_push = speculative_request; //0 cycle turn around
-   wire ack_pop ;
-   wire [0:1] ack_errors;
-   wire ack_full;
-   wire ack_empty;
-   wire ack_almost_full;
-   wire ack_almost_empty;
+   assign  ack_push = speculative_request; //0 cycle turn around
    c_fifo
      #(
        // Parameters
@@ -744,6 +751,7 @@ module test_nic(/*autoarg*/
 	  $display("NIC ERROR: Ack fifo error %m");
 	if(|inject_fc_error)
 	  $display("NIC ERROR: Flow control from injection error %m");
+
      end
     // synopsys translate_on
 
