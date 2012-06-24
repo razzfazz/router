@@ -190,7 +190,7 @@ module test_nic(/*autoarg*/
    wire grant_almost_full;
    wire grant_almost_empty;
    //ack fifo declarations
-   wire ack_push;; //0 cycle turn around
+   wire ack_push; //0 cycle turn around
    wire ack_pop ;
    wire [0:1] ack_errors;
    wire ack_full;
@@ -738,22 +738,7 @@ module test_nic(/*autoarg*/
       .flit_sel_in_ovc			(injection_gnt_ovc));
 
 
-  
-   // synopsys translate_off
-   
-   always @(posedge clk)
-     begin
-	if(|eject_fifo_error)
-	  $display("NIC ERROR: Eject fifo problem %m");
-	if(|grant_errors)
-	  $display("NIC ERROR: Grant fifo error %m");
-	if(|ack_errors)
-	  $display("NIC ERROR: Ack fifo error %m");
-	if(|inject_fc_error)
-	  $display("NIC ERROR: Flow control from injection error %m");
 
-     end
-    // synopsys translate_on
 
    
    assign error  = (|eject_fifo_error) | (|grant_errors) | (|ack_errors) |(|inject_fc_error)|fb_error; 
