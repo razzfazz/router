@@ -12,10 +12,14 @@ module message_generator(/*autoarg*/
 `include "parameters.v"
 
    parameter seed 			= 1;
-   integer msg_gen_seed 			= seed;
-   
+   integer msg_gen_seed 		= seed;
    parameter injection_rate 		= 10;
+   parameter intra_router_only 		= 1;
+
+   parameter router_id=0;
+   parameter node_id=0;
    
+  
    
    // width required to select individual resource class
    localparam resource_class_idx_width 	= clogb(num_resource_classes);
@@ -94,7 +98,7 @@ module message_generator(/*autoarg*/
        (packet_format == `PACKET_FORMAT_EXPLICIT_LENGTH) ? 
        (route_info_width + payload_length_width) : 
        -1;
- 
+   
    parameter max_reservation_size     = 16;
    parameter time_to_wait_width       = 8;
    localparam reservation_size_width  = clogb(max_reservation_size);
@@ -109,11 +113,10 @@ module message_generator(/*autoarg*/
    input host_next_flit;
    input buffer_empty;
    
-
    output [0:reservation_size_width-1] message_size;
    reg  [0:reservation_size_width-1] message_size;
    output [0:dest_info_width-1] message_dest;
-   reg  [0:dest_info_width-1] message_dest;
+   reg [0:dest_info_width-1] message_dest;
    output has_message;
    reg has_message;
    
@@ -139,58 +142,68 @@ module message_generator(/*autoarg*/
    integer i;
    integer total_injected;
    //message generator
-   always@(posedge clk, posedge reset)
-     begin
-	if(reset)
-	  begin
-	     has_message 	    <= 0;
-	     message_size 	    <= 0;
-	     message_dest 	    <= 0;
-	     host_message_size 	    <= {reservation_size_width{1'b0}};
-	     host_data 	    <= {flit_data_width{1'b0}};
-	     host_flit_counter 	    <= 0;
-	  end
-	else
-	  begin
-	     //stat
-	     if(message_ready)
-	       total_injected 	     = total_injected +  message_size;
-
-	     //random bits come and go
-	     for(i = 0; i < flit_data_width; i = i + 1)
-	       host_data[i] 	    <= $dist_uniform(msg_gen_seed, 0, 1);
-
-	     if(message_ready)
-	       begin
-		  host_message_size <= message_size;
-	       end
-	     if(host_message_size) //decrement
-	       host_message_size    <=host_message_size-(host_data_tail & host_next_flit);
-
-	     if(host_next_flit)
-	       host_flit_counter    <= host_flit_counter+1'b1;
-	     
-	     
-	     //create message
-	     if(~has_message)
-	       begin 
-		  has_message 	    <= ($dist_uniform(msg_gen_seed, 0,  99) < injection_rate);
-		  message_size 	    <= $dist_uniform(msg_gen_seed, 1,  max_reservation_size-1);
-		  message_dest 	    <= $dist_uniform(msg_gen_seed, 0, num_routers_per_dim*num_routers_per_dim-2);
-	       end
-	     else
-	       begin
-		  if(message_ready)
-		    begin
-		       has_message  <=0;
-		       message_size <=0;
-		       message_dest <= 0;
-		    end
-	       end // else: !if(~has_message)	
+   generate
+      always@(posedge clk, posedge reset)
+	begin
+	   if(reset)
+	     begin
+		has_message 	    <= 0;
+		message_size 	    <= 0;
+		message_dest 	    <= 0;
+		host_message_size 	    <= {reservation_size_width{1'b0}};
+		host_data 		    <= {flit_data_width{1'b0}};
+		host_flit_counter 	    <= 0;
 	     end
-     end
+	   else
+	     begin
+		//stat
+		if(message_ready)
+		  total_injected 	     = total_injected +  message_size;
 
+		//random bits come and go
+		for(i = 0; i < flit_data_width; i = i + 1)
+		  host_data[i] 	    <= $dist_uniform(msg_gen_seed, 0, 1);
+
+		if(message_ready)
+		  begin
+		     host_message_size <= message_size;
+		  end
+		if(host_message_size) //decrement
+		  host_message_size    <=host_message_size-(host_data_tail & host_next_flit);
+
+		if(host_next_flit)
+		  host_flit_counter    <= host_flit_counter+1'b1;
+		
+		
+		//create message
+		if(~has_message)
+		  begin
+		     has_message 	    <= ($dist_uniform(msg_gen_seed, 0,  999) < injection_rate);
+		     message_size 	    <= $dist_uniform(msg_gen_seed, 1,  max_reservation_size-1);
+		     if(num_nodes_per_router>1)
+		       message_dest[router_addr_width:dest_info_width-1]  <= (node_id+$dist_uniform(msg_gen_seed, 0,num_nodes_per_router-2)+1)%num_nodes_per_router;
+		     
+		     if(intra_router_only)
+		       message_dest[0:router_addr_width-1] = router_id;
+		     else
+		       message_dest[0:router_addr_width-1] <= (router_id+$dist_uniform(msg_gen_seed, 0, num_routers-2)+1)%num_routers;
+		  end
+		else
+		  begin
+		     if(message_ready)
+		       begin
+			  has_message  <=0;
+			  message_size <=0;
+			  message_dest <= 0;
+		       end
+		  end // else: !if(~has_message)	
+	     end
+	end // always@ (posedge clk, posedge reset)
+      
+
+
+   endgenerate
+   
 
    
 endmodule
-   

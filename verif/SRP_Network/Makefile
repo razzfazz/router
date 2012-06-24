@@ -29,7 +29,7 @@
 #
 
 TOP_SRC = testbench.v
-DEP_SRCS = parameters.v 
+DEP_SRCS = parameters.v message_generator.v 
 
 SRCS = $(TOP_SRC) $(DEP_SRCS)
 
