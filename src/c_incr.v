@@ -50,13 +50,7 @@ module c_incr
    output [0:width-1] data_out;
    wire [0:width-1] data_out;
    
-   wire 	    carry;
-   assign carry = &data_in[(width-cwidth):width-1];
-   
-   wire 	    wrap;
-   assign wrap = (data_in[(width-cwidth):width-1] ==
-		  max_value[(width-cwidth):width-1]);
-   
+
    generate
       
       if((1 << cwidth) == num_values)
@@ -70,7 +64,9 @@ module c_incr
 	end
       else
 	begin
-	   
+	      wire 	    wrap;
+   assign wrap = (data_in[(width-cwidth):width-1] ==
+		  max_value[(width-cwidth):width-1]);
 	   // if the range is not a power of two, we need to implement 
 	   // explicit wraparound
 	   assign data_out[(width-cwidth):width-1]
@@ -94,7 +90,12 @@ module c_incr
 	     end
 	   else
 	     begin
-		
+		   wire 	    carry;
+   assign carry = &data_in[(width-cwidth):width-1];
+ wire 	    wrap;
+   assign wrap = (data_in[(width-cwidth):width-1] ==
+		  max_value[(width-cwidth):width-1]);
+   
 		// if the first and last value have differing MSBs, we need to
 		// adjust them whenever either the LSBs overflow or wraparound
 		// occurs

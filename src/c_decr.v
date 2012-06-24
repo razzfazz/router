@@ -50,13 +50,7 @@ module c_decr
    output [0:width-1] data_out;
    wire [0:width-1] data_out;
    
-   wire 	    carry;
-   assign carry = ~|data_in[(width-cwidth):width-1];
-   
-   wire 	    wrap;
-   assign wrap = (data_in[(width-cwidth):width-1] ==
-		  min_value[(width-cwidth):width-1]);
-   
+
    generate
       
       if((1 << cwidth) == num_values)
@@ -70,7 +64,9 @@ module c_decr
 	end
       else
 	begin
-	   
+	      wire 	    wrap;
+   assign wrap = (data_in[(width-cwidth):width-1] ==
+		  min_value[(width-cwidth):width-1]);
 	   // if the range is not a power of two, we need to implement 
 	   // explicit wraparound
 	   assign data_out[(width-cwidth):width-1]
@@ -82,7 +78,12 @@ module c_decr
       
       if(width > cwidth)
 	begin
-	   
+	      wire 	    carry;
+   assign carry = ~|data_in[(width-cwidth):width-1];
+   
+   wire 	    wrap;
+   assign wrap = (data_in[(width-cwidth):width-1] ==
+		  min_value[(width-cwidth):width-1]);
 	   if(min_value[0:(width-cwidth)-1] == max_value[0:(width-cwidth)-1])
 	     begin
 		
