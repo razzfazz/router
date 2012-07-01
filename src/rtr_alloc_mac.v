@@ -1104,8 +1104,18 @@ module rtr_alloc_mac
 	      else
 		assign flit_sel_fast = 1'b0;
 	      
-	      wire [0:num_vcs-1] gnt_hi_ivc, gnt_lo_ivc;
 	      wire [0:num_vcs-1] gnt_ivc;
+
+	      wire 		 flit_kill;
+	      c_select_1ofn
+		#(.num_ports(num_vcs),
+		  .width(1))
+	      flit_kill_sel
+		(.select(gnt_ivc),
+		 .data_in(ivs_flit_kill_ivc),
+		 .data_out(flit_kill));
+	      
+	      wire [0:num_vcs-1] gnt_hi_ivc, gnt_lo_ivc;
 	      wire 		 allocated;
 	      
 	      if(precomp_ivc_sel)
@@ -1152,20 +1162,33 @@ module rtr_alloc_mac
 					  (|req_lo_ivc) ? mgnt_lo_ivc :
 					  mgnt_other_ivc;
 			
-			wire [0:num_vcs-1] flit_sent_ivc;
-			assign flit_sent_ivc = {num_vcs{oal_flit_sent}} & 
-					       gnt_ivc & ~ivs_flit_kill_ivc;
+			wire 		   other_flits_valid;
+			assign other_flits_valid
+			  = |(flit_valid_in_ivc & ~gnt_ivc);
 			
-			wire [0:num_vcs-1] rem_ivc;
-			assign rem_ivc = flit_valid_in_ivc & 
-					 ~(flit_sent_ivc & flit_last_in_ivc);
+			wire 		   flit_sent;
+			assign flit_sent = oal_flit_sent & ~flit_kill;
+			
+			wire 		   flit_last;
+			c_select_1ofn
+			  #(.num_ports(num_vcs),
+			    .width(1))
+			flit_last_sel
+			  (.select(gnt_ivc),
+			   .data_in(flit_last_in_ivc),
+			   .data_out(flit_last));
+			
+			wire 		   last_flit_sent;
+			assign last_flit_sent
+			  = flit_last & flit_sent & ~other_flits_valid;
 			
 			wire 		   update;
 			
 			wire [0:num_vcs-1] mask_ivc_s, mask_ivc_q;
-			assign mask_ivc_s = update ? 
-					    (mgnt_ivc | {num_vcs{~|rem_ivc}}) : 
-					    mask_ivc_q;
+			assign mask_ivc_s
+			  = update ? 
+			    (mgnt_ivc | {num_vcs{last_flit_sent}}) : 
+			    mask_ivc_q;
 			c_dff
 			  #(.width(num_vcs),
 			    .reset_value({num_vcs{1'b1}}),
@@ -1270,15 +1293,6 @@ module rtr_alloc_mac
 		(.select(gnt_ivc),
 		 .data_in(ivs_flit_sel_ivc_ovc),
 		 .data_out(flit_sel_ovc));
-	      
-	      wire 		   flit_kill;
-	      c_select_1ofn
-		#(.num_ports(num_vcs),
-		  .width(1))
-	      flit_kill_sel
-		(.select(gnt_ivc),
-		 .data_in(ivs_flit_kill_ivc),
-		 .data_out(flit_kill));
 	      
 	      assign ial_flit_valid_hi_op = flit_valid_hi_op;
 	      assign ial_flit_valid_lo_op = flit_valid_lo_op;
