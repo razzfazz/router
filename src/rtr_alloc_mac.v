@@ -1703,7 +1703,6 @@ module rtr_alloc_mac
 		   
 		   wire [0:num_ports-1] gnt_ip;
 		   wire 		flit_sent;
-		   wire [0:num_ports-1] sel_ip;
 		   
 		   if(dual_path_allow_conflicts)
 		     begin
@@ -1731,8 +1730,6 @@ module rtr_alloc_mac
 			   .gnt_pr(gnt_ip),
 			   .gnt());
 			
-			assign sel_ip = gnt_ip;
-			
 		     end
 		   else
 		     begin
@@ -1751,7 +1748,6 @@ module rtr_alloc_mac
 			   .multi_hot(multi_hot));
 			
 			assign flit_sent = |req_ip & ~multi_hot;
-			assign sel_ip = req_ip;
 			
 		     end
 		   
@@ -1760,7 +1756,7 @@ module rtr_alloc_mac
 		     #(.num_ports(num_ports),
 		       .width(1))
 		   flit_head_sel
-		     (.select(sel_ip),
+		     (.select(gnt_ip),
 		      .data_in(flit_head_fast_in_ip),
 		      .data_out(flit_head));
 		   
@@ -1769,7 +1765,7 @@ module rtr_alloc_mac
 		     #(.num_ports(num_ports),
 		       .width(1))
 		   flit_tail_sel
-		     (.select(sel_ip),
+		     (.select(gnt_ip),
 		      .data_in(flit_tail_fast_in_ip),
 		      .data_out(flit_tail));
 		   
@@ -1778,7 +1774,7 @@ module rtr_alloc_mac
 		     #(.num_ports(num_ports),
 		       .width(num_vcs))
 		   ifl_flit_sel_ovc_sel
-		     (.select(sel_ip),
+		     (.select(gnt_ip),
 		      .data_in(ifl_flit_sel_ip_ovc),
 		      .data_out(ifl_flit_sel_ovc));
 		   
