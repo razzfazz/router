@@ -320,6 +320,7 @@ module testbench
        .fb_mgmt_type(fb_mgmt_type),
        .explicit_pipeline_register(explicit_pipeline_register),
        .dual_path_alloc(dual_path_alloc),
+       .dual_path_allow_conflicts(dual_path_allow_conflicts),
        .precomp_ivc_sel(precomp_ivc_sel),
        .precomp_ip_sel(precomp_ip_sel),
        .elig_mask(elig_mask),

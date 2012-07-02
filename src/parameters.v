@@ -114,6 +114,10 @@ parameter gate_buffer_write = 0;
 // enable dual-path allocation
 parameter dual_path_alloc = 0;
 
+// resolve output conflicts when using dual-path allocation via arbitration
+// (otherwise, kill if more than one fast-path request per output port)
+parameter dual_path_allow_conflicts = 0;
+
 // precompute input-side arbitration decision one cycle ahead
 parameter precomp_ivc_sel = 0;
 

@@ -107,6 +107,10 @@ module rtr_alloc_mac
    // enable dual-path allocation
    parameter dual_path_alloc = 1;
    
+   // resolve output conflicts when using dual-path allocation via arbitration
+   // (otherwise, kill if more than one fast-path request per output port)
+   parameter dual_path_allow_conflicts = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -1701,27 +1705,7 @@ module rtr_alloc_mac
 		   wire 		flit_sent;
 		   wire [0:num_ports-1] sel_ip;
 		   
-		   if(dual_path_alloc == 1)
-		     begin
-			
-			c_one_hot_filter
-			  #(.width(num_ports))
-			oohf
-			  (.data_in(req_ip),
-			   .data_out(gnt_ip));
-			
-			wire multi_hot;
-			c_multi_hot_det
-			  #(.width(num_ports))
-			omhd
-			  (.data(req_ip),
-			   .multi_hot(multi_hot));
-			
-			assign flit_sent = |req_ip & ~multi_hot;
-			assign sel_ip = req_ip;
-			
-		     end
-		   else if(dual_path_alloc > 1)
+		   if(dual_path_allow_conflicts)
 		     begin
 			
 			// NOTE: If a head flit wins output arbitration, but 
@@ -1748,6 +1732,26 @@ module rtr_alloc_mac
 			   .gnt());
 			
 			assign sel_ip = gnt_ip;
+			
+		     end
+		   else
+		     begin
+			
+			c_one_hot_filter
+			  #(.width(num_ports))
+			oohf
+			  (.data_in(req_ip),
+			   .data_out(gnt_ip));
+			
+			wire multi_hot;
+			c_multi_hot_det
+			  #(.width(num_ports))
+			omhd
+			  (.data(req_ip),
+			   .multi_hot(multi_hot));
+			
+			assign flit_sent = |req_ip & ~multi_hot;
+			assign sel_ip = req_ip;
 			
 		     end
 		   

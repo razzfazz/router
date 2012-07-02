@@ -249,6 +249,7 @@ module router_wrap
 		 .explicit_pipeline_register(explicit_pipeline_register),
 		 .gate_buffer_write(gate_buffer_write),
 		 .dual_path_alloc(dual_path_alloc),
+		 .dual_path_allow_conflicts(dual_path_allow_conflicts),
 		 .precomp_ivc_sel(precomp_ivc_sel),
 		 .precomp_ip_sel(precomp_ip_sel),
 		 .elig_mask(elig_mask),

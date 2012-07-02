@@ -124,6 +124,10 @@ module rtr_top
    // enable dual-path allocation
    parameter dual_path_alloc = 1;
    
+   // resolve output conflicts when using dual-path allocation via arbitration
+   // (otherwise, kill if more than one fast-path request per output port)
+   parameter dual_path_allow_conflicts = 0;
+   
    // precompute input-side arbitration decision one cycle ahead
    parameter precomp_ivc_sel = 1;
    
@@ -426,6 +430,7 @@ module rtr_top
        .vc_alloc_arbiter_type(vc_alloc_arbiter_type),
        .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
        .dual_path_alloc(dual_path_alloc),
+       .dual_path_allow_conflicts(dual_path_allow_conflicts),
        .reset_type(reset_type))
    alo
      (.clk(clk),
