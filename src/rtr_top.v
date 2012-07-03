@@ -128,6 +128,9 @@ module rtr_top
    // (otherwise, kill if more than one fast-path request per output port)
    parameter dual_path_allow_conflicts = 0;
    
+   // only mask fast-path requests if any slow path requests are ready
+   parameter dual_path_mask_on_ready = 1;
+   
    // precompute input-side arbitration decision one cycle ahead
    parameter precomp_ivc_sel = 1;
    
@@ -431,6 +434,7 @@ module rtr_top
        .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
        .dual_path_alloc(dual_path_alloc),
        .dual_path_allow_conflicts(dual_path_allow_conflicts),
+       .dual_path_mask_on_ready(dual_path_mask_on_ready),
        .reset_type(reset_type))
    alo
      (.clk(clk),

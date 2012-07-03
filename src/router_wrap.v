@@ -250,6 +250,7 @@ module router_wrap
 		 .gate_buffer_write(gate_buffer_write),
 		 .dual_path_alloc(dual_path_alloc),
 		 .dual_path_allow_conflicts(dual_path_allow_conflicts),
+		 .dual_path_mask_on_ready(dual_path_mask_on_ready),
 		 .precomp_ivc_sel(precomp_ivc_sel),
 		 .precomp_ip_sel(precomp_ip_sel),
 		 .elig_mask(elig_mask),

@@ -118,6 +118,9 @@ parameter dual_path_alloc = 0;
 // (otherwise, kill if more than one fast-path request per output port)
 parameter dual_path_allow_conflicts = 0;
 
+// only mask fast-path requests if any slow path requests are ready
+parameter dual_path_mask_on_ready = 1;
+
 // precompute input-side arbitration decision one cycle ahead
 parameter precomp_ivc_sel = 0;
 

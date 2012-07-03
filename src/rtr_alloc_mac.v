@@ -111,6 +111,9 @@ module rtr_alloc_mac
    // (otherwise, kill if more than one fast-path request per output port)
    parameter dual_path_allow_conflicts = 0;
    
+   // only mask fast-path requests if any slow path requests are ready
+   parameter dual_path_mask_on_ready = 1;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -1099,12 +1102,15 @@ module rtr_alloc_mac
 	      
 	      wire 		 flit_sel_fast;
 	      
-	      // Use fast path only if no regular-path flits are ready to go 
-	      // and the fast path VC doesn't have any queued flits already.
-	      
 	      if(dual_path_alloc)
-		assign flit_sel_fast
-		  = ~|(req_ivc | (flit_valid_in_ivc & flit_sel_fast_in_ivc));
+		begin
+		   if(dual_path_mask_on_ready)
+		     assign flit_sel_fast
+		       = ~|(req_ivc | 
+			    (flit_valid_in_ivc & flit_sel_fast_in_ivc));
+		   else
+		     assign flit_sel_fast = ~|flit_valid_in_ivc;
+		end
 	      else
 		assign flit_sel_fast = 1'b0;
 	      
