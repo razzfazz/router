@@ -71,6 +71,9 @@ parameter min_payload_length = 0;
 // select router implementation
 parameter router_type = `ROUTER_TYPE_VC;
 
+// enable link power management
+parameter enable_link_pm = 1;
+
 // width of flit payload data
 parameter flit_data_width = 64;
 

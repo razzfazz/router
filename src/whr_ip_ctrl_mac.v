@@ -113,6 +113,12 @@ module whr_ip_ctrl_mac
    // width of counter for remaining flits
    localparam flit_ctr_width = clogb(max_payload_length);
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -127,7 +133,8 @@ module whr_ip_ctrl_mac
    parameter flit_data_width = 64;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // filter out illegal destination ports
    // (the intent is to allow synthesis to optimize away the logic associated 
@@ -278,6 +285,7 @@ module whr_ip_ctrl_mac
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .route_info_width(route_info_width),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi

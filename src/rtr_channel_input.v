@@ -60,6 +60,9 @@ module rtr_channel_input
    // total number of bits required for routing-related information
    parameter route_info_width = 14;
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
    // width of flit payload data
    parameter flit_data_width = 64;
    
@@ -90,6 +93,9 @@ module rtr_channel_input
        (route_info_width + payload_length_width) : 
        -1;
    
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -101,7 +107,8 @@ module rtr_channel_input
        -1;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    
    //---------------------------------------------------------------------------
@@ -144,12 +151,41 @@ module rtr_channel_input
    // implementation
    //---------------------------------------------------------------------------
    
+   wire 			  regs_active;
+   
+   generate
+      
+      if(enable_link_pm)
+	begin
+	   
+	   wire link_active_s, link_active_q;
+	   assign link_active_s = channel_in[0];
+	   c_dff
+	     #(.width(1),
+	       .reset_type(reset_type))
+	   link_activeq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(link_active_s),
+	      .q(link_active_q));
+	   
+	   assign regs_active = link_active_q;
+	   
+	end
+      else
+	assign regs_active = active;
+      
+   endgenerate
+   
    wire [0:flit_ctrl_width-1] 	  flit_ctrl_in;
-   assign flit_ctrl_in = channel_in[0:flit_ctrl_width-1];
+   assign flit_ctrl_in = channel_in[link_ctrl_width:
+				    link_ctrl_width+flit_ctrl_width-1];
    
    wire [0:flit_data_width-1] 	  flit_data_in;
    assign flit_data_in
-     = channel_in[flit_ctrl_width:flit_ctrl_width+flit_data_width-1];
+     = channel_in[link_ctrl_width+flit_ctrl_width:
+		  link_ctrl_width+flit_ctrl_width+flit_data_width-1];
    
    wire [0:flit_data_width-1] 	  flit_data_s, flit_data_q;
    assign flit_data_s = flit_data_in;
@@ -159,7 +195,7 @@ module rtr_channel_input
    flit_dataq
      (.clk(clk),
       .reset(1'b0),
-      .active(active),
+      .active(regs_active),
       .d(flit_data_s),
       .q(flit_data_q));
    
@@ -188,7 +224,7 @@ module rtr_channel_input
 	     flit_validq
 	       (.clk(clk),
 		.reset(reset),
-		.active(active),
+		.active(regs_active),
 		.d(flit_valid_s),
 		.q(flit_valid_q));
 	     
@@ -205,7 +241,7 @@ module rtr_channel_input
 		  flit_ctrlq
 		    (.clk(clk),
 		     .reset(1'b0),
-		     .active(active),
+		     .active(regs_active),
 		     .d(flit_ctrl_s[1:flit_ctrl_width-1]),
 		     .q(flit_ctrl_q[1:flit_ctrl_width-1]));
 		  
@@ -262,7 +298,7 @@ module rtr_channel_input
 			 flit_headq
 			   (.clk(clk),
 			    .reset(reset),
-			    .active(active),
+			    .active(regs_active),
 			    .d(flit_head_s),
 			    .q(flit_head_q));
 			 

@@ -48,6 +48,9 @@ module rtr_channel_output
    // select packet format
    parameter packet_format = `PACKET_FORMAT_EXPLICIT_LENGTH;
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
    // width of flit payload data
    parameter flit_data_width = 64;
    
@@ -61,6 +64,9 @@ module rtr_channel_output
    // width required to select individual VC
    localparam vc_idx_width = clogb(num_vcs);
    
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -72,7 +78,8 @@ module rtr_channel_output
        -1;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    
    //---------------------------------------------------------------------------
@@ -107,12 +114,23 @@ module rtr_channel_output
    // implementation
    //---------------------------------------------------------------------------
    
+   wire 		       flit_valid_out;
+   
+   generate
+      
+      if(enable_link_pm)
+	assign channel_out[0] = active | flit_valid_out;
+      
+   endgenerate
+   
    wire [0:flit_ctrl_width-1]  flit_ctrl_out;
    wire [0:flit_data_width-1]  flit_data_out;
    
-   assign channel_out[0:flit_ctrl_width-1]
+   assign channel_out[link_ctrl_width:
+		      link_ctrl_width+flit_ctrl_width-1]
      = flit_ctrl_out;
-   assign channel_out[flit_ctrl_width:flit_ctrl_width+flit_data_width-1]
+   assign channel_out[link_ctrl_width+flit_ctrl_width:
+		      link_ctrl_width+flit_ctrl_width+flit_data_width-1]
      = flit_data_out;
    
    wire [0:flit_data_width-1]  flit_data_s, flit_data_q;
@@ -156,12 +174,10 @@ module rtr_channel_output
 	     // register, it currently will most likely end up being free-
 	     // running, so this may actually be a good tradeoff.
 	     
-	     wire 			flit_valid_q;
-	     
 	     wire 			flit_valid_active;
-	     assign flit_valid_active = active | flit_valid_q;
+	     assign flit_valid_active = active | flit_valid_out;
 	     
-	     wire 			flit_valid_s;
+	     wire 			flit_valid_s, flit_valid_q;
 	     assign flit_valid_s = flit_ctrl_s[0];
 	     c_dff
 	       #(.width(1),
@@ -173,6 +189,7 @@ module rtr_channel_output
 		.d(flit_valid_s),
 		.q(flit_valid_q));
 	     
+	     assign flit_valid_out = flit_valid_q;
 	     assign flit_ctrl_q[0] = flit_valid_q;
 	     
 	     if(flit_ctrl_width > 1)

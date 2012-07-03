@@ -78,6 +78,12 @@ module flit_sink
    // total number of bits required for routing-related information
    parameter route_info_width = 14;
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -92,7 +98,8 @@ module flit_sink
    parameter flit_data_width = 64;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // select implementation variant for flit buffer register file
    parameter fb_regfile_type = `REGFILE_TYPE_FF_2D;
@@ -131,6 +138,7 @@ module flit_sink
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .route_info_width(route_info_width),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi

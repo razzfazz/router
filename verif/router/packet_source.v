@@ -157,6 +157,12 @@ module packet_source
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -171,7 +177,8 @@ module packet_source
    parameter flit_data_width = 64;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // width required for lookahead routing information
    localparam lar_info_width = port_idx_width + resource_class_idx_width;
@@ -313,12 +320,13 @@ module packet_source
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    cho
      (.clk(clk),
       .reset(reset),
-      .active(1'b1),
+      .active(flit_valid),
       .flit_valid_in(flit_valid),
       .flit_head_in(flit_head),
       .flit_tail_in(flit_tail),

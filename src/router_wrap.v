@@ -91,6 +91,9 @@ module router_wrap
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
        -1;
    
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -102,7 +105,8 @@ module router_wrap
        -1;
    
    // width of channel
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    
    input clk;
@@ -147,6 +151,7 @@ module router_wrap
 		 .flow_ctrl_bypass(flow_ctrl_bypass),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
+		 .enable_link_pm(enable_link_pm),
 		 .flit_data_width(flit_data_width),
 		 .error_capture_mode(error_capture_mode),
 		 .restrict_turns(restrict_turns),
@@ -190,6 +195,7 @@ module router_wrap
 		 .flow_ctrl_bypass(flow_ctrl_bypass),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
+		 .enable_link_pm(enable_link_pm),
 		 .flit_data_width(flit_data_width),
 		 .error_capture_mode(error_capture_mode),
 		 .restrict_turns(restrict_turns),
@@ -237,6 +243,7 @@ module router_wrap
 		 .flow_ctrl_bypass(flow_ctrl_bypass),
 		 .max_payload_length(max_payload_length),
 		 .min_payload_length(min_payload_length),
+		 .enable_link_pm(enable_link_pm),
 		 .flit_data_width(flit_data_width),
 		 .error_capture_mode(error_capture_mode),
 		 .restrict_turns(restrict_turns),

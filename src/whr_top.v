@@ -110,7 +110,13 @@ module whr_top
    // number of bits required to represent all possible payload sizes
    localparam payload_length_width
      = clogb(max_payload_length-min_payload_length+1);
-
+   
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -125,7 +131,8 @@ module whr_top
    parameter flit_data_width = 64;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -379,6 +386,7 @@ module whr_top
 	       .elig_mask(elig_mask),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
+	       .enable_link_pm(enable_link_pm),
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
 	       .port_id(op),

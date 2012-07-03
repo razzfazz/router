@@ -79,6 +79,12 @@ module vcr_op_ctrl_mac
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
        -1;
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -93,7 +99,8 @@ module vcr_op_ctrl_mac
    parameter flit_data_width = 64;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // configure error checking logic
    parameter error_capture_mode = `ERROR_CAPTURE_MODE_NO_HOLD;
@@ -377,6 +384,7 @@ module vcr_op_ctrl_mac
    rtr_channel_output
      #(.num_vcs(num_vcs),
        .packet_format(packet_format),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    cho

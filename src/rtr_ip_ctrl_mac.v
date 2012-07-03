@@ -84,6 +84,9 @@ module rtr_ip_ctrl_mac
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
    // width of flit payload data
    parameter flit_data_width = 64;
    
@@ -198,6 +201,9 @@ module rtr_ip_ctrl_mac
    // total number of bits required for routing-related information
    localparam route_info_width = lar_info_width + dest_info_width;
    
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -209,7 +215,8 @@ module rtr_ip_ctrl_mac
        -1;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // total number of bits of header information encoded in header flit payload
    localparam header_info_width
@@ -333,6 +340,7 @@ module rtr_ip_ctrl_mac
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .route_info_width(route_info_width),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .reset_type(reset_type))
    chi

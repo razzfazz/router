@@ -84,6 +84,9 @@ module rtr_top
    // (note: only used if packet_format==`PACKET_FORMAT_EXPLICIT_LENGTH)
    parameter min_payload_length = 1;
    
+   // enable link power management
+   parameter enable_link_pm = 1;
+   
    // width of flit payload data
    parameter flit_data_width = 64;
    
@@ -192,6 +195,9 @@ module rtr_top
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
        -1;
    
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -203,7 +209,8 @@ module rtr_top
        -1;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    
    //---------------------------------------------------------------------------
@@ -316,6 +323,7 @@ module rtr_top
 	       .flow_ctrl_type(flow_ctrl_type),
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
+	       .enable_link_pm(enable_link_pm),
 	       .flit_data_width(flit_data_width),
 	       .restrict_turns(restrict_turns),
 	       .predecode_lar_info(predecode_lar_info),
@@ -536,6 +544,7 @@ module rtr_top
 	       .fb_mgmt_type(fb_mgmt_type),
 	       .elig_mask(elig_mask),
 	       .vc_alloc_prefer_empty(vc_alloc_prefer_empty),
+	       .enable_link_pm(enable_link_pm),
 	       .flit_data_width(flit_data_width),
 	       .reset_type(reset_type))
 	   opc

@@ -138,6 +138,9 @@ module testbench
      = (flow_ctrl_type == `FLOW_CTRL_TYPE_CREDIT) ? (1 + vc_idx_width) :
        -1;
    
+   // width of link management signals
+   localparam link_ctrl_width = enable_link_pm ? 1 : 0;
+   
    // width of flit control signals
    localparam flit_ctrl_width
      = (packet_format == `PACKET_FORMAT_HEAD_TAIL) ? 
@@ -149,7 +152,8 @@ module testbench
        -1;
    
    // channel width
-   localparam channel_width = flit_ctrl_width + flit_data_width;
+   localparam channel_width
+     = link_ctrl_width + flit_ctrl_width + flit_data_width;
    
    // use atomic VC allocation
    localparam atomic_vc_allocation = (elig_mask == `ELIG_MASK_USED);
@@ -551,6 +555,7 @@ module testbench
 		    .flow_ctrl_bypass(flow_ctrl_bypass),
 		    .max_payload_length(max_payload_length),
 		    .min_payload_length(min_payload_length),
+		    .enable_link_pm(enable_link_pm),
 		    .flit_data_width(flit_data_width),
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
@@ -622,6 +627,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -671,6 +677,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -720,6 +727,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -769,6 +777,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -818,6 +827,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -867,6 +877,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -916,6 +927,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -965,6 +977,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns),
@@ -1014,6 +1027,7 @@ module testbench
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
        .router_type(router_type),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .restrict_turns(restrict_turns), 
@@ -1064,6 +1078,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1089,6 +1104,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1114,6 +1130,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1139,6 +1156,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1164,6 +1182,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1189,6 +1208,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1214,6 +1234,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1239,6 +1260,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1264,6 +1286,7 @@ module testbench
        .packet_format(packet_format),
        .max_payload_length(max_payload_length),
        .min_payload_length(min_payload_length),
+       .enable_link_pm(enable_link_pm),
        .flit_data_width(flit_data_width),
        .error_capture_mode(error_capture_mode),
        .routing_type(routing_type),
@@ -1292,7 +1315,8 @@ module testbench
 					       (op+1)*channel_width-1];
 	   
 	   wire [0:flit_ctrl_width-1] flit_ctrl_out;
-	   assign flit_ctrl_out = channel_out[0:flit_ctrl_width-1];
+	   assign flit_ctrl_out
+	     = channel_out[link_ctrl_width:link_ctrl_width+flit_ctrl_width-1];
 	   
 	   assign flit_valid_out_op[op] = flit_ctrl_out[0];
 	   
@@ -1322,6 +1346,7 @@ module testbench
 	       .max_payload_length(max_payload_length),
 	       .min_payload_length(min_payload_length),
 	       .route_info_width(route_info_width),
+	       .enable_link_pm(enable_link_pm),
 	       .flit_data_width(flit_data_width),
 	       .fb_regfile_type(fb_regfile_type),
 	       .fb_mgmt_type(fb_mgmt_type),
