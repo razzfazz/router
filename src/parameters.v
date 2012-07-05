@@ -33,7 +33,7 @@
 parameter topology = `TOPOLOGY_MESH;
 
 // flit buffer entries per VC
-parameter num_flits_per_vc = 8;
+parameter num_flits_per_vc = 32;
 
 // number of message classes (e.g. request, reply)
 parameter num_message_classes = 4;

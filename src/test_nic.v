@@ -742,6 +742,7 @@ module test_nic(/*autoarg*/
 
    
    assign error  = (|eject_fifo_error) | (|grant_errors) | (|ack_errors) |(|inject_fc_error)|fb_error; 
+    // synopsys translate_on
 endmodule // test_nic
 
 

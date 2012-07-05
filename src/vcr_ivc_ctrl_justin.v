@@ -576,7 +576,7 @@ module vcr_ivc_ctrl_justin
 	   
 	   if(gate_buffer_write)
 	     assign fbf_write_enable
-               = flit_valid_in & ~(fbc_empty & flit_sent);
+               = flit_valid_in & ~(fbc_empty & (flit_sent|drop_body));
 	   else
 	     assign fbf_write_enable = flit_valid_in;
 	   
@@ -759,10 +759,11 @@ module vcr_ivc_ctrl_justin
    generate
       if(elig_mask == `ELIG_MASK_USED)
 	assign hdr_valid_s
-		    = (hdr_valid_q & ~(flit_sent_prev & flit_tail_prev)) | flit_valid_in;
+ 			    = (hdr_valid_q & ~(flit_sent_prev & flit_tail_prev)) | (flit_valid_in);
+      
       else
 	assign hdr_valid_s
-	  = flit_sent ?
+ 	  = (flit_sent| drop_body) ?
 	    (fbc_empty ? 
 	     ~flit_tail_in : 
 	     (~fb_flit_tail | ~fbc_almost_empty | flit_valid_in)) : 
@@ -821,7 +822,7 @@ module vcr_ivc_ctrl_justin
 	   assign peek_lar_info = peek_route_info[0:lar_info_width-1];
 	   
 	   assign hdr_lar_info_s
-	     = (~hdr_valid_q | packet_done) ? 
+	     = (~hdr_valid_q | packet_done | (drop_body & flit_tail) ) ? 
                (two_plus_flits ? peek_lar_info : lar_info_in) : 
                hdr_lar_info_q;
 	   
@@ -854,7 +855,7 @@ module vcr_ivc_ctrl_justin
 	     = fbf_peek_data[spec_src_start+:dest_info_width];
 	   
 	   assign hdr_src_info_s
-	     = (~hdr_valid_q | packet_done) ?
+	     = (~hdr_valid_q | packet_done | (drop_body & flit_tail)) ?
                (two_plus_flits ? peek_src_info : src_info_in) :
                hdr_src_info_q;
 	   
@@ -887,7 +888,7 @@ module vcr_ivc_ctrl_justin
 	     = peek_route_info[lar_info_width:lar_info_width+dest_info_width-1];
 	   
 	   assign hdr_dest_info_s
-	     = (~hdr_valid_q | packet_done) ?
+	     = (~hdr_valid_q | packet_done | (drop_body & flit_tail)) ?
                (two_plus_flits ? peek_dest_info : dest_info_in) :
                hdr_dest_info_q;
 	   
@@ -1007,7 +1008,9 @@ module vcr_ivc_ctrl_justin
    wire [0:lar_info_width-1] 	       lar_info;
    assign lar_info =header_expired?default_port_enc:(hdr_valid_q ? hdr_lar_info_q : lar_info_in);
    
+
    wire [0:router_addr_width-1] 	       next_router_address;
+
    rtr_next_hop_addr
      #(.num_resource_classes(num_resource_classes),
        .num_routers_per_dim(num_routers_per_dim),
@@ -1167,7 +1170,7 @@ module vcr_ivc_ctrl_justin
 		  
 		  wire 	     next_free;
 		  assign next_free
-		    = flit_sent ? two_or_more_credits : one_or_more_credits;
+		    = (flit_sent|drop_body) ? two_or_more_credits : one_or_more_credits;
 		  
 		  assign next_free_ocvc[ocvc] = next_free;
 		  
@@ -1554,7 +1557,7 @@ module vcr_ivc_ctrl_justin
 	if(error_ct_overflow)
 	  $display("ERROR: Credit tracker overflow in module %m.");
 	if(drop_body&fbc_empty)
-	  $display("ERROR: dropping from empty buffer.");
+	  $display("ERROR: dropping from empty buffer %m.");
      end
    
    // synopsys translate_on
