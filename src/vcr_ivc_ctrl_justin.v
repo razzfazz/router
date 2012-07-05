@@ -381,17 +381,23 @@ module vcr_ivc_ctrl_justin
    wire [0:dest_info_width-1] spec_source;
    wire [0:spec_buffer_width-1] spec_buffer_id;
    
+
+   //flit buffer control signals
+   wire 					     fbc_empty;
+
    
    wire 			 header_expired;
    wire                          sw_expired  = header_expired&real_allocated&(state==SW_WAIT);
    
+
+
    
-   //TODO this currently assumes no cycle gaps within packets
-   wire drop_body 			     = (state==VC_DROP);
+   //
+   wire drop_body 			     = (state==VC_DROP) & ~fbc_empty;
    assign drop_event 			     = drop_body;
    assign expired 			     = header_expired;
 
-   assign cancel_vc= 	sw_expired 	    ?
+   assign cancel_vc 			     = sw_expired 	    ?
 		     real_route_op:
 		     {num_ports{1'b0}};
    
@@ -402,7 +408,6 @@ module vcr_ivc_ctrl_justin
    //---------------------------------------------------------------------------
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
-   wire 					     fbc_empty;
    //under vc_drop, forces body flits to be invisibile to the ouside
    assign flit_valid  = (flit_valid_in | ~fbc_empty) & !drop_body;
    assign real_flit_valid  = (flit_valid_in | ~fbc_empty);
@@ -1611,7 +1616,7 @@ module vcr_ivc_ctrl_justin
 	       	 else
 		   state <=VC_NACK;
 	       VC_DROP:
-		 if(real_flit_tail)
+		 if(real_flit_tail & drop_body)
 		   state <=VC_WAIT;
 		 else  
 		   state <=VC_DROP;
