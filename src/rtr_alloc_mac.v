@@ -1551,7 +1551,12 @@ module rtr_alloc_mac
 		     (.data_in(mgnt_ip),
 		      .data_out(next_port));
 		   
+		   wire [0:num_ports-1]      req_ip;
+		   assign req_ip = req_hi_ip | req_lo_ip;
+		   
 		   wire 		     update;
+		   assign update = |req_ip;
+		   
 		   
 		   wire [0:port_idx_width-1] presel_s, presel_q;
 		   assign presel_s = update ? next_port : presel_q;
@@ -1578,11 +1583,6 @@ module rtr_alloc_mac
 		   presel_ip_dec
 		     (.data_in(presel_q),
 		      .data_out(presel_ip));
-		   
-		   wire [0:num_ports-1]      req_ip;
-		   assign req_ip = req_hi_ip | req_lo_ip;
-		   
-		   assign update = |req_ip;
 		   
 		   wire [0:num_ports-1]      gnt_presel_ip;
 		   assign gnt_presel_ip = req_ip & presel_ip;
