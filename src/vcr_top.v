@@ -427,7 +427,7 @@ module vcr_top
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] 		xbr_ctrl_op_ip;
-   
+   ///*
    assign sw_gnt_ip 	 = gnt_nonspec_ip;
    assign sw_sel_ip_ivc  = sel_nonspec_ip_ivc;
    
@@ -460,14 +460,66 @@ module vcr_top
       .data_out(active_op));
    
    wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
-   wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc = {(num_ports*num_vcs){1'b0}};
    wire [0:num_ports-1] 		   gnt_nonspec_ip;
-   wire [0:num_ports-1] 		   gnt_spec_ip;
+   wire [0:num_ports-1] 		   gnt_spec_ip = {num_ports{1'b0}};
    wire [0:num_ports*num_ports-1] 	   gnt_op_ip;
+
+
+ 
+    ////////////////////////////////////
+   wire [0:num_ports*num_vcs*num_ports-1] route_ip_ivc_op_int;
+   c_interleave_block
+     #(// Parameters
+       .width				(num_ports*num_vcs*num_ports),
+       .num_blocks			(num_vcs),
+       .chunk_size (num_ports))
+   route_op_int
+     (
+      // Outputs
+      .data_out				(route_ip_ivc_op_int),
+      // Inputs
+      .data_in				(route_ip_ivc_op));
+   wire [0:num_ports*num_vcs-1] req_nonspec_ip_ivc_int;
+   wire [0:num_ports*num_vcs-1] req_nonspec_ip_ivc_arb;
+   c_interleave_block
+     #(// Parameters
+       .width				(num_ports*num_vcs),
+       .num_blocks			(num_vcs),
+       .chunk_size (1))
+   req_nonspec_int
+     (
+      // Outputs
+      .data_out				(req_nonspec_ip_ivc_int),
+      // Inputs
+      .data_in				(req_nonspec_ip_ivc_arb));
+
+   generate
+      genvar sw_input;
+      for(sw_input = 0; sw_input<num_ports ; sw_input=sw_input+1)
+	begin:sw_input_loop
+	   c_lod
+		     #(
+		       // Parameters
+		       .width			(num_vcs),
+		       .num_priorities		(1))
+	   sw_vc_pri_arb
+		     ( // Outputs
+		      .data_out		(req_nonspec_ip_ivc_arb[sw_input*num_vcs+:num_vcs]),
+		       // Inputs
+		       .data_in		(req_nonspec_ip_ivc[sw_input*num_vcs+:num_vcs]));
+	end
+   endgenerate
    
+   ////////////////////////////////////
+		       
+   wire [0:num_ports-1] sel_nonspec_ip_res;
+   wire [0:num_ports-1] gnt_nonspec_ip_res;
+   wire [0:num_ports*num_ports-1] gnt_op_ip_res;
+   wire [0:num_ports-1] gnt_op_taken_res;
    vcr_sw_alloc_SRP
      #(// Parameters
-       .num_vcs				(num_vcs),
+       .num_vcs				(1),
        .num_ports			(num_ports),
        .arbiter_type			(sw_alloc_arbiter_type),
        .spec_type			(sw_alloc_spec_type),
@@ -475,19 +527,119 @@ module vcr_top
    swa_res
      (
       // Outputs
-      .sel_nonspec_ip_ivc		(sel_nonspec_ip_ivc),
-      .sel_spec_ip_ivc			(sel_spec_ip_ivc),
-      .gnt_nonspec_ip			(gnt_nonspec_ip),
-      .gnt_spec_ip			(gnt_spec_ip),
-      .gnt_op_ip			(gnt_op_ip),
+      .sel_nonspec_ip_ivc		(sel_nonspec_ip_res),
+      .gnt_nonspec_ip			(gnt_nonspec_ip_res),
+      .gnt_op_ip			(gnt_op_ip_res),
+      .gnt_op_taken(gnt_op_taken_res),
       // Inputs
       .clk				(clk),
       .reset				(reset),
+      .gnt_op_disable({num_ports{1'b0}}),
       .active_ip			(active_ip),
       .active_op			(active_op),
-      .route_ip_ivc_op			(route_ip_ivc_op),
-      .req_nonspec_ip_ivc		(req_nonspec_ip_ivc),
-      .req_spec_ip_ivc			(req_spec_ip_ivc));
+      .route_ip_ivc_op			(route_ip_ivc_op_int[0+:num_ports*num_ports]),
+      .req_nonspec_ip_ivc		(req_nonspec_ip_ivc_int[0+:num_ports]));
+   
+   wire [0:num_ports-1] sel_nonspec_ip_gnt;
+   wire [0:num_ports-1] gnt_nonspec_ip_gnt;
+   wire [0:num_ports*num_ports-1] gnt_op_ip_gnt;
+   wire [0:num_ports-1] gnt_op_taken_gnt;
+   vcr_sw_alloc_SRP
+     #(// Parameters
+       .num_vcs				(1),
+       .num_ports			(num_ports),
+       .arbiter_type			(sw_alloc_arbiter_type),
+       .spec_type			(sw_alloc_spec_type),
+       .reset_type			(reset_type))
+   swa_gnt
+     (
+      // Outputs
+      .sel_nonspec_ip_ivc		(sel_nonspec_ip_gnt),
+      .gnt_nonspec_ip			(gnt_nonspec_ip_gnt),
+      .gnt_op_ip			(gnt_op_ip_gnt),
+      .gnt_op_taken(gnt_op_taken_gnt),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .gnt_op_disable(gnt_op_taken_res),
+      .active_ip			(active_ip),
+      .active_op			(active_op),
+      .route_ip_ivc_op			(route_ip_ivc_op_int[num_ports*num_ports+:num_ports*num_ports]),
+      .req_nonspec_ip_ivc		(req_nonspec_ip_ivc_int[num_ports+:num_ports]));
+   
+   wire [0:num_ports-1] sel_nonspec_ip_nonspec;
+   wire [0:num_ports-1] gnt_nonspec_ip_nonspec;
+   wire [0:num_ports*num_ports-1] gnt_op_ip_nonspec;
+   wire [0:num_ports-1] gnt_op_taken_nonspec;
+   vcr_sw_alloc_SRP
+     #(// Parameters
+       .num_vcs				(1),
+       .num_ports			(num_ports),
+       .arbiter_type			(sw_alloc_arbiter_type),
+       .spec_type			(sw_alloc_spec_type),
+       .reset_type			(reset_type))
+   swa_nonspec
+     (
+      // Outputs
+      .sel_nonspec_ip_ivc		(sel_nonspec_ip_nonspec),
+      .gnt_nonspec_ip			(gnt_nonspec_ip_nonspec),
+      .gnt_op_ip			(gnt_op_ip_nonspec),
+      .gnt_op_taken(gnt_op_taken_nonspec),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .gnt_op_disable(gnt_op_taken_gnt),
+      .active_ip			(active_ip),
+      .active_op			(active_op),
+      .route_ip_ivc_op			(route_ip_ivc_op_int[2*num_ports*num_ports+:num_ports*num_ports]),
+      .req_nonspec_ip_ivc		(req_nonspec_ip_ivc_int[2*num_ports+:num_ports]));
+   
+   wire [0:num_ports-1] sel_nonspec_ip_spec;
+   wire [0:num_ports-1] gnt_nonspec_ip_spec;
+   wire [0:num_ports*num_ports-1] gnt_op_ip_spec;
+   wire [0:num_ports-1] gnt_op_taken_spec;
+   vcr_sw_alloc_SRP
+     #(// Parameters
+       .num_vcs				(1),
+       .num_ports			(num_ports),
+       .arbiter_type			(sw_alloc_arbiter_type),
+       .spec_type			(sw_alloc_spec_type),
+       .reset_type			(reset_type))
+   swa_spec
+     (
+      // Outputs
+      .sel_nonspec_ip_ivc		(sel_nonspec_ip_spec),
+      .gnt_nonspec_ip			(gnt_nonspec_ip_spec),
+      .gnt_op_ip			(gnt_op_ip_spec),
+      .gnt_op_taken(gnt_op_taken_spec),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .gnt_op_disable(gnt_op_taken_nonspec),
+      .active_ip			(active_ip),
+      .active_op			(active_op),
+      .route_ip_ivc_op			(route_ip_ivc_op_int[3*num_ports*num_ports+:num_ports*num_ports]),
+      .req_nonspec_ip_ivc		(req_nonspec_ip_ivc_int[3*num_ports+:num_ports]));
+
+
+   assign gnt_op_ip 	  = gnt_op_ip_res|gnt_op_ip_gnt|gnt_op_ip_nonspec|gnt_op_ip_spec;
+   assign gnt_nonspec_ip  = gnt_nonspec_ip_res|gnt_nonspec_ip_gnt|gnt_nonspec_ip_nonspec|gnt_nonspec_ip_spec;
+
+   c_interleave
+     #(// Parameters
+       .width				(num_ports*num_vcs),
+       .num_blocks			(num_vcs))
+   sel_ivc_int
+     (// Outputs
+      .data_out				(sel_nonspec_ip_ivc),
+      // Inputs
+      .data_in				({sel_nonspec_ip_res,
+					  sel_nonspec_ip_gnt,
+					  sel_nonspec_ip_nonspec,
+					  sel_nonspec_ip_spec}));
+   
+
+
    
    generate
       genvar 				   sw_op;
@@ -514,21 +666,28 @@ module vcr_top
 	   assign xbr_ctrl_op_ip[sw_op*num_ports:(sw_op+1)*num_ports-1] = xbr_ctrl_ip;
 	end
    endgenerate
-
+//*/
    
    /*
+
    vcr_sw_alloc_mac
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
-       .allocator_type(sw_alloc_type),
-       .arbiter_type(sw_alloc_arbiter_type),
        .spec_type(sw_alloc_spec_type),
        .reset_type(reset_type))
    swa
-     (
+     (.clk(clk),
+      .reset(reset),
+      .route_ip_ivc_op(route_ip_ivc_op),
+      .allocated_ip_ivc(allocated_ip_ivc),
+      .flit_valid_ip_ivc(flit_valid_ip_ivc),
+      .free_nonspec_ip_ivc(free_nonspec_ip_ivc),
+      .sel_ip_ivc(sw_sel_ip_ivc),
+      .gnt_ip(sw_gnt_ip),
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip));
-   */
    
+      */
+      
    //---------------------------------------------------------------------------
    // crossbars
    //---------------------------------------------------------------------------

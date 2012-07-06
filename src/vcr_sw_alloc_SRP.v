@@ -32,11 +32,10 @@
 module vcr_sw_alloc_SRP
   (/*autoarg*/
    // Outputs
-   sel_nonspec_ip_ivc, sel_spec_ip_ivc, gnt_nonspec_ip, gnt_spec_ip,
-   gnt_op_ip,
+   sel_nonspec_ip_ivc, gnt_nonspec_ip, gnt_op_taken, gnt_op_ip,
    // Inputs
    clk, reset, active_ip, active_op, route_ip_ivc_op,
-   req_nonspec_ip_ivc, req_spec_ip_ivc
+   req_nonspec_ip_ivc, gnt_op_disable
    );
    
 `include "c_functions.v"
@@ -70,23 +69,26 @@ module vcr_sw_alloc_SRP
    // non-speculative switch requests
    input [0:num_ports*num_vcs-1] 	   req_nonspec_ip_ivc;
    
-   // speculative switch requests
-   input [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
    
    // indicate which VC at a given port is granted non-speculatively
    output [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
    
    // indicate which VC at a given port is granted speculatively
-   output [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
+   //output [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
    wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
    
    // non-speculative grants
    output [0:num_ports-1] 		   gnt_nonspec_ip;
    wire [0:num_ports-1] 		   gnt_nonspec_ip;
+
+   //output port masking from higher priority allocators
+   input [0:num_ports-1] 		   gnt_op_disable;
+   //output port masking to lower priority allocator
+   output [0:num_ports-1] 		   gnt_op_taken;
    
    // speculative grants
-   output [0:num_ports-1] 		   gnt_spec_ip;
+   //output [0:num_ports-1] 		   gnt_spec_ip;
    wire [0:num_ports-1] 		   gnt_spec_ip;
    
    // crossbar control signals
@@ -317,8 +319,9 @@ module vcr_sw_alloc_SRP
 	   // port in the first stage, one of these input ports will be granted
 	   // here as well, and we can thus update priorities
 	   wire 		update_arb_nonspec;
-	   assign update_arb_nonspec = |req_out_nonspec_ip;
+	   assign update_arb_nonspec  = |req_out_nonspec_ip & ~gnt_op_disable[op];
 	   
+	   assign gnt_op_taken[op]    = update_arb_nonspec | gnt_op_disable[op];
 	   wire [0:num_ports-1] gnt_out_nonspec_ip;
 
 	   
@@ -339,9 +342,11 @@ module vcr_sw_alloc_SRP
 	   //-------------------------------------------------------------------
 	   // feed grants back to input stage
 	   //-------------------------------------------------------------------
-	   
+
+	   //op_disable from high priority allocator kill all grants
+	  
 	   assign gnt_out_nonspec_op_ip[op*num_ports:(op+1)*num_ports-1]
-		    = gnt_out_nonspec_ip;
+		    = gnt_op_disable[op]?{num_ports{1'b0}}:gnt_out_nonspec_ip;
 	   
 	   
 	   //-------------------------------------------------------------------
