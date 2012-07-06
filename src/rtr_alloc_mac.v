@@ -1126,6 +1126,7 @@ module rtr_alloc_mac
 		 .data_out(flit_kill));
 	      
 	      wire [0:num_vcs-1] gnt_hi_ivc, gnt_lo_ivc;
+	      wire [0:num_vcs-1] sel_ivc;
 	      
 	      if(precomp_ivc_sel)
 		begin
@@ -1135,6 +1136,7 @@ module rtr_alloc_mac
 			assign gnt_hi_ivc = req_hi_ivc;
 			assign gnt_lo_ivc = req_lo_ivc;
 			assign gnt_ivc = req_ivc;
+			assign sel_ivc = 1'b1;
 		     end
 		   else if(num_vcs > 1)
 		     begin
@@ -1201,6 +1203,7 @@ module rtr_alloc_mac
 			     assign gnt_hi_ivc = req_hi_ivc & presel_ivc_q;
 			     assign gnt_lo_ivc = req_lo_ivc & presel_ivc_q;
 			     assign gnt_ivc = req_ivc & presel_ivc_q;
+			     assign sel_ivc = presel_ivc_q;
 			     
 			  end
 			else
@@ -1258,6 +1261,7 @@ module rtr_alloc_mac
 			     assign gnt_hi_ivc = req_hi_ivc & mask_ivc_q;
 			     assign gnt_lo_ivc = req_lo_ivc & mask_ivc_q;
 			     assign gnt_ivc = req_ivc & mask_ivc_q;
+			     assign sel_ivc = gnt_ivc;
 			     
 			  end
 			
@@ -1284,6 +1288,8 @@ module rtr_alloc_mac
 		      .gnt_pr({gnt_hi_ivc, gnt_lo_ivc}),
 		      .gnt(gnt_ivc));
 		   
+		   assign sel_ivc = gnt_ivc;
+		   
 		end
 	      
 	      wire [0:num_ports-1] flit_valid_hi_op;
@@ -1309,7 +1315,7 @@ module rtr_alloc_mac
 		#(.num_ports(num_vcs),
 		  .width(1))
 	      flit_head_sel
-		(.select(gnt_ivc),
+		(.select(sel_ivc),
 		 .data_in(flit_head_in_ivc),
 		 .data_out(flit_head));
 	      
@@ -1318,7 +1324,7 @@ module rtr_alloc_mac
 		#(.num_ports(num_vcs),
 		  .width(1))
 	      flit_tail_sel
-		(.select(gnt_ivc),
+		(.select(sel_ivc),
 		 .data_in(flit_tail_in_ivc),
 		 .data_out(flit_tail));
 	      
@@ -1327,19 +1333,19 @@ module rtr_alloc_mac
 		#(.num_ports(num_vcs),
 		  .width(num_vcs))
 	      flit_sel_ovc_sel
-		(.select(gnt_ivc),
+		(.select(sel_ivc),
 		 .data_in(ivs_flit_sel_ivc_ovc),
 		 .data_out(flit_sel_ovc));
 	      
 	      assign ial_flit_valid_hi_op = flit_valid_hi_op;
 	      assign ial_flit_valid_lo_op = flit_valid_lo_op;
-	      assign ial_flit_sel_ivc = gnt_ivc;
+	      assign ial_flit_sel_ivc = sel_ivc;
 	      assign ial_flit_head = flit_head;
 	      assign ial_flit_tail = flit_tail;
 	      assign ial_flit_sel_ovc = flit_sel_ovc;
 	      assign ial_flit_sel_fast = flit_sel_fast;
 	      
-	      assign flit_sel_out_ivc = gnt_ivc;	
+	      assign flit_sel_out_ivc = sel_ivc;	
 	      assign flit_sent_out = oal_flit_sent & ~flit_kill;
 	      
 	   end
