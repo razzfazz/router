@@ -1114,19 +1114,19 @@ module rtr_alloc_mac
 	      else
 		assign flit_sel_fast = 1'b0;
 	      
-	      wire [0:num_vcs-1] gnt_ivc;
-
+	      wire [0:num_vcs-1] sel_ivc;
+	      
 	      wire 		 flit_kill;
 	      c_select_1ofn
 		#(.num_ports(num_vcs),
 		  .width(1))
 	      flit_kill_sel
-		(.select(gnt_ivc),
+		(.select(sel_ivc),
 		 .data_in(ivs_flit_kill_ivc),
 		 .data_out(flit_kill));
 	      
 	      wire [0:num_vcs-1] gnt_hi_ivc, gnt_lo_ivc;
-	      wire [0:num_vcs-1] sel_ivc;
+	      wire [0:num_vcs-1] gnt_ivc;
 	      
 	      if(precomp_ivc_sel)
 		begin
@@ -1215,7 +1215,7 @@ module rtr_alloc_mac
 			     
 			     wire 		other_flits_valid;
 			     assign other_flits_valid
-			       = |(flit_valid_in_ivc & ~gnt_ivc);
+			       = |(flit_valid_in_ivc & ~sel_ivc);
 			     
 			     wire 		flit_sent;
 			     assign flit_sent = oal_flit_sent & ~flit_kill;
@@ -1225,7 +1225,7 @@ module rtr_alloc_mac
 			       #(.num_ports(num_vcs),
 				 .width(1))
 			     flit_last_sel
-			       (.select(gnt_ivc),
+			       (.select(sel_ivc),
 				.data_in(flit_last_in_ivc),
 				.data_out(flit_last));
 			     
