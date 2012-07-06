@@ -416,43 +416,107 @@ module vcr_top
    c_select_mofn
      #(.num_ports(num_ports*num_vcs),
        .width(num_ports))
-   active_op_sel
+   vc_active_op_sel
      (.select(req_ip_ivc),
       .data_in(route_ip_ivc_op),
       .data_out(vc_active_op));
 
-   /*
-   
-   vcr_vc_alloc_mac
-     #(.num_message_classes(num_message_classes),
-       .num_resource_classes(num_resource_classes),
-       .num_vcs_per_class(num_vcs_per_class),
-       .num_ports(num_ports),
-       .allocator_type(vc_alloc_type),
-       .arbiter_type(vc_alloc_arbiter_type),
-       .reset_type(reset_type))
-   vca
-     (.clk(clk),//
-      .reset(reset),//
-    .route_ip_ivc_op(route_ip_ivc_op),//
-    .route_ip_ivc_orc(route_ip_ivc_orc),//
-      .allocated_ip_ivc(allocated_ip_ivc),//
-      .flit_valid_ip_ivc(flit_valid_ip_ivc),//
-      .elig_op_ovc(elig_op_ovc),//
-      .active_op(vc_active_op),//
-      .gnt_ip_ivc(vc_gnt_ip_ivc),//
-      .gnt_ip_ivc_ocvc(vc_gnt_ip_ivc_ocvc),//
-      .gnt_op_ovc(vc_gnt_op_ovc),//
-      .gnt_op_ovc_ip(vc_gnt_op_ovc_ip),//
-      .gnt_op_ovc_ivc(vc_gnt_op_ovc_ivc));
-   
-    */
    
    //---------------------------------------------------------------------------
    // switch allocator
    //---------------------------------------------------------------------------
    
    wire [0:num_ports*num_ports-1] 		xbr_ctrl_op_ip;
+   
+   assign sw_gnt_ip 	 = gnt_nonspec_ip;
+   assign sw_sel_ip_ivc  = sel_nonspec_ip_ivc;
+   
+   wire [0:num_ports*num_vcs-1] 	   req_nonspec_ip_ivc;
+   assign req_nonspec_ip_ivc
+     = allocated_ip_ivc & flit_valid_ip_ivc & free_nonspec_ip_ivc;
+   
+   wire [0:num_ports*num_vcs-1] 	   req_spec_ip_ivc;
+   assign req_spec_ip_ivc = ~allocated_ip_ivc & flit_valid_ip_ivc;
+
+   wire [0:num_ports-1] 		   active_ip;
+   c_mat_mult
+     #(.dim1_width(num_ports),
+       .dim2_width(num_vcs),
+       .dim3_width(1),
+       .prod_op(`BINARY_OP_AND),
+       .sum_op(`BINARY_OP_OR))
+   sw_active_ip_mmult
+     (.input_a(flit_valid_ip_ivc),
+      .input_b({num_vcs{1'b1}}),
+      .result(active_ip));
+   
+   wire [0:num_ports-1] 		   active_op;
+   c_select_mofn
+     #(.num_ports(num_ports*num_vcs),
+       .width(num_ports))
+   sw_active_op_sel
+     (.select(flit_valid_ip_ivc),
+      .data_in(route_ip_ivc_op),
+      .data_out(active_op));
+   
+   wire [0:num_ports*num_vcs-1] 	   sel_nonspec_ip_ivc;
+   wire [0:num_ports*num_vcs-1] 	   sel_spec_ip_ivc;
+   wire [0:num_ports-1] 		   gnt_nonspec_ip;
+   wire [0:num_ports-1] 		   gnt_spec_ip;
+   wire [0:num_ports*num_ports-1] 	   gnt_op_ip;
+   
+   vcr_sw_alloc_SRP
+     #(// Parameters
+       .num_vcs				(num_vcs),
+       .num_ports			(num_ports),
+       .arbiter_type			(sw_alloc_arbiter_type),
+       .spec_type			(sw_alloc_spec_type),
+       .reset_type			(reset_type))
+   swa_res
+     (
+      // Outputs
+      .sel_nonspec_ip_ivc		(sel_nonspec_ip_ivc),
+      .sel_spec_ip_ivc			(sel_spec_ip_ivc),
+      .gnt_nonspec_ip			(gnt_nonspec_ip),
+      .gnt_spec_ip			(gnt_spec_ip),
+      .gnt_op_ip			(gnt_op_ip),
+      // Inputs
+      .clk				(clk),
+      .reset				(reset),
+      .active_ip			(active_ip),
+      .active_op			(active_op),
+      .route_ip_ivc_op			(route_ip_ivc_op),
+      .req_nonspec_ip_ivc		(req_nonspec_ip_ivc),
+      .req_spec_ip_ivc			(req_spec_ip_ivc));
+   
+   generate
+      genvar 				   sw_op;
+      for(sw_op = 0; sw_op < num_ports; sw_op = sw_op + 1)
+	begin:sw_ops
+	   wire [0:num_ports-1] xbr_ctrl_ip;
+	   wire 		active;
+	   assign active = active_op[sw_op] | (|xbr_ctrl_ip);
+	   
+	   wire [0:num_ports-1] xbr_ctrl_ip_s, xbr_ctrl_ip_q;
+	   assign xbr_ctrl_ip_s = gnt_op_ip[sw_op*num_ports:(sw_op+1)*num_ports-1];
+	   c_dff
+	     #(.width(num_ports),
+	       .reset_type(reset_type))
+	   xbr_ctrl_ipq
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(active),
+	      .d(xbr_ctrl_ip_s),
+	      .q(xbr_ctrl_ip_q));
+	   
+	   assign xbr_ctrl_ip = xbr_ctrl_ip_q;
+	   
+	   assign xbr_ctrl_op_ip[sw_op*num_ports:(sw_op+1)*num_ports-1] = xbr_ctrl_ip;
+	end
+   endgenerate
+
+   
+   /*
    vcr_sw_alloc_mac
      #(.num_vcs(num_vcs),
        .num_ports(num_ports),
@@ -461,16 +525,9 @@ module vcr_top
        .spec_type(sw_alloc_spec_type),
        .reset_type(reset_type))
    swa
-     (.clk(clk),
-      .reset(reset),
-      .route_ip_ivc_op(route_ip_ivc_op),
-      .allocated_ip_ivc(allocated_ip_ivc),
-      .flit_valid_ip_ivc(flit_valid_ip_ivc),
-      .free_nonspec_ip_ivc(free_nonspec_ip_ivc),
-      .sel_ip_ivc(sw_sel_ip_ivc),
-      .gnt_ip(sw_gnt_ip),
+     (
       .xbr_ctrl_op_ip(xbr_ctrl_op_ip));
-   
+   */
    
    //---------------------------------------------------------------------------
    // crossbars
