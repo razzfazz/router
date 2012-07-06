@@ -25,6 +25,13 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+/*
+ TODO
+ -Currently drop can only occur from the flit buffer, so droppable flits must first be written in buffer
+   before drop.
+*/
+
 //==============================================================================
 // input VC controller
 //==============================================================================
@@ -393,7 +400,8 @@ module vcr_ivc_ctrl_justin
 
    
    //
-   wire drop_body 			     = (state==VC_DROP) & ~fbc_empty;
+   wire drop_mode 			     = (state==VC_DROP);
+   wire drop_body 			     = drop_mode & ~fbc_empty;
    assign drop_event 			     = drop_body;
    assign expired 			     = header_expired;
 
@@ -409,7 +417,7 @@ module vcr_ivc_ctrl_justin
    // keep track of VC allocation status
    //---------------------------------------------------------------------------
    //under vc_drop, forces body flits to be invisibile to the ouside
-   assign flit_valid  = (flit_valid_in | ~fbc_empty) & !drop_body;
+   assign flit_valid  = (flit_valid_in | ~fbc_empty) & !drop_mode;
    assign real_flit_valid  = (flit_valid_in | ~fbc_empty);
    
    wire 					     pop_active;
