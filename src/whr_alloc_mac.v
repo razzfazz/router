@@ -34,9 +34,13 @@ module whr_alloc_mac
    flit_valid_op, flit_head_op, flit_tail_op, xbr_ctrl_op_ip, elig_op, full_op);
    
 `include "c_constants.v"
+`include "c_functions.v"
    
    // number of input and output ports on router
    parameter num_ports = 5;
+   
+   // width required to select an individual port
+   localparam port_idx_width = clogb(num_ports);
    
    // precompute output-side arbitration decision one cycle ahead
    parameter precomp_ip_sel = 1;
@@ -156,6 +160,9 @@ module whr_alloc_mac
 	   wire 		arb_active;
 	   assign arb_active = |arb_req_ip;
 	   
+	   wire [0:num_ports-1] hold_gnt_ip;
+	   assign hold_gnt_ip = arb_req_ip & ~req_head_ip;
+	   
 	   wire [0:num_ports-1] arb_gnt_ip;
 	   
 	   wire 		gnt;
@@ -174,26 +181,47 @@ module whr_alloc_mac
 		   .gnt(mgnt_ip));
 		
 		wire 		     update;
-		assign update = |arb_req_ip;
+		assign update
+		  = (|(hold_gnt_ip & req_tail_ip) | (elig & |arb_req_ip)) & 
+		    ~full;
 		
-		wire [0:num_ports-1] mask_ip_s, mask_ip_q;
-		assign mask_ip_s = update ? mgnt_ip : mask_ip_q;
+		wire [0:port_idx_width-1] next_port;
+		c_encode
+		  #(.num_ports(num_ports))
+		next_port_enc
+		  (.data_in(mgnt_ip),
+		   .data_out(next_port));
+		
+		wire [0:port_idx_width-1] presel_s, presel_q;
+		assign presel_s = update ? next_port : presel_q;
 		c_dff
-		  #(.width(num_ports),
+		  #(.width(port_idx_width),
 		    .reset_type(reset_type))
-		mask_ipq
+		preselq
 		  (.clk(clk),
 		   .reset(reset),
 		   .active(arb_active),
-		   .d(mask_ip_s),
-		   .q(mask_ip_q));
+		   .d(presel_s),
+		   .q(presel_q));
 		
-		assign prio_ip = mask_ip_q;
+		c_decode
+		  #(.num_ports(num_ports),
+		    .offset(num_ports-1))
+		prio_ip_dec
+		  (.data_in(presel_q),
+		   .data_out(prio_ip));
 		
-		wire [0:num_ports-1] gnt_presel_ip;
-		assign gnt_presel_ip = arb_req_ip & prio_ip;
+		wire [0:num_ports-1] 	  presel_ip;
+		c_decode
+		  #(.num_ports(num_ports))
+		presel_ip_dec
+		  (.data_in(presel_q),
+		   .data_out(presel_ip));
 		
-		wire [0:num_ports-1] gnt_onehot_ip;
+		wire [0:num_ports-1] 	  gnt_presel_ip;
+		assign gnt_presel_ip = arb_req_ip & presel_ip;
+		
+		wire [0:num_ports-1] 	  gnt_onehot_ip;
 		c_one_hot_filter
 		  #(.width(num_ports))
 		oohf
@@ -209,7 +237,8 @@ module whr_alloc_mac
 		assign arb_gnt_ip = gnt_presel_ip | gnt_onehot_ip;
 		
 		assign gnt
-		  = (elig ? |arb_gnt_ip : |(arb_req_ip & ~req_head_ip)) & ~full;
+		  = ((elig & |arb_gnt_ip) | |(arb_req_ip & ~req_head_ip)) & 
+		    ~full;
 		
 	     end
 	   else
@@ -236,9 +265,6 @@ module whr_alloc_mac
 		  = |(arb_req_ip & (~req_head_ip | {num_ports{elig}})) & ~full;
 		
 	     end
-	   
-	   wire [0:num_ports-1] hold_gnt_ip;
-	   assign hold_gnt_ip = arb_req_ip & ~req_head_ip;
 	   
 	   wire [0:num_ports-1] raw_gnt_ip;
 	   assign raw_gnt_ip = elig ? arb_gnt_ip : hold_gnt_ip;
