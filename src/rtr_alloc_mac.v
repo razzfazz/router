@@ -1126,7 +1126,6 @@ module rtr_alloc_mac
 		 .data_out(flit_kill));
 	      
 	      wire [0:num_vcs-1] gnt_hi_ivc, gnt_lo_ivc;
-	      wire 		 allocated;
 	      
 	      if(precomp_ivc_sel)
 		begin
@@ -1136,7 +1135,6 @@ module rtr_alloc_mac
 			assign gnt_hi_ivc = req_hi_ivc;
 			assign gnt_lo_ivc = req_lo_ivc;
 			assign gnt_ivc = req_ivc;
-			assign allocated = ivs_allocated_ivc;
 		     end
 		   else if(num_vcs > 1)
 		     begin
@@ -1230,8 +1228,6 @@ module rtr_alloc_mac
 			assign gnt_lo_ivc = req_lo_ivc & mask_ivc_q;
 			assign gnt_ivc = req_ivc & mask_ivc_q;
 			
-			assign allocated = |(gnt_ivc & ivs_allocated_ivc);
-			
 		     end
 		   
 		end
@@ -1254,8 +1250,6 @@ module rtr_alloc_mac
 		      .req_pr({req_hi_ivc, req_lo_ivc}),
 		      .gnt_pr({gnt_hi_ivc, gnt_lo_ivc}),
 		      .gnt(gnt_ivc));
-		   
-		   assign allocated = |req_hi_ivc;
 		   
 		end
 	      
