@@ -422,7 +422,7 @@ module test_nic(/*autoarg*/
    wire [0:flit_data_width-1] reservation_data  = eject_fifo_data[0:flit_data_width-1];
    wire [0:reservation_size_width+packet_length_width-1] reservation_size = 
 							 (reservation_request)?
-							 {reservation_data[res_size_start +:reservation_size_width], {packet_length_width{1'b1}}}:
+							 {reservation_data[res_size_start +:reservation_size_width], {packet_length_width{1'b0}}}:
 							 {{reservation_size_width{1'b0}},{packet_length_width{1'b0}}};
    wire [0:dest_info_width-1] reservation_src = (reservation_request)?
 			      reservation_data[res_src_start+:dest_info_width]:
@@ -442,7 +442,7 @@ module test_nic(/*autoarg*/
 				    reservation_schedule_q;
    //next reservaiton time = grant_time + reservation_size or last reservation time
    assign reservation_schedule_s  = reservation_request?
-				    grant_time +reservation_size:
+				    grant_time +reservation_size+10:
 				    reservation_schedule_q;
    
    c_dff
