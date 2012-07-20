@@ -190,6 +190,7 @@ module rtr_fc_state
 			.fast_almost_empty(fast_almost_empty),
 			.fast_two_free(1),
 			.enable_bypass(0),
+			.enable_reservations(1),
 			.reset_type(reset_type))
 		    damqt
 		      (.clk(clk),
