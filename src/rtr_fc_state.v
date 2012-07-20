@@ -256,7 +256,8 @@ module rtr_fc_state
 	     else
 	       begin
 		  assign almost_full_ovc
-		    = debit_ovc ? ft_two_free_ovc : ft_almost_full_ovc;
+		    = (debit_ovc & ft_two_free_ovc) |
+		      (~debit_ovc & ft_almost_full_ovc);
 		  assign full_ovc
 		    = ft_full_ovc | (debit_ovc & ft_almost_full_ovc);
 		  assign full_prev_ovc = ft_full_ovc;
