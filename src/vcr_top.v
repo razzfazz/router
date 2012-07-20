@@ -159,6 +159,12 @@ module vcr_top
    // improve timing for peek access
    parameter fb_fast_peek = 1;
    
+   // EXPERIMENTAL:
+   // for dynamic buffer management, only reserve a buffer slot for a VC while 
+   // it is active (i.e., while a packet is partially transmitted)
+   // (NOTE: This is currently broken!)
+   parameter disable_static_reservations = 0;
+   
    // use explicit pipeline register between flit buffer and crossbar?
    parameter explicit_pipeline_register = 0;
    
@@ -510,6 +516,7 @@ module vcr_top
 	       .flit_data_width(flit_data_width),
 	       .error_capture_mode(error_capture_mode),
 	       .fb_mgmt_type(fb_mgmt_type),
+	       .disable_static_reservations(disable_static_reservations),
 	       .elig_mask(elig_mask),
 	       .sw_alloc_spec(sw_alloc_spec_type != `SW_ALLOC_SPEC_TYPE_NONE),
 	       .reset_type(reset_type))

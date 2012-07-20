@@ -108,6 +108,12 @@ module vcr_op_ctrl_mac
    // select flit buffer management scheme
    parameter fb_mgmt_type = `FB_MGMT_TYPE_STATIC;
    
+   // EXPERIMENTAL:
+   // for dynamic buffer management, only reserve a buffer slot for a VC while 
+   // it is active (i.e., while a packet is partially transmitted)
+   // (NOTE: This is currently broken!)
+   parameter disable_static_reservations = 0;
+   
    // select whether to exclude full or non-empty VCs from VC allocation
    parameter elig_mask = `ELIG_MASK_NONE;
    
@@ -274,12 +280,15 @@ module vcr_op_ctrl_mac
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .mgmt_type(fb_mgmt_type),
        .fast_almost_empty(fast_almost_empty),
+       .disable_static_reservations(disable_static_reservations),
        .reset_type(reset_type))
    fcs
      (.clk(clk),
       .reset(reset),
       .active(fcs_active),
       .flit_valid(flit_sent),
+      .flit_head(flit_head_q),
+      .flit_tail(flit_tail_q),
       .flit_sel_ovc(flit_sel_ovc),
       .fc_event_valid(fc_event_valid),
       .fc_event_sel_ovc(fc_event_sel_ovc),

@@ -30,9 +30,9 @@
 //==============================================================================
 
 module rtr_fc_state
-  (clk, reset, active, flit_valid, flit_sel_ovc, fc_event_valid, 
-   fc_event_sel_ovc, fc_active, empty_ovc, almost_full_ovc, full_ovc, 
-   full_prev_ovc, errors_ovc);
+  (clk, reset, active, flit_valid, flit_head, flit_tail, flit_sel_ovc, 
+   fc_event_valid, fc_event_sel_ovc, fc_active, empty_ovc, almost_full_ovc, 
+   full_ovc, full_prev_ovc, errors_ovc);
    
 `include "c_functions.v"
 `include "c_constants.v"
@@ -62,6 +62,12 @@ module rtr_fc_state
    // generate the almost_empty output early in the clock cycle
    parameter fast_almost_empty = 0;
    
+   // EXPERIMENTAL:
+   // for dynamic buffer management, only reserve a buffer slot for a VC while 
+   // it is active (i.e., while a packet is partially transmitted)
+   // (NOTE: This is currently broken!)
+   parameter disable_static_reservations = 0;
+   
    parameter reset_type = `RESET_TYPE_ASYNC;
    
    
@@ -83,8 +89,14 @@ module rtr_fc_state
    // clock enable signal
    input active;
    
-   // a flit is begin sent
+   // a flit is being sent
    input flit_valid;
+   
+   // the flit is a head flit
+   input flit_head;
+   
+   // the flit is a tail flit
+   input flit_tail;
    
    // VC to which the flit is sent
    input [0:num_vcs-1] flit_sel_ovc;
@@ -190,7 +202,7 @@ module rtr_fc_state
 			.fast_almost_empty(fast_almost_empty),
 			.fast_two_free(1),
 			.enable_bypass(0),
-			.enable_reservations(1),
+			.enable_reservations(!disable_static_reservations),
 			.reset_type(reset_type))
 		    damqt
 		      (.clk(clk),

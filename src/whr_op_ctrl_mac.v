@@ -190,12 +190,15 @@ module whr_op_ctrl_mac
        .flow_ctrl_bypass(flow_ctrl_bypass),
        .mgmt_type(`FB_MGMT_TYPE_STATIC),
        .fast_almost_empty(fast_almost_empty),
+       .disable_static_reservations(0),
        .reset_type(reset_type))
    fcs
      (.clk(clk),
       .reset(reset),
       .active(fcs_active),
       .flit_valid(flit_valid_in),
+      .flit_head(flit_head_in),
+      .flit_tail(flit_tail_in),
       .flit_sel_ovc(1'b1),
       .fc_event_valid(fc_event_valid),
       .fc_event_sel_ovc(1'b1),

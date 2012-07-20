@@ -247,6 +247,7 @@ module testbench
 		    .routing_type(routing_type),
 		    .dim_order(dim_order),
 		    .fb_mgmt_type(fb_mgmt_type),
+		    .disable_static_reservations(disable_static_reservations),
 		    .elig_mask(elig_mask),
 		    .port_id(ip),
 		    .reset_type(reset_type))
