@@ -128,6 +128,7 @@ module vcr_vc_alloc_wf
 	   c_wf_alloc
 	     #(.num_ports(num_ports*num_resource_classes*num_vcs_per_class),
 	       .num_priorities(1),
+	       .skip_empty_diags(1),
 	       .wf_alloc_type(wf_alloc_type),
 	       .reset_type(reset_type))
 	   gnt_wf_ip_irc_icvc_op_orc_ocvc_alloc
