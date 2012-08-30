@@ -1,7 +1,7 @@
 // $Id: vcr_ivc_ctrl.v 1228 2009-05-01 20:35:02Z qtedq $
 
 /*
- Copyright (c) 2007-2011, Trustees of The Leland Stanford Junior University
+ Copyright (c) 2007-2012, Trustees of The Leland Stanford Junior University
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
