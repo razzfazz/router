@@ -12,6 +12,6 @@ do
     echo "rundir=${rundir}" > ${rundir}/config.sh
     echo "restrict=${restrict}" >> ${rundir}/config.sh
     echo "buffer_occupancy=${buffer_occupancy}" >> ${rundir}/config.sh
-    echo ${rundir}/run.sh | qsub -N ${name} -v rundir=${rundir}
+    echo ${rundir}/run.sh | qsub -N ${name} -v rundir=${rundir} -cwd
   done
 done

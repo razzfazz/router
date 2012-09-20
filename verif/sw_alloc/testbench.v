@@ -164,7 +164,7 @@ module testbench
    wire [0:num_ports*num_ports-1] req_ip_op;
    
    // crossbar control signals
-   wire [0:num_ports*num_ports-1] gnt_ip_op;
+   wire [0:num_ports*num_ports-1] gnt_op_ip;
    
    wire [0:num_ports*num_vcs*port_idx_width-1] route_port_ip_ivc;
    
@@ -323,15 +323,15 @@ module testbench
       .req_spec_ip_ivc(req_spec_ip_ivc),
       .gnt_nonspec_ip_ivc(gnt_nonspec_ip_ivc),
       .gnt_spec_ip_ivc(gnt_spec_ip_ivc),
-      .gnt_ip_op(gnt_ip_op));
+      .gnt_op_ip(gnt_op_ip));
    
-   wire [0:num_ports*num_ports-1] 	       gnt_op_ip;
+   wire [0:num_ports*num_ports-1] 	       gnt_ip_op;
    c_interleaver
      #(.width(num_ports*num_ports),
        .num_blocks(num_ports))
    gnt_intl
-     (.data_in(gnt_ip_op),
-      .data_out(gnt_op_ip));
+     (.data_in(gnt_op_ip),
+      .data_out(gnt_ip_op));
 
    function [0:num_ports*num_ports-1] augment_alloc
      (input [0:num_ports*num_ports-1] requests,

@@ -2,7 +2,7 @@
 
 basedir=${1}
 
-files="config_base.sh Makefile run.sh testbench.v config_utils.v config.v constants.v functions.v sim_functions.v"
+files="config_base.sh Makefile run.sh testbench.v c_constants.v vcr_constants.v"
 
 rm -rf ${basedir}
 
