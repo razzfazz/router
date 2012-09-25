@@ -317,10 +317,33 @@ module testbench();
    
 
 
-
+   ///////////////////////
+   //Stat tracking
+   ///////////////////////
+   wire [0:31] total_receive_s [0:num_nodes_per_router-1];
+   wire [0:31] total_receive   [0:num_nodes_per_router-1];
+   generate
+      genvar total_receive_port;
+      for(total_receive_port = 0; total_receive_port<num_nodes_per_router; total_receive_port=total_receive_port+1)
+	begin:total_receive_count_loop
+	   assign total_receive_s[total_receive_port]  =
+			      total_receive[total_receive_port]+
+			      (channel_out_op[channel_width*(total_receive_port+2)]);//nodes start at port 2
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   total_receive_count_zero_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(total_receive_s[total_receive_port]),
+	      .q(total_receive[total_receive_port]));				   
+	end
+   endgenerate
 
    
 
+   integer stat_loop;
    
    //clock
    always
@@ -332,15 +355,18 @@ module testbench();
      end
 
    
-   integer cycles;   
+   integer cycles;
+   integer total_receive_total;
+   
    initial
      begin
-	seed 	    = 10;
-	
+	seed 	    = 10;	
    	reset 	    = 1'b0;
 	clk_en 	    = 1'b0;
 	run 	    = 1'b0;
 	cycles 	    = 0;
+
+
 	
 	
 	#(Tclk);
@@ -356,7 +382,21 @@ module testbench();
 	  begin
 	     cycles 				= cycles + 1;
 	     #(Tclk);
+	     end
+
+
+	total_receive_total  =0;
+	
+	for(stat_loop = 0; stat_loop<num_nodes_per_router; stat_loop=stat_loop+1)
+	  begin
+	     $display("Node %d",stat_loop);
+	     $display("\tData received\t%d",total_receive[stat_loop]);
+	     total_receive_total  = total_receive_total+total_receive[stat_loop];
+	     
 	  end
+	$display ("TOTAL");
+	$display("\tData received\t%d",total_receive_total);
+	  
 	$finish;      
      end
    
