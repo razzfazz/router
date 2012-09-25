@@ -149,6 +149,9 @@ module test_nic(/*autoarg*/
    //SRP packet related
 `include "srp_format.v"
    
+
+   parameter overhead = 10;
+
    
    //default inputs
    input clk;
@@ -442,7 +445,7 @@ module test_nic(/*autoarg*/
 				    reservation_schedule_q;
    //next reservaiton time = grant_time + reservation_size or last reservation time
    assign reservation_schedule_s  = reservation_request?
-				    grant_time +reservation_size+10:
+				    grant_time +reservation_size+overhead:
 				    reservation_schedule_q;
    
    c_dff

@@ -143,7 +143,7 @@ module flow_buffer(/*autoarg*/
    localparam reservation_size_width  = clogb(max_reservation_size);
    parameter reset_type 	      = `RESET_TYPE_ASYNC;
 
-   parameter [0:time_to_wait_width-1] base_ttw = 63;
+   parameter [0:time_to_wait_width-1] base_ttw = 31;
    
 
    
