@@ -57,7 +57,7 @@ int main(int argc, char** argv){
 	//assert(false);
       } else {
 	int deltat = cycle-input_data[unique_id];
-	assert(deltat>0);
+	//assert(deltat>0);
 	cout<<((port!=actual_port)?"":"#")<<"Port "<<port
 	    <<"\tTTW "<<(input_ttw-ttw)*4
 	    <<"\tdeltaT "<<deltat
@@ -67,6 +67,7 @@ int main(int argc, char** argv){
     }
     srp_out.close();
   }
+  cout<<"Estimate "<<input_data.size()<<" packets dropped\n";
   
   return 0;
 }

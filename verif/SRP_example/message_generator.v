@@ -1,10 +1,10 @@
 module message_generator(/*autoarg*/
-			 // Outputs
-			 message_size, message_dest, has_message, host_data_head,
-			 host_data_tail, host_data_valid, host_data,
-			 // Inputs
-			 clk, reset, host_next_flit, buffer_empty
-			 );
+   // Outputs
+   message_size, message_dest, has_message, host_data_head,
+   host_data_tail, host_data_valid, host_data,
+   // Inputs
+   clk, reset, run, host_next_flit, buffer_empty
+   );
 `include "c_functions.v"
 `include "c_constants.v"
 `include "rtr_constants.v"
@@ -112,6 +112,9 @@ module message_generator(/*autoarg*/
    input clk;
    input reset;
 
+   input run;
+   
+   
    input host_next_flit;
    input buffer_empty;
    
@@ -179,7 +182,7 @@ module message_generator(/*autoarg*/
 		
 		
 		//create message
-		if(~has_message)
+		if(~has_message&run)
 		  begin
 		     generate_message  <= ($dist_uniform(msg_gen_seed, 0,  999) < injection_rate);
 		     message_size      <=  max_reservation_size-1;

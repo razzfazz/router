@@ -13,9 +13,9 @@ module testbench();
 `include "parameters.v"
    
    parameter channel_delay 		= 1;
-   parameter injection_rate 		= 555;//out of 999
+   parameter injection_rate 		= 999;//out of 999
    
-   parameter Tclk 			= 2;
+   parameter Tclk 			= 2.0;
 
    
    
@@ -109,15 +109,17 @@ module testbench();
    
    // measurement interval in cycles
    parameter run_time 		      = 10000;
-   parameter cool_time 		      = 1000;
-   integer seed;
+   parameter cool_time 		      = 0;
+   parameter  seed = 90;
    
 
    reg clk;
    reg reset;
    reg clk_en;
    reg run;
-
+   reg run_mesg_gen;
+   
+      
    
    wire [0:router_addr_width-1] router_zero_address 	= {router_addr_width{1'b0}};
    wire [0:router_addr_width-1] router_one_address 	= 1;
@@ -191,11 +193,11 @@ module testbench();
 
 		message_generator
 		  #(// Parameters
-		    .seed(1+node),
+		    .seed(seed+node),
 		    .router_id(0),
 		    .node_id(node),
 		    //.injection_rate (injection_rate),
-		    .injection_rate (node==0?0:injection_rate),//example
+		    .injection_rate (node<2?0:injection_rate),//example
 		    .use_target_dest(1),//example
 		    .target_dest({dest_info_width{1'b0}}),//example
 		    .max_reservation_size		(max_reservation_size),
@@ -214,6 +216,7 @@ module testbench();
 		   // Inputs
 		   .clk				(clk),
 		   .reset				(reset),
+		   .run(run_mesg_gen),
 		   .host_next_flit			(host_next_flit),
 		   .buffer_empty			(buffer_empty));
 
@@ -354,7 +357,7 @@ module testbench();
 
 		message_generator
 		  #(// Parameters
-		    .seed(5+node),
+		    .seed(seed*2+node),
 		    .router_id(1),
 		    .node_id(node),
 		    .injection_rate((node==3)?0:injection_rate),
@@ -377,6 +380,7 @@ module testbench();
 		   // Inputs
 		   .clk				(clk),
 		   .reset				(reset),
+		   .run(run_mesg_gen),
 		   .host_next_flit			(host_next_flit),
 		   .buffer_empty			(buffer_empty));
 
@@ -627,6 +631,79 @@ module testbench();
    ///////////////////////
    //Stat tracking
    ///////////////////////
+
+   //TOTAL
+   wire [0:31] total_receive_s [0:2*num_nodes_per_router-1];
+   wire [0:31] total_receive   [0:2*num_nodes_per_router-1];
+   generate
+      genvar total_receive_port;
+      for(total_receive_port = 0; total_receive_port<num_nodes_per_router; total_receive_port=total_receive_port+1)
+	begin:total_receive_count_loop
+	   assign total_receive_s[total_receive_port]  =
+			      total_receive[total_receive_port]+
+			      (r_zero_rx_valid[total_receive_port]);//vc 2 or 3
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   total_receive_count_zero_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(total_receive_s[total_receive_port]),
+	      .q(total_receive[total_receive_port]));
+	   
+	   assign total_receive_s[total_receive_port+num_nodes_per_router]  =
+			       total_receive[total_receive_port+num_nodes_per_router]+
+			       (r_one_rx_valid[total_receive_port]);//vc 2 or 3
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   total_receive_count_one_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(total_receive_s[total_receive_port+num_nodes_per_router]),
+	      .q(total_receive[total_receive_port+num_nodes_per_router]));				   
+	end
+   endgenerate
+
+
+
+   wire [0:31] total_send_s [0:2*num_nodes_per_router-1];
+   wire [0:31] total_send   [0:2*num_nodes_per_router-1];
+   generate
+      genvar total_send_port;
+      for(total_send_port = 0; total_send_port<num_nodes_per_router; total_send_port=total_send_port+1)
+	begin:total_send_count_loop
+	   assign total_send_s[total_send_port]  =
+			      total_send[total_send_port]+
+			      (r_zero_tx_valid[total_send_port]);//vc 2 or 3
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   total_send_count_zero_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(total_send_s[total_send_port]),
+	      .q(total_send[total_send_port]));
+	   
+	   assign total_send_s[total_send_port+num_nodes_per_router]  =
+			       total_send[total_send_port+num_nodes_per_router]+
+			       (r_one_tx_valid[total_send_port]);//vc 2 or 3
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   total_send_count_one_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(total_send_s[total_send_port+num_nodes_per_router]),
+	      .q(total_send[total_send_port+num_nodes_per_router]));				   
+	end
+   endgenerate
+
+   /////data only
    wire [0:31] data_receive_s [0:2*num_nodes_per_router-1];
    wire [0:31] data_receive   [0:2*num_nodes_per_router-1];
    generate
@@ -703,7 +780,8 @@ module testbench();
 
 
 
-
+   ///NACK
+   
    wire [0:31] nack_s [0:2*num_nodes_per_router-1];
    wire [0:31] nack   [0:2*num_nodes_per_router-1];
    generate
@@ -746,7 +824,44 @@ module testbench();
    endgenerate
 
 
-
+   ///SPEC   
+   wire [0:31] spec_s [0:2*num_nodes_per_router-1];
+   wire [0:31] spec   [0:2*num_nodes_per_router-1];
+   generate
+      genvar spec_port;
+      for(spec_port = 0; spec_port<num_nodes_per_router; spec_port=spec_port+1)
+	begin:spec_count_loop
+	   assign spec_s[spec_port]  =
+		      spec[spec_port]+
+		      (r_zero_tx_valid[spec_port] &
+		       (r_zero_tx_vc  [spec_port]==3));
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   spec_count_zero_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(spec_s[spec_port]),
+	      .q(spec[spec_port]));
+	   
+	   assign spec_s[spec_port+num_nodes_per_router]  =
+			       spec[spec_port+num_nodes_per_router]+
+			       (r_one_tx_valid[spec_port] &
+				r_one_tx_head [spec_port] &
+				(r_one_tx_vc  [spec_port]==3));
+				
+	   c_dff
+	     #(.width(32),
+	       .reset_type(reset_type))
+	   spec_count_one_reg
+	     (.clk(clk),
+	      .reset(reset),
+	      .active(1'b1),
+	      .d(spec_s[spec_port+num_nodes_per_router]),
+	      .q(spec[spec_port+num_nodes_per_router]));				   
+	end
+   endgenerate
 
 
 
@@ -778,7 +893,8 @@ module testbench();
 		   r_zero_tx_head[gnt_port] &&
 		   (r_zero_tx_vc[gnt_port] == 1) &&
 		   (r_zero_channel_in_ip[(gnt_port+2)*channel_width+flit_ctrl_width+default_end+:2]==2'b00))
-		  $display("Port %d_0 Grant T %d current %d",gnt_port,r_zero_channel_in_ip[(gnt_port+2)*channel_width+40:(gnt_port+2+1)*channel_width-1],ports_zero[gnt_port+2].thenic.current_time_q);
+		  $display("Port %d_0 Grant T %d current %d",gnt_port,r_zero_channel_in_ip[(gnt_port+2)*channel_width+40:(gnt_port+2+1)*channel_width-1],
+			   ports_zero[gnt_port+2].thenic.current_time_q);
 		if(r_zero_rx_valid[gnt_port] &&
 		   r_zero_rx_head[gnt_port] &&
 		   (r_zero_rx_vc[gnt_port] == 1) &&
@@ -832,12 +948,12 @@ module testbench();
    integer cycles;   
    initial
      begin
-	seed 	    = 10;
 	
-   	reset 	    = 1'b0;
-	clk_en 	    = 1'b0;
-	run 	    = 1'b0;
-	cycles 	    = 0;
+   	reset 	      = 1'b0;
+	clk_en 	      = 1'b0;
+	run 	      = 1'b0;
+	run_mesg_gen  = 1'b0;
+	cycles 	      = 0;
 	
 	
 	#(Tclk);
@@ -848,13 +964,15 @@ module testbench();
 	#(Tclk);
 	clk_en = 1'b1;
 	#(Tclk/2);
-	run 	= 1'b1;
+	run 	      = 1'b1;
+	run_mesg_gen  = 1'b1;
+	
 	while(cycles < run_time)
 	  begin
 	     cycles 				= cycles + 1;
 	     #(Tclk);
 	     end
-	run  =0'b1;
+	run_mesg_gen =0'b1;
 	while(cycles < run_time+cool_time)
 	  begin
 	     cycles 				= cycles + 1;
@@ -864,9 +982,12 @@ module testbench();
 	for(stat_loop = 0; stat_loop<2*num_nodes_per_router; stat_loop=stat_loop+1)
 	  begin
 	     $display("Node %d",stat_loop);
+	     $display("\tTota tx\t%d",total_send[stat_loop]);
+	     $display("\tData tx\t%d",data_send[stat_loop]);
+	     $display("\tSpec tx\t%d",spec[stat_loop]);
+	     $display("\tTota rx\t%d",total_receive[stat_loop]);
 	     $display("\tData rx\t%d",data_receive[stat_loop]);
-	     $display("\tData tx\t%d",    data_send[stat_loop]);
-	     $display("\tNack rx\t%d\n",    nack[stat_loop]);
+	     $display("\tNack rx\t%d\n",nack[stat_loop]);
 	  end
 	$finish;      
      end
