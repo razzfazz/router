@@ -131,8 +131,27 @@ module message_generator(/*autoarg*/
    output host_data_tail;
    output host_data_valid;
    
-   output [0:flit_data_width-1]host_data;
-   reg  [0:flit_data_width-1]host_data;
+   output [0:flit_data_width-1] host_data;
+   reg [0:flit_data_width-1] rand_data;
+
+   reg [0:flit_data_width-9] data_count;
+   
+   always @(posedge clk, posedge reset)
+     begin
+	if(reset)
+	  begin
+	     data_count <='b0;
+	  end
+	else 
+	  begin
+	     data_count 	    <=data_count+1'b1;
+	  end // else: !if(reset)
+     end // always @ (posedge clk, posedge reset)
+
+   assign host_data[0                :flit_data_width-9] = data_count;
+   assign host_data[flit_data_width-8:flit_data_width-5] = router_id;
+   assign host_data[flit_data_width-4:flit_data_width-1] = node_id;
+   
    
    reg [0:payload_length_width-1]  host_flit_counter;
    reg [0:reservation_size_width-1] host_message_size;
@@ -157,7 +176,7 @@ module message_generator(/*autoarg*/
 		message_size 	       <= 0;
 		message_dest 	       <= 0;
 		host_message_size      <= {reservation_size_width{1'b0}};
-		host_data 	       <= {flit_data_width{1'b0}};
+		rand_data 	       <= {flit_data_width{1'b0}};
 		host_flit_counter      <= 0;
 	     end
 	   else
@@ -168,7 +187,7 @@ module message_generator(/*autoarg*/
 
 		//random bits come and go
 		for(i = 0; i < flit_data_width; i = i + 1)
-		  host_data[i] 	       <= $dist_uniform(msg_gen_seed, 0, 1);
+		  rand_data[i] 	       <= $dist_uniform(msg_gen_seed, 0, 1);
 
 		if(message_ready)
 		  begin
@@ -184,9 +203,9 @@ module message_generator(/*autoarg*/
 		//create message
 		if(~has_message&run)
 		  begin
-		     generate_message  <= ($dist_uniform(msg_gen_seed, 0,  999) < injection_rate);
+		     generate_message  <= ($dist_uniform(msg_gen_seed, 0,  9999) < injection_rate);
 		     message_size      <=  max_reservation_size-1;
-//$dist_uniform(msg_gen_seed,4,  max_reservation_size-1);
+		     //$dist_uniform(msg_gen_seed,4,  max_reservation_size-1);
 		     if(use_target_dest)
 		       begin
 			  message_dest[0:dest_info_width-1] = target_dest;

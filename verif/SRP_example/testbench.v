@@ -13,7 +13,9 @@ module testbench();
 `include "parameters.v"
    
    parameter channel_delay 		= 1;
-   parameter injection_rate 		= 999;//out of 999
+   parameter victim_rate 		= 3;
+   
+   parameter injection_rate 		= 9999;//out of 9999
    
    parameter Tclk 			= 2.0;
 
@@ -29,7 +31,7 @@ module testbench();
    localparam vc_idx_width 		= clogb(num_vcs);
    // total number of routers
    localparam num_routers
-     = (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
+ 					= (num_nodes + num_nodes_per_router - 1) / num_nodes_per_router;
    // number of routers in each dimension
    localparam num_routers_per_dim 	= croot(num_routers, num_dimensions);
    // width required to select individual router in a dimension
@@ -38,7 +40,7 @@ module testbench();
    localparam router_addr_width 	= num_dimensions * dim_addr_width;
    // connectivity within each dimension
    localparam connectivity
-     = (topology == `TOPOLOGY_MESH) ?
+ 					= (topology == `TOPOLOGY_MESH) ?
        `CONNECTIVITY_LINE :
        (topology == `TOPOLOGY_TORUS) ?
        `CONNECTIVITY_RING :
@@ -108,7 +110,7 @@ module testbench();
    
    
    // measurement interval in cycles
-   parameter run_time 		      = 10000;
+   parameter run_time 		      = 30000;
    parameter cool_time 		      = 0;
    parameter  seed = 90;
    
@@ -360,7 +362,7 @@ module testbench();
 		    .seed(seed*2+node),
 		    .router_id(1),
 		    .node_id(node),
-		    .injection_rate((node==3)?0:injection_rate),
+		    .injection_rate((node==0)?victim_rate :injection_rate),
 		    .use_target_dest(1),//example
 		    .target_dest((node==0)?{3'b001}:{dest_info_width{1'b0}}),//example
 		    //.target_dest({dest_info_width{1'b0}}),//example
@@ -864,30 +866,68 @@ module testbench();
    endgenerate
 
 
+   integer srp_in, srp_out;
+   integer in_index, out_index;
+   integer in_end_index, out_end_index;
+   integer srp_in_i,srp_out_i;
+   //file IO  for SRP checking
+   //assumes explicit length
+   always@(negedge clk)
+     if(run)
+       begin
+	  for(srp_in_i = 0; srp_in_i<num_nodes_per_router; srp_in_i=srp_in_i+1)
+	    begin:in_ps
+	       in_index  = (srp_in_i+2)*channel_width+38;
+	       if(r_zero_tx_valid[srp_in_i] &&
+		  r_zero_tx_head[srp_in_i] &&
+		  (r_zero_tx_vc[srp_in_i]==2))		 
+		 $fdisplay(srp_in,"%d %d %b",
+			   cycles,
+			   r_zero_channel_in_ip[in_index+:30],
+			   r_zero_channel_in_ip[in_index+15+:15]);
+	       
+	       if(r_one_tx_valid[srp_in_i] &&
+		  r_one_tx_head[srp_in_i] &&
+		  (r_one_tx_vc[srp_in_i]==2))		 
+		 $fdisplay(srp_in,"%d %d %b",
+			   cycles,
+			   r_one_channel_in_ip[in_index+:30],
+			   r_one_channel_in_ip[in_index+15+:15]);
+	    end
+       end
+   always@(negedge clk)
+     if(run)
+       begin
+	  for(srp_out_i = 0; srp_out_i <num_nodes_per_router; srp_out_i = srp_out_i + 1)
+	    begin:out_ps
+	       out_index  = (srp_out_i+2)*channel_width+38;
+	       if(r_zero_rx_valid[srp_out_i] &&
+		  r_zero_rx_head[srp_out_i] &&
+		  (r_zero_rx_vc[srp_out_i]==2))
+		 $fdisplay(srp_out,"%d %d %b",
+			   cycles,
+			   r_zero_channel_out_op[out_index+:30],
+			   r_zero_channel_out_op[out_index+15+:15]);
+	       if(r_one_rx_valid[srp_out_i] &&
+		  r_one_rx_head[srp_out_i] &&
+		  (r_one_rx_vc[srp_out_i]==2))
+		 $fdisplay(srp_out,"%d %d %b",
+			   cycles,
+			   r_one_channel_out_op[out_index+:30],
+			   r_one_channel_out_op[out_index+15+:15]);
+	    end
+       end
 
 
-
-
-
-
-
-
-
-
-
-
- 
-
+   
 
    //Grant time dump
-   
    generate
       genvar gnt_port;
       for(gnt_port = 0; gnt_port<num_nodes_per_router; gnt_port=gnt_port+1)
 	begin:gnt_port_loop
 	   always@(posedge clk)
 	     begin
-		
 		//router zero
 		if(r_zero_tx_valid[gnt_port] &&
 		   r_zero_tx_head[gnt_port] &&
@@ -932,9 +972,10 @@ module testbench();
 	  $display("router one receivd a dest mismatch");
 	
      end
+
+
    
    integer stat_loop;
-   
    //clock
    always
      begin
@@ -948,6 +989,11 @@ module testbench();
    integer cycles;   
    initial
      begin
+
+
+      //file IO declaration for SRP checking
+      srp_in 	= $fopen("srp_input.txt","w");
+      srp_out  = $fopen("srp_output.txt","w");
 	
    	reset 	      = 1'b0;
 	clk_en 	      = 1'b0;
