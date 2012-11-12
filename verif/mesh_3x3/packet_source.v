@@ -304,8 +304,9 @@ module packet_source
    wire [0:packet_count_reg_width-1] 	 ready_packet_count_q;
    assign ready_packet_count_s
      = run ?
-       ready_packet_count_q - (packet_sent & ~ready_packet_count_zero) + 
-       packet_ready :
+       (ready_packet_count_q - 
+	((!flit_pending_q || packet_sent) && !ready_packet_count_zero) +
+	packet_ready) :
        {packet_count_reg_width{1'b0}};
    c_dff
      #(.width(packet_count_reg_width),
